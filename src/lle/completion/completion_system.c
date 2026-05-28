@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Create a new completion system
@@ -34,7 +34,7 @@ lle_completion_system_create(lle_memory_pool_t *pool,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Create source manager */
+    /// Create source manager
     lle_result_t res = lle_source_manager_create(pool, &system->source_manager);
     if (res != LLE_SUCCESS) {
         return res;
@@ -44,7 +44,7 @@ lle_completion_system_create(lle_memory_pool_t *pool,
     system->menu = NULL;
     system->pool = pool;
     system->enable_history_source = true;
-    system->enable_fuzzy_matching = false; /* Future feature */
+    system->enable_fuzzy_matching = false; /// Future feature
     system->max_completions = 100;
 
     *out_system = system;
@@ -60,25 +60,25 @@ void lle_completion_system_destroy(lle_completion_system_t *system) {
         return;
     }
 
-    /* Free source manager */
+    /// Free source manager
     if (system->source_manager) {
         lle_source_manager_free(system->source_manager);
     }
 
-    /* Free menu state (must be freed before current_state since menu
-     * references result owned by current_state) */
+    /// Free menu state (must be freed before current_state since menu
+    /// references result owned by current_state)
     if (system->menu) {
         lle_completion_menu_state_free(system->menu);
         system->menu = NULL;
     }
 
-    /* Free current state (this also frees the results and context) */
+    /// Free current state (this also frees the results and context)
     if (system->current_state) {
         lle_completion_state_free(system->current_state);
         system->current_state = NULL;
     }
 
-    /* Note: system structure itself is pool-allocated */
+    /// Note: system structure itself is pool-allocated
 }
 
 /**
@@ -90,9 +90,9 @@ void lle_completion_system_clear(lle_completion_system_t *system) {
         return;
     }
 
-    /* Free menu first (must be freed before state since menu references
-     * result owned by state). The display_controller should have already
-     * cleared its reference before calling this function. */
+    /// Free menu first (must be freed before state since menu references
+    /// result owned by state). The display_controller should have already
+    /// cleared its reference before calling this function.
     if (system->menu) {
         lle_completion_menu_state_free(system->menu);
         system->menu = NULL;
@@ -104,9 +104,9 @@ void lle_completion_system_clear(lle_completion_system_t *system) {
     }
 }
 
-// ============================================================================
-// HELPER FUNCTIONS FOR PHASE 4
-// ============================================================================
+/// ============================================================================
+/// HELPER FUNCTIONS FOR PHASE 4
+/// ============================================================================
 
 /**
  * @brief Deduplicate completion results
@@ -129,10 +129,10 @@ static lle_result_t deduplicate_results(lle_completion_result_t *result) {
         const char *text = result->items[read_pos].text;
         lle_completion_type_t type = result->items[read_pos].type;
 
-        /* Check if we've seen this text+type combination before */
+        /// Check if we've seen this text+type combination before
         bool duplicate = false;
         for (size_t check = 0; check < write_pos; check++) {
-            /* Only dedupe if BOTH text AND type match */
+            /// Only dedupe if BOTH text AND type match
             if (strcmp(result->items[check].text, text) == 0 &&
                 result->items[check].type == type) {
                 duplicate = true;
@@ -140,7 +140,7 @@ static lle_result_t deduplicate_results(lle_completion_result_t *result) {
             }
         }
 
-        /* Keep items that are unique by text+type combination */
+        /// Keep items that are unique by text+type combination
         if (!duplicate) {
             if (write_pos != read_pos) {
                 result->items[write_pos] = result->items[read_pos];
@@ -163,18 +163,18 @@ static int completion_compare(const void *a, const void *b) {
     const lle_completion_item_t *item_a = (const lle_completion_item_t *)a;
     const lle_completion_item_t *item_b = (const lle_completion_item_t *)b;
 
-    /* Sort by relevance_score first (higher score = earlier in list) */
+    /// Sort by relevance_score first (higher score = earlier in list)
     if (item_a->relevance_score != item_b->relevance_score) {
         return item_b->relevance_score -
-               item_a->relevance_score; /* Descending order */
+               item_a->relevance_score; /// Descending order
     }
 
-    /* Then by type for items with same score */
+    /// Then by type for items with same score
     if (item_a->type != item_b->type) {
         return item_a->type - item_b->type;
     }
 
-    /* Finally alphabetically within same type */
+    /// Finally alphabetically within same type
     return strcmp(item_a->text, item_b->text);
 }
 
@@ -194,9 +194,9 @@ static lle_result_t sort_results(lle_completion_result_t *result) {
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// COMPLETION GENERATION (Spec 12 Core)
-// ============================================================================
+/// ============================================================================
+/// COMPLETION GENERATION (Spec 12 Core)
+/// ============================================================================
 
 /**
  * @brief Generate completions for buffer at cursor position
@@ -214,7 +214,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 1: Analyze the word context at the cursor. */
+    /// Step 1: Analyze the word context at the cursor.
     lle_word_context_t *context = NULL;
     lle_result_t res =
         lle_word_context_analyze(buffer, cursor_pos, system->pool, &context);
@@ -222,7 +222,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 2: Create result structure */
+    /// Step 2: Create result structure
     lle_completion_result_t *result = NULL;
     res = lle_completion_result_create(system->pool, 64, &result);
     if (res != LLE_SUCCESS) {
@@ -230,7 +230,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 3: Query all applicable sources */
+    /// Step 3: Query all applicable sources
     res = lle_source_manager_query(system->source_manager, context, result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
@@ -238,7 +238,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 4: Deduplicate results */
+    /// Step 4: Deduplicate results
     res = deduplicate_results(result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
@@ -246,7 +246,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 5: Sort results */
+    /// Step 5: Sort results
     res = sort_results(result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
@@ -254,7 +254,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 6: Create and store completion state */
+    /// Step 6: Create and store completion state
     lle_completion_state_t *state = NULL;
     res = lle_completion_state_create(system->pool, buffer, cursor_pos, context,
                                       result, &state);
@@ -264,10 +264,10 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return res;
     }
 
-    /* Step 7: Create menu if multiple completions (for display system) */
+    /// Step 7: Create menu if multiple completions (for display system)
     lle_completion_menu_state_t *menu = NULL;
     if (result->count > 1) {
-        /* Create menu with default config */
+        /// Create menu with default config
         lle_completion_menu_config_t menu_config = {
             .max_visible_items = 20,
             .show_category_headers = true,
@@ -279,15 +279,15 @@ lle_completion_system_generate(lle_completion_system_t *system,
         res = lle_completion_menu_state_create(system->pool, result,
                                                &menu_config, &menu);
         if (res != LLE_SUCCESS) {
-            /* state owns result and context, so freeing state frees them too.
-             * Do NOT call result_free or context_free separately - that would
-             * be a double-free. */
+            /// state owns result and context, so freeing state frees them too.
+            /// Do NOT call result_free or context_free separately - that would
+            /// be a double-free.
             lle_completion_state_free(state);
             return res;
         }
     }
 
-    /* Clear old state and menu */
+    /// Clear old state and menu
     if (system->current_state) {
         lle_completion_state_free(system->current_state);
     }
@@ -296,15 +296,15 @@ lle_completion_system_generate(lle_completion_system_t *system,
     }
 
     system->current_state = state;
-    system->menu = menu; /* NULL if single completion or no completions */
+    system->menu = menu; /// NULL if single completion or no completions
     *out_result = result;
 
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// STATE QUERIES
-// ============================================================================
+/// ============================================================================
+/// STATE QUERIES
+/// ============================================================================
 
 /**
  * @brief Check if completion system has active state

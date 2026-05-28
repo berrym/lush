@@ -39,12 +39,15 @@
 #include "../lle/notification.h"
 #include "autosuggestions_layer.h"
 
-/* Symbol compatibility mode for display rendering */
+/// Forward declarations; full definitions pulled in by the .c.
+struct pager_layer;
+
+/// Symbol compatibility mode for display rendering
 typedef enum {
-    SYMBOL_MODE_UNICODE = 0,   /**< Full Unicode symbols */
-    SYMBOL_MODE_ASCII = 1,     /**< ASCII-only fallback */
-    SYMBOL_MODE_NERD_FONT = 2, /**< Nerd Font enhanced symbols */
-    SYMBOL_MODE_AUTO = 3       /**< Auto-detect terminal capability */
+    SYMBOL_MODE_UNICODE = 0,   ///< Full Unicode symbols
+    SYMBOL_MODE_ASCII = 1,     ///< ASCII-only fallback
+    SYMBOL_MODE_NERD_FONT = 2, ///< Nerd Font enhanced symbols
+    SYMBOL_MODE_AUTO = 3       ///< Auto-detect terminal capability
 } symbol_compatibility_t;
 
 #define THEME_NAME_MAX 64
@@ -62,32 +65,32 @@ typedef enum {
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define DISPLAY_CONTROLLER_VERSION_MAJOR 1
 #define DISPLAY_CONTROLLER_VERSION_MINOR 0
 #define DISPLAY_CONTROLLER_VERSION_PATCH 0
 
-// Performance and caching limits
+/// Performance and caching limits
 #define DISPLAY_CONTROLLER_MAX_CACHE_SIZE 32768
 #define DISPLAY_CONTROLLER_MAX_DIFF_SIZE 4096
 #define DISPLAY_CONTROLLER_DEFAULT_CACHE_TTL_MS 10000
 #define DISPLAY_CONTROLLER_PERFORMANCE_HISTORY_SIZE 100
 
-// Optimization thresholds
+/// Optimization thresholds
 #define DISPLAY_CONTROLLER_PERFORMANCE_THRESHOLD_MS 10
 #define DISPLAY_CONTROLLER_CACHE_HIT_RATE_THRESHOLD 0.8
 #define DISPLAY_CONTROLLER_MEMORY_THRESHOLD_MB 5
 
-// Configuration defaults
+/// Configuration defaults
 #define DISPLAY_CONTROLLER_DEFAULT_OPTIMIZATION_LEVEL 2
 #define DISPLAY_CONTROLLER_DEFAULT_MONITORING_INTERVAL_MS 1000
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Display controller error codes.
@@ -112,11 +115,11 @@ typedef enum {
  * Display optimization levels.
  */
 typedef enum {
-    DISPLAY_OPTIMIZATION_DISABLED = 0,   // No optimization
-    DISPLAY_OPTIMIZATION_BASIC = 1,      // Basic caching only
-    DISPLAY_OPTIMIZATION_STANDARD = 2,   // Standard optimization (default)
-    DISPLAY_OPTIMIZATION_AGGRESSIVE = 3, // Aggressive optimization
-    DISPLAY_OPTIMIZATION_MAXIMUM = 4     // Maximum performance mode
+    DISPLAY_OPTIMIZATION_DISABLED = 0,   /// No optimization
+    DISPLAY_OPTIMIZATION_BASIC = 1,      /// Basic caching only
+    DISPLAY_OPTIMIZATION_STANDARD = 2,   /// Standard optimization (default)
+    DISPLAY_OPTIMIZATION_AGGRESSIVE = 3, /// Aggressive optimization
+    DISPLAY_OPTIMIZATION_MAXIMUM = 4     /// Maximum performance mode
 } display_optimization_level_t;
 
 /**
@@ -135,85 +138,85 @@ typedef enum {
  * System-wide performance metrics.
  */
 typedef struct {
-    // Overall system performance
-    uint64_t total_display_operations; // Total display operations
-    uint64_t avg_display_time_ns;      // Average total display time
-    uint64_t max_display_time_ns;      // Maximum display time
-    uint64_t min_display_time_ns;      // Minimum display time
+    /// Overall system performance
+    uint64_t total_display_operations; /// Total display operations
+    uint64_t avg_display_time_ns;      /// Average total display time
+    uint64_t max_display_time_ns;      /// Maximum display time
+    uint64_t min_display_time_ns;      /// Minimum display time
 
-    // Layer-specific performance
-    uint64_t prompt_layer_time_ns;     // Time in prompt layer
-    uint64_t command_layer_time_ns;    // Time in command layer
-    uint64_t composition_time_ns;      // Time in composition
-    uint64_t terminal_control_time_ns; // Time in terminal control
+    /// Layer-specific performance
+    uint64_t prompt_layer_time_ns;     /// Time in prompt layer
+    uint64_t command_layer_time_ns;    /// Time in command layer
+    uint64_t composition_time_ns;      /// Time in composition
+    uint64_t terminal_control_time_ns; /// Time in terminal control
 
-    // Caching performance
-    uint64_t cache_hits;             // Display cache hits
-    uint64_t cache_misses;           // Display cache misses
-    uint64_t cache_invalidations;    // Cache invalidation operations
-    double cache_hit_rate;           // Cache hit rate percentage
-    size_t cache_memory_usage_bytes; // Cache memory usage
+    /// Caching performance
+    uint64_t cache_hits;             /// Display cache hits
+    uint64_t cache_misses;           /// Display cache misses
+    uint64_t cache_invalidations;    /// Cache invalidation operations
+    double cache_hit_rate;           /// Cache hit rate percentage
+    size_t cache_memory_usage_bytes; /// Cache memory usage
 
-    // Optimization metrics
-    uint64_t optimization_saves_ns;   // Time saved by optimizations
-    uint64_t diff_operations;         // Number of diff operations
-    uint64_t full_refresh_operations; // Number of full refreshes
+    /// Optimization metrics
+    uint64_t optimization_saves_ns;   /// Time saved by optimizations
+    uint64_t diff_operations;         /// Number of diff operations
+    uint64_t full_refresh_operations; /// Number of full refreshes
 
-    // System health
-    bool performance_within_threshold; // Performance is acceptable
-    bool memory_within_threshold;      // Memory usage is acceptable
-    bool optimization_effective;       // Optimizations are helping
+    /// System health
+    bool performance_within_threshold; /// Performance is acceptable
+    bool memory_within_threshold;      /// Memory usage is acceptable
+    bool optimization_effective;       /// Optimizations are helping
 } display_controller_performance_t;
 
 /**
  * Display state cache entry.
  */
 typedef struct {
-    char *display_content;    // Cached display content
-    size_t content_length;    // Content length
-    char *state_hash;         // State hash for validation
-    struct timeval timestamp; // Cache entry timestamp
-    uint32_t access_count;    // Access frequency counter
-    bool is_valid;            // Cache entry validity
+    char *display_content;    /// Cached display content
+    size_t content_length;    /// Content length
+    char *state_hash;         /// State hash for validation
+    struct timeval timestamp; /// Cache entry timestamp
+    uint32_t access_count;    /// Access frequency counter
+    bool is_valid;            /// Cache entry validity
 } display_cache_entry_t;
 
 /**
  * Display state diff information.
  */
 typedef struct {
-    display_state_change_t change_type; // Type of change detected
-    size_t change_start_pos;            // Start position of change
-    size_t change_length;               // Length of changed content
-    char *diff_content;                 // Differential content
-    bool requires_full_refresh;         // Full refresh needed flag
+    display_state_change_t change_type; /// Type of change detected
+    size_t change_start_pos;            /// Start position of change
+    size_t change_length;               /// Length of changed content
+    char *diff_content;                 /// Differential content
+    bool requires_full_refresh;         /// Full refresh needed flag
 } display_state_diff_t;
 
 /**
  * Display controller configuration.
  */
 typedef struct {
-    // Performance configuration
-    display_optimization_level_t optimization_level; // Optimization level
-    uint32_t cache_ttl_ms;                           // Cache time-to-live
-    uint32_t performance_monitor_interval_ms;        // Monitoring interval
-    uint32_t max_cache_entries;                      // Maximum cache entries
+    /// Performance configuration
+    display_optimization_level_t optimization_level; /// Optimization level
+    uint32_t cache_ttl_ms;                           /// Cache time-to-live
+    uint32_t performance_monitor_interval_ms;        /// Monitoring interval
+    uint32_t max_cache_entries;                      /// Maximum cache entries
 
-    // Feature toggles
-    bool enable_caching;                // Enable display caching
-    bool enable_diff_algorithms;        // Enable diff algorithms
-    bool enable_performance_monitoring; // Enable performance monitoring
-    bool enable_adaptive_optimization;  // Enable adaptive optimization
-    bool enable_integration_mode;       // Enable shell integration mode
+    /// Feature toggles
+    bool enable_caching;                /// Enable display caching
+    bool enable_diff_algorithms;        /// Enable diff algorithms
+    bool enable_performance_monitoring; /// Enable performance monitoring
+    bool enable_adaptive_optimization;  /// Enable adaptive optimization
+    bool enable_integration_mode;       /// Enable shell integration mode
 
-    // Threshold configuration
-    uint32_t performance_threshold_ms; // Performance threshold
-    double cache_hit_rate_threshold;   // Cache hit rate threshold
-    uint32_t memory_threshold_mb;      // Memory usage threshold
+    /// Threshold configuration
+    uint32_t performance_threshold_ms; /// Performance threshold
+    double cache_hit_rate_threshold;   /// Cache hit rate threshold
+    uint32_t memory_threshold_mb;      /// Memory usage threshold
 
-    // Debug and diagnostics
-    bool enable_debug_logging;         // Enable debug logging
-    bool enable_performance_profiling; // Enable detailed profiling
-    char *log_file_path;               // Log file path (optional)
+    /// Debug and diagnostics
+    bool enable_debug_logging;         /// Enable debug logging
+    bool enable_performance_profiling; /// Enable detailed profiling
+    char *log_file_path;               /// Log file path (optional)
 } display_controller_config_t;
 
 /**
@@ -225,70 +228,77 @@ typedef struct {
  * layered display architecture.
  */
 typedef struct {
-    // Core layer management
-    composition_engine_t *compositor;   // Composition engine instance
-    terminal_control_t *terminal_ctrl;  // Terminal control context
-    layer_event_system_t *event_system; // Event system instance
+    /// Core layer management
+    composition_engine_t *compositor;   /// Composition engine instance
+    terminal_control_t *terminal_ctrl;  /// Terminal control context
+    layer_event_system_t *event_system; /// Event system instance
 
-    // Display state management
-    char *last_display_state;   // Last complete display state
-    size_t last_display_length; // Length of last display
-    char *current_state_hash;   // Current state hash
-    bool display_cache_valid;   // Display cache validity
+    /// Display state management
+    char *last_display_state;   /// Last complete display state
+    size_t last_display_length; /// Length of last display
+    char *current_state_hash;   /// Current state hash
+    bool display_cache_valid;   /// Display cache validity
 
-    // Performance monitoring
-    display_controller_performance_t performance; // Performance metrics
-    struct timeval last_performance_update; // Last performance update time
+    /// Performance monitoring
+    display_controller_performance_t performance; /// Performance metrics
+    struct timeval last_performance_update; /// Last performance update time
     uint64_t performance_history
-        [DISPLAY_CONTROLLER_PERFORMANCE_HISTORY_SIZE]; // Performance history
-    size_t performance_history_index; // History circular buffer index
+        [DISPLAY_CONTROLLER_PERFORMANCE_HISTORY_SIZE]; /// Performance history
+    size_t performance_history_index; /// History circular buffer index
 
-    // Caching system
-    display_cache_entry_t *cache_entries; // Cache entries array
-    size_t cache_count;                   // Current cache count
-    size_t cache_capacity;                // Cache capacity
-    struct timeval last_cache_cleanup;    // Last cache cleanup time
+    /// Caching system
+    display_cache_entry_t *cache_entries; /// Cache entries array
+    size_t cache_count;                   /// Current cache count
+    size_t cache_capacity;                /// Cache capacity
+    struct timeval last_cache_cleanup;    /// Last cache cleanup time
 
-    // Configuration and optimization
-    display_controller_config_t config; // Controller configuration
+    /// Configuration and optimization
+    display_controller_config_t config; /// Controller configuration
     display_optimization_level_t
-        current_optimization;           // Current optimization level
-    bool adaptive_optimization_enabled; // Adaptive optimization state
+        current_optimization;           /// Current optimization level
+    bool adaptive_optimization_enabled; /// Adaptive optimization state
 
-    // State tracking
-    bool is_initialized;                // Initialization state
-    bool integration_mode_active;       // Shell integration mode
-    struct timeval initialization_time; // Initialization timestamp
-    uint32_t operation_sequence_number; // Operation sequence counter
+    /// State tracking
+    bool is_initialized;                /// Initialization state
+    bool integration_mode_active;       /// Shell integration mode
+    struct timeval initialization_time; /// Initialization timestamp
+    uint32_t operation_sequence_number; /// Operation sequence counter
 
-    // Theme context integration
-    char current_theme_name[THEME_NAME_MAX]; // Current active theme name
+    /// Theme context integration
+    char current_theme_name[THEME_NAME_MAX]; /// Current active theme name
     symbol_compatibility_t
-        current_symbol_mode;        // Current symbol compatibility mode
-    bool theme_context_initialized; // Theme context initialization state
+        current_symbol_mode;        /// Current symbol compatibility mode
+    bool theme_context_initialized; /// Theme context initialization state
 
-    // Completion menu integration (LLE Spec 12 - Proper Architecture)
+    /// Completion menu integration (LLE Spec 12 - Proper Architecture)
     lle_completion_menu_state_t
-        *active_completion_menu;  // Active completion menu (NULL if none)
-    bool completion_menu_visible; // Menu visibility state
-    bool menu_state_changed;      // Flag: menu state changed, needs redraw
+        *active_completion_menu;  /// Active completion menu (NULL if none)
+    bool completion_menu_visible; /// Menu visibility state
+    bool menu_state_changed;      /// Flag: menu state changed, needs redraw
 
-    // Autosuggestions integration (Fish-style ghost text)
+    /// Autosuggestions integration (Fish-style ghost text)
     autosuggestions_layer_t
-        *autosuggestions_layer;   // Autosuggestions layer (NULL if disabled)
-    bool autosuggestions_enabled; // Whether autosuggestions are active
+        *autosuggestions_layer;   /// Autosuggestions layer (NULL if disabled)
+    bool autosuggestions_enabled; /// Whether autosuggestions are active
 
-    // Notification integration (transient hints below command line)
-    // We store a COPY of the notification, not a pointer, because the source
-    // may be on the stack and get overwritten by intermediate function calls
-    lle_notification_state_t notification_copy; // Copy of notification data
-    bool notification_visible;                  // Notification visibility state
-    bool notification_state_changed; // Flag: notification changed, needs redraw
+    /// Notification integration (transient hints below command line)
+    /// We store a COPY of the notification, not a pointer, because the source
+    /// may be on the stack and get overwritten by intermediate function calls
+    lle_notification_state_t notification_copy; /// Copy of notification data
+    bool notification_visible; /// Notification visibility state
+    bool
+        notification_state_changed; /// Flag: notification changed, needs redraw
+
+    /// Pager integration. When non-NULL, the render cycle composes
+    /// from the pager's content + view state instead of the normal
+    /// prompt + command pipeline. Pointer is borrowed; caller owns
+    /// lifetime. See display_controller_attach_pager.
+    struct pager_layer *active_pager;
 } display_controller_t;
 
-// ============================================================================
-// CORE API FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CORE API FUNCTIONS
+/// ============================================================================
 
 /**
  * Create a new display controller instance.
@@ -450,9 +460,69 @@ display_controller_clear_screen(display_controller_t *controller);
  */
 void display_controller_destroy(display_controller_t *controller);
 
-// ============================================================================
-// COMPLETION MENU INTEGRATION (LLE Spec 12 - Proper Architecture)
-// ============================================================================
+/// ============================================================================
+/// PAGER LAYER INTEGRATION
+/// ============================================================================
+
+/**
+ * @brief Attach a pager layer for paginated rendering
+ *
+ * While a pager is attached, the display controller's render cycle
+ * uses the pager's content + view state as the primary surface and
+ * suppresses prompt + command rendering. The pager pointer is
+ * borrowed -- the caller owns the pager_layer lifetime and must keep
+ * it alive until display_controller_detach_pager is called or the
+ * controller is destroyed.
+ *
+ * Calling attach again with a different (or the same) pager replaces
+ * the prior attachment. Calling with NULL detaches.
+ *
+ * @param controller The display controller
+ * @param pager      The pager layer to attach (NULL to detach)
+ */
+void display_controller_attach_pager(display_controller_t *controller,
+                                     struct pager_layer *pager);
+
+/**
+ * @brief Detach the currently-attached pager layer
+ *
+ * Equivalent to display_controller_attach_pager(controller, NULL).
+ * Idempotent.
+ *
+ * @param controller The display controller
+ */
+void display_controller_detach_pager(display_controller_t *controller);
+
+/**
+ * @brief Render the attached pager view into `output`
+ *
+ * Composes the visible slice of the pager's content (starting at
+ * pager->top_line, up to pager_layer_visible_line_count entries),
+ * pads empty lines to fill the view, and appends a status line:
+ * `Lines X-Y of Z (NN%)`. Each rendered row is newline-terminated.
+ *
+ * Returns DISPLAY_CONTROLLER_ERROR_INVALID_PARAM if no pager is
+ * attached or output is NULL, ERROR_BUFFER_TOO_SMALL if the buffer
+ * cannot hold the rendered view, SUCCESS otherwise.
+ *
+ * No terminal control sequences are written by this function -- it
+ * produces a plain-text view that the caller can wrap in
+ * clear-screen / cursor-position sequences as needed. The pager's
+ * mode (search prompt / help overlay) is not yet rendered; that
+ * lands in the input-loop step.
+ *
+ * @param controller   Controller with attached pager
+ * @param output       Buffer to receive the rendered view
+ * @param output_size  Size of output
+ * @return DISPLAY_CONTROLLER_SUCCESS or an error code
+ */
+display_controller_error_t
+display_controller_render_pager(display_controller_t *controller, char *output,
+                                size_t output_size);
+
+/// ============================================================================
+/// COMPLETION MENU INTEGRATION (LLE Spec 12 - Proper Architecture)
+/// ============================================================================
 
 /**
  * Set active completion menu for display composition.
@@ -520,9 +590,9 @@ display_controller_get_completion_menu(const display_controller_t *controller);
 bool display_controller_check_and_clear_menu_changed(
     display_controller_t *controller);
 
-// ============================================================================
-// AUTOSUGGESTIONS INTEGRATION (Fish-style Ghost Text)
-// ============================================================================
+/// ============================================================================
+/// AUTOSUGGESTIONS INTEGRATION (Fish-style Ghost Text)
+/// ============================================================================
 
 /**
  * Update autosuggestion state based on current buffer content.
@@ -610,9 +680,9 @@ void display_controller_clear_autosuggestion(display_controller_t *controller);
 void display_controller_set_autosuggestions_enabled(
     display_controller_t *controller, bool enabled);
 
-// ============================================================================
-// NOTIFICATION INTEGRATION (Transient Hints)
-// ============================================================================
+/// ============================================================================
+/// NOTIFICATION INTEGRATION (Transient Hints)
+/// ============================================================================
 
 /**
  * Set active notification for display composition.
@@ -665,9 +735,9 @@ bool display_controller_has_notification(
 bool display_controller_check_and_clear_notification_changed(
     display_controller_t *controller);
 
-// ============================================================================
-// PERFORMANCE AND MONITORING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND MONITORING FUNCTIONS
+/// ============================================================================
 
 /**
  * Get system-wide performance metrics.
@@ -708,9 +778,9 @@ display_controller_error_t display_controller_update_performance_monitoring(
 display_controller_error_t
 display_controller_reset_performance_metrics(display_controller_t *controller);
 
-// ============================================================================
-// CACHING AND OPTIMIZATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CACHING AND OPTIMIZATION FUNCTIONS
+/// ============================================================================
 
 /**
  * Configure optimization level.
@@ -780,9 +850,9 @@ display_controller_error_t display_controller_validate_cache(
 display_controller_error_t
 display_controller_optimize_cache(display_controller_t *controller);
 
-// ============================================================================
-// CONFIGURATION AND STATE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND STATE FUNCTIONS
+/// ============================================================================
 
 /**
  * Get current configuration.
@@ -871,9 +941,9 @@ display_controller_error_t
 display_controller_get_version(const display_controller_t *controller,
                                char *version_buffer, size_t buffer_size);
 
-// ============================================================================
-// INTEGRATION PREPARATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INTEGRATION PREPARATION FUNCTIONS
+/// ============================================================================
 
 /**
  * Prepare for shell integration.
@@ -905,9 +975,9 @@ display_controller_error_t display_controller_get_integration_interface(
     const display_controller_t *controller, void *interface_buffer,
     size_t buffer_size);
 
-// ============================================================================
-// UTILITY AND DIAGNOSTIC FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY AND DIAGNOSTIC FUNCTIONS
+/// ============================================================================
 
 /**
  * Get error description string.
@@ -1043,4 +1113,4 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
 }
 #endif
 
-#endif /* DISPLAY_CONTROLLER_H */
+#endif /// DISPLAY_CONTROLLER_H

@@ -16,13 +16,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test state tracking */
+/// Test state tracking
 static int g_hook_callback_called = 0;
 static int g_hook_callback_count = 0;
 static lle_editor_t *g_hook_editor_arg = NULL;
 static lle_widget_hook_type_t g_last_hook_type = 0;
 
-/* Test widget callbacks */
+/// Test widget callbacks
 static lle_result_t test_hook_widget_callback(lle_editor_t *editor,
                                               void *user_data) {
     (void)user_data;
@@ -41,7 +41,7 @@ static lle_result_t test_hook_widget_error(lle_editor_t *editor,
     return LLE_ERROR_INVALID_STATE;
 }
 
-/* Helper to reset test state */
+/// Helper to reset test state
 static void reset_test_state(void) {
     g_hook_callback_called = 0;
     g_hook_callback_count = 0;
@@ -49,7 +49,7 @@ static void reset_test_state(void) {
     g_last_hook_type = 0;
 }
 
-/* Test: Initialize hooks manager */
+/// Test: Initialize hooks manager
 TEST(hooks_manager_init) {
     reset_test_state();
 
@@ -57,27 +57,27 @@ TEST(hooks_manager_init) {
     lle_widget_registry_t *registry = NULL;
     lle_widget_hooks_manager_t *manager = NULL;
 
-    /* Initialize registry first */
+    /// Initialize registry first
     lle_result_t result = lle_widget_registry_init(&registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Initialize hooks manager */
+    /// Initialize hooks manager
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(manager != NULL);
 
-    /* Verify all hook lists are empty */
+    /// Verify all hook lists are empty
     for (int i = 0; i < LLE_HOOK_COUNT; i++) {
         int count =
             lle_widget_hook_get_count(manager, (lle_widget_hook_type_t)i);
         ASSERT(count == 0);
     }
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Invalid parameter checks for init */
+/// Test: Invalid parameter checks for init
 TEST(hooks_manager_init_invalid_params) {
     reset_test_state();
 
@@ -86,27 +86,27 @@ TEST(hooks_manager_init_invalid_params) {
     lle_widget_hooks_manager_t *manager = NULL;
     lle_result_t result;
 
-    /* Initialize registry for valid tests */
+    /// Initialize registry for valid tests
     result = lle_widget_registry_init(&registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* NULL manager pointer */
+    /// NULL manager pointer
     result = lle_widget_hooks_manager_init(NULL, registry, pool);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* NULL registry */
+    /// NULL registry
     result = lle_widget_hooks_manager_init(&manager, NULL, pool);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* NULL pool */
+    /// NULL pool
     result = lle_widget_hooks_manager_init(&manager, registry, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Register hook */
+/// Test: Register hook
 TEST(hook_register) {
     reset_test_state();
 
@@ -122,26 +122,26 @@ TEST(hook_register) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register a widget */
+    /// Register a widget
     result = lle_widget_register(registry, "test-hook-widget",
                                  test_hook_widget_callback, LLE_WIDGET_BUILTIN,
                                  NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register widget to hook */
+    /// Register widget to hook
     result = lle_widget_hook_register(manager, LLE_HOOK_LINE_INIT,
                                       "test-hook-widget");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify hook count */
+    /// Verify hook count
     int count = lle_widget_hook_get_count(manager, LLE_HOOK_LINE_INIT);
     ASSERT(count == 1);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Register multiple hooks */
+/// Test: Register multiple hooks
 TEST(hook_register_multiple) {
     reset_test_state();
 
@@ -156,7 +156,7 @@ TEST(hook_register_multiple) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register widgets */
+    /// Register widgets
     result = lle_widget_register(registry, "widget1", test_hook_widget_callback,
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
@@ -169,7 +169,7 @@ TEST(hook_register_multiple) {
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register all to same hook */
+    /// Register all to same hook
     result =
         lle_widget_hook_register(manager, LLE_HOOK_BUFFER_MODIFIED, "widget1");
     ASSERT(result == LLE_SUCCESS);
@@ -182,15 +182,15 @@ TEST(hook_register_multiple) {
         lle_widget_hook_register(manager, LLE_HOOK_BUFFER_MODIFIED, "widget3");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify count */
+    /// Verify count
     int count = lle_widget_hook_get_count(manager, LLE_HOOK_BUFFER_MODIFIED);
     ASSERT(count == 3);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Register duplicate hook */
+/// Test: Register duplicate hook
 TEST(hook_register_duplicate) {
     reset_test_state();
 
@@ -205,13 +205,13 @@ TEST(hook_register_duplicate) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register widget */
+    /// Register widget
     result =
         lle_widget_register(registry, "dup-widget", test_hook_widget_callback,
                             LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register to hook twice */
+    /// Register to hook twice
     result =
         lle_widget_hook_register(manager, LLE_HOOK_PRE_COMMAND, "dup-widget");
     ASSERT(result == LLE_SUCCESS);
@@ -220,15 +220,15 @@ TEST(hook_register_duplicate) {
         lle_widget_hook_register(manager, LLE_HOOK_PRE_COMMAND, "dup-widget");
     ASSERT(result == LLE_ERROR_ALREADY_EXISTS);
 
-    /* Should still only have one */
+    /// Should still only have one
     int count = lle_widget_hook_get_count(manager, LLE_HOOK_PRE_COMMAND);
     ASSERT(count == 1);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Trigger hook */
+/// Test: Trigger hook
 TEST(hook_trigger) {
     reset_test_state();
 
@@ -244,35 +244,35 @@ TEST(hook_trigger) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Set up editor with registry */
+    /// Set up editor with registry
     editor.widget_registry = registry;
     editor.widget_hooks_manager = manager;
 
-    /* Register widget */
+    /// Register widget
     result =
         lle_widget_register(registry, "trigger-test", test_hook_widget_callback,
                             LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register to hook */
+    /// Register to hook
     result =
         lle_widget_hook_register(manager, LLE_HOOK_LINE_INIT, "trigger-test");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Trigger hook */
+    /// Trigger hook
     result = lle_widget_hook_trigger(manager, LLE_HOOK_LINE_INIT, &editor);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify callback was called */
+    /// Verify callback was called
     ASSERT(g_hook_callback_called == 1);
     ASSERT(g_hook_callback_count == 1);
     ASSERT(g_hook_editor_arg == &editor);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Trigger multiple hooks */
+/// Test: Trigger multiple hooks
 TEST(hook_trigger_multiple) {
     reset_test_state();
 
@@ -291,7 +291,7 @@ TEST(hook_trigger_multiple) {
     editor.widget_registry = registry;
     editor.widget_hooks_manager = manager;
 
-    /* Register three widgets */
+    /// Register three widgets
     result = lle_widget_register(registry, "hook1", test_hook_widget_callback,
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
@@ -304,7 +304,7 @@ TEST(hook_trigger_multiple) {
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register all to same hook */
+    /// Register all to same hook
     result = lle_widget_hook_register(manager, LLE_HOOK_POST_COMMAND, "hook1");
     ASSERT(result == LLE_SUCCESS);
 
@@ -314,18 +314,18 @@ TEST(hook_trigger_multiple) {
     result = lle_widget_hook_register(manager, LLE_HOOK_POST_COMMAND, "hook3");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Trigger hook */
+    /// Trigger hook
     result = lle_widget_hook_trigger(manager, LLE_HOOK_POST_COMMAND, &editor);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify all three callbacks were called */
+    /// Verify all three callbacks were called
     ASSERT(g_hook_callback_count == 3);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Trigger hook with error widget (should continue) */
+/// Test: Trigger hook with error widget (should continue)
 TEST(hook_trigger_with_error) {
     reset_test_state();
 
@@ -344,7 +344,7 @@ TEST(hook_trigger_with_error) {
     editor.widget_registry = registry;
     editor.widget_hooks_manager = manager;
 
-    /* Register normal widget, error widget, then normal widget */
+    /// Register normal widget, error widget, then normal widget
     result = lle_widget_register(registry, "normal1", test_hook_widget_callback,
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
@@ -357,7 +357,7 @@ TEST(hook_trigger_with_error) {
                                  LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register to hook */
+    /// Register to hook
     result =
         lle_widget_hook_register(manager, LLE_HOOK_COMPLETION_START, "normal1");
     ASSERT(result == LLE_SUCCESS);
@@ -370,19 +370,19 @@ TEST(hook_trigger_with_error) {
         lle_widget_hook_register(manager, LLE_HOOK_COMPLETION_START, "normal2");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Trigger hook - should continue despite error */
+    /// Trigger hook - should continue despite error
     result =
         lle_widget_hook_trigger(manager, LLE_HOOK_COMPLETION_START, &editor);
-    ASSERT(result == LLE_SUCCESS); /* Hook manager continues on error */
+    ASSERT(result == LLE_SUCCESS); /// Hook manager continues on error
 
-    /* All three should have been called */
+    /// All three should have been called
     ASSERT(g_hook_callback_count == 3);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Unregister hook */
+/// Test: Unregister hook
 TEST(hook_unregister) {
     reset_test_state();
 
@@ -397,31 +397,31 @@ TEST(hook_unregister) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register widget */
+    /// Register widget
     result =
         lle_widget_register(registry, "unreg-test", test_hook_widget_callback,
                             LLE_WIDGET_BUILTIN, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Register to hook */
+    /// Register to hook
     result = lle_widget_hook_register(manager, LLE_HOOK_HISTORY_SEARCH,
                                       "unreg-test");
     ASSERT(result == LLE_SUCCESS);
 
     ASSERT(lle_widget_hook_get_count(manager, LLE_HOOK_HISTORY_SEARCH) == 1);
 
-    /* Unregister */
+    /// Unregister
     result = lle_widget_hook_unregister(manager, LLE_HOOK_HISTORY_SEARCH,
                                         "unreg-test");
     ASSERT(result == LLE_SUCCESS);
 
     ASSERT(lle_widget_hook_get_count(manager, LLE_HOOK_HISTORY_SEARCH) == 0);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Enable/disable hooks globally */
+/// Test: Enable/disable hooks globally
 TEST(hook_enable_disable) {
     reset_test_state();
 
@@ -440,7 +440,7 @@ TEST(hook_enable_disable) {
     editor.widget_registry = registry;
     editor.widget_hooks_manager = manager;
 
-    /* Register widget */
+    /// Register widget
     result =
         lle_widget_register(registry, "enable-test", test_hook_widget_callback,
                             LLE_WIDGET_BUILTIN, NULL);
@@ -450,43 +450,43 @@ TEST(hook_enable_disable) {
                                       "enable-test");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify hooks are enabled by default */
+    /// Verify hooks are enabled by default
     ASSERT(lle_widget_hooks_enabled(manager) == true);
 
-    /* Trigger - should execute */
+    /// Trigger - should execute
     result =
         lle_widget_hook_trigger(manager, LLE_HOOK_TERMINAL_RESIZE, &editor);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(g_hook_callback_count == 1);
 
-    /* Disable hooks globally */
+    /// Disable hooks globally
     result = lle_widget_hooks_disable(manager);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(lle_widget_hooks_enabled(manager) == false);
 
-    /* Trigger - should NOT execute */
+    /// Trigger - should NOT execute
     reset_test_state();
     result =
         lle_widget_hook_trigger(manager, LLE_HOOK_TERMINAL_RESIZE, &editor);
     ASSERT(result == LLE_SUCCESS);
-    ASSERT(g_hook_callback_count == 0); /* Not called */
+    ASSERT(g_hook_callback_count == 0); /// Not called
 
-    /* Re-enable hooks globally */
+    /// Re-enable hooks globally
     result = lle_widget_hooks_enable(manager);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(lle_widget_hooks_enabled(manager) == true);
 
-    /* Trigger - should execute again */
+    /// Trigger - should execute again
     result =
         lle_widget_hook_trigger(manager, LLE_HOOK_TERMINAL_RESIZE, &editor);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(g_hook_callback_count == 1);
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Test: Hook count */
+/// Test: Hook count
 TEST(hook_count) {
     reset_test_state();
 
@@ -501,10 +501,10 @@ TEST(hook_count) {
     result = lle_widget_hooks_manager_init(&manager, registry, pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Initially zero */
+    /// Initially zero
     ASSERT(lle_widget_hook_get_count(manager, LLE_HOOK_LINE_FINISH) == 0);
 
-    /* Register widgets */
+    /// Register widgets
     for (int i = 0; i < 5; i++) {
         char name[32];
         snprintf(name, sizeof(name), "count-widget-%d", i);
@@ -519,11 +519,11 @@ TEST(hook_count) {
                (size_t)(i + 1));
     }
 
-    /* Cleanup */
+    /// Cleanup
     lle_pool_destroy(pool);
 }
 
-/* Main test runner */
+/// Main test runner
 int main(void) {
     printf("=== Widget Hooks Manager Tests ===\n\n");
 

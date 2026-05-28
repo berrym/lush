@@ -35,7 +35,7 @@ int bin_setopt(int argc, char **argv) {
     bool query_mode = false;
     int start_idx = 1;
 
-    /* Parse flags */
+    /// Parse flags
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (strcmp(argv[i], "-p") == 0) {
@@ -59,7 +59,7 @@ int bin_setopt(int argc, char **argv) {
         }
     }
 
-    /* No option specified - list all options */
+    /// No option specified - list all options
     if (start_idx >= argc) {
         if (query_mode) {
             executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
@@ -83,12 +83,17 @@ int bin_setopt(int argc, char **argv) {
         return 0;
     }
 
-    /* Process each option */
+    /// Process each option
     for (int i = start_idx; i < argc; i++) {
         shell_feature_t feature;
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
+            /// Zsh-compat names: silently accepted no-op (see bin_unsetopt.c).
+            if (shell_feature_is_noop_alias(argv[i])) {
+                shell_feature_record_noop_alias_state(argv[i], true);
+                continue;
+            }
             if (!query_mode) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_OPTION,
@@ -99,14 +104,14 @@ int bin_setopt(int argc, char **argv) {
         }
 
         if (query_mode) {
-            /* For query, return status based on the *aliased* sense:
-             * `setopt -q bsd_echo` is true when xpg_echo is OFF. */
+            /// For query, return status based on the *aliased* sense:
+            /// `setopt -q bsd_echo` is true when xpg_echo is OFF.
             bool effective = shell_mode_allows(feature) ^ invert;
             return effective ? 0 : 1;
         }
 
-        /* Enable from the alias's perspective; flip on the underlying
-         * feature when the alias is inverted. */
+        /// Enable from the alias's perspective; flip on the underlying
+        /// feature when the alias is inverted.
         bool target_value = !invert;
         if (target_value) {
             shell_feature_enable(feature);
@@ -114,7 +119,7 @@ int bin_setopt(int argc, char **argv) {
             shell_feature_disable(feature);
         }
 
-        /* Sync to registry if initialized */
+        /// Sync to registry if initialized
         if (config_registry_is_initialized()) {
             char key[CREG_KEY_MAX];
             snprintf(key, sizeof(key), "shell.features.%s",

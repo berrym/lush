@@ -20,9 +20,9 @@
 #include "lle/lle_shell_integration.h"
 
 int display_lle_history(int argc, char **argv) {
-    /* History behavior configuration commands */
+    // History behavior configuration commands
     if (argc < 2) {
-        /* No subcommand - show help with all options and values */
+        // No subcommand - show help with all options and values
         printf("Usage: display lle history <command> [options]\n");
         printf("\nCommands:\n");
         printf("  status                  - Show current settings\n");
@@ -51,13 +51,13 @@ int display_lle_history(int argc, char **argv) {
     const char *hist_subcmd = argv[1];
 
     if (strcmp(hist_subcmd, "status") == 0) {
-        /* Show current history settings */
+        // Show current history settings
         printf("LLE History Settings:\n");
         printf("\nWrite-time Deduplication:\n");
         printf("  Enabled: %s\n",
                config.lle_enable_deduplication ? "yes" : "no");
 
-        /* Scope */
+        // Scope
         const char *scope_str = "unknown";
         switch (config.lle_dedup_scope) {
         case LLE_DEDUP_SCOPE_NONE:
@@ -75,7 +75,7 @@ int display_lle_history(int argc, char **argv) {
         }
         printf("  Scope: %s\n", scope_str);
 
-        /* Strategy */
+        // Strategy
         const char *strategy_str = "unknown";
         switch (config.lle_dedup_strategy) {
         case LLE_DEDUP_STRATEGY_IGNORE:
@@ -112,7 +112,7 @@ int display_lle_history(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(hist_subcmd, "dedup") == 0) {
-        /* Deduplication settings */
+        // Deduplication settings
         if (argc < 3) {
             printf("Usage: display lle history dedup <option>\n");
             printf("Options:\n");
@@ -164,8 +164,7 @@ int display_lle_history(int argc, char **argv) {
             } else if (strcmp(scope_val, "global") == 0) {
                 config.lle_dedup_scope = LLE_DEDUP_SCOPE_GLOBAL;
 
-                /* When switching to global scope, run full dedup scan
-                 */
+                /// When switching to global scope, run full dedup scan
                 lle_editor_t *editor = lle_get_global_editor();
                 if (editor && editor->history_system &&
                     editor->history_system->dedup_engine) {
@@ -174,7 +173,7 @@ int display_lle_history(int argc, char **argv) {
                         editor->history_system->dedup_engine, &removed);
                     if (removed > 0) {
                         printf("Cleaned %zu duplicate entries\n", removed);
-                        /* Save to persist changes */
+                        // Save to persist changes
                         const char *home = getenv("HOME");
                         if (home) {
                             char history_path[1024];
@@ -233,7 +232,7 @@ int display_lle_history(int argc, char **argv) {
             return 0;
 
         } else if (strcmp(dedup_opt, "clean") == 0) {
-            /* Full history deduplication scan */
+            // Full history deduplication scan
             lle_editor_t *editor = lle_get_global_editor();
             if (!editor || !editor->history_system) {
                 fprintf(stderr, "Error: History system not available\n");
@@ -255,7 +254,7 @@ int display_lle_history(int argc, char **argv) {
 
             if (removed > 0) {
                 printf("Removed %zu duplicate entries from history\n", removed);
-                /* Save history to persist changes */
+                // Save history to persist changes
                 const char *home = getenv("HOME");
                 if (home) {
                     char history_path[1024];
@@ -278,7 +277,7 @@ int display_lle_history(int argc, char **argv) {
         }
 
     } else if (strcmp(hist_subcmd, "nav-dedup") == 0) {
-        /* Navigation-time duplicate skipping */
+        // Navigation-time duplicate skipping
         if (argc < 3) {
             printf("Navigation duplicate skipping: %s\n",
                    config.lle_dedup_navigation ? "enabled" : "disabled");
@@ -307,7 +306,7 @@ int display_lle_history(int argc, char **argv) {
         }
 
     } else if (strcmp(hist_subcmd, "nav-unique") == 0) {
-        /* Unique entries per navigation session */
+        // Unique entries per navigation session
         if (argc < 3) {
             printf("Unique entries per session: %s\n",
                    config.lle_dedup_navigation_unique ? "enabled" : "disabled");

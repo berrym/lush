@@ -28,8 +28,10 @@ Lush is a **superset shell**. It is not an emulator. It accepts both bash and zs
 
 **Core Principles**:
 - **Syntax is polyglot**: `${var^^}` and `${(U)var}` both uppercase a string
-- **Profiles are presets, not restrictions**: `set -o bash` loads defaults, but all features remain available
+- **Profiles are presets, not restrictions**: `mode bash` (or its alias `set -o bash`) loads defaults, but all features remain available
 - **When scripts don't work, lush knows why**: Compatibility database, static analyzer, debugger
+- **Value kinds are first-class**: Scalar / List / Map are distinguished by the executor; no implicit list-to-string coercion (SEMANTICS §3.4 / §3.9)
+- **The debugger keeps pace with the language**: PHILOSOPHY §7 enforces this via an integration-test gate (`tests/unit/test_debug_integration.c`)
 
 Lush does NOT write different tokenizers/parsers/executors to match other shells. Lush is rich enough that its components encompass the older shells.
 
@@ -93,6 +95,16 @@ Native line editor replacing GNU Readline. Buffer-oriented, event-driven archite
 | `adaptive/` | Terminal detection and adaptation |
 
 **Key principle**: LLE is the **single source of truth** for buffer content and cursor position. The display system queries LLE; it never modifies LLE state.
+
+**Customization surfaces (LLE Phase 3, shipped)**:
+- `display lle widget` — user-defined editing actions bound to key sequences
+- `display lle hook` — lifecycle hook registration (precmd, preexec, chpwd, periodic)
+- `display lle segment` — custom prompt segments backed by shell variables
+
+**Debug break prompt**: the `(lush-debug)` prompt is LLE-driven
+via `lle_readline_no_history` (separate in-process history,
+swap-restore on entry/exit). First-word completion switches to the
+debug command vocabulary when `lle_in_debug_prompt()` is true.
 
 ### Display System
 
@@ -200,8 +212,11 @@ meson test -C build -v test_history_phase1
 ## Important Documentation
 
 - `docs/VISION.md` - Project philosophy (read first)
-- `docs/PHILOSOPHY.md` - Founding principles governing day-to-day design decisions (identity vs polyglot, surface separation, architectural correctness over expediency)
+- `docs/PHILOSOPHY.md` - Founding principles governing day-to-day design decisions (identity vs polyglot, surface separation, architectural correctness over expediency, debugger-keeps-pace rule §7)
+- `docs/SEMANTICS.md` - Engine spec: value model (Scalar / List / Map), scoping discipline, no implicit list-to-string coercion, the engine-vs-preset distinction
 - `docs/CONFIGURATION.md` - The four configuration surfaces (`mode`, `set`, `setopt`/`shopt`, `config`) -- authoritative reference replacing the prior SHELL_MODES / CONFIG_SYSTEM / SHELL_OPTIONS docs
+- `docs/BUILTIN_COMMANDS.md` - Complete builtin reference (~60 commands; canonical inventory)
+- `docs/DEBUGGER_GUIDE.md` - Integrated debugger: (lush-debug) prompt, breakpoints, kind-aware inspection, depth-aware stepping, `debug analyze` predictive type warnings
 - `docs/development/ARCHITECTURE-SYNTAX-BRIDGING.md` - Syntax bridging design
 - `docs/development/COMPLETION_ARCHITECTURE.md` - Completion subsystem reference (analyzer, sources, splicer, menu, how to add a source). Authoritative; supersedes spec 12
 - `docs/development/SPEC-COMPATIBILITY.md` - Compatibility targets

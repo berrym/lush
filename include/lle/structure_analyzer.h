@@ -22,47 +22,47 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+/// Forward declarations
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 
 /**
  * @brief Configuration for structure analysis
  */
 typedef struct lle_analyzer_config {
-    size_t max_nesting_depth;  /**< Maximum nesting depth to analyze */
-    bool detect_incomplete;    /**< Whether to detect incomplete constructs */
-    bool validate_syntax;      /**< Whether to perform syntax validation */
-    bool track_indentation;    /**< Whether to track indentation */
+    size_t max_nesting_depth;  ///< Maximum nesting depth to analyze
+    bool detect_incomplete;    ///< Whether to detect incomplete constructs
+    bool validate_syntax;      ///< Whether to perform syntax validation
+    bool track_indentation;    ///< Whether to track indentation
     size_t max_command_length; /**< Maximum command length to analyze (safety
                                   limit) */
-    void *reserved[4];         /**< Reserved for future use */
+    void *reserved[4];         ///< Reserved for future use
 } lle_analyzer_config_t;
 
 /**
  * @brief Analysis context for tracking state during parsing
  */
 typedef struct lle_analysis_context {
-    size_t current_line;   /**< Current line being analyzed */
-    size_t current_offset; /**< Current character offset in command */
-    size_t current_depth;  /**< Current nesting depth */
-    bool in_quoted_string; /**< Whether currently inside a quoted string */
-    char quote_char;       /**< Quote character if in_quoted_string is true */
-    bool last_was_escape;  /**< Whether last character was an escape */
-    bool in_comment;       /**< Whether currently inside a comment */
-    size_t indent_level;   /**< Current indentation level */
-    void *reserved[4];     /**< Reserved for future use */
+    size_t current_line;   ///< Current line being analyzed
+    size_t current_offset; ///< Current character offset in command
+    size_t current_depth;  ///< Current nesting depth
+    bool in_quoted_string; ///< Whether currently inside a quoted string
+    char quote_char;       ///< Quote character if in_quoted_string is true
+    bool last_was_escape;  ///< Whether last character was an escape
+    bool in_comment;       ///< Whether currently inside a comment
+    size_t indent_level;   ///< Current indentation level
+    void *reserved[4];     ///< Reserved for future use
 } lle_analysis_context_t;
 
 /**
  * @brief Keyword detection result
  */
 typedef struct lle_keyword_match {
-    lle_keyword_type_t type; /**< Type of keyword matched */
-    size_t start_offset;     /**< Start offset in command text */
-    size_t length;           /**< Length of keyword */
-    size_t line_number;      /**< Line number where keyword appears */
-    bool is_command_start;   /**< Whether keyword is at start of command/line */
-    void *reserved[2];       /**< Reserved for future use */
+    lle_keyword_type_t type; ///< Type of keyword matched
+    size_t start_offset;     ///< Start offset in command text
+    size_t length;           ///< Length of keyword
+    size_t line_number;      ///< Line number where keyword appears
+    bool is_command_start;   ///< Whether keyword is at start of command/line
+    void *reserved[2];       ///< Reserved for future use
 } lle_keyword_match_t;
 
 /**
@@ -173,4 +173,4 @@ lle_result_t lle_structure_analyzer_reset(lle_structure_analyzer_t *analyzer);
 }
 #endif
 
-#endif /* LLE_STRUCTURE_ANALYZER_H */
+#endif /// LLE_STRUCTURE_ANALYZER_H

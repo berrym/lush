@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Test assertion counter */
+/// Test assertion counter
 static int assertions_passed = 0;
 
 #define COMPLIANCE_ASSERT(condition, message)                                  \
@@ -36,13 +36,13 @@ int main(void) {
     printf("Spec 04 Event System Compliance Test\n");
     printf("=====================================\n\n");
 
-    /* =====================================================================
-     * EVENT TYPE CATEGORY VERIFICATION
-     * ===================================================================== */
+    /// =====================================================================
+    /// EVENT TYPE CATEGORY VERIFICATION
+    /// =====================================================================
 
     printf("Checking Event Type category starting points exist...\n");
 
-    /* Verify major event type categories are defined (starting points) */
+    /// Verify major event type categories are defined (starting points)
     COMPLIANCE_ASSERT(LLE_EVENT_KEY_PRESS == 0x1000,
                       "Key events start at 0x1000");
     COMPLIANCE_ASSERT(LLE_EVENT_MOUSE_PRESS == 0x2000,
@@ -72,9 +72,9 @@ int main(void) {
 
     printf("✓ Event type categories verified (13 assertions)\n\n");
 
-    /* =====================================================================
-     * PRIORITY LEVEL COMPLIANCE
-     * ===================================================================== */
+    /// =====================================================================
+    /// PRIORITY LEVEL COMPLIANCE
+    /// =====================================================================
 
     printf("Checking Priority Level definitions...\n");
 
@@ -88,9 +88,9 @@ int main(void) {
 
     printf("✓ Priority levels verified (6 assertions)\n\n");
 
-    /* =====================================================================
-     * FILTER RESULT TYPE COMPLIANCE
-     * ===================================================================== */
+    /// =====================================================================
+    /// FILTER RESULT TYPE COMPLIANCE
+    /// =====================================================================
 
     printf("Checking Filter Result Type definitions...\n");
 
@@ -101,9 +101,9 @@ int main(void) {
 
     printf("✓ Filter result types verified (4 assertions)\n\n");
 
-    /* =====================================================================
-     * STRUCTURE VERIFICATION
-     * ===================================================================== */
+    /// =====================================================================
+    /// STRUCTURE VERIFICATION
+    /// =====================================================================
 
     printf("Checking core structure definitions exist...\n");
 
@@ -118,13 +118,13 @@ int main(void) {
 
     printf("✓ Core structures verified (5 assertions)\n\n");
 
-    /* =====================================================================
-     * PHASE 1 API VERIFICATION
-     * ===================================================================== */
+    /// =====================================================================
+    /// PHASE 1 API VERIFICATION
+    /// =====================================================================
 
     printf("Checking Phase 1 core API functions...\n");
 
-    /* Verify function pointers can be assigned (header-only check) */
+    /// Verify function pointers can be assigned (header-only check)
     COMPLIANCE_ASSERT(lle_event_system_init != NULL,
                       "lle_event_system_init declared");
     COMPLIANCE_ASSERT(lle_event_system_destroy != NULL,
@@ -151,9 +151,9 @@ int main(void) {
 
     printf("✓ Phase 1 API verified (14 assertions)\n\n");
 
-    /* =====================================================================
-     * PHASE 2B: ENHANCED STATISTICS API
-     * ===================================================================== */
+    /// =====================================================================
+    /// PHASE 2B: ENHANCED STATISTICS API
+    /// =====================================================================
 
     printf("Checking Phase 2B Enhanced Statistics API...\n");
 
@@ -174,9 +174,9 @@ int main(void) {
 
     printf("✓ Phase 2B API verified (7 assertions)\n\n");
 
-    /* =====================================================================
-     * PHASE 2C: EVENT FILTERING API
-     * ===================================================================== */
+    /// =====================================================================
+    /// PHASE 2C: EVENT FILTERING API
+    /// =====================================================================
 
     printf("Checking Phase 2C Event Filtering API...\n");
 
@@ -196,9 +196,9 @@ int main(void) {
 
     printf("✓ Phase 2C API verified (7 assertions)\n\n");
 
-    /* =====================================================================
-     * PHASE 2D: TIMER EVENTS API
-     * ===================================================================== */
+    /// =====================================================================
+    /// PHASE 2D: TIMER EVENTS API
+    /// =====================================================================
 
     printf("Checking Phase 2D Timer Events API...\n");
 
@@ -223,9 +223,9 @@ int main(void) {
 
     printf("✓ Phase 2D API verified (10 assertions)\n\n");
 
-    /* =====================================================================
-     * TYPEDEF VERIFICATION
-     * ===================================================================== */
+    /// =====================================================================
+    /// TYPEDEF VERIFICATION
+    /// =====================================================================
 
     printf("Checking callback typedef definitions...\n");
 
@@ -241,9 +241,9 @@ int main(void) {
 
     printf("✓ Typedefs verified (2 assertions)\n\n");
 
-    /* =====================================================================
-     * SUMMARY
-     * ===================================================================== */
+    /// =====================================================================
+    /// SUMMARY
+    /// =====================================================================
 
     printf("=====================================\n");
     printf("✓ Spec 04 Event System: COMPLIANT\n");

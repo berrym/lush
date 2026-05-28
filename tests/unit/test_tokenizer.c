@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * LIFECYCLE TESTS
@@ -50,7 +50,7 @@ TEST(tokenizer_new_empty) {
 
 TEST(tokenizer_new_null) {
     tokenizer_t *tok = tokenizer_new(NULL);
-    /* Should handle NULL gracefully - either return NULL or empty tokenizer */
+    /// Should handle NULL gracefully - either return NULL or empty tokenizer
     if (tok != NULL) {
         token_t *token = tokenizer_current(tok);
         if (token != NULL) {
@@ -113,8 +113,7 @@ TEST(tokenize_single_quoted_string) {
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_STRING, "Should be STRING token");
-    /* String content may or may not include quotes depending on implementation
-     */
+    /// String content may or may not include quotes depending on implementation
     ASSERT_NOT_NULL(token->text, "Token text should not be NULL");
 
     tokenizer_free(tok);
@@ -137,7 +136,7 @@ TEST(tokenize_number) {
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
     token_t *token = tokenizer_current(tok);
-    /* Numbers might be recognized as WORD or NUMBER depending on context */
+    /// Numbers might be recognized as WORD or NUMBER depending on context
     ASSERT(token->type == TOK_NUMBER || token->type == TOK_WORD,
            "Should be NUMBER or WORD token");
     ASSERT_STR_EQ(token->text, "42", "Number text mismatch");
@@ -172,8 +171,8 @@ TEST(tokenize_pipe) {
     tokenizer_t *tok = tokenizer_new("cat file | grep pattern");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cat */
-    tokenizer_advance(tok); /* skip file */
+    tokenizer_advance(tok); /// skip cat
+    tokenizer_advance(tok); /// skip file
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_PIPE, "Should be PIPE");
@@ -185,7 +184,7 @@ TEST(tokenize_logical_and) {
     tokenizer_t *tok = tokenizer_new("cmd1 && cmd2");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cmd1 */
+    tokenizer_advance(tok); /// skip cmd1
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_LOGICAL_AND, "Should be LOGICAL_AND");
@@ -197,7 +196,7 @@ TEST(tokenize_logical_or) {
     tokenizer_t *tok = tokenizer_new("cmd1 || cmd2");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cmd1 */
+    tokenizer_advance(tok); /// skip cmd1
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_LOGICAL_OR, "Should be LOGICAL_OR");
@@ -209,8 +208,8 @@ TEST(tokenize_background) {
     tokenizer_t *tok = tokenizer_new("sleep 10 &");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip sleep */
-    tokenizer_advance(tok); /* skip 10 */
+    tokenizer_advance(tok); /// skip sleep
+    tokenizer_advance(tok); /// skip 10
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_AND, "Should be AND (background)");
@@ -227,7 +226,7 @@ TEST(tokenize_redirect_in) {
     tokenizer_t *tok = tokenizer_new("cat < file");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cat */
+    tokenizer_advance(tok); /// skip cat
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_REDIRECT_IN, "Should be REDIRECT_IN");
@@ -239,8 +238,8 @@ TEST(tokenize_redirect_out) {
     tokenizer_t *tok = tokenizer_new("echo hello > file");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip echo */
-    tokenizer_advance(tok); /* skip hello */
+    tokenizer_advance(tok); /// skip echo
+    tokenizer_advance(tok); /// skip hello
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_REDIRECT_OUT, "Should be REDIRECT_OUT");
@@ -252,8 +251,8 @@ TEST(tokenize_append) {
     tokenizer_t *tok = tokenizer_new("echo hello >> file");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip echo */
-    tokenizer_advance(tok); /* skip hello */
+    tokenizer_advance(tok); /// skip echo
+    tokenizer_advance(tok); /// skip hello
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_APPEND, "Should be APPEND");
@@ -265,7 +264,7 @@ TEST(tokenize_heredoc) {
     tokenizer_t *tok = tokenizer_new("cat << EOF");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cat */
+    tokenizer_advance(tok); /// skip cat
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_HEREDOC, "Should be HEREDOC");
@@ -277,7 +276,7 @@ TEST(tokenize_herestring) {
     tokenizer_t *tok = tokenizer_new("cat <<< 'hello'");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cat */
+    tokenizer_advance(tok); /// skip cat
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_HERESTRING, "Should be HERESTRING");
@@ -289,7 +288,7 @@ TEST(tokenize_stderr_redirect) {
     tokenizer_t *tok = tokenizer_new("cmd 2> /dev/null");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cmd */
+    tokenizer_advance(tok); /// skip cmd
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_REDIRECT_ERR, "Should be REDIRECT_ERR");
@@ -301,7 +300,7 @@ TEST(tokenize_redirect_both) {
     tokenizer_t *tok = tokenizer_new("cmd &> file");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cmd */
+    tokenizer_advance(tok); /// skip cmd
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_REDIRECT_BOTH, "Should be REDIRECT_BOTH");
@@ -322,8 +321,8 @@ TEST(tokenize_if_then_else_fi) {
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_IF, "Should be IF keyword");
 
-    tokenizer_advance(tok); /* skip true */
-    tokenizer_advance(tok); /* skip ; */
+    tokenizer_advance(tok); /// skip true
+    tokenizer_advance(tok); /// skip ;
     tokenizer_advance(tok);
 
     token = tokenizer_current(tok);
@@ -339,7 +338,7 @@ TEST(tokenize_for_in_do_done) {
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_FOR, "Should be FOR keyword");
 
-    tokenizer_advance(tok); /* skip i */
+    tokenizer_advance(tok); /// skip i
     tokenizer_advance(tok);
 
     token = tokenizer_current(tok);
@@ -400,8 +399,8 @@ TEST(tokenize_parentheses) {
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_LPAREN, "Should be LPAREN");
 
-    tokenizer_advance(tok); /* skip echo */
-    tokenizer_advance(tok); /* skip hello */
+    tokenizer_advance(tok); /// skip echo
+    tokenizer_advance(tok); /// skip hello
     tokenizer_advance(tok);
 
     token = tokenizer_current(tok);
@@ -449,7 +448,7 @@ TEST(tokenize_process_sub_in) {
     tokenizer_t *tok = tokenizer_new("diff <(cat a) <(cat b)");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip diff */
+    tokenizer_advance(tok); /// skip diff
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_PROC_SUB_IN, "Should be PROC_SUB_IN");
@@ -461,7 +460,7 @@ TEST(tokenize_process_sub_out) {
     tokenizer_t *tok = tokenizer_new("tee >(cat > file)");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip tee */
+    tokenizer_advance(tok); /// skip tee
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_PROC_SUB_OUT, "Should be PROC_SUB_OUT");
@@ -473,7 +472,7 @@ TEST(tokenize_pipe_stderr) {
     tokenizer_t *tok = tokenizer_new("cmd |& grep error");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip cmd */
+    tokenizer_advance(tok); /// skip cmd
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_PIPE_STDERR, "Should be PIPE_STDERR");
@@ -485,7 +484,7 @@ TEST(tokenize_plus_assign) {
     tokenizer_t *tok = tokenizer_new("arr+=value");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip arr */
+    tokenizer_advance(tok); /// skip arr
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_PLUS_ASSIGN, "Should be PLUS_ASSIGN");
@@ -499,7 +498,7 @@ TEST(tokenize_plus_assign) {
  */
 
 TEST(token_type_name_coverage) {
-    /* Test that token_type_name returns non-NULL for various types */
+    /// Test that token_type_name returns non-NULL for various types
     ASSERT_NOT_NULL(token_type_name(TOK_EOF), "EOF name should not be NULL");
     ASSERT_NOT_NULL(token_type_name(TOK_WORD), "WORD name should not be NULL");
     ASSERT_NOT_NULL(token_type_name(TOK_PIPE), "PIPE name should not be NULL");
@@ -558,7 +557,7 @@ TEST(tokenizer_peek) {
     ASSERT_STR_EQ(current->text, "echo", "Current text mismatch");
     ASSERT_STR_EQ(next->text, "hello", "Peek text mismatch");
 
-    /* Peek should not advance */
+    /// Peek should not advance
     token_t *still_current = tokenizer_current(tok);
     ASSERT_STR_EQ(still_current->text, "echo", "Peek should not advance");
 
@@ -586,7 +585,7 @@ TEST(tokenizer_consume) {
 
     ASSERT(!tokenizer_consume(tok, TOK_PIPE), "Should not consume PIPE");
 
-    /* Should still be at hello since consume failed */
+    /// Should still be at hello since consume failed
     token = tokenizer_current(tok);
     ASSERT_STR_EQ(token->text, "hello", "Should still be at hello");
 
@@ -597,21 +596,21 @@ TEST(tokenizer_disable_keywords) {
     tokenizer_t *tok = tokenizer_new("if");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    /* By default, keywords should be recognized */
+    /// By default, keywords should be recognized
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_IF, "Should recognize IF keyword by default");
 
     tokenizer_free(tok);
 
-    /* Test that enable_keywords flag exists and can be set */
+    /// Test that enable_keywords flag exists and can be set
     tok = tokenizer_new("echo");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    /* Verify the flag can be toggled without crashing */
+    /// Verify the flag can be toggled without crashing
     tokenizer_enable_keywords(tok, false);
     tokenizer_enable_keywords(tok, true);
 
-    /* Current token should still be valid */
+    /// Current token should still be valid
     token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_WORD, "echo should be WORD");
 
@@ -646,7 +645,7 @@ TEST(tokenize_comment) {
 
     tokenizer_advance(tok);
     token = tokenizer_current(tok);
-    /* Tokenizer returns TOK_COMMENT for comments (parser handles skipping) */
+    /// Tokenizer returns TOK_COMMENT for comments (parser handles skipping)
     ASSERT_EQ(token->type, TOK_COMMENT, "Should have COMMENT token");
 
     tokenizer_advance(tok);
@@ -678,7 +677,7 @@ TEST(tokenize_variable) {
     tokenizer_t *tok = tokenizer_new("echo $HOME");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip echo */
+    tokenizer_advance(tok); /// skip echo
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_VARIABLE, "Should be VARIABLE");
@@ -690,7 +689,7 @@ TEST(tokenize_command_substitution) {
     tokenizer_t *tok = tokenizer_new("echo $(pwd)");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip echo */
+    tokenizer_advance(tok); /// skip echo
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_COMMAND_SUB, "Should be COMMAND_SUB");
@@ -702,7 +701,7 @@ TEST(tokenize_arithmetic_expansion) {
     tokenizer_t *tok = tokenizer_new("echo $((1+2))");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
-    tokenizer_advance(tok); /* skip echo */
+    tokenizer_advance(tok); /// skip echo
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_ARITH_EXP, "Should be ARITH_EXP");
@@ -745,18 +744,18 @@ TEST(tokenize_line_position_tracking) {
  * a partial sequence at end-of-input caused token_new's memcpy to read
  * past the buffer (heap-buffer-overflow under ASan). The minimal trigger
  * is "{x}" + a 4-byte UTF-8 lead byte (0xF0) with zero continuations.
- * Behavioural assertion: parses successfully without crashing.
+ * Behavioral assertion: parses successfully without crashing.
  * ============================================================================
  */
 
 TEST(utf8_partial_sequence_at_eof_brace_expansion) {
-    /* 4 bytes total: '{', 'x', '}', 0xF0. The lead byte claims a 4-byte
-     * UTF-8 sequence; no continuation bytes follow. */
+    /// 4 bytes total: '{', 'x', '}', 0xF0. The lead byte claims a 4-byte
+    /// UTF-8 sequence; no continuation bytes follow.
     const char input[] = {'{', 'x', '}', (char)0xF0, '\0'};
     tokenizer_t *t = tokenizer_new(input);
     ASSERT_NOT_NULL(t, "tokenizer_new failed");
-    /* Drain all tokens. The previous defect crashed inside token_new during
-     * the first WORD emission; reaching TOK_EOF here proves the bound holds. */
+    /// Drain all tokens. The previous defect crashed inside token_new during
+    /// the first WORD emission; reaching TOK_EOF here proves the bound holds.
     token_t *tok = NULL;
     do {
         tok = tokenizer_current(t);

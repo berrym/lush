@@ -28,28 +28,28 @@ extern "C" {
  * @brief Tracks state of current completion session
  */
 typedef struct lle_completion_state {
-    /* Input state */
+    // Input state
     char *buffer_snapshot;  /**< Buffer at completion start */
     size_t cursor_position; /**< Cursor at completion start */
 
-    /* Context */
+    // Context
     lle_word_context_t *context; /**< Analyzed context */
 
-    /* Results */
+    // Results
     lle_completion_result_t *results; /**< Generated completions */
 
-    /* Cycling state (for inline completion) */
+    // Cycling state (for inline completion)
     int current_index;   /**< Current selection (for TAB cycling) */
     char *original_word; /**< Original partial word */
 
-    /* Timing */
+    // Timing
     uint64_t generation_time_us; /**< Time to generate completions */
 
-    /* Flags */
+    // Flags
     bool active;    /**< Completion session active? */
     bool menu_mode; /**< Menu shown or inline cycling? */
 
-    /* Memory pool reference */
+    // Memory pool reference
     lle_memory_pool_t *pool; /**< For allocations */
 } lle_completion_state_t;
 
@@ -106,4 +106,4 @@ lle_completion_state_get_current(const lle_completion_state_t *state);
 }
 #endif
 
-#endif /* LLE_COMPLETION_STATE_H */
+#endif // LLE_COMPLETION_STATE_H

@@ -401,28 +401,28 @@ static lle_result_t widget_transient_prompt(lle_editor_t *editor,
                                             void *user_data) {
     (void)user_data;
 
-    /* Get shell integration for composer access */
+    // Get shell integration for composer access
     if (!g_lle_integration || !g_lle_integration->prompt_composer) {
-        return LLE_SUCCESS; /* Graceful degradation */
+        return LLE_SUCCESS; // Graceful degradation
     }
 
     lle_prompt_composer_t *composer = g_lle_integration->prompt_composer;
 
-    /* Check if transient prompts are enabled */
+    // Check if transient prompts are enabled
     if (!composer->config.enable_transient) {
         return LLE_SUCCESS;
     }
 
-    /* Get active theme */
+    // Get active theme
     const lle_theme_t *theme = lle_theme_registry_get_active(composer->themes);
     if (!theme || !theme->layout.enable_transient ||
         theme->layout.transient_format[0] == '\0') {
         return LLE_SUCCESS;
     }
 
-    /* Render transient format through Spec 28 two-pass expansion engine.
-     * This routes the transient format string through lle_prompt_expand()
-     * which handles bash \X, zsh %X, and LLE ${segment} syntax. */
+    /// Render transient format through Spec 28 two-pass expansion engine.
+    /// This routes the transient format string through lle_prompt_expand()
+    /// which handles bash \X, zsh %X, and LLE ${segment} syntax.
     lle_template_render_ctx_t render_ctx =
         lle_composer_create_render_ctx(composer);
 
@@ -438,16 +438,16 @@ static lle_result_t widget_transient_prompt(lle_editor_t *editor,
                           sizeof(transient_output), &expand_ctx);
 
     if (result != LLE_SUCCESS) {
-        return LLE_SUCCESS; /* Graceful degradation on render failure */
+        return LLE_SUCCESS; // Graceful degradation on render failure
     }
 
-    /* Get command text from editor buffer */
+    // Get command text from editor buffer
     const char *command_text = NULL;
     if (editor && editor->buffer && editor->buffer->data) {
         command_text = editor->buffer->data;
     }
 
-    /* Apply transient prompt through display controller (screen buffer) */
+    // Apply transient prompt through display controller (screen buffer)
     dc_apply_transient_prompt(transient_output, command_text);
 
     return LLE_SUCCESS;
@@ -474,7 +474,7 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
 
     lle_result_t result;
 
-    /* Movement widgets */
+    // Movement widgets
     result = lle_widget_register(registry, "forward-char", widget_forward_char,
                                  LLE_WIDGET_BUILTIN, NULL);
     if (result != LLE_SUCCESS)
@@ -520,7 +520,7 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Editing widgets */
+    // Editing widgets
     result = lle_widget_register(registry, "delete-char", widget_delete_char,
                                  LLE_WIDGET_BUILTIN, NULL);
     if (result != LLE_SUCCESS)
@@ -571,7 +571,7 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Case change widgets */
+    // Case change widgets
     result =
         lle_widget_register(registry, "capitalize-word", widget_capitalize_word,
                             LLE_WIDGET_BUILTIN, NULL);
@@ -589,7 +589,7 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* History widgets */
+    // History widgets
     result =
         lle_widget_register(registry, "previous-history",
                             widget_previous_history, LLE_WIDGET_BUILTIN, NULL);
@@ -601,22 +601,22 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Note: beginning-of-history and end-of-history widgets pending
-     * implementation of underlying action functions */
+    /// Note: beginning-of-history and end-of-history widgets pending
+    /// implementation of underlying action functions
 
-    /* Completion widgets */
+    // Completion widgets
     result = lle_widget_register(registry, "complete", widget_complete,
                                  LLE_WIDGET_BUILTIN, NULL);
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Line control widgets */
+    // Line control widgets
     result = lle_widget_register(registry, "clear-screen", widget_clear_screen,
                                  LLE_WIDGET_BUILTIN, NULL);
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Multiline/smart navigation widgets */
+    // Multiline/smart navigation widgets
     result = lle_widget_register(registry, "smart-up", widget_smart_up,
                                  LLE_WIDGET_BUILTIN, NULL);
     if (result != LLE_SUCCESS)
@@ -627,7 +627,7 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Transient prompt widget (Spec 25 Section 12) */
+    // Transient prompt widget (Spec 25 Section 12)
     result =
         lle_widget_register(registry, "transient-prompt",
                             widget_transient_prompt, LLE_WIDGET_BUILTIN, NULL);
@@ -654,13 +654,13 @@ lle_register_builtin_widget_hooks(lle_widget_hooks_manager_t *hooks_manager) {
 
     lle_result_t result;
 
-    /* Register transient-prompt widget for LINE_ACCEPTED hook
-     * This applies transient prompt when user presses Enter, before
-     * cursor moves to output area (Spec 25 Section 12) */
+    /// Register transient-prompt widget for LINE_ACCEPTED hook
+    /// This applies transient prompt when user presses Enter, before
+    /// cursor moves to output area (Spec 25 Section 12)
     result = lle_widget_hook_register(hooks_manager, LLE_HOOK_LINE_ACCEPTED,
                                       "transient-prompt");
     if (result != LLE_SUCCESS && result != LLE_ERROR_NOT_FOUND) {
-        /* NOT_FOUND is acceptable if shell integration not available */
+        // NOT_FOUND is acceptable if shell integration not available
         return result;
     }
 

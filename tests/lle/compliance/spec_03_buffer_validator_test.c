@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_buffer_validator_test.c
+ * @brief Spec 03 buffer validator compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 Buffer Validator Compliance Tests
  *
  * Verifies that buffer validator implementation complies with:
@@ -74,7 +82,7 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
-/* Helper to create a minimal valid buffer for testing */
+/// Helper to create a minimal valid buffer for testing
 static lle_buffer_t *create_test_buffer(const char *content) {
     lle_buffer_t *buffer = calloc(1, sizeof(lle_buffer_t));
     if (!buffer)
@@ -115,14 +123,14 @@ static void free_test_buffer(lle_buffer_t *buffer) {
     }
 }
 
-/* Test: Buffer validator structure fields */
+/// Test: Buffer validator structure fields
 static void test_buffer_validator_structure() {
     TEST("Buffer validator structure has all required fields");
 
     lle_buffer_validator_t val;
     memset(&val, 0, sizeof(val));
 
-    /* Verify all fields exist and can be set */
+    /// Verify all fields exist and can be set
     val.utf8_validation_enabled = true;
     val.line_structure_validation = true;
     val.cursor_validation_enabled = true;
@@ -144,7 +152,7 @@ static void test_buffer_validator_structure() {
     PASS();
 }
 
-/* Test: Buffer validator initialization */
+/// Test: Buffer validator initialization
 static void test_buffer_validator_init() {
     TEST("Buffer validator initialization");
 
@@ -170,7 +178,7 @@ static void test_buffer_validator_init() {
     PASS();
 }
 
-/* Test: Validate valid buffer */
+/// Test: Validate valid buffer
 static void test_validate_valid_buffer() {
     TEST("Validate valid buffer");
 
@@ -191,7 +199,7 @@ static void test_validate_valid_buffer() {
     PASS();
 }
 
-/* Test: Detect buffer overflow */
+/// Test: Detect buffer overflow
 static void test_detect_buffer_overflow() {
     TEST("Detect buffer overflow (length > capacity)");
 
@@ -202,7 +210,7 @@ static void test_detect_buffer_overflow() {
     lle_buffer_t *buffer = create_test_buffer("Hello");
     ASSERT_TRUE(buffer != NULL, "Test buffer created");
 
-    /* Corrupt buffer: set length > capacity */
+    /// Corrupt buffer: set length > capacity
     buffer->length = buffer->capacity + 100;
 
     result = lle_buffer_validate_complete(buffer, validator);
@@ -216,7 +224,7 @@ static void test_detect_buffer_overflow() {
     PASS();
 }
 
-/* Test: Detect invalid UTF-8 */
+/// Test: Detect invalid UTF-8
 static void test_detect_invalid_utf8() {
     TEST("Detect invalid UTF-8 encoding");
 
@@ -227,8 +235,8 @@ static void test_detect_invalid_utf8() {
     lle_buffer_t *buffer = create_test_buffer("");
     ASSERT_TRUE(buffer != NULL, "Test buffer created");
 
-    /* Insert invalid UTF-8 sequence */
-    buffer->data[0] = (char)0xFF; /* Invalid UTF-8 start byte */
+    /// Insert invalid UTF-8 sequence
+    buffer->data[0] = (char)0xFF; /// Invalid UTF-8 start byte
     buffer->data[1] = (char)0xFF;
     buffer->data[2] = '\0';
     buffer->length = 2;
@@ -243,7 +251,7 @@ static void test_detect_invalid_utf8() {
     PASS();
 }
 
-/* Test: Detect cursor out of bounds */
+/// Test: Detect cursor out of bounds
 static void test_detect_cursor_out_of_bounds() {
     TEST("Detect cursor position out of bounds");
 
@@ -254,7 +262,7 @@ static void test_detect_cursor_out_of_bounds() {
     lle_buffer_t *buffer = create_test_buffer("Hello");
     ASSERT_TRUE(buffer != NULL, "Test buffer created");
 
-    /* Set cursor beyond buffer end */
+    /// Set cursor beyond buffer end
     buffer->cursor.byte_offset = buffer->length + 100;
     buffer->cursor.position_valid = true;
 
@@ -269,7 +277,7 @@ static void test_detect_cursor_out_of_bounds() {
     PASS();
 }
 
-/* Test: Validate bounds checking */
+/// Test: Validate bounds checking
 static void test_validate_bounds() {
     TEST("Buffer bounds validation");
 
@@ -283,7 +291,7 @@ static void test_validate_bounds() {
     result = lle_buffer_validate_bounds(buffer, validator);
     ASSERT_SUCCESS(result, "Bounds validation succeeds for valid buffer");
 
-    /* Test used > capacity */
+    /// Test used > capacity
     buffer->used = buffer->capacity + 1;
     result = lle_buffer_validate_bounds(buffer, validator);
     ASSERT_FAILURE(result, "Detects used > capacity");
@@ -293,7 +301,7 @@ static void test_validate_bounds() {
     PASS();
 }
 
-/* Test: Selective validation (disable features) */
+/// Test: Selective validation (disable features)
 static void test_selective_validation() {
     TEST("Selective validation (disable UTF-8 check)");
 
@@ -301,13 +309,13 @@ static void test_selective_validation() {
     lle_result_t result = lle_buffer_validator_init(&validator);
     ASSERT_SUCCESS(result, "Validator initialization succeeds");
 
-    /* Disable UTF-8 validation */
+    /// Disable UTF-8 validation
     validator->utf8_validation_enabled = false;
 
     lle_buffer_t *buffer = create_test_buffer("");
     ASSERT_TRUE(buffer != NULL, "Test buffer created");
 
-    /* Insert invalid UTF-8 (should pass because validation disabled) */
+    /// Insert invalid UTF-8 (should pass because validation disabled)
     buffer->data[0] = (char)0xFF;
     buffer->data[1] = '\0';
     buffer->length = 1;
@@ -320,7 +328,7 @@ static void test_selective_validation() {
     PASS();
 }
 
-/* Test: Validation statistics */
+/// Test: Validation statistics
 static void test_validation_statistics() {
     TEST("Validation statistics tracking");
 
@@ -331,17 +339,17 @@ static void test_validation_statistics() {
     lle_buffer_t *buffer = create_test_buffer("Hello");
     ASSERT_TRUE(buffer != NULL, "Test buffer created");
 
-    /* First validation (should succeed) */
+    /// First validation (should succeed)
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "First validation succeeds");
     ASSERT_EQ(validator->validation_count, 1, "Validation count is 1");
 
-    /* Second validation (should succeed) */
+    /// Second validation (should succeed)
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Second validation succeeds");
     ASSERT_EQ(validator->validation_count, 2, "Validation count is 2");
 
-    /* Corrupt buffer and validate (should fail) */
+    /// Corrupt buffer and validate (should fail)
     buffer->length = buffer->capacity + 1;
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_FAILURE(result, "Corrupted buffer validation fails");
@@ -353,23 +361,23 @@ static void test_validation_statistics() {
     PASS();
 }
 
-/* Test: Error handling */
+/// Test: Error handling
 static void test_error_handling() {
     TEST("Buffer validator error handling");
 
     lle_result_t result;
 
-    /* NULL pointer to init */
+    /// NULL pointer to init
     result = lle_buffer_validator_init(NULL);
     ASSERT_TRUE(result == LLE_ERROR_INVALID_PARAMETER,
                 "Init rejects NULL pointer");
 
-    /* NULL pointer to destroy */
+    /// NULL pointer to destroy
     result = lle_buffer_validator_destroy(NULL);
     ASSERT_TRUE(result == LLE_ERROR_INVALID_PARAMETER,
                 "Destroy rejects NULL pointer");
 
-    /* NULL buffer to validate */
+    /// NULL buffer to validate
     lle_buffer_validator_t *validator = NULL;
     lle_buffer_validator_init(&validator);
     result = lle_buffer_validate_complete(NULL, validator);
@@ -386,29 +394,29 @@ int main(void) {
     printf("Spec 03: Buffer Validator Compliance Tests\n");
     printf("=================================================\n\n");
 
-    /* Structure Tests */
+    /// Structure Tests
     printf("Buffer Validator Structure Tests:\n");
     test_buffer_validator_structure();
     test_buffer_validator_init();
 
-    /* Validation Tests */
+    /// Validation Tests
     printf("\nBuffer Validation Tests:\n");
     test_validate_valid_buffer();
     test_validate_bounds();
     test_selective_validation();
 
-    /* Detection Tests */
+    /// Detection Tests
     printf("\nCorruption Detection Tests:\n");
     test_detect_buffer_overflow();
     test_detect_invalid_utf8();
     test_detect_cursor_out_of_bounds();
 
-    /* Management Tests */
+    /// Management Tests
     printf("\nValidator Management Tests:\n");
     test_validation_statistics();
     test_error_handling();
 
-    /* Summary */
+    /// Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

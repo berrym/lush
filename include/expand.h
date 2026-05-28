@@ -39,9 +39,9 @@
  * nested quotes, backticks, and expansion mode flags.
  */
 typedef struct {
-    int mode;          /**< Expansion mode flags (EXPAND_*) */
-    bool in_quotes;    /**< Currently inside quotes */
-    bool in_backticks; /**< Currently inside backticks */
+    int mode;          ///< Expansion mode flags (EXPAND_*)
+    bool in_quotes;    ///< Currently inside quotes
+    bool in_backticks; ///< Currently inside backticks
 } expand_ctx_t;
 
 /**
@@ -67,4 +67,4 @@ void expand_ctx_init(expand_ctx_t *ctx, int mode);
  */
 bool expand_ctx_check(expand_ctx_t *ctx, int mode_flag);
 
-#endif /* EXPAND_H */
+#endif /// EXPAND_H

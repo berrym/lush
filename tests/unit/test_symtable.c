@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * MANAGER LIFECYCLE TESTS
@@ -169,19 +169,19 @@ TEST(local_variable_shadowing) {
     symtable_manager_t *mgr = symtable_manager_new();
     ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
 
-    /* Set global variable */
+    /// Set global variable
     symtable_set_var(mgr, "X", "global", SYMVAR_NONE);
 
-    /* Push function scope and set local */
+    /// Push function scope and set local
     symtable_push_scope(mgr, SCOPE_FUNCTION, "func");
     symtable_set_local_var(mgr, "X", "local");
 
-    /* Local should shadow global */
+    /// Local should shadow global
     char *value = symtable_get_var(mgr, "X");
     ASSERT_STR_EQ(value, "local", "Local should shadow global");
     free(value);
 
-    /* Pop scope - global should be visible again */
+    /// Pop scope - global should be visible again
     symtable_pop_scope(mgr);
     value = symtable_get_var(mgr, "X");
     ASSERT_STR_EQ(value, "global", "Global should be visible after pop");
@@ -241,10 +241,10 @@ TEST(readonly_variable) {
     symvar_flags_t flags = symtable_get_flags(mgr, "CONST");
     ASSERT(flags & SYMVAR_READONLY, "Variable should have READONLY flag");
 
-    /* Attempting to overwrite readonly should fail */
+    /// Attempting to overwrite readonly should fail
     int result = symtable_set_var(mgr, "CONST", "new_value", SYMVAR_NONE);
-    /* Note: exact behavior depends on implementation - may return error or
-     * silently fail */
+    /// Note: exact behavior depends on implementation - may return error or
+    /// silently fail
     (void)result;
 
     symtable_manager_free(mgr);
@@ -261,7 +261,7 @@ TEST(get_environ) {
     char **env = symtable_get_environ(mgr);
     ASSERT_NOT_NULL(env, "symtable_get_environ should return non-NULL");
 
-    /* Verify exported vars are present */
+    /// Verify exported vars are present
     bool found_var1 = false, found_var2 = false, found_var3 = false;
     for (int i = 0; env[i] != NULL; i++) {
         if (strstr(env[i], "VAR1=value1"))
@@ -289,14 +289,14 @@ TEST(nameref_basic) {
     symtable_manager_t *mgr = symtable_manager_new();
     ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
 
-    /* Set target variable */
+    /// Set target variable
     symtable_set_var(mgr, "TARGET", "hello", SYMVAR_NONE);
 
-    /* Create nameref pointing to TARGET */
+    /// Create nameref pointing to TARGET
     int result = symtable_set_nameref(mgr, "REF", "TARGET", SYMVAR_NONE);
     ASSERT_EQ(result, 0, "symtable_set_nameref should succeed");
 
-    /* Accessing REF should give TARGET's value */
+    /// Accessing REF should give TARGET's value
     char *value = symtable_get_var(mgr, "REF");
     ASSERT_STR_EQ(value, "hello", "Nameref should resolve to target value");
     free(value);
@@ -405,19 +405,114 @@ TEST(array_associative) {
 }
 
 /* ============================================================================
+ * UNIFIED VALUE VIEW TESTS (SEMANTICS section 3 first-class values)
+ * ============================================================================
+ */
+
+TEST(value_view_scalar_lookup) {
+    /// symtable_lookup queries the global manager. Ensure it is up;
+    /// init_symtable() is a no-op if already initialized.
+    init_symtable();
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    if (!mgr) {
+        printf(
+            "    (Skipped - global manager not initialized in test context)\n");
+        return;
+    }
+    symtable_set_var(mgr, "lush_view_scalar", "hello", 0);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_scalar", &view);
+
+    ASSERT(found, "scalar binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_SCALAR, "kind should be SCALAR");
+    ASSERT_NOT_NULL(view.scalar_value, "scalar_value populated");
+    ASSERT_STR_EQ(view.scalar_value, "hello", "value matches");
+    ASSERT_NULL(view.array, "array NULL for scalar");
+
+    lush_value_view_clear(&view);
+    ASSERT_NULL(view.scalar_value, "clear zeroed scalar_value");
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "clear zeroed kind");
+
+    symtable_unset_var(mgr, "lush_view_scalar");
+}
+
+TEST(value_view_list_lookup) {
+    array_value_t *arr = symtable_array_create(false);
+    ASSERT_NOT_NULL(arr, "array_create");
+    symtable_array_append(arr, "a");
+    symtable_array_append(arr, "b");
+    symtable_set_array("lush_view_list", arr);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_list", &view);
+
+    ASSERT(found, "list binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_LIST, "kind should be LIST");
+    ASSERT_NULL(view.scalar_value, "scalar_value NULL for list");
+    ASSERT_NOT_NULL(view.array, "array populated");
+    ASSERT_EQ(symtable_array_length(view.array), 2, "length matches");
+
+    lush_value_view_clear(&view);
+    /// The borrowed array is untouched by clear: still live in the
+    /// symtable until we explicitly unset.
+    symtable_unset_var(symtable_manager(), "lush_view_list");
+}
+
+TEST(value_view_map_lookup) {
+    array_value_t *arr = symtable_array_create(true);
+    ASSERT_NOT_NULL(arr, "array_create assoc");
+    symtable_array_set_assoc(arr, "k1", "v1");
+    symtable_set_array("lush_view_map", arr);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_map", &view);
+
+    ASSERT(found, "map binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_MAP, "kind should be MAP");
+    ASSERT_NOT_NULL(view.array, "array populated for map");
+    ASSERT(view.array->is_associative, "is_associative on the borrowed array");
+
+    lush_value_view_clear(&view);
+    symtable_unset_var(symtable_manager(), "lush_view_map");
+}
+
+TEST(value_view_none_on_miss) {
+    lush_value_view_t view = {
+        .kind = LUSH_VALUE_SCALAR, .scalar_value = NULL, .array = NULL};
+    bool found = symtable_lookup("lush_view_no_such_var", &view);
+
+    ASSERT(!found, "unbound name should not be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "kind reset to NONE on miss");
+    ASSERT_NULL(view.scalar_value, "scalar_value NULL on miss");
+    ASSERT_NULL(view.array, "array NULL on miss");
+    lush_value_view_clear(&view);
+}
+
+TEST(value_view_clear_idempotent) {
+    lush_value_view_t view = {0};
+    /// Repeated clears on a zero view are no-ops; safe to call after
+    /// lookup whether or not a binding was found.
+    lush_value_view_clear(&view);
+    lush_value_view_clear(&view);
+    lush_value_view_clear(NULL); /// NULL-safe
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "remains NONE");
+}
+
+/* ============================================================================
  * GLOBAL CONVENIENCE API TESTS
  * ============================================================================
  */
 
 TEST(global_convenience_api) {
-    /* Note: These use the global manager, which may not be initialized in test
-     * context. The global convenience API is primarily for use within the shell
-     * runtime. */
+    /// Note: These use the global manager, which may not be initialized in test
+    /// context. The global convenience API is primarily for use within the
+    /// shell runtime.
 
     symtable_manager_t *mgr = symtable_get_global_manager();
     if (mgr == NULL) {
-        /* Global manager not initialized - this is expected in unit test
-         * context */
+        /// Global manager not initialized - this is expected in unit test
+        /// context
         printf(
             "    (Skipped - global manager not initialized in test context)\n");
         return;
@@ -433,7 +528,7 @@ TEST(global_convenience_api) {
 
     ASSERT(symtable_exists_global("TEST_VAR"), "Variable should exist");
 
-    /* Clean up */
+    /// Clean up
     symtable_unset_var(mgr, "TEST_VAR");
 }
 
@@ -474,6 +569,11 @@ int main(void) {
 
     printf("\nArray tests:\n");
     RUN_TEST(array_create);
+    RUN_TEST(value_view_scalar_lookup);
+    RUN_TEST(value_view_list_lookup);
+    RUN_TEST(value_view_map_lookup);
+    RUN_TEST(value_view_none_on_miss);
+    RUN_TEST(value_view_clear_idempotent);
     RUN_TEST(array_indexed_operations);
     RUN_TEST(array_append);
     RUN_TEST(array_associative);

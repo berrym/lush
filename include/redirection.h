@@ -53,12 +53,12 @@ int count_redirections(node_t *command);
  * restored after command execution.
  */
 typedef struct redirection_state {
-    int saved_stdin;   /**< Saved stdin file descriptor */
-    int saved_stdout;  /**< Saved stdout file descriptor */
-    int saved_stderr;  /**< Saved stderr file descriptor */
-    bool stdin_saved;  /**< Whether stdin was saved */
-    bool stdout_saved; /**< Whether stdout was saved */
-    bool stderr_saved; /**< Whether stderr was saved */
+    int saved_stdin;   ///< Saved stdin file descriptor
+    int saved_stdout;  ///< Saved stdout file descriptor
+    int saved_stderr;  ///< Saved stderr file descriptor
+    bool stdin_saved;  ///< Whether stdin was saved
+    bool stdout_saved; ///< Whether stdout was saved
+    bool stderr_saved; ///< Whether stderr was saved
 } redirection_state_t;
 
 /**
@@ -92,4 +92,4 @@ int restore_file_descriptors(redirection_state_t *state);
  */
 void redirection_error(const char *message);
 
-#endif /* REDIRECTION_H */
+#endif /// REDIRECTION_H

@@ -55,10 +55,10 @@ static int print_emit(int fd, const char *text, size_t len) {
 }
 
 int bin_print(int argc, char **argv) {
-    /* Mode gate. The builtin is registered universally in the
-     * builtins[] table; honor the feature flag so bash and POSIX
-     * modes surface "command not found" matching their actual
-     * behavior (neither has a `print` builtin). */
+    /// Mode gate. The builtin is registered universally in the
+    /// builtins[] table; honor the feature flag so bash and POSIX
+    /// modes surface "command not found" matching their actual
+    /// behavior (neither has a `print` builtin).
     if (!shell_mode_allows(FEATURE_ZSH_PRINT_BUILTIN)) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR,
@@ -75,15 +75,15 @@ int bin_print(int argc, char **argv) {
     const char *fmt_str = NULL;
     int target_fd = STDOUT_FILENO;
 
-    /* Zsh-style short-option parsing: combinable flags (-lr, -nr, etc.),
-     * -u and -f take an argument that may be glued (-u2) or separate
-     * (-u 2). `--` terminates option processing. The first non-option
-     * argument also terminates. */
+    /// Zsh-style short-option parsing: combinable flags (-lr, -nr, etc.),
+    /// -u and -f take an argument that may be glued (-u2) or separate
+    /// (-u 2). `--` terminates option processing. The first non-option
+    /// argument also terminates.
     int i = 1;
     while (i < argc) {
         const char *arg = argv[i];
         if (arg[0] != '-' || arg[1] == '\0') {
-            break; /* positional, or bare "-" */
+            break; /// positional, or bare "-"
         }
         if (strcmp(arg, "--") == 0) {
             i++;
@@ -132,8 +132,8 @@ int bin_print(int argc, char **argv) {
                     target_fd = (int)fd_val;
                     consumed_glued_value = true;
                 } else {
-                    /* -u with next-arg form: handled after the inner
-                     * loop because we must advance `i` first. */
+                    /// -u with next-arg form: handled after the inner
+                    /// loop because we must advance `i` first.
                     off++;
                 }
                 break;
@@ -146,8 +146,8 @@ int bin_print(int argc, char **argv) {
                 }
                 break;
             default:
-                /* Unknown short flag. zsh prints "bad option" and exits
-                 * with status 1; mirror that. */
+                /// Unknown short flag. zsh prints "bad option" and exits
+                /// with status 1; mirror that.
                 {
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
@@ -162,9 +162,9 @@ int bin_print(int argc, char **argv) {
 
         i++;
 
-        /* Handle -u/-f when the value comes from the next argv. The
-         * inner loop stops at the trailing 'u' or 'f' (no glued value
-         * after it); pull the value from argv[i]. */
+        /// Handle -u/-f when the value comes from the next argv. The
+        /// inner loop stops at the trailing 'u' or 'f' (no glued value
+        /// after it); pull the value from argv[i].
         if (!consumed_glued_value &&
             (last_letter == 'u' || last_letter == 'f')) {
             if (i >= argc) {
@@ -198,16 +198,16 @@ int bin_print(int argc, char **argv) {
 
     int arg_start = i;
 
-    /* -f delegates to bin_printf with FMT as argv[1] and remaining
-     * positional args following. Inherits the full printf format-spec
-     * surface (%s, %d, %x, %.Ns, etc.) without duplicating any of it
-     * here. -n is the only print-side flag that interacts with -f:
-     * zsh's `print -nf FMT a b c` produces no trailing newline. -u
-     * also composes with -f. */
+    /// -f delegates to bin_printf with FMT as argv[1] and remaining
+    /// positional args following. Inherits the full printf format-spec
+    /// surface (%s, %d, %x, %.Ns, etc.) without duplicating any of it
+    /// here. -n is the only print-side flag that interacts with -f:
+    /// zsh's `print -nf FMT a b c` produces no trailing newline. -u
+    /// also composes with -f.
     if (fmt_str) {
-        /* Rebuild argv as if it were ["printf", FMT, args...]. The
-         * extra slot at index 0 is the synthetic argv[0] bin_printf
-         * expects. */
+        /// Rebuild argv as if it were ["printf", FMT, args...]. The
+        /// extra slot at index 0 is the synthetic argv[0] bin_printf
+        /// expects.
         int new_argc = 2 + (argc - arg_start);
         char **new_argv = malloc((size_t)(new_argc + 1) * sizeof(char *));
         if (!new_argv) {
@@ -225,11 +225,11 @@ int bin_print(int argc, char **argv) {
         }
         new_argv[new_argc] = NULL;
 
-        /* bin_printf writes to stdout. For target_fd != stdout we'd
-         * need to dup-restore; document the constraint by erroring
-         * on the combination rather than silently dropping output.
-         * Most zsh callers using -f use stdout; -u is an edge case
-         * that can be added later if a real script needs it. */
+        /// bin_printf writes to stdout. For target_fd != stdout we'd
+        /// need to dup-restore; document the constraint by erroring
+        /// on the combination rather than silently dropping output.
+        /// Most zsh callers using -f use stdout; -u is an edge case
+        /// that can be added later if a real script needs it.
         if (target_fd != STDOUT_FILENO) {
             int saved = dup(STDOUT_FILENO);
             if (saved < 0 || dup2(target_fd, STDOUT_FILENO) < 0) {
@@ -258,14 +258,14 @@ int bin_print(int argc, char **argv) {
         return rc;
     }
 
-    /* Default / -l / -n / -r / -P path. Build the joined output,
-     * then emit in one write() to the target fd so partial writes
-     * across split args are avoided. */
+    /// Default / -l / -n / -r / -P path. Build the joined output,
+    /// then emit in one write() to the target fd so partial writes
+    /// across split args are avoided.
     const char *sep = one_per_line ? "\n" : " ";
     size_t sep_len = strlen(sep);
 
-    /* Compute total length needed. For -P we don't know post-expansion
-     * length, so use a per-arg buffer of PRINT_PROMPT_BUF_SIZE. */
+    /// Compute total length needed. For -P we don't know post-expansion
+    /// length, so use a per-arg buffer of PRINT_PROMPT_BUF_SIZE.
     size_t total_cap = 64;
     size_t total_len = 0;
     char *buf = malloc(total_cap);
@@ -284,10 +284,10 @@ int bin_print(int argc, char **argv) {
         char prompt_buf[PRINT_PROMPT_BUF_SIZE];
 
         if (prompt_expand_flag) {
-            /* Route through the unified prompt expansion engine. The
-             * minimal context is fine for `print -P`: no template
-             * segments (template_ctx=NULL), runtime values pulled
-             * from the live shell state. */
+            /// Route through the unified prompt expansion engine. The
+            /// minimal context is fine for `print -P`: no template
+            /// segments (template_ctx=NULL), runtime values pulled
+            /// from the live shell state.
             lle_prompt_expand_ctx_t pctx = {
                 .template_ctx = NULL,
                 .last_exit_status = last_exit_status,
@@ -301,11 +301,11 @@ int bin_print(int argc, char **argv) {
             if (r == LLE_SUCCESS) {
                 src = prompt_buf;
             }
-            /* On failure fall through and emit the raw argument so
-             * the user at least sees something. */
+            /// On failure fall through and emit the raw argument so
+            /// the user at least sees something.
         } else if (!raw) {
-            /* Default: process \n, \t, \xNN, etc. like bin_echo's
-             * XPG-mode path. */
+            /// Default: process \n, \t, \xNN, etc. like bin_echo's
+            /// XPG-mode path.
             processed = process_escape_sequences(argv[k]);
             if (processed) {
                 src = processed;

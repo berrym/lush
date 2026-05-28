@@ -61,25 +61,25 @@ int bin_getopts(int argc, char **argv) {
     char *optstring = argv[1];
     char *varname = argv[2];
 
-    // Get current OPTIND value from environment
+    /// Get current OPTIND value from environment
     char *optind_str = symtable_get_global("OPTIND");
     int current_optind = optind_str ? atoi(optind_str) : 1;
 
-    // Determine arguments to parse
+    /// Determine arguments to parse
     char **parse_args;
     int parse_argc;
 
     if (argc > 3) {
-        // Use provided arguments
+        /// Use provided arguments
         parse_args = &argv[3];
         parse_argc = argc - 3;
     } else {
-        // Use positional parameters - get from shell environment
-        // For now, use a simple implementation
+        /// Use positional parameters - get from shell environment
+        /// For now, use a simple implementation
         parse_args = NULL;
         parse_argc = 0;
 
-        // Try to get positional parameters from shell variables
+        /// Try to get positional parameters from shell variables
         char *argc_str = symtable_get_global("#");
         if (argc_str) {
             parse_argc = atoi(argc_str);
@@ -96,10 +96,11 @@ int bin_getopts(int argc, char **argv) {
         }
     }
 
-    // Check if we have arguments to parse
+    /// Check if we have arguments to parse
     if (parse_argc == 0 || current_optind > parse_argc) {
-        // No more arguments - OPTIND should point to first non-option argument
-        // Don't reset OPTIND to 1, leave it pointing to where non-options start
+        /// No more arguments - OPTIND should point to first non-option argument
+        /// Don't reset OPTIND to 1, leave it pointing to where non-options
+        /// start
         if (argc <= 3 && parse_args) {
             for (int i = 0; i < parse_argc; i++) {
                 free(parse_args[i]);
@@ -109,21 +110,21 @@ int bin_getopts(int argc, char **argv) {
         return 1;
     }
 
-    // Get current argument to parse
+    /// Get current argument to parse
     char *current_arg = parse_args[current_optind - 1];
 
-    // Static variables to maintain state between calls
+    /// Static variables to maintain state between calls
     static char *current_option_arg = NULL;
     static int option_pos = 0;
 
-    // Check if we're continuing with a combined option (like -abc)
+    /// Check if we're continuing with a combined option (like -abc)
     if (option_pos == 0) {
-        // Starting new argument
+        /// Starting new argument
         if (!current_arg || current_arg[0] != '-' ||
             strcmp(current_arg, "-") == 0) {
-            // Not an option or single dash - OPTIND should point to this
-            // non-option Don't reset OPTIND to 1, it should point to current
-            // position
+            /// Not an option or single dash - OPTIND should point to this
+            /// non-option Don't reset OPTIND to 1, it should point to current
+            /// position
             if (argc <= 3 && parse_args) {
                 for (int i = 0; i < parse_argc; i++) {
                     free(parse_args[i]);
@@ -134,7 +135,7 @@ int bin_getopts(int argc, char **argv) {
         }
 
         if (strcmp(current_arg, "--") == 0) {
-            // End of options marker
+            /// End of options marker
             char next_optind[16];
             snprintf(next_optind, sizeof(next_optind), "%d",
                      current_optind + 1);
@@ -149,13 +150,13 @@ int bin_getopts(int argc, char **argv) {
         }
 
         current_option_arg = current_arg;
-        option_pos = 1; // Skip the initial '-'
+        option_pos = 1; /// Skip the initial '-'
     }
 
-    // Get current option character
+    /// Get current option character
     char opt_char = current_option_arg[option_pos];
     if (opt_char == '\0') {
-        // Move to next argument
+        /// Move to next argument
         current_optind++;
         option_pos = 0;
         char next_optind[16];
@@ -168,15 +169,15 @@ int bin_getopts(int argc, char **argv) {
             free(parse_args);
         }
         return bin_getopts(argc,
-                           argv); // Recursive call to process next argument
+                           argv); /// Recursive call to process next argument
     }
 
-    // Check if option is valid
+    /// Check if option is valid
     bool silent_mode = (optstring[0] == ':');
     char *opt_pos = strchr(silent_mode ? optstring + 1 : optstring, opt_char);
 
     if (!opt_pos) {
-        // Invalid option
+        /// Invalid option
         if (silent_mode) {
             symtable_set_global(varname, "?");
             char optarg_val[2] = {opt_char, '\0'};
@@ -190,7 +191,7 @@ int bin_getopts(int argc, char **argv) {
         }
         option_pos++;
 
-        // If we've finished processing this argument, move to next
+        /// If we've finished processing this argument, move to next
         if (current_option_arg[option_pos] == '\0') {
             current_optind++;
             option_pos = 0;
@@ -208,25 +209,25 @@ int bin_getopts(int argc, char **argv) {
         return 0;
     }
 
-    // Check if option requires an argument
+    /// Check if option requires an argument
     bool needs_arg = (opt_pos[1] == ':');
 
     if (needs_arg) {
         char *arg_value = NULL;
 
         if (current_option_arg[option_pos + 1] != '\0') {
-            // Argument is attached (like -fvalue)
+            /// Argument is attached (like -fvalue)
             arg_value = &current_option_arg[option_pos + 1];
-            option_pos = 0; // Move to next argument
+            option_pos = 0; /// Move to next argument
             current_optind++;
         } else {
-            // Argument should be in next parameter
+            /// Argument should be in next parameter
             if (current_optind < parse_argc) {
                 arg_value = parse_args[current_optind];
-                current_optind++; // Move past the option argument
+                current_optind++; /// Move past the option argument
                 option_pos = 0;
             } else {
-                // Missing argument
+                /// Missing argument
                 if (silent_mode) {
                     symtable_set_global(varname, ":");
                     char optarg_val[2] = {opt_char, '\0'};
@@ -253,34 +254,34 @@ int bin_getopts(int argc, char **argv) {
             }
         }
 
-        // Set option and argument
+        /// Set option and argument
         char opt_val[2] = {opt_char, '\0'};
         symtable_set_global(varname, opt_val);
         symtable_set_global("OPTARG", arg_value ? arg_value : "");
 
-        // For options with arguments, we need to increment current_optind again
-        // since we consumed both the option and its argument
+        /// For options with arguments, we need to increment current_optind
+        /// again since we consumed both the option and its argument
         current_optind++;
     } else {
-        // Option doesn't take an argument
+        /// Option doesn't take an argument
         char opt_val[2] = {opt_char, '\0'};
         symtable_set_global(varname, opt_val);
         symtable_set_global("OPTARG", "");
         option_pos++;
 
-        // If we've finished processing this argument, move to next
+        /// If we've finished processing this argument, move to next
         if (current_option_arg[option_pos] == '\0') {
             current_optind++;
             option_pos = 0;
         }
     }
 
-    // Update OPTIND
+    /// Update OPTIND
     char next_optind[16];
     snprintf(next_optind, sizeof(next_optind), "%d", current_optind);
     symtable_set_global("OPTIND", next_optind);
 
-    // Clean up if we allocated parse_args
+    /// Clean up if we allocated parse_args
     if (argc <= 3 && parse_args) {
         for (int i = 0; i < parse_argc; i++) {
             free(parse_args[i]);
@@ -288,5 +289,5 @@ int bin_getopts(int argc, char **argv) {
         free(parse_args);
     }
 
-    return 0; // Found an option
+    return 0; /// Found an option
 }

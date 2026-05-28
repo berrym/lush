@@ -26,7 +26,7 @@
  */
 
 TEST(c0_control_characters_zero_width) {
-    ASSERT_EQ(lle_codepoint_width(0x00), 0, "NUL"); /* C0: 0x00-0x1F */
+    ASSERT_EQ(lle_codepoint_width(0x00), 0, "NUL"); /// C0: 0x00-0x1F
     ASSERT_EQ(lle_codepoint_width(0x07), 0, "BEL");
     ASSERT_EQ(lle_codepoint_width(0x09), 0, "TAB");
     ASSERT_EQ(lle_codepoint_width(0x0A), 0, "LF");
@@ -71,32 +71,32 @@ TEST(ascii_printable_width_one) {
  */
 
 TEST(combining_diacritical_marks_zero_width) {
-    /* U+0300..U+036F */
+    /// U+0300..U+036F
     ASSERT_EQ(lle_codepoint_width(0x0300), 0, "first combining mark");
     ASSERT_EQ(lle_codepoint_width(0x0301), 0, "combining acute");
     ASSERT_EQ(lle_codepoint_width(0x036F), 0, "last in block");
 }
 
 TEST(combining_diacritical_marks_extended_zero_width) {
-    /* U+1AB0..U+1AFF */
+    /// U+1AB0..U+1AFF
     ASSERT_EQ(lle_codepoint_width(0x1AB0), 0, "first ext combining");
     ASSERT_EQ(lle_codepoint_width(0x1AFF), 0, "last ext combining");
 }
 
 TEST(combining_diacritical_marks_supplement_zero_width) {
-    /* U+1DC0..U+1DFF */
+    /// U+1DC0..U+1DFF
     ASSERT_EQ(lle_codepoint_width(0x1DC0), 0, "first supp combining");
     ASSERT_EQ(lle_codepoint_width(0x1DFF), 0, "last supp combining");
 }
 
 TEST(combining_diacritical_marks_for_symbols_zero_width) {
-    /* U+20D0..U+20FF */
+    /// U+20D0..U+20FF
     ASSERT_EQ(lle_codepoint_width(0x20D0), 0, "first symbol-comb");
     ASSERT_EQ(lle_codepoint_width(0x20FF), 0, "last symbol-comb");
 }
 
 TEST(combining_half_marks_zero_width) {
-    /* U+FE20..U+FE2F */
+    /// U+FE20..U+FE2F
     ASSERT_EQ(lle_codepoint_width(0xFE20), 0, "first combining half");
     ASSERT_EQ(lle_codepoint_width(0xFE2F), 0, "last combining half");
 }
@@ -119,14 +119,14 @@ TEST(explicit_zero_width_characters) {
  */
 
 TEST(hangul_jamo_choseong_wide) {
-    /* U+1100..U+115F : initial consonants render as wide */
+    /// U+1100..U+115F : initial consonants render as wide
     ASSERT_EQ(lle_codepoint_width(0x1100), 2, "first choseong");
     ASSERT_EQ(lle_codepoint_width(0x1112), 2, "middle of choseong block");
     ASSERT_EQ(lle_codepoint_width(0x115F), 2, "last choseong");
 }
 
 TEST(hangul_jamo_jungseong_jongseong_zero_width) {
-    /* U+1160..U+11FF : medial vowels and final consonants combine */
+    /// U+1160..U+11FF : medial vowels and final consonants combine
     ASSERT_EQ(lle_codepoint_width(0x1160), 0, "first jungseong");
     ASSERT_EQ(lle_codepoint_width(0x11A7), 0, "boundary jungseong/jongseong");
     ASSERT_EQ(lle_codepoint_width(0x11FF), 0, "last jongseong");
@@ -138,7 +138,7 @@ TEST(hangul_jamo_jungseong_jongseong_zero_width) {
  */
 
 TEST(cjk_unified_ideographs_wide) {
-    /* U+4E00..U+9FFF : the main CJK block */
+    /// U+4E00..U+9FFF : the main CJK block
     ASSERT_EQ(lle_codepoint_width(0x4E00), 2, "U+4E00 (one)");
     ASSERT_EQ(lle_codepoint_width(0x4E2D), 2, "U+4E2D (middle / China)");
     ASSERT_EQ(lle_codepoint_width(0x6F22), 2, "U+6F22 (Han)");
@@ -170,7 +170,7 @@ TEST(cjk_extension_c_through_g_wide) {
  */
 
 TEST(hangul_syllables_wide) {
-    /* U+AC00..U+D7A3 */
+    /// U+AC00..U+D7A3
     ASSERT_EQ(lle_codepoint_width(0xAC00), 2, "first syllable (가)");
     ASSERT_EQ(lle_codepoint_width(0xC548), 2, "안");
     ASSERT_EQ(lle_codepoint_width(0xB155), 2, "녕");
@@ -183,21 +183,21 @@ TEST(hangul_syllables_wide) {
  */
 
 TEST(hiragana_wide) {
-    /* U+3040..U+309F */
+    /// U+3040..U+309F
     ASSERT_EQ(lle_codepoint_width(0x3040), 2, "first hiragana block");
     ASSERT_EQ(lle_codepoint_width(0x3042), 2, "あ");
     ASSERT_EQ(lle_codepoint_width(0x309F), 2, "last hiragana block");
 }
 
 TEST(katakana_wide) {
-    /* U+30A0..U+30FF */
+    /// U+30A0..U+30FF
     ASSERT_EQ(lle_codepoint_width(0x30A0), 2, "first katakana block");
     ASSERT_EQ(lle_codepoint_width(0x30AB), 2, "カ");
     ASSERT_EQ(lle_codepoint_width(0x30FF), 2, "last katakana block");
 }
 
 TEST(katakana_phonetic_extensions_wide) {
-    /* U+31F0..U+31FF */
+    /// U+31F0..U+31FF
     ASSERT_EQ(lle_codepoint_width(0x31F0), 2, "first kata phonetic ext");
     ASSERT_EQ(lle_codepoint_width(0x31FF), 2, "last kata phonetic ext");
 }
@@ -208,14 +208,14 @@ TEST(katakana_phonetic_extensions_wide) {
  */
 
 TEST(fullwidth_forms_wide) {
-    /* U+FF00..U+FF60 */
+    /// U+FF00..U+FF60
     ASSERT_EQ(lle_codepoint_width(0xFF00), 2, "first fullwidth");
     ASSERT_EQ(lle_codepoint_width(0xFF21), 2, "FULLWIDTH A");
     ASSERT_EQ(lle_codepoint_width(0xFF60), 2, "last in first fullwidth range");
 }
 
 TEST(fullwidth_forms_secondary_range_wide) {
-    /* U+FFE0..U+FFE6 */
+    /// U+FFE0..U+FFE6
     ASSERT_EQ(lle_codepoint_width(0xFFE0), 2, "FULLWIDTH CENT SIGN");
     ASSERT_EQ(lle_codepoint_width(0xFFE6), 2, "FULLWIDTH WON SIGN");
 }
@@ -226,33 +226,33 @@ TEST(fullwidth_forms_secondary_range_wide) {
  */
 
 TEST(emoji_main_block_wide) {
-    /* U+1F300..U+1F9FF — the dominant emoji blocks */
+    /// U+1F300..U+1F9FF — the dominant emoji blocks
     ASSERT_EQ(lle_codepoint_width(0x1F300), 2, "first emoji block");
     ASSERT_EQ(lle_codepoint_width(0x1F600), 2, "smiley");
     ASSERT_EQ(lle_codepoint_width(0x1F9FF), 2, "last in emoji block");
 }
 
 TEST(emoji_symbols_pictographs_extended_a_wide) {
-    /* U+1FA00..U+1FAFF */
+    /// U+1FA00..U+1FAFF
     ASSERT_EQ(lle_codepoint_width(0x1FA00), 2, "first SP-A");
     ASSERT_EQ(lle_codepoint_width(0x1FAFF), 2, "last SP-A");
 }
 
 TEST(misc_symbols_wide) {
-    /* U+2600..U+27BF */
+    /// U+2600..U+27BF
     ASSERT_EQ(lle_codepoint_width(0x2600), 2, "BLACK SUN WITH RAYS");
     ASSERT_EQ(lle_codepoint_width(0x2705), 2, "WHITE HEAVY CHECK MARK");
     ASSERT_EQ(lle_codepoint_width(0x27BF), 2, "last in block");
 }
 
 TEST(misc_technical_wide) {
-    /* U+2300..U+23FF */
+    /// U+2300..U+23FF
     ASSERT_EQ(lle_codepoint_width(0x2300), 2, "first technical");
     ASSERT_EQ(lle_codepoint_width(0x23FF), 2, "last technical");
 }
 
 TEST(stars_wide) {
-    /* U+2B50..U+2B55 */
+    /// U+2B50..U+2B55
     ASSERT_EQ(lle_codepoint_width(0x2B50), 2, "WHITE MEDIUM STAR");
     ASSERT_EQ(lle_codepoint_width(0x2B55), 2, "HEAVY LARGE CIRCLE");
 }
@@ -263,7 +263,7 @@ TEST(stars_wide) {
  */
 
 TEST(variation_selectors_zero_width) {
-    /* U+FE00..U+FE0F */
+    /// U+FE00..U+FE0F
     ASSERT_EQ(lle_codepoint_width(0xFE00), 0, "VS-1");
     ASSERT_EQ(lle_codepoint_width(0xFE0E), 0, "VS-15 (text)");
     ASSERT_EQ(lle_codepoint_width(0xFE0F), 0, "VS-16 (emoji)");
@@ -294,7 +294,7 @@ TEST(emoji_skin_tone_modifiers_wide) {
  */
 
 TEST(regional_indicators_wide) {
-    /* U+1F1E6..U+1F1FF — flag letters */
+    /// U+1F1E6..U+1F1FF — flag letters
     ASSERT_EQ(lle_codepoint_width(0x1F1E6), 2, "REGIONAL INDICATOR A");
     ASSERT_EQ(lle_codepoint_width(0x1F1FA), 2, "REGIONAL INDICATOR U");
     ASSERT_EQ(lle_codepoint_width(0x1F1FF), 2, "REGIONAL INDICATOR Z");
@@ -307,21 +307,21 @@ TEST(regional_indicators_wide) {
  */
 
 TEST(box_drawing_width_one) {
-    /* U+2500..U+257F */
+    /// U+2500..U+257F
     ASSERT_EQ(lle_codepoint_width(0x2500), 1, "BOX DRAWINGS LIGHT HORIZONTAL");
     ASSERT_EQ(lle_codepoint_width(0x2550), 1, "BOX DRAWINGS DOUBLE HORIZONTAL");
     ASSERT_EQ(lle_codepoint_width(0x257F), 1, "last box drawing");
 }
 
 TEST(block_elements_width_one) {
-    /* U+2580..U+259F */
+    /// U+2580..U+259F
     ASSERT_EQ(lle_codepoint_width(0x2580), 1, "UPPER HALF BLOCK");
     ASSERT_EQ(lle_codepoint_width(0x2588), 1, "FULL BLOCK");
     ASSERT_EQ(lle_codepoint_width(0x259F), 1, "last block element");
 }
 
 TEST(geometric_shapes_width_one) {
-    /* U+25A0..U+25FF */
+    /// U+25A0..U+25FF
     ASSERT_EQ(lle_codepoint_width(0x25A0), 1, "BLACK SQUARE");
     ASSERT_EQ(lle_codepoint_width(0x25CF), 1, "BLACK CIRCLE");
     ASSERT_EQ(lle_codepoint_width(0x25FF), 1, "last geometric shape");
@@ -348,16 +348,16 @@ TEST(unmapped_codepoints_default_to_one) {
  */
 
 TEST(boundary_just_before_cjk_unified) {
-    /* 0x4DFF is just before the CJK block (0x4E00..) and is the end of
-     * Yijing Hexagram Symbols, which the implementation does not treat
-     * specially, so it falls through to the default width of 1. */
+    /// 0x4DFF is just before the CJK block (0x4E00..) and is the end of
+    /// Yijing Hexagram Symbols, which the implementation does not treat
+    /// specially, so it falls through to the default width of 1.
     ASSERT_EQ(lle_codepoint_width(0x4DFF), 1, "just before CJK");
     ASSERT_EQ(lle_codepoint_width(0x4E00), 2, "first CJK");
 }
 
 TEST(boundary_just_after_cjk_unified) {
-    /* 0xA000 is just after CJK (0x9FFF). Yi Syllables block; falls
-     * through to default. */
+    /// 0xA000 is just after CJK (0x9FFF). Yi Syllables block; falls
+    /// through to default.
     ASSERT_EQ(lle_codepoint_width(0x9FFF), 2, "last CJK");
     ASSERT_EQ(lle_codepoint_width(0xA000), 1, "just after CJK (default)");
 }

@@ -35,6 +35,7 @@
 #include "config.h"
 #include "executor.h"
 #include "ht.h"
+#include "identifier.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -43,7 +44,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* bin_set's underlying impl lives in src/posix_opts.c. */
+/// bin_set's underlying impl lives in src/posix_opts.c.
 int builtin_set(char **argv);
 
 /* Hash table for remembered command paths. Owned here; bin_hash.c
@@ -82,7 +83,7 @@ typedef struct {
 } path_neg_cache_entry_t;
 
 static path_neg_cache_entry_t path_neg_cache[PATH_NEG_CACHE_SIZE];
-static size_t path_neg_cache_next; /* FIFO insertion index */
+static size_t path_neg_cache_next; /// FIFO insertion index
 
 static int64_t timespec_diff_ms(const struct timespec *later,
                                 const struct timespec *earlier) {
@@ -96,11 +97,11 @@ static int64_t timespec_diff_ms(const struct timespec *later,
 static bool path_neg_cache_check(const char *command) {
     int ttl_ms = config.path_negative_cache_ttl_ms;
     if (ttl_ms <= 0) {
-        return false; /* disabled */
+        return false; /// disabled
     }
     struct timespec now;
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
-        return false; /* defensive: treat clock failure as "not cached" */
+        return false; /// defensive: treat clock failure as "not cached"
     }
     for (size_t i = 0; i < PATH_NEG_CACHE_SIZE; i++) {
         if (!path_neg_cache[i].valid) {
@@ -111,7 +112,7 @@ static bool path_neg_cache_check(const char *command) {
                 ttl_ms) {
                 return true;
             }
-            path_neg_cache[i].valid = false; /* stale */
+            path_neg_cache[i].valid = false; /// stale
             return false;
         }
     }
@@ -126,7 +127,7 @@ static void path_neg_cache_insert(const char *command) {
         return;
     }
     if (strlen(command) >= PATH_NEG_CACHE_NAME_MAX) {
-        return; /* too long to cache; PATH walk will retry next time */
+        return; /// too long to cache; PATH walk will retry next time
     }
     size_t idx = path_neg_cache_next;
     path_neg_cache_next = (path_neg_cache_next + 1) % PATH_NEG_CACHE_SIZE;
@@ -152,74 +153,91 @@ void path_negative_cache_clear(void) {
  */
 
 builtin builtins[] = {
-    {"exit", "exit shell", bin_exit},
-    {"help", "builtin help", bin_help},
-    {"cd", "change directory", bin_cd},
-    {"pwd", "print working directory", bin_pwd},
-    {"history", "print command history", bin_history},
-    {"fc", "fix command (POSIX history edit/list)", bin_fc},
-    {"alias", "set an alias", bin_alias},
-    {"unalias", "unset an alias", bin_unalias},
-    {"clear", "clear the screen", bin_clear},
-    {"terminal", "display terminal information", bin_terminal},
-    {"type", "display command type", bin_type},
-    {"unset", "unset a shell variable", bin_unset},
-    {"echo", "echo text to stdout", bin_echo},
-    {"print", "zsh-style print (-l/-n/-r/-u/-f/-P)", bin_print},
-    {"printf", "formatted output", bin_printf},
-    {"export", "export shell variables", bin_export},
-    {"source", "source a script", bin_source},
-    {".", "source a script", bin_source},
-    {"test", "test expressions", bin_test},
-    {"[", "test expressions", bin_test},
-    {"read", "read user input", bin_read},
-    {"eval", "evaluate arguments", bin_eval},
-    {"true", "return success status", bin_true},
-    {"false", "return failure status", bin_false},
-    {"set", "set shell options", bin_set},
-    {"jobs", "list active jobs", bin_jobs},
-    {"fg", "bring job to foreground", bin_fg},
-    {"bg", "send job to background", bin_bg},
-    {"disown", "remove jobs from shell or mark to not receive SIGHUP",
-     bin_disown},
-    {"shift", "shift positional parameters", bin_shift},
-    {"break", "break out of loops", bin_break},
-    {"continue", "continue to next loop iteration", bin_continue},
-    {"return", "return from functions", bin_return},
-    {"return_value", "set function return value", bin_return_value},
-    {"trap", "set signal handlers", bin_trap},
-    {"exec", "replace shell with command", bin_exec},
-    {"wait", "wait for background jobs", bin_wait},
-    {"umask", "set/display file creation mask", bin_umask},
-    {"ulimit", "set/display resource limits", bin_ulimit},
-    {"times", "display process times", bin_times},
-    {"getopts", "parse command options", bin_getopts},
-    {"local", "declare local variables", bin_local},
-    {"declare", "declare variables with attributes", bin_declare},
-    {"typeset", "declare variables with attributes", bin_declare},
-    {"let", "evaluate arithmetic expressions", bin_let},
-    {":", "null command (no-op)", bin_colon},
-    {"readonly", "create read-only variables", bin_readonly},
-    {"config", "manage shell configuration", bin_config},
-    {"setopt", "enable shell options/features", bin_setopt},
-    {"unsetopt", "disable shell options/features", bin_unsetopt},
-    {"shopt", "bash-style shell options", bin_shopt},
-    {"mode", "select active shell mode preset", bin_mode},
-    {"hash", "remember utility locations", bin_hash},
-    {"display", "manage layered display system", bin_display},
-    {"network", "manage network and SSH hosts", bin_network},
-    {"debug", "advanced debugging and profiling", bin_debug},
-    {"command", "execute command bypassing builtins/aliases", bin_command},
-    {"pushd", "push directory onto stack", bin_pushd},
-    {"popd", "pop directory from stack", bin_popd},
-    {"dirs", "display directory stack", bin_dirs},
-    {"mapfile", "read lines from stdin into array", bin_mapfile},
-    {"readarray", "read lines from stdin into array", bin_mapfile},
-    {"env", "run command with modified environment", bin_env},
-    {"printenv", "print environment variables", bin_env},
-    {"analyze", "full script analysis with info, warnings, and errors",
-     bin_analyze},
-    {"lint", "lint scripts and optionally apply automatic fixes", bin_lint},
+    {        "exit",                                               "exit shell",bin_exit                                                                                },
+    {        "help",                                             "builtin help",         bin_help},
+    {          "cd",                                         "change directory",           bin_cd},
+    {         "pwd",                                  "print working directory",          bin_pwd},
+    {     "history",                                    "print command history",      bin_history},
+    {          "fc",                    "fix command (POSIX history edit/list)",           bin_fc},
+    {       "alias",                                             "set an alias",        bin_alias},
+    {     "unalias",                                           "unset an alias",      bin_unalias},
+    {       "clear",                                         "clear the screen",        bin_clear},
+    {    "terminal",                             "display terminal information",     bin_terminal},
+    {        "type",                                     "display command type",         bin_type},
+    {       "unset",                                   "unset a shell variable",        bin_unset},
+    {        "echo",                                      "echo text to stdout",         bin_echo},
+    {       "print",                      "zsh-style print (-l/-n/-r/-u/-f/-P)",        bin_print},
+    {      "printf",                                         "formatted output",       bin_printf},
+    {      "export",                                   "export shell variables",       bin_export},
+    {      "source",                                          "source a script",       bin_source},
+    {           ".",                                          "source a script",       bin_source},
+    {        "test",                                         "test expressions",         bin_test},
+    {           "[",                                         "test expressions",         bin_test},
+    {        "read",                                          "read user input",         bin_read},
+    {        "eval",                                       "evaluate arguments",         bin_eval},
+    {        "true",                                    "return success status",         bin_true},
+    {       "false",                                    "return failure status",        bin_false},
+    {         "set",                                        "set shell options",          bin_set},
+    {        "jobs",                                         "list active jobs",         bin_jobs},
+    {          "fg",                                  "bring job to foreground",           bin_fg},
+    {          "bg",                                   "send job to background",           bin_bg},
+    {      "disown",     "remove jobs from shell or mark to not receive SIGHUP",
+     bin_disown                                                                                  },
+    {       "shift",                              "shift positional parameters",        bin_shift},
+    {       "break",                                       "break out of loops",        bin_break},
+    {    "continue",                          "continue to next loop iteration",     bin_continue},
+    {      "return",                                    "return from functions",       bin_return},
+    {        "trap",                                      "set signal handlers",         bin_trap},
+    {        "exec",                               "replace shell with command",         bin_exec},
+    {        "wait",                                 "wait for background jobs",         bin_wait},
+    {       "umask",                           "set/display file creation mask",        bin_umask},
+    {      "ulimit",                              "set/display resource limits",       bin_ulimit},
+    {       "times",                                    "display process times",        bin_times},
+    {     "getopts",                                    "parse command options",      bin_getopts},
+    {       "local",                                  "declare local variables",        bin_local},
+    {     "declare",                        "declare variables with attributes",      bin_declare},
+    {     "typeset",                        "declare variables with attributes",      bin_declare},
+    {         "let",                          "evaluate arithmetic expressions",          bin_let},
+    {           ":",                                     "null command (no-op)",        bin_colon},
+    {    "readonly",                               "create read-only variables",     bin_readonly},
+    {      "config",                               "manage shell configuration",       bin_config},
+    {      "setopt",                            "enable shell options/features",       bin_setopt},
+    {    "unsetopt",                           "disable shell options/features",     bin_unsetopt},
+    {       "shopt",                                 "bash-style shell options",        bin_shopt},
+    {        "mode",                          "select active shell mode preset",         bin_mode},
+    {        "hash",                               "remember utility locations",         bin_hash},
+    {     "display",                            "manage layered display system",      bin_display},
+    {     "network",                             "manage network and SSH hosts",      bin_network},
+    {       "debug",                         "advanced debugging and profiling",        bin_debug},
+    {     "command",               "execute command bypassing builtins/aliases",      bin_command},
+    {       "pushd",                                "push directory onto stack",        bin_pushd},
+    {        "popd",                                 "pop directory from stack",         bin_popd},
+    {        "dirs",                                  "display directory stack",         bin_dirs},
+    {     "mapfile",                         "read lines from stdin into array",      bin_mapfile},
+    {   "readarray",                         "read lines from stdin into array",      bin_mapfile},
+    {         "env",                    "run command with modified environment",          bin_env},
+    {    "printenv",                              "print environment variables",          bin_env},
+    {     "analyze",     "full script analysis with info, warnings, and errors",
+     bin_analyze                                                                                 },
+    {        "lint",        "lint scripts and optionally apply automatic fixes",         bin_lint},
+    /// zsh-compatibility stubs (no-op; see bin_zsh_stubs.c)
+    {     "bindkey",                "zsh key-binding (records + routes to LLE)",      bin_bindkey},
+    {    "autoload",                "zsh lazy function loader (fpath-resolved)",     bin_autoload},
+    {    "zmodload",                           "zsh module loader (no-op stub)",     bin_zmodload},
+    {     "emulate", "zsh emulation switch (no-op when target == current mode)",
+     bin_emulate                                                                                 },
+    {      "colors",                           "zsh colors helper (no-op stub)",       bin_colors},
+    {         "zle",            "zsh line-editor widget registration / listing",          bin_zle},
+    /// bash-completion compatibility (no-op stubs; full record-and-query
+    /// implementation tracked in CORPUS_PUNCH_LIST.md)
+    {    "complete",                "bash completion registration (no-op stub)",     bin_complete},
+    {     "compgen",         "bash completion candidate generator (no-op stub)",
+     bin_compgen                                                                                 },
+    {     "compopt",              "bash completion option mutator (no-op stub)",      bin_compopt},
+    {      "zstyle",                    "zsh pattern-based style configuration",       bin_zstyle},
+    {    "compinit",                         "zsh completion init (no-op stub)",     bin_compinit},
+    {"bashcompinit",                    "zsh bash-completion init (no-op stub)", bin_bashcompinit},
+    {  "unfunction",                               "zsh remove shell functions",   bin_unfunction},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);
@@ -298,23 +316,14 @@ source_location_t builtin_get_source_location(void) {
  */
 
 int is_valid_identifier(const char *name) {
-    if (!name || !*name) {
-        return 0;
-    }
-
-    /* First character must be letter or underscore. */
-    if (!isalpha(*name) && *name != '_') {
-        return 0;
-    }
-
-    /* Subsequent characters must be alphanumeric or underscore. */
-    for (const char *p = name + 1; *p; p++) {
-        if (!isalnum(*p) && *p != '_') {
-            return 0;
-        }
-    }
-
-    return 1;
+    /// Single source of truth for "is this a valid identifier?" is
+    /// lush_is_valid_identifier in src/identifier.c, which honors
+    /// FEATURE_UNICODE_IDENTIFIERS and NFC-canonicalizes the input
+    /// internally so NFD-encoded names validate on equal terms with
+    /// the NFC equivalent. This wrapper keeps the int-returning C
+    /// API the existing callers (declare, local, export, readonly,
+    /// unset) already use.
+    return lush_is_valid_identifier(name) ? 1 : 0;
 }
 
 /* ============================================================================
@@ -351,7 +360,7 @@ char *find_command_in_path(const char *command) {
         return NULL;
     }
 
-    /* If command contains slash, check if it exists as-is. */
+    /// If command contains slash, check if it exists as-is.
     if (strchr(command, '/')) {
         if (access(command, F_OK) == 0) {
             return strdup(command);
@@ -359,11 +368,11 @@ char *find_command_in_path(const char *command) {
         return NULL;
     }
 
-    /* Positive cache: command_hash holds previously-resolved paths
-     * (also populated by the POSIX `hash` builtin). On hit, revalidate
-     * with access(X_OK) so a removed binary doesn't keep a stale path
-     * pinned -- on revalidation failure, drop the stale entry and fall
-     * through to a fresh PATH walk. */
+    /// Positive cache: command_hash holds previously-resolved paths
+    /// (also populated by the POSIX `hash` builtin). On hit, revalidate
+    /// with access(X_OK) so a removed binary doesn't keep a stale path
+    /// pinned -- on revalidation failure, drop the stale entry and fall
+    /// through to a fresh PATH walk.
     if (command_hash) {
         const char *cached = ht_strstr_get(command_hash, command);
         if (cached) {
@@ -374,9 +383,9 @@ char *find_command_in_path(const char *command) {
         }
     }
 
-    /* Negative cache: short-circuit a recent miss within TTL so a tight
-     * loop calling a missing command pays O(1) instead of O(PATH_dirs)
-     * per iteration. */
+    /// Negative cache: short-circuit a recent miss within TTL so a tight
+    /// loop calling a missing command pays O(1) instead of O(PATH_dirs)
+    /// per iteration.
     if (path_neg_cache_check(command)) {
         return NULL;
     }
@@ -398,7 +407,7 @@ char *find_command_in_path(const char *command) {
     while (path_dir) {
         size_t dir_len = strlen(path_dir);
         size_t cmd_len = strlen(command);
-        char *full_path = malloc(dir_len + cmd_len + 2); /* +'/' + '\0' */
+        char *full_path = malloc(dir_len + cmd_len + 2); /// +'/' + '\0'
 
         if (full_path) {
             snprintf(full_path, dir_len + cmd_len + 2, "%s/%s", path_dir,
@@ -418,8 +427,8 @@ char *find_command_in_path(const char *command) {
     free(path_copy);
 
     if (result) {
-        /* Populate positive cache. POSIX hash table doubles as the
-         * positive cache; the `hash` builtin shows / clears it. */
+        /// Populate positive cache. POSIX hash table doubles as the
+        /// positive cache; the `hash` builtin shows / clears it.
         if (!command_hash) {
             init_command_hash();
         }
@@ -427,7 +436,7 @@ char *find_command_in_path(const char *command) {
             ht_strstr_insert(command_hash, command, result);
         }
     } else {
-        /* Populate negative cache so the next call within TTL is O(1). */
+        /// Populate negative cache so the next call within TTL is O(1).
         path_neg_cache_insert(command);
     }
     return result;

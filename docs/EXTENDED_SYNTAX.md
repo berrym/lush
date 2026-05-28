@@ -2,22 +2,89 @@
 
 **Modern shell features beyond POSIX**
 
-Lush mode (the default) and Bash/Zsh compatibility modes support extended syntax that goes beyond the POSIX shell specification. This document covers all extended language features.
+Lush mode (the default) and Bash/Zsh compatibility modes support
+extended syntax that goes beyond the POSIX shell specification. This
+document covers all extended language features.
 
 ---
 
 ## Table of Contents
 
-1. [Arrays](#arrays)
-2. [Arithmetic](#arithmetic)
-3. [Extended Test](#extended-test)
-4. [Process Substitution](#process-substitution)
-5. [Parameter Expansion](#parameter-expansion)
-6. [Extended Globbing](#extended-globbing)
-7. [Glob Qualifiers](#glob-qualifiers)
-8. [Control Flow Extensions](#control-flow-extensions)
-9. [Functions](#functions)
-10. [Mode Requirements](#mode-requirements)
+1. [Value Model (SEMANTICS section 3)](#value-model-semantics-section-3)
+2. [Arrays](#arrays)
+3. [Arithmetic](#arithmetic)
+4. [Extended Test](#extended-test)
+5. [Process Substitution](#process-substitution)
+6. [Parameter Expansion](#parameter-expansion)
+7. [Extended Globbing](#extended-globbing)
+8. [Glob Qualifiers](#glob-qualifiers)
+9. [Control Flow Extensions](#control-flow-extensions)
+10. [Functions](#functions)
+11. [Mode Requirements](#mode-requirements)
+
+---
+
+## Value Model (SEMANTICS section 3)
+
+Before reading the per-feature sections below, know the engine rule
+that governs how a value crosses a position: **a list (indexed array)
+or map (associative array) is never silently converted to a scalar
+string**. This is the core of [SEMANTICS.md section 3](SEMANTICS.md);
+the per-feature syntax sections inherit it.
+
+### What it means in practice
+
+```bash
+arr=(a b c)
+
+# Vector slots -- argv, for-loop word list, array initializer:
+# the list contributes its elements, one to a slot.
+echo "${arr[@]}"          # 3 distinct args: a b c
+echo ${arr}               # Same: bare ${arr} on a list is vector-yielding
+for x in "${arr[@]}"; do
+    echo "$x"             # Three iterations: a, b, c
+done
+
+# Scalar slots -- assignment RHS, case word, here-string, arithmetic,
+# conditional [[ ]] operand, or within-word "glued" position:
+# the list is a type error at runtime.
+x="${arr[@]}"             # ERROR: type mismatch -- list in scalar slot
+y="prefix-${arr[@]}"      # ERROR: list glued to text (whole-word constraint)
+case "${arr[@]}" in ...   # ERROR: case word is scalar-requiring
+echo "(( ${arr[@]} ))"    # ERROR: arithmetic operand is scalar-requiring
+
+# To put a list in a scalar slot, JOIN explicitly:
+x="${arr[*]}"             # OK: [*] joins with IFS (canonical SEMANTICS form)
+x="${(j: :)arr}"          # OK: zsh-style explicit join with separator
+x="${arr[0]}"             # OK: single subscript -- scalar yield, not a list
+```
+
+### Diagnostic shape
+
+The runtime type error goes through the structured-error system:
+
+```
+error[E1132]: type mismatch: list value ${arr[@]} in a scalar position
+  --> script.lush:5:5
+   |
+ 5 | x="${arr[@]}"
+   |     ^^^^^^^^
+   |
+   = help: join the list explicitly -- use ${name[*]} for space-joining,
+           or build a scalar from the elements with an explicit join.
+```
+
+`export` and `readonly` raise the same type-mismatch on list values
+rather than silently coercing them (the process environment is
+key=string; readonly without `-a` is a scalar binding).
+
+### Why
+
+Implicit list-to-string coercion is the largest single source of
+silent quoting bugs in legacy shells. Lush makes the coercion
+explicit, so the type of every value at every position is visible to
+the reader, the static analyzer, and the integrated debugger. See
+SEMANTICS.md sections 3.4 and 3.9 for the full rule and rationale.
 
 ---
 
@@ -531,6 +598,51 @@ echo "${var:?error message}"
 echo "${var:+alternate}"
 ```
 
+### Zsh-Style Parameter Flags
+
+Lush mirrors zsh's `${(FLAGS)var}` parameter flags. Each flag is a
+single character inside the parens; multiple flags combine. The
+key feature per SEMANTICS section 3.5: **transformation flags always
+fire**, regardless of quote context.
+
+```bash
+arr=(banana apple Cherry date)
+
+# (@) -- spelling alias for [@] presentation. Vector-yielding.
+echo "${(@)arr}"            # Same as ${arr[@]}: 4 distinct args
+for x in ${(@)arr}; do echo "[$x]"; done
+
+# (o) / (O) -- sort ascending / descending. Transformation fires
+# every time; the @ alias above composes.
+echo "${(o)arr[@]}"         # Cherry apple banana date (ASCII)
+echo "${(O)arr[@]}"         # date banana apple Cherry
+echo "${(oi)arr[@]}"        # apple banana Cherry date (i = case-insensitive)
+
+# (u) -- unique, preserving first occurrence.
+dups=(a b a c b a d)
+echo "${(u)dups[@]}"        # a b c d
+
+# (k) / (v) / (kv) -- keys / values / interleaved (associative).
+declare -A m
+m[host]=server
+m[port]=22
+echo "${(k)m[@]}"           # host port
+echo "${(v)m[@]}"           # server 22
+echo "${(kv)m[@]}"          # host server port 22 (insertion order)
+
+# Composition: (o@), (u@), (uo@), (kv), etc.
+arr=(c a b a)
+echo "${(uo@)arr}"          # a b c (dedupe then sort ascending)
+```
+
+The flag family wires through `try_expand_vector_arg` (see
+`src/executor.c`); recognized flag characters include `@ o O u k v a`
+plus the case-folding family (`U` upper, `L` lower, `C` capitalize),
+join (`j:sep:`), split (`s:sep:`), and the standard zsh transformation
+set. `(@)` is a no-op spelling alias documented explicitly in
+SEMANTICS section 3.7 -- presentation belongs to the subscript, but
+both spellings work and yield identical results.
+
 ---
 
 ## Extended Globbing
@@ -764,12 +876,22 @@ my_function "hello" "world"
 
 ```bash
 my_func() {
-    local x=10          # Local to function
-    local -i num=42     # Local integer
-    local -a arr=(1 2)  # Local array
-    local -A map        # Local associative array
+    local x=10              # Local scalar
+    local -i num=42         # Local integer
+    local -a arr=(1 2)      # Local indexed array (explicit -a form)
+    local arr=(a b c)       # Local indexed array (literal form)
+    local data="(literal)"  # Scalar -- quoted (...) stays a scalar
+    local -A map            # Local associative array
 }
 ```
+
+The unquoted `local arr=(...)` form is parsed as an array literal
+and produces a real indexed array (dies with the function scope,
+matches bash and zsh). The same shape with surrounding quotes,
+`local data="(...)"`, is a quoted scalar -- the parens are just
+text. The discrimination is in the parser (an internal sentinel on
+the argv element); see SEMANTICS section 7 implementation notes for
+how local/declare/typeset route between the two forms.
 
 ### Nameref Variables
 
@@ -831,26 +953,43 @@ Immediate execution:
 | Case modification | No | Yes | Yes | Yes |
 | Extended globbing | No | Yes | Yes | Yes |
 | Glob qualifiers | No | No | Yes | Yes |
+| Zsh parameter flags `${(...)var}` | No | No | Yes | Yes |
+| Bare `${arr}` vector yield | No | No | Yes | Yes |
+| `${arr[@]}` in scalar slot = type error | No | No | No | Yes |
 | `;&` fall-through | No | Yes | Yes | Yes |
+| `;;&` continue-test | No | Yes | Yes | Yes |
 | `select` loop | No | Yes | Yes | Yes |
 | `time` keyword | No | Yes | Yes | Yes |
 | Nameref `local -n` | No | Yes | Yes | Yes |
+| `local arr=(a b c)` array literal | No | Yes | Yes | Yes |
 | Anonymous functions | No | No | Yes | Yes |
 
 To check your current mode:
 
 ```bash
+mode                 # Print active mode (canonical entry point)
 set -o | grep -E "posix|bash|zsh|lush"
 ```
 
 To change mode:
 
 ```bash
-set -o lush    # Default, all features
-set -o bash      # Bash compatibility
-set -o zsh       # Zsh compatibility
-set -o posix     # Strict POSIX
+mode lush            # Default; full feature set, no quirks
+mode bash            # Bash compatibility
+mode zsh             # Zsh compatibility
+mode posix           # Strict POSIX
+
+# Bridges (functionally equivalent to the `mode` form):
+set -o lush
+set -o bash
+set -o zsh
+set -o posix
 ```
+
+`mode` is the canonical builtin; the `set -o` forms are bridges
+preserved for portability with bash/zsh script idioms. See
+[CONFIGURATION.md](CONFIGURATION.md) for the full four-surface
+configuration model (`mode`, `set`, `setopt`/`shopt`, `config`).
 
 ---
 

@@ -13,7 +13,7 @@
 #include "display_integration.h"
 
 int display_lle_autosuggestions(int argc, char **argv) {
-    /* Control autosuggestions */
+    // Control autosuggestions
     if (argc < 2) {
         printf("Autosuggestions: %s\n",
                config.display_autosuggestions ? "enabled" : "disabled");

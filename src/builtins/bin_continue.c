@@ -56,7 +56,7 @@ int bin_continue(int argc, char **argv) {
         return 1;
     }
 
-    // Parse optional level argument (continue n)
+    /// Parse optional level argument (continue n)
     int continue_level = 1;
     if (argc > 1) {
         char *endptr;
@@ -136,7 +136,7 @@ int bin_continue(int argc, char **argv) {
         }
     }
 
-    // Set loop control state to continue
+    /// Set loop control state to continue
     current_executor->loop_control = LOOP_CONTINUE;
 
     return 0;

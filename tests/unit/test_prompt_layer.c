@@ -39,7 +39,7 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-/* Helper to create an initialized event system for tests */
+/// Helper to create an initialized event system for tests
 static layer_event_system_t *create_test_event_system(void) {
     layer_event_system_t *events = layer_events_create(NULL);
     if (events) {
@@ -48,7 +48,7 @@ static layer_event_system_t *create_test_event_system(void) {
     return events;
 }
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -160,7 +160,7 @@ static int test_error_string_invalid_code(void) {
  * ============================================================ */
 
 static int test_get_version_all_null(void) {
-    /* Should not crash */
+    /// Should not crash
     prompt_layer_get_version(NULL, NULL, NULL);
     return 1;
 }
@@ -210,7 +210,7 @@ static int test_create_initializes_disabled(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Layer should start disabled until initialized */
+    /// Layer should start disabled until initialized
     ASSERT_EQ(layer->initialized, false);
     ASSERT_EQ(layer->enabled, false);
 
@@ -222,7 +222,7 @@ static int test_create_initializes_content_null(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Content pointers should be NULL initially */
+    /// Content pointers should be NULL initially
     ASSERT_NULL(layer->raw_content);
     ASSERT_NULL(layer->rendered_content);
 
@@ -231,7 +231,7 @@ static int test_create_initializes_content_null(void) {
 }
 
 static int test_destroy_null_layer(void) {
-    /* Should not crash */
+    /// Should not crash
     prompt_layer_destroy(NULL);
     return 1;
 }
@@ -241,8 +241,8 @@ static int test_destroy_twice(void) {
     ASSERT_NOT_NULL(layer);
 
     prompt_layer_destroy(layer);
-    /* Second call with same pointer would be undefined, but we test
-       that the first destroy doesn't crash */
+    /// Second call with same pointer would be undefined, but we test
+    ///        that the first destroy doesn't crash
     return 1;
 }
 
@@ -260,7 +260,7 @@ static int test_init_null_events(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Init with NULL events returns INVALID_PARAM - events are required */
+    /// Init with NULL events returns INVALID_PARAM - events are required
     prompt_layer_error_t result = prompt_layer_init(layer, NULL);
     ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_PARAM);
     ASSERT_EQ(layer->initialized, false);
@@ -335,7 +335,7 @@ static int test_cleanup_uninitialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Cleanup should work even if not initialized */
+    /// Cleanup should work even if not initialized
     prompt_layer_error_t result = prompt_layer_cleanup(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
@@ -349,7 +349,7 @@ static int test_cleanup_twice(void) {
 
     prompt_layer_cleanup(layer);
 
-    /* Second cleanup should also be safe */
+    /// Second cleanup should also be safe
     prompt_layer_error_t result = prompt_layer_cleanup(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
@@ -407,7 +407,7 @@ static int test_set_content_uninitialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Uninitialized layer should return INVALID_STATE */
+    /// Uninitialized layer should return INVALID_STATE
     prompt_layer_error_t result = prompt_layer_set_content(layer, "$ ");
     ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_STATE);
 
@@ -424,7 +424,7 @@ static int test_set_content_empty_content(void) {
 
     prompt_layer_init(layer, events);
 
-    /* Empty content should be allowed */
+    /// Empty content should be allowed
     prompt_layer_error_t result = prompt_layer_set_content(layer, "");
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
@@ -445,7 +445,7 @@ static int test_set_content_simple_prompt(void) {
     prompt_layer_error_t result = prompt_layer_set_content(layer, "$ ");
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
-    /* Content should be stored */
+    /// Content should be stored
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, "$ ");
 
@@ -662,7 +662,7 @@ static int test_get_rendered_content_no_content_set(void) {
     char output[256];
     prompt_layer_error_t result =
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
-    /* May return empty string or error - implementation dependent */
+    /// May return empty string or error - implementation dependent
     (void)result;
 
     prompt_layer_destroy(layer);
@@ -710,8 +710,7 @@ static int test_get_rendered_content_preserves_content(void) {
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
 
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    /* Output should contain the original content (possibly with theme colors)
-     */
+    /// Output should contain the original content (possibly with theme colors)
     ASSERT(strstr(output, "test") != NULL || strstr(output, "$") != NULL);
 
     prompt_layer_destroy(layer);
@@ -730,7 +729,7 @@ static int test_get_rendered_content_buffer_too_small(void) {
 
     prompt_layer_set_content(layer, "this is a long prompt $ ");
 
-    char output[5]; /* Too small */
+    char output[5]; /// Too small
     prompt_layer_error_t result =
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
 
@@ -780,7 +779,7 @@ static int test_get_metrics_no_content(void) {
 
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    /* Should succeed with zeroed metrics or return error */
+    /// Should succeed with zeroed metrics or return error
     (void)result;
 
     prompt_layer_destroy(layer);
@@ -893,7 +892,7 @@ static int test_update_theme_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Should return error for uninitialized layer */
+    /// Should return error for uninitialized layer
     prompt_layer_error_t result = prompt_layer_update_theme(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
 
@@ -932,7 +931,7 @@ static int test_force_render_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
 
-    /* Force render on uninitialized layer should fail */
+    /// Force render on uninitialized layer should fail
     prompt_layer_error_t result = prompt_layer_force_render(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
 
@@ -949,9 +948,9 @@ static int test_force_render_no_content(void) {
 
     prompt_layer_init(layer, events);
 
-    /* Force render with no content */
+    /// Force render with no content
     prompt_layer_error_t result = prompt_layer_force_render(layer);
-    /* May succeed with empty render or return error */
+    /// May succeed with empty render or return error
     (void)result;
 
     prompt_layer_destroy(layer);
@@ -1040,7 +1039,7 @@ static int test_get_performance_new_layer(void) {
     prompt_layer_error_t result = prompt_layer_get_performance(layer, &perf);
 
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    /* New layer should have zero render count */
+    /// New layer should have zero render count
     ASSERT_EQ(perf.render_count, 0);
 
     prompt_layer_destroy(layer);
@@ -1092,7 +1091,7 @@ static int test_reset_performance_valid(void) {
 
     prompt_layer_init(layer, events);
 
-    /* Do some renders to accumulate stats */
+    /// Do some renders to accumulate stats
     prompt_layer_set_content(layer, "$ ");
     char output[256];
     prompt_layer_get_rendered_content(layer, output, sizeof(output));
@@ -1100,7 +1099,7 @@ static int test_reset_performance_valid(void) {
     prompt_layer_error_t result = prompt_layer_reset_performance(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
-    /* Verify counters are zero */
+    /// Verify counters are zero
     prompt_performance_t perf;
     prompt_layer_get_performance(layer, &perf);
     ASSERT_EQ(perf.render_count, 0);
@@ -1177,7 +1176,7 @@ static int test_process_events_with_events(void) {
 
     prompt_layer_init(layer, events);
 
-    /* Process events with valid event system */
+    /// Process events with valid event system
     prompt_layer_error_t result = prompt_layer_process_events(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 

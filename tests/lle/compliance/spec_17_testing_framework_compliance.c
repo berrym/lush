@@ -22,15 +22,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Include only the testing header */
+/// Include only the testing header
 #include "lle/testing.h"
 
-/* Test tracking */
+/// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Simple assertion macros */
+/// Simple assertion macros
 #define ASSERT_EQ(expected, actual, message)                                   \
     do {                                                                       \
         tests_run++;                                                           \
@@ -64,58 +64,52 @@ static int tests_failed = 0;
  * Testing Framework Constants Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify performance test constants match spec
- * Spec Requirement: Performance testing configuration
- */
+/// @brief Test: Verify performance test constants match spec
+/// Spec Requirement: Performance testing configuration
 static bool test_performance_constants(void) {
     printf("  Testing performance test constants...\n");
 
-    /* Response time: 500μs = 500,000ns */
+    /// Response time: 500μs = 500,000ns
     ASSERT_EQ(500000ULL, LLE_PERF_MAX_RESPONSE_TIME_NS,
               "LLE_PERF_MAX_RESPONSE_TIME_NS must be 500000ns (500μs)");
 
-    /* Allocation time: 100μs = 100,000ns */
+    /// Allocation time: 100μs = 100,000ns
     ASSERT_EQ(100000ULL, LLE_PERF_MAX_ALLOCATION_TIME_NS,
               "LLE_PERF_MAX_ALLOCATION_TIME_NS must be 100000ns (100μs)");
 
-    /* Render time: 1ms = 1,000,000ns */
+    /// Render time: 1ms = 1,000,000ns
     ASSERT_EQ(1000000ULL, LLE_PERF_MAX_RENDER_TIME_NS,
               "LLE_PERF_MAX_RENDER_TIME_NS must be 1000000ns (1ms)");
 
-    /* Event processing: 250μs = 250,000ns */
+    /// Event processing: 250μs = 250,000ns
     ASSERT_EQ(250000ULL, LLE_PERF_MAX_EVENT_PROCESSING_NS,
               "LLE_PERF_MAX_EVENT_PROCESSING_NS must be 250000ns (250μs)");
 
     return true;
 }
 
-/**
- * Test: Verify performance threshold constants
- * Spec Requirement: Performance thresholds configuration
- */
+/// @brief Test: Verify performance threshold constants
+/// Spec Requirement: Performance thresholds configuration
 static bool test_performance_thresholds(void) {
     printf("  Testing performance threshold constants...\n");
 
-    /* Cache hit rate: 75% */
+    /// Cache hit rate: 75%
     ASSERT_EQ_DOUBLE(75.0, LLE_PERF_MIN_CACHE_HIT_RATE,
                      "LLE_PERF_MIN_CACHE_HIT_RATE must be 75.0%");
 
-    /* Memory utilization: 85% */
+    /// Memory utilization: 85%
     ASSERT_EQ_DOUBLE(85.0, LLE_PERF_MIN_MEMORY_UTILIZATION,
                      "LLE_PERF_MIN_MEMORY_UTILIZATION must be 85.0%");
 
-    /* Regression tolerance: 10% */
+    /// Regression tolerance: 10%
     ASSERT_EQ_DOUBLE(10.0, LLE_PERF_MAX_REGRESSION_PERCENT,
                      "LLE_PERF_MAX_REGRESSION_PERCENT must be 10.0%");
 
     return true;
 }
 
-/**
- * Test: Verify test limit constants
- * Spec Requirement: Test framework limits
- */
+/// @brief Test: Verify test limit constants
+/// Spec Requirement: Test framework limits
 static bool test_limit_constants(void) {
     printf("  Testing test limit constants...\n");
 
@@ -145,12 +139,12 @@ int main(void) {
     printf("Running Spec 17 (Testing Framework) Compliance Tests...\n");
     printf("=======================================================\n\n");
 
-    /* Run all compliance tests */
+    /// Run all compliance tests
     test_performance_constants();
     test_performance_thresholds();
     test_limit_constants();
 
-    /* Print results */
+    /// Print results
     printf("\n");
     printf("=======================================================\n");
     printf("Tests run:    %d\n", tests_run);

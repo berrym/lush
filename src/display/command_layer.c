@@ -45,8 +45,8 @@
 #include "lle/prompt/theme.h"
 #include "lle/syntax_highlighting.h"
 
-// Note: Completion menu support moved to display_controller (proper
-// architecture)
+/// Note: Completion menu support moved to display_controller (proper
+/// architecture)
 
 #include <limits.h>
 #include <stdio.h>
@@ -56,24 +56,24 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-// ============================================================================
-// CONSTANTS AND INTERNAL CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND INTERNAL CONFIGURATION
+/// ============================================================================
 
-#define COMMAND_LAYER_MAGIC 0x434D444C // "CMDL" in hex
+#define COMMAND_LAYER_MAGIC 0x434D444C /// "CMDL" in hex
 #define COMMAND_LAYER_VERSION_STRING "1.0.0"
 
-// Performance monitoring constants
+/// Performance monitoring constants
 #define NANOSECONDS_PER_SECOND 1000000000ULL
 #define NANOSECONDS_PER_MILLISECOND 1000000ULL
 
-// Cache management constants
+/// Cache management constants
 #define CACHE_HASH_MULTIPLIER 31
 #define CACHE_CLEANUP_THRESHOLD 0.8
 
-// ============================================================================
-// INTERNAL STRUCTURES AND STATE
-// ============================================================================
+/// ============================================================================
+/// INTERNAL STRUCTURES AND STATE
+/// ============================================================================
 
 /**
  * Syntax highlighting statistics
@@ -85,14 +85,14 @@ typedef struct {
     uint64_t highlighting_time_ns;
 } highlighting_stats_t;
 
-// Global statistics for monitoring
+/// Global statistics for monitoring
 static highlighting_stats_t g_highlighting_stats = {0};
 
-// ============================================================================
-// FORWARD DECLARATIONS
-// ============================================================================
+/// ============================================================================
+/// FORWARD DECLARATIONS
+/// ============================================================================
 
-// Core functionality
+/// Core functionality
 static command_layer_error_t
 perform_syntax_highlighting(command_layer_t *layer);
 static command_layer_error_t update_command_metrics(command_layer_t *layer);
@@ -100,7 +100,7 @@ static uint64_t get_current_time_ns(void);
 static void update_performance_stats(command_layer_t *layer,
                                      uint64_t operation_time_ns);
 
-// Cache management
+/// Cache management
 static uint32_t calculate_command_hash(const char *command);
 static command_cache_entry_t *find_cache_entry(command_layer_t *layer,
                                                const char *command);
@@ -110,20 +110,20 @@ static command_layer_error_t add_to_cache(command_layer_t *layer,
                                           const command_metrics_t *metrics);
 static void expire_old_cache_entries(command_layer_t *layer);
 
-// Event handling
+/// Event handling
 static layer_events_error_t handle_layer_event(const layer_event_t *event,
                                                void *user_data);
 static command_layer_error_t
 publish_command_event(command_layer_t *layer, layer_event_type_t event_type);
 
-// Validation and utilities
+/// Validation and utilities
 static bool validate_layer_state(command_layer_t *layer);
 static void reset_layer_state(command_layer_t *layer);
 static size_t safe_string_copy(char *dest, const char *src, size_t dest_size);
 
-// ============================================================================
-// CORE API IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// CORE API IMPLEMENTATION
+/// ============================================================================
 
 const char *command_layer_get_version(void) {
     return COMMAND_LAYER_VERSION_STRING;
@@ -135,17 +135,17 @@ command_layer_t *command_layer_create(void) {
         return NULL;
     }
 
-    // Initialize magic number for validation
+    /// Initialize magic number for validation
     layer->magic = COMMAND_LAYER_MAGIC;
     layer->initialized = false;
     layer->needs_redraw = false;
 
-    // Initialize command content
+    /// Initialize command content
     layer->command_text[0] = '\0';
     layer->highlighted_text[0] = '\0';
     layer->cursor_position = 0;
 
-    // Initialize syntax highlighting state
+    /// Initialize syntax highlighting state
     layer->region_count = 0;
     layer->syntax_config.enabled = true;
     layer->syntax_config.use_colors = true;
@@ -155,41 +155,41 @@ command_layer_t *command_layer_create(void) {
     layer->syntax_config.max_update_time_ms =
         COMMAND_LAYER_TARGET_UPDATE_TIME_MS;
 
-    // Initialize performance statistics
+    /// Initialize performance statistics
     memset(&layer->performance, 0, sizeof(command_performance_t));
     layer->performance.min_update_time_ns = UINT64_MAX;
 
-    // Initialize cache
+    /// Initialize cache
     layer->cache_size = 0;
     layer->cache_access_count = 0;
     for (size_t i = 0; i < COMMAND_LAYER_CACHE_SIZE; i++) {
         layer->cache[i].is_valid = false;
     }
 
-    // Initialize event system integration
+    /// Initialize event system integration
     layer->event_system = NULL;
     layer->event_subscription_id = 0;
 
-    // Initialize prompt layer integration
+    /// Initialize prompt layer integration
     layer->prompt_layer = NULL;
     layer->prompt_integration_enabled = false;
 
-    // Initialize completion menu state
+    /// Initialize completion menu state
     layer->completion_menu_visible = false;
     layer->completion_menu_content = NULL;
     layer->completion_menu_content_size = 0;
     layer->completion_menu_lines = 0;
     layer->completion_menu_selected_index = 0;
 
-    // Initialize performance monitoring
+    /// Initialize performance monitoring
     clock_gettime(CLOCK_MONOTONIC, &layer->last_update_time);
     layer->update_sequence_number = 0;
 
-    // Initialize spec-compliant syntax highlighter (Spec 11)
+    /// Initialize spec-compliant syntax highlighter (Spec 11)
     layer->spec_highlighter = NULL;
     if (lle_syntax_highlighter_create(&layer->spec_highlighter) != 0) {
-        // Highlighter creation failed - continue without it, fall back to
-        // inline
+        /// Highlighter creation failed - continue without it, fall back to
+        /// inline
         layer->spec_highlighter = NULL;
     }
 
@@ -206,27 +206,25 @@ command_layer_error_t command_layer_init(command_layer_t *layer,
         return COMMAND_LAYER_ERROR_INVALID_PARAM;
     }
 
-    // Store event system reference
+    /// Store event system reference
     layer->event_system = events;
 
-    // Subscribe to relevant events
-    // Temporarily disable theme subscription to isolate issue
-    /*
-    layer_events_error_t event_result = layer_events_subscribe(
-        events,
-        LAYER_EVENT_THEME_CHANGED,
-        LAYER_ID_COMMAND_LAYER,
-        handle_layer_event,
-        layer,
-        LAYER_EVENT_PRIORITY_HIGH
-    );
+    /// Subscribe to relevant events
+    /// Temporarily disable theme subscription to isolate issue
+    ///     layer_events_error_t event_result = layer_events_subscribe(
+    ///         events,
+    ///         LAYER_EVENT_THEME_CHANGED,
+    ///         LAYER_ID_COMMAND_LAYER,
+    ///         handle_layer_event,
+    ///         layer,
+    ///         LAYER_EVENT_PRIORITY_HIGH
+    ///     );
+    ///
+    ///     if (event_result != LAYER_EVENTS_SUCCESS) {
+    ///         return COMMAND_LAYER_ERROR_EVENT_SYSTEM;
+    ///     }
 
-    if (event_result != LAYER_EVENTS_SUCCESS) {
-        return COMMAND_LAYER_ERROR_EVENT_SYSTEM;
-    }
-    */
-
-    // Subscribe to prompt layer events if available
+    /// Subscribe to prompt layer events if available
     layer_events_error_t event_result = layer_events_subscribe(
         events, LAYER_EVENT_CONTENT_CHANGED, LAYER_ID_COMMAND_LAYER,
         handle_layer_event, layer, LAYER_EVENT_PRIORITY_NORMAL);
@@ -237,7 +235,7 @@ command_layer_error_t command_layer_init(command_layer_t *layer,
 
     layer->initialized = true;
 
-    // Publish initialization complete event
+    /// Publish initialization complete event
     publish_command_event(layer, LAYER_EVENT_INITIALIZATION_COMPLETE);
 
     return COMMAND_LAYER_SUCCESS;
@@ -265,17 +263,16 @@ command_layer_error_t command_layer_set_command(command_layer_t *layer,
 
     uint64_t start_time = get_current_time_ns();
 
-    // Check if command has changed
+    /// Check if command has changed
     bool command_changed = (strcmp(layer->command_text, command_text) != 0);
     bool cursor_changed = (layer->cursor_position != cursor_pos);
 
-    /* Always need initial render even if buffer is empty */
+    /// Always need initial render even if buffer is empty
     bool is_first_render = (layer->update_sequence_number == 0);
 
-    /* Check if completion menu or notification state changed (even if
-     * command/cursor didn't). When menu/notification is shown/hidden, we need
-     * redraw even if command text unchanged.
-     */
+    /// Check if completion menu or notification state changed (even if
+    /// command/cursor didn't). When menu/notification is shown/hidden, we need
+    /// redraw even if command text unchanged.
     bool menu_changed = false;
     bool notification_changed = false;
     display_controller_t *dc = display_integration_get_controller();
@@ -287,78 +284,78 @@ command_layer_error_t command_layer_set_command(command_layer_t *layer,
 
     if (!command_changed && !cursor_changed && !is_first_render &&
         !menu_changed && !notification_changed) {
-        // No change, just update performance stats with minimal time
+        /// No change, just update performance stats with minimal time
         update_performance_stats(layer, get_current_time_ns() - start_time);
         return COMMAND_LAYER_SUCCESS;
     }
 
-    // Update command text and cursor position
+    /// Update command text and cursor position
     safe_string_copy(layer->command_text, command_text,
                      sizeof(layer->command_text));
     layer->cursor_position = cursor_pos;
     layer->needs_redraw = true;
     layer->update_sequence_number++;
 
-    // Check cache first for performance
+    /// Check cache first for performance
     command_cache_entry_t *cached = NULL;
     if (layer->syntax_config.cache_enabled && command_changed) {
         cached = find_cache_entry(layer, command_text);
         layer->performance.cache_hits += (cached != NULL) ? 1 : 0;
         layer->performance.cache_misses += (cached == NULL) ? 1 : 0;
 
-        // Record layer-specific cache operation
+        /// Record layer-specific cache operation
         display_integration_record_layer_cache_operation("command_layer",
                                                          (cached != NULL));
     }
 
     if (cached && cached->is_valid) {
-        // Use cached result
+        /// Use cached result
         safe_string_copy(layer->highlighted_text, cached->highlighted_text,
                          sizeof(layer->highlighted_text));
         layer->metrics = cached->metrics;
         layer->region_count =
-            0; // Reset regions as they're embedded in highlighted text
+            0; /// Reset regions as they're embedded in highlighted text
     } else {
-        // Perform syntax highlighting
+        /// Perform syntax highlighting
         command_layer_error_t result = perform_syntax_highlighting(layer);
         if (result != COMMAND_LAYER_SUCCESS) {
             update_performance_stats(layer, get_current_time_ns() - start_time);
             return result;
         }
 
-        // Update metrics
+        /// Update metrics
         result = update_command_metrics(layer);
         if (result != COMMAND_LAYER_SUCCESS) {
             update_performance_stats(layer, get_current_time_ns() - start_time);
             return result;
         }
 
-        // Add to cache if enabled
+        /// Add to cache if enabled
         if (layer->syntax_config.cache_enabled && command_changed) {
             add_to_cache(layer, command_text, layer->highlighted_text,
                          &layer->metrics);
         }
     }
 
-    // Update cursor position in metrics
+    /// Update cursor position in metrics
     layer->metrics.cursor_position = cursor_pos;
 
     uint64_t operation_time = get_current_time_ns() - start_time;
     update_performance_stats(layer, operation_time);
 
-    // Publish content changed event if command changed
+    /// Publish content changed event if command changed
     if (command_changed) {
         publish_command_event(layer, LAYER_EVENT_CONTENT_CHANGED);
     }
 
-    // Publish cursor moved event if cursor changed
+    /// Publish cursor moved event if cursor changed
     if (cursor_changed) {
         publish_command_event(layer, LAYER_EVENT_CURSOR_MOVED);
     }
 
-    // Publish redraw needed event (triggers display_controller to render)
-    // This was previously done by command_layer_update(), but that caused
-    // redundant syntax highlighting. Now we do it here after highlighting.
+    /// Publish redraw needed event (triggers display_controller to render)
+    /// This was previously done by command_layer_update(), but that caused
+    /// redundant syntax highlighting. Now we do it here after highlighting.
     publish_command_event(layer, LAYER_EVENT_REDRAW_NEEDED);
 
     return COMMAND_LAYER_SUCCESS;
@@ -400,7 +397,7 @@ command_layer_error_t command_layer_set_cursor_position(command_layer_t *layer,
         layer->metrics.cursor_position = cursor_pos;
         layer->needs_redraw = true;
 
-        // Publish cursor moved event
+        /// Publish cursor moved event
         publish_command_event(layer, LAYER_EVENT_CURSOR_MOVED);
     }
 
@@ -428,13 +425,13 @@ command_layer_error_t command_layer_update(command_layer_t *layer) {
 
     uint64_t start_time = get_current_time_ns();
 
-    // Force syntax highlighting update
+    /// Force syntax highlighting update
     command_layer_error_t result = perform_syntax_highlighting(layer);
     if (result != COMMAND_LAYER_SUCCESS) {
         return result;
     }
 
-    // Update metrics
+    /// Update metrics
     result = update_command_metrics(layer);
     if (result != COMMAND_LAYER_SUCCESS) {
         return result;
@@ -446,7 +443,7 @@ command_layer_error_t command_layer_update(command_layer_t *layer) {
     uint64_t operation_time = get_current_time_ns() - start_time;
     update_performance_stats(layer, operation_time);
 
-    // Publish redraw needed event
+    /// Publish redraw needed event
     publish_command_event(layer, LAYER_EVENT_REDRAW_NEEDED);
 
     return COMMAND_LAYER_SUCCESS;
@@ -457,33 +454,33 @@ command_layer_error_t command_layer_clear(command_layer_t *layer) {
         return COMMAND_LAYER_ERROR_INVALID_PARAM;
     }
 
-    // Clear command content
+    /// Clear command content
     layer->command_text[0] = '\0';
     layer->highlighted_text[0] = '\0';
     layer->cursor_position = 0;
     layer->region_count = 0;
     layer->needs_redraw = true;
 
-    // Reset metrics
+    /// Reset metrics
     memset(&layer->metrics, 0, sizeof(command_metrics_t));
 
-    // Publish content changed event
+    /// Publish content changed event
     publish_command_event(layer, LAYER_EVENT_CONTENT_CHANGED);
 
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// NOTE: Completion menu integration moved to display_controller
-// All menu-related functions removed - proper architecture now in place
-// ============================================================================
+/// ============================================================================
+/// NOTE: Completion menu integration moved to display_controller
+/// All menu-related functions removed - proper architecture now in place
+/// ============================================================================
 
 command_layer_error_t command_layer_cleanup(command_layer_t *layer) {
     if (!layer || layer->magic != COMMAND_LAYER_MAGIC) {
         return COMMAND_LAYER_ERROR_INVALID_PARAM;
     }
 
-    // Unsubscribe from events if event system is available
+    /// Unsubscribe from events if event system is available
     if (layer->event_system && layer->initialized) {
         layer_events_unsubscribe(layer->event_system, LAYER_EVENT_THEME_CHANGED,
                                  LAYER_ID_COMMAND_LAYER);
@@ -492,13 +489,13 @@ command_layer_error_t command_layer_cleanup(command_layer_t *layer) {
                                  LAYER_ID_COMMAND_LAYER);
     }
 
-    // Clear cache
+    /// Clear cache
     for (size_t i = 0; i < COMMAND_LAYER_CACHE_SIZE; i++) {
         layer->cache[i].is_valid = false;
     }
     layer->cache_size = 0;
 
-    // Free completion menu content
+    /// Free completion menu content
     if (layer->completion_menu_content) {
         free(layer->completion_menu_content);
         layer->completion_menu_content = NULL;
@@ -508,7 +505,7 @@ command_layer_error_t command_layer_cleanup(command_layer_t *layer) {
     layer->completion_menu_lines = 0;
     layer->completion_menu_selected_index = 0;
 
-    // Reset state
+    /// Reset state
     reset_layer_state(layer);
     layer->initialized = false;
 
@@ -520,27 +517,27 @@ void command_layer_destroy(command_layer_t *layer) {
         return;
     }
 
-    // Cleanup if not already done
+    /// Cleanup if not already done
     if (layer->initialized) {
         command_layer_cleanup(layer);
     }
 
-    // Destroy spec highlighter
+    /// Destroy spec highlighter
     if (layer->spec_highlighter) {
         lle_syntax_highlighter_destroy(layer->spec_highlighter);
         layer->spec_highlighter = NULL;
     }
 
-    // Clear magic number
+    /// Clear magic number
     layer->magic = 0;
 
-    // Free memory
+    /// Free memory
     free(layer);
 }
 
-// ============================================================================
-// SYNTAX HIGHLIGHTING IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// SYNTAX HIGHLIGHTING IMPLEMENTATION
+/// ============================================================================
 
 /**
  * @brief Primary syntax highlighting using spec-compliant system (Spec 11)
@@ -555,7 +552,7 @@ void command_layer_destroy(command_layer_t *layer) {
 static command_layer_error_t
 perform_syntax_highlighting(command_layer_t *layer) {
     if (!layer->syntax_config.enabled || !layer->syntax_config.use_colors) {
-        // If highlighting is disabled, just copy the command text
+        /// If highlighting is disabled, just copy the command text
         safe_string_copy(layer->highlighted_text, layer->command_text,
                          sizeof(layer->highlighted_text));
         layer->region_count = 0;
@@ -564,26 +561,26 @@ perform_syntax_highlighting(command_layer_t *layer) {
 
     uint64_t start_time = get_current_time_ns();
 
-    // Initialize highlighting output
+    /// Initialize highlighting output
     layer->highlighted_text[0] = '\0';
     layer->region_count = 0;
 
     if (!layer->command_text[0]) {
-        // Empty command, nothing to highlight
+        /// Empty command, nothing to highlight
         return COMMAND_LAYER_SUCCESS;
     }
 
-    // Use spec-compliant highlighter (Spec 11)
+    /// Use spec-compliant highlighter (Spec 11)
     if (layer->spec_highlighter) {
         size_t command_len = strlen(layer->command_text);
 
-        // Tokenize using spec highlighter
+        /// Tokenize using spec highlighter
         int token_count = lle_syntax_highlight(
             layer->spec_highlighter, layer->command_text, command_len);
 
         if (token_count >= 0) {
-            // Use spec highlighter's render function which applies its own
-            // colors based on the LLE theme system
+            /// Use spec highlighter's render function which applies its own
+            /// colors based on the LLE theme system
             int rendered = lle_syntax_render_ansi(
                 layer->spec_highlighter, layer->command_text,
                 layer->highlighted_text, sizeof(layer->highlighted_text));
@@ -595,20 +592,20 @@ perform_syntax_highlighting(command_layer_t *layer) {
                 return COMMAND_LAYER_SUCCESS;
             }
         }
-        // Spec highlighting returned error - fall through to plain text
+        /// Spec highlighting returned error - fall through to plain text
     }
 
-    // No spec highlighter available or it failed - just copy plain text
-    // This is a graceful degradation: syntax highlighting is cosmetic,
-    // so we show unhighlighted text rather than failing
+    /// No spec highlighter available or it failed - just copy plain text
+    /// This is a graceful degradation: syntax highlighting is cosmetic,
+    /// so we show unhighlighted text rather than failing
     safe_string_copy(layer->highlighted_text, layer->command_text,
                      sizeof(layer->highlighted_text));
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// CACHE MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CACHE MANAGEMENT
+/// ============================================================================
 
 /**
  * @brief Calculate hash of command string for cache lookup
@@ -645,7 +642,7 @@ static command_cache_entry_t *find_cache_entry(command_layer_t *layer,
             continue;
         }
 
-        // Check if cache entry has expired
+        /// Check if cache entry has expired
         uint64_t age_ns = current_time - entry->timestamp_ns;
         if (age_ns > (layer->syntax_config.cache_expiry_ms *
                       NANOSECONDS_PER_MILLISECOND)) {
@@ -653,7 +650,7 @@ static command_cache_entry_t *find_cache_entry(command_layer_t *layer,
             continue;
         }
 
-        // Check if hash and command match
+        /// Check if hash and command match
         if (entry->hash == hash && strcmp(entry->command_text, command) == 0) {
             return entry;
         }
@@ -676,10 +673,10 @@ static command_layer_error_t add_to_cache(command_layer_t *layer,
                                           const command_metrics_t *metrics) {
     if (!layer->syntax_config.cache_enabled || !command || !highlighted ||
         !metrics) {
-        return COMMAND_LAYER_SUCCESS; // Not an error, just disabled
+        return COMMAND_LAYER_SUCCESS; /// Not an error, just disabled
     }
 
-    // Find empty slot or oldest entry
+    /// Find empty slot or oldest entry
     command_cache_entry_t *entry = NULL;
     uint64_t oldest_time = UINT64_MAX;
     size_t oldest_index = 0;
@@ -696,14 +693,14 @@ static command_layer_error_t add_to_cache(command_layer_t *layer,
         }
     }
 
-    // If no empty slot found, use oldest entry
+    /// If no empty slot found, use oldest entry
     if (!entry) {
         entry = &layer->cache[oldest_index];
     } else if (layer->cache_size < COMMAND_LAYER_CACHE_SIZE) {
         layer->cache_size++;
     }
 
-    // Store cache entry
+    /// Store cache entry
     safe_string_copy(entry->command_text, command, sizeof(entry->command_text));
     safe_string_copy(entry->highlighted_text, highlighted,
                      sizeof(entry->highlighted_text));
@@ -737,9 +734,9 @@ static void expire_old_cache_entries(command_layer_t *layer) {
     }
 }
 
-// ============================================================================
-// METRICS AND PERFORMANCE
-// ============================================================================
+/// ============================================================================
+/// METRICS AND PERFORMANCE
+/// ============================================================================
 
 /**
  * @brief Update command metrics from current layer state
@@ -749,13 +746,13 @@ static void expire_old_cache_entries(command_layer_t *layer) {
 static command_layer_error_t update_command_metrics(command_layer_t *layer) {
     command_metrics_t *metrics = &layer->metrics;
 
-    // Basic metrics
+    /// Basic metrics
     metrics->command_length = strlen(layer->command_text);
     metrics->visual_length = strlen(layer->highlighted_text);
     metrics->token_count = layer->region_count;
     metrics->cursor_position = layer->cursor_position;
 
-    // Error detection
+    /// Error detection
     metrics->error_count = 0;
     metrics->has_syntax_errors = false;
     for (size_t i = 0; i < layer->region_count; i++) {
@@ -765,14 +762,14 @@ static command_layer_error_t update_command_metrics(command_layer_t *layer) {
         }
     }
 
-    // Multiline detection
+    /// Multiline detection
     metrics->is_multiline_command = (strchr(layer->command_text, '\n') != NULL);
 
-    // Display positioning (will be updated by composition engine)
+    /// Display positioning (will be updated by composition engine)
     metrics->estimated_display_column = 0;
     metrics->estimated_display_row = 0;
 
-    // If prompt layer integration is available, get positioning info
+    /// If prompt layer integration is available, get positioning info
     if (layer->prompt_integration_enabled && layer->prompt_layer) {
         prompt_metrics_t prompt_metrics;
         if (prompt_layer_get_metrics(layer->prompt_layer, &prompt_metrics) ==
@@ -811,7 +808,7 @@ static void update_performance_stats(command_layer_t *layer,
     perf->update_count++;
     perf->total_processing_time_ns += operation_time_ns;
 
-    // Update min/max times
+    /// Update min/max times
     if (operation_time_ns < perf->min_update_time_ns) {
         perf->min_update_time_ns = operation_time_ns;
     }
@@ -819,17 +816,17 @@ static void update_performance_stats(command_layer_t *layer,
         perf->max_update_time_ns = operation_time_ns;
     }
 
-    // Calculate average
+    /// Calculate average
     perf->avg_update_time_ns =
         perf->total_processing_time_ns / perf->update_count;
 
-    // Update last update time
+    /// Update last update time
     clock_gettime(CLOCK_MONOTONIC, &layer->last_update_time);
 }
 
-// ============================================================================
-// EVENT HANDLING
-// ============================================================================
+/// ============================================================================
+/// EVENT HANDLING
+/// ============================================================================
 
 /**
  * @brief Handle layer events from event system
@@ -847,13 +844,13 @@ static layer_events_error_t handle_layer_event(const layer_event_t *event,
 
     switch (event->type) {
     case LAYER_EVENT_THEME_CHANGED:
-        // Theme changes are handled by the LLE spec-compliant highlighter
+        /// Theme changes are handled by the LLE spec-compliant highlighter
         layer->needs_redraw = true;
         publish_command_event(layer, LAYER_EVENT_REDRAW_NEEDED);
         break;
 
     case LAYER_EVENT_CONTENT_CHANGED:
-        // Prompt layer content changed, update positioning
+        /// Prompt layer content changed, update positioning
         if (layer->prompt_integration_enabled) {
             update_command_metrics(layer);
             layer->needs_redraw = true;
@@ -861,13 +858,13 @@ static layer_events_error_t handle_layer_event(const layer_event_t *event,
         break;
 
     case LAYER_EVENT_SIZE_CHANGED:
-        // Terminal size changed, may affect display
+        /// Terminal size changed, may affect display
         layer->needs_redraw = true;
         publish_command_event(layer, LAYER_EVENT_REDRAW_NEEDED);
         break;
 
     default:
-        // Ignore other events
+        /// Ignore other events
         break;
     }
 
@@ -883,11 +880,11 @@ static layer_events_error_t handle_layer_event(const layer_event_t *event,
 static command_layer_error_t
 publish_command_event(command_layer_t *layer, layer_event_type_t event_type) {
     if (!layer->event_system) {
-        return COMMAND_LAYER_SUCCESS; // Not an error if no event system
+        return COMMAND_LAYER_SUCCESS; /// Not an error if no event system
     }
 
-    /* Use HIGH priority for REDRAW_NEEDED events to match display_controller
-     * subscription */
+    /// Use HIGH priority for REDRAW_NEEDED events to match display_controller
+    /// subscription
     layer_event_priority_t priority = (event_type == LAYER_EVENT_REDRAW_NEEDED)
                                           ? LAYER_EVENT_PRIORITY_HIGH
                                           : LAYER_EVENT_PRIORITY_NORMAL;
@@ -899,9 +896,9 @@ publish_command_event(command_layer_t *layer, layer_event_type_t event_type) {
                                             : COMMAND_LAYER_ERROR_EVENT_SYSTEM;
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Validate command layer state and magic number
@@ -959,9 +956,9 @@ static size_t safe_string_copy(char *dest, const char *src, size_t dest_size) {
     return copy_len;
 }
 
-// ============================================================================
-// CONFIGURATION AND SYNTAX HIGHLIGHTING API
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND SYNTAX HIGHLIGHTING API
+/// ============================================================================
 
 command_layer_error_t command_layer_set_syntax_enabled(command_layer_t *layer,
                                                        bool enabled) {
@@ -973,7 +970,7 @@ command_layer_error_t command_layer_set_syntax_enabled(command_layer_t *layer,
         layer->syntax_config.enabled = enabled;
         layer->needs_redraw = true;
 
-        // Clear cache when enabling/disabling
+        /// Clear cache when enabling/disabling
         command_layer_clear_cache(layer);
 
         publish_command_event(layer, LAYER_EVENT_STYLE_UPDATED);
@@ -1000,7 +997,7 @@ command_layer_set_syntax_config(command_layer_t *layer,
     layer->syntax_config = *config;
     layer->needs_redraw = true;
 
-    // Clear cache since configuration changed
+    /// Clear cache since configuration changed
     command_layer_clear_cache(layer);
 
     publish_command_event(layer, LAYER_EVENT_STYLE_UPDATED);
@@ -1008,9 +1005,9 @@ command_layer_set_syntax_config(command_layer_t *layer,
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// PROMPT LAYER INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// PROMPT LAYER INTEGRATION
+/// ============================================================================
 
 command_layer_error_t
 command_layer_set_prompt_layer(command_layer_t *layer,
@@ -1022,7 +1019,7 @@ command_layer_set_prompt_layer(command_layer_t *layer,
     layer->prompt_layer = prompt_layer;
 
     if (prompt_layer && layer->prompt_integration_enabled) {
-        // Update metrics with new prompt information
+        /// Update metrics with new prompt information
         update_command_metrics(layer);
         layer->needs_redraw = true;
     }
@@ -1039,7 +1036,7 @@ command_layer_set_prompt_integration(command_layer_t *layer, bool enabled) {
     layer->prompt_integration_enabled = enabled;
 
     if (enabled && layer->prompt_layer) {
-        // Update metrics when enabling integration
+        /// Update metrics when enabling integration
         update_command_metrics(layer);
         layer->needs_redraw = true;
     }
@@ -1060,9 +1057,9 @@ command_layer_error_t command_layer_get_display_position(command_layer_t *layer,
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// PERFORMANCE AND MONITORING API
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND MONITORING API
+/// ============================================================================
 
 command_layer_error_t
 command_layer_get_performance(command_layer_t *layer,
@@ -1095,7 +1092,7 @@ command_layer_error_t command_layer_set_cache_enabled(command_layer_t *layer,
     layer->syntax_config.cache_enabled = enabled;
 
     if (!enabled) {
-        // Clear cache when disabling
+        /// Clear cache when disabling
         command_layer_clear_cache(layer);
     }
 
@@ -1117,9 +1114,9 @@ command_layer_error_t command_layer_clear_cache(command_layer_t *layer) {
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// VALIDATION AND DEBUGGING
-// ============================================================================
+/// ============================================================================
+/// VALIDATION AND DEBUGGING
+/// ============================================================================
 
 bool command_layer_validate(command_layer_t *layer) {
     return validate_layer_state(layer);
@@ -1164,9 +1161,9 @@ command_layer_error_t command_layer_get_debug_info(command_layer_t *layer,
     return COMMAND_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Get human-readable error message for error code
@@ -1204,9 +1201,9 @@ const char *command_layer_get_error_message(command_layer_error_t error) {
     }
 }
 
-// ============================================================================
-// COMPLETION MENU INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// COMPLETION MENU INTEGRATION
+/// ============================================================================
 
 /**
  * @brief Set completion menu content to display
@@ -1225,14 +1222,14 @@ command_layer_set_completion_menu(command_layer_t *layer,
     }
 
     if (!menu_content || num_lines <= 0) {
-        // Clear menu if invalid input
+        /// Clear menu if invalid input
         return command_layer_clear_completion_menu(layer);
     }
 
     size_t content_len = strlen(menu_content);
     size_t needed_size = content_len + 1;
 
-    // Allocate or reallocate buffer if needed
+    /// Allocate or reallocate buffer if needed
     if (layer->completion_menu_content_size < needed_size) {
         char *new_buffer = realloc(layer->completion_menu_content, needed_size);
         if (!new_buffer) {
@@ -1242,16 +1239,16 @@ command_layer_set_completion_menu(command_layer_t *layer,
         layer->completion_menu_content_size = needed_size;
     }
 
-    // Copy menu content
+    /// Copy menu content
     memcpy(layer->completion_menu_content, menu_content, content_len + 1);
 
-    // Update state
+    /// Update state
     layer->completion_menu_visible = true;
     layer->completion_menu_lines = num_lines;
     layer->completion_menu_selected_index = selected_index;
     layer->needs_redraw = true;
 
-    // Publish redraw event
+    /// Publish redraw event
     if (layer->event_system) {
         layer_event_t event = {.type = LAYER_EVENT_REDRAW_NEEDED,
                                .source_layer = LAYER_ID_COMMAND_LAYER,
@@ -1279,13 +1276,13 @@ command_layer_clear_completion_menu(command_layer_t *layer) {
     layer->completion_menu_lines = 0;
     layer->completion_menu_selected_index = 0;
 
-    // Don't free the buffer - keep it for reuse
-    // Just mark as not visible
+    /// Don't free the buffer - keep it for reuse
+    /// Just mark as not visible
 
     if (was_visible) {
         layer->needs_redraw = true;
 
-        // Publish redraw event
+        /// Publish redraw event
         if (layer->event_system) {
             layer_event_t event = {.type = LAYER_EVENT_REDRAW_NEEDED,
                                    .source_layer = LAYER_ID_COMMAND_LAYER,
@@ -1379,7 +1376,7 @@ command_layer_create_default_config(command_syntax_config_t *config) {
     config->cache_expiry_ms = COMMAND_LAYER_CACHE_EXPIRY_MS;
     config->max_update_time_ms = COMMAND_LAYER_TARGET_UPDATE_TIME_MS;
 
-    // Color scheme is no longer used - colors are handled by spec highlighter
+    /// Color scheme is no longer used - colors are handled by spec highlighter
     memset(&config->color_scheme, 0, sizeof(config->color_scheme));
 
     return COMMAND_LAYER_SUCCESS;

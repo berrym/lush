@@ -27,16 +27,16 @@ char *process_escape_sequences(const char *str);
  * @return Always returns 0
  */
 int bin_echo(int argc, char **argv) {
-    /* Default escape-interpretation policy is the FEATURE_XPG_ECHO flag,
-     * curated zsh-style in lush mode (escapes interpreted unless `-E` is
-     * given). Bash mode and `unsetopt xpg_echo` (or the inverted-alias
-     * `setopt bsd_echo`) flip the default to literal. `-e` / `-E` always
-     * override per-call. */
+    /// Default escape-interpretation policy is the FEATURE_XPG_ECHO flag,
+    /// curated zsh-style in lush mode (escapes interpreted unless `-E` is
+    /// given). Bash mode and `unsetopt xpg_echo` (or the inverted-alias
+    /// `setopt bsd_echo`) flip the default to literal. `-e` / `-E` always
+    /// override per-call.
     bool interpret_escapes = shell_mode_allows(FEATURE_XPG_ECHO);
     bool no_newline = false;
     int arg_start = 1;
 
-    // Parse options
+    /// Parse options
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-e") == 0) {
             interpret_escapes = true;
@@ -48,17 +48,17 @@ int bin_echo(int argc, char **argv) {
             interpret_escapes = false;
             arg_start = i + 1;
         } else if (argv[i][0] == '-') {
-            // Unknown option, treat as argument
+            /// Unknown option, treat as argument
             break;
         } else {
             break;
         }
     }
 
-    // Clear any previous error state on stdout
+    /// Clear any previous error state on stdout
     clearerr(stdout);
 
-    // Print arguments
+    /// Print arguments
     for (int i = arg_start; i < argc; i++) {
         if (i > arg_start) {
             printf(" ");
@@ -81,7 +81,7 @@ int bin_echo(int argc, char **argv) {
         printf("\n");
     }
 
-    // Flush and check for write errors (e.g., writing to closed/invalid fd)
+    /// Flush and check for write errors (e.g., writing to closed/invalid fd)
     if (fflush(stdout) == EOF || ferror(stdout)) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,

@@ -116,4 +116,4 @@ int lle_utf8_codepoint_width(uint32_t codepoint);
  */
 size_t lle_utf8_string_width(const char *text, size_t length);
 
-#endif /* LLE_UTF8_SUPPORT_H */
+#endif /// LLE_UTF8_SUPPORT_H

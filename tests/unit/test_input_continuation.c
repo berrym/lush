@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * STATE INITIALIZATION TESTS
@@ -30,7 +30,7 @@
 
 TEST(state_init_zeros_fields) {
     continuation_state_t state;
-    /* Set some garbage values first */
+    /// Set some garbage values first
     memset(&state, 0xFF, sizeof(state));
 
     continuation_state_init(&state);
@@ -54,13 +54,13 @@ TEST(state_cleanup_frees_delimiter) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* Simulate setting a here doc delimiter */
+    /// Simulate setting a here doc delimiter
     state.here_doc_delimiter = strdup("EOF");
     state.in_here_doc = true;
 
     continuation_state_cleanup(&state);
 
-    /* After cleanup, delimiter should be freed and set to NULL */
+    /// After cleanup, delimiter should be freed and set to NULL
     ASSERT_NULL(state.here_doc_delimiter,
                 "here_doc_delimiter should be NULL after cleanup");
     ASSERT_FALSE(state.in_here_doc,
@@ -71,7 +71,7 @@ TEST(state_cleanup_null_delimiter) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* Should not crash with NULL delimiter */
+    /// Should not crash with NULL delimiter
     continuation_state_cleanup(&state);
 }
 
@@ -167,7 +167,7 @@ TEST(escaped_quote_not_terminator) {
 
     continuation_analyze_line("echo \"hello\\\"", &state);
 
-    /* The escaped quote should not close the string */
+    /// The escaped quote should not close the string
     ASSERT_TRUE(state.in_double_quote, "Escaped quote should not close string");
 }
 
@@ -175,16 +175,16 @@ TEST(multiline_quote) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* First line - unclosed quote */
+    /// First line - unclosed quote
     continuation_analyze_line("echo \"hello", &state);
     ASSERT_TRUE(state.in_double_quote,
                 "Should be in double quote after first line");
 
-    /* Second line - still in quote */
+    /// Second line - still in quote
     continuation_analyze_line("world", &state);
     ASSERT_TRUE(state.in_double_quote, "Should still be in double quote");
 
-    /* Third line - close quote */
+    /// Third line - close quote
     continuation_analyze_line("end\"", &state);
     ASSERT_FALSE(state.in_double_quote, "Quote should be closed");
     ASSERT_TRUE(continuation_is_complete(&state),
@@ -311,7 +311,7 @@ TEST(backslash_not_at_end) {
 
     continuation_analyze_line("echo hello\\nworld", &state);
 
-    /* Backslash in middle of line is not continuation */
+    /// Backslash in middle of line is not continuation
     ASSERT_TRUE(continuation_is_complete(&state),
                 "Backslash in middle should not be continuation");
 }
@@ -521,7 +521,7 @@ TEST(prompt_for_single_quote) {
 
     const char *prompt = continuation_get_prompt(&state);
     ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
-    /* Prompt should indicate quote context */
+    /// Prompt should indicate quote context
 }
 
 TEST(prompt_for_double_quote) {
@@ -561,7 +561,7 @@ TEST(command_substitution_dollar_paren) {
 
     continuation_analyze_line("echo $(date", &state);
 
-    /* Should need continuation for unclosed $() */
+    /// Should need continuation for unclosed $()
     ASSERT_FALSE(continuation_is_complete(&state),
                  "Unclosed $() should need continuation");
 }
@@ -607,8 +607,8 @@ TEST(pipe_at_end) {
 
     continuation_analyze_line("ls |", &state);
 
-    /* Note: Whether pipe at end needs continuation depends on implementation */
-    /* Just verify it doesn't crash and returns a valid result */
+    /// Note: Whether pipe at end needs continuation depends on implementation
+    /// Just verify it doesn't crash and returns a valid result
     (void)continuation_is_complete(&state);
 }
 
@@ -616,7 +616,7 @@ TEST(operators_analyzed) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* Test that operators are analyzed without crashing */
+    /// Test that operators are analyzed without crashing
     continuation_analyze_line("true && false", &state);
     ASSERT_TRUE(continuation_is_complete(&state),
                 "Complete && expression should be complete");
@@ -663,21 +663,21 @@ TEST(multiline_if_statement) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* Line 1: if */
+    /// Line 1: if
     continuation_analyze_line("if [ -f file ]", &state);
     ASSERT_FALSE(continuation_is_complete(&state),
                  "if without then should need continuation");
 
-    /* Line 2: then */
+    /// Line 2: then
     continuation_analyze_line("then", &state);
     ASSERT_FALSE(continuation_is_complete(&state),
                  "if/then without fi should need continuation");
 
-    /* Line 3: command */
+    /// Line 3: command
     continuation_analyze_line("    echo exists", &state);
     ASSERT_FALSE(continuation_is_complete(&state), "Still need fi");
 
-    /* Line 4: fi */
+    /// Line 4: fi
     continuation_analyze_line("fi", &state);
     ASSERT_TRUE(continuation_is_complete(&state),
                 "if/then/fi should be complete");
@@ -703,7 +703,7 @@ TEST(quote_in_single_quote_ignored) {
     continuation_state_t state;
     continuation_state_init(&state);
 
-    /* Double quote inside single quotes should not start double quote mode */
+    /// Double quote inside single quotes should not start double quote mode
     continuation_analyze_line("echo '\"hello\"'", &state);
 
     ASSERT_FALSE(state.in_single_quote, "Single quote should be closed");
@@ -732,8 +732,8 @@ TEST(quote_in_comment) {
 
     continuation_analyze_line("# this is a comment with \"quotes\"", &state);
 
-    /* Just verify the line is analyzed without crashing */
-    /* Note: Implementation may or may not track quotes in comments */
+    /// Just verify the line is analyzed without crashing
+    /// Note: Implementation may or may not track quotes in comments
     (void)continuation_is_complete(&state);
 }
 

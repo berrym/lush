@@ -37,247 +37,248 @@ static const lle_action_registry_entry_t ACTION_REGISTRY[] = {
      * MOVEMENT ACTIONS
      * ========================================================================
      */
-    {.name = "beginning-of-line",
+    {      .name = "beginning-of-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_beginning_of_line,
-     .description = "Move cursor to beginning of line"},
-    {.name = "end-of-line",
+     .description = "Move cursor to beginning of line"                       },
+    {            .name = "end-of-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_end_of_line,
-     .description = "Move cursor to end of line"},
-    {.name = "forward-char",
+     .description = "Move cursor to end of line"                             },
+    {           .name = "forward-char",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_forward_char,
-     .description = "Move cursor forward one character"},
-    {.name = "backward-char",
+     .description = "Move cursor forward one character"                      },
+    {          .name = "backward-char",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_backward_char,
-     .description = "Move cursor backward one character"},
-    {.name = "forward-word",
+     .description = "Move cursor backward one character"                     },
+    {           .name = "forward-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_forward_word,
-     .description = "Move cursor forward one word"},
-    {.name = "backward-word",
+     .description = "Move cursor forward one word"                           },
+    {          .name = "backward-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_backward_word,
-     .description = "Move cursor backward one word"},
+     .description = "Move cursor backward one word"                          },
 
     /* ========================================================================
      * BUFFER NAVIGATION
      * ========================================================================
      */
-    {.name = "beginning-of-buffer",
+    {    .name = "beginning-of-buffer",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_beginning_of_buffer,
-     .description = "Move cursor to beginning of buffer"},
-    {.name = "end-of-buffer",
+     .description = "Move cursor to beginning of buffer"                     },
+    {          .name = "end-of-buffer",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_end_of_buffer,
-     .description = "Move cursor to end of buffer"},
-    {.name = "previous-line",
+     .description = "Move cursor to end of buffer"                           },
+    {          .name = "previous-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_previous_line,
-     .description = "Move cursor to previous line (multiline)"},
-    {.name = "next-line",
+     .description = "Move cursor to previous line (multiline)"               },
+    {              .name = "next-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_next_line,
-     .description = "Move cursor to next line (multiline)"},
-    {.name = "smart-up-arrow",
+     .description = "Move cursor to next line (multiline)"                   },
+    {         .name = "smart-up-arrow",
      .type = LLE_ACTION_TYPE_CONTEXT,
      .func.context = lle_smart_up_arrow_context,
      .description = "Context-aware up: history or previous line (with hints)"},
-    {.name = "smart-down-arrow",
+    {       .name = "smart-down-arrow",
      .type = LLE_ACTION_TYPE_CONTEXT,
      .func.context = lle_smart_down_arrow_context,
-     .description = "Context-aware down: history or next line (with hints)"},
+     .description = "Context-aware down: history or next line (with hints)"  },
 
     /* ========================================================================
      * DELETION AND KILLING
      * ========================================================================
      */
-    {.name = "delete-char",
+    {            .name = "delete-char",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_delete_char,
-     .description = "Delete character at cursor"},
-    {.name = "backward-delete-char",
+     .description = "Delete character at cursor"                             },
+    {   .name = "backward-delete-char",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_backward_delete_char,
-     .description = "Delete character before cursor"},
-    {.name = "kill-line",
+     .description = "Delete character before cursor"                         },
+    {              .name = "kill-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_kill_line,
-     .description = "Kill from cursor to end of line"},
-    {.name = "backward-kill-line",
+     .description = "Kill from cursor to end of line"                        },
+    {     .name = "backward-kill-line",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_backward_kill_line,
-     .description = "Kill from beginning of line to cursor"},
-    {.name = "kill-word",
+     .description = "Kill from beginning of line to cursor"                  },
+    {              .name = "kill-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_kill_word,
-     .description = "Kill from cursor to end of word"},
-    {.name = "backward-kill-word",
+     .description = "Kill from cursor to end of word"                        },
+    {     .name = "backward-kill-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_backward_kill_word,
-     .description = "Kill from beginning of word to cursor"},
-    {.name = "unix-line-discard",
+     .description = "Kill from beginning of word to cursor"                  },
+    {      .name = "unix-line-discard",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_unix_line_discard,
-     .description = "Kill entire line (Unix style)"},
-    {.name = "unix-word-rubout",
+     .description = "Kill entire line (Unix style)"                          },
+    {       .name = "unix-word-rubout",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_unix_word_rubout,
-     .description = "Kill word backward (Unix style)"},
+     .description = "Kill word backward (Unix style)"                        },
     {.name = "delete-horizontal-space",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_delete_horizontal_space,
-     .description = "Delete whitespace around cursor"},
+     .description = "Delete whitespace around cursor"                        },
 
     /* ========================================================================
      * YANK AND TRANSPOSE
      * ========================================================================
      */
-    {.name = "yank",
+    {                   .name = "yank",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_yank,
-     .description = "Yank (paste) from kill ring"},
-    {.name = "yank-pop",
+     .description = "Yank (paste) from kill ring"                            },
+    {               .name = "yank-pop",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_yank_pop,
-     .description = "Cycle through kill ring"},
-    {.name = "transpose-chars",
+     .description = "Cycle through kill ring"                                },
+    {        .name = "transpose-chars",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_transpose_chars,
-     .description = "Swap character at cursor with previous"},
-    {.name = "transpose-words",
+     .description = "Swap character at cursor with previous"                 },
+    {        .name = "transpose-words",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_transpose_words,
-     .description = "Swap current word with previous"},
+     .description = "Swap current word with previous"                        },
 
     /* ========================================================================
      * CASE CHANGES
      * ========================================================================
      */
-    {.name = "upcase-word",
+    {            .name = "upcase-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_upcase_word,
-     .description = "Convert word to uppercase"},
-    {.name = "downcase-word",
+     .description = "Convert word to uppercase"                              },
+    {          .name = "downcase-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_downcase_word,
-     .description = "Convert word to lowercase"},
-    {.name = "capitalize-word",
+     .description = "Convert word to lowercase"                              },
+    {        .name = "capitalize-word",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_capitalize_word,
-     .description = "Capitalize word"},
+     .description = "Capitalize word"                                        },
 
     /* ========================================================================
      * HISTORY NAVIGATION
      * ========================================================================
      */
-    {.name = "history-previous",
+    {       .name = "history-previous",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_history_previous,
-     .description = "Previous history entry"},
-    {.name = "history-next",
+     .description = "Previous history entry"                                 },
+    {           .name = "history-next",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_history_next,
-     .description = "Next history entry"},
-    {.name = "reverse-search-history",
+     .description = "Next history entry"                                     },
+    { .name = "reverse-search-history",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_reverse_search_history,
-     .description = "Incremental reverse history search"},
-    {.name = "forward-search-history",
+     .description = "Incremental reverse history search"                     },
+    { .name = "forward-search-history",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_forward_search_history,
-     .description = "Incremental forward history search"},
+     .description = "Incremental forward history search"                     },
     {.name = "history-search-backward",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_history_search_backward,
-     .description = "Search history backward for prefix"},
-    {.name = "history-search-forward",
+     .description = "Search history backward for prefix"                     },
+    { .name = "history-search-forward",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_history_search_forward,
-     .description = "Search history forward for prefix"},
+     .description = "Search history forward for prefix"                      },
 
     /* ========================================================================
      * COMPLETION
      * ========================================================================
      */
-    {.name = "complete",
+    {               .name = "complete",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_complete,
-     .description = "Complete current word"},
-    {.name = "possible-completions",
+     .description = "Complete current word"                                  },
+    {   .name = "possible-completions",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_possible_completions,
-     .description = "List possible completions"},
-    {.name = "insert-completions",
+     .description = "List possible completions"                              },
+    {     .name = "insert-completions",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_insert_completions,
-     .description = "Insert all completions"},
+     .description = "Insert all completions"                                 },
 
     /* ========================================================================
      * CONTEXT-AWARE ACTIONS
      * ========================================================================
      */
-    {.name = "accept-line",
+    {            .name = "accept-line",
      .type = LLE_ACTION_TYPE_CONTEXT,
      .func.context = lle_accept_line_context,
-     .description = "Accept line for execution"},
-    {.name = "abort-line",
+     .description = "Accept line for execution"                              },
+    {             .name = "abort-line",
      .type = LLE_ACTION_TYPE_CONTEXT,
      .func.context = lle_abort_line_context,
-     .description = "Abort current line"},
+     .description = "Abort current line"                                     },
 
     /* ========================================================================
      * SHELL OPERATIONS
      * ========================================================================
      */
-    {.name = "send-eof",
+    {               .name = "send-eof",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_send_eof,
-     .description = "Send EOF (Ctrl-D on empty line)"},
-    {.name = "interrupt",
+     .description = "Send EOF (Ctrl-D on empty line)"                        },
+    {              .name = "interrupt",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_interrupt,
-     .description = "Send interrupt signal"},
-    {.name = "suspend",
+     .description = "Send interrupt signal"                                  },
+    {                .name = "suspend",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_suspend,
-     .description = "Suspend shell"},
-    {.name = "clear-screen",
+     .description = "Suspend shell"                                          },
+    {           .name = "clear-screen",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_clear_screen,
-     .description = "Clear screen and redraw"},
+     .description = "Clear screen and redraw"                                },
 
     /* ========================================================================
      * UTILITY ACTIONS
      * ========================================================================
      */
-    {.name = "quoted-insert",
+    {          .name = "quoted-insert",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_quoted_insert,
-     .description = "Insert next character literally"},
-    {.name = "tab-insert",
+     .description = "Insert next character literally"                        },
+    {             .name = "tab-insert",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_tab_insert,
-     .description = "Insert tab character"},
-    {.name = "newline",
+     .description = "Insert tab character"                                   },
+    {                .name = "newline",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_newline,
-     .description = "Insert newline character"},
-    {.name = "insert-newline-literal",
+     .description = "Insert newline character"                               },
+    { .name = "insert-newline-literal",
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = lle_insert_newline_literal,
-     .description = "Insert literal newline"},
+     .description = "Insert literal newline"                                 },
 
-    /* Sentinel - marks end of registry */
-    {.name = NULL,
+    /// Sentinel - marks end of registry
+    {                     .name = NULL,
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = NULL,
-     .description = NULL}};
+     .description = NULL                                                     }
+};
 
-/* Count of actions (excluding sentinel) */
+/// Count of actions (excluding sentinel)
 static const size_t ACTION_REGISTRY_COUNT =
     (sizeof(ACTION_REGISTRY) / sizeof(ACTION_REGISTRY[0])) - 1;
 
@@ -373,7 +374,7 @@ lle_result_t lle_keybinding_get_user_config_path(char *buffer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Try XDG_CONFIG_HOME first */
+    /// Try XDG_CONFIG_HOME first
     const char *xdg_config = getenv("XDG_CONFIG_HOME");
     if (xdg_config && xdg_config[0]) {
         int written = snprintf(buffer, buffer_size, "%s/lush/%s", xdg_config,
@@ -383,7 +384,7 @@ lle_result_t lle_keybinding_get_user_config_path(char *buffer,
         }
     }
 
-    /* Fall back to ~/.config/lush/ */
+    /// Fall back to ~/.config/lush/
     const char *home = get_home_dir();
     if (!home) {
         return LLE_ERROR_SYSTEM_CALL;
@@ -415,7 +416,7 @@ static char *read_file_contents(const char *filepath, size_t *size_out) {
         return NULL;
     }
 
-    /* Get file size */
+    /// Get file size
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
         return NULL;
@@ -432,14 +433,14 @@ static char *read_file_contents(const char *filepath, size_t *size_out) {
         return NULL;
     }
 
-    /* Allocate buffer */
+    /// Allocate buffer
     char *content = malloc((size_t)size + 1);
     if (!content) {
         fclose(fp);
         return NULL;
     }
 
-    /* Read file */
+    /// Read file
     size_t read_size = fread(content, 1, (size_t)size, fp);
     fclose(fp);
 
@@ -478,12 +479,12 @@ static lle_result_t keybinding_config_callback(const char *section,
                                                void *user_data) {
     keybinding_parser_ctx_t *ctx = user_data;
 
-    /* Only process [bindings] section */
+    /// Only process [bindings] section
     if (strcmp(section, "bindings") != 0) {
         return LLE_SUCCESS;
     }
 
-    /* Value must be a string */
+    /// Value must be a string
     if (value->type != LLE_THEME_VALUE_STRING) {
         ctx->result->errors_count++;
         return LLE_SUCCESS;
@@ -492,7 +493,7 @@ static lle_result_t keybinding_config_callback(const char *section,
     const char *key_sequence = key;
     const char *action_name = value->data.string;
 
-    /* Handle "none" to unbind */
+    /// Handle "none" to unbind
     if (strcmp(action_name, "none") == 0 || action_name[0] == '\0') {
         lle_result_t unbind_result =
             lle_keybinding_manager_unbind(ctx->manager, key_sequence);
@@ -502,33 +503,33 @@ static lle_result_t keybinding_config_callback(const char *section,
         return LLE_SUCCESS;
     }
 
-    /* Look up action in registry */
+    /// Look up action in registry
     const lle_action_registry_entry_t *entry =
         lle_action_registry_lookup(action_name);
     if (!entry) {
-        /* Unknown action - skip with warning */
+        /// Unknown action - skip with warning
         ctx->result->errors_count++;
         return LLE_SUCCESS;
     }
 
-    /* Validate key sequence */
+    /// Validate key sequence
     lle_key_event_t key_event;
     lle_result_t parse_result =
         lle_key_sequence_parse(key_sequence, &key_event);
     if (parse_result != LLE_SUCCESS) {
-        /* Invalid key sequence - skip with warning */
+        /// Invalid key sequence - skip with warning
         ctx->result->errors_count++;
         return LLE_SUCCESS;
     }
 
-    /* Check if this overrides an existing binding */
+    /// Check if this overrides an existing binding
     lle_keybinding_action_t *existing = NULL;
     if (lle_keybinding_manager_lookup(ctx->manager, key_sequence, &existing) ==
         LLE_SUCCESS) {
         ctx->result->bindings_overridden++;
     }
 
-    /* Bind based on action type */
+    /// Bind based on action type
     lle_result_t bind_result;
     if (entry->type == LLE_ACTION_TYPE_SIMPLE) {
         bind_result = lle_keybinding_manager_bind(
@@ -567,10 +568,10 @@ lle_keybinding_load_from_string(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize result */
+    /// Initialize result
     memset(result, 0, sizeof(*result));
 
-    /* Initialize parser */
+    /// Initialize parser
     lle_theme_parser_t parser;
     lle_result_t init_result = lle_theme_parser_init(&parser, content);
     if (init_result != LLE_SUCCESS) {
@@ -580,10 +581,10 @@ lle_keybinding_load_from_string(lle_keybinding_manager_t *manager,
         return init_result;
     }
 
-    /* Set up parser context */
+    /// Set up parser context
     keybinding_parser_ctx_t ctx = {.manager = manager, .result = result};
 
-    /* Parse and apply bindings */
+    /// Parse and apply bindings
     lle_result_t parse_result =
         lle_theme_parser_parse(&parser, keybinding_config_callback, &ctx);
 
@@ -615,11 +616,11 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize result */
+    /// Initialize result
     memset(result, 0, sizeof(*result));
     snprintf(result->filepath, sizeof(result->filepath), "%s", filepath);
 
-    /* Check if file exists */
+    /// Check if file exists
     struct stat st;
     if (stat(filepath, &st) != 0) {
         result->status = LLE_ERROR_NOT_FOUND;
@@ -628,7 +629,7 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Read file contents */
+    /// Read file contents
     size_t content_size;
     char *content = read_file_contents(filepath, &content_size);
     if (!content) {
@@ -638,7 +639,7 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* Parse content */
+    /// Parse content
     lle_result_t load_result =
         lle_keybinding_load_from_string(manager, content, result);
 
@@ -660,7 +661,7 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Get user config path */
+    /// Get user config path
     char config_path[LLE_KEYBINDING_CONFIG_PATH_MAX];
     lle_result_t path_result =
         lle_keybinding_get_user_config_path(config_path, sizeof(config_path));
@@ -670,8 +671,7 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
         return path_result;
     }
 
-    /* Load from file (LLE_ERROR_NOT_FOUND is acceptable - config is optional)
-     */
+    /// Load from file (LLE_ERROR_NOT_FOUND is acceptable - config is optional)
     return lle_keybinding_load_from_file(manager, config_path, result);
 }
 
@@ -684,6 +684,6 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
 lle_result_t
 lle_keybinding_reload_user_config(lle_keybinding_manager_t *manager,
                                   lle_keybinding_load_result_t *result) {
-    /* Reload is the same as load - just re-apply user config */
+    /// Reload is the same as load - just re-apply user config
     return lle_keybinding_load_user_config(manager, result);
 }

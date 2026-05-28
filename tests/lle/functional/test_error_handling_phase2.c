@@ -16,7 +16,7 @@
 
 #include "lle/error_handling.h"
 
-/* Test result tracking */
+/// Test result tracking
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -61,7 +61,7 @@ static int test_error_context_creation(void) {
 static int test_forensic_logging_with_backtrace(void) {
     printf("Testing forensic log entry creation with backtrace...\n");
 
-    /* Create an error context */
+    /// Create an error context
     lle_error_context_t *ctx = LLE_CREATE_ERROR_CONTEXT(
         LLE_ERROR_MEMORY_CORRUPTION, "Detected memory corruption in buffer",
         "BufferManagement");
@@ -71,7 +71,7 @@ static int test_forensic_logging_with_backtrace(void) {
         return 0;
     }
 
-    /* Create forensic log entry */
+    /// Create forensic log entry
     lle_forensic_log_entry_t *log_entry = NULL;
     lle_result_t result = lle_create_forensic_log_entry(ctx, &log_entry);
 
@@ -82,13 +82,13 @@ static int test_forensic_logging_with_backtrace(void) {
 
     printf("  ✓ Forensic log entry created\n");
 
-    /* Verify system snapshot was captured */
+    /// Verify system snapshot was captured
     printf("  System snapshot:\n");
     printf("    Active components: 0x%x\n",
            log_entry->system_snapshot.active_components_mask);
     printf("    Thread count: %u\n", log_entry->system_snapshot.thread_count);
 
-    /* Verify stack trace was captured */
+    /// Verify stack trace was captured
     printf("  Stack trace:\n");
     printf("    Frames captured: %zu\n", log_entry->stack_trace.frame_count);
     printf("    Trace complete: %s\n",
@@ -97,7 +97,7 @@ static int test_forensic_logging_with_backtrace(void) {
     if (log_entry->stack_trace.frame_count > 0) {
         printf("  ✓ Stack trace captured successfully\n");
 
-        /* Print first few frames if symbols are available */
+        /// Print first few frames if symbols are available
         if (log_entry->stack_trace.symbol_names) {
             printf("    Stack frames:\n");
             size_t max_frames = log_entry->stack_trace.frame_count < 5
@@ -113,7 +113,7 @@ static int test_forensic_logging_with_backtrace(void) {
                "backtrace)\n");
     }
 
-    /* Verify component states were dumped */
+    /// Verify component states were dumped
     printf("  Component state dumps:\n");
     printf("    Total size: %zu bytes\n",
            log_entry->component_state.total_state_dump_size);
@@ -123,7 +123,7 @@ static int test_forensic_logging_with_backtrace(void) {
         printf("  ✓ Component states dumped\n");
     }
 
-    /* Clean up */
+    /// Clean up
     if (log_entry->stack_trace.symbol_names) {
         free(log_entry->stack_trace.symbol_names);
     }
@@ -237,7 +237,7 @@ static int test_component_state_dumps(void) {
 static int test_error_reporting_pipeline(void) {
     printf("Testing complete error reporting pipeline...\n");
 
-    /* Create error context */
+    /// Create error context
     lle_error_context_t *ctx = LLE_CREATE_ERROR_CONTEXT(
         LLE_ERROR_INVALID_STATE, "Component in invalid state during operation",
         "EventSystem");
@@ -247,7 +247,7 @@ static int test_error_reporting_pipeline(void) {
         return 0;
     }
 
-    /* Report the error (should output to console) */
+    /// Report the error (should output to console)
     printf("  Reporting error to console:\n");
     lle_result_t result = lle_report_error(ctx);
 

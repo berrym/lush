@@ -7,7 +7,11 @@
  */
 
 #include "builtins.h"
+#include "lle/lle_pager.h"
 #include "symtable.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 
 /**
  * @brief Export shell variables to the environment
@@ -22,19 +26,82 @@
  */
 int bin_export(int argc, char **argv) {
     if (argc == 1) {
-        // Print all exported variables
+        /// Print all exported variables. The full environment is
+        /// commonly several hundred entries deep on containerised
+        /// or development setups, so the listing is built into an
+        /// open_memstream heap buffer and handed to
+        /// lle_pager_present; non-tty, disabled master switch, and
+        /// fits-in-one-screen cases stream directly. memstream
+        /// allocation failure falls back to the prior streaming
+        /// path so output still surfaces.
         extern char **environ;
+        char *buf = NULL;
+        size_t buf_len = 0;
+        FILE *out = open_memstream(&buf, &buf_len);
+        FILE *sink = out ? out : stdout;
         for (char **env = environ; *env; env++) {
-            printf("export %s\n", *env);
+            fprintf(sink, "export %s\n", *env);
+        }
+        if (out) {
+            fclose(out);
+            lle_pager_present(NULL, buf);
+            free(buf);
         }
         return 0;
     }
 
     for (int i = 1; i < argc; i++) {
-        char *eq = strchr(argv[i], '=');
+        char *arg = argv[i];
+        /// Parser-internal array-literal sentinel (\x1F): an argv
+        /// element with this prefix came from the unquoted `name=(...)`
+        /// form. The process environment is a key=string map -- list
+        /// values cannot be exported. Per SEMANTICS section 3.4 (no
+        /// implicit list-to-string coercion) and section 3.9 (list in
+        /// a scalar-requiring slot is a runtime type error), reject
+        /// with the structured-error type-mismatch rather than
+        /// silently joining the elements into a string. bash silently
+        /// flattens; lush does not.
+        if (arg[0] == '\x1F') {
+            /// Recover the name for the diagnostic.
+            const char *name_start = arg + 1;
+            const char *name_end = strchr(name_start, '=');
+            size_t nlen =
+                name_end ? (size_t)(name_end - name_start) : strlen(name_start);
+            char namebuf[256];
+            if (nlen >= sizeof(namebuf)) {
+                nlen = sizeof(namebuf) - 1;
+            }
+            memcpy(namebuf, name_start, nlen);
+            namebuf[nlen] = '\0';
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                builtin_get_source_location(),
+                "type mismatch: cannot export list value '%s' as an "
+                "environment variable",
+                namebuf);
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "the process environment is a key=string map; "
+                    "export individual elements (export FOO=\"${arr[0]}\") "
+                    "or an explicit join (export FOO=\"${arr[*]}\"), or "
+                    "use `declare -a -x` for an exported indexed array.");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                executor_error_report(
+                    current_executor, SHELL_ERR_TYPE_MISMATCH,
+                    builtin_get_source_location(),
+                    "type mismatch: cannot export list value '%s' as an "
+                    "environment variable",
+                    namebuf);
+            }
+            return 1;
+        }
+        char *eq = strchr(arg, '=');
         if (eq) {
-            // Variable assignment: VAR=value
-            size_t name_len = eq - argv[i];
+            /// Variable assignment: VAR=value
+            size_t name_len = eq - arg;
             char *name = malloc(name_len + 1);
             if (!name) {
                 executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
@@ -42,12 +109,12 @@ int bin_export(int argc, char **argv) {
                                       "memory allocation failed");
                 return 1;
             }
-            strncpy(name, argv[i], name_len);
+            strncpy(name, arg, name_len);
             name[name_len] = '\0';
 
             const char *value = eq + 1;
 
-            // Validate variable name
+            /// Validate variable name
             if (!is_valid_identifier(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -57,19 +124,19 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Set variable value using modern API
+            /// Set variable value using modern API
             symtable_set_global(name, value);
 
-            // Export the variable using modern API
+            /// Export the variable using modern API
             symtable_export_global(name);
 
             free(name);
         } else if (i + 2 < argc && strcmp(argv[i + 1], "=") == 0) {
-            // Handle tokenized assignment: VAR = value
+            /// Handle tokenized assignment: VAR = value
             const char *name = argv[i];
             const char *value = argv[i + 2];
 
-            // Validate variable name
+            /// Validate variable name
             if (!is_valid_identifier(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -78,16 +145,16 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Set variable value using modern API
+            /// Set variable value using modern API
             symtable_set_global(name, value);
 
-            // Export the variable using modern API
+            /// Export the variable using modern API
             symtable_export_global(name);
 
-            // Skip the = and value tokens
+            /// Skip the = and value tokens
             i += 2;
         } else {
-            // Just export existing variable
+            /// Just export existing variable
             if (!is_valid_identifier(argv[i])) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -96,13 +163,13 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Check if variable exists and get its value
+            /// Check if variable exists and get its value
             char *current_value = symtable_get_global(argv[i]);
             if (current_value) {
-                // Variable exists - just export it
+                /// Variable exists - just export it
                 symtable_export_global(argv[i]);
             } else {
-                // Variable doesn't exist - create with empty value and export
+                /// Variable doesn't exist - create with empty value and export
                 symtable_set_global(argv[i], "");
                 symtable_export_global(argv[i]);
             }

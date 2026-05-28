@@ -14,7 +14,7 @@
 #include "lle/prompt/composer.h"
 
 int display_lle_newline_before(int argc, char **argv) {
-    /* Control newline before prompt for visual separation */
+    // Control newline before prompt for visual separation
     if (argc < 2) {
         printf("Newline before prompt: %s\n",
                config.display_newline_before_prompt ? "enabled" : "disabled");

@@ -20,7 +20,7 @@
 #include "dirstack.h"
 #include "test_framework.h"
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -35,13 +35,13 @@ TEST(dirstack_init_cleanup) {
 
 TEST(dirstack_double_init) {
     dirstack_init();
-    dirstack_init(); /* Should not crash */
+    dirstack_init(); /// Should not crash
     ASSERT_EQ(dirstack_size(), 0, "Stack should still be empty");
     dirstack_cleanup();
 }
 
 TEST(dirstack_cleanup_without_init) {
-    /* Should not crash */
+    /// Should not crash
     dirstack_cleanup();
 }
 
@@ -273,9 +273,9 @@ TEST(dirstack_clear_empty) {
 
 TEST(dirstack_rotate_positive) {
     dirstack_init();
-    dirstack_push("/first"); /* bottom */
+    dirstack_push("/first"); /// bottom
     dirstack_push("/second");
-    dirstack_push("/third"); /* top */
+    dirstack_push("/third"); /// top
 
     int result = dirstack_rotate(2);
     ASSERT_EQ(result, 0, "Rotate should succeed");
@@ -366,7 +366,7 @@ TEST(dirstack_print_with_entries) {
     dirstack_push("/first");
     dirstack_push("/second");
 
-    /* Just verify these don't crash */
+    /// Just verify these don't crash
     dirstack_print(false, false);
     dirstack_print(true, false);
     dirstack_print(false, true);
@@ -385,7 +385,7 @@ TEST(dirstack_sync_variable) {
     dirstack_push("/first");
     dirstack_push("/second");
 
-    /* Should not crash */
+    /// Should not crash
     dirstack_sync_variable();
 
     dirstack_cleanup();
@@ -399,7 +399,7 @@ TEST(dirstack_sync_variable) {
 TEST(dirstack_many_entries) {
     dirstack_init();
 
-    /* Push many entries */
+    /// Push many entries
     for (int i = 0; i < 50; i++) {
         char path[32];
         snprintf(path, sizeof(path), "/dir%d", i);
@@ -409,7 +409,7 @@ TEST(dirstack_many_entries) {
 
     ASSERT_EQ(dirstack_size(), 50, "Should have 50 entries");
 
-    /* Pop all */
+    /// Pop all
     for (int i = 49; i >= 0; i--) {
         char *popped = dirstack_pop();
         ASSERT_NOT_NULL(popped, "Pop should succeed");
@@ -434,64 +434,64 @@ TEST(dirstack_many_entries) {
 int main(void) {
     printf("\n=== Directory Stack Unit Tests ===\n\n");
 
-    /* Initialization tests */
+    /// Initialization tests
     printf("Initialization Tests:\n");
     RUN_TEST(dirstack_init_cleanup);
     RUN_TEST(dirstack_double_init);
     RUN_TEST(dirstack_cleanup_without_init);
 
-    /* Push tests */
+    /// Push tests
     printf("\nPush Tests:\n");
     RUN_TEST(dirstack_push_single);
     RUN_TEST(dirstack_push_multiple);
     RUN_TEST(dirstack_push_null);
 
-    /* Pop tests */
+    /// Pop tests
     printf("\nPop Tests:\n");
     RUN_TEST(dirstack_pop_single);
     RUN_TEST(dirstack_pop_order);
     RUN_TEST(dirstack_pop_empty);
 
-    /* Peek tests */
+    /// Peek tests
     printf("\nPeek Tests:\n");
     RUN_TEST(dirstack_peek_top);
     RUN_TEST(dirstack_peek_middle);
     RUN_TEST(dirstack_peek_out_of_range);
     RUN_TEST(dirstack_peek_empty);
 
-    /* Remove tests */
+    /// Remove tests
     printf("\nRemove Tests:\n");
     RUN_TEST(dirstack_remove_top);
     RUN_TEST(dirstack_remove_middle);
     RUN_TEST(dirstack_remove_out_of_range);
 
-    /* Clear tests */
+    /// Clear tests
     printf("\nClear Tests:\n");
     RUN_TEST(dirstack_clear_populated);
     RUN_TEST(dirstack_clear_empty);
 
-    /* Rotate tests */
+    /// Rotate tests
     printf("\nRotate Tests:\n");
     RUN_TEST(dirstack_rotate_positive);
     RUN_TEST(dirstack_rotate_zero);
     RUN_TEST(dirstack_rotate_out_of_range);
     RUN_TEST(dirstack_rotate_empty);
 
-    /* Size tests */
+    /// Size tests
     printf("\nSize Tests:\n");
     RUN_TEST(dirstack_size_empty);
     RUN_TEST(dirstack_size_after_operations);
 
-    /* Print tests */
+    /// Print tests
     printf("\nPrint Tests:\n");
     RUN_TEST(dirstack_print_empty);
     RUN_TEST(dirstack_print_with_entries);
 
-    /* Sync tests */
+    /// Sync tests
     printf("\nSync Tests:\n");
     RUN_TEST(dirstack_sync_variable);
 
-    /* Stress tests */
+    /// Stress tests
     printf("\nStress Tests:\n");
     RUN_TEST(dirstack_many_entries);
 

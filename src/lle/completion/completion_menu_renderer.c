@@ -15,7 +15,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/*                            HELPER FUNCTIONS                                */
+/// HELPER FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -69,49 +69,49 @@ static size_t visual_width(const char *str) {
     if (len == 0)
         return 0;
 
-    /* Fast path: no ANSI escape sequences */
+    /// Fast path: no ANSI escape sequences
     const char *esc = memchr(str, 0x1B, len);
     if (!esc) {
-        /* No escape sequences - use lle_utf8_string_width directly */
+        /// No escape sequences - use lle_utf8_string_width directly
         return lle_utf8_string_width(str, len);
     }
 
-    /* Slow path: string contains ANSI escape sequences
-     * Process segments between escape sequences */
+    /// Slow path: string contains ANSI escape sequences
+    /// Process segments between escape sequences
     size_t width = 0;
     size_t i = 0;
 
     while (i < len) {
         unsigned char c = (unsigned char)str[i];
 
-        /* Check for ANSI escape sequence (ESC = 0x1B) */
+        /// Check for ANSI escape sequence (ESC = 0x1B)
         if (c == 0x1B && i + 1 < len) {
             unsigned char next = (unsigned char)str[i + 1];
             if (next == '[') {
-                /* CSI sequence: ESC [ ... final_byte
-                 * Skip until we find the final byte (0x40-0x7E) */
-                i += 2; /* Skip ESC [ */
+                /// CSI sequence: ESC [ ... final_byte
+                /// Skip until we find the final byte (0x40-0x7E)
+                i += 2; /// Skip ESC [
                 while (i < len) {
                     unsigned char seq_char = (unsigned char)str[i];
                     i++;
                     if (seq_char >= 0x40 && seq_char <= 0x7E) {
-                        break; /* Found final byte, sequence complete */
+                        break; /// Found final byte, sequence complete
                     }
                 }
-                continue; /* Don't add to width, continue to next character */
+                continue; /// Don't add to width, continue to next character
             }
-            /* Other escape sequences (ESC + single char) */
+            /// Other escape sequences (ESC + single char)
             i += 2;
             continue;
         }
 
-        /* Find length of text segment until next escape or end */
+        /// Find length of text segment until next escape or end
         size_t segment_start = i;
         while (i < len && (unsigned char)str[i] != 0x1B) {
             i++;
         }
 
-        /* Calculate width of this segment using proper UTF-8 width */
+        /// Calculate width of this segment using proper UTF-8 width
         if (i > segment_start) {
             width +=
                 lle_utf8_string_width(str + segment_start, i - segment_start);
@@ -137,7 +137,7 @@ static size_t pad_string(char *dest, size_t dest_size, const char *src,
     size_t src_width = visual_width(src);
     size_t written = 0;
 
-    // Copy source
+    /// Copy source
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
         src_len = dest_size - 1;
@@ -145,7 +145,7 @@ static size_t pad_string(char *dest, size_t dest_size, const char *src,
     memcpy(dest, src, src_len);
     written = src_len;
 
-    // Add padding if needed
+    /// Add padding if needed
     if (src_width < target_width && written < dest_size - 1) {
         size_t padding = target_width - src_width;
         if (padding > dest_size - written - 1) {
@@ -160,7 +160,7 @@ static size_t pad_string(char *dest, size_t dest_size, const char *src,
 }
 
 /* ========================================================================== */
-/*                         PUBLIC API FUNCTIONS                               */
+/// PUBLIC API FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -194,19 +194,19 @@ size_t
 lle_menu_renderer_calculate_column_width(const lle_completion_item_t *items,
                                          size_t count, size_t terminal_width,
                                          size_t max_columns) {
-    (void)max_columns; // Reserved for future use
+    (void)max_columns; /// Reserved for future use
 
     if (!items || count == 0) {
         return LLE_MENU_RENDERER_MIN_COL_WIDTH;
     }
 
-    // Find longest item
+    /// Find longest item
     size_t max_len = 0;
     for (size_t i = 0; i < count; i++) {
         if (items[i].text) {
             size_t len = visual_width(items[i].text);
 
-            // Account for type indicator if present
+            /// Account for type indicator if present
             if (items[i].type_indicator) {
                 len += strlen(items[i].type_indicator);
             }
@@ -217,15 +217,15 @@ lle_menu_renderer_calculate_column_width(const lle_completion_item_t *items,
         }
     }
 
-    // Add padding
+    /// Add padding
     max_len += LLE_MENU_RENDERER_COL_PADDING;
 
-    // Ensure minimum width
+    /// Ensure minimum width
     if (max_len < LLE_MENU_RENDERER_MIN_COL_WIDTH) {
         max_len = LLE_MENU_RENDERER_MIN_COL_WIDTH;
     }
 
-    // Ensure we can fit at least one column
+    /// Ensure we can fit at least one column
     if (max_len > terminal_width) {
         max_len = terminal_width;
     }
@@ -313,7 +313,7 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
     char formatted[256];
     size_t pos = 0;
 
-    // Add selection prefix if selected
+    /// Add selection prefix if selected
     if (is_selected && selection_prefix) {
         size_t prefix_len = strlen(selection_prefix);
         if (prefix_len < sizeof(formatted) - pos) {
@@ -321,7 +321,7 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
             pos += prefix_len;
         }
     } else if (selection_prefix) {
-        // Add spaces to align non-selected items
+        /// Add spaces to align non-selected items
         size_t prefix_len = strlen(selection_prefix);
         if (prefix_len < sizeof(formatted) - pos) {
             memset(formatted + pos, ' ', prefix_len);
@@ -329,7 +329,7 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
         }
     }
 
-    // Add item text
+    /// Add item text
     if (item->text && pos < sizeof(formatted) - 1) {
         size_t text_len = strlen(item->text);
         if (text_len > sizeof(formatted) - pos - 1) {
@@ -339,7 +339,7 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
         pos += text_len;
     }
 
-    // Add type indicator
+    /// Add type indicator
     if (show_indicator && item->type_indicator && pos < sizeof(formatted) - 1) {
         size_t ind_len = strlen(item->type_indicator);
         if (ind_len > sizeof(formatted) - pos - 1) {
@@ -351,7 +351,7 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
 
     formatted[pos] = '\0';
 
-    // Apply highlighting if selected
+    /// Apply highlighting if selected
     int written;
     if (is_selected) {
         written =
@@ -377,10 +377,10 @@ lle_result_t lle_menu_renderer_format_item(const lle_completion_item_t *item,
 size_t
 lle_menu_renderer_estimate_size(const lle_completion_menu_state_t *state,
                                 const lle_menu_render_options_t *options) {
-    (void)options; // Reserved for future use
+    (void)options; /// Reserved for future use
 
     if (!state || !state->result) {
-        return 1024; // Default estimate
+        return 1024; /// Default estimate
     }
 
     size_t visible = state->visible_count;
@@ -388,11 +388,11 @@ lle_menu_renderer_estimate_size(const lle_completion_menu_state_t *state,
         visible = state->result->count - state->first_visible;
     }
 
-    // Rough estimate:
-    // - Average 20 chars per item
-    // - Category headers: 30 chars each (max 8 types)
-    // - ANSI codes: ~20 chars per item
-    // - Newlines and padding
+    /// Rough estimate:
+    /// - Average 20 chars per item
+    /// - Category headers: 30 chars each (max 8 types)
+    /// - ANSI codes: ~20 chars per item
+    /// - Newlines and padding
 
     size_t estimate = visible * 40 + 8 * 30 + 256;
 
@@ -429,17 +429,17 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
         return LLE_SUCCESS;
     }
 
-    // Use default options if not provided
+    /// Use default options if not provided
     lle_menu_render_options_t default_opts;
     if (!options) {
         default_opts = lle_menu_renderer_default_options(80);
         options = &default_opts;
     }
 
-    // Initialize stats
+    /// Initialize stats
     lle_menu_render_stats_t local_stats = {0};
 
-    // Get visible range
+    /// Get visible range
     size_t start_idx = state->first_visible;
     size_t end_idx = start_idx + state->visible_count;
     if (end_idx > state->result->count) {
@@ -450,18 +450,18 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
     size_t output_pos = 0;
     size_t rows_used = 0;
 
-    // Use pre-calculated column layout from menu state if available
-    // This ensures stable layout during navigation (no column shifting)
+    /// Use pre-calculated column layout from menu state if available
+    /// This ensures stable layout during navigation (no column shifting)
     size_t col_width = 0;
     size_t columns = 1;
     if (options->use_multi_column) {
-        // Prefer cached layout from state (set by
-        // lle_completion_menu_update_layout)
+        /// Prefer cached layout from state (set by
+        /// lle_completion_menu_update_layout)
         if (state->column_width > 0 && state->num_columns > 0) {
             col_width = state->column_width;
             columns = state->num_columns;
         } else {
-            // Fallback: calculate fresh if state doesn't have layout info
+            /// Fallback: calculate fresh if state doesn't have layout info
             col_width = lle_menu_renderer_calculate_column_width(
                 items + start_idx, end_idx - start_idx, options->terminal_width,
                 LLE_MENU_RENDERER_MAX_COLS);
@@ -479,26 +479,26 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
          i++) {
         const lle_completion_item_t *item = &items[i];
 
-        // Category header if type changed
+        /// Category header if type changed
         if (options->show_category_headers && item->type != current_category) {
-            // Finish current row if mid-row
+            /// Finish current row if mid-row
             if (column > 0 && output_pos < output_size - 1) {
                 output[output_pos++] = '\n';
                 rows_used++;
                 column = 0;
             }
 
-            // Check row limit
+            /// Check row limit
             if (rows_used >= options->max_rows) {
                 local_stats.truncated = true;
                 break;
             }
 
-            // Format category header
+            /// Format category header
             char header[128];
             lle_result_t result = lle_menu_renderer_format_category_header(
                 item->type, header, sizeof(header),
-                true // Use bold
+                true /// Use bold
             );
 
             if (result == LLE_SUCCESS) {
@@ -514,13 +514,13 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
             }
         }
 
-        // Check row limit before rendering item
+        /// Check row limit before rendering item
         if (rows_used >= options->max_rows) {
             local_stats.truncated = true;
             break;
         }
 
-        // Format item
+        /// Format item
         char formatted[256];
         bool is_selected = (i == state->selected_index);
         lle_result_t result = lle_menu_renderer_format_item(
@@ -530,12 +530,12 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
             formatted, sizeof(formatted));
 
         if (result != LLE_SUCCESS) {
-            continue; // Skip this item
+            continue; /// Skip this item
         }
 
-        // Add to output with column layout
+        /// Add to output with column layout
         if (options->use_multi_column) {
-            // Pad to column width
+            /// Pad to column width
             char padded[256];
             pad_string(padded, sizeof(padded), formatted, col_width);
 
@@ -546,16 +546,16 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
 
                 column++;
                 if (column >= columns) {
-                    // End of row
+                    /// End of row
                     output[output_pos++] = '\n';
                     rows_used++;
                     column = 0;
                 } else {
-                    // Add column separator (included in padding)
+                    /// Add column separator (included in padding)
                 }
             }
         } else {
-            // Single column layout
+            /// Single column layout
             size_t formatted_len = strlen(formatted);
             if (output_pos + formatted_len + 1 < output_size) {
                 memcpy(output + output_pos, formatted, formatted_len);
@@ -568,13 +568,13 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
         local_stats.items_rendered++;
     }
 
-    // Finish last row if needed
+    /// Finish last row if needed
     if (column > 0 && output_pos < output_size - 1) {
         output[output_pos++] = '\n';
         rows_used++;
     }
 
-    // Null terminate
+    /// Null terminate
     if (output_pos < output_size) {
         output[output_pos] = '\0';
     } else {
@@ -584,7 +584,7 @@ lle_completion_menu_render(const lle_completion_menu_state_t *state,
 
     local_stats.rows_used = rows_used;
 
-    // Copy stats if requested
+    /// Copy stats if requested
     if (stats) {
         *stats = local_stats;
     }

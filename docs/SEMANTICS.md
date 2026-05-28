@@ -234,6 +234,89 @@ The asymmetry is principled: one is the engine silently lying; the
 other is a configurable, syntactically-requested expansion. Word
 splitting stays exactly as it is, governed by the feature matrix.
 
+### 3.9 List and map values meeting a position
+
+§3.4 forbids implicit list→string coercion; §3.5 binds presentation to
+the subscript. This section completes the model: what a list or map
+value does when it reaches a position, and what is forbidden outright.
+
+**The whole-word constraint.** A vector-yielding expansion -- a bare
+`${arr}` that resolves to a list/map, `${arr[@]}`, or a
+vector-producing map operator (`(k)`, `(v)`, `(kv)`) -- must occupy
+the *entire* whitespace-delimited word it appears in. It may not be
+glued to literal text or to another expansion within a single word.
+
+- Permitted: `${arr[@]}`, `"${arr[@]}"` -- the expansion is the whole
+  word's content (the quotes are a whitespace anchor, §3.6, and do not
+  change this).
+- Forbidden: `x${arr}`, `"prefix_${arr[@]}"` -- a list glued to text.
+  Gluing a list to a string has no coherent meaning; allowing it would
+  force an implicit flatten, which §3.4 forbids.
+
+String concatenation is therefore *not* a slot category -- it is a
+within-word phenomenon governed entirely by this constraint. To build
+a string from a list, join it explicitly (`${arr[*]}`, an explicit
+join) and concatenate the resulting *scalar*.
+
+The constraint is enforced at **runtime**: whether an expansion is
+vector-yielding depends on the variable's value, which is runtime
+state -- `x${arr}` is ordinary concatenation when `arr` holds a scalar
+and a violation when it holds a list. (An explicit `[@]` glued to text
+is statically detectable, and an implementation may diagnose it early,
+but the guarantee is defined at runtime, uniform with the slot check
+below.)
+
+**Slot context.** Every position an expansion can occupy is either
+vector-accepting or scalar-requiring:
+
+| Slot category    | Positions |
+|------------------|-----------|
+| Vector-accepting | argv (command arguments); the command-name position; array initializer `( ... )`; for-loop word list |
+| Scalar-requiring | variable assignment RHS; `case` word (`case $x in`); redirect target (`>`, `>>`); here-string (`<<<`); arithmetic operand `$(( ... ))`; conditional-expression operand `[[ ... ]]` |
+
+This table states the model's intent; the engine must codify the
+*complete* enumeration of positions. It is a living classification,
+not yet exhaustive here.
+
+A list or map value -- bare `${arr}`, or a vector-producing operator
+-- is valid in a vector-accepting slot: it contributes its elements,
+exactly as `${arr[@]}` does. In a scalar-requiring slot it is a type
+error. `${arr[*]}` and explicit joins produce a scalar and are valid
+in scalar-requiring slots.
+
+**Type-mismatch diagnostic.** A list or map value that reaches a
+scalar-requiring slot, or that violates the whole-word constraint, is
+a runtime type error. The engine halts the offending evaluation and
+emits a diagnostic through the structured-error system, the source
+span on the offending expansion:
+
+```
+error[E_TYPE]: type mismatch -- expected scalar string, got list
+  --> script.lush:12:13
+   |
+12 | msg="prefix ${my_list}"
+   |             ^^^^^^^^^^ list value in a scalar within-word position
+   |
+   = help: join the list explicitly to place it in a string position --
+           ${my_list[*]} for space-joining, or an explicit join.
+```
+
+`E_TYPE` is a placeholder; the real code is assigned from lush's
+structured-error registry, not invented here.
+
+**Enforcement.** The check is runtime (a variable's kind is runtime
+state). In a script, a type mismatch aborts with a non-zero exit
+before the bad value can reach a downstream command. Interactively,
+the diagnostic prints to stderr, the current command line is
+abandoned, and control returns cleanly to the prompt and the
+debugger -- the session is not killed.
+
+This makes the bare `${arr}` fully defined: it is the first-class
+list (or map) value itself; `[@]` / `[*]` are operators *on* that
+value, not type switches; the value flows into vector-accepting
+positions and is a diagnosed type error in scalar-requiring ones.
+There is no implicit join, ever.
+
 ---
 
 ## 4. The three boundary rules
@@ -381,21 +464,27 @@ sizes are rough engineering estimates.)
 
 | Area | Current state | Target | Gap |
 |------|---------------|--------|-----|
-| Value kinds | `symvar.value` is `char *`; arrays in a side-table `array_value_t`; a `symvar_type_t` tag exists | scalar/list/map are first-class throughout the expansion engine | medium |
+| Value kinds | scalar/list/map all live in per-scope `vars_ht` as kind-tagged `symvar` entries; the previous global `array_storage` side-table is removed; `symtable_lookup` returns a kind-tagged view (`lush_value_view_t`) | scalar/list/map are first-class throughout the expansion engine | **match** |
 | Flatness / nesting | none (a list element is always `char *`) | none (bounded, §3.2) | **match** |
 | Map insertion order | implemented -- `array_value_t.assoc_insertion_order` (Issue #69) | insertion order (§4.2) | **match** |
 | Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (§3.5) | **match** |
 | Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (§3.5) | **match** |
 | Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (§3.6) -- so the un-threaded state is *correct*, not a gap | **match** |
-| Implicit list-to-string | the expansion engine still joins lists to strings on some paths | no implicit coercion (§3.4) | real -- needs a full audit of expansion sites |
-| `(@)` flag | recognized among parameter flags | redundant; at most a spelling alias (§3.7) | small |
+| Implicit list-to-string | `${arr[@]}` in a scalar slot raises `SHELL_ERR_TYPE_MISMATCH` and aborts the script (`executor.c` general parameter-expansion fallthrough). Bare `${arr}` enforced the same way: vector slot yields N elements, scalar slot raises type mismatch, glued-to-text raises type mismatch. `export` and `readonly` raise on list values rather than silently joining. | no implicit coercion (§3.4, §3.9) | **match** |
+| `(@)` flag | accepted as a no-op spelling alias for `[@]` presentation in `try_expand_vector_arg` (`${(@)arr}` yields the same as `${arr[@]}`) | redundant; at most a spelling alias (§3.7) | **match** |
+| Array-literal discrimination | parser-internal `\x1F` sentinel prefix on unquoted `name=(...)` argv elements lets `local`/`declare`/`typeset` route to array-literal handling while `local data="(scoped)"` (which strips quotes to the same shape) correctly stays a scalar | a parsed `local arr=(a b c)` must build a real array, distinct from `local data="(...)"` | **match** |
 | Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (§3.8) | **match** |
-| Typed-function form | not implemented -- no `fn` keyword, no typed parameters; `return_value` is a builtin emitting a `__LUSH_RETURN__` marker, not a language construct | a typed form carrying lexical scope (§5.3) | large -- form not yet designed |
+| Typed-function form | declaration grammar implemented -- `fn name(p: kind, ...) [-> kind] { body }` parses to NODE_FN_DECL; call expression, typed `return`, and `let name = call(args)` capture in flight. The legacy `return_value` builtin and its `__LUSH_RETURN__` marker scanner were removed; the typed form is the only path to a structured return value | a typed form carrying lexical scope (§5.3) | parser surface landed; runtime + lexical resolution + debugger surface remain |
 | Scoping | dynamic scope-chain for all functions (`symtable` walks `scope->parent`; issue #47 assignment semantics) | dynamic for POSIX form, lexical for the typed form (§5) | large -- lexical resolution and the typed form both unbuilt |
 
 The two "large" gaps -- the typed-function form and lexical scoping --
-are coupled and are deliberately out of scope for this document; see
-§8.
+are coupled and are recorded in §8 as the next pieces of work. The
+six value-model rows that previously sat at medium / small / "one
+targeted fix" have all landed: `tests/real_world/` runs at 100% (20
+passes + 2 principled `known_divergences.txt` entries), and the
+storage layer is unified (the array side-table is gone; local
+arrays die with their function scope; `[[ -v arr ]]` returns true
+on arrays; `${!ref}` no longer leaks pointer bytes).
 
 ---
 
@@ -404,25 +493,15 @@ are coupled and are deliberately out of scope for this document; see
 Recorded here so they are not lost. These are *not* decided by this
 document; they are to be decided against it, as their own work.
 
-- **The bare, un-subscripted reference `${arr}`** on a list- or
-  map-valued variable. `[@]` and `[*]` are defined (§3.5); the
-  no-subscript form is not. Candidates: it is the first-class list
-  value itself; it is a diagnosed error ("a structured value
-  referenced without a presentation subscript"); it defaults to
-  `[*]`-style scalar. Current behavior is joined-scalar
-  (`known_divergences.txt` 307). To be decided.
-- **The typed-function form.** Its syntax, typed parameters, a proper
-  `return_value` construct (replacing the marker-hack builtin), and
-  the lexical-scope resolution pass. A full design of its own.
-- **Pipeline status reporting** -- a modern alternative to `pipefail`
-  feeding clean per-stage exit states into the structured-error
-  system.
-- **LLE real-time variable inspection** -- inspection hooks on the
-  command line.
-- **Sigil conventions** (`$`, `@`, `%`) once values are first-class.
-- **Error catalogue for misapplied transformations** -- e.g. an
+- **The typed-function form.** Its syntax and parameter declaration
+  landed; the call expression, the typed `return EXPR` statement, the
+  `let name = call(args)` capture form, and the lexical-scope
+  resolution pass remain to land. The legacy `return_value` builtin
+  was retired at the start of this work; the typed form is the only
+  path to a structured return value.
+- **Error catalog for misapplied transformations** -- e.g. an
   array-only flag applied to a scalar. The principle is settled (an
-  immediate, clear diagnostic); the exhaustive catalogue is not.
+  immediate, clear diagnostic); the exhaustive catalog is not.
 
 ---
 

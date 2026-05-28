@@ -1,3 +1,11 @@
+/**
+ * @file test_mouse_parser.c
+ * @brief Unit tests for mouse parser
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_mouse_parser.c - Unit tests for Mouse Parser
  *
@@ -21,7 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* External memory pool functions (mock) */
+/// External memory pool functions (mock)
 extern void *lle_pool_alloc(size_t size);
 extern void lle_pool_free(void *ptr);
 
@@ -34,12 +42,12 @@ extern void lle_pool_free(void *ptr);
 static void test_mouse_parser_init_destroy(void) {
     lle_mouse_parser_t *parser = NULL;
 
-    /* Initialize parser */
+    /// Initialize parser
     lle_result_t result = lle_mouse_parser_init(&parser, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to initialize mouse parser");
     TEST_ASSERT(parser != NULL, "Parser is NULL after init");
 
-    /* Destroy parser */
+    /// Destroy parser
     result = lle_mouse_parser_destroy(parser);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to destroy mouse parser");
 
@@ -56,13 +64,13 @@ static void test_x10_button_press(void) {
     lle_result_t result = lle_mouse_parser_init(&parser, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to initialize parser");
 
-    /* Enable tracking */
+    /// Enable tracking
     result =
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: ESC[M + button(32) + x(33='!') + y(33='!') */
-    /* Button 0 (left button) at position (0,0) */
+    /// X10 format: ESC[M + button(32) + x(33='!') + y(33='!')
+    /// Button 0 (left button) at position (0,0)
     const char sequence[] = "\x1B[M !!";
     size_t sequence_len = 6;
 
@@ -95,7 +103,7 @@ static void test_x10_button_release(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: button code 3 (0x23 = 35) means button release */
+    /// X10 format: button code 3 (0x23 = 35) means button release
     const char sequence[] = "\x1B[M#!!";
     size_t sequence_len = 6;
 
@@ -125,7 +133,7 @@ static void test_x10_middle_button(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: button 1 (middle button) = 33 (0x21 = '!') */
+    /// X10 format: button 1 (middle button) = 33 (0x21 = '!')
     const char sequence[] = "\x1B[M!!!";
     size_t sequence_len = 6;
 
@@ -156,7 +164,7 @@ static void test_x10_right_button(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: button 2 (right button) = 34 (0x22 = '"') */
+    /// X10 format: button 2 (right button) = 34 (0x22 = '"')
     const char sequence[] = "\x1B[M\"!!";
     size_t sequence_len = 6;
 
@@ -187,8 +195,8 @@ static void test_x10_coordinates(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: position (10, 5) = (43='*'+1, 38='%'+1) in 1-based coords */
-    /* We subtract 32 and then subtract 1 to get 0-based coords */
+    /// X10 format: position (10, 5) = (43='*'+1, 38='%'+1) in 1-based coords
+    /// We subtract 32 and then subtract 1 to get 0-based coords
     const char sequence[] = "\x1B[M /%";
     size_t sequence_len = 6;
 
@@ -197,9 +205,9 @@ static void test_x10_coordinates(void) {
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse coordinates");
     TEST_ASSERT(event != NULL, "Event is NULL");
     TEST_ASSERT(event->x == 14,
-                "Wrong x coordinate"); /* '/' = 47, 47-32-1 = 14 */
+                "Wrong x coordinate"); /// '/' = 47, 47-32-1 = 14
     TEST_ASSERT(event->y == 4,
-                "Wrong y coordinate"); /* '%' = 37, 37-32-1 = 4 */
+                "Wrong y coordinate"); /// '%' = 37, 37-32-1 = 4
 
     lle_pool_free(event);
     lle_mouse_parser_destroy(parser);
@@ -221,7 +229,7 @@ static void test_x10_wheel_up(void) {
                                            LLE_MOUSE_TRACKING_BTN_EVENT);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: wheel up = button 64 (0x60 = 96) */
+    /// X10 format: wheel up = button 64 (0x60 = 96)
     const char sequence[] = "\x1B[M`!!";
     size_t sequence_len = 6;
 
@@ -254,7 +262,7 @@ static void test_x10_wheel_down(void) {
                                            LLE_MOUSE_TRACKING_BTN_EVENT);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* X10 format: wheel down = button 65 (0x61 = 97 = 'a') */
+    /// X10 format: wheel down = button 65 (0x61 = 97 = 'a')
     const char sequence[] = "\x1B[Ma!!";
     size_t sequence_len = 6;
 
@@ -287,7 +295,7 @@ static void test_sgr_button_press(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* SGR format: ESC[<0;10;5M (left button press at 10,5) */
+    /// SGR format: ESC[<0;10;5M (left button press at 10,5)
     const char sequence[] = "\x1B[<0;10;5M";
     size_t sequence_len = 11;
 
@@ -297,8 +305,8 @@ static void test_sgr_button_press(void) {
     TEST_ASSERT(event != NULL, "Event is NULL");
     TEST_ASSERT(event->button == LLE_MOUSE_BUTTON_LEFT, "Wrong button");
     TEST_ASSERT(event->type == LLE_MOUSE_EVENT_PRESS, "Wrong event type");
-    TEST_ASSERT(event->x == 9, "Wrong x coordinate"); /* 1-based to 0-based */
-    TEST_ASSERT(event->y == 4, "Wrong y coordinate"); /* 1-based to 0-based */
+    TEST_ASSERT(event->x == 9, "Wrong x coordinate"); /// 1-based to 0-based
+    TEST_ASSERT(event->y == 4, "Wrong y coordinate"); /// 1-based to 0-based
 
     lle_pool_free(event);
     lle_mouse_parser_destroy(parser);
@@ -320,7 +328,7 @@ static void test_sgr_button_release(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* SGR format: ESC[<0;10;5m (lowercase 'm' = release) */
+    /// SGR format: ESC[<0;10;5m (lowercase 'm' = release)
     const char sequence[] = "\x1B[<0;10;5m";
     size_t sequence_len = 11;
 
@@ -351,7 +359,7 @@ static void test_sgr_modifiers(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* SGR format: ESC[<4;10;5M (4 = Shift modifier) */
+    /// SGR format: ESC[<4;10;5M (4 = Shift modifier)
     const char sequence[] = "\x1B[<4;10;5M";
     size_t sequence_len = 11;
 
@@ -382,15 +390,15 @@ static void test_mouse_drag(void) {
                                            LLE_MOUSE_TRACKING_ANY_EVENT);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* First: button press */
+    /// First: button press
     const char press_seq[] = "\x1B[<0;10;5M";
     result = lle_mouse_parser_parse_sequence(parser, press_seq, 11, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse press");
     lle_pool_free(event);
     event = NULL;
 
-    /* Then: movement with button held (drag) - button code 32 (0x20 + motion
-     * flag) */
+    /// Then: movement with button held (drag) - button code 32 (0x20 + motion
+    /// flag)
     const char drag_seq[] = "\x1B[<32;15;10M";
     result = lle_mouse_parser_parse_sequence(parser, drag_seq, 13, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse drag");
@@ -417,13 +425,13 @@ static void test_statistics(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* Parse a valid sequence */
+    /// Parse a valid sequence
     const char sequence[] = "\x1B[<0;10;5M";
     result = lle_mouse_parser_parse_sequence(parser, sequence, 11, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse");
     lle_pool_free(event);
 
-    /* Check statistics */
+    /// Check statistics
     uint64_t events_parsed = 0;
     uint64_t invalid_sequences = 0;
     result =
@@ -451,17 +459,17 @@ static void test_reset(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* Parse a sequence */
+    /// Parse a sequence
     const char sequence[] = "\x1B[<0;10;5M";
     result = lle_mouse_parser_parse_sequence(parser, sequence, 11, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse");
     lle_pool_free(event);
 
-    /* Reset parser */
+    /// Reset parser
     result = lle_mouse_parser_reset(parser);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to reset");
 
-    /* Check statistics are reset */
+    /// Check statistics are reset
     uint64_t events_parsed = 0;
     uint64_t invalid_sequences = 0;
     result =
@@ -488,13 +496,13 @@ static void test_get_state(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* Parse a button press at (10, 5) */
+    /// Parse a button press at (10, 5)
     const char sequence[] = "\x1B[<0;11;6M";
     result = lle_mouse_parser_parse_sequence(parser, sequence, 11, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse");
     lle_pool_free(event);
 
-    /* Get state */
+    /// Get state
     uint16_t x = 0, y = 0;
     lle_mouse_button_t buttons = 0;
     result = lle_mouse_parser_get_state(parser, &x, &y, &buttons);
@@ -522,7 +530,7 @@ static void test_invalid_sequence(void) {
         lle_mouse_parser_set_tracking(parser, true, LLE_MOUSE_TRACKING_X10);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to enable tracking");
 
-    /* Invalid sequence (too short) */
+    /// Invalid sequence (too short)
     const char sequence[] = "\x1B[<0";
     size_t sequence_len = 4;
 
@@ -530,7 +538,7 @@ static void test_invalid_sequence(void) {
         lle_mouse_parser_parse_sequence(parser, sequence, sequence_len, &event);
     TEST_ASSERT(result != LLE_SUCCESS, "Should fail on invalid sequence");
 
-    /* Check statistics */
+    /// Check statistics
     uint64_t events_parsed = 0;
     uint64_t invalid_sequences = 0;
     result =
@@ -549,7 +557,7 @@ static void test_invalid_sequence(void) {
 int main(void) {
     printf("=== LLE Mouse Parser Unit Tests ===\n\n");
 
-    /* Run tests */
+    /// Run tests
     RUN_TEST(mouse_parser_init_destroy);
     RUN_TEST(x10_button_press);
     RUN_TEST(x10_button_release);

@@ -25,7 +25,7 @@
  * scripts that reference these variables directly.
  */
 void init_shell_opts(void) {
-    // Legacy function - now uses config system values
+    /// Legacy function - now uses config system values
     symtable_set_global_int("HISTORY_NO_DUPS", config.history_no_dups);
     symtable_set_global_int("NO_WORD_EXPAND", config.no_word_expand);
     symtable_set_global_int("ENHANCED_COMPLETION", config.completion_enabled);

@@ -46,228 +46,229 @@
 #include <sys/types.h>
 #include <time.h>
 
-// Forward declaration for LLE types (no longer needed in command_layer)
-// Completion menu state moved to display_controller (proper architecture)
+/// Forward declaration for LLE types (no longer needed in command_layer)
+/// Completion menu state moved to display_controller (proper architecture)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define COMMAND_LAYER_VERSION_MAJOR 1
 #define COMMAND_LAYER_VERSION_MINOR 0
 #define COMMAND_LAYER_VERSION_PATCH 0
 
-// Command content limits
+/// Command content limits
 #define COMMAND_LAYER_MAX_COMMAND_SIZE 8192
 #define COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE 16384
 #define COMMAND_LAYER_MAX_TOKENS 512
 
-// Performance targets
+/// Performance targets
 #define COMMAND_LAYER_TARGET_UPDATE_TIME_MS 5
 #define COMMAND_LAYER_CACHE_EXPIRY_MS 50
 
-// Cache configuration
+/// Cache configuration
 #define COMMAND_LAYER_CACHE_SIZE 64
 #define COMMAND_LAYER_METRICS_HISTORY_SIZE 32
 
-// Syntax highlighting configuration
+/// Syntax highlighting configuration
 #define COMMAND_LAYER_MAX_HIGHLIGHT_REGIONS 256
 #define COMMAND_LAYER_COLOR_RESET "\033[0m"
 #define COMMAND_LAYER_MAX_COLOR_CODE_SIZE 32
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for command layer operations
  */
 typedef enum {
-    COMMAND_LAYER_SUCCESS = 0,              // Operation completed successfully
-    COMMAND_LAYER_ERROR_INVALID_PARAM,      // Invalid parameter provided
-    COMMAND_LAYER_ERROR_NULL_POINTER,       // NULL pointer passed
-    COMMAND_LAYER_ERROR_MEMORY_ALLOCATION,  // Memory allocation failed
-    COMMAND_LAYER_ERROR_BUFFER_TOO_SMALL,   // Output buffer insufficient
-    COMMAND_LAYER_ERROR_COMMAND_TOO_LARGE,  // Command exceeds limits
-    COMMAND_LAYER_ERROR_INVALID_CURSOR_POS, // Cursor position invalid
-    COMMAND_LAYER_ERROR_CACHE_FULL,         // Cache is full
-    COMMAND_LAYER_ERROR_SYNTAX_ERROR,       // Syntax highlighting error
-    COMMAND_LAYER_ERROR_NOT_INITIALIZED,    // Layer not initialized
-    COMMAND_LAYER_ERROR_EVENT_SYSTEM,       // Event system error
-    COMMAND_LAYER_ERROR_PERFORMANCE_LIMIT   // Performance limit exceeded
+    COMMAND_LAYER_SUCCESS = 0,              /// Operation completed successfully
+    COMMAND_LAYER_ERROR_INVALID_PARAM,      /// Invalid parameter provided
+    COMMAND_LAYER_ERROR_NULL_POINTER,       /// NULL pointer passed
+    COMMAND_LAYER_ERROR_MEMORY_ALLOCATION,  /// Memory allocation failed
+    COMMAND_LAYER_ERROR_BUFFER_TOO_SMALL,   /// Output buffer insufficient
+    COMMAND_LAYER_ERROR_COMMAND_TOO_LARGE,  /// Command exceeds limits
+    COMMAND_LAYER_ERROR_INVALID_CURSOR_POS, /// Cursor position invalid
+    COMMAND_LAYER_ERROR_CACHE_FULL,         /// Cache is full
+    COMMAND_LAYER_ERROR_SYNTAX_ERROR,       /// Syntax highlighting error
+    COMMAND_LAYER_ERROR_NOT_INITIALIZED,    /// Layer not initialized
+    COMMAND_LAYER_ERROR_EVENT_SYSTEM,       /// Event system error
+    COMMAND_LAYER_ERROR_PERFORMANCE_LIMIT   /// Performance limit exceeded
 } command_layer_error_t;
 
 /**
  * Syntax highlighting token types
  */
 typedef enum {
-    COMMAND_TOKEN_NONE = 0, // No token / whitespace
-    COMMAND_TOKEN_COMMAND,  // Command name
-    COMMAND_TOKEN_ARGUMENT, // Command argument
-    COMMAND_TOKEN_OPTION,   // Command option (--flag)
-    COMMAND_TOKEN_STRING,   // Quoted string
-    COMMAND_TOKEN_VARIABLE, // Variable ($var)
-    COMMAND_TOKEN_REDIRECT, // Redirection (>, <, >>)
-    COMMAND_TOKEN_PIPE,     // Pipe (|)
-    COMMAND_TOKEN_KEYWORD,  // Shell keywords (if, for, etc)
-    COMMAND_TOKEN_OPERATOR, // Operators (&&, ||, ;)
-    COMMAND_TOKEN_PATH,     // File paths
-    COMMAND_TOKEN_NUMBER,   // Numeric values
-    COMMAND_TOKEN_COMMENT,  // Comments (#)
-    COMMAND_TOKEN_ERROR     // Syntax errors
+    COMMAND_TOKEN_NONE = 0, /// No token / whitespace
+    COMMAND_TOKEN_COMMAND,  /// Command name
+    COMMAND_TOKEN_ARGUMENT, /// Command argument
+    COMMAND_TOKEN_OPTION,   /// Command option (--flag)
+    COMMAND_TOKEN_STRING,   /// Quoted string
+    COMMAND_TOKEN_VARIABLE, /// Variable ($var)
+    COMMAND_TOKEN_REDIRECT, /// Redirection (>, <, >>)
+    COMMAND_TOKEN_PIPE,     /// Pipe (|)
+    COMMAND_TOKEN_KEYWORD,  /// Shell keywords (if, for, etc)
+    COMMAND_TOKEN_OPERATOR, /// Operators (&&, ||, ;)
+    COMMAND_TOKEN_PATH,     /// File paths
+    COMMAND_TOKEN_NUMBER,   /// Numeric values
+    COMMAND_TOKEN_COMMENT,  /// Comments (#)
+    COMMAND_TOKEN_ERROR     /// Syntax errors
 } command_token_type_t;
 
 /**
  * Syntax highlighting color scheme
  */
 typedef struct {
-    char command_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  // Command names
-    char argument_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; // Arguments
-    char option_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   // Options/flags
-    char string_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   // Strings
-    char variable_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; // Variables
-    char redirect_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; // Redirections
-    char pipe_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];     // Pipes
-    char keyword_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  // Keywords
-    char operator_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; // Operators
-    char path_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];     // Paths
-    char number_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   // Numbers
-    char comment_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  // Comments
-    char error_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];    // Errors
-    char reset_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];    // Reset
+    char command_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  /// Command names
+    char argument_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; /// Arguments
+    char option_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   /// Options/flags
+    char string_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   /// Strings
+    char variable_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; /// Variables
+    char redirect_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; /// Redirections
+    char pipe_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];     /// Pipes
+    char keyword_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  /// Keywords
+    char operator_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; /// Operators
+    char path_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];     /// Paths
+    char number_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];   /// Numbers
+    char comment_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];  /// Comments
+    char error_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];    /// Errors
+    char reset_color[COMMAND_LAYER_MAX_COLOR_CODE_SIZE];    /// Reset
 } command_color_scheme_t;
 
 /**
  * Syntax highlighting region
  */
 typedef struct {
-    size_t start;                    // Start position in command
-    size_t length;                   // Length of region
-    command_token_type_t token_type; // Type of token
-    char color_code[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; // Color for this region
+    size_t start;                    /// Start position in command
+    size_t length;                   /// Length of region
+    command_token_type_t token_type; /// Type of token
+    char
+        color_code[COMMAND_LAYER_MAX_COLOR_CODE_SIZE]; /// Color for this region
 } command_highlight_region_t;
 
 /**
  * Command metrics and positioning information
  */
 typedef struct {
-    size_t command_length;        // Length of command text
-    size_t cursor_position;       // Cursor position in command
-    size_t visual_length;         // Visual length (with colors)
-    size_t token_count;           // Number of tokens identified
-    size_t error_count;           // Number of syntax errors
-    int estimated_display_column; // Where command will display
-    int estimated_display_row;    // Row for command display
-    bool is_multiline_command;    // Command spans multiple lines
-    bool has_syntax_errors;       // Command has syntax errors
+    size_t command_length;        /// Length of command text
+    size_t cursor_position;       /// Cursor position in command
+    size_t visual_length;         /// Visual length (with colors)
+    size_t token_count;           /// Number of tokens identified
+    size_t error_count;           /// Number of syntax errors
+    int estimated_display_column; /// Where command will display
+    int estimated_display_row;    /// Row for command display
+    bool is_multiline_command;    /// Command spans multiple lines
+    bool has_syntax_errors;       /// Command has syntax errors
 } command_metrics_t;
 
 /**
  * Command layer performance statistics
  */
 typedef struct {
-    uint64_t update_count;             // Number of command updates
-    uint64_t cache_hits;               // Cache hit count
-    uint64_t cache_misses;             // Cache miss count
-    uint64_t syntax_highlight_time_ns; // Time for syntax highlighting
-    uint64_t avg_update_time_ns;       // Average update time
-    uint64_t max_update_time_ns;       // Maximum update time
-    uint64_t min_update_time_ns;       // Minimum update time
-    uint64_t total_processing_time_ns; // Total processing time
+    uint64_t update_count;             /// Number of command updates
+    uint64_t cache_hits;               /// Cache hit count
+    uint64_t cache_misses;             /// Cache miss count
+    uint64_t syntax_highlight_time_ns; /// Time for syntax highlighting
+    uint64_t avg_update_time_ns;       /// Average update time
+    uint64_t max_update_time_ns;       /// Maximum update time
+    uint64_t min_update_time_ns;       /// Minimum update time
+    uint64_t total_processing_time_ns; /// Total processing time
 } command_performance_t;
 
 /**
  * Command cache entry
  */
 typedef struct {
-    char command_text[COMMAND_LAYER_MAX_COMMAND_SIZE];         // Cached command
-    char highlighted_text[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE]; // Cached output
-    command_metrics_t metrics;                                 // Cached metrics
-    uint64_t timestamp_ns; // Cache timestamp
-    uint32_t hash;         // Command hash for validation
-    bool is_valid;         // Cache entry validity
+    char command_text[COMMAND_LAYER_MAX_COMMAND_SIZE]; /// Cached command
+    char highlighted_text[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE]; /// Cached output
+    command_metrics_t metrics; /// Cached metrics
+    uint64_t timestamp_ns;     /// Cache timestamp
+    uint32_t hash;             /// Command hash for validation
+    bool is_valid;             /// Cache entry validity
 } command_cache_entry_t;
 
 /**
  * Syntax highlighting configuration
  */
 typedef struct {
-    bool enabled;                        // Syntax highlighting enabled
-    bool use_colors;                     // Use color output
-    bool highlight_errors;               // Highlight syntax errors
-    bool cache_enabled;                  // Enable result caching
-    command_color_scheme_t color_scheme; // Color configuration
-    uint32_t cache_expiry_ms;            // Cache expiry time
-    uint32_t max_update_time_ms;         // Maximum update time
+    bool enabled;                        /// Syntax highlighting enabled
+    bool use_colors;                     /// Use color output
+    bool highlight_errors;               /// Highlight syntax errors
+    bool cache_enabled;                  /// Enable result caching
+    command_color_scheme_t color_scheme; /// Color configuration
+    uint32_t cache_expiry_ms;            /// Cache expiry time
+    uint32_t max_update_time_ms;         /// Maximum update time
 } command_syntax_config_t;
 
 /**
  * Command layer state structure
  */
 typedef struct command_layer_s {
-    // Layer identification and state
-    uint32_t magic;    // Magic number for validation
-    bool initialized;  // Initialization state
-    bool needs_redraw; // Redraw needed flag
+    /// Layer identification and state
+    uint32_t magic;    /// Magic number for validation
+    bool initialized;  /// Initialization state
+    bool needs_redraw; /// Redraw needed flag
 
-    // Command content management
-    char command_text[COMMAND_LAYER_MAX_COMMAND_SIZE]; // Current command
-    char highlighted_text[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE]; // Highlighted
-                                                               // output
-    size_t cursor_position; // Current cursor position (byte offset)
+    /// Command content management
+    char command_text[COMMAND_LAYER_MAX_COMMAND_SIZE]; /// Current command
+    char highlighted_text[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE]; /// Highlighted
+                                                               /// output
+    size_t cursor_position; /// Current cursor position (byte offset)
 
-    // Cursor screen coordinates (calculated by LLE using incremental tracking)
-    size_t cursor_screen_row;          // Cursor row on screen (0-based)
-    size_t cursor_screen_column;       // Cursor column on screen (0-based)
-    bool cursor_screen_position_valid; // True if screen position is valid
+    /// Cursor screen coordinates (calculated by LLE using incremental tracking)
+    size_t cursor_screen_row;          /// Cursor row on screen (0-based)
+    size_t cursor_screen_column;       /// Cursor column on screen (0-based)
+    bool cursor_screen_position_valid; /// True if screen position is valid
 
-    // Completion menu state (tracked as extension of command layer)
-    // The menu is conceptually part of the command - it shows completions FOR
-    // the command being typed. By tracking it here, screen_buffer can include
-    // menu rows in cursor calculations, fixing the display bug.
-    bool completion_menu_visible;        // Menu is currently displayed
-    char *completion_menu_content;       // Rendered menu text (with ANSI)
-    size_t completion_menu_content_size; // Size of allocated buffer
-    int completion_menu_lines;           // Number of lines menu occupies
-    int completion_menu_selected_index;  // Currently selected item index
+    /// Completion menu state (tracked as extension of command layer)
+    /// The menu is conceptually part of the command - it shows completions FOR
+    /// the command being typed. By tracking it here, screen_buffer can include
+    /// menu rows in cursor calculations, fixing the display bug.
+    bool completion_menu_visible;        /// Menu is currently displayed
+    char *completion_menu_content;       /// Rendered menu text (with ANSI)
+    size_t completion_menu_content_size; /// Size of allocated buffer
+    int completion_menu_lines;           /// Number of lines menu occupies
+    int completion_menu_selected_index;  /// Currently selected item index
 
-    // Syntax highlighting state
+    /// Syntax highlighting state
     command_highlight_region_t
         highlight_regions[COMMAND_LAYER_MAX_HIGHLIGHT_REGIONS];
-    size_t region_count;                   // Number of highlight regions
-    command_syntax_config_t syntax_config; // Highlighting configuration
+    size_t region_count;                   /// Number of highlight regions
+    command_syntax_config_t syntax_config; /// Highlighting configuration
     lle_syntax_highlighter_t
-        *spec_highlighter; // Spec-compliant highlighter (Spec 11)
+        *spec_highlighter; /// Spec-compliant highlighter (Spec 11)
 
-    // Metrics and positioning
-    command_metrics_t metrics;         // Command metrics
-    command_performance_t performance; // Performance statistics
+    /// Metrics and positioning
+    command_metrics_t metrics;         /// Command metrics
+    command_performance_t performance; /// Performance statistics
 
-    // Caching system
-    command_cache_entry_t cache[COMMAND_LAYER_CACHE_SIZE]; // Result cache
-    size_t cache_size;                                     // Current cache size
-    uint64_t cache_access_count; // Cache access counter
+    /// Caching system
+    command_cache_entry_t cache[COMMAND_LAYER_CACHE_SIZE]; /// Result cache
+    size_t cache_size;           /// Current cache size
+    uint64_t cache_access_count; /// Cache access counter
 
-    // Event system integration
-    layer_event_system_t *event_system; // Event system reference
-    uint32_t event_subscription_id;     // Event subscription ID
+    /// Event system integration
+    layer_event_system_t *event_system; /// Event system reference
+    uint32_t event_subscription_id;     /// Event subscription ID
 
-    // Integration with prompt layer
-    prompt_layer_t *prompt_layer;    // Associated prompt layer
-    bool prompt_integration_enabled; // Prompt coordination enabled
+    /// Integration with prompt layer
+    prompt_layer_t *prompt_layer;    /// Associated prompt layer
+    bool prompt_integration_enabled; /// Prompt coordination enabled
 
-    // Performance monitoring
-    struct timespec last_update_time; // Last update timestamp
-    uint64_t update_sequence_number;  // Update sequence tracking
+    /// Performance monitoring
+    struct timespec last_update_time; /// Last update timestamp
+    uint64_t update_sequence_number;  /// Update sequence tracking
 } command_layer_t;
 
-// ============================================================================
-// CORE API FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CORE API FUNCTIONS
+/// ============================================================================
 
 /**
  * Get command layer version information
@@ -351,15 +352,15 @@ command_layer_error_t command_layer_update(command_layer_t *layer);
  */
 command_layer_error_t command_layer_clear(command_layer_t *layer);
 
-// ============================================================================
-// COMPLETION MENU INTEGRATION
-//
-// The completion menu is tracked as an extension of the command layer because
-// it is conceptually part of the command input - showing completions FOR the
-// command being typed. By tracking the menu here, screen_buffer can include
-// menu rows in cursor position calculations, ensuring correct cursor placement
-// regardless of terminal scrolling.
-// ============================================================================
+/// ============================================================================
+/// COMPLETION MENU INTEGRATION
+///
+/// The completion menu is tracked as an extension of the command layer because
+/// it is conceptually part of the command input - showing completions FOR the
+/// command being typed. By tracking the menu here, screen_buffer can include
+/// menu rows in cursor position calculations, ensuring correct cursor placement
+/// regardless of terminal scrolling.
+/// ============================================================================
 
 /**
  * Set completion menu content
@@ -426,9 +427,9 @@ int command_layer_get_menu_lines(const command_layer_t *layer);
 command_layer_error_t command_layer_set_menu_selection(command_layer_t *layer,
                                                        int selected_index);
 
-// ============================================================================
-// LIFECYCLE MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE MANAGEMENT
+/// ============================================================================
 
 /**
  * Cleanup command layer resources
@@ -445,9 +446,9 @@ command_layer_error_t command_layer_cleanup(command_layer_t *layer);
  */
 void command_layer_destroy(command_layer_t *layer);
 
-// ============================================================================
-// SYNTAX HIGHLIGHTING CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// SYNTAX HIGHLIGHTING CONFIGURATION
+/// ============================================================================
 
 /**
  * Enable or disable syntax highlighting
@@ -500,9 +501,9 @@ command_layer_error_t
 command_layer_set_syntax_config(command_layer_t *layer,
                                 const command_syntax_config_t *config);
 
-// ============================================================================
-// PROMPT LAYER INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// PROMPT LAYER INTEGRATION
+/// ============================================================================
 
 /**
  * Set associated prompt layer for coordination
@@ -536,9 +537,9 @@ command_layer_set_prompt_integration(command_layer_t *layer, bool enabled);
 command_layer_error_t command_layer_get_display_position(command_layer_t *layer,
                                                          int *column, int *row);
 
-// ============================================================================
-// PERFORMANCE AND MONITORING
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND MONITORING
+/// ============================================================================
 
 /**
  * Get performance statistics
@@ -577,9 +578,9 @@ command_layer_error_t command_layer_set_cache_enabled(command_layer_t *layer,
  */
 command_layer_error_t command_layer_clear_cache(command_layer_t *layer);
 
-// ============================================================================
-// VALIDATION AND DEBUGGING
-// ============================================================================
+/// ============================================================================
+/// VALIDATION AND DEBUGGING
+/// ============================================================================
 
 /**
  * Validate command layer instance
@@ -601,9 +602,9 @@ command_layer_error_t command_layer_get_debug_info(command_layer_t *layer,
                                                    char *status_buffer,
                                                    size_t buffer_size);
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * Create default syntax highlighting configuration
@@ -647,4 +648,4 @@ lle_result_t command_layer_apply_theme_colors(const lle_theme_t *lle_theme,
 }
 #endif
 
-#endif // COMMAND_LAYER_H
+#endif /// COMMAND_LAYER_H

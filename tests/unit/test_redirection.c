@@ -12,13 +12,16 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "executor.h"
 #include "node.h"
 #include "redirection.h"
+#include "symtable.h"
 #include "test_framework.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
@@ -27,7 +30,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * FILE DESCRIPTOR SAVE/RESTORE TESTS
@@ -40,11 +43,11 @@ TEST(save_file_descriptors_basic) {
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "save_file_descriptors should succeed");
 
-    /* At least some FDs should be saved */
+    /// At least some FDs should be saved
     ASSERT(state.stdin_saved || state.stdout_saved || state.stderr_saved,
            "At least one FD should be saved");
 
-    /* Clean up */
+    /// Clean up
     restore_file_descriptors(&state);
 }
 
@@ -98,7 +101,7 @@ TEST(restore_file_descriptors_basic) {
 TEST(restore_file_descriptors_empty_state) {
     redirection_state_t state = {0};
 
-    /* Restore without save - should handle gracefully */
+    /// Restore without save - should handle gracefully
     int result = restore_file_descriptors(&state);
     ASSERT_EQ(result, 0, "restore empty state should succeed");
 }
@@ -106,21 +109,21 @@ TEST(restore_file_descriptors_empty_state) {
 TEST(save_restore_preserves_fds) {
     redirection_state_t state = {0};
 
-    /* Get original FDs */
+    /// Get original FDs
     int orig_stdin = dup(STDIN_FILENO);
     int orig_stdout = dup(STDOUT_FILENO);
     int orig_stderr = dup(STDERR_FILENO);
 
     save_file_descriptors(&state);
 
-    /* Verify we can still use standard FDs */
+    /// Verify we can still use standard FDs
     ASSERT(isatty(STDIN_FILENO) >= 0 || 1, "stdin should still work");
     ASSERT(isatty(STDOUT_FILENO) >= 0 || 1, "stdout should still work");
     ASSERT(isatty(STDERR_FILENO) >= 0 || 1, "stderr should still work");
 
     restore_file_descriptors(&state);
 
-    /* Clean up our test dups */
+    /// Clean up our test dups
     close(orig_stdin);
     close(orig_stdout);
     close(orig_stderr);
@@ -306,7 +309,7 @@ TEST(count_redirections_null) {
  */
 
 TEST(redirection_error_basic) {
-    /* Should not crash - output goes to stderr */
+    /// Should not crash - output goes to stderr
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
     if (null_err) {
@@ -318,7 +321,7 @@ TEST(redirection_error_basic) {
 }
 
 TEST(redirection_error_null_message) {
-    /* Should handle NULL gracefully */
+    /// Should handle NULL gracefully
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
     if (null_err) {
@@ -330,12 +333,98 @@ TEST(redirection_error_null_message) {
 }
 
 /* ============================================================================
+ * VARIABLE-ALLOCATED FD LIFECYCLE TESTS
+ * ============================================================================
+ *
+ * These verify that `exec {var}<file` allocations are tracked by the
+ * executor and reclaimed when executor_free runs — a script that opens
+ * but never closes a {var}<file fd must not leak past shell exit.
+ */
+
+static bool fd_is_open(int fd) {
+    struct stat st;
+    return fstat(fd, &st) != -1;
+}
+
+TEST(alloc_fd_track_then_executor_free_closes) {
+    executor_t *executor = executor_new();
+    ASSERT_TRUE(executor != NULL, "executor_new");
+
+    int fd = open("/etc/hosts", O_RDONLY);
+    ASSERT_TRUE(fd >= 0, "open /etc/hosts");
+
+    executor_track_alloc_fd(executor, fd);
+    ASSERT_TRUE(fd_is_open(fd), "fd open before executor_free");
+
+    executor_free(executor);
+    ASSERT_FALSE(fd_is_open(fd), "fd closed after executor_free");
+}
+
+TEST(alloc_fd_untrack_then_executor_free_does_not_double_close) {
+    executor_t *executor = executor_new();
+    ASSERT_TRUE(executor != NULL, "executor_new");
+
+    int fd = open("/etc/hosts", O_RDONLY);
+    ASSERT_TRUE(fd >= 0, "open /etc/hosts");
+
+    executor_track_alloc_fd(executor, fd);
+    executor_untrack_alloc_fd(executor, fd);
+
+    int rc = close(fd);
+    ASSERT_EQ(rc, 0, "manual close after untrack succeeds");
+
+    /// executor_free must not attempt to close the recycled fd. Test passes
+    /// if we exit cleanly without any double-close-on-recycled-fd hazard.
+    executor_free(executor);
+}
+
+TEST(alloc_fd_registry_grows_past_initial_capacity) {
+    executor_t *executor = executor_new();
+    ASSERT_TRUE(executor != NULL, "executor_new");
+
+    /// Initial capacity is 8; allocate enough to force at least one realloc.
+    int fds[24];
+    size_t n = 0;
+    for (; n < sizeof(fds) / sizeof(fds[0]); n++) {
+        fds[n] = open("/etc/hosts", O_RDONLY);
+        if (fds[n] < 0) {
+            break;
+        }
+        executor_track_alloc_fd(executor, fds[n]);
+    }
+    ASSERT_TRUE(n > 8, "tracked more than initial capacity");
+
+    for (size_t i = 0; i < n; i++) {
+        ASSERT_TRUE(fd_is_open(fds[i]), "fd open before cleanup");
+    }
+
+    executor_free(executor);
+
+    for (size_t i = 0; i < n; i++) {
+        ASSERT_FALSE(fd_is_open(fds[i]),
+                     "fd closed by executor_free after grow");
+    }
+}
+
+TEST(alloc_fd_untrack_unknown_is_noop) {
+    executor_t *executor = executor_new();
+    ASSERT_TRUE(executor != NULL, "executor_new");
+
+    /// Untrack on never-tracked fd must not crash, even with an empty
+    /// registry. The function must also handle invalid fd values silently.
+    executor_untrack_alloc_fd(executor, 999);
+    executor_untrack_alloc_fd(executor, -1);
+
+    executor_free(executor);
+}
+
+/* ============================================================================
  * COMPLEX REDIRECTION SCENARIOS
  * ============================================================================
  */
 
 TEST(complex_command_with_redirections) {
-    /* Simulate: cmd arg1 > out.txt 2> err.txt < in.txt */
+    /// Simulate: cmd arg1 > out.txt 2> err.txt < in.txt
     node_t *cmd = new_node(NODE_COMMAND);
     node_t *var = new_node(NODE_VAR);
     node_t *arg = new_node(NODE_VAR);
@@ -393,8 +482,8 @@ TEST(herestring_detection) {
 TEST(save_with_closed_stdin) {
     redirection_state_t state = {0};
 
-    /* This is tricky - we don't want to actually close stdin */
-    /* Just verify the API handles various states */
+    /// This is tricky - we don't want to actually close stdin
+    /// Just verify the API handles various states
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "Should handle current FD state");
 
@@ -403,9 +492,9 @@ TEST(save_with_closed_stdin) {
 
 TEST(state_initialization) {
     redirection_state_t state;
-    memset(&state, 0xFF, sizeof(state)); /* Fill with garbage */
+    memset(&state, 0xFF, sizeof(state)); /// Fill with garbage
 
-    /* Manually initialize */
+    /// Manually initialize
     state.saved_stdin = -1;
     state.saved_stdout = -1;
     state.saved_stderr = -1;
@@ -413,7 +502,7 @@ TEST(state_initialization) {
     state.stdout_saved = false;
     state.stderr_saved = false;
 
-    /* Should be able to save now */
+    /// Should be able to save now
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "Should succeed with clean state");
 
@@ -427,6 +516,10 @@ TEST(state_initialization) {
 
 int main(void) {
     printf("Running redirection.c tests...\n\n");
+
+    /// executor_new() pulls from the global symbol table manager; tests
+    /// exercising the executor need it initialized.
+    init_symtable();
 
     printf("File Descriptor Save/Restore Tests:\n");
     RUN_TEST(save_file_descriptors_basic);
@@ -469,6 +562,12 @@ int main(void) {
     printf("\nFD Management Edge Cases:\n");
     RUN_TEST(save_with_closed_stdin);
     RUN_TEST(state_initialization);
+
+    printf("\nVariable-Allocated FD Lifecycle:\n");
+    RUN_TEST(alloc_fd_track_then_executor_free_closes);
+    RUN_TEST(alloc_fd_untrack_then_executor_free_does_not_double_close);
+    RUN_TEST(alloc_fd_registry_grows_past_initial_capacity);
+    RUN_TEST(alloc_fd_untrack_unknown_is_noop);
 
     return TEST_RESULT();
 }

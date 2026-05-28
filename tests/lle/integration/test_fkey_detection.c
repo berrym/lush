@@ -1,3 +1,11 @@
+/**
+ * @file test_fkey_detection.c
+ * @brief Integration tests for fkey detection
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_fkey_detection.c - Integration test for F-key detection
  *
@@ -17,7 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Test counter */
+/// Test counter
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -33,7 +41,7 @@ static int tests_passed = 0;
     }                                                                          \
     static void name(void)
 
-/* Helper to create a pipe with data */
+/// Helper to create a pipe with data
 static int create_pipe_with_data(const void *data, size_t len, int *write_fd) {
     int pipefd[2];
     if (pipe(pipefd) == -1) {
@@ -60,7 +68,7 @@ static int create_pipe_with_data(const void *data, size_t len, int *write_fd) {
     return pipefd[0];
 }
 
-/* External memory pool reference (defined in lush_memory_pool.c) */
+/// External memory pool reference (defined in lush_memory_pool.c)
 extern lush_memory_pool_system_t *global_memory_pool;
 
 /* ============================================================================
@@ -69,43 +77,43 @@ extern lush_memory_pool_system_t *global_memory_pool;
  */
 
 TEST(test_f1_detection_with_parser) {
-    /* F1 key: ESC O P (SS3 sequence) */
+    /// F1 key: ESC O P (SS3 sequence)
     unsigned char f1_data[] = {0x1B, 'O', 'P'};
     int pipe_fd = create_pipe_with_data(f1_data, sizeof(f1_data), NULL);
     assert(pipe_fd >= 0);
 
-    /* Initialize unix interface */
+    /// Initialize unix interface
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
     assert(result == LLE_SUCCESS);
     assert(interface != NULL);
 
-    /* Initialize capabilities for parser */
+    /// Initialize capabilities for parser
     lle_terminal_capabilities_t *capabilities = NULL;
     result = lle_capabilities_detect_environment(&capabilities, interface);
     assert(result == LLE_SUCCESS);
 
-    /* Initialize sequence parser + key_detector (this is what we're testing) */
+    /// Initialize sequence parser + key_detector (this is what we're testing)
     result = lle_unix_interface_init_sequence_parser(
         interface, capabilities, (lle_memory_pool_t *)global_memory_pool);
     assert(result == LLE_SUCCESS);
 
-    /* Verify parser and key_detector were initialized */
+    /// Verify parser and key_detector were initialized
     assert(interface->sequence_parser != NULL);
     assert(interface->key_detector != NULL);
 
-    /* Redirect stdin to our pipe */
+    /// Redirect stdin to our pipe
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
     interface->terminal_fd = STDIN_FILENO;
 
-    /* Read F1 key - should be properly detected by key_detector */
+    /// Read F1 key - should be properly detected by key_detector
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    /* With parser initialized, we might need multiple reads to accumulate the
-     * sequence */
-    /* Try reading up to 3 times to get the complete event */
+    /// With parser initialized, we might need multiple reads to accumulate the
+    /// sequence
+    /// Try reading up to 3 times to get the complete event
     int read_attempts = 0;
     while (result == LLE_SUCCESS && event.type == LLE_INPUT_TYPE_TIMEOUT &&
            read_attempts < 3) {
@@ -115,11 +123,11 @@ TEST(test_f1_detection_with_parser) {
 
     assert(result == LLE_SUCCESS);
 
-    /* Verify F1 was detected correctly */
+    /// Verify F1 was detected correctly
     assert(event.type == LLE_INPUT_TYPE_SPECIAL_KEY);
     assert(event.data.special_key.key == LLE_KEY_F1);
 
-    /* Cleanup */
+    /// Cleanup
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
     close(pipe_fd);
@@ -128,38 +136,38 @@ TEST(test_f1_detection_with_parser) {
 }
 
 TEST(test_f5_detection_with_parser) {
-    /* F5 key: ESC [ 1 5 ~ (CSI sequence) */
+    /// F5 key: ESC [ 1 5 ~ (CSI sequence)
     unsigned char f5_data[] = {0x1B, '[', '1', '5', '~'};
     int pipe_fd = create_pipe_with_data(f5_data, sizeof(f5_data), NULL);
     assert(pipe_fd >= 0);
 
-    /* Initialize unix interface */
+    /// Initialize unix interface
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
     assert(result == LLE_SUCCESS);
 
-    /* Initialize capabilities for parser */
+    /// Initialize capabilities for parser
     lle_terminal_capabilities_t *capabilities = NULL;
     result = lle_capabilities_detect_environment(&capabilities, interface);
     assert(result == LLE_SUCCESS);
 
-    /* Initialize sequence parser + key_detector */
+    /// Initialize sequence parser + key_detector
     result = lle_unix_interface_init_sequence_parser(
         interface, capabilities, (lle_memory_pool_t *)global_memory_pool);
     assert(result == LLE_SUCCESS);
     assert(interface->sequence_parser != NULL);
     assert(interface->key_detector != NULL);
 
-    /* Redirect stdin to our pipe */
+    /// Redirect stdin to our pipe
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
     interface->terminal_fd = STDIN_FILENO;
 
-    /* Read F5 key sequence */
+    /// Read F5 key sequence
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    /* Parser needs multiple reads to accumulate complete sequence */
+    /// Parser needs multiple reads to accumulate complete sequence
     int read_attempts = 0;
     while (result == LLE_SUCCESS && event.type == LLE_INPUT_TYPE_TIMEOUT &&
            read_attempts < 5) {
@@ -169,11 +177,11 @@ TEST(test_f5_detection_with_parser) {
 
     assert(result == LLE_SUCCESS);
 
-    /* Verify F5 was detected correctly */
+    /// Verify F5 was detected correctly
     assert(event.type == LLE_INPUT_TYPE_SPECIAL_KEY);
     assert(event.data.special_key.key == LLE_KEY_F5);
 
-    /* Cleanup */
+    /// Cleanup
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
     close(pipe_fd);
@@ -182,22 +190,22 @@ TEST(test_f5_detection_with_parser) {
 }
 
 TEST(test_arrow_key_with_parser) {
-    /* Up arrow: ESC [ A (CSI sequence) */
+    /// Up arrow: ESC [ A (CSI sequence)
     unsigned char up_data[] = {0x1B, '[', 'A'};
     int pipe_fd = create_pipe_with_data(up_data, sizeof(up_data), NULL);
     assert(pipe_fd >= 0);
 
-    /* Initialize unix interface */
+    /// Initialize unix interface
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
     assert(result == LLE_SUCCESS);
 
-    /* Initialize capabilities for parser */
+    /// Initialize capabilities for parser
     lle_terminal_capabilities_t *capabilities = NULL;
     result = lle_capabilities_detect_environment(&capabilities, interface);
     assert(result == LLE_SUCCESS);
 
-    /* Initialize sequence parser + key_detector */
+    /// Initialize sequence parser + key_detector
     result = lle_unix_interface_init_sequence_parser(
         interface, capabilities, (lle_memory_pool_t *)global_memory_pool);
     assert(result == LLE_SUCCESS);
@@ -206,7 +214,7 @@ TEST(test_arrow_key_with_parser) {
     dup2(pipe_fd, STDIN_FILENO);
     interface->terminal_fd = STDIN_FILENO;
 
-    /* Read up arrow */
+    /// Read up arrow
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
@@ -219,7 +227,7 @@ TEST(test_arrow_key_with_parser) {
 
     assert(result == LLE_SUCCESS);
 
-    /* Verify UP arrow was detected correctly */
+    /// Verify UP arrow was detected correctly
     assert(event.type == LLE_INPUT_TYPE_SPECIAL_KEY);
     assert(event.data.special_key.key == LLE_KEY_UP);
 
@@ -240,7 +248,7 @@ int main(void) {
     printf("===========================================\n");
     printf("Testing with FULL parser + key_detector initialization\n\n");
 
-    /* Initialize memory pool system (required for parser initialization) */
+    /// Initialize memory pool system (required for parser initialization)
     lush_pool_config_t pool_config = lush_pool_get_default_config();
     lush_pool_error_t pool_result = lush_pool_init(&pool_config);
     if (pool_result != LUSH_POOL_SUCCESS) {

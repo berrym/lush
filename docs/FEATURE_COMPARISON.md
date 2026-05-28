@@ -16,12 +16,26 @@
 
 ## Overview
 
-Lush v1.4.0 occupies a unique position in the shell landscape:
+Lush v1.5.0 occupies a unique position in the shell landscape:
 
-- **Native line editor (LLE)** - Not readline, not ZLE, built from scratch
-- **Multi-mode architecture** - Run POSIX, Bash, Zsh, or Lush mode
-- **Integrated debugging** - No other shell has this
-- **Modern features** - Hook system, extended syntax, context-aware completion
+- **One engine, polyglot spellings** - bash and zsh idioms both work
+  because they're spellings of the same underlying operations, not
+  separate code paths.
+- **Native line editor (LLE)** - Not readline, not ZLE; built from
+  scratch, owns the terminal end-to-end, embeds the framed-gutter
+  debugger break prompt and the customization trio (`widget`/`hook`/
+  `segment`).
+- **Multi-mode architecture** - `posix`, `bash`, `zsh`, `lush`
+  presets configure the same engine; the `mode` builtin is the
+  canonical switch.
+- **First-class value model** - scalar/list/map share one per-scope
+  storage path; implicit list-to-string coercion is forbidden
+  (SEMANTICS section 3.4).
+- **Integrated debugger that keeps pace** - PHILOSOPHY section 7:
+  every language change carries a debugger obligation.
+- **Modern features** - structured-error system, predictive script
+  analysis, context-aware completion, lifecycle hooks, custom prompt
+  segments.
 
 This document compares Lush with Bash, Zsh, Fish, and Dash.
 
@@ -43,12 +57,16 @@ This document compares Lush with Bash, Zsh, Fish, and Dash.
 | Feature | Lush | Bash | Zsh | Fish | Dash |
 |---------|:------:|:----:|:---:|:----:|:----:|
 | Line editor | LLE (native) | Readline | ZLE | Native | None |
-| Emacs mode | Yes (44 actions) | Yes | Yes | Partial | No |
-| Vi mode | In development | Yes | Yes | Yes | No |
-| Syntax highlighting | Yes (45 types) | No | Plugin | Yes | No |
-| Context-aware completion | Yes (45 builtins) | Limited | Plugin | Yes | No |
+| Emacs mode | Yes | Yes | Yes | Partial | No |
+| Vi mode | Partial | Yes | Yes | Yes | No |
+| Syntax highlighting | Yes | No | Plugin | Yes | No |
+| Context-aware completion | Yes | Limited | Plugin | Yes | No |
+| User-defined widgets | Yes (`display lle widget`) | No | Yes (`zle -N`) | Yes | No |
+| Lifecycle hooks | Yes (`display lle hook`) | precmd/preexec | Yes | Yes | No |
+| Custom prompt segments | Yes (`display lle segment`) | Plugin (themes) | Plugin (themes) | Native | No |
 | Multi-line editing | Yes | Yes | Yes | Yes | No |
-| History search | Yes | Yes | Yes | Yes | No |
+| History search (Ctrl-R) | Yes | Yes | Yes | Yes | No |
+| Themed prompt + transient | Yes | Plugin | Plugin | Yes | No |
 
 ### Extended Syntax
 
@@ -61,9 +79,17 @@ This document compares Lush with Bash, Zsh, Fish, and Dash.
 | Process substitution | Yes | Yes | Yes | Yes | No |
 | Extended globbing | Yes | Yes | Yes | Yes | No |
 | Glob qualifiers | Yes | No | Yes | No | No |
+| Zsh parameter flags `${(...)var}` | Yes | No | Yes | No | No |
+| Case modification `${var^^}` | Yes | Yes | Yes | No | No |
+| Parameter transform `${var@Q}` | Yes | Yes | No | No | No |
 | `;&` case fall-through | Yes | Yes | Yes | No | No |
+| `;;&` case continue-test | Yes | Yes | Yes | No | No |
 | `select` loop | Yes | Yes | Yes | No | No |
+| `time` keyword | Yes | Yes | Yes | No | No |
 | Nameref variables | Yes | Yes | Yes | No | No |
+| Anonymous functions | Yes | No | Yes | No | No |
+| `local arr=(a b c)` array literal | Yes | Yes | Yes | n/a | No |
+| List-in-scalar = type error | Yes | No | No | n/a | No |
 
 ### Hook System
 
@@ -80,11 +106,16 @@ This document compares Lush with Bash, Zsh, Fish, and Dash.
 | Feature | Lush | Bash | Zsh | Fish | Dash |
 |---------|:------:|:----:|:---:|:----:|:----:|
 | Integrated debugger | **Yes** | No | No | No | No |
-| Breakpoints | Yes | No | No | No | No |
-| Step execution | Yes | No | No | No | No |
-| Variable inspection | Yes | No | No | No | No |
-| Profiling | Yes | No | No | No | No |
+| LLE-driven break prompt | **Yes** | No | No | No | No |
+| Breakpoints (`debug break`) | Yes | No | No | No | No |
+| Step / step-over / step-out (depth-aware) | Yes | No | No | No | No |
+| Variable inspection (kind-aware: Scalar / List / Map) | Yes | No | No | No | No |
+| `type` / `t` typed inspection | Yes | No | No | No | No |
+| Predictive type-mismatch warnings (`debug analyze`) | Yes | No | No | No | No |
+| Profiling (`debug profile`) | Yes | No | No | No | No |
+| ERR / DEBUG / RETURN trap inheritance (`errtrace`, `functrace`) | Yes | Yes | Yes | n/a | No |
 | `set -x` tracing | Yes | Yes | Yes | No | Yes |
+| Static script analysis (`analyze`, `lint`) | Yes | No | No | No | No |
 
 ### Configuration
 
@@ -93,7 +124,9 @@ This document compares Lush with Bash, Zsh, Fish, and Dash.
 | Config command | Yes | No | No | Yes | No |
 | Startup files | Yes | Yes | Yes | Yes | Yes |
 | Theme system | Yes | No | Plugin | No | No |
-| Shell modes | Yes | No | Partial | No | No |
+| Shell modes (`mode` builtin) | Yes | No | Partial | No | No |
+| Four config surfaces (`mode`/`set`/`setopt`/`config`) | Yes | No | No | No | No |
+| Structured-error diagnostics | Yes | No | No | Yes | No |
 
 ---
 

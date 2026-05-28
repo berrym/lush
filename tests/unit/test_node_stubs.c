@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-/* Error function stubs (from errors.c) */
+/// Error function stubs (from errors.c)
 int error_return(int errcode, const char *fmt, ...) {
     (void)errcode;
     if (fmt) {

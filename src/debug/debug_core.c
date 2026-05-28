@@ -15,6 +15,7 @@
 #include "executor.h"
 #include "lush.h"
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +36,7 @@ debug_context_t *debug_init(void) {
         return NULL;
     }
 
-    // Initialize all fields to default values
+    /// Initialize all fields to default values
     ctx->level = DEBUG_NONE;
     ctx->mode = DEBUG_MODE_NORMAL;
     ctx->enabled = false;
@@ -44,40 +45,41 @@ debug_context_t *debug_init(void) {
     ctx->profile_enabled = false;
     ctx->analysis_enabled = false;
 
-    // Execution state
+    /// Execution state
     ctx->current_frame = NULL;
     ctx->stack_depth = 0;
+    ctx->step_target_depth = INT_MAX;
 
-    // Breakpoints
+    /// Breakpoints
     ctx->breakpoints = NULL;
     ctx->next_breakpoint_id = 1;
 
-    // Profiling
+    /// Profiling
     ctx->profile_data = NULL;
     ctx->timing_enabled = false;
 
-    // Analysis
+    /// Analysis
     ctx->analysis_issues = NULL;
     ctx->issue_count = 0;
 
-    // Output control - default to stderr for debug output
+    /// Output control - default to stderr for debug output
     ctx->debug_output = stderr;
     ctx->profile_output = stderr;
     ctx->analysis_output = stderr;
 
-    // Configuration defaults
+    /// Configuration defaults
     ctx->show_variables = true;
     ctx->show_stack_trace = true;
     ctx->show_timing = false;
     ctx->highlight_syntax = true;
     ctx->max_stack_depth = 100;
 
-    // Statistics
+    /// Statistics
     ctx->total_commands = 0;
     ctx->total_time_ns = 0;
     clock_gettime(CLOCK_MONOTONIC, &ctx->session_start);
 
-    // Initialize execution context (for loop debugging fix)
+    /// Initialize execution context (for loop debugging fix)
     ctx->execution_context.in_loop = false;
     ctx->execution_context.loop_variable = NULL;
     ctx->execution_context.loop_variable_value = NULL;
@@ -85,7 +87,7 @@ debug_context_t *debug_init(void) {
     ctx->execution_context.loop_iteration = 0;
     ctx->execution_context.loop_node = NULL;
 
-    // Set global context
+    /// Set global context
     g_debug_context = ctx;
 
     return ctx;
@@ -100,15 +102,15 @@ void debug_cleanup(debug_context_t *ctx) {
         return;
     }
 
-    // Clean up stack frames
+    /// Clean up stack frames
     while (ctx->current_frame) {
         debug_pop_frame(ctx);
     }
 
-    // Clean up breakpoints
+    /// Clean up breakpoints
     debug_clear_breakpoints(ctx);
 
-    // Clean up profile data
+    /// Clean up profile data
     profile_data_t *profile = ctx->profile_data;
     while (profile) {
         profile_data_t *next = profile->next;
@@ -118,10 +120,10 @@ void debug_cleanup(debug_context_t *ctx) {
         profile = next;
     }
 
-    // Clean up analysis issues
+    /// Clean up analysis issues
     debug_clear_analysis_issues(ctx);
 
-    // Clean up execution context (for loop debugging fix)
+    /// Clean up execution context (for loop debugging fix)
     free(ctx->execution_context.loop_variable);
     free(ctx->execution_context.loop_variable_value);
     ctx->execution_context.loop_variable = NULL;
@@ -131,7 +133,7 @@ void debug_cleanup(debug_context_t *ctx) {
     ctx->execution_context.loop_iteration = 0;
     ctx->execution_context.loop_body_start_line = 0;
 
-    // Close output files if they're not stderr
+    /// Close output files if they're not stderr
     if (ctx->debug_output != stderr) {
         fclose(ctx->debug_output);
     }
@@ -142,7 +144,7 @@ void debug_cleanup(debug_context_t *ctx) {
         fclose(ctx->analysis_output);
     }
 
-    // Clear global context if this is it
+    /// Clear global context if this is it
     if (g_debug_context == ctx) {
         g_debug_context = NULL;
     }
@@ -162,7 +164,7 @@ void debug_set_level(debug_context_t *ctx, debug_level_t level) {
 
     ctx->level = level;
 
-    // Enable features based on level
+    /// Enable features based on level
     switch (level) {
     case DEBUG_NONE:
         ctx->enabled = false;
@@ -222,6 +224,9 @@ void debug_set_mode(debug_context_t *ctx, debug_mode_t mode) {
     case DEBUG_MODE_STEP:
     case DEBUG_MODE_STEP_OVER:
         ctx->step_mode = true;
+        /// Default to step-into depth semantics; debug_step_over()
+        /// narrows step_target_depth when the user asks for it.
+        ctx->step_target_depth = INT_MAX;
         break;
 
     case DEBUG_MODE_CONTINUE:
@@ -293,15 +298,31 @@ void debug_printf(debug_context_t *ctx, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
-    // Add debug prefix
-    fprintf(ctx->debug_output, "[DEBUG] ");
-
-    // Add stack depth indication
+    /// Indent by stack depth.
     for (int i = 0; i < ctx->stack_depth; i++) {
         fprintf(ctx->debug_output, "  ");
     }
 
-    // Print the actual message
+    vfprintf(ctx->debug_output, format, args);
+    fflush(ctx->debug_output);
+
+    va_end(args);
+}
+
+/* Internal engine trace. Silent unless the user opted into a trace
+ * level -- so the interactive UI stays clean during normal debugging. */
+void debug_trace_printf(debug_context_t *ctx, const char *format, ...) {
+    if (!ctx || !ctx->enabled || ctx->level < DEBUG_TRACE) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+
+    for (int i = 0; i < ctx->stack_depth; i++) {
+        fprintf(ctx->debug_output, "  ");
+    }
+
     vfprintf(ctx->debug_output, format, args);
     fflush(ctx->debug_output);
 
@@ -317,7 +338,6 @@ void debug_print_separator(debug_context_t *ctx) {
         return;
     }
 
-    fprintf(ctx->debug_output, "[DEBUG] ");
     for (int i = 0; i < 60; i++) {
         fprintf(ctx->debug_output, "-");
     }
@@ -350,15 +370,15 @@ void debug_set_output_file(debug_context_t *ctx, const char *filename) {
         return;
     }
 
-    // Close existing file if it's not stderr
+    /// Close existing file if it's not stderr
     if (ctx->debug_output != stderr) {
         fclose(ctx->debug_output);
     }
 
-    // Open new file
+    /// Open new file
     ctx->debug_output = fopen(filename, "w");
     if (!ctx->debug_output) {
-        ctx->debug_output = stderr; // Fallback to stderr
+        ctx->debug_output = stderr; /// Fallback to stderr
         debug_printf(
             ctx,
             "Warning: Could not open debug output file '%s', using stderr\n",
@@ -508,14 +528,14 @@ char *debug_get_node_description(node_t *node) {
     case NODE_CASE_ITEM: {
         const char *term_str = ";;";
         const char *pattern = node->val.str ? node->val.str : "";
-        // Pattern format: "<terminator_char><pattern>"
+        /// Pattern format: "<terminator_char><pattern>"
         if (pattern[0] >= '0' && pattern[0] <= '2') {
             if (pattern[0] == '1') {
                 term_str = ";&";
             } else if (pattern[0] == '2') {
                 term_str = ";;&";
             }
-            pattern++; // Skip prefix
+            pattern++; /// Skip prefix
         }
         snprintf(desc, 256, "CASE_ITEM: %s [%s]", pattern, term_str);
         break;
@@ -550,21 +570,21 @@ void debug_print_node(debug_context_t *ctx, node_t *node, int indent) {
         return;
     }
 
-    // Print indentation
+    /// Print indentation
     for (int i = 0; i < indent; i++) {
         fprintf(ctx->debug_output, "  ");
     }
 
     char *desc = debug_get_node_description(node);
-    fprintf(ctx->debug_output, "[DEBUG] %s\n", desc);
+    fprintf(ctx->debug_output, "%s\n", desc);
     free(desc);
 
-    // Print children
+    /// Print children
     if (node->first_child) {
         debug_print_node(ctx, node->first_child, indent + 1);
     }
 
-    // Print siblings
+    /// Print siblings
     if (node->next_sibling) {
         debug_print_node(ctx, node->next_sibling, indent);
     }
@@ -618,7 +638,7 @@ void debug_list_functions(debug_context_t *ctx) {
         return;
     }
 
-    // Access the current executor to get function definitions
+    /// Access the current executor to get function definitions
     if (!current_executor || !current_executor->functions) {
         printf("No functions defined.\n");
         return;
@@ -653,13 +673,13 @@ void debug_show_function(debug_context_t *ctx, const char *function_name) {
         return;
     }
 
-    // Access the current executor to find the function
+    /// Access the current executor to find the function
     if (!current_executor) {
         printf("No executor context available.\n");
         return;
     }
 
-    // Find the function in the executor's function list
+    /// Find the function in the executor's function list
     function_def_t *func = current_executor->functions;
     while (func) {
         if (strcmp(func->name, function_name) == 0) {
@@ -674,11 +694,11 @@ void debug_show_function(debug_context_t *ctx, const char *function_name) {
         return;
     }
 
-    // Display function information
+    /// Display function information
     printf("Function: %s\n", func->name);
     printf("========================================\n");
 
-    // Display parameter information
+    /// Display parameter information
     if (func->params) {
         printf("Parameters:\n");
         function_param_t *param = func->params;
@@ -708,18 +728,15 @@ void debug_show_function(debug_context_t *ctx, const char *function_name) {
     } else {
         printf("Body: (AST representation)\n");
 
-        // Print the AST structure for the function body
+        /// Print the AST structure for the function body
         printf("AST Structure:\n");
         debug_print_node(ctx, func->body, 2);
     }
 
-    // Display return value information
+    /// Display return value information
     printf("Return Values:\n");
     printf("  Exit Status: 0-255 (via 'return [code]')\n");
-    printf("  String Value: any text (via 'return_value \"text\"')\n");
     printf("  Stdout Capture: $(function_name args) captures output\n");
-    printf("  Return Value Capture: $(function_name args) captures "
-           "return_value if set\n");
     printf("\n");
 
     printf("Debug Integration:\n");
@@ -748,7 +765,6 @@ void debug_show_function(debug_context_t *ctx, const char *function_name) {
 
     printf("\nReturn Value Examples:\n");
     printf("  %s args               # Execute function\n", func->name);
-    printf("  result=$(%s args)     # Capture output or return_value\n",
-           func->name);
+    printf("  result=$(%s args)     # Capture stdout output\n", func->name);
     printf("  echo $?               # Check exit status after call\n");
 }

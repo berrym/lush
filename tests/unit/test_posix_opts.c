@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* External declarations for posix_opts functions */
+/// External declarations for posix_opts functions
 extern shell_options_t shell_opts;
 extern void init_posix_options(void);
 extern bool is_posix_option_set(char option);
@@ -41,7 +41,7 @@ extern bool is_history_enabled(void);
 extern bool is_interactive_comments_enabled(void);
 extern void print_command_trace(const char *command);
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -51,7 +51,7 @@ extern void print_command_trace(const char *command);
 TEST(init_posix_options_defaults) {
     init_posix_options();
 
-    /* Check default values after initialization */
+    /// Check default values after initialization
     ASSERT_FALSE(shell_opts.command_mode,
                  "command_mode should default to false");
     ASSERT_FALSE(shell_opts.stdin_mode, "stdin_mode should default to false");
@@ -105,7 +105,7 @@ TEST(should_exit_on_error_query) {
     shell_opts.exit_on_error = true;
     ASSERT_TRUE(should_exit_on_error(), "should return true when enabled");
 
-    shell_opts.exit_on_error = false; /* Reset */
+    shell_opts.exit_on_error = false; /// Reset
 }
 
 TEST(should_trace_execution_query) {
@@ -117,7 +117,7 @@ TEST(should_trace_execution_query) {
     shell_opts.trace_execution = true;
     ASSERT_TRUE(should_trace_execution(), "should return true when enabled");
 
-    shell_opts.trace_execution = false; /* Reset */
+    shell_opts.trace_execution = false; /// Reset
 }
 
 TEST(is_syntax_check_mode_query) {
@@ -129,7 +129,7 @@ TEST(is_syntax_check_mode_query) {
     shell_opts.syntax_check = true;
     ASSERT_TRUE(is_syntax_check_mode(), "should return true when enabled");
 
-    shell_opts.syntax_check = false; /* Reset */
+    shell_opts.syntax_check = false; /// Reset
 }
 
 TEST(should_error_unset_vars_query) {
@@ -142,7 +142,7 @@ TEST(should_error_unset_vars_query) {
     shell_opts.unset_error = true;
     ASSERT_TRUE(should_error_unset_vars(), "should return true when enabled");
 
-    shell_opts.unset_error = false; /* Reset */
+    shell_opts.unset_error = false; /// Reset
 }
 
 TEST(is_verbose_mode_query) {
@@ -154,7 +154,7 @@ TEST(is_verbose_mode_query) {
     shell_opts.verbose = true;
     ASSERT_TRUE(is_verbose_mode(), "should return true when enabled");
 
-    shell_opts.verbose = false; /* Reset */
+    shell_opts.verbose = false; /// Reset
 }
 
 TEST(is_globbing_disabled_query) {
@@ -166,7 +166,7 @@ TEST(is_globbing_disabled_query) {
     shell_opts.no_globbing = true;
     ASSERT_TRUE(is_globbing_disabled(), "should return true when enabled");
 
-    shell_opts.no_globbing = false; /* Reset */
+    shell_opts.no_globbing = false; /// Reset
 }
 
 TEST(should_auto_export_query) {
@@ -178,7 +178,7 @@ TEST(should_auto_export_query) {
     shell_opts.allexport = true;
     ASSERT_TRUE(should_auto_export(), "should return true when enabled");
 
-    shell_opts.allexport = false; /* Reset */
+    shell_opts.allexport = false; /// Reset
 }
 
 TEST(is_noclobber_enabled_query) {
@@ -190,7 +190,7 @@ TEST(is_noclobber_enabled_query) {
     shell_opts.noclobber = true;
     ASSERT_TRUE(is_noclobber_enabled(), "should return true when enabled");
 
-    shell_opts.noclobber = false; /* Reset */
+    shell_opts.noclobber = false; /// Reset
 }
 
 TEST(is_ignoreeof_enabled_query) {
@@ -202,7 +202,7 @@ TEST(is_ignoreeof_enabled_query) {
     shell_opts.ignoreeof = true;
     ASSERT_TRUE(is_ignoreeof_enabled(), "should return true when enabled");
 
-    shell_opts.ignoreeof = false; /* Reset */
+    shell_opts.ignoreeof = false; /// Reset
 }
 
 TEST(is_nolog_enabled_query) {
@@ -214,19 +214,19 @@ TEST(is_nolog_enabled_query) {
     shell_opts.nolog = true;
     ASSERT_TRUE(is_nolog_enabled(), "should return true when enabled");
 
-    shell_opts.nolog = false; /* Reset */
+    shell_opts.nolog = false; /// Reset
 }
 
 TEST(is_emacs_mode_enabled_query) {
     init_posix_options();
 
-    /* emacs_mode defaults to true */
+    /// emacs_mode defaults to true
     ASSERT_TRUE(is_emacs_mode_enabled(), "should return true by default");
 
     shell_opts.emacs_mode = false;
     ASSERT_FALSE(is_emacs_mode_enabled(), "should return false when disabled");
 
-    shell_opts.emacs_mode = true; /* Reset */
+    shell_opts.emacs_mode = true; /// Reset
 }
 
 TEST(is_vi_mode_enabled_query) {
@@ -238,7 +238,7 @@ TEST(is_vi_mode_enabled_query) {
     shell_opts.vi_mode = true;
     ASSERT_TRUE(is_vi_mode_enabled(), "should return true when enabled");
 
-    shell_opts.vi_mode = false; /* Reset */
+    shell_opts.vi_mode = false; /// Reset
 }
 
 TEST(is_posix_mode_enabled_query) {
@@ -250,7 +250,7 @@ TEST(is_posix_mode_enabled_query) {
     shell_opts.posix_mode = true;
     ASSERT_TRUE(is_posix_mode_enabled(), "should return true when enabled");
 
-    shell_opts.posix_mode = false; /* Reset */
+    shell_opts.posix_mode = false; /// Reset
 }
 
 TEST(is_pipefail_enabled_query) {
@@ -262,37 +262,37 @@ TEST(is_pipefail_enabled_query) {
     shell_opts.pipefail_mode = true;
     ASSERT_TRUE(is_pipefail_enabled(), "should return true when enabled");
 
-    shell_opts.pipefail_mode = false; /* Reset */
+    shell_opts.pipefail_mode = false; /// Reset
 }
 
 TEST(is_histexpand_enabled_query) {
     init_posix_options();
 
-    /* histexpand_mode defaults to true */
+    /// histexpand_mode defaults to true
     ASSERT_TRUE(is_histexpand_enabled(), "should return true by default");
 
     shell_opts.histexpand_mode = false;
     ASSERT_FALSE(is_histexpand_enabled(), "should return false when disabled");
 
-    shell_opts.histexpand_mode = true; /* Reset */
+    shell_opts.histexpand_mode = true; /// Reset
 }
 
 TEST(is_history_enabled_query) {
     init_posix_options();
 
-    /* history_mode defaults to true */
+    /// history_mode defaults to true
     ASSERT_TRUE(is_history_enabled(), "should return true by default");
 
     shell_opts.history_mode = false;
     ASSERT_FALSE(is_history_enabled(), "should return false when disabled");
 
-    shell_opts.history_mode = true; /* Reset */
+    shell_opts.history_mode = true; /// Reset
 }
 
 TEST(is_interactive_comments_enabled_query) {
     init_posix_options();
 
-    /* interactive_comments_mode defaults to true */
+    /// interactive_comments_mode defaults to true
     ASSERT_TRUE(is_interactive_comments_enabled(),
                 "should return true by default");
 
@@ -300,7 +300,7 @@ TEST(is_interactive_comments_enabled_query) {
     ASSERT_FALSE(is_interactive_comments_enabled(),
                  "should return false when disabled");
 
-    shell_opts.interactive_comments_mode = true; /* Reset */
+    shell_opts.interactive_comments_mode = true; /// Reset
 }
 
 /* ============================================================================
@@ -441,7 +441,7 @@ TEST(is_posix_option_set_f) {
 TEST(is_posix_option_set_h) {
     init_posix_options();
 
-    /* hash_commands defaults to true */
+    /// hash_commands defaults to true
     ASSERT_TRUE(is_posix_option_set('h'), "-h should return true by default");
 
     shell_opts.hash_commands = false;
@@ -519,7 +519,7 @@ TEST(is_posix_option_set_b) {
 TEST(is_posix_option_set_invalid) {
     init_posix_options();
 
-    /* Invalid/unknown options should return false */
+    /// Invalid/unknown options should return false
     ASSERT_FALSE(is_posix_option_set('z'),
                  "unknown option should return false");
     ASSERT_FALSE(is_posix_option_set('?'),
@@ -535,11 +535,11 @@ TEST(is_posix_option_set_invalid) {
 int main(void) {
     printf("Running POSIX Options tests...\n");
 
-    /* Initialization tests */
+    /// Initialization tests
     printf("\n=== Initialization Tests ===\n");
     RUN_TEST(init_posix_options_defaults);
 
-    /* Option query function tests */
+    /// Option query function tests
     printf("\n=== Option Query Function Tests ===\n");
     RUN_TEST(should_exit_on_error_query);
     RUN_TEST(should_trace_execution_query);
@@ -559,7 +559,7 @@ int main(void) {
     RUN_TEST(is_history_enabled_query);
     RUN_TEST(is_interactive_comments_enabled_query);
 
-    /* is_posix_option_set tests */
+    /// is_posix_option_set tests
     printf("\n=== is_posix_option_set Tests ===\n");
     RUN_TEST(is_posix_option_set_c);
     RUN_TEST(is_posix_option_set_s);

@@ -9,9 +9,24 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "alias.h"
 #include "executor.h"
+#include "identifier.h"
+#include "lle/buffer_management.h"
+#include "lle/lle_editor.h"
+#include "lle/syntax_highlighting.h"
 #include "symtable.h"
 #include "test_shell_harness.h"
+
+extern lle_result_t lush_inspect_widget_callback(lle_editor_t *editor,
+                                                 void *user_data);
+
+/// Side-table resets for bindkey/zle tests; the side tables are
+/// process-global so leaking state across tests breaks reproducibility.
+extern void bindkey_table_reset(void);
+extern void zle_widget_table_reset(void);
+extern void zstyle_table_reset(void);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +39,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * LIFECYCLE TESTS
@@ -111,7 +126,7 @@ TEST(variable_assignment) {
     run_result_t r = run_shell_with_executor(exec, "FOO=bar");
     ASSERT_EXIT_STATUS(r, 0);
 
-    /* Verify variable was set */
+    /// Verify variable was set
     char *value = symtable_get_var(exec->symtable, "FOO");
     ASSERT_NOT_NULL(value, "Variable should be set");
     ASSERT_STR_EQ(value, "bar", "Variable value mismatch");
@@ -126,7 +141,7 @@ TEST(variable_expansion) {
 
     executor_execute_command_line(exec, "MYVAR=hello", 1);
 
-    /* Test that variable exists */
+    /// Test that variable exists
     char *value = symtable_get_var(exec->symtable, "MYVAR");
     ASSERT_NOT_NULL(value, "Variable should be set");
     ASSERT_STR_EQ(value, "hello", "Variable value mismatch");
@@ -211,11 +226,11 @@ TEST(for_loop_basic) {
 }
 
 TEST(for_loop_no_in) {
-    /* Tests Issue #55 fix - for without 'in' iterates over $@ */
+    /// Tests Issue #55 fix - for without 'in' iterates over $@
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Set positional parameters and iterate */
+    /// Set positional parameters and iterate
     run_result_t r = run_shell_with_executor(
         exec, "set -- a b c; COUNT=0; for arg; do COUNT=$((COUNT+1)); done");
     ASSERT_EXIT_STATUS(r, 0);
@@ -293,6 +308,390 @@ TEST(case_wildcard) {
     executor_free(exec);
 }
 
+/* POSIX character classes ([[:space:]], [[:upper:]], ...) parse correctly
+ * inside case patterns. The tokenizer greedily lexes "[[" as
+ * TOK_DOUBLE_LBRACKET (the extended-test opener); the case-pattern
+ * collector now accepts that token as literal "[[" text so the resulting
+ * pattern string "[[:class:]]" reaches match_pattern intact. */
+/* The bash-style ERR pseudo-signal trap fires after a command's
+ * non-zero exit, before set -e would otherwise abort. Phase 1 of
+ * issue #108 -- the errtrace option (inheritance into functions and
+ * subshells) is not yet implemented; this asserts only that the
+ * trap registers and fires for a top-level non-zero exit. */
+TEST(trap_err_fires_on_nonzero_exit) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// trap_list is global state shared across executors. Clear it
+    /// at the end of the test so subsequent tests don't observe a
+    /// stale ERR handler firing on their own non-zero exits.
+    run_result_t r = run_shell_with_executor(
+        exec, "trap 'echo ERR_HIT' ERR\nfalse\necho continuing\ntrap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /// The trap action runs after `false` returns 1, then execution
+    /// continues with the next command.
+    ASSERT_STDOUT_CONTAINS(r, "ERR_HIT");
+    ASSERT_STDOUT_CONTAINS(r, "continuing");
+
+    executor_free(exec);
+}
+
+/* Phase 2 of issue #108: the errtrace option controls whether the ERR
+ * trap is inherited into function bodies. Without errtrace, lush
+ * matches bash's default: the trap fires only at the function's call
+ * site (where the function returns non-zero), not inside the body.
+ * With `set -o errtrace`, the trap also fires inside the body. */
+TEST(trap_err_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo HIT' ERR\n"
+                                                   "f() { false; }\n"
+                                                   "f\n"
+                                                   "trap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /// Exactly one HIT -- the top-level fire on f's non-zero return.
+    /// The inside-f false was suppressed by the default-off errtrace.
+    const char *p = r.out;
+    int hits = 0;
+    while ((p = strstr(p, "HIT")) != NULL) {
+        hits++;
+        p++;
+    }
+    ASSERT_EQ(hits, 1, "exactly one ERR fire without errtrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_err_inherited_in_function_with_errtrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo HIT' ERR\n"
+                                                   "set -o errtrace\n"
+                                                   "f() { false; }\n"
+                                                   "f\n"
+                                                   "set +o errtrace\n"
+                                                   "trap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /// Two HITs -- inside f at false, and at the top-level on f's
+    /// non-zero return.
+    const char *p = r.out;
+    int hits = 0;
+    while ((p = strstr(p, "HIT")) != NULL) {
+        hits++;
+        p++;
+    }
+    ASSERT_EQ(hits, 2, "two ERR fires with errtrace -- inside f + top");
+
+    executor_free(exec);
+}
+
+/* Issue #109: the functrace option (`set -o functrace` / `-T`)
+ * controls whether the DEBUG and RETURN traps are inherited into
+ * function bodies. Without functrace, both traps are suppressed for
+ * commands executed inside a function scope (bash's default).
+ * With functrace, they fire normally inside the body. */
+TEST(trap_debug_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo D' DEBUG\n"
+                                                   "f() { echo a; echo b; }\n"
+                                                   "f\n"
+                                                   "trap - DEBUG\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /// Between `a` and `b` (both inside f's body), no DEBUG line
+    /// should appear. If DEBUG were inherited, we'd see "a\nD\nb";
+    /// with the default-off behavior we should see "a\nb" with no
+    /// interruption.
+    ASSERT_NULL(strstr(r.out, "a\nD\nb"),
+                "DEBUG must not fire between commands inside f");
+
+    executor_free(exec);
+}
+
+TEST(trap_debug_inherited_in_function_with_functrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo D' DEBUG\n"
+                                                   "set -o functrace\n"
+                                                   "f() { echo a; echo b; }\n"
+                                                   "f\n"
+                                                   "set +o functrace\n"
+                                                   "trap - DEBUG\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /// With functrace, between a and b a DEBUG line should appear
+    /// (`a\nD\nb`), proving the trap fired inside the body.
+    ASSERT_NOT_NULL(strstr(r.out, "a\nD\nb"),
+                    "DEBUG must fire between commands inside f with functrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_return_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo RET' RETURN\n"
+                                                   "f() { echo inside; }\n"
+                                                   "f\n"
+                                                   "trap - RETURN\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_NULL(strstr(r.out, "RET"),
+                "RETURN trap must NOT fire without functrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_return_inherited_in_function_with_functrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo RET' RETURN\n"
+                                                   "set -o functrace\n"
+                                                   "f() { echo inside; }\n"
+                                                   "f\n"
+                                                   "set +o functrace\n"
+                                                   "trap - RETURN\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_NOT_NULL(strstr(r.out, "RET"),
+                    "RETURN trap must fire when functrace is set");
+
+    executor_free(exec);
+}
+
+TEST(trap_err_silent_on_zero_exit) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "trap 'echo ERR_HIT' ERR\ntrue\necho continuing\ntrap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_TRUE(strstr(r.out, "ERR_HIT") == NULL,
+                "no ERR trap on a zero-exit command");
+    ASSERT_STDOUT_CONTAINS(r, "continuing");
+
+    executor_free(exec);
+}
+
+TEST(case_posix_character_class) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "case \" \" in [[:space:]]) R=ws;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r1 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r1, "R should be set");
+    ASSERT_STR_EQ(r1, "ws", "[[:space:]] matched whitespace");
+    free(r1);
+
+    r = run_shell_with_executor(
+        exec, "case \"A\" in [[:upper:]]) R=up;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r2 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r2, "R should be set");
+    ASSERT_STR_EQ(r2, "up", "[[:upper:]] matched uppercase");
+    free(r2);
+
+    /// Non-match falls through to the wildcard arm without misparsing
+    /// the bracket class.
+    r = run_shell_with_executor(
+        exec, "case \"x\" in [[:space:]]) R=ws;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r3 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r3, "R should be set");
+    ASSERT_STR_EQ(r3, "other", "non-whitespace falls through to default");
+    free(r3);
+
+    executor_free(exec);
+}
+
+/* ============================================================================
+ * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
+ *
+ * Per SEMANTICS.md section 3.9, a list value (${arr[@]}, etc.) reaching
+ * a scalar-requiring position is a runtime type error. Vector-accepting
+ * positions (argv, for-loop word list) continue to receive the array's
+ * elements; the explicit-join subscript ${arr[*]} stays a scalar.
+ * ============================================================================
+ */
+
+TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nx=${arr[@]}\necho saw_post_assign\n");
+
+    /// The offending command aborts execution -- "saw_post_assign"
+    /// must not reach stdout.
+    ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
+                "execution aborted after type mismatch");
+    /// The diagnostic must reach stderr with the canonical phrasing.
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "${arr[@]}");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on type-mismatch abort");
+
+    executor_free(exec);
+}
+
+/* SEMANTICS section 3.9: bare unsubscripted ${arr} on a list value.
+ * - In a vector-accepting slot (argv, for-loop word list, array
+ *   init), contributes elements one-to-one with [@].
+ * - In a scalar-requiring slot (assignment RHS, case word, here-
+ *   string, arithmetic operand, conditional-expression operand,
+ *   or a within-word glued position), the engine raises a runtime
+ *   type-mismatch error and the script aborts before the bad value
+ *   reaches a downstream command. */
+TEST(bare_arr_in_scalar_assignment_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\ny=${arr}\necho saw_post_assign\n");
+
+    ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
+                "execution aborted after type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "${arr}");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on type-mismatch abort");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_in_for_loop_iterates) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nfor i in ${arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=b");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no error in vector position");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_glued_to_text_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Whole-word constraint per section 3.9: a list value glued to
+    /// other text within a single word has no coherent meaning and is
+    /// a runtime type error.
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\necho \"x${arr}y\"\necho after\n");
+
+    ASSERT_TRUE(strstr(r.out, "after") == NULL,
+                "execution aborted on glued list");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on glued list");
+
+    executor_free(exec);
+}
+
+/* SEMANTICS section 3.7: the (@) parameter flag is a spelling alias
+ * for vector presentation. It is redundant with the [@] subscript --
+ * ${(@)arr} must yield exactly what ${arr[@]} yields. */
+TEST(at_paren_flag_alias_yields_vector) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a 'x y' c)\nfor i in ${(@)arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=x y");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+
+    executor_free(exec);
+}
+
+TEST(at_paren_flag_composes_with_sort) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// (o@) -- sort ascending and yield vector. (@) is the no-op
+    /// presentation alias; (o) carries the transformation per
+    /// SEMANTICS section 3.5 (transformation and presentation
+    /// orthogonal).
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(c a b)\nfor i in ${(o@)arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    const char *p_a = strstr(r.out, "iter=a");
+    const char *p_b = strstr(r.out, "iter=b");
+    const char *p_c = strstr(r.out, "iter=c");
+    ASSERT_TRUE(p_a != NULL && p_b != NULL && p_c != NULL,
+                "all three elements emitted");
+    ASSERT_TRUE(p_a < p_b && p_b < p_c, "sort applied via (o)");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_argv_yields_elements_one_to_one) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// argv slot is vector-accepting. printf '<%s>\n' ${arr} must
+    /// produce one <element> line per element, preserving the
+    /// original boundaries even for elements containing spaces.
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a 'x y' c)\nprintf '<%s>\\n' ${arr}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "<a>");
+    ASSERT_STDOUT_CONTAINS(r, "<x y>");
+    ASSERT_STDOUT_CONTAINS(r, "<c>");
+
+    executor_free(exec);
+}
+
+TEST(arr_at_in_for_loop_iterates) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The for-loop word list is vector-accepting -- ${arr[@]} feeds it
+    /// elements, no error.
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nfor i in ${arr[@]}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=b");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+    /// No spurious type-mismatch diagnostic.
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no error in vector position");
+
+    executor_free(exec);
+}
+
+TEST(arr_star_in_scalar_assignment_joins) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// ${arr[*]} is the explicit scalar-join operator -- legal in a
+    /// scalar-requiring position; per SEMANTICS section 3.5.
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nx=${arr[*]}\necho \"x=$x\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "x=a b c");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "[*] join is conformant in scalar context");
+
+    executor_free(exec);
+}
+
 /* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
@@ -317,7 +716,7 @@ TEST(and_operator_fail) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Set RESULT first, then verify it's NOT changed */
+    /// Set RESULT first, then verify it's NOT changed
     executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "false && RESULT=changed");
     ASSERT_EXIT_STATUS(r, 1);
@@ -334,7 +733,7 @@ TEST(or_operator_success) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* First succeeds, second should not run */
+    /// First succeeds, second should not run
     executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "true || RESULT=changed");
     ASSERT_EXIT_STATUS(r, 0);
@@ -386,7 +785,7 @@ TEST(function_definition_posix) {
 }
 
 TEST(function_definition_ksh) {
-    /* Tests Issue #56 fix - function without parentheses */
+    /// Tests Issue #56 fix - function without parentheses
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -449,6 +848,64 @@ TEST(function_return) {
  * the value the assignment specified.
  * ============================================================================
  */
+
+/* Parser-internal sentinel discrimination: `local arr=(a b c)` is an
+ * array literal (parser emits the bundled form prefixed with \x1F),
+ * while `local data="(scoped)"` is a scalar (regular argument path,
+ * no sentinel). These tests pin the discrimination so a future
+ * refactor of the parser path or the builtin-side sentinel-stripping
+ * shows up as a regression. Each test uses unique function and
+ * variable names because the global manager persists across
+ * executor_free calls in this test binary, so reusing names risks
+ * cross-test interference. */
+TEST(local_array_literal_builds_indexed_array) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "lalf() { local larr=(a b c); echo len=${#larr[@]} "
+              "first=${larr[0]}; }\nlalf\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "len=3");
+    ASSERT_STDOUT_CONTAINS(r, "first=a");
+
+    executor_free(exec);
+}
+
+TEST(local_quoted_paren_value_stays_scalar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "lqpv() { local sdata=\"(scoped)\"; echo \"sdata=$sdata\"; }\nlqpv\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    /// Sentinel correctly absent on quoted scalar; the (...) is just a
+    /// literal substring of a scalar value, NOT an array literal.
+    ASSERT_STDOUT_CONTAINS(r, "sdata=(scoped)");
+
+    executor_free(exec);
+}
+
+TEST(local_array_dies_with_function_scope) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// bash conformance: a local array declared inside a function
+    /// does not outlive that function. Pre-storage-unification, lush
+    /// leaked such arrays out via the global array side-table; the
+    /// symtable refactor fixed that, but the test pins the contract.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "ladwfs() { local farr=(a b c); }\nladwfs\necho len=${#farr[@]}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "len=0");
+
+    executor_free(exec);
+}
 
 TEST(local_plain_string_reassignment) {
     executor_t *exec = executor_new();
@@ -612,11 +1069,11 @@ TEST(local_plus_equals_append) {
 }
 
 TEST(local_while_loop_counter) {
-    /* The original symptomatic case from issue #47 — a while-loop counter
-     * with `local` infinite-looped before the fix. The test framework
-     * exits on first failure, so earlier simpler tests stop the run before
-     * this one ever executes in the broken state. After the fix, this
-     * confirms the loop terminates correctly. */
+    /// The original symptomatic case from issue #47 — a while-loop counter
+    /// with `local` infinite-looped before the fix. The test framework
+    /// exits on first failure, so earlier simpler tests stop the run before
+    /// this one ever executes in the broken state. After the fix, this
+    /// confirms the loop terminates correctly.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -728,9 +1185,9 @@ TEST(function_redir_keyword_form_applied_at_call) {
 }
 
 TEST(function_redir_input_applied_at_call) {
-    /* Verifies the function's stdin is the redirected file. The captured
-     * value is stored in a global so the test does not need command
-     * substitution to read it back. */
+    /// Verifies the function's stdin is the redirected file. The captured
+    /// value is stored in a global so the test does not need command
+    /// substitution to read it back.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -753,8 +1210,8 @@ TEST(function_redir_input_applied_at_call) {
 }
 
 TEST(function_redir_does_not_break_normal_call) {
-    /* Sanity: calling a function with a trailing redirect must not leak
-     * the redirection across to subsequent unrelated commands. */
+    /// Sanity: calling a function with a trailing redirect must not leak
+    /// the redirection across to subsequent unrelated commands.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -762,8 +1219,8 @@ TEST(function_redir_does_not_break_normal_call) {
     executor_execute_command_line(
         exec, "f() { echo from-f; } > /tmp/lush_test_48", 1);
     executor_execute_command_line(exec, "f", 1);
-    /* This echo must NOT also be captured by f's redirect — its output
-     * should be discarded as normal (we don't capture stdout here). */
+    /// This echo must NOT also be captured by f's redirect — its output
+    /// should be discarded as normal (we don't capture stdout here).
     executor_execute_command_line(exec, "echo from-second-call", 1);
     executor_execute_command_line(
         exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
@@ -851,7 +1308,7 @@ TEST(subshell_isolation) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec, "OUTER=yes", 1);
-    /* Variable set in subshell should not affect parent */
+    /// Variable set in subshell should not affect parent
     executor_execute_command_line(exec, "(INNER=subshell)", 1);
 
     char *outer = symtable_get_var(exec->symtable, "OUTER");
@@ -859,7 +1316,7 @@ TEST(subshell_isolation) {
     ASSERT_STR_EQ(outer, "yes", "OUTER should be yes");
     free(outer);
 
-    /* INNER should not exist in parent */
+    /// INNER should not exist in parent
     char *inner = symtable_get_var(exec->symtable, "INNER");
     ASSERT(inner == NULL, "INNER should NOT be set in parent");
 
@@ -870,7 +1327,7 @@ TEST(brace_group) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Brace group runs in current shell */
+    /// Brace group runs in current shell
     run_result_t r = run_shell_with_executor(exec, "{ A=1; B=2; }");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1015,7 +1472,7 @@ TEST(builtin_shift) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Test shift with positional parameters */
+    /// Test shift with positional parameters
     executor_execute_command_line(exec, "set -- a b c d e", 1);
     executor_execute_command_line(exec, "FIRST=$1", 1);
     executor_execute_command_line(exec, "shift", 1);
@@ -1105,7 +1562,7 @@ TEST(loop_continue) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Count only odd numbers: skip even iterations */
+    /// Count only odd numbers: skip even iterations
     run_result_t r = run_shell_with_executor(
         exec, "SUM=0; for i in 1 2 3 4 5; do "
               "if [ $((i % 2)) -eq 0 ]; then continue; fi; "
@@ -1129,7 +1586,7 @@ TEST(pipeline_simple) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Simple pipeline - echo piped to cat */
+    /// Simple pipeline - echo piped to cat
     run_result_t r = run_shell_with_executor(exec, "true | true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1140,7 +1597,7 @@ TEST(pipeline_exit_status) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Pipeline exit status is last command's status */
+    /// Pipeline exit status is last command's status
     run_result_t r = run_shell_with_executor(exec, "true | false");
     ASSERT_EXIT_STATUS(r, 1);
 
@@ -1151,7 +1608,7 @@ TEST(pipeline_three_commands) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Three-stage pipeline */
+    /// Three-stage pipeline
     run_result_t r = run_shell_with_executor(exec, "true | true | true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1406,7 +1863,7 @@ TEST(command_substitution_syntax) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Verify command substitution parses and executes without error */
+    /// Verify command substitution parses and executes without error
     run_result_t r = run_shell_with_executor(exec, "X=$(true)");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1414,25 +1871,22 @@ TEST(command_substitution_syntax) {
 }
 
 TEST(command_substitution_exit_status) {
-    /*
-     * KNOWN BUG: Command substitution exit status not preserved
-     * Issue #58: $? after $(false) returns 0 instead of 1
-     * The exit status of the command inside $() should be available via $?
-     */
+    /// KNOWN BUG: Command substitution exit status not preserved
+    /// Issue #58: $? after $(false) returns 0 instead of 1
+    /// The exit status of the command inside $() should be available via $?
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* For now, just test that the syntax works */
+    /// For now, just test that the syntax works
     run_result_t r = run_shell_with_executor(exec, "X=$(true)");
     ASSERT_EXIT_STATUS(r, 0);
 
-    /* TODO: Re-enable when bug is fixed:
-     * status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
-     * ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
-     * char *y = symtable_get_var(exec->symtable, "Y");
-     * ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
-     * free(y);
-     */
+    /// TODO: Re-enable when bug is fixed:
+    /// status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
+    /// ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
+    /// char *y = symtable_get_var(exec->symtable, "Y");
+    /// ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
+    /// free(y);
 
     executor_free(exec);
 }
@@ -1466,8 +1920,8 @@ TEST(special_var_dollar_dollar) {
 
     char *pid = symtable_get_var(exec->symtable, "PID");
     ASSERT_NOT_NULL(pid, "$$ should be set");
-    /* PID should be set - could be 0 in test environment or actual PID */
-    /* Just verify it's a valid number */
+    /// PID should be set - could be 0 in test environment or actual PID
+    /// Just verify it's a valid number
     int pid_val = atoi(pid);
     ASSERT(pid_val >= 0, "$$ should be non-negative");
     free(pid);
@@ -1558,22 +2012,20 @@ TEST(elif_chain) {
  */
 
 TEST(negation_command) {
-    /*
-     * KNOWN BUG: Negation command causes memory corruption (double-free)
-     * Issue #57: "! command" syntax triggers malloc error
-     * TODO: Fix the negation handling in executor.c
-     */
+    /// KNOWN BUG: Negation command causes memory corruption (double-free)
+    /// Issue #57: "! command" syntax triggers malloc error
+    /// TODO: Fix the negation handling in executor.c
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Skip actual negation test until bug is fixed */
-    /* int status = executor_execute_command_line(exec, "! false", 1); */
-    /* ASSERT_EQ(status, 0, "Negated false should return 0"); */
+    /// Skip actual negation test until bug is fixed
+    /// int status = executor_execute_command_line(exec, "! false", 1);
+    /// ASSERT_EQ(status, 0, "Negated false should return 0");
 
-    /* status = executor_execute_command_line(exec, "! true", 1); */
-    /* ASSERT_EQ(status, 1, "Negated true should return 1"); */
+    /// status = executor_execute_command_line(exec, "! true", 1);
+    /// ASSERT_EQ(status, 1, "Negated true should return 1");
 
-    /* For now, just verify executor works without negation */
+    /// For now, just verify executor works without negation
     run_result_t r = run_shell_with_executor(exec, "true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1593,10 +2045,9 @@ TEST(here_string) {
     ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
-    /* cat outputs with trailing newline, command substitution may preserve it
-     */
+    /// cat outputs with trailing newline, command substitution may preserve it
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Check that result starts with "hello" (may have trailing newline) */
+    /// Check that result starts with "hello" (may have trailing newline)
     ASSERT(strncmp(result, "hello", 5) == 0,
            "Here string should provide 'hello'");
     free(result);
@@ -1677,13 +2128,13 @@ TEST(local_variable_in_function) {
 /* ============================================================================
  * REGRESSION TESTS -- 2026-05 real-world hardening wave (PR #113)
  *
- * Behavioural coverage for the defects the real-world script corpus
+ * Behavioral coverage for the defects the real-world script corpus
  * surfaced. Every test runs a shell snippet in-process and asserts on
- * observable behaviour; each names the fix it guards.
+ * observable behavior; each names the fix it guards.
  * ============================================================================
  */
 
-/* Create an empty file -- fixture helper for the glob tests. */
+/// Create an empty file -- fixture helper for the glob tests.
 static void rt_touch(const char *path) {
     FILE *f = fopen(path, "w");
     if (f) {
@@ -1691,11 +2142,11 @@ static void rt_touch(const char *path) {
     }
 }
 
-/* --- Deferred here-document collection -------------------------------- */
+/// --- Deferred here-document collection --------------------------------
 
 TEST(rt_heredoc_through_pipe) {
-    /* The body must reach `tr`; the parser once collected the heredoc
-     * inline and lost the `| tr` that followed `<<EOF` on the line. */
+    /// The body must reach `tr`; the parser once collected the heredoc
+    /// inline and lost the `| tr` that followed `<<EOF` on the line.
     run_result_t r = run_shell("cat <<EOF | tr a-z A-Z\nhello world\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "HELLO WORLD\n");
@@ -1714,28 +2165,28 @@ TEST(rt_heredoc_in_if_body) {
 }
 
 TEST(rt_heredoc_loop_redirection) {
-    run_result_t r = run_shell(
-        "while read l; do echo \"got $l\"; done <<EOF\nx\ny\nEOF\n");
+    run_result_t r =
+        run_shell("while read l; do echo \"got $l\"; done <<EOF\nx\ny\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "got x\ngot y\n");
 }
 
 TEST(rt_heredoc_strip_tabs) {
-    /* <<- strips leading tabs from body lines and the terminator. */
+    /// <<- strips leading tabs from body lines and the terminator.
     run_result_t r = run_shell("cat <<-EOF\n\t\tindented\n\t\tEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "indented\n");
 }
 
 TEST(rt_heredoc_quoted_delimiter) {
-    /* A quoted delimiter disables expansion of the body. */
+    /// A quoted delimiter disables expansion of the body.
     run_result_t r = run_shell("cat <<'EOF'\nliteral $UNSET here\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "literal $UNSET here\n");
 }
 
 TEST(rt_heredoc_multiline_var_body) {
-    /* Body referencing a multi-line variable -- posix/105 regression. */
+    /// Body referencing a multi-line variable -- posix/105 regression.
     run_result_t r =
         run_shell("x=\"line1\nline2\"\ncat <<EOF\n$x\nEOF\necho done\n");
     ASSERT_EXIT_STATUS(r, 0);
@@ -1747,7 +2198,517 @@ TEST(rt_heredoc_unterminated_error) {
     ASSERT_TRUE(r.exit_status != 0, "unterminated heredoc must fail");
 }
 
-/* --- Glob expansion in for-loops, arrays, and zsh qualifiers ---------- */
+TEST(rt_heredoc_delimiter_nfc_vs_nfd) {
+    /// NFC script delimiter "EOF_\xc3\xa9" (E O F _ + precomposed
+    /// e-acute U+00E9 = 5 bytes) is terminated by an NFD line
+    /// "EOF_e\xcc\x81" (E O F _ e + combining acute U+0301 = 6
+    /// bytes). The heredoc body should be exactly "body\n".
+    run_result_t r = run_shell("cat <<EOF_\xc3\xa9\n"
+                               "body\n"
+                               "EOF_e\xcc\x81\n");
+    ASSERT_STDOUT_EQ(r, "body\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_heredoc_delimiter_nfd_vs_nfc) {
+    /// Mirror: NFD script delimiter, NFC terminator. Same outcome.
+    run_result_t r = run_shell("cat <<EOF_e\xcc\x81\n"
+                               "body\n"
+                               "EOF_\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "body\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_heredoc_delimiter_unequal_when_actually_different) {
+    /// NFC normalization does not paper over real differences.
+    /// "EOF" terminator does not close a "DONE"-delimited heredoc;
+    /// the script reaches EOF without finding the delimiter and
+    /// the parser reports an unterminated heredoc.
+    run_result_t r = run_shell("cat <<DONE\nEOF\n");
+    ASSERT_TRUE(r.exit_status != 0, "DONE delimiter is not terminated by EOF");
+}
+
+TEST(rt_assoc_key_nfc_nfd_collapse) {
+    /// declare -A m; m[NFC]=one; m[NFD]=two
+    /// Both keys (NFC e-acute precomposed + NFD e + combining acute)
+    /// must hash to the same entry. The second set overwrites the
+    /// first; the resulting array has one entry and both lookup
+    /// forms find it.
+    run_result_t r = run_shell("declare -A m\n"
+                               "nfc=$'caf\\xc3\\xa9'\n"
+                               "nfd=$'cafe\\xcc\\x81'\n"
+                               "m[$nfc]=one\n"
+                               "m[$nfd]=two\n"
+                               "echo len=${#m[@]}\n"
+                               "echo via_nfc=${m[$nfc]}\n"
+                               "echo via_nfd=${m[$nfd]}\n");
+    ASSERT_STDOUT_EQ(r, "len=1\nvia_nfc=two\nvia_nfd=two\n");
+}
+
+TEST(rt_assoc_key_distinct_when_actually_different) {
+    /// NFC normalization does not paper over real key differences.
+    /// "café" and "CAFÉ" hash to separate entries (case folding is
+    /// a separate axis from NFC normalization).
+    run_result_t r = run_shell("declare -A m\n"
+                               "m[café]=lower\n"
+                               "m[CAFÉ]=upper\n"
+                               "echo len=${#m[@]}\n"
+                               "echo lower=${m[café]}\n"
+                               "echo upper=${m[CAFÉ]}\n");
+    ASSERT_STDOUT_EQ(r, "len=2\nlower=lower\nupper=upper\n");
+}
+
+TEST(rt_assoc_key_ascii_paths_unchanged) {
+    /// ASCII keys hit the primitive's strdup fast path -- behavior
+    /// must be byte-identical to the prior implementation.
+    run_result_t r = run_shell("declare -A m\n"
+                               "m[foo]=one\n"
+                               "m[bar]=two\n"
+                               "m[baz]=three\n"
+                               "echo ${m[foo]}\n"
+                               "echo ${m[bar]}\n"
+                               "echo ${m[baz]}\n"
+                               "echo len=${#m[@]}\n");
+    ASSERT_STDOUT_EQ(r, "one\ntwo\nthree\nlen=3\n");
+}
+
+TEST(rt_unicode_ident_declare_and_expand_latin) {
+    /// FEATURE_UNICODE_IDENTIFIERS is default-on in lush mode. A
+    /// non-ASCII identifier (precomposed café) round-trips through
+    /// declare's name validation, symtable storage, tokenizer
+    /// $var parsing, and the expand_variable name-extraction loop.
+    run_result_t r =
+        run_shell("declare caf\xc3\xa9=hello\necho $caf\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_unicode_ident_declare_and_expand_greek) {
+    run_result_t r = run_shell("declare \xce\xa3=sigma\necho $\xce\xa3\n");
+    ASSERT_STDOUT_EQ(r, "sigma\n");
+}
+
+TEST(rt_unicode_ident_declare_and_expand_cyrillic) {
+    /// Cyrillic "имя" (name) -- 3 codepoints, 6 UTF-8 bytes.
+    run_result_t r = run_shell("declare \xd0\xb8\xd0\xbc\xd1\x8f=name\n"
+                               "echo $\xd0\xb8\xd0\xbc\xd1\x8f\n");
+    ASSERT_STDOUT_EQ(r, "name\n");
+}
+
+TEST(rt_unicode_ident_rejected_in_bash_mode) {
+    /// `mode bash` flips FEATURE_UNICODE_IDENTIFIERS off; identifier
+    /// validation falls back to POSIX ASCII-only. declare rejects
+    /// the non-ASCII name.
+    run_result_t r = run_shell("mode bash\ndeclare caf\xc3\xa9=hello\n");
+    ASSERT_STDERR_CONTAINS(r, "not a valid identifier");
+    /// Restore lush mode so subsequent tests in this in-process suite
+    /// see the default feature matrix (shell_mode state is global).
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_opt_in_from_bash_mode) {
+    /// Feature matrix gate: the user can opt in via shopt from any
+    /// mode, including bash, without leaving the preset.
+    ///
+    /// The mode-change + opt-in is performed in a separate run_shell
+    /// call from the identifier-using script so the tokenizer sees
+    /// the feature flag already set. Within a single run_shell, the
+    /// tokenizer parses the entire input upfront before any
+    /// statement executes; if `shopt -s` and `$caf<UTF-8>` lived in
+    /// the same input, the tokenizer would still see the feature off
+    /// when scanning `$caf<UTF-8>` because shopt has not run yet.
+    /// Two separate run_shell calls share global shell_mode state,
+    /// so the second call's tokenizer sees the override.
+    run_result_t setup = run_shell("mode bash\nshopt -s unicode_identifiers\n");
+    ASSERT_EXIT_STATUS(setup, 0);
+    run_result_t r = run_shell("declare caf\xc3\xa9=hi\necho $caf\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+    /// Restore lush-mode harness default for subsequent tests.
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_ascii_paths_unchanged) {
+    /// ASCII identifiers hit the fast path in both lush and bash
+    /// modes; behavior must be byte-identical to the prior
+    /// isalpha/isalnum implementation.
+    run_result_t r = run_shell("X=hello\n"
+                               "_y=world\n"
+                               "Z9=ok\n"
+                               "echo $X $_y $Z9\n");
+    ASSERT_STDOUT_EQ(r, "hello world ok\n");
+}
+
+TEST(rt_unicode_ident_invalid_start_still_rejected) {
+    /// Numeric-leading names are still invalid in both modes;
+    /// FEATURE_UNICODE_IDENTIFIERS widens the LETTER set but does
+    /// not relax the Start-vs-Continue distinction.
+    run_result_t r = run_shell("declare 9bad=oops\n");
+    ASSERT_STDERR_CONTAINS(r, "not a valid identifier");
+}
+
+TEST(rt_unicode_ident_arithmetic_bare) {
+    /// Non-ASCII identifier as a bare arithmetic operand:
+    /// $((café+1)) reads café from the symbol table.
+    run_result_t r = run_shell("declare café=41\n"
+                               "echo $((café+1))\n");
+    ASSERT_STDOUT_EQ(r, "42\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_dollar) {
+    /// Non-ASCII identifier with $ sigil inside arithmetic.
+    run_result_t r = run_shell("declare Σ=10\n"
+                               "echo $(($Σ*3))\n");
+    ASSERT_STDOUT_EQ(r, "30\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_compound) {
+    /// (( ... )) compound, increment with non-ASCII name.
+    run_result_t r = run_shell("declare имя=7\n"
+                               "(( имя += 5 ))\n"
+                               "echo $имя\n");
+    ASSERT_STDOUT_EQ(r, "12\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_positional_unchanged) {
+    /// Positional parameters in arithmetic (digit-leading) still work;
+    /// my edit to get_var_name_with_context must not regress this.
+    run_result_t r = run_shell("set -- 7 8\n"
+                               "echo $(($1+$2))\n");
+    ASSERT_STDOUT_EQ(r, "15\n");
+}
+
+TEST(rt_unicode_ident_function_name_lush) {
+    /// Function definition with a non-ASCII name in lush mode.
+    /// Parser was already permissive here (POSIX-only validation),
+    /// but the lush_is_valid_identifier delegation must not regress
+    /// the lush case.
+    run_result_t r = run_shell("función() { echo from-función; }\n"
+                               "función\n");
+    ASSERT_STDOUT_EQ(r, "from-función\n");
+}
+
+TEST(rt_unicode_ident_function_name_posix_rejected) {
+    /// In POSIX mode (with the feature off by default), a function
+    /// name containing non-ASCII bytes must be rejected. Two separate
+    /// run_shell calls so the parser sees posix_mode = true.
+    (void)run_shell("set -o posix\n");
+    run_result_t r = run_shell("función() { :; }\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid function name in POSIX mode");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_function_name_posix_opt_in) {
+    /// POSIX mode plus `shopt -s unicode_identifiers` must accept
+    /// the unicode name. Same multi-input pattern as the bash opt-in
+    /// test: parser sees posix_mode + feature override at parse time.
+    (void)run_shell("set -o posix\n"
+                    "shopt -s unicode_identifiers\n");
+    run_result_t r = run_shell("función() { echo posix-ok; }\n"
+                               "función\n");
+    ASSERT_STDOUT_EQ(r, "posix-ok\n");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_alias_name_lush) {
+    /// Non-ASCII alias name accepted in lush mode (FEATURE_UNICODE_IDENTIFIERS
+    /// default on). init_aliases() seeds the global alias table the in-process
+    /// harness shares with set_alias; the real shell calls it during startup
+    /// via src/init.c but the harness has no equivalent entry point.
+    init_aliases();
+    run_result_t r = run_shell("alias café=\"echo from-café\"\n"
+                               "café\n");
+    ASSERT_STDOUT_EQ(r, "from-café\n");
+}
+
+TEST(rt_unicode_ident_alias_name_bash_rejected) {
+    /// In bash mode, the byte-level check rejects café.
+    (void)run_shell("mode bash\n");
+    run_result_t r = run_shell("alias café=\"echo nope\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid alias name");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_alias_digit_leading_unchanged) {
+    /// Alias accepts digit-leading names (bash+zsh consensus); the
+    /// migration must not regress this.
+    init_aliases();
+    run_result_t r = run_shell("alias 1=\"echo one\"\n"
+                               "1\n");
+    ASSERT_STDOUT_EQ(r, "one\n");
+}
+
+TEST(rt_unicode_ident_alias_extension_chars_unchanged) {
+    /// Alias accepts .-+ as name characters; preserve.
+    init_aliases();
+    run_result_t r = run_shell("alias my.cmd=\"echo dotted\"\n"
+                               "my.cmd\n");
+    ASSERT_STDOUT_EQ(r, "dotted\n");
+}
+
+TEST(rt_unicode_ident_array_subscript) {
+    /// ${arr[N]} subscript lookup with a unicode array name. Before
+    /// the executor wave the name-prefix validator in
+    /// parse_parameter_expansion rejected the non-ASCII bytes and
+    /// silently fell through to the scalar branch, returning empty.
+    run_result_t r = run_shell("café=(alpha beta gamma)\n"
+                               "echo \"${café[0]}=${café[1]}=${café[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "alpha=beta=gamma\n");
+}
+
+TEST(rt_unicode_ident_array_length) {
+    /// ${#arr[@]} on a unicode-named array.
+    run_result_t r = run_shell("café=(one two three four)\n"
+                               "echo \"${#café[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "4\n");
+}
+
+TEST(rt_unicode_ident_array_vector_in_for) {
+    /// "${arr[@]}" word-list expansion in a for-loop body. Before
+    /// the wave, try_expand_vector_arg's byte-test name extraction
+    /// declined the unicode name and the scalar-slot enforcement
+    /// raised SHELL_ERR_TYPE_MISMATCH ("list value in scalar position").
+    run_result_t r =
+        run_shell("café=(a b c)\n"
+                  "for x in \"${café[@]}\"; do echo \"[$x]\"; done\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
+}
+
+TEST(rt_unicode_ident_array_joined) {
+    /// ${arr[*]} space-joined form.
+    run_result_t r = run_shell("café=(one two three)\n"
+                               "echo \"[${café[*]}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[one two three]\n");
+}
+
+TEST(rt_unicode_ident_assoc_array_subscript) {
+    /// Associative array with a unicode name; key lookup honors the
+    /// predicate-driven name prefix detection too.
+    run_result_t r = run_shell("declare -A имя\n"
+                               "имя[k1]=v1\n"
+                               "имя[k2]=v2\n"
+                               "echo \"${имя[k1]}=${имя[k2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v1=v2\n");
+}
+
+TEST(rt_unicode_ident_kind_sigil) {
+    /// `@café` kind sigil on a unicode-named array (lush default has
+    /// FEATURE_KIND_SIGILS on).
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "echo \"@café\"\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
+TEST(rt_unicode_ident_bare_array_expands_zsh_lush) {
+    /// Bare $arr explodes to N words in zsh/lush mode -- now also
+    /// works for unicode names via the migrated try_expand_vector_arg
+    /// detection.
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "for x in $café; do echo \"[$x]\"; done\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
+}
+
+TEST(rt_unicode_ident_indirect_expansion_target) {
+    /// ${!ptr} resolves the value of $ptr as a variable name. Both
+    /// the pointer and the target may now be unicode-named.
+    run_result_t r = run_shell("declare ptr=café\n"
+                               "declare café=hello\n"
+                               "echo \"${!ptr}\"\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_unicode_ident_indirect_expansion_pointer) {
+    /// Pointer itself uses a unicode identifier name.
+    run_result_t r = run_shell("declare имя=café\n"
+                               "declare café=world\n"
+                               "echo \"${!имя}\"\n");
+    ASSERT_STDOUT_EQ(r, "world\n");
+}
+
+TEST(rt_unicode_ident_zsh_bare_subscript) {
+    /// $arr[0] (zsh bare subscript, no braces). The tokenizer's
+    /// quoted-string $NAME scanner used to byte-test the name;
+    /// now it walks lush_ident_match_continue.
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "echo $café[0]\n");
+    ASSERT_STDOUT_EQ(r, "a\n");
+}
+
+TEST(rt_unicode_ident_fd_allocation_var) {
+    /// exec {varname}>FILE allocates a free fd into $varname.
+    /// The tokenizer's {NAME} fd-allocation scanner must accept
+    /// unicode names too.
+    run_result_t r = run_shell("exec {café}>/tmp/lush_ut_fd.out\n"
+                               "[ $café -ge 10 ] && echo high-fd\n");
+    ASSERT_STDOUT_EQ(r, "high-fd\n");
+    unlink("/tmp/lush_ut_fd.out");
+}
+
+TEST(rt_unicode_ident_nfd_passes_validation) {
+    /// NFD-encoded "cafe + combining-acute" (U+0301) validates as a
+    /// single canonicalized identifier "café" after the validator's
+    /// NFC normalization. Before this wave, declare rejected NFD with
+    /// "not a valid identifier". Lookup uses the precomposed NFC name
+    /// "caf<é>" (4 codepoints) -- the canonical storage form.
+    run_result_t r = run_shell("declare cafe\xCC\x81=NFD_FORM\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "NFD_FORM\n");
+}
+
+TEST(rt_unicode_ident_nfd_reference_resolves) {
+    /// The bidirectional lookup: store the binding under the NFC form,
+    /// then reference it with NFD bytes (cafe + U+0301). The tokenizer
+    /// now pulls the combining mark into the identifier token (UAX #31
+    /// Continue accepts GB_EXTEND), so expand_variable receives the
+    /// full NFD name, canonicalizes it to NFC, and resolves the binding.
+    /// Regression guard for the showstopper where the name scan stopped
+    /// at the mark and truncated to "cafe".
+    run_result_t r = run_shell("declare caf\xC3\xA9=NFC_STORED\n"
+                               "echo \"$cafe\xCC\x81\"\n");
+    ASSERT_STDOUT_EQ(r, "NFC_STORED\n");
+}
+
+TEST(rt_unicode_ident_leading_mark_not_identifier) {
+    /// A bare leading combining mark must NOT start an identifier
+    /// (lush_ident_match_start rejects marks). `$<U+0301>x` therefore
+    /// does not form a variable reference; the `$` and the mark fall
+    /// through to literal text. Asserts the Start position stays
+    /// mark-rejecting after the Continue-position relaxation.
+    run_result_t r = run_shell("echo \"[\xCC\x81x]\"\n");
+    ASSERT_STDOUT_EQ(r, "[\xCC\x81x]\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_storage_collision) {
+    /// NFC-encoded `café` and NFD-encoded `cafe + U+0301` MUST
+    /// collide as one binding in the symtable. Set via NFC, overwrite
+    /// via NFD, read via NFC: the NFC read sees the NFD-side write.
+    run_result_t r = run_shell("declare caf\xC3\xA9=NFC_FIRST\n"
+                               "declare cafe\xCC\x81=NFD_OVERWRITE\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "NFD_OVERWRITE\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_alias_collision) {
+    /// Same NFC/NFD collision for aliases. valid_alias_name and
+    /// set_alias both canonicalize.
+    init_aliases();
+    run_result_t r = run_shell("alias caf\xC3\xA9=\"echo NFC_DEF\"\n"
+                               "alias cafe\xCC\x81=\"echo NFD_DEF\"\n"
+                               "caf\xC3\xA9\n");
+    ASSERT_STDOUT_EQ(r, "NFD_DEF\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_function_collision) {
+    /// Functions also collide on NFC. store_function and find_function
+    /// share the canonicalizer. The unalias up front avoids name-
+    /// resolution shadowing from the prior alias-collision test, which
+    /// leaves a global alias of the same name behind (aliases beat
+    /// functions in the dispatch order).
+    init_aliases();
+    (void)run_shell("unalias caf\xC3\xA9 2>/dev/null || true\n");
+    run_result_t r = run_shell("caf\xC3\xA9() { echo NFC_BODY; }\n"
+                               "cafe\xCC\x81() { echo NFD_BODY; }\n"
+                               "caf\xC3\xA9\n");
+    ASSERT_STDOUT_EQ(r, "NFD_BODY\n");
+}
+
+TEST(rt_unicode_ident_nfc_array_assoc_collision) {
+    /// Same canonicalization for arrays via symtable_set_array /
+    /// symtable_get_array.
+    run_result_t r = run_shell("declare -A caf\xC3\xA9\n"
+                               "caf\xC3\xA9[k]=v_nfc\n"
+                               "echo \"${caf\xC3\xA9[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v_nfc\n");
+}
+
+TEST(rt_unicode_ident_highlight_spans_full_name) {
+    /// Syntax highlighter must color the whole `$café` as one VARIABLE
+    /// token. The byte-test it replaced stopped at the multibyte `é`,
+    /// truncating the highlighted span to `$caf`. This binary links the
+    /// strong, feature-flag-aware lush_ident_match_* (src/identifier.c),
+    /// so it overrides the ASCII weak fallback in liblle and proves the
+    /// real product highlights unicode identifiers. `$café` is 6 bytes:
+    /// `$` + `caf` + `é` (0xC3 0xA9). FEATURE_UNICODE_IDENTIFIERS is the
+    /// lush-mode default the harness runs under.
+    (void)run_shell("mode lush\n");
+    lle_syntax_highlighter_t *h = NULL;
+    ASSERT_EQ(lle_syntax_highlighter_create(&h), 0, "create highlighter");
+    const char *input = "echo $caf\xC3\xA9";
+    lle_syntax_highlight(h, input, strlen(input));
+    size_t count = 0;
+    const lle_syntax_token_t *toks = lle_syntax_get_tokens(h, &count);
+    size_t var_start = 0, var_end = 0;
+    bool found = false;
+    for (size_t i = 0; i < count; i++) {
+        if (toks[i].type == LLE_TOKEN_VARIABLE) {
+            var_start = toks[i].start;
+            var_end = toks[i].end;
+            found = true;
+            break;
+        }
+    }
+    lle_syntax_highlighter_destroy(h);
+    ASSERT(found, "a VARIABLE token was produced for $café");
+    /// `$café` begins at offset 5 ("echo " is 5 bytes) and is 6 bytes.
+    ASSERT_EQ(var_start, (size_t)5, "variable token starts at $");
+    ASSERT_EQ(var_end - var_start, (size_t)6, "variable token spans $café");
+}
+
+TEST(rt_unicode_ident_mixed_script_detected) {
+    /// `pаsswd` -- Latin p, then Cyrillic а (U+0430), then Latin sswd --
+    /// is the classic homograph: visually `passwd`. lush_ident_mixes_scripts
+    /// reports the crossing and names both scripts.
+    const char *a = NULL, *b = NULL;
+    bool mixed = lush_ident_mixes_scripts("p\xD0\xB0sswd", &a, &b);
+    ASSERT(mixed, "Latin+Cyrillic name flagged as mixed-script");
+    ASSERT_NOT_NULL(a, "first script name set");
+    ASSERT_NOT_NULL(b, "second script name set");
+    ASSERT(strcmp(a, "latin") == 0, "first script is latin");
+    ASSERT(strcmp(b, "cyrillic") == 0, "crossing script is cyrillic");
+}
+
+TEST(rt_unicode_ident_single_script_not_flagged) {
+    /// Single-script names -- including ones with digits, underscores,
+    /// and combining marks -- are not mixed-script.
+    ASSERT(!lush_ident_mixes_scripts("café", NULL, NULL), "all-Latin café");
+    ASSERT(!lush_ident_mixes_scripts("\xCE\xA3", NULL, NULL), "all-Greek Σ");
+    ASSERT(!lush_ident_mixes_scripts("\xD0\xB8\xD0\xBC\xD1\x8F", NULL, NULL),
+           "all-Cyrillic имя");
+    ASSERT(!lush_ident_mixes_scripts("x1_y2", NULL, NULL),
+           "ASCII with digits/underscore");
+    /// NFD café (cafe + combining acute): the mark is inherited, not a
+    /// second script.
+    ASSERT(!lush_ident_mixes_scripts("cafe\xCC\x81", NULL, NULL),
+           "NFD café -- combining mark is inherited, not mixed");
+}
+
+TEST(rt_unicode_ident_mixed_script_allowed_by_default) {
+    /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off in every mode, lush
+    /// included, so a mixed-script name is accepted and runs.
+    run_result_t r = run_shell("declare p\xD0\xB0sswd=hi\n"
+                               "echo \"$p\xD0\xB0sswd\"\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_unicode_ident_mixed_script_rejected_when_opted_in) {
+    /// With the hardening flag on, declaring a Latin+Cyrillic name is a
+    /// definition-time error. unsetopt at the end so the global feature
+    /// override does not leak into later tests.
+    run_result_t r = run_shell("setopt reject_mixed_script_idents\n"
+                               "declare p\xD0\xB0sswd=hi\n");
+    ASSERT_STDERR_CONTAINS(r, "mixes latin and cyrillic");
+    (void)run_shell("unsetopt reject_mixed_script_idents\n");
+}
+
+TEST(rt_unicode_ident_mixed_script_single_script_ok_when_opted_in) {
+    /// The flag rejects only cross-script names; an all-Latin unicode
+    /// identifier is still accepted.
+    run_result_t r = run_shell("setopt reject_mixed_script_idents\n"
+                               "declare caf\xC3\xA9=hi\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+    (void)run_shell("unsetopt reject_mixed_script_idents\n");
+}
+
+/// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
     char saved_cwd[4096];
@@ -1757,39 +2718,38 @@ TEST(rt_glob_for_array_qualifiers) {
     ASSERT_NOT_NULL(mkdtemp(dir), "mkdtemp");
     ASSERT_EQ(chdir(dir), 0, "chdir into temp dir");
 
-    /* Fixture: three regular files, one subdirectory, one dotfile. */
+    /// Fixture: three regular files, one subdirectory, one dotfile.
     rt_touch("alpha.txt");
     rt_touch("beta.txt");
     rt_touch("gamma.log");
     mkdir("subdir", 0700);
     rt_touch(".hidden");
 
-    /* for-loop word list globs (previously iterated the literal "*"). */
-    run_result_t r =
-        run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
+    /// for-loop word list globs (previously iterated the literal "*").
+    run_result_t r = run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
     ASSERT_STDOUT_EQ(r, "4\n");
 
-    /* indexed-array initializer globs. */
+    /// indexed-array initializer globs.
     r = run_shell("arr=(*.txt); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "2\n");
 
-    /* zsh (.N) qualifier -- regular files only. */
+    /// zsh (.N) qualifier -- regular files only.
     r = run_shell("arr=(*(.N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "3\n");
 
-    /* zsh (/N) qualifier -- directories only. */
+    /// zsh (/N) qualifier -- directories only.
     r = run_shell("arr=(*(/N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "1\n");
 
-    /* zsh (DN) qualifier -- include dotfiles. */
+    /// zsh (DN) qualifier -- include dotfiles.
     r = run_shell("arr=(*(DN)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "5\n");
 
-    /* qualifier on a prefixed pattern -- *.txt(N). */
+    /// qualifier on a prefixed pattern -- *.txt(N).
     r = run_shell("arr=(*.txt(N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "2\n");
 
-    /* Teardown: remove the fixture while still inside the temp dir. */
+    /// Teardown: remove the fixture while still inside the temp dir.
     unlink("alpha.txt");
     unlink("beta.txt");
     unlink("gamma.log");
@@ -1799,7 +2759,7 @@ TEST(rt_glob_for_array_qualifiers) {
     rmdir(dir);
 }
 
-/* --- return / exit propagation out of loops and case arms ------------- */
+/// --- return / exit propagation out of loops and case arms -------------
 
 TEST(rt_return_from_for_loop) {
     run_result_t r = run_shell(
@@ -1817,24 +2777,24 @@ TEST(rt_return_from_while_loop) {
 }
 
 TEST(rt_case_arm_runs_all) {
-    /* A case arm is a command list -- a non-zero command must not
-     * short-circuit the rest of the arm. */
+    /// A case arm is a command list -- a non-zero command must not
+    /// short-circuit the rest of the arm.
     run_result_t r =
         run_shell("case x in x) echo one; false; echo two ;; esac\n");
     ASSERT_STDOUT_EQ(r, "one\ntwo\n");
 }
 
 TEST(rt_case_arm_return_status) {
-    /* posix/101 init-script shape: a function returning non-zero in a
-     * case arm, its status captured by a following command. */
-    run_result_t r = run_shell(
-        "do_status() { return 3; }\n"
-        "case status in status) do_status; rc=$?; esac\necho $rc\n");
+    /// posix/101 init-script shape: a function returning non-zero in a
+    /// case arm, its status captured by a following command.
+    run_result_t r =
+        run_shell("do_status() { return 3; }\n"
+                  "case status in status) do_status; rc=$?; esac\necho $rc\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "3\n");
 }
 
-/* --- printf flag forwarding ------------------------------------------- */
+/// --- printf flag forwarding -------------------------------------------
 
 TEST(rt_printf_flags) {
     run_result_t r = run_shell("printf '%05d\\n' 42");
@@ -1849,7 +2809,7 @@ TEST(rt_printf_flags) {
     ASSERT_STDOUT_EQ(r, " 42\n");
 }
 
-/* --- brace expansion -------------------------------------------------- */
+/// --- brace expansion --------------------------------------------------
 
 TEST(rt_brace_nested) {
     run_result_t r = run_shell("echo {{1..3},{a..c}}");
@@ -1867,7 +2827,7 @@ TEST(rt_brace_in_array_init) {
     ASSERT_STDOUT_EQ(r, "3 x1y x3y\n");
 }
 
-/* --- parameter expansion operators on array elements ------------------ */
+/// --- parameter expansion operators on array elements ------------------
 
 TEST(rt_array_elem_default_missing) {
     run_result_t r =
@@ -1893,30 +2853,747 @@ TEST(rt_array_elem_alt_missing) {
     ASSERT_STDOUT_EQ(r, "[]\n");
 }
 
-/* --- POSIX character classes in pattern matching ---------------------- */
+/// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
-    /* [[:space:]] non-negated class -- strips trailing whitespace. */
+    /// [[:space:]] non-negated class -- strips trailing whitespace.
     run_result_t r = run_shell("s='a   '; echo \"[${s%%[[:space:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[a]\n");
 }
 
 TEST(rt_char_class_negated) {
-    /* [![:space:]] -- the building block of the whitespace-trim idiom. */
+    /// [![:space:]] -- the building block of the whitespace-trim idiom.
     run_result_t r = run_shell("s='  hi'; echo \"[${s%%[![:space:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[  ]\n");
 }
 
 TEST(rt_char_class_digit) {
-    /* [[:digit:]] in a parameter-expansion suffix-removal pattern. */
+    /// [[:digit:]] in a parameter-expansion suffix-removal pattern.
     run_result_t r = run_shell("s=abc123; echo \"[${s%%[[:digit:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[abc]\n");
 }
 
 TEST(rt_char_class_upper) {
-    /* [![:upper:]] negated class. */
+    /// [![:upper:]] negated class.
     run_result_t r = run_shell("s=ABCdef; echo \"[${s%%[![:upper:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[ABC]\n");
+}
+
+/// --- typed-function form ---------------------------------------------
+
+TEST(rt_typed_fn_scalar_return) {
+    run_result_t r = run_shell("fn answer() -> scalar { return \"42\"; }\n"
+                               "let r = answer()\n"
+                               "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[42]\n");
+}
+
+TEST(rt_typed_fn_scalar_param) {
+    run_result_t r =
+        run_shell("fn shout(s: scalar) -> scalar { return \"$s!\"; }\n"
+                  "let r = shout(\"hi\")\n"
+                  "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[hi!]\n");
+}
+
+TEST(rt_typed_fn_list_param) {
+    run_result_t r = run_shell("fn first(xs: list) -> scalar { return "
+                               "\"${xs[0]}\"; }\n"
+                               "arr=(alpha beta gamma)\n"
+                               "let r = first($arr)\n"
+                               "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[alpha]\n");
+}
+
+TEST(rt_typed_fn_arity_mismatch) {
+    run_result_t r =
+        run_shell("fn one(a: scalar) -> scalar { return \"ok\"; }\n"
+                  "let r = one()\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_kind_mismatch_arg) {
+    run_result_t r = run_shell("fn ws(s: scalar) -> scalar { return $s; }\n"
+                               "arr=(a b c)\n"
+                               "let r = ws($arr)\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_void_called_via_let) {
+    run_result_t r = run_shell("fn nop() { :; }\n"
+                               "let r = nop()\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_void_no_return) {
+    run_result_t r = run_shell("fn nop() { echo hello; }\n"
+                               "nop\n");
+    /// nop is a POSIX-form call site (no parens at statement position
+    /// yet); for now this just confirms the fn declaration parses and
+    /// does not fire a runtime error before reaching its body.
+    (void)r;
+}
+
+/// --- parameter-expansion catalog --------------------------------------
+/// Operators have a defined input-kind to output-kind contract. When the
+/// kinds disagree the engine raises a structured runtime type-mismatch
+/// rather than silently no-op'ing or producing wrong output. These tests
+/// pin the cells of that catalog.
+
+TEST(rt_pe_catalog_join_flag_on_list) {
+    /// Explicit list-to-scalar join with custom separator. Previously
+    /// over-rejected by the bare-${arr[@]} list-in-scalar-slot check;
+    /// (j:X:) IS the explicit join, so the runtime allows it.
+    run_result_t r = run_shell("arr=(alpha beta gamma)\n"
+                               "echo \"[${(j:+:)arr[@]}]\"\n"
+                               "echo \"[${(j:+:)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[alpha+beta+gamma]\n[alpha+beta+gamma]\n");
+}
+
+TEST(rt_pe_catalog_case_mod_flag_per_element) {
+    /// (U) flag on a list per-elements; the result is the elements
+    /// uppercased and space-joined.
+    run_result_t r = run_shell("arr=(alpha beta)\n"
+                               "echo \"[${(U)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[ALPHA BETA]\n");
+}
+
+TEST(rt_pe_catalog_sort_flag_on_list) {
+    run_result_t r = run_shell("arr=(c a b)\n"
+                               "echo \"[${(o)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a b c]\n");
+}
+
+TEST(rt_pe_catalog_keys_flag_on_scalar) {
+    /// Collection-only flag (k) applied to a scalar -> type mismatch.
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(k)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_values_flag_on_scalar) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(v)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_kv_flag_on_scalar) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(kv)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_join_flag_on_scalar) {
+    /// (j:X:) on a non-collection is meaningless: there is nothing to
+    /// join. Type mismatch.
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(j:+:)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_conditional_on_bare_list) {
+    /// ${list:-default} silently collapses to the first-element-default
+    /// form in legacy shells. lush rejects it; the user picks slice for
+    /// a scalar element fallback, or assigns a list literal for a
+    /// list-shaped fallback.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr:-default}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_case_mod_on_bare_list) {
+    /// ${arr^^} on a bare list name -- scalar operator on collection.
+    /// The user must vectorize explicitly via ${arr[@]^^}.
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr^^}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_pattern_strip_on_bare_list) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr##*.}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_substring_on_bare_list) {
+    run_result_t r = run_shell("arr=(alpha beta)\n"
+                               "echo \"[${arr:0:2}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_at_transform_on_bare_list) {
+    /// ${arr@Q} on bare list -- the @-transform is scalar-shaped on a
+    /// bare name. Vectorize via ${arr[@]@Q}.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr@Q}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_conditional_on_map) {
+    run_result_t r = run_shell("declare -A m=([a]=1 [b]=2)\n"
+                               "echo \"[${m:-default}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalog_scalar_slice_still_works) {
+    /// Regression: ${arr[0]:-default} is the scalar-element form and
+    /// remains valid -- the slice produces a scalar and the
+    /// conditional operates on that scalar.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr[0]:-default}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n");
+}
+
+TEST(rt_pe_catalog_per_element_case_mod_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]^^}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[HELLO WORLD]\n");
+}
+
+TEST(rt_pe_catalog_per_element_prefix_strip_via_slice) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr[@]##*.}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[txt log]\n");
+}
+
+TEST(rt_pe_catalog_per_element_suffix_strip_via_slice) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr[@]%%.*}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[file other]\n");
+}
+
+TEST(rt_pe_catalog_per_element_replace_first_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]/l/L}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[heLlo worLd]\n");
+}
+
+TEST(rt_pe_catalog_per_element_replace_all_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]//l/L}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[heLLo worLd]\n");
+}
+
+TEST(rt_pe_catalog_per_element_at_q_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]@Q}]\"\n");
+    ASSERT_STDOUT_EQ(r, "['hello' 'world']\n");
+}
+
+TEST(rt_pipeline_three_stages) {
+    /// Three-stage plumbing: producer | middle | terminator. The
+    /// original form used `wc -c` to count bytes, but `wc -c`
+    /// emits leading-whitespace-padded output on BSD coreutils
+    /// (macOS) and unpadded output on GNU coreutils (Linux),
+    /// which made the literal-output assertion platform-specific.
+    /// `cat | cat` exercises the same N-stage pipeline plumbing
+    /// (data flows through three connected pipes; the final stage
+    /// must terminate the pipeline) with byte-identical output
+    /// across platforms.
+    run_result_t r = run_shell("echo hello | cat | cat\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_pipeline_four_stages) {
+    run_result_t r = run_shell("echo abcde | cat | cat | rev\n");
+    ASSERT_STDOUT_EQ(r, "edcba\n");
+}
+
+TEST(rt_pipeline_pipestatus_three_stages) {
+    run_result_t r = run_shell(
+        "false | true | false\n"
+        "echo \"${PIPESTATUS[0]} ${PIPESTATUS[1]} ${PIPESTATUS[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "1 0 1\n");
+}
+
+TEST(rt_pipeline_lush_pipestatus_three_stages) {
+    run_result_t r = run_shell(
+        "true | false | true\n"
+        "echo \"${pipestatus[0]} ${pipestatus[1]} ${pipestatus[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "0 1 0\n");
+}
+
+TEST(rt_pipeline_pipefail_rightmost_nonzero) {
+    run_result_t r = run_shell("set -o pipefail\n"
+                               "true | false | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=1\n");
+}
+
+TEST(rt_pipeline_pipefail_all_succeed) {
+    run_result_t r = run_shell("set -o pipefail\n"
+                               "true | true | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=0\n");
+}
+
+TEST(rt_pipeline_diagnostic_per_stage_errors) {
+    run_result_t r = run_shell("set -o pipeline-diagnostic\n"
+                               "false | true | false\n"
+                               "echo exit=$?\n");
+    ASSERT_STDERR_CONTAINS(r, "pipeline stage 1 of 3 exited 1");
+    ASSERT_STDERR_CONTAINS(r, "pipeline stage 3 of 3 exited 1");
+    ASSERT_STDOUT_EQ(r, "exit=1\n");
+}
+
+TEST(rt_pipeline_diagnostic_silent_on_success) {
+    run_result_t r = run_shell("set -o pipeline-diagnostic\n"
+                               "true | true | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=0\n");
+}
+
+TEST(rt_pe_catalog_scalar_conditional_still_works) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${s:-default}]\"\n"
+                               "unset s\n"
+                               "echo \"[${s:-default}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[hello]\n[default]\n");
+}
+
+/// Helper for the inspect-widget tests.  Stages a synthetic editor with text +
+/// cursor, runs the callback, and returns the captured LUSH_INSPECT_* values
+/// via the symtable's exit-status-irrelevant get_var path.
+static void run_inspect(const char *text, size_t cursor_pos) {
+    lle_buffer_t buf;
+    memset(&buf, 0, sizeof(buf));
+    buf.data = (char *)text;
+    buf.length = text ? strlen(text) : 0;
+    buf.cursor.byte_offset = cursor_pos;
+
+    lle_editor_t editor;
+    memset(&editor, 0, sizeof(editor));
+    editor.buffer = &buf;
+
+    lush_inspect_widget_callback(&editor, NULL);
+}
+
+static const char *inspect_var(const char *name) {
+    return symtable_get_var(symtable_get_global_manager(), name);
+}
+
+TEST(rt_inspect_scalar_at_cursor) {
+    symtable_set_global("FOO", "hello");
+    run_inspect("echo $FOO", 9); /// cursor at end of FOO
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "FOO", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "hello", "value");
+}
+
+TEST(rt_inspect_braced_name) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 9); /// cursor mid-identifier in ${BAR}
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "world", "value");
+}
+
+TEST(rt_inspect_strict_past_closing_brace) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 11); /// strict: past closing '}' is outside
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "none", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_cursor_on_dollar) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo $BAR", 5); /// cursor on the `$`
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+}
+
+TEST(rt_inspect_cursor_on_closing_brace) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 10); /// cursor on the `}`
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+}
+
+TEST(rt_inspect_list_quoted) {
+    /// arr=(hello "two words" three) -- the inspector must @Q-quote each
+    /// element so a space-containing entry stays unambiguous.
+    run_shell("arr=(hello 'two words' three)\n");
+    run_inspect("echo $arr", 9);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "list", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"),
+                  "'hello' 'two words' 'three'", "value");
+}
+
+TEST(rt_inspect_unset_variable) {
+    run_inspect("echo $UNDEFINED_VAR_NAME", 24);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "UNDEFINED_VAR_NAME",
+                  "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "unset", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_no_ref_under_cursor) {
+    run_inspect("plain text no dollar here", 5);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "none", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_cursor_mid_identifier) {
+    symtable_set_global("LONGNAME", "v");
+    run_inspect("echo $LONGNAME tail", 9); /// cursor mid 'LONGNAME'
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "LONGNAME", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "v", "value");
+}
+
+TEST(rt_sigil_at_on_scalar) {
+    run_result_t r = run_shell("x=hello\necho @x\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_sigil_at_on_list) {
+    run_result_t r = run_shell("arr=(a b c)\necho @arr\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
+TEST(rt_sigil_at_on_map) {
+    run_result_t r = run_shell("declare -A m\nm[k1]=v1\nm[k2]=v2\necho @m\n");
+    ASSERT_STDOUT_EQ(r, "v1 v2\n");
+}
+
+TEST(rt_sigil_pair_on_list) {
+    run_result_t r = run_shell("arr=(a b c)\necho %arr\n");
+    ASSERT_STDOUT_EQ(r, "0 a 1 b 2 c\n");
+}
+
+TEST(rt_sigil_pair_on_map) {
+    run_result_t r = run_shell("declare -A m\nm[k1]=v1\nm[k2]=v2\necho %m\n");
+    ASSERT_STDOUT_EQ(r, "k1 v1 k2 v2\n");
+}
+
+TEST(rt_sigil_pair_on_scalar_type_mismatch) {
+    run_result_t r = run_shell("x=hello\necho %x\n");
+    ASSERT_STDERR_CONTAINS(r, "%x: pair sigil on scalar");
+}
+
+TEST(rt_sigil_compat_user_at_host) {
+    /// `user@host` is a bare word -- `@` is mid-token, not at word start.
+    run_result_t r = run_shell("echo user@host\n");
+    ASSERT_STDOUT_EQ(r, "user@host\n");
+}
+
+TEST(rt_sigil_compat_at_invalid_identifier) {
+    /// `@{-1}` post-sigil string `{-1}` fails identifier regex; bare word.
+    run_result_t r = run_shell("echo '@{-1}'\n");
+    ASSERT_STDOUT_EQ(r, "@{-1}\n");
+}
+
+TEST(rt_sigil_unset_name_empty) {
+    /// Unset name expands to empty (matches default $x behavior; set -u path
+    /// is exercised separately).
+    run_result_t r = run_shell("echo \"[@undefined]\"\n");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_sigil_off_in_bash_mode) {
+    /// mode bash disables FEATURE_KIND_SIGILS -- @x stays a bare word so
+    /// existing bash scripts that pass `@reboot` etc. don't break.
+    run_result_t r = run_shell("mode bash\nx=hello\necho @x\n");
+    ASSERT_STDOUT_EQ(r, "@x\n");
+}
+
+TEST(rt_test_o_errexit_reflects_set_e) {
+    /// `[[ -o errexit ]]` must reflect the current state of `set -e`.
+    /// Before lush/posix_opts shipped shell_is_option_set, the operator
+    /// always returned false regardless of state -- a hard masking bug
+    /// for any script that branches on shell-option state.
+    run_result_t r = run_shell("[[ -o errexit ]] && echo before-on || echo "
+                               "before-off\n"
+                               "set -e\n"
+                               "[[ -o errexit ]] && echo after-on || echo "
+                               "after-off\n"
+                               "set +e\n"
+                               "[[ -o errexit ]] && echo clear-on || echo "
+                               "clear-off\n");
+    ASSERT_STDOUT_EQ(r, "before-off\nafter-on\nclear-off\n");
+}
+
+TEST(rt_test_o_noop_alias_records_state) {
+    /// setopt on a noop-alias (prompt_subst etc.) must record state so
+    /// `[[ -o name ]]` reports the right answer. The underlying behavior
+    /// is always-on; this is purely about introspection-matching zsh.
+    run_result_t r = run_shell("[[ -o prompt_subst ]] && echo default-on || "
+                               "echo default-off\n"
+                               "unsetopt prompt_subst\n"
+                               "[[ -o prompt_subst ]] && echo unset-on || "
+                               "echo unset-off\n"
+                               "setopt prompt_subst\n"
+                               "[[ -o prompt_subst ]] && echo set-on || echo "
+                               "set-off\n");
+    ASSERT_STDOUT_EQ(r, "default-on\nunset-off\nset-on\n");
+}
+
+TEST(rt_bindkey_bind_then_query_round_trips) {
+    bindkey_table_reset();
+    /// bindkey now records bindings in a side table so the query form
+    /// returns what was set. Previously the silent no-op left every
+    /// query empty -- a verified ~17% divergence in oh-my-zsh sites.
+    run_result_t r = run_shell("bindkey '^X^E' some-widget\n"
+                               "bindkey '^X^E'\n");
+    ASSERT_STDOUT_EQ(r, "\"^X^E\" some-widget\n");
+}
+
+TEST(rt_bindkey_list_after_multiple_binds) {
+    bindkey_table_reset();
+    /// Listing prints every recorded binding in the active keymap.
+    /// We only check that both bindings appear; order isn't contractual.
+    run_result_t r = run_shell("bindkey '^A' alpha-widget\n"
+                               "bindkey '^B' beta-widget\n"
+                               "bindkey\n");
+    ASSERT_STDOUT_CONTAINS(r, "\"^A\" alpha-widget");
+    ASSERT_STDOUT_CONTAINS(r, "\"^B\" beta-widget");
+}
+
+TEST(rt_bindkey_query_unbound_key_returns_nonzero) {
+    bindkey_table_reset();
+    /// Query for a key that was never bound must return non-zero
+    /// (matches zsh) and emit nothing.
+    run_result_t r = run_shell("bindkey '^Z' && echo bound || echo unbound\n");
+    ASSERT_STDOUT_EQ(r, "unbound\n");
+}
+
+TEST(rt_zle_register_then_list) {
+    zle_widget_table_reset();
+    /// zle -N records the widget; zle -l lists the names.
+    run_result_t r = run_shell("my_widget() { echo hi; }\n"
+                               "zle -N my_widget\n"
+                               "zle -l\n");
+    ASSERT_STDOUT_EQ(r, "my_widget\n");
+}
+
+TEST(rt_zle_register_with_body_then_L_form) {
+    zle_widget_table_reset();
+    /// zle -N WIDGET FUNCTION records both names; -L emits the
+    /// re-runnable `zle -N WIDGET FUNCTION` form.
+    run_result_t r = run_shell("fn_impl() { echo body; }\n"
+                               "zle -N alias_widget fn_impl\n"
+                               "zle -L\n");
+    ASSERT_STDOUT_EQ(r, "zle -N alias_widget fn_impl\n");
+}
+
+TEST(rt_logical_op_at_eol_continues_statement) {
+    /// `} &&` followed by newline used to break: the input layer didn't
+    /// know `&&` at end of line meant "incomplete, keep reading", so the
+    /// parser saw `} &&` as one statement and raised E1001 on the empty
+    /// right-hand side.
+    run_result_t r = run_shell("_f() {\n"
+                               "    echo body\n"
+                               "} &&\n"
+                               "    echo done\n"
+                               "_f\n");
+    ASSERT_STDOUT_EQ(r, "done\nbody\n");
+}
+
+TEST(rt_pipe_at_eol_continues_statement) {
+    /// Same fix covers a trailing `|` at end of line for multi-line
+    /// pipelines.
+    run_result_t r = run_shell("echo hello |\n"
+                               "    tr a-z A-Z\n");
+    ASSERT_STDOUT_EQ(r, "HELLO\n");
+}
+
+TEST(rt_extended_test_empty_lhs_inequality) {
+    /// `[[ "$EMPTY" != true ]]` after $EMPTY expands to "" must return
+    /// true (empty != "true"). Lush previously fell through to the "no
+    /// operator -- non-empty string is true" branch because the single
+    /// `=` / `!=` operator wasn't recognized for empty-LHS cases.
+    run_result_t r = run_shell("v=\"\"\n"
+                               "[[ \"$v\" != true ]] && echo unequal || echo "
+                               "equal\n");
+    ASSERT_STDOUT_EQ(r, "unequal\n");
+}
+
+TEST(rt_extended_test_single_equals_alias) {
+    /// Bash/zsh accept `=` as an alias for `==` in [[ ]]. Lush now
+    /// routes both through the same pattern-match path.
+    run_result_t r = run_shell("[[ hello = hello ]] && echo eq || echo ne\n"
+                               "[[ hello = world ]] && echo eq || echo ne\n");
+    ASSERT_STDOUT_EQ(r, "eq\nne\n");
+}
+
+TEST(rt_test_equality_under_nfc_equivalence) {
+    /// `[ a = b ]` (and the `[`-builtin form) now compares under NFC
+    /// equivalence: precomposed "café" (e-acute U+00E9, bytes
+    /// C3 A9) equals decomposed "café" (e + combining acute,
+    /// bytes 65 CC 81) even though byte-level strcmp would diverge.
+    /// Lush-superset divergence from bash/zsh; justified by the
+    /// project's NFC-everywhere policy.
+    run_result_t r =
+        run_shell("nfc=$'caf\\xc3\\xa9'\n"
+                  "nfd=$'cafe\\xcc\\x81'\n"
+                  "[ \"$nfc\" = \"$nfd\" ] && echo eq || echo ne\n"
+                  "[ \"$nfc\" != \"$nfd\" ] && echo ne2 || echo eq2\n");
+    ASSERT_STDOUT_EQ(r, "eq\neq2\n");
+}
+
+TEST(rt_test_inequality_under_nfc_when_actually_different) {
+    /// NFC equivalence does not paper over actually-different
+    /// strings.  Lowercase café vs uppercase CAFÉ remain unequal
+    /// (case folding is a separate axis from NFC).
+    run_result_t r =
+        run_shell("[ \"café\" = \"CAFÉ\" ] && echo eq || echo ne\n");
+    ASSERT_STDOUT_EQ(r, "ne\n");
+}
+
+TEST(rt_test_ascii_paths_unchanged) {
+    /// ASCII inputs hit the NFC fast path (LLE_UNICODE_COMPARE_DEFAULT
+    /// detects ASCII-only and shortcircuits to byte compare); behavior
+    /// must be byte-identical to the prior strcmp implementation.
+    run_result_t r = run_shell("[ \"hello\" = \"hello\" ] && echo eq\n"
+                               "[ \"hello\" = \"world\" ] && echo ouch || "
+                               "echo correct-ne\n"
+                               "[ \"\" = \"\" ] && echo empty-eq\n"
+                               "[ \"hi\" != \"bye\" ] && echo ne-ok\n");
+    ASSERT_STDOUT_EQ(r, "eq\ncorrect-ne\nempty-eq\nne-ok\n");
+}
+
+TEST(rt_dollar_plus_is_set_test) {
+    /// zsh `${+NAME}` returns "1" if NAME is set, "0" otherwise. Both
+    /// braced and unbraced (`$+NAME`) forms must work.
+    run_result_t r = run_shell("v=hi\n"
+                               "echo \"${+v}\"\n"
+                               "echo \"${+nonexist}\"\n"
+                               "(( $+v )) && echo set || echo unset\n");
+    ASSERT_STDOUT_EQ(r, "1\n0\nset\n");
+}
+
+TEST(rt_dollar_plus_commands_path_lookup) {
+    /// zsh's `${+commands[NAME]}` checks whether NAME is on $path.
+    /// Lush implements it as a PATH lookup since there's no `$commands`
+    /// hash.  `ls` is essentially universally available.
+    run_result_t r = run_shell("(( $+commands[ls] )) && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "yes\n");
+}
+
+TEST(rt_unfunction_removes_function) {
+    /// `unfunction NAME` removes a defined function. Subsequent call
+    /// produces command-not-found behavior (caught by the test
+    /// framework's exit-code check via the conditional).
+    run_result_t r = run_shell("greet() { echo hello; }\n"
+                               "greet\n"
+                               "unfunction greet\n"
+                               "greet 2>/dev/null && echo still-defined || "
+                               "echo removed\n");
+    ASSERT_STDOUT_EQ(r, "hello\nremoved\n");
+}
+
+TEST(rt_multi_name_function_definition) {
+    /// zsh's `function NAME1 NAME2 { body }` defines all names as
+    /// functions sharing the body. Each must be independently callable.
+    run_result_t r = run_shell("function foo bar baz {\n"
+                               "    echo args: \"$@\"\n"
+                               "}\n"
+                               "foo arg1\n"
+                               "bar arg2\n"
+                               "baz arg3\n");
+    ASSERT_STDOUT_EQ(r, "args: arg1\nargs: arg2\nargs: arg3\n");
+}
+
+TEST(rt_zstyle_set_then_query_t_true) {
+    zstyle_table_reset();
+    /// zstyle PATTERN STYLE true; zstyle -t PATTERN STYLE returns 0
+    /// (matches zsh).
+    run_result_t r = run_shell("zstyle ':completion:*' menu true\n"
+                               "zstyle -t ':completion:*' menu && echo on || "
+                               "echo off\n");
+    ASSERT_STDOUT_EQ(r, "on\n");
+}
+
+TEST(rt_zstyle_set_then_query_s_get) {
+    zstyle_table_reset();
+    /// zstyle -s PATTERN STYLE VAR populates VAR with the value.
+    run_result_t r = run_shell("zstyle ':completion:*' format 'completing %d'\n"
+                               "zstyle -s ':completion:*' format result\n"
+                               "echo \"[$result]\"\n");
+    ASSERT_STDOUT_EQ(r, "[completing %d]\n");
+}
+
+TEST(rt_zstyle_T_treats_unset_as_true) {
+    zstyle_table_reset();
+    /// zstyle -T returns 0 when the pattern+style is unset (matches zsh
+    /// semantics: -T is "true unless explicitly false").
+    run_result_t r =
+        run_shell("zstyle -T ':never:set' style && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "yes\n");
+}
+
+TEST(rt_zstyle_delete_removes_entry) {
+    zstyle_table_reset();
+    run_result_t r = run_shell("zstyle ':x' k v\n"
+                               "zstyle -d ':x' k\n"
+                               "zstyle -t ':x' k && echo on || echo off\n");
+    ASSERT_STDOUT_EQ(r, "off\n");
+}
+
+TEST(rt_typeset_H_flag_accepted) {
+    /// zsh's typeset -H (hide from listing) is purely a display attribute;
+    /// lush accepts it silently so `typeset -AHg name` (the spectrum.zsh
+    /// idiom) declares the assoc array without tripping invalid-option.
+    run_result_t r = run_shell("typeset -AHg M\n"
+                               "M[k]=v\n"
+                               "echo \"${M[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v\n");
+}
+
+TEST(rt_typeset_U_flag_accepted) {
+    /// zsh's typeset -U (unique-element array). Lush accepts the flag but
+    /// does not enforce dedup yet (documented limitation); script must
+    /// still run without invalid-option error.
+    run_result_t r = run_shell("typeset -aU arr\n"
+                               "arr=(a b c)\n"
+                               "echo \"${arr[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
+TEST(rt_zle_delete_then_list_empty) {
+    zle_widget_table_reset();
+    /// zle -D removes the widget; subsequent -l prints nothing.
+    run_result_t r = run_shell("zle -N w1\n"
+                               "zle -N w2\n"
+                               "zle -D w1\n"
+                               "zle -l\n");
+    ASSERT_STDOUT_EQ(r, "w2\n");
+}
+
+TEST(rt_bindkey_remove_then_query_returns_nonzero) {
+    bindkey_table_reset();
+    /// bindkey -r KEY removes the binding; subsequent query returns
+    /// non-zero (matches zsh).
+    run_result_t r = run_shell("bindkey '^X' some-widget\n"
+                               "bindkey -r '^X'\n"
+                               "bindkey '^X' && echo bound || echo unbound\n");
+    ASSERT_STDOUT_EQ(r, "unbound\n");
+}
+
+TEST(rt_test_o_unknown_option_returns_false) {
+    /// An option name lush has no opinion on must return false -- not
+    /// crash, not error.
+    run_result_t r =
+        run_shell("[[ -o totally_made_up_option ]] && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "no\n");
+}
+
+TEST(rt_typed_fn_lexical_scope) {
+    /// A typed-fn body resolves free names through its captured
+    /// declaration-site scope, not through the dynamic caller's
+    /// locals. The same outer caller invokes a POSIX function and a
+    /// typed function -- the POSIX one sees the caller's `local v`,
+    /// the typed one sees the global `v`.
+    run_result_t r = run_shell(
+        "v=GLOBAL\n"
+        "posix_callee() { echo \"[$v]\"; }\n"
+        "fn typed_callee() -> scalar { return \"$v\"; }\n"
+        "outer() { local v=LOCAL; posix_callee; let r = typed_callee(); "
+        "echo \"[$r]\"; }\n"
+        "outer\n");
+    ASSERT_STDOUT_EQ(r, "[LOCAL]\n[GLOBAL]\n");
 }
 
 /* ============================================================================
@@ -1924,14 +3601,186 @@ TEST(rt_char_class_upper) {
  * ============================================================================
  */
 
-/* Forward declarations for initialization */
+/// Forward declarations for initialization
 extern void init_symtable(void);
 extern void free_global_symtable(void);
+
+/* ============================================================================
+ * Regression: readonly enforcement
+ *
+ * Covers the contract that SYMVAR_READONLY actually blocks subsequent
+ * writes: bare reassign, cross-function-scope reassign, declare -r and
+ * readonly keyword routes, array-element reassign, and the listing.
+ * ============================================================================
+ */
+
+/// Each test below uses a name unique to itself so the global
+/// symbol table (which persists across run_shell calls in the
+/// in-process harness) does not leak a readonly attribute from
+/// the previous case into the next case's preamble.
+
+TEST(rt_readonly_blocks_same_scope_reassign) {
+    run_result_t r = run_shell("readonly RO_REASSIGN=1\n"
+                               "RO_REASSIGN=2\n"
+                               "echo \"final $RO_REASSIGN\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final 1\n");
+}
+
+TEST(rt_readonly_blocks_via_readonly_keyword) {
+    /// `readonly NAME` without a value promotes an existing scalar
+    /// to readonly; later writes must be refused.
+    run_result_t r = run_shell("RO_PROMOTE=initial\n"
+                               "readonly RO_PROMOTE\n"
+                               "RO_PROMOTE=overwrite\n"
+                               "echo \"final $RO_PROMOTE\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final initial\n");
+}
+
+TEST(rt_readonly_blocks_across_function_scope) {
+    /// Cross-scope rule: an assignment inside a function body to a
+    /// name that is readonly at any enclosing scope is refused.
+    run_result_t r = run_shell("readonly RO_FUNC=outer\n"
+                               "ro_func_fixture() { RO_FUNC=inner; }\n"
+                               "ro_func_fixture\n"
+                               "echo \"final $RO_FUNC\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final outer\n");
+}
+
+TEST(rt_readonly_blocks_via_declare_r) {
+    /// declare -r sets SYMVAR_READONLY the same way the readonly
+    /// builtin does; enforcement applies through the same path.
+    run_result_t r = run_shell("declare -r RO_DECLARE=fixed\n"
+                               "RO_DECLARE=mutated\n"
+                               "echo \"final $RO_DECLARE\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final fixed\n");
+}
+
+TEST(rt_readonly_blocks_array_element_via_readonly_keyword) {
+    /// `readonly NAME` against an existing array marks the array
+    /// readonly via its own flags field. Subsequent element writes
+    /// (NAME[idx]=value) are refused by symtable_set_array_element
+    /// with SYMTABLE_ERR_READONLY; the array's prior contents are
+    /// preserved.
+    run_result_t r = run_shell("declare -a ROA_KW=(a b c)\n"
+                               "readonly ROA_KW\n"
+                               "ROA_KW[0]=clobber\n"
+                               "echo \"[0]=${ROA_KW[0]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[0]=a\n");
+}
+
+TEST(rt_readonly_blocks_array_element_via_declare_ar) {
+    /// declare -ar threads SYMVAR_READONLY onto the array record at
+    /// declaration time; element writes are refused immediately.
+    run_result_t r = run_shell("declare -ar ROA_DECL=(x y z)\n"
+                               "ROA_DECL[1]=clobber\n"
+                               "echo \"[1]=${ROA_DECL[1]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[1]=y\n");
+}
+
+TEST(rt_readonly_blocks_associative_array_element) {
+    /// Associative arrays carry the same flags field; `declare -Ar`
+    /// rejects subsequent key writes just like indexed arrays.
+    run_result_t r = run_shell("declare -Ar ROA_ASSOC=([k]=v)\n"
+                               "ROA_ASSOC[k]=overwrite\n"
+                               "echo \"[k]=${ROA_ASSOC[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[k]=v\n");
+}
+
+TEST(rt_readonly_listing_includes_marked) {
+    /// The no-arg `readonly` listing path now enumerates marked
+    /// variables; entries set via `readonly NAME=VALUE` appear.
+    run_result_t r = run_shell("readonly RO_LISTED=hello\nreadonly\n");
+    ASSERT_STDOUT_CONTAINS(r, "readonly RO_LISTED='hello'");
+}
+
+TEST(rt_readonly_promotes_existing_var) {
+    /// `readonly NAME` without `=` keeps the prior value and marks
+    /// the variable readonly without clobbering its content.
+    run_result_t r = run_shell("RO_KEEP=kept\n"
+                               "readonly RO_KEEP\n"
+                               "readonly | grep \"^readonly RO_KEEP=\"\n");
+    ASSERT_STDOUT_CONTAINS(r, "readonly RO_KEEP='kept'");
+}
+
+/* ============================================================================
+ * Regression: declare -l / declare -u case-attribute enforcement
+ *
+ * The SYMVAR_LOWERCASE / SYMVAR_UPPERCASE flags were previously set by
+ * bin_declare but never read by any write path; values assigned to a
+ * -l / -u variable were stored verbatim. Enforcement now lives in
+ * execute_assignment (via symtable_apply_case_attr_alloc), and the
+ * declare path itself folds the initial value at declaration time
+ * including retroactive folding when promoting an existing variable.
+ * ============================================================================
+ */
+
+TEST(rt_declare_l_initial_value_folded) {
+    /// declare -l NAME=VALUE folds VALUE to lowercase at declaration.
+    run_result_t r = run_shell("declare -l DL_INIT=HELLO\necho \"$DL_INIT\"\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_declare_l_subsequent_assignment_folded) {
+    /// Subsequent writes to a -l variable also fold to lowercase.
+    run_result_t r =
+        run_shell("declare -l DL_LATER\nDL_LATER=WORLD\necho \"$DL_LATER\"\n");
+    ASSERT_STDOUT_EQ(r, "world\n");
+}
+
+TEST(rt_declare_l_unicode_fold) {
+    /// Case fold goes through lle_utf8_tolower so non-ASCII codepoints
+    /// fold per the project's Unicode case table.
+    run_result_t r = run_shell("declare -l DL_UNI=CAFÉ\necho \"$DL_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "café\n");
+}
+
+TEST(rt_declare_l_promotes_existing) {
+    /// declare -l NAME (no value) on an existing variable folds the
+    /// current value retroactively and adds the attribute so future
+    /// assignments also fold.
+    run_result_t r = run_shell("DL_PROMOTE=Mixed\n"
+                               "declare -l DL_PROMOTE\n"
+                               "echo \"$DL_PROMOTE\"\n"
+                               "DL_PROMOTE=ANOTHER\n"
+                               "echo \"$DL_PROMOTE\"\n");
+    ASSERT_STDOUT_EQ(r, "mixed\nanother\n");
+}
+
+TEST(rt_declare_u_initial_value_folded) {
+    /// declare -u NAME=VALUE folds VALUE to uppercase at declaration.
+    run_result_t r = run_shell("declare -u DU_INIT=hello\necho \"$DU_INIT\"\n");
+    ASSERT_STDOUT_EQ(r, "HELLO\n");
+}
+
+TEST(rt_declare_u_subsequent_assignment_folded) {
+    /// Subsequent writes to a -u variable also fold to uppercase.
+    run_result_t r =
+        run_shell("declare -u DU_LATER\nDU_LATER=world\necho \"$DU_LATER\"\n");
+    ASSERT_STDOUT_EQ(r, "WORLD\n");
+}
+
+TEST(rt_declare_u_unicode_fold) {
+    /// Unicode fold via lle_utf8_toupper.
+    run_result_t r = run_shell("declare -u DU_UNI=café\necho \"$DU_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "CAFÉ\n");
+}
+
+TEST(rt_declare_no_value_preserves_existing) {
+    /// declare without an attribute or value on an existing variable
+    /// must not clobber the existing value.
+    run_result_t r = run_shell(
+        "DECL_KEEP=preserved\ndeclare DECL_KEEP\necho \"$DECL_KEEP\"\n");
+    ASSERT_STDOUT_EQ(r, "preserved\n");
+}
 
 int main(void) {
     printf("Running executor integration tests...\n\n");
 
-    /* Initialize global symbol table - required for executor_new() */
+    /// Initialize global symbol table - required for executor_new()
     init_symtable();
 
     printf("Lifecycle tests:\n");
@@ -1958,6 +3807,26 @@ int main(void) {
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
     RUN_TEST(case_wildcard);
+    RUN_TEST(case_posix_character_class);
+    RUN_TEST(trap_err_fires_on_nonzero_exit);
+    RUN_TEST(trap_err_silent_on_zero_exit);
+    RUN_TEST(trap_err_not_inherited_in_function_by_default);
+    RUN_TEST(trap_err_inherited_in_function_with_errtrace);
+    RUN_TEST(trap_debug_not_inherited_in_function_by_default);
+    RUN_TEST(trap_debug_inherited_in_function_with_functrace);
+    RUN_TEST(trap_return_not_inherited_in_function_by_default);
+    RUN_TEST(trap_return_inherited_in_function_with_functrace);
+
+    printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
+    RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);
+    RUN_TEST(arr_at_in_for_loop_iterates);
+    RUN_TEST(arr_star_in_scalar_assignment_joins);
+    RUN_TEST(bare_arr_in_scalar_assignment_raises_type_mismatch);
+    RUN_TEST(bare_arr_in_for_loop_iterates);
+    RUN_TEST(bare_arr_glued_to_text_raises_type_mismatch);
+    RUN_TEST(bare_arr_argv_yields_elements_one_to_one);
+    RUN_TEST(at_paren_flag_alias_yields_vector);
+    RUN_TEST(at_paren_flag_composes_with_sort);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);
@@ -1984,6 +3853,9 @@ int main(void) {
     RUN_TEST(local_for_loop_variable);
     RUN_TEST(local_plus_equals_append);
     RUN_TEST(local_while_loop_counter);
+    RUN_TEST(local_array_literal_builds_indexed_array);
+    RUN_TEST(local_quoted_paren_value_stays_scalar);
+    RUN_TEST(local_array_dies_with_function_scope);
 
     printf("\nRegression tests — Issue #48 (function trailing redirections at "
            "call):\n");
@@ -2084,6 +3956,57 @@ int main(void) {
     printf("\nRegression: deferred here-documents:\n");
     RUN_TEST(rt_heredoc_through_pipe);
     RUN_TEST(rt_heredoc_trailing_command);
+    RUN_TEST(rt_heredoc_delimiter_nfc_vs_nfd);
+    RUN_TEST(rt_heredoc_delimiter_nfd_vs_nfc);
+    RUN_TEST(rt_heredoc_delimiter_unequal_when_actually_different);
+    RUN_TEST(rt_assoc_key_nfc_nfd_collapse);
+    RUN_TEST(rt_assoc_key_distinct_when_actually_different);
+    RUN_TEST(rt_assoc_key_ascii_paths_unchanged);
+
+    printf(
+        "\nRegression: Unicode identifiers (FEATURE_UNICODE_IDENTIFIERS):\n");
+    RUN_TEST(rt_unicode_ident_declare_and_expand_latin);
+    RUN_TEST(rt_unicode_ident_declare_and_expand_greek);
+    RUN_TEST(rt_unicode_ident_declare_and_expand_cyrillic);
+    RUN_TEST(rt_unicode_ident_rejected_in_bash_mode);
+    RUN_TEST(rt_unicode_ident_opt_in_from_bash_mode);
+    RUN_TEST(rt_unicode_ident_ascii_paths_unchanged);
+    RUN_TEST(rt_unicode_ident_invalid_start_still_rejected);
+    RUN_TEST(rt_unicode_ident_arithmetic_bare);
+    RUN_TEST(rt_unicode_ident_arithmetic_dollar);
+    RUN_TEST(rt_unicode_ident_arithmetic_compound);
+    RUN_TEST(rt_unicode_ident_arithmetic_positional_unchanged);
+    RUN_TEST(rt_unicode_ident_function_name_lush);
+    RUN_TEST(rt_unicode_ident_function_name_posix_rejected);
+    RUN_TEST(rt_unicode_ident_function_name_posix_opt_in);
+    RUN_TEST(rt_unicode_ident_alias_name_lush);
+    RUN_TEST(rt_unicode_ident_alias_name_bash_rejected);
+    RUN_TEST(rt_unicode_ident_alias_digit_leading_unchanged);
+    RUN_TEST(rt_unicode_ident_alias_extension_chars_unchanged);
+    RUN_TEST(rt_unicode_ident_array_subscript);
+    RUN_TEST(rt_unicode_ident_array_length);
+    RUN_TEST(rt_unicode_ident_array_vector_in_for);
+    RUN_TEST(rt_unicode_ident_array_joined);
+    RUN_TEST(rt_unicode_ident_assoc_array_subscript);
+    RUN_TEST(rt_unicode_ident_kind_sigil);
+    RUN_TEST(rt_unicode_ident_bare_array_expands_zsh_lush);
+    RUN_TEST(rt_unicode_ident_indirect_expansion_target);
+    RUN_TEST(rt_unicode_ident_indirect_expansion_pointer);
+    RUN_TEST(rt_unicode_ident_zsh_bare_subscript);
+    RUN_TEST(rt_unicode_ident_fd_allocation_var);
+    RUN_TEST(rt_unicode_ident_nfd_passes_validation);
+    RUN_TEST(rt_unicode_ident_nfd_reference_resolves);
+    RUN_TEST(rt_unicode_ident_leading_mark_not_identifier);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_storage_collision);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_alias_collision);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_function_collision);
+    RUN_TEST(rt_unicode_ident_nfc_array_assoc_collision);
+    RUN_TEST(rt_unicode_ident_highlight_spans_full_name);
+    RUN_TEST(rt_unicode_ident_mixed_script_detected);
+    RUN_TEST(rt_unicode_ident_single_script_not_flagged);
+    RUN_TEST(rt_unicode_ident_mixed_script_allowed_by_default);
+    RUN_TEST(rt_unicode_ident_mixed_script_rejected_when_opted_in);
+    RUN_TEST(rt_unicode_ident_mixed_script_single_script_ok_when_opted_in);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
@@ -2096,6 +4019,89 @@ int main(void) {
 
     printf("\nRegression: return/case control flow:\n");
     RUN_TEST(rt_return_from_for_loop);
+    RUN_TEST(rt_typed_fn_scalar_return);
+    RUN_TEST(rt_typed_fn_scalar_param);
+    RUN_TEST(rt_typed_fn_list_param);
+    RUN_TEST(rt_typed_fn_arity_mismatch);
+    RUN_TEST(rt_typed_fn_kind_mismatch_arg);
+    RUN_TEST(rt_typed_fn_void_called_via_let);
+    RUN_TEST(rt_typed_fn_void_no_return);
+    RUN_TEST(rt_pe_catalog_join_flag_on_list);
+    RUN_TEST(rt_pe_catalog_case_mod_flag_per_element);
+    RUN_TEST(rt_pe_catalog_sort_flag_on_list);
+    RUN_TEST(rt_pe_catalog_keys_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_values_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_kv_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_join_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_conditional_on_bare_list);
+    RUN_TEST(rt_pe_catalog_case_mod_on_bare_list);
+    RUN_TEST(rt_pe_catalog_pattern_strip_on_bare_list);
+    RUN_TEST(rt_pe_catalog_substring_on_bare_list);
+    RUN_TEST(rt_pe_catalog_at_transform_on_bare_list);
+    RUN_TEST(rt_pe_catalog_conditional_on_map);
+    RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
+    RUN_TEST(rt_pe_catalog_per_element_case_mod_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_prefix_strip_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_suffix_strip_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_replace_first_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_replace_all_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_at_q_via_slice);
+    RUN_TEST(rt_pipeline_three_stages);
+    RUN_TEST(rt_pipeline_four_stages);
+    RUN_TEST(rt_pipeline_pipestatus_three_stages);
+    RUN_TEST(rt_pipeline_lush_pipestatus_three_stages);
+    RUN_TEST(rt_pipeline_pipefail_rightmost_nonzero);
+    RUN_TEST(rt_pipeline_pipefail_all_succeed);
+    RUN_TEST(rt_pipeline_diagnostic_per_stage_errors);
+    RUN_TEST(rt_pipeline_diagnostic_silent_on_success);
+    RUN_TEST(rt_pe_catalog_scalar_conditional_still_works);
+    RUN_TEST(rt_inspect_scalar_at_cursor);
+    RUN_TEST(rt_inspect_braced_name);
+    RUN_TEST(rt_inspect_strict_past_closing_brace);
+    RUN_TEST(rt_inspect_cursor_on_dollar);
+    RUN_TEST(rt_inspect_cursor_on_closing_brace);
+    RUN_TEST(rt_inspect_list_quoted);
+    RUN_TEST(rt_inspect_unset_variable);
+    RUN_TEST(rt_inspect_no_ref_under_cursor);
+    RUN_TEST(rt_inspect_cursor_mid_identifier);
+    RUN_TEST(rt_sigil_at_on_scalar);
+    RUN_TEST(rt_sigil_at_on_list);
+    RUN_TEST(rt_sigil_at_on_map);
+    RUN_TEST(rt_sigil_pair_on_list);
+    RUN_TEST(rt_sigil_pair_on_map);
+    RUN_TEST(rt_sigil_pair_on_scalar_type_mismatch);
+    RUN_TEST(rt_sigil_compat_user_at_host);
+    RUN_TEST(rt_sigil_compat_at_invalid_identifier);
+    RUN_TEST(rt_sigil_unset_name_empty);
+    RUN_TEST(rt_sigil_off_in_bash_mode);
+    RUN_TEST(rt_test_o_errexit_reflects_set_e);
+    RUN_TEST(rt_test_o_noop_alias_records_state);
+    RUN_TEST(rt_bindkey_bind_then_query_round_trips);
+    RUN_TEST(rt_bindkey_list_after_multiple_binds);
+    RUN_TEST(rt_bindkey_query_unbound_key_returns_nonzero);
+    RUN_TEST(rt_bindkey_remove_then_query_returns_nonzero);
+    RUN_TEST(rt_zle_register_then_list);
+    RUN_TEST(rt_zle_register_with_body_then_L_form);
+    RUN_TEST(rt_zle_delete_then_list_empty);
+    RUN_TEST(rt_logical_op_at_eol_continues_statement);
+    RUN_TEST(rt_pipe_at_eol_continues_statement);
+    RUN_TEST(rt_extended_test_empty_lhs_inequality);
+    RUN_TEST(rt_extended_test_single_equals_alias);
+    RUN_TEST(rt_test_equality_under_nfc_equivalence);
+    RUN_TEST(rt_test_inequality_under_nfc_when_actually_different);
+    RUN_TEST(rt_test_ascii_paths_unchanged);
+    RUN_TEST(rt_dollar_plus_is_set_test);
+    RUN_TEST(rt_dollar_plus_commands_path_lookup);
+    RUN_TEST(rt_unfunction_removes_function);
+    RUN_TEST(rt_multi_name_function_definition);
+    RUN_TEST(rt_zstyle_set_then_query_t_true);
+    RUN_TEST(rt_zstyle_set_then_query_s_get);
+    RUN_TEST(rt_zstyle_T_treats_unset_as_true);
+    RUN_TEST(rt_zstyle_delete_removes_entry);
+    RUN_TEST(rt_typeset_H_flag_accepted);
+    RUN_TEST(rt_typeset_U_flag_accepted);
+    RUN_TEST(rt_test_o_unknown_option_returns_false);
+    RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);
     RUN_TEST(rt_case_arm_return_status);
@@ -2120,7 +4126,28 @@ int main(void) {
     RUN_TEST(rt_char_class_digit);
     RUN_TEST(rt_char_class_upper);
 
-    /* Cleanup global symbol table */
+    printf("\nRegression: readonly enforcement:\n");
+    RUN_TEST(rt_readonly_blocks_same_scope_reassign);
+    RUN_TEST(rt_readonly_blocks_via_readonly_keyword);
+    RUN_TEST(rt_readonly_blocks_across_function_scope);
+    RUN_TEST(rt_readonly_blocks_via_declare_r);
+    RUN_TEST(rt_readonly_blocks_array_element_via_readonly_keyword);
+    RUN_TEST(rt_readonly_blocks_array_element_via_declare_ar);
+    RUN_TEST(rt_readonly_blocks_associative_array_element);
+    RUN_TEST(rt_readonly_listing_includes_marked);
+    RUN_TEST(rt_readonly_promotes_existing_var);
+
+    printf("\nRegression: declare -l / declare -u case attribute:\n");
+    RUN_TEST(rt_declare_l_initial_value_folded);
+    RUN_TEST(rt_declare_l_subsequent_assignment_folded);
+    RUN_TEST(rt_declare_l_unicode_fold);
+    RUN_TEST(rt_declare_l_promotes_existing);
+    RUN_TEST(rt_declare_u_initial_value_folded);
+    RUN_TEST(rt_declare_u_subsequent_assignment_folded);
+    RUN_TEST(rt_declare_u_unicode_fold);
+    RUN_TEST(rt_declare_no_value_preserves_existing);
+
+    /// Cleanup global symbol table
     free_global_symtable();
 
     return TEST_RESULT();

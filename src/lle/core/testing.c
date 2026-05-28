@@ -87,7 +87,7 @@ struct lle_test_reporter_t {
     size_t failed_tests;
 };
 
-/* Note: lle_test_results_t and lle_test_failure_info_t are defined in header */
+/// Note: lle_test_results_t and lle_test_failure_info_t are defined in header
 
 /* ============================================================================
  * FRAMEWORK INITIALIZATION AND CLEANUP
@@ -108,7 +108,7 @@ lle_testing_framework_initialize(lle_testing_framework_t **framework) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize suite registry */
+    /// Initialize suite registry
     fw->suite_registry = calloc(1, sizeof(lle_test_suite_registry_t));
     if (!fw->suite_registry) {
         free(fw);
@@ -124,7 +124,7 @@ lle_testing_framework_initialize(lle_testing_framework_t **framework) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize test runner */
+    /// Initialize test runner
     fw->test_runner = calloc(1, sizeof(lle_test_runner_t));
     if (!fw->test_runner) {
         free(fw->suite_registry->suites);
@@ -135,7 +135,7 @@ lle_testing_framework_initialize(lle_testing_framework_t **framework) {
 
     fw->test_runner->registry = fw->suite_registry;
 
-    /* Initialize reporter */
+    /// Initialize reporter
     fw->reporter = calloc(1, sizeof(lle_test_reporter_t));
     if (!fw->reporter) {
         free(fw->test_runner);
@@ -160,7 +160,7 @@ lle_result_t lle_testing_framework_destroy(lle_testing_framework_t *framework) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Destroy all test suites */
+    /// Destroy all test suites
     if (framework->suite_registry) {
         if (framework->suite_registry->suites) {
             for (size_t i = 0; i < framework->suite_registry->suite_count;
@@ -172,7 +172,7 @@ lle_result_t lle_testing_framework_destroy(lle_testing_framework_t *framework) {
         free(framework->suite_registry);
     }
 
-    /* Destroy runner */
+    /// Destroy runner
     if (framework->test_runner) {
         if (framework->test_runner->current_context) {
             lle_test_context_destroy(framework->test_runner->current_context);
@@ -180,7 +180,7 @@ lle_result_t lle_testing_framework_destroy(lle_testing_framework_t *framework) {
         free(framework->test_runner);
     }
 
-    /* Destroy reporter */
+    /// Destroy reporter
     if (framework->reporter) {
         lle_test_reporter_destroy(framework->reporter);
     }
@@ -200,7 +200,7 @@ lle_testing_framework_run_all_tests(lle_testing_framework_t *framework,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize results */
+    /// Initialize results
     memset(results, 0, sizeof(lle_test_results_t));
     results->start_timestamp = (uint64_t)time(NULL);
 
@@ -213,21 +213,21 @@ lle_testing_framework_run_all_tests(lle_testing_framework_t *framework,
     runner->tests_passed = 0;
     runner->tests_failed = 0;
 
-    /* Run all test suites */
+    /// Run all test suites
     for (size_t i = 0; i < framework->suite_registry->suite_count; i++) {
         lle_test_suite_t *suite = framework->suite_registry->suites[i];
 
-        /* Run all tests in suite */
+        /// Run all tests in suite
         for (size_t j = 0; j < suite->test_count; j++) {
             lle_test_case_t *test_case = suite->test_cases[j];
 
-            /* Check config for test filtering */
+            /// Check config for test filtering
             if (config && !config->include_nightly_tests &&
                 test_case->priority == LLE_TEST_PRIORITY_NIGHTLY) {
                 continue;
             }
 
-            /* Create test context */
+            /// Create test context
             lle_test_context_t *ctx = calloc(1, sizeof(lle_test_context_t));
             if (!ctx) {
                 continue;
@@ -236,7 +236,7 @@ lle_testing_framework_run_all_tests(lle_testing_framework_t *framework,
             ctx->current_test = test_case;
             runner->current_context = ctx;
 
-            /* Execute test */
+            /// Execute test
             lle_test_execution_result_t exec_result;
             lle_result_t run_result =
                 lle_test_runner_execute_test(runner, ctx, &exec_result);
@@ -262,14 +262,14 @@ lle_testing_framework_run_all_tests(lle_testing_framework_t *framework,
             lle_test_context_destroy(ctx);
             runner->current_context = NULL;
 
-            /* Check fail-fast */
+            /// Check fail-fast
             if (config && config->fail_fast &&
                 exec_result.result != LLE_TEST_RESULT_SUCCESS) {
                 break;
             }
         }
 
-        /* Check fail-fast for outer loop */
+        /// Check fail-fast for outer loop
         if (config && config->fail_fast && runner->tests_failed > 0) {
             break;
         }
@@ -296,9 +296,9 @@ lle_test_discovery_scan_and_register(lle_testing_framework_t *framework) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* In a real implementation, this would scan for test annotations,
-     * shared library symbols, or test registration sections.
-     * For now, we provide the infrastructure for manual registration. */
+    /// In a real implementation, this would scan for test annotations,
+    /// shared library symbols, or test registration sections.
+    /// For now, we provide the infrastructure for manual registration.
 
     return LLE_SUCCESS;
 }
@@ -353,7 +353,7 @@ lle_test_suite_registry_add_suite(lle_test_suite_registry_t *registry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if we need to resize */
+    /// Check if we need to resize
     if (registry->suite_count >= registry->suite_capacity) {
         size_t new_capacity = registry->suite_capacity * 2;
         lle_test_suite_t **new_suites = realloc(
@@ -399,7 +399,7 @@ lle_result_t lle_test_suite_add_test_case(lle_test_suite_t *suite,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if we need to resize */
+    /// Check if we need to resize
     if (suite->test_count >= suite->test_capacity) {
         size_t new_capacity =
             suite->test_capacity == 0 ? 8 : suite->test_capacity * 2;
@@ -430,7 +430,7 @@ lle_test_suite_get_tests_by_priority(lle_test_suite_t *suite,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Count matching tests */
+    /// Count matching tests
     size_t matching = 0;
     for (size_t i = 0; i < suite->test_count; i++) {
         if (suite->test_cases[i]->priority <= min_priority) {
@@ -444,13 +444,13 @@ lle_test_suite_get_tests_by_priority(lle_test_suite_t *suite,
         return LLE_SUCCESS;
     }
 
-    /* Allocate array for matching tests */
+    /// Allocate array for matching tests
     lle_test_case_t **filtered = malloc(matching * sizeof(lle_test_case_t *));
     if (!filtered) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Collect matching tests */
+    /// Collect matching tests
     size_t idx = 0;
     for (size_t i = 0; i < suite->test_count; i++) {
         if (suite->test_cases[i]->priority <= min_priority) {
@@ -515,14 +515,14 @@ lle_result_t lle_test_runner_execute_test(lle_test_runner_t *runner,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Initialize result */
+    /// Initialize result
     memset(result, 0, sizeof(lle_test_execution_result_t));
 
-    /* Record test start time */
+    /// Record test start time
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-    /* Run setup if provided */
+    /// Run setup if provided
     if (test_case->setup_function) {
         lle_result_t setup_result = test_case->setup_function(context);
         if (setup_result != LLE_SUCCESS) {
@@ -532,28 +532,27 @@ lle_result_t lle_test_runner_execute_test(lle_test_runner_t *runner,
         }
     }
 
-    /* Execute test */
+    /// Execute test
     lle_test_result_t test_result = test_case->test_function(context);
 
-    /* Run teardown if provided */
+    /// Run teardown if provided
     if (test_case->teardown_function) {
         test_case->teardown_function(context);
     }
 
-    /* Record test end time */
+    /// Record test end time
     struct timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
 
-    /* Calculate duration in microseconds */
+    /// Calculate duration in microseconds
     uint64_t duration_us =
         ((end_time.tv_sec - start_time.tv_sec) * 1000000ULL) +
         ((end_time.tv_nsec - start_time.tv_nsec) / 1000ULL);
 
-    /* Fill result */
+    /// Fill result
     result->result = test_result;
     result->execution_time_us = duration_us;
-    result->peak_memory_usage =
-        0; /* Would need memory tracking for real value */
+    result->peak_memory_usage = 0; /// Would need memory tracking for real value
 
     if (test_result != LLE_TEST_RESULT_SUCCESS) {
         result->failure_reason = strdup(context->last_error);
@@ -573,8 +572,8 @@ lle_result_t lle_test_runner_execute_test(lle_test_runner_t *runner,
 void lle_test_record_assertion_failure(lle_test_context_t *ctx,
                                        const char *file, int line,
                                        const char *format, ...) {
-    (void)file; /* For future enhancement */
-    (void)line; /* For future enhancement */
+    (void)file; /// For future enhancement
+    (void)line; /// For future enhancement
 
     if (!ctx) {
         return;
@@ -593,8 +592,8 @@ void lle_test_record_assertion_failure(lle_test_context_t *ctx,
  */
 void lle_test_record_assertion_success(lle_test_context_t *ctx,
                                        const char *file, int line) {
-    (void)file; /* For future enhancement */
-    (void)line; /* For future enhancement */
+    (void)file; /// For future enhancement
+    (void)line; /// For future enhancement
 
     if (!ctx) {
         return;
@@ -609,8 +608,8 @@ void lle_test_record_assertion_success(lle_test_context_t *ctx,
 void lle_test_record_performance_failure(lle_test_context_t *ctx,
                                          const char *file, int line,
                                          const char *format, ...) {
-    (void)file; /* For future enhancement */
-    (void)line; /* For future enhancement */
+    (void)file; /// For future enhancement
+    (void)line; /// For future enhancement
 
     if (!ctx) {
         return;
@@ -631,9 +630,9 @@ void lle_test_record_performance_failure(lle_test_context_t *ctx,
 void lle_test_record_performance_success(lle_test_context_t *ctx,
                                          const char *file, int line,
                                          uint64_t duration_us) {
-    (void)file;        /* For future enhancement */
-    (void)line;        /* For future enhancement */
-    (void)duration_us; /* For future performance tracking */
+    (void)file;        /// For future enhancement
+    (void)line;        /// For future enhancement
+    (void)duration_us; /// For future performance tracking
 
     if (!ctx) {
         return;
@@ -647,8 +646,8 @@ void lle_test_record_performance_success(lle_test_context_t *ctx,
  */
 void lle_test_record_failure(lle_test_context_t *ctx, const char *file,
                              int line, const char *format, ...) {
-    (void)file; /* For future enhancement */
-    (void)line; /* For future enhancement */
+    (void)file; /// For future enhancement
+    (void)line; /// For future enhancement
 
     if (!ctx) {
         return;
@@ -675,7 +674,7 @@ void lle_test_reporter_destroy(lle_test_reporter_t *reporter) {
         return;
     }
 
-    /* Don't close stdout/stderr */
+    /// Don't close stdout/stderr
     free(reporter);
 }
 
@@ -685,7 +684,7 @@ void lle_test_reporter_destroy(lle_test_reporter_t *reporter) {
 lle_result_t lle_test_reporter_generate_report(lle_test_reporter_t *reporter,
                                                lle_test_results_t *results,
                                                lle_test_report_t *report) {
-    (void)report; /* For future enhancement - currently output to stream */
+    (void)report; /// For future enhancement - currently output to stream
 
     if (!reporter || !results) {
         return LLE_ERROR_INVALID_PARAMETER;
@@ -727,11 +726,11 @@ lle_result_t lle_test_results_add_failure(lle_test_results_t *results,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Increment failure count */
+    /// Increment failure count
     results->failure_count++;
 
-    /* In a complete implementation, we would reallocate the failures array
-     * For Phase 1, we just track the count */
+    /// In a complete implementation, we would reallocate the failures array
+    /// For Phase 1, we just track the count
 
     return LLE_SUCCESS;
 }
@@ -751,8 +750,8 @@ lle_testing_get_performance_metrics(lle_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* In a real implementation, this would query the actual system.
-     * For now, we provide the infrastructure. */
+    /// In a real implementation, this would query the actual system.
+    /// For now, we provide the infrastructure.
     memset(metrics, 0, sizeof(lle_performance_metrics_t));
 
     return LLE_SUCCESS;

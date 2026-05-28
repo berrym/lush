@@ -38,7 +38,7 @@
  */
 
 #define EXPANSION_MAX_LENGTH 4096
-#define EXPANSION_MAX_DEPTH 10 /* Prevent infinite recursion */
+#define EXPANSION_MAX_DEPTH 10 /// Prevent infinite recursion
 
 /* ============================================================================
  * TYPE DEFINITIONS
@@ -49,40 +49,40 @@
  * Expansion type
  */
 typedef enum {
-    EXPANSION_TYPE_NONE,      /* No expansion */
-    EXPANSION_TYPE_LAST,      /* !! */
-    EXPANSION_TYPE_NUMBER,    /* !n */
-    EXPANSION_TYPE_RELATIVE,  /* !-n */
-    EXPANSION_TYPE_PREFIX,    /* !string */
-    EXPANSION_TYPE_SUBSTRING, /* !?string */
-    EXPANSION_TYPE_QUICK_SUB  /* ^old^new */
+    EXPANSION_TYPE_NONE,      ///< No expansion
+    EXPANSION_TYPE_LAST,      ///< !!
+    EXPANSION_TYPE_NUMBER,    ///< !n
+    EXPANSION_TYPE_RELATIVE,  ///< !-n
+    EXPANSION_TYPE_PREFIX,    ///< !string
+    EXPANSION_TYPE_SUBSTRING, ///< !?string
+    EXPANSION_TYPE_QUICK_SUB  /// ^old^new
 } lle_expansion_type_t;
 
 /**
  * Expansion result
  */
 typedef struct {
-    lle_expansion_type_t type; /* Type of expansion */
-    char *expanded_command;    /* Expanded command text */
-    size_t expansion_start;    /* Start position in original */
-    size_t expansion_end;      /* End position in original */
-    bool print_only;           /* :p modifier - print only */
-    bool needs_substitution;   /* :s modifier present */
-    char *sub_old;             /* Substitution old pattern */
-    char *sub_new;             /* Substitution new pattern */
+    lle_expansion_type_t type; ///< Type of expansion
+    char *expanded_command;    ///< Expanded command text
+    size_t expansion_start;    ///< Start position in original
+    size_t expansion_end;      ///< End position in original
+    bool print_only;           ///< :p modifier - print only
+    bool needs_substitution;   ///< :s modifier present
+    char *sub_old;             ///< Substitution old pattern
+    char *sub_new;             ///< Substitution new pattern
 } lle_expansion_result_t;
 
 /**
  * Expansion context
  */
 typedef struct {
-    lle_history_core_t *history_core; /* History core for lookups */
-    int recursion_depth;              /* Current recursion depth */
-    bool space_disables_expansion;    /* Leading space disables expansion */
-    bool verify_before_execute;       /* Verify expansion before execute */
+    lle_history_core_t *history_core; ///< History core for lookups
+    int recursion_depth;              ///< Current recursion depth
+    bool space_disables_expansion;    ///< Leading space disables expansion
+    bool verify_before_execute;       ///< Verify expansion before execute
 } lle_expansion_context_t;
 
-/* Global expansion context */
+/// Global expansion context
 static lle_expansion_context_t g_expansion_ctx = {
     .history_core = NULL,
     .recursion_depth = 0,
@@ -133,7 +133,7 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
     bool in_double_quote = false;
     bool escaped = false;
 
-    /* Track quote state from beginning of string */
+    /// Track quote state from beginning of string
     for (size_t i = 0; i < start_pos && i < len; i++) {
         if (escaped) {
             escaped = false;
@@ -153,7 +153,7 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
     for (size_t i = start_pos; i < len; i++) {
         char c = str[i];
 
-        /* Handle escape sequences */
+        /// Handle escape sequences
         if (escaped) {
             escaped = false;
             continue;
@@ -163,7 +163,7 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
             continue;
         }
 
-        /* Track quote state */
+        /// Track quote state
         if (c == '\'' && !in_double_quote) {
             in_single_quote = !in_single_quote;
             continue;
@@ -173,21 +173,21 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
             continue;
         }
 
-        /* Skip if inside quotes - no history expansion inside quotes */
+        /// Skip if inside quotes - no history expansion inside quotes
         if (in_single_quote || in_double_quote) {
             continue;
         }
 
-        /* Check for expansion markers only outside quotes */
+        /// Check for expansion markers only outside quotes
         if (c == '!') {
-            /* Check if it's escaped (already handled above, but double-check
-             * for cases where escape wasn't at i-1 due to other chars) */
+            /// Check if it's escaped (already handled above, but double-check
+            /// for cases where escape wasn't at i-1 due to other chars)
             if (i > 0 && str[i - 1] == '\\') {
-                continue; /* Escaped, not an expansion */
+                continue; /// Escaped, not an expansion
             }
             return (ssize_t)i;
         } else if (c == '^' && i == 0) {
-            /* Quick substitution must be at start */
+            /// Quick substitution must be at start
             return (ssize_t)i;
         }
     }
@@ -217,20 +217,20 @@ static bool parse_history_number(const char *str, int64_t *number,
     *consumed = 0;
     *is_relative = false;
 
-    /* Check for relative notation (!-n) */
+    /// Check for relative notation (!-n)
     if (str[0] == '-') {
         *is_relative = true;
         str++;
         (*consumed)++;
     }
 
-    /* Parse the number */
+    /// Parse the number
     char *endptr;
     errno = 0;
     long parsed = strtol(str, &endptr, 10);
 
     if (errno != 0 || endptr == str) {
-        return false; /* Parse error */
+        return false; /// Parse error
     }
 
     *number = parsed;
@@ -258,7 +258,7 @@ static size_t extract_expansion_string(const char *str, char *output,
 
     size_t i = 0;
     while (str[i] != '\0' && i < max_len - 1) {
-        /* Stop at whitespace, special chars, or command terminators */
+        /// Stop at whitespace, special chars, or command terminators
         if (isspace(str[i]) || str[i] == ';' || str[i] == '|' ||
             str[i] == '&' || str[i] == '>' || str[i] == '<' || str[i] == '(' ||
             str[i] == ')' || str[i] == '\n') {
@@ -294,35 +294,35 @@ static bool perform_quick_substitution(const char *last_command,
         return false;
     }
 
-    /* Find the old pattern in the last command */
+    /// Find the old pattern in the last command
     const char *match_pos = strstr(last_command, old_pattern);
     if (!match_pos) {
-        /* Pattern not found - substitution fails */
+        /// Pattern not found - substitution fails
         return false;
     }
 
-    /* Build the substituted command */
+    /// Build the substituted command
     size_t prefix_len = match_pos - last_command;
     size_t old_len = strlen(old_pattern);
     size_t new_len = strlen(new_pattern);
     size_t suffix_len = strlen(match_pos + old_len);
 
-    /* Check if result will fit */
+    /// Check if result will fit
     if (prefix_len + new_len + suffix_len >= max_len) {
-        /* Result too long */
+        /// Result too long
         return false;
     }
 
-    /* Copy prefix */
+    /// Copy prefix
     memcpy(result, last_command, prefix_len);
 
-    /* Copy replacement */
+    /// Copy replacement
     memcpy(result + prefix_len, new_pattern, new_len);
 
-    /* Copy suffix */
+    /// Copy suffix
     memcpy(result + prefix_len + new_len, match_pos + old_len, suffix_len);
 
-    /* Null terminate */
+    /// Null terminate
     result[prefix_len + new_len + suffix_len] = '\0';
 
     return true;
@@ -349,16 +349,16 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
     memset(result, 0, sizeof(lle_expansion_result_t));
 
-    /* Handle !! (repeat last command) */
+    /// Handle !! (repeat last command)
     if (expansion_str[0] == '!') {
         result->type = EXPANSION_TYPE_LAST;
-        result->expansion_end = 2; /* !! is 2 characters */
+        result->expansion_end = 2; /// !! is 2 characters
 
         lle_history_entry_t *entry = NULL;
         lle_result_t res = lle_history_bridge_get_by_reverse_index(0, &entry);
 
         if (res != LLE_SUCCESS || !entry) {
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
@@ -370,7 +370,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         return LLE_SUCCESS;
     }
 
-    /* Handle !n or !-n (number reference) */
+    /// Handle !n or !-n (number reference)
     if (isdigit(expansion_str[0]) || expansion_str[0] == '-') {
         int64_t number;
         bool is_relative;
@@ -378,27 +378,27 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
         if (!parse_history_number(expansion_str, &number, &is_relative,
                                   &consumed)) {
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
         result->type =
             is_relative ? EXPANSION_TYPE_RELATIVE : EXPANSION_TYPE_NUMBER;
-        result->expansion_end = consumed + 1; /* +1 for the ! */
+        result->expansion_end = consumed + 1; /// +1 for the !
 
         lle_history_entry_t *entry = NULL;
         lle_result_t res;
 
         if (is_relative) {
-            /* !-n means n commands back (0 = most recent) */
+            /// !-n means n commands back (0 = most recent)
             if (number < 0) {
-                /* Error - details in return code */
+                /// Error - details in return code
                 return LLE_ERROR_INVALID_PARAMETER;
             }
             res =
                 lle_history_bridge_get_by_reverse_index((size_t)number, &entry);
         } else {
-            /* !n means entry ID n */
+            /// !n means entry ID n
             res = lle_history_bridge_get_by_number((uint64_t)number, &entry);
         }
 
@@ -406,7 +406,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
             char err[128];
             snprintf(err, sizeof(err), "!%s%" PRId64 ": event not found",
                      is_relative ? "-" : "", number);
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
@@ -418,7 +418,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         return LLE_SUCCESS;
     }
 
-    /* Handle !?string (substring search) */
+    /// Handle !?string (substring search)
     if (expansion_str[0] == '?') {
         result->type = EXPANSION_TYPE_SUBSTRING;
 
@@ -427,13 +427,13 @@ static lle_result_t expand_single_reference(const char *expansion_str,
             expansion_str + 1, search_str, sizeof(search_str));
 
         if (consumed == 0) {
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
-        result->expansion_end = consumed + 2; /* +1 for !, +1 for ? */
+        result->expansion_end = consumed + 2; /// +1 for !, +1 for ?
 
-        /* Search for command containing string */
+        /// Search for command containing string
         lle_history_search_results_t *search_results =
             lle_history_search_substring(g_expansion_ctx.history_core,
                                          search_str, 1);
@@ -445,7 +445,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
             }
             char err[256];
             snprintf(err, sizeof(err), "!?%.230s: event not found", search_str);
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
@@ -462,7 +462,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         return LLE_SUCCESS;
     }
 
-    /* Handle !string (prefix search) */
+    /// Handle !string (prefix search)
     result->type = EXPANSION_TYPE_PREFIX;
 
     char search_str[256];
@@ -470,13 +470,13 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         extract_expansion_string(expansion_str, search_str, sizeof(search_str));
 
     if (consumed == 0) {
-        /* Error - details in return code */
+        /// Error - details in return code
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    result->expansion_end = consumed + 1; /* +1 for ! */
+    result->expansion_end = consumed + 1; /// +1 for !
 
-    /* Search for most recent command starting with string */
+    /// Search for most recent command starting with string
     lle_history_search_results_t *search_results =
         lle_history_search_prefix(g_expansion_ctx.history_core, search_str, 1);
 
@@ -487,7 +487,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         }
         char err[256];
         snprintf(err, sizeof(err), "!%.235s: event not found", search_str);
-        /* Error - details in return code */
+        /// Error - details in return code
         return LLE_ERROR_NOT_FOUND;
     }
 
@@ -560,17 +560,17 @@ bool lle_history_expansion_needed(const char *command) {
         return false;
     }
 
-    /* Check for space prefix disabling expansion */
+    /// Check for space prefix disabling expansion
     if (g_expansion_ctx.space_disables_expansion && isspace(command[0])) {
         return false;
     }
 
-    /* Check for quick substitution (^old^new) */
+    /// Check for quick substitution (^old^new)
     if (command[0] == '^') {
         return true;
     }
 
-    /* Check for ! expansion */
+    /// Check for ! expansion
     return (find_expansion_marker(command, 0) >= 0);
 }
 
@@ -601,56 +601,56 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
 
     *expanded = NULL;
 
-    /* Check for recursion depth */
+    /// Check for recursion depth
     if (g_expansion_ctx.recursion_depth >= EXPANSION_MAX_DEPTH) {
-        /* Error - details in return code */
+        /// Error - details in return code
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Check if expansion is needed */
+    /// Check if expansion is needed
     if (!lle_history_expansion_needed(command)) {
         *expanded = pool_strdup(command);
         return *expanded ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Handle quick substitution (^old^new) */
+    /// Handle quick substitution (^old^new)
     if (command[0] == '^') {
-        /* Parse ^old^new format */
+        /// Parse ^old^new format
         const char *p = command + 1;
         char old_pattern[256] = {0};
         char new_pattern[256] = {0};
 
-        /* Extract old pattern */
+        /// Extract old pattern
         size_t i = 0;
         while (*p != '\0' && *p != '^' && i < sizeof(old_pattern) - 1) {
             old_pattern[i++] = *p++;
         }
 
         if (*p != '^') {
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
-        p++; /* Skip second ^ */
+        p++; /// Skip second ^
 
-        /* Extract new pattern */
+        /// Extract new pattern
         i = 0;
         while (*p != '\0' && *p != ' ' && *p != '\n' &&
                i < sizeof(new_pattern) - 1) {
             new_pattern[i++] = *p++;
         }
 
-        /* Get last command */
+        /// Get last command
         lle_history_entry_t *last_entry = NULL;
         lle_result_t res =
             lle_history_bridge_get_by_reverse_index(0, &last_entry);
 
         if (res != LLE_SUCCESS || !last_entry) {
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
-        /* Perform substitution */
+        /// Perform substitution
         char result[EXPANSION_MAX_LENGTH];
         if (!perform_quick_substitution(last_entry->command, old_pattern,
                                         new_pattern, result, sizeof(result))) {
@@ -661,7 +661,7 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
         return *expanded ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Handle ! expansions */
+    /// Handle ! expansions
     char result[EXPANSION_MAX_LENGTH];
     size_t result_pos = 0;
     size_t cmd_pos = 0;
@@ -673,11 +673,11 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
         ssize_t expansion_pos = find_expansion_marker(command + cmd_pos, 0);
 
         if (expansion_pos < 0) {
-            /* No more expansions, copy rest of string */
+            /// No more expansions, copy rest of string
             size_t remaining = cmd_len - cmd_pos;
             if (result_pos + remaining >= EXPANSION_MAX_LENGTH) {
                 g_expansion_ctx.recursion_depth--;
-                /* Error - details in return code */
+                /// Error - details in return code
                 return LLE_ERROR_BUFFER_OVERFLOW;
             }
             memcpy(result + result_pos, command + cmd_pos, remaining);
@@ -685,14 +685,14 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
             break;
         }
 
-        /* Copy text before expansion */
+        /// Copy text before expansion
         if (expansion_pos > 0) {
             memcpy(result + result_pos, command + cmd_pos, expansion_pos);
             result_pos += expansion_pos;
             cmd_pos += expansion_pos;
         }
 
-        /* Process the expansion */
+        /// Process the expansion
         lle_expansion_result_t exp_result;
         lle_result_t res =
             expand_single_reference(command + cmd_pos + 1, &exp_result);
@@ -702,12 +702,12 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
             return res;
         }
 
-        /* Copy expanded text */
+        /// Copy expanded text
         size_t expanded_len = strlen(exp_result.expanded_command);
         if (result_pos + expanded_len >= EXPANSION_MAX_LENGTH) {
             lle_pool_free(exp_result.expanded_command);
             g_expansion_ctx.recursion_depth--;
-            /* Error - details in return code */
+            /// Error - details in return code
             return LLE_ERROR_BUFFER_OVERFLOW;
         }
 

@@ -11,7 +11,7 @@
  *   1. Output-capturing executor invocation. run_shell() runs a shell
  *      string through an in-process executor with stdout and stderr
  *      redirected to temp files, then returns exit status plus
- *      captured streams in a single struct. This unlocks behavioural
+ *      captured streams in a single struct. This unlocks behavioral
  *      assertions like ASSERT_STDOUT_EQ(result, "hello\n") that the
  *      pre-existing tests could not express.
  *
@@ -96,8 +96,8 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
     FILE *out_tmp = tmpfile();
     FILE *err_tmp = tmpfile();
     if (!out_tmp || !err_tmp) {
-        /* Fall back to uncaptured execution rather than failing the test;
-         * the caller's exit-status assertion will still run. */
+        /// Fall back to uncaptured execution rather than failing the test;
+        /// the caller's exit-status assertion will still run.
         r.exit_status = executor_execute_command_line(exec, src, 1);
         if (out_tmp) {
             fclose(out_tmp);
@@ -170,7 +170,7 @@ static inline run_result_t run_shell(const char *src) {
 /**
  * @brief Locate the lush binary for subprocess execution
  *
- * Honours the LUSH_TEST_BINARY environment variable so meson and CI
+ * Honors the LUSH_TEST_BINARY environment variable so meson and CI
  * can point at an out-of-tree build. Falls back to ./build/lush which
  * matches the project's documented build directory layout.
  *
@@ -198,10 +198,10 @@ static inline void lush_harness_drain_fd(int fd, char *buf, size_t cap) {
         n += (size_t)r;
     }
     buf[n] = '\0';
-    /* Drain anything remaining so the child's writes do not block. */
+    // Drain anything remaining so the child's writes do not block.
     char scratch[1024];
     while (read(fd, scratch, sizeof(scratch)) > 0) {
-        /* discard */
+        // discard
     }
 }
 
@@ -231,10 +231,10 @@ static inline run_result_t run_shell_subprocess(const char *src) {
         return r;
     }
 
-    /* Use the project's fork wrapper so any pending stdio buffer
-     * content is flushed before the child inherits it — otherwise
-     * captured output may include duplicated bytes from the parent's
-     * pre-fork stdio state. */
+    /// Use the project's fork wrapper so any pending stdio buffer
+    /// content is flushed before the child inherits it — otherwise
+    /// captured output may include duplicated bytes from the parent's
+    /// pre-fork stdio state.
     pid_t pid = lush_fork();
     if (pid < 0) {
         close(out_pipe[0]);
@@ -246,7 +246,7 @@ static inline run_result_t run_shell_subprocess(const char *src) {
     }
 
     if (pid == 0) {
-        /* Child: rewire stdio to the pipe write ends, exec lush -c. */
+        // Child: rewire stdio to the pipe write ends, exec lush -c.
         dup2(out_pipe[1], STDOUT_FILENO);
         dup2(err_pipe[1], STDERR_FILENO);
         close(out_pipe[0]);
@@ -256,10 +256,10 @@ static inline run_result_t run_shell_subprocess(const char *src) {
 
         const char *bin = lush_test_binary_path();
         execl(bin, bin, "-c", src, (char *)NULL);
-        _exit(127); /* exec failed */
+        _exit(127); // exec failed
     }
 
-    /* Parent: close write ends, drain read ends, reap child. */
+    // Parent: close write ends, drain read ends, reap child.
     close(out_pipe[1]);
     close(err_pipe[1]);
     lush_harness_drain_fd(out_pipe[0], r.out, sizeof(r.out));
@@ -389,4 +389,4 @@ static inline const char *node_first_arg(const node_t *n) {
 #define ASSERT_NODE_CHILD_COUNT(node, expected)                                \
     ASSERT_EQ(node_child_count(node), (expected), "child count")
 
-#endif /* LUSH_TEST_SHELL_HARNESS_H */
+#endif // LUSH_TEST_SHELL_HARNESS_H

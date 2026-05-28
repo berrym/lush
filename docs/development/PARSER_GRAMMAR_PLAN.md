@@ -1,8 +1,25 @@
 # Parser Grammar & Quality Plan
 
-**Branch:** `parser-grammar-spec`
-**Status:** Step 1 in progress (parser mapping)
+**Branch:** `parser-grammar-spec` (merged) / `grammar-fuzzing` (merged)
+**Status (2026-05-23):**
+- **Step 1 (document the grammar) — DONE.** Synthesis lives at
+  [`grammar/LUSH_GRAMMAR.ebnf`](grammar/LUSH_GRAMMAR.ebnf) and
+  [`grammar/PARSER_NOTES.md`](grammar/PARSER_NOTES.md), backed by
+  nine per-section research files under `grammar/sections/`.
+- **Step 2 (grammar-driven fuzzing) — DONE.** See
+  [`FUZZING_PLAN.md`](FUZZING_PLAN.md) (all four phases baselined
+  2026-05-19 / 2026-05-20; phase-1 + 4 libfuzzer targets clean,
+  phase-3 differential harness operational).
+- **Follow-on grammar fixes landed:** POSIX `cmd_prefix` grammar
+  (`daeb658d`, #105) is the most recent example — the documented
+  grammar now drives real parser corrections.
+
 **Scope:** lush as a polyglot bash + zsh shell. Fish, ksh, tcsh, csh are explicitly **out of scope**.
+
+This document is preserved as the original plan that drove both
+the grammar specification and the fuzzing infrastructure. Refer to
+the linked artifacts above for current state; update those rather
+than re-editing this plan.
 
 ## Why this branch exists
 

@@ -47,7 +47,7 @@ typedef struct {
     struct termios original_termios;
     bool termios_saved;
 
-    /* Statistics */
+    /// Statistics
     uint64_t byte_count;
     uint64_t sequence_count;
     uint64_t utf8_char_count;
@@ -82,11 +82,11 @@ static int setup_raw_terminal(test_context_t *ctx) {
 
     struct termios raw = ctx->original_termios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    /* DON'T disable OPOST - we need output processing for proper \n handling */
+    /// DON'T disable OPOST - we need output processing for proper \n handling
     raw.c_cflag |= (CS8);
     raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 1; /* 100ms timeout */
+    raw.c_cc[VTIME] = 1; /// 100ms timeout
 
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) < 0) {
         fprintf(stderr, "ERROR: Failed to set raw mode: %s\n", strerror(errno));
@@ -109,14 +109,14 @@ static void restore_terminal(test_context_t *ctx) {
 
 static int utf8_byte_count(uint8_t first_byte) {
     if ((first_byte & 0x80) == 0)
-        return 1; /* 0xxxxxxx */
+        return 1; /// 0xxxxxxx
     if ((first_byte & 0xE0) == 0xC0)
-        return 2; /* 110xxxxx */
+        return 2; /// 110xxxxx
     if ((first_byte & 0xF0) == 0xE0)
-        return 3; /* 1110xxxx */
+        return 3; /// 1110xxxx
     if ((first_byte & 0xF8) == 0xF0)
-        return 4; /* 11110xxx */
-    return 1;     /* Invalid */
+        return 4; /// 11110xxx
+    return 1;     /// Invalid
 }
 
 /* ============================================================================
@@ -173,7 +173,7 @@ static const char *detect_sequence(const uint8_t *buf, ssize_t len) {
  */
 
 static void print_header(void) {
-    printf("\033[2J\033[H"); /* Clear screen and home */
+    printf("\033[2J\033[H"); /// Clear screen and home
     printf("==================================================================="
            "=====\n");
     printf("         LLE Manual Integration Test - Raw Input Verification\n");
@@ -235,7 +235,7 @@ static int run_test(test_context_t *ctx) {
 
             printf("\n[Input: %zd bytes] ", n);
 
-            /* Check for escape sequence */
+            /// Check for escape sequence
             if (buf[0] == 27 && n > 1) {
                 const char *seq = detect_sequence(buf, n);
                 if (seq) {
@@ -245,30 +245,30 @@ static int run_test(test_context_t *ctx) {
                     printf("\n  → Escape pressed\n");
                 }
 
-                /* Show raw bytes */
+                /// Show raw bytes
                 printf("  Raw: ");
                 for (ssize_t i = 0; i < n; i++) {
                     printf("%02X ", buf[i]);
                 }
                 printf("\n");
             }
-            /* Check for control characters */
+            /// Check for control characters
             else if (buf[0] < 32) {
-                if (buf[0] == 3) { /* Ctrl+C */
+                if (buf[0] == 3) { /// Ctrl+C
                     ctx->running = false;
                     break;
-                } else if (buf[0] == 13) { /* Enter */
+                } else if (buf[0] == 13) { /// Enter
                     printf("\n  → Enter pressed\n");
-                } else if (buf[0] == 127 || buf[0] == 8) { /* Backspace */
+                } else if (buf[0] == 127 || buf[0] == 8) { /// Backspace
                     printf("\n  → Backspace pressed\n");
                 } else {
                     printf("\n  → Control char: ^%c (0x%02X)\n", buf[0] + 64,
                            buf[0]);
                 }
             }
-            /* Regular character */
+            /// Regular character
             else {
-                /* UTF-8 processing */
+                /// UTF-8 processing
                 for (ssize_t i = 0; i < n; i++) {
                     if (utf8_pending == 0) {
                         int bytes = utf8_byte_count(buf[i]);
@@ -304,7 +304,7 @@ static int run_test(test_context_t *ctx) {
             return -1;
         }
 
-        /* Update stats periodically */
+        /// Update stats periodically
         static int counter = 0;
         if (++counter % 100 == 0) {
             print_stats(ctx);
@@ -333,7 +333,7 @@ int main(void) {
 
     restore_terminal(ctx);
 
-    /* Print final results */
+    /// Print final results
     printf("\n");
     printf("==================================================================="
            "=====\n");

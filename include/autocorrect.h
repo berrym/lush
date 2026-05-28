@@ -31,14 +31,14 @@
  * Controls all aspects of the auto-correction system behavior.
  */
 typedef struct {
-    bool enabled;             /**< Enable/disable auto-correction */
-    int max_suggestions;      /**< Maximum number of suggestions (1-5) */
-    int similarity_threshold; /**< Minimum similarity score (0-100) */
-    bool interactive_prompts; /**< Show "Did you mean?" prompts */
-    bool learn_from_history;  /**< Learn from command history */
-    bool correct_builtins;    /**< Suggest builtin corrections */
-    bool correct_external;    /**< Suggest external command corrections */
-    bool case_sensitive;      /**< Case-sensitive matching */
+    bool enabled;             ///< Enable/disable auto-correction
+    int max_suggestions;      ///< Maximum number of suggestions (1-5)
+    int similarity_threshold; ///< Minimum similarity score (0-100)
+    bool interactive_prompts; ///< Show "Did you mean?" prompts
+    bool learn_from_history;  ///< Learn from command history
+    bool correct_builtins;    ///< Suggest builtin corrections
+    bool correct_external;    ///< Suggest external command corrections
+    bool case_sensitive;      ///< Case-sensitive matching
 } autocorrect_config_t;
 
 /**
@@ -47,9 +47,9 @@ typedef struct {
  * Represents a single command correction suggestion with metadata.
  */
 typedef struct {
-    char *command;      /**< Suggested command */
-    int score;          /**< Similarity score (0-100) */
-    const char *source; /**< Source: "builtin", "history", "path", "function" */
+    char *command;      ///< Suggested command
+    int score;          ///< Similarity score (0-100)
+    const char *source; ///< Source: "builtin", "history", "path", "function"
 } correction_t;
 
 /**
@@ -58,9 +58,9 @@ typedef struct {
  * Contains all correction suggestions for a misspelled command.
  */
 typedef struct {
-    correction_t suggestions[MAX_CORRECTIONS]; /**< Array of suggestions */
-    int count;              /**< Number of suggestions found */
-    char *original_command; /**< Original misspelled command */
+    correction_t suggestions[MAX_CORRECTIONS]; ///< Array of suggestions
+    int count;                                 ///< Number of suggestions found
+    char *original_command;                    ///< Original misspelled command
 } correction_results_t;
 
 /** @brief Forward declaration for executor integration */
@@ -291,4 +291,4 @@ void autocorrect_reset_stats(void);
  */
 void autocorrect_set_debug(bool enabled);
 
-#endif /* AUTOCORRECT_H */
+#endif /// AUTOCORRECT_H

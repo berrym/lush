@@ -29,7 +29,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -41,7 +41,7 @@ TEST(autocorrect_init_cleanup) {
     ASSERT_EQ(result, 0, "autocorrect_init should succeed");
 
     autocorrect_cleanup();
-    /* Should not crash on cleanup */
+    /// Should not crash on cleanup
 }
 
 TEST(autocorrect_double_init) {
@@ -55,7 +55,7 @@ TEST(autocorrect_double_init) {
 }
 
 TEST(autocorrect_cleanup_without_init) {
-    /* Should not crash */
+    /// Should not crash
     autocorrect_cleanup();
 }
 
@@ -87,7 +87,7 @@ TEST(autocorrect_validate_config_valid) {
 TEST(autocorrect_validate_config_invalid_suggestions) {
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
-    config.max_suggestions = 10; /* Invalid - too many */
+    config.max_suggestions = 10; /// Invalid - too many
 
     bool valid = autocorrect_validate_config(&config);
     ASSERT_FALSE(valid, "Config with too many suggestions should be invalid");
@@ -96,7 +96,7 @@ TEST(autocorrect_validate_config_invalid_suggestions) {
 TEST(autocorrect_validate_config_invalid_threshold) {
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
-    config.similarity_threshold = 150; /* Invalid - over 100 */
+    config.similarity_threshold = 150; /// Invalid - over 100
 
     bool valid = autocorrect_validate_config(&config);
     ASSERT_FALSE(valid, "Config with threshold > 100 should be invalid");
@@ -248,6 +248,51 @@ TEST(similarity_score_case_insensitive) {
     ASSERT(score >= 90, "Case insensitive identical should match");
 }
 
+TEST(levenshtein_unicode_case_insensitive_latin1) {
+    /// Latin-1 Supplement: É (U+00C9) folds to é (U+00E9). The byte
+    /// length differs from codepoint length, so a byte-by-byte fold
+    /// would mismatch even between identical inputs of opposite case.
+    int dist = autocorrect_levenshtein_distance("café", "CAFÉ");
+    ASSERT_EQ(dist, 0, "Case-insensitive Café/CAFÉ should fold to distance 0");
+}
+
+TEST(levenshtein_unicode_one_codepoint_typo) {
+    /// One-codepoint substitution at a non-ASCII position.
+    /// "café" -> "cafe": é (multi-byte) replaced by ASCII e. A bytewise
+    /// Levenshtein would count the multi-byte difference as two edits
+    /// (one per replaced byte) plus a deletion; codepoint-wise this
+    /// is one substitution.
+    int dist = autocorrect_levenshtein_distance("café", "cafe");
+    ASSERT_EQ(dist, 1, "café -> cafe should be one codepoint substitution");
+}
+
+TEST(levenshtein_unicode_extended_a) {
+    /// Latin Extended-A: Č (U+010C) folds to č (U+010D). Without the
+    /// lle_unicode_tolower_codepoint path, libfuzzy's prior fold only
+    /// covered ASCII + Latin-1 Supplement and would mishandle this.
+    int dist = autocorrect_levenshtein_distance("ČAJ", "čaj");
+    ASSERT_EQ(dist, 0, "Latin Extended-A case-fold should match identically");
+}
+
+TEST(levenshtein_unicode_greek) {
+    /// Greek: Α (U+0391) folds to α (U+03B1). Same reasoning -- prior
+    /// code wouldn't have touched Greek codepoints.
+    int dist = autocorrect_levenshtein_distance("ΑΒΓ", "αβγ");
+    ASSERT_EQ(dist, 0, "Greek case-fold should match identically");
+}
+
+TEST(levenshtein_unicode_codepoint_distance_not_byte) {
+    /// "café" is 4 codepoints / 5 bytes. "naïve" is 5 codepoints / 6
+    /// bytes. The edit distance should reflect codepoint differences,
+    /// not byte differences: substitutions on c/n, a/n... vs a, f/i,
+    /// é/v, plus an insertion of e -- net 4 edits over codepoints.
+    /// A bytewise count would inflate this past the codepoint figure
+    /// because the multi-byte é and ï each look like multiple byte
+    /// edits.
+    int dist = autocorrect_levenshtein_distance("café", "naïve");
+    ASSERT(dist <= 5, "Codepoint-level distance should be bounded by max len");
+}
+
 /* ============================================================================
  * SUGGESTION TESTS
  * ============================================================================
@@ -259,7 +304,7 @@ TEST(suggest_builtins_basic) {
     correction_t suggestions[5];
     int count = autocorrect_suggest_builtins("ehco", suggestions, 5, true);
 
-    /* Should find 'echo' as a suggestion */
+    /// Should find 'echo' as a suggestion
     bool found_echo = false;
     for (int i = 0; i < count; i++) {
         if (suggestions[i].command &&
@@ -281,14 +326,14 @@ TEST(suggest_builtins_no_match) {
     correction_t suggestions[5];
     int count = autocorrect_suggest_builtins("xyzabc123", suggestions, 5, true);
 
-    /* Clean up any suggestions */
+    /// Clean up any suggestions
     for (int i = 0; i < count; i++) {
         if (suggestions[i].command) {
             free(suggestions[i].command);
         }
     }
 
-    /* Unlikely to find matches for random string */
+    /// Unlikely to find matches for random string
     ASSERT(count <= 1, "Random string should have few or no matches");
 
     autocorrect_cleanup();
@@ -305,7 +350,7 @@ TEST(free_results_empty) {
     results.count = 0;
     results.original_command = NULL;
 
-    /* Should not crash */
+    /// Should not crash
     autocorrect_free_results(&results);
 }
 
@@ -319,7 +364,7 @@ TEST(free_results_with_data) {
     results.suggestions[0].source = "test";
 
     autocorrect_free_results(&results);
-    /* Should not crash and should clean up memory */
+    /// Should not crash and should clean up memory
 }
 
 /* ============================================================================
@@ -370,6 +415,41 @@ TEST(stats_learn_command) {
     autocorrect_cleanup();
 }
 
+TEST(learn_command_nfc_nfd_dedup) {
+    /// Same user-visible command name in NFC and NFD must not
+    /// expand the learned-commands set -- they are canonically
+    /// equivalent strings.
+    autocorrect_init();
+    autocorrect_reset_stats();
+
+    autocorrect_learn_command("caf\xC3\xA9");  /// NFC: e-acute U+00E9
+    autocorrect_learn_command("cafe\xCC\x81"); /// NFD: e + U+0301
+
+    int offered, accepted, learned;
+    autocorrect_get_stats(&offered, &accepted, &learned);
+    ASSERT_EQ(learned, 1,
+              "NFC and NFD encodings of café must collapse to one entry");
+
+    autocorrect_cleanup();
+}
+
+TEST(learn_command_distinct_under_case) {
+    /// NFC equivalence does not paper over case differences --
+    /// "café" and "CAFÉ" remain separate learned entries.
+    autocorrect_init();
+    autocorrect_reset_stats();
+
+    autocorrect_learn_command("caf\xC3\xA9"); /// café (lowercase)
+    autocorrect_learn_command("CAF\xC3\x89"); /// CAFÉ (uppercase)
+
+    int offered, accepted, learned;
+    autocorrect_get_stats(&offered, &accepted, &learned);
+    ASSERT_EQ(learned, 2,
+              "Different case is a different command for dedup purposes");
+
+    autocorrect_cleanup();
+}
+
 /* ============================================================================
  * DEBUG MODE TESTS
  * ============================================================================
@@ -378,7 +458,7 @@ TEST(stats_learn_command) {
 TEST(debug_mode_toggle) {
     autocorrect_init();
 
-    /* Should not crash */
+    /// Should not crash
     autocorrect_set_debug(true);
     autocorrect_set_debug(false);
 
@@ -426,7 +506,7 @@ TEST(command_exists_external) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "Executor should be created");
 
-    /* 'ls' should exist on most systems */
+    /// 'ls' should exist on most systems
     bool exists = autocorrect_command_exists(exec, "ls");
     ASSERT_TRUE(exists, "'ls' should exist in PATH");
 
@@ -439,7 +519,7 @@ TEST(command_exists_external) {
  */
 
 TEST(null_inputs) {
-    /* These should not crash */
+    /// These should not crash
     autocorrect_similarity_score(NULL, "test", true);
     autocorrect_similarity_score("test", NULL, true);
     autocorrect_levenshtein_distance(NULL, "test");
@@ -468,13 +548,13 @@ TEST(empty_strings) {
 int main(void) {
     printf("\n=== Autocorrect System Unit Tests ===\n\n");
 
-    /* Initialization tests */
+    /// Initialization tests
     printf("Initialization Tests:\n");
     RUN_TEST(autocorrect_init_cleanup);
     RUN_TEST(autocorrect_double_init);
     RUN_TEST(autocorrect_cleanup_without_init);
 
-    /* Configuration tests */
+    /// Configuration tests
     printf("\nConfiguration Tests:\n");
     RUN_TEST(autocorrect_default_config);
     RUN_TEST(autocorrect_validate_config_valid);
@@ -484,7 +564,7 @@ int main(void) {
     RUN_TEST(autocorrect_apply_config);
     RUN_TEST(autocorrect_is_enabled);
 
-    /* Similarity scoring tests */
+    /// Similarity scoring tests
     printf("\nSimilarity Scoring Tests:\n");
     RUN_TEST(levenshtein_identical);
     RUN_TEST(levenshtein_one_char_diff);
@@ -504,34 +584,41 @@ int main(void) {
     RUN_TEST(similarity_score_identical);
     RUN_TEST(similarity_score_typo);
     RUN_TEST(similarity_score_case_insensitive);
+    RUN_TEST(levenshtein_unicode_case_insensitive_latin1);
+    RUN_TEST(levenshtein_unicode_one_codepoint_typo);
+    RUN_TEST(levenshtein_unicode_extended_a);
+    RUN_TEST(levenshtein_unicode_greek);
+    RUN_TEST(levenshtein_unicode_codepoint_distance_not_byte);
 
-    /* Suggestion tests */
+    /// Suggestion tests
     printf("\nSuggestion Tests:\n");
     RUN_TEST(suggest_builtins_basic);
     RUN_TEST(suggest_builtins_no_match);
 
-    /* Result management tests */
+    /// Result management tests
     printf("\nResult Management Tests:\n");
     RUN_TEST(free_results_empty);
     RUN_TEST(free_results_with_data);
 
-    /* Statistics tests */
+    /// Statistics tests
     printf("\nStatistics Tests:\n");
     RUN_TEST(stats_initial);
     RUN_TEST(stats_reset);
     RUN_TEST(stats_learn_command);
+    RUN_TEST(learn_command_nfc_nfd_dedup);
+    RUN_TEST(learn_command_distinct_under_case);
 
-    /* Debug mode tests */
+    /// Debug mode tests
     printf("\nDebug Mode Tests:\n");
     RUN_TEST(debug_mode_toggle);
 
-    /* Command exists tests */
+    /// Command exists tests
     printf("\nCommand Exists Tests:\n");
     RUN_TEST(command_exists_builtin);
     RUN_TEST(command_exists_nonexistent);
     RUN_TEST(command_exists_external);
 
-    /* Edge case tests */
+    /// Edge case tests
     printf("\nEdge Case Tests:\n");
     RUN_TEST(null_inputs);
     RUN_TEST(empty_strings);

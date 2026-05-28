@@ -30,17 +30,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Mock memory pool instance - just a non-NULL pointer for validation */
+/// Mock memory pool instance - just a non-NULL pointer for validation
 /* The test_memory_mock.c provides lle_pool_alloc/free that don't actually use
  * this */
-/* We cast a dummy value to satisfy the pointer requirement */
+/// We cast a dummy value to satisfy the pointer requirement
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* External memory pool from lush_memory_pool.c for buffer operations */
+/// External memory pool from lush_memory_pool.c for buffer operations
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Test setup/teardown for memory pool */
+/// Test setup/teardown for memory pool
 static void test_setup(void) {
     lush_pool_config_t config = lush_pool_get_default_config();
     lush_pool_error_t result = lush_pool_init(&config);
@@ -65,28 +65,26 @@ static void test_teardown(void) { lush_pool_shutdown(); }
     } while (0)
 
 /* ========================================================================== */
-/*                            MOCK OBJECTS                                    */
+/// MOCK OBJECTS
 /* ========================================================================== */
 
-/* Note: display_controller_get_event_system is provided by libdisplay.a */
+/// Note: display_controller_get_event_system is provided by libdisplay.a
 
-/**
- * Mock display controller for testing
- * Uses real display_controller structure but minimal initialization
- */
+/// @brief Mock display controller for testing
+/// Uses real display_controller structure but minimal initialization
 static display_controller_t *create_mock_display_controller(void) {
     display_controller_t *display = calloc(1, sizeof(display_controller_t));
     if (!display)
         return NULL;
 
-    /* Create mock composition engine */
+    /// Create mock composition engine
     display->compositor = calloc(1, sizeof(composition_engine_t));
     if (!display->compositor) {
         free(display);
         return NULL;
     }
 
-    /* Create mock command_layer - required by display_bridge */
+    /// Create mock command_layer - required by display_bridge
     display->compositor->command_layer = calloc(1, sizeof(command_layer_t));
     if (!display->compositor->command_layer) {
         free(display->compositor);
@@ -94,7 +92,7 @@ static display_controller_t *create_mock_display_controller(void) {
         return NULL;
     }
 
-    /* Initialize minimal compositor state */
+    /// Initialize minimal compositor state
     display->compositor->initialized = false;
 
     return display;
@@ -112,18 +110,14 @@ static void destroy_mock_display_controller(display_controller_t *display) {
     }
 }
 
-/**
- * Mock editor context (opaque pointer for testing)
- */
+/// @brief Mock editor context (opaque pointer for testing)
 static void *create_mock_editor(void) {
-    /* Just return a non-NULL pointer for validation tests */
+    /// Just return a non-NULL pointer for validation tests
     static int dummy = 42;
     return &dummy;
 }
 
-/**
- * Mock display bridge for render controller testing
- */
+/// @brief Mock display bridge for render controller testing
 static lle_display_bridge_t *create_mock_display_bridge(void) {
     void *editor = create_mock_editor();
     display_controller_t *display = create_mock_display_controller();
@@ -144,13 +138,13 @@ static lle_display_bridge_t *create_mock_display_bridge(void) {
 
 static void destroy_mock_display_bridge(lle_display_bridge_t *bridge) {
     if (bridge) {
-        /* Just cleanup bridge - display controller is managed separately */
+        /// Just cleanup bridge - display controller is managed separately
         lle_display_bridge_cleanup(bridge);
     }
 }
 
 /* ========================================================================== */
-/*                          INITIALIZATION TESTS                              */
+/// INITIALIZATION TESTS
 /* ========================================================================== */
 
 TEST(render_controller_init_success) {
@@ -159,19 +153,19 @@ TEST(render_controller_init_success) {
 
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Test successful initialization */
+    /// Test successful initialization
     lle_result_t result =
         lle_render_controller_init(&controller, bridge, mock_pool);
 
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
     ASSERT_NOT_NULL(controller, "Render controller should be allocated");
 
-    /* Verify controller state */
+    /// Verify controller state
     ASSERT_NOT_NULL(controller->bridge, "Display bridge should be set");
     ASSERT_EQ(controller->bridge, bridge, "Display bridge should match input");
     ASSERT_NOT_NULL(controller->memory_pool, "Memory pool should be set");
 
-    /* Verify sub-components are initialized (non-NULL) */
+    /// Verify sub-components are initialized (non-NULL)
     ASSERT_NOT_NULL(controller->buffer_renderer,
                     "Buffer renderer should be initialized");
     ASSERT_NOT_NULL(controller->cursor_renderer,
@@ -183,7 +177,7 @@ TEST(render_controller_init_success) {
                     "Render metrics should be initialized");
     ASSERT_NOT_NULL(controller->config, "Render config should be initialized");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -192,20 +186,20 @@ TEST(render_controller_init_null_controller) {
     lle_display_bridge_t *bridge = create_mock_display_bridge();
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Test NULL controller pointer */
+    /// Test NULL controller pointer
     lle_result_t result = lle_render_controller_init(NULL, bridge, mock_pool);
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject NULL controller pointer");
 
-    /* Cleanup */
+    /// Cleanup
     destroy_mock_display_bridge(bridge);
 }
 
 TEST(render_controller_init_null_bridge) {
     lle_render_controller_t *controller = NULL;
 
-    /* Test NULL display bridge */
+    /// Test NULL display bridge
     lle_result_t result =
         lle_render_controller_init(&controller, NULL, mock_pool);
 
@@ -219,19 +213,19 @@ TEST(render_controller_init_null_memory_pool) {
     lle_display_bridge_t *bridge = create_mock_display_bridge();
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Test NULL memory pool */
+    /// Test NULL memory pool
     lle_result_t result = lle_render_controller_init(&controller, bridge, NULL);
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject NULL memory pool");
     ASSERT_NULL(controller, "Controller should remain NULL on failure");
 
-    /* Cleanup */
+    /// Cleanup
     destroy_mock_display_bridge(bridge);
 }
 
 /* ========================================================================== */
-/*                            CLEANUP TESTS                                   */
+/// CLEANUP TESTS
 /* ========================================================================== */
 
 TEST(render_controller_cleanup_success) {
@@ -239,22 +233,22 @@ TEST(render_controller_cleanup_success) {
     lle_display_bridge_t *bridge = create_mock_display_bridge();
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Initialize controller */
+    /// Initialize controller
     lle_result_t result =
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
     ASSERT_NOT_NULL(controller, "Render controller should be allocated");
 
-    /* Test cleanup */
+    /// Test cleanup
     result = lle_render_controller_cleanup(controller);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller cleanup should succeed");
 
-    /* Bridge cleanup */
+    /// Bridge cleanup
     destroy_mock_display_bridge(bridge);
 }
 
 TEST(render_controller_cleanup_null_controller) {
-    /* Test cleanup with NULL controller */
+    /// Test cleanup with NULL controller
     lle_result_t result = lle_render_controller_cleanup(NULL);
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
@@ -266,25 +260,25 @@ TEST(render_controller_double_cleanup) {
     lle_display_bridge_t *bridge = create_mock_display_bridge();
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Initialize controller */
+    /// Initialize controller
     lle_result_t result =
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* First cleanup */
+    /// First cleanup
     result = lle_render_controller_cleanup(controller);
     ASSERT_EQ(result, LLE_SUCCESS, "First cleanup should succeed");
 
-    /* Second cleanup - controller memory was freed, so we can't safely call
-     * again */
-    /* This test just verifies that single cleanup works correctly */
+    /// Second cleanup - controller memory was freed, so we can't safely call
+    /// again
+    /// This test just verifies that single cleanup works correctly
 
-    /* Bridge cleanup */
+    /// Bridge cleanup
     destroy_mock_display_bridge(bridge);
 }
 
 /* ========================================================================== */
-/*                         SUB-COMPONENT TESTS                                */
+/// SUB-COMPONENT TESTS
 /* ========================================================================== */
 
 TEST(render_controller_buffer_renderer_initialized) {
@@ -297,7 +291,7 @@ TEST(render_controller_buffer_renderer_initialized) {
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
     ASSERT_NOT_NULL(controller, "Render controller should be allocated");
 
-    /* Verify buffer renderer structure */
+    /// Verify buffer renderer structure
     lle_buffer_renderer_t *renderer = controller->buffer_renderer;
     ASSERT_NOT_NULL(renderer, "Buffer renderer should be initialized");
     ASSERT_NOT_NULL(renderer->memory_pool,
@@ -305,7 +299,7 @@ TEST(render_controller_buffer_renderer_initialized) {
     ASSERT_EQ(renderer->max_render_size, 0,
               "Buffer renderer max_render_size should be 0");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -319,7 +313,7 @@ TEST(render_controller_cursor_renderer_initialized) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Verify cursor renderer structure */
+    /// Verify cursor renderer structure
     lle_cursor_renderer_t *renderer = controller->cursor_renderer;
     ASSERT_NOT_NULL(renderer, "Cursor renderer should be initialized");
     ASSERT_NOT_NULL(renderer->memory_pool,
@@ -328,7 +322,7 @@ TEST(render_controller_cursor_renderer_initialized) {
                 "Cursor should be visible by default");
     ASSERT_EQ(renderer->cursor_style, 0, "Cursor style should be default");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -342,7 +336,7 @@ TEST(render_controller_frame_scheduler_initialized) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Verify frame scheduler structure */
+    /// Verify frame scheduler structure
     lle_frame_scheduler_t *scheduler = controller->scheduler;
     ASSERT_NOT_NULL(scheduler, "Frame scheduler should be initialized");
     ASSERT_EQ(scheduler->target_frame_time_us, 16667,
@@ -353,7 +347,7 @@ TEST(render_controller_frame_scheduler_initialized) {
     ASSERT_TRUE(scheduler->throttling_enabled,
                 "Throttling should be enabled by default");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -367,13 +361,13 @@ TEST(render_controller_render_cache_initialized) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Verify render cache structure */
+    /// Verify render cache structure
     lle_render_cache_t *cache = controller->cache;
     ASSERT_NOT_NULL(cache, "Render cache should be initialized");
     ASSERT_EQ(cache->max_render_size, 0, "Max render size should be 0");
     ASSERT_EQ(cache->cache_ttl_ms, 5000, "Cache TTL should be 5000ms");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -387,7 +381,7 @@ TEST(render_controller_render_metrics_initialized) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Verify render metrics structure */
+    /// Verify render metrics structure
     lle_render_metrics_t *metrics = controller->metrics;
     ASSERT_NOT_NULL(metrics, "Render metrics should be initialized");
     ASSERT_EQ(metrics->total_renders, 0, "Total renders should start at 0");
@@ -396,13 +390,13 @@ TEST(render_controller_render_metrics_initialized) {
     ASSERT_EQ(metrics->avg_render_time_ns, 0,
               "Avg render time should start at 0");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
 
 /* ========================================================================== */
-/*                         RENDERING OUTPUT TESTS                             */
+/// RENDERING OUTPUT TESTS
 /* ========================================================================== */
 
 TEST(render_buffer_content_success) {
@@ -412,29 +406,29 @@ TEST(render_buffer_content_success) {
     lle_display_bridge_t *bridge = create_mock_display_bridge();
     ASSERT_NOT_NULL(bridge, "Mock bridge creation failed");
 
-    /* Initialize controller */
+    /// Initialize controller
     lle_result_t result =
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Create a test buffer */
+    /// Create a test buffer
     lle_buffer_t *buffer = NULL;
     result = lle_buffer_create(&buffer, global_memory_pool, 1024);
     ASSERT_EQ(result, LLE_SUCCESS, "Buffer creation should succeed");
     ASSERT_NOT_NULL(buffer, "Buffer should be allocated");
 
-    /* Insert some test content */
+    /// Insert some test content
     result = lle_buffer_insert_text(buffer, 0, "Hello, World!", 13);
     ASSERT_EQ(result, LLE_SUCCESS, "Insert text should succeed");
 
-    /* Create cursor position */
+    /// Create cursor position
     lle_cursor_position_t cursor = {0};
     cursor.byte_offset = 0;
     cursor.line_number = 0;
     cursor.visual_column = 0;
     cursor.position_valid = true;
 
-    /* Render buffer content */
+    /// Render buffer content
     lle_render_output_t *output = NULL;
     result = lle_render_buffer_content(controller, buffer, &cursor, &output);
     ASSERT_EQ(result, LLE_SUCCESS, "Render buffer content should succeed");
@@ -444,7 +438,7 @@ TEST(render_buffer_content_success) {
     ASSERT_TRUE(memcmp(output->content, "Hello, World!", 13) == 0,
                 "Output content should match buffer");
 
-    /* Verify metrics were updated */
+    /// Verify metrics were updated
     ASSERT_EQ(controller->metrics->total_renders, 1,
               "Total renders should be 1");
     ASSERT_TRUE(controller->metrics->min_render_time_ns > 0,
@@ -452,7 +446,7 @@ TEST(render_buffer_content_success) {
     ASSERT_TRUE(controller->metrics->max_render_time_ns > 0,
                 "Max render time should be tracked");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_output_free(output);
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
@@ -470,16 +464,16 @@ TEST(render_buffer_content_empty_buffer) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Create an empty buffer */
+    /// Create an empty buffer
     lle_buffer_t *buffer = NULL;
     result = lle_buffer_create(&buffer, global_memory_pool, 1024);
     ASSERT_EQ(result, LLE_SUCCESS, "Buffer creation should succeed");
 
-    /* Create cursor position */
+    /// Create cursor position
     lle_cursor_position_t cursor = {0};
     cursor.position_valid = true;
 
-    /* Render empty buffer */
+    /// Render empty buffer
     lle_render_output_t *output = NULL;
     result = lle_render_buffer_content(controller, buffer, &cursor, &output);
     ASSERT_EQ(result, LLE_SUCCESS, "Render empty buffer should succeed");
@@ -487,7 +481,7 @@ TEST(render_buffer_content_empty_buffer) {
     ASSERT_EQ(output->content_length, 0,
               "Empty buffer should have zero length output");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_output_free(output);
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
@@ -512,24 +506,24 @@ TEST(render_buffer_content_null_params) {
     lle_cursor_position_t cursor = {0};
     lle_render_output_t *output = NULL;
 
-    /* Test null controller */
+    /// Test null controller
     result = lle_render_buffer_content(NULL, buffer, &cursor, &output);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null controller");
 
-    /* Test null buffer */
+    /// Test null buffer
     result = lle_render_buffer_content(controller, NULL, &cursor, &output);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject null buffer");
 
-    /* Test null cursor */
+    /// Test null cursor
     result = lle_render_buffer_content(controller, buffer, NULL, &output);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject null cursor");
 
-    /* Test null output */
+    /// Test null output
     result = lle_render_buffer_content(controller, buffer, &cursor, NULL);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject null output");
 
-    /* Cleanup */
+    /// Cleanup
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
@@ -544,13 +538,13 @@ TEST(render_cursor_position_success) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Create cursor at line 5, column 10 */
+    /// Create cursor at line 5, column 10
     lle_cursor_position_t cursor = {0};
     cursor.line_number = 5;
     cursor.visual_column = 10;
     cursor.position_valid = true;
 
-    /* Render cursor position */
+    /// Render cursor position
     char output[64];
     size_t bytes_written = 0;
     result = lle_render_cursor_position(controller, &cursor, output,
@@ -558,12 +552,12 @@ TEST(render_cursor_position_success) {
     ASSERT_EQ(result, LLE_SUCCESS, "Render cursor position should succeed");
     ASSERT_TRUE(bytes_written > 0, "Should write bytes");
 
-    /* Verify ANSI escape sequence format: ESC[row;colH */
-    /* Line 5, col 10 -> screen row 6, col 11 (1-based) */
+    /// Verify ANSI escape sequence format: ESC[row;colH
+    /// Line 5, col 10 -> screen row 6, col 11 (1-based)
     ASSERT_TRUE(strstr(output, "\033[6;11H") != NULL,
                 "Should generate correct ANSI sequence");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
@@ -577,14 +571,14 @@ TEST(render_cursor_position_hidden) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /* Hide cursor */
+    /// Hide cursor
     controller->cursor_renderer->cursor_visible = false;
 
-    /* Create cursor position */
+    /// Create cursor position
     lle_cursor_position_t cursor = {0};
     cursor.position_valid = true;
 
-    /* Render cursor position */
+    /// Render cursor position
     char output[64];
     size_t bytes_written = 0;
     result = lle_render_cursor_position(controller, &cursor, output,
@@ -592,17 +586,17 @@ TEST(render_cursor_position_hidden) {
     ASSERT_EQ(result, LLE_SUCCESS, "Render cursor position should succeed");
     ASSERT_TRUE(bytes_written > 0, "Should write bytes");
 
-    /* Verify hide cursor sequence: ESC[?25l */
+    /// Verify hide cursor sequence: ESC[?25l
     ASSERT_TRUE(strstr(output, "\033[?25l") != NULL,
                 "Should generate hide cursor sequence");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_controller_cleanup(controller);
     destroy_mock_display_bridge(bridge);
 }
 
 TEST(render_output_free_success) {
-    /* Allocate a render output */
+    /// Allocate a render output
     lle_render_output_t *output = lle_pool_alloc(sizeof(lle_render_output_t));
     ASSERT_NOT_NULL(output, "Output allocation should succeed");
     memset(output, 0, sizeof(lle_render_output_t));
@@ -612,37 +606,37 @@ TEST(render_output_free_success) {
     output->content_capacity = 100;
     output->content_length = 50;
 
-    /* Free the output */
+    /// Free the output
     lle_result_t result = lle_render_output_free(output);
     ASSERT_EQ(result, LLE_SUCCESS, "Render output free should succeed");
 }
 
 TEST(render_output_free_null) {
-    /* Test freeing null output */
+    /// Test freeing null output
     lle_result_t result = lle_render_output_free(NULL);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject null output");
 }
 
 /* ========================================================================== */
-/*                         PIPELINE STAGE TESTS                               */
+/// PIPELINE STAGE TESTS
 /* ========================================================================== */
 
 TEST(pipeline_init_success) {
     lle_render_pipeline_t *pipeline = NULL;
 
-    /* Initialize pipeline */
+    /// Initialize pipeline
     lle_result_t result = lle_render_pipeline_init(&pipeline, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Pipeline init should succeed");
     ASSERT_NOT_NULL(pipeline, "Pipeline should be allocated");
 
-    /* Verify pipeline structure */
+    /// Verify pipeline structure
     ASSERT_EQ(pipeline->stage_count, 4, "Should have 4 stages");
     ASSERT_EQ(pipeline->stage_capacity, 4, "Should have capacity for 4 stages");
     ASSERT_NOT_NULL(pipeline->stages, "Stages array should be allocated");
     ASSERT_FALSE(pipeline->parallel_execution_enabled,
                  "Parallel execution should be disabled by default");
 
-    /* Verify each stage */
+    /// Verify each stage
     ASSERT_EQ(pipeline->stages[0].type, LLE_RENDER_STAGE_PREPROCESSING,
               "Stage 0 should be preprocessing");
     ASSERT_TRUE(pipeline->stages[0].enabled,
@@ -670,19 +664,19 @@ TEST(pipeline_init_success) {
     ASSERT_NOT_NULL(pipeline->stages[3].execute,
                     "Composition stage should have execute function");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_pipeline_cleanup(pipeline);
 }
 
 TEST(pipeline_init_null_params) {
     lle_render_pipeline_t *pipeline = NULL;
 
-    /* Test null pipeline pointer */
+    /// Test null pipeline pointer
     lle_result_t result = lle_render_pipeline_init(NULL, mock_pool);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null pipeline pointer");
 
-    /* Test null memory pool */
+    /// Test null memory pool
     result = lle_render_pipeline_init(&pipeline, NULL);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null memory pool");
@@ -693,25 +687,25 @@ TEST(pipeline_execute_success) {
 
     lle_render_pipeline_t *pipeline = NULL;
 
-    /* Initialize pipeline */
+    /// Initialize pipeline
     lle_result_t result = lle_render_pipeline_init(&pipeline, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Pipeline init should succeed");
 
-    /* Create a test buffer */
+    /// Create a test buffer
     lle_buffer_t *buffer = NULL;
     result = lle_buffer_create(&buffer, global_memory_pool, 1024);
     ASSERT_EQ(result, LLE_SUCCESS, "Buffer creation should succeed");
 
-    /* Insert test content */
+    /// Insert test content
     result = lle_buffer_insert_text(buffer, 0, "Test content", 12);
     ASSERT_EQ(result, LLE_SUCCESS, "Insert text should succeed");
 
-    /* Create render context */
+    /// Create render context
     lle_render_context_t context = {0};
     context.buffer = buffer;
     context.memory_pool = mock_pool;
 
-    /* Execute pipeline */
+    /// Execute pipeline
     lle_render_output_t *output = NULL;
     result = lle_render_pipeline_execute(pipeline, &context, &output);
     ASSERT_EQ(result, LLE_SUCCESS, "Pipeline execution should succeed");
@@ -719,13 +713,13 @@ TEST(pipeline_execute_success) {
     ASSERT_NOT_NULL(output->content, "Output content should be allocated");
     ASSERT_EQ(output->content_length, 12, "Output length should match input");
 
-    /* Verify stage metrics were updated */
+    /// Verify stage metrics were updated
     for (size_t i = 0; i < pipeline->stage_count; i++) {
         ASSERT_TRUE(pipeline->stages[i].execution_count > 0,
                     "Stage should have been executed");
     }
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_output_free(output);
     lle_buffer_destroy(buffer);
     lle_render_pipeline_cleanup(pipeline);
@@ -747,38 +741,38 @@ TEST(pipeline_execute_null_params) {
     context.memory_pool = mock_pool;
     lle_render_output_t *output = NULL;
 
-    /* Test null pipeline */
+    /// Test null pipeline
     result = lle_render_pipeline_execute(NULL, &context, &output);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null pipeline");
 
-    /* Test null context */
+    /// Test null context
     result = lle_render_pipeline_execute(pipeline, NULL, &output);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null context");
 
-    /* Test null output */
+    /// Test null output
     result = lle_render_pipeline_execute(pipeline, &context, NULL);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject null output");
 
-    /* Cleanup */
+    /// Cleanup
     lle_buffer_destroy(buffer);
     lle_render_pipeline_cleanup(pipeline);
 }
 
 TEST(pipeline_cleanup_null) {
-    /* Test cleanup with null pipeline */
+    /// Test cleanup with null pipeline
     lle_result_t result = lle_render_pipeline_cleanup(NULL);
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject null pipeline");
 }
 
 /* ========================================================================== */
-/*                    CACHE SYSTEM TESTS (libhashtable)                       */
+/// CACHE SYSTEM TESTS (libhashtable)
 /* ========================================================================== */
 
 TEST(cache_init_success) {
-    /* Test successful cache initialization using libhashtable */
+    /// Test successful cache initialization using libhashtable
     lle_display_cache_t *cache = NULL;
 
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
@@ -786,12 +780,12 @@ TEST(cache_init_success) {
     ASSERT_NOT_NULL(cache, "Cache should be allocated");
     ASSERT_NOT_NULL(cache->cache_table, "libhashtable should be created");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_init_null_params) {
-    /* Test cache init with null parameters */
+    /// Test cache init with null parameters
     lle_display_cache_t *cache = NULL;
 
     lle_result_t result = lle_display_cache_init(NULL, mock_pool);
@@ -804,12 +798,12 @@ TEST(cache_init_null_params) {
 }
 
 TEST(cache_store_and_lookup_success) {
-    /* Test storing and retrieving from cache using libhashtable */
+    /// Test storing and retrieving from cache using libhashtable
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Store data in cache */
+    /// Store data in cache
     const char *test_data = "test render output";
     uint64_t key = 12345;
 
@@ -817,7 +811,7 @@ TEST(cache_store_and_lookup_success) {
         lle_display_cache_store(cache, key, test_data, strlen(test_data) + 1);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache store should succeed");
 
-    /* Lookup data from cache */
+    /// Lookup data from cache
     void *retrieved_data = NULL;
     size_t retrieved_size = 0;
 
@@ -830,18 +824,18 @@ TEST(cache_store_and_lookup_success) {
     ASSERT_EQ(strcmp((char *)retrieved_data, test_data), 0,
               "Retrieved data should match");
 
-    /* Cleanup */
-    lle_pool_free(retrieved_data); /* Free deserialized data */
+    /// Cleanup
+    lle_pool_free(retrieved_data); /// Free deserialized data
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_lookup_miss) {
-    /* Test cache miss on non-existent key */
+    /// Test cache miss on non-existent key
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Try to lookup non-existent key */
+    /// Try to lookup non-existent key
     void *retrieved_data = NULL;
     size_t retrieved_size = 0;
     uint64_t nonexistent_key = 99999;
@@ -850,27 +844,27 @@ TEST(cache_lookup_miss) {
                                       &retrieved_size);
     ASSERT_EQ(result, LLE_ERROR_CACHE_MISS, "Should return cache miss");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_hit_count) {
-    /* Test cache hit metrics with libhashtable backend */
+    /// Test cache hit metrics with libhashtable backend
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Store data */
+    /// Store data
     const char *test_data = "test data";
     uint64_t key = 100;
     result =
         lle_display_cache_store(cache, key, test_data, strlen(test_data) + 1);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache store should succeed");
 
-    /* Get initial hit count */
+    /// Get initial hit count
     uint64_t initial_hits = cache->metrics->cache_hits;
 
-    /* Lookup multiple times to increment hit count */
+    /// Lookup multiple times to increment hit count
     void *data = NULL;
     size_t size = 0;
     for (int i = 0; i < 5; i++) {
@@ -882,24 +876,24 @@ TEST(cache_hit_count) {
         }
     }
 
-    /* Verify hit count increased */
+    /// Verify hit count increased
     ASSERT_EQ(cache->metrics->cache_hits, initial_hits + 5,
               "Hit count should increase by 5");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_miss_count) {
-    /* Test cache miss metrics */
+    /// Test cache miss metrics
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Get initial miss count */
+    /// Get initial miss count
     uint64_t initial_misses = cache->metrics->cache_misses;
 
-    /* Try to lookup non-existent keys */
+    /// Try to lookup non-existent keys
     void *data = NULL;
     size_t size = 0;
     for (int i = 0; i < 3; i++) {
@@ -907,16 +901,16 @@ TEST(cache_miss_count) {
         ASSERT_EQ(result, LLE_ERROR_CACHE_MISS, "Should return cache miss");
     }
 
-    /* Verify miss count increased */
+    /// Verify miss count increased
     ASSERT_EQ(cache->metrics->cache_misses, initial_misses + 3,
               "Miss count should increase by 3");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(render_cache_init_success) {
-    /* Test render cache initialization with libhashtable */
+    /// Test render cache initialization with libhashtable
     lle_render_cache_t *cache = NULL;
 
     lle_result_t result = lle_render_cache_init(&cache, mock_pool);
@@ -926,12 +920,12 @@ TEST(render_cache_init_success) {
     ASSERT_NOT_NULL(cache->base_cache->cache_table,
                     "libhashtable should be created");
 
-    /* Cleanup */
+    /// Cleanup
     lle_render_cache_cleanup(cache);
 }
 
 TEST(render_cache_init_null_params) {
-    /* Test render cache init with null parameters */
+    /// Test render cache init with null parameters
     lle_render_cache_t *cache = NULL;
 
     lle_result_t result = lle_render_cache_init(NULL, mock_pool);
@@ -944,19 +938,19 @@ TEST(render_cache_init_null_params) {
 }
 
 TEST(cache_invalidate_entry) {
-    /* Test cache entry invalidation */
+    /// Test cache entry invalidation
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Store data */
+    /// Store data
     const char *test_data = "test data";
     uint64_t key = 300;
     result =
         lle_display_cache_store(cache, key, test_data, strlen(test_data) + 1);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache store should succeed");
 
-    /* Verify it's in cache */
+    /// Verify it's in cache
     void *data = NULL;
     size_t size = 0;
     result = lle_display_cache_lookup(cache, key, &data, &size);
@@ -964,27 +958,27 @@ TEST(cache_invalidate_entry) {
     if (data)
         lle_pool_free(data);
 
-    /* Invalidate entry */
+    /// Invalidate entry
     result = lle_display_cache_invalidate(cache, key);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache invalidate should succeed");
 
-    /* Verify it's no longer in cache */
+    /// Verify it's no longer in cache
     data = NULL;
     result = lle_display_cache_lookup(cache, key, &data, &size);
     ASSERT_EQ(result, LLE_ERROR_CACHE_MISS,
               "Should return cache miss after invalidation");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_invalidate_all) {
-    /* Test invalidating all cache entries */
+    /// Test invalidating all cache entries
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Store multiple entries */
+    /// Store multiple entries
     const char *test_data = "test";
     for (uint64_t i = 0; i < 5; i++) {
         result = lle_display_cache_store(cache, 400 + i, test_data,
@@ -992,11 +986,11 @@ TEST(cache_invalidate_all) {
         ASSERT_EQ(result, LLE_SUCCESS, "Cache store should succeed");
     }
 
-    /* Invalidate all */
+    /// Invalidate all
     result = lle_display_cache_invalidate_all(cache);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache invalidate all should succeed");
 
-    /* Verify all entries are gone */
+    /// Verify all entries are gone
     void *data = NULL;
     size_t size = 0;
     for (uint64_t i = 0; i < 5; i++) {
@@ -1005,28 +999,28 @@ TEST(cache_invalidate_all) {
                   "Should return cache miss after invalidate all");
     }
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_hit_rate_calculation) {
-    /* Test cache hit rate calculation */
+    /// Test cache hit rate calculation
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Store data */
+    /// Store data
     const char *test_data = "test";
     uint64_t key = 500;
     result =
         lle_display_cache_store(cache, key, test_data, strlen(test_data) + 1);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache store should succeed");
 
-    /* Generate 7 hits and 3 misses for 70% hit rate */
+    /// Generate 7 hits and 3 misses for 70% hit rate
     void *data = NULL;
     size_t size = 0;
 
-    /* 7 hits */
+    /// 7 hits
     for (int i = 0; i < 7; i++) {
         result = lle_display_cache_lookup(cache, key, &data, &size);
         ASSERT_EQ(result, LLE_SUCCESS, "Cache lookup should succeed");
@@ -1036,36 +1030,36 @@ TEST(cache_hit_rate_calculation) {
         }
     }
 
-    /* 3 misses */
+    /// 3 misses
     for (int i = 0; i < 3; i++) {
         result = lle_display_cache_lookup(cache, 600 + i, &data, &size);
         ASSERT_EQ(result, LLE_ERROR_CACHE_MISS, "Cache lookup should miss");
     }
 
-    /* Check hit rate (should be 70%) */
+    /// Check hit rate (should be 70%)
     double hit_rate = cache->metrics->hit_rate;
     ASSERT_TRUE(hit_rate >= 69.0 && hit_rate <= 71.0,
                 "Hit rate should be approximately 70%");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 TEST(cache_policy_initialized) {
-    /* Test that LRU policy is initialized */
+    /// Test that LRU policy is initialized
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /* Verify policy is initialized */
+    /// Verify policy is initialized
     ASSERT_NOT_NULL(cache->policy, "Cache policy should be initialized");
 
-    /* Cleanup */
+    /// Cleanup
     lle_display_cache_cleanup(cache);
 }
 
 /* ========================================================================== */
-/*                            TEST RUNNER                                     */
+/// TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {
@@ -1075,28 +1069,28 @@ int main(void) {
     printf("================================================================="
            "\n\n");
 
-    /* Initialize memory pool for buffer tests */
+    /// Initialize memory pool for buffer tests
     test_setup();
 
-    /* Initialization tests */
+    /// Initialization tests
     RUN_TEST(render_controller_init_success);
     RUN_TEST(render_controller_init_null_controller);
     RUN_TEST(render_controller_init_null_bridge);
     RUN_TEST(render_controller_init_null_memory_pool);
 
-    /* Cleanup tests */
+    /// Cleanup tests
     RUN_TEST(render_controller_cleanup_success);
     RUN_TEST(render_controller_cleanup_null_controller);
     RUN_TEST(render_controller_double_cleanup);
 
-    /* Sub-component tests */
+    /// Sub-component tests
     RUN_TEST(render_controller_buffer_renderer_initialized);
     RUN_TEST(render_controller_cursor_renderer_initialized);
     RUN_TEST(render_controller_frame_scheduler_initialized);
     RUN_TEST(render_controller_render_cache_initialized);
     RUN_TEST(render_controller_render_metrics_initialized);
 
-    /* Rendering output tests */
+    /// Rendering output tests
     RUN_TEST(render_buffer_content_success);
     RUN_TEST(render_buffer_content_empty_buffer);
     RUN_TEST(render_buffer_content_null_params);
@@ -1105,14 +1099,14 @@ int main(void) {
     RUN_TEST(render_output_free_success);
     RUN_TEST(render_output_free_null);
 
-    /* Pipeline stage tests */
+    /// Pipeline stage tests
     RUN_TEST(pipeline_init_success);
     RUN_TEST(pipeline_init_null_params);
     RUN_TEST(pipeline_execute_success);
     RUN_TEST(pipeline_execute_null_params);
     RUN_TEST(pipeline_cleanup_null);
 
-    /* Cache system tests (libhashtable integration) */
+    /// Cache system tests (libhashtable integration)
     RUN_TEST(cache_init_success);
     RUN_TEST(cache_init_null_params);
     RUN_TEST(cache_store_and_lookup_success);
@@ -1122,7 +1116,7 @@ int main(void) {
     RUN_TEST(render_cache_init_success);
     RUN_TEST(render_cache_init_null_params);
 
-    /* Cache policy and invalidation tests */
+    /// Cache policy and invalidation tests
     RUN_TEST(cache_invalidate_entry);
     RUN_TEST(cache_invalidate_all);
     RUN_TEST(cache_hit_rate_calculation);

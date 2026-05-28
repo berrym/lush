@@ -117,9 +117,9 @@ shell_error_t *shell_error_createv(shell_error_code_t code,
     error->location = loc;
     error->recoverable = (severity != SHELL_SEVERITY_FATAL);
 
-    /* Set default exit status based on error category */
+    /// Set default exit status based on error category
     if (code >= SHELL_ERR_PARSE_BASE && code <= SHELL_ERR_PARSE_MAX) {
-        error->exit_status = 2; /* Syntax error */
+        error->exit_status = 2; /// Syntax error
     } else if (code == SHELL_ERR_COMMAND_NOT_FOUND) {
         error->exit_status = 127;
     } else if (code == SHELL_ERR_PERMISSION_DENIED ||
@@ -129,7 +129,7 @@ shell_error_t *shell_error_createv(shell_error_code_t code,
         error->exit_status = 1;
     }
 
-    /* Format the message */
+    /// Format the message
     if (fmt) {
         va_list args_copy;
         va_copy(args_copy, args);
@@ -156,12 +156,12 @@ void shell_error_free(shell_error_t *error) {
         free(error->suggestion);
         free(error->source_line);
 
-        /* Free context stack */
+        /// Free context stack
         for (size_t i = 0; i < error->context_depth; i++) {
             free(error->context_stack[i]);
         }
 
-        /* Free cause chain */
+        /// Free cause chain
         if (error->cause) {
             shell_error_free(error->cause);
         }
@@ -259,7 +259,7 @@ void shell_error_collector_free(shell_error_collector_t *collector) {
     shell_error_t *error = collector->first;
     while (error) {
         shell_error_t *next = error->next;
-        error->next = NULL; /* Prevent double-free in shell_error_free */
+        error->next = NULL; /// Prevent double-free in shell_error_free
         shell_error_free(error);
         error = next;
     }
@@ -274,7 +274,7 @@ void shell_error_collector_add(shell_error_collector_t *collector,
         return;
     }
 
-    /* Add to linked list */
+    /// Add to linked list
     if (!collector->first) {
         collector->first = error;
         collector->last = error;
@@ -283,7 +283,7 @@ void shell_error_collector_add(shell_error_collector_t *collector,
         collector->last = error;
     }
 
-    /* Update counters */
+    /// Update counters
     if (error->severity == SHELL_SEVERITY_WARNING) {
         collector->warning_count++;
     } else {
@@ -316,7 +316,7 @@ char *shell_error_collector_get_line(shell_error_collector_t *collector,
     size_t current_line = 1;
     size_t line_start = 0;
 
-    /* Find the start of the requested line */
+    /// Find the start of the requested line
     for (size_t i = 0; i < len && current_line < line_num; i++) {
         if (src[i] == '\n') {
             current_line++;
@@ -325,16 +325,16 @@ char *shell_error_collector_get_line(shell_error_collector_t *collector,
     }
 
     if (current_line != line_num) {
-        return NULL; /* Line not found */
+        return NULL; /// Line not found
     }
 
-    /* Find the end of the line */
+    /// Find the end of the line
     size_t line_end = line_start;
     while (line_end < len && src[line_end] != '\n') {
         line_end++;
     }
 
-    /* Allocate and copy */
+    /// Allocate and copy
     size_t line_len = line_end - line_start;
     char *result = malloc(line_len + 1);
     if (result) {
@@ -350,9 +350,7 @@ char *shell_error_collector_get_line(shell_error_collector_t *collector,
  * ============================================================================
  */
 
-/**
- * @brief Print colored text if colors enabled
- */
+/// @brief Print colored text if colors enabled
 static void print_colored(FILE *out, bool use_color, const char *color,
                           const char *fmt, ...) {
     if (use_color && color) {
@@ -369,9 +367,7 @@ static void print_colored(FILE *out, bool use_color, const char *color,
     }
 }
 
-/**
- * @brief Get color for severity
- */
+/// @brief Get color for severity
 static const char *severity_color(shell_error_severity_t severity) {
     switch (severity) {
     case SHELL_SEVERITY_NOTE:
@@ -394,7 +390,7 @@ void shell_error_display(shell_error_t *error, FILE *out, bool use_color) {
     const char *sev_color = severity_color(error->severity);
     const char *sev_str = shell_error_severity_str(error->severity);
 
-    /* Header line: error[E1001]: message */
+    /// Header line: error[E1001]: message
     print_colored(out, use_color, sev_color, "%s", sev_str);
     print_colored(out, use_color, ANSI_BOLD, "[%s]",
                   shell_error_code_str(error->code));
@@ -402,7 +398,7 @@ void shell_error_display(shell_error_t *error, FILE *out, bool use_color) {
     print_colored(out, use_color, ANSI_BOLD, "%s\n",
                   error->message ? error->message : "(no message)");
 
-    /* Location line: --> file:line:column */
+    /// Location line: --> file:line:column
     if (SOURCE_LOC_VALID(error->location)) {
         print_colored(out, use_color, ANSI_BLUE, "  --> ");
         fprintf(out, "%s:%zu:%zu\n",
@@ -412,19 +408,19 @@ void shell_error_display(shell_error_t *error, FILE *out, bool use_color) {
                 error->location.column > 0 ? error->location.column : 1);
     }
 
-    /* Source line with highlighting */
+    /// Source line with highlighting
     if (error->source_line) {
         size_t line_num = error->location.line;
         int line_width = snprintf(NULL, 0, "%zu", line_num);
 
-        /* Blank line prefix */
+        /// Blank line prefix
         print_colored(out, use_color, ANSI_BLUE, "%*s |\n", line_width, "");
 
-        /* Source line */
+        /// Source line
         print_colored(out, use_color, ANSI_BLUE, "%zu | ", line_num);
         fprintf(out, "%s\n", error->source_line);
 
-        /* Highlight line */
+        /// Highlight line
         print_colored(out, use_color, ANSI_BLUE, "%*s | ", line_width, "");
 
         size_t col = error->location.column > 0 ? error->location.column : 1;
@@ -438,32 +434,32 @@ void shell_error_display(shell_error_t *error, FILE *out, bool use_color) {
             print_colored(out, use_color, sev_color, "~");
         }
 
-        /* Inline message */
+        /// Inline message
         if (error->detail) {
             fprintf(out, " ");
             print_colored(out, use_color, sev_color, "%s", error->detail);
         }
         fprintf(out, "\n");
 
-        /* Trailing blank */
+        /// Trailing blank
         print_colored(out, use_color, ANSI_BLUE, "%*s |\n", line_width, "");
     }
 
-    /* Context stack */
+    /// Context stack
     for (size_t i = 0; i < error->context_depth; i++) {
         print_colored(out, use_color, ANSI_BLUE, "   = ");
         print_colored(out, use_color, ANSI_CYAN, "while: ");
         fprintf(out, "%s\n", error->context_stack[i]);
     }
 
-    /* Suggestion */
+    /// Suggestion
     if (error->suggestion) {
         print_colored(out, use_color, ANSI_BLUE, "   = ");
         print_colored(out, use_color, ANSI_CYAN, "help: ");
         fprintf(out, "%s\n", error->suggestion);
     }
 
-    /* Cause chain */
+    /// Cause chain
     if (error->cause) {
         fprintf(out, "\n");
         print_colored(out, use_color, ANSI_BLUE, "   = ");
@@ -479,9 +475,9 @@ void shell_error_display_all(shell_error_collector_t *collector, FILE *out,
     if (!collector || !out)
         return;
 
-    /* Display each error */
+    /// Display each error
     for (shell_error_t *err = collector->first; err; err = err->next) {
-        /* Try to get source line if not already set */
+        /// Try to get source line if not already set
         if (!err->source_line && SOURCE_LOC_VALID(err->location)) {
             char *line =
                 shell_error_collector_get_line(collector, err->location.line);
@@ -496,7 +492,7 @@ void shell_error_display_all(shell_error_collector_t *collector, FILE *out,
         shell_error_display(err, out, use_color);
     }
 
-    /* Summary line */
+    /// Summary line
     if (collector->count > 0 || collector->warning_count > 0) {
         print_colored(out, use_color, ANSI_BOLD, "aborting due to ");
         if (collector->count > 0) {

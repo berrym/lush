@@ -15,11 +15,11 @@
 #include "lle/lle_watchdog.h"
 
 int display_lle_diagnostics(int argc, char **argv) {
-    /* Diagnostics dump takes no arguments. */
+    // Diagnostics dump takes no arguments.
     (void)argc;
     (void)argv;
 
-    /* Show LLE diagnostics */
+    // Show LLE diagnostics
     lle_editor_t *editor = lle_get_global_editor();
 
     printf("LLE Diagnostics\n");
@@ -31,9 +31,9 @@ int display_lle_diagnostics(int argc, char **argv) {
 
     if (editor) {
         printf("\nSubsystems:\n");
-        /* Buffer and keybindings are session-scoped - created during
-         * readline and cleaned up after. They're not "MISSING", just
-         * inactive between prompts. */
+        /// Buffer and keybindings are session-scoped - created during
+        /// readline and cleaned up after. They're not "MISSING", just
+        /// inactive between prompts.
         printf("  Buffer: %s\n", editor->buffer ? "OK" : "OK (session-scoped)");
         printf("  History: %s\n", editor->history_system ? "OK" : "MISSING");
         printf("  Keybindings: %s\n",
@@ -88,14 +88,14 @@ int display_lle_diagnostics(int argc, char **argv) {
     if (!editor) {
         printf("ERROR (editor not initialized)\n");
     } else if (!editor->history_system) {
-        /* Only check persistent subsystems - buffer and keybindings
-         * are session-scoped and intentionally NULL between prompts */
+        /// Only check persistent subsystems - buffer and keybindings
+        /// are session-scoped and intentionally NULL between prompts
         printf("DEGRADED (missing persistent subsystems)\n");
     } else {
         printf("OK\n");
     }
 
-    /* Watchdog Statistics */
+    // Watchdog Statistics
     printf("\nWatchdog (Deadlock Detection):\n");
     lle_watchdog_stats_t wd_stats;
     if (lle_watchdog_get_stats(&wd_stats) == LLE_SUCCESS) {
@@ -113,14 +113,14 @@ int display_lle_diagnostics(int argc, char **argv) {
         printf("  Status: not initialized\n");
     }
 
-    /* Safety System Statistics */
+    // Safety System Statistics
     printf("\nSafety System (Panic Recovery):\n");
     printf("  %s\n", lle_safety_get_stats_summary());
     printf("  Init state: %s\n", lle_safety_get_init_state_summary());
     printf("  Recovery mode: %s\n",
            lle_safety_is_recovery_mode() ? "ACTIVE" : "inactive");
 
-    /* Shell Event Hub Statistics */
+    // Shell Event Hub Statistics
     printf("\nShell Event Hub:\n");
     uint64_t events_fired = 0, dir_changes = 0, commands = 0;
     lle_safety_get_event_stats(&events_fired, &dir_changes, &commands);

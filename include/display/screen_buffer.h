@@ -22,16 +22,16 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS
+/// ============================================================================
 
 #define SCREEN_BUFFER_MAX_ROWS 100
 #define SCREEN_BUFFER_MAX_COLS 512
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Represents a single character cell in the virtual screen
@@ -48,10 +48,10 @@ extern "C" {
  * - 2 for wide characters (CJK, emoji)
  */
 typedef struct {
-    char utf8_bytes[4];   // Full UTF-8 sequence (1-4 bytes)
-    uint8_t byte_len;     // Actual bytes used (1-4)
-    uint8_t visual_width; // Display width in columns (0, 1, or 2)
-    bool is_prompt;       // True if this cell is part of the prompt
+    char utf8_bytes[4];   /// Full UTF-8 sequence (1-4 bytes)
+    uint8_t byte_len;     /// Actual bytes used (1-4)
+    uint8_t visual_width; /// Display width in columns (0, 1, or 2)
+    bool is_prompt;       /// True if this cell is part of the prompt
 } screen_cell_t;
 
 /**
@@ -62,11 +62,11 @@ typedef struct {
  * like autosuggestions.
  */
 typedef struct {
-    char *text;          // Prefix text (e.g., "> ", "loop> ")
-    size_t length;       // Length in bytes
-    size_t visual_width; // Visual width in columns (excluding ANSI codes)
-    bool contains_ansi;  // True if prefix contains ANSI escape codes
-    bool dirty;          // True if prefix changed since last render
+    char *text;          /// Prefix text (e.g., "> ", "loop> ")
+    size_t length;       /// Length in bytes
+    size_t visual_width; /// Visual width in columns (excluding ANSI codes)
+    bool contains_ansi;  /// True if prefix contains ANSI escape codes
+    bool dirty;          /// True if prefix changed since last render
 } screen_line_prefix_t;
 
 /**
@@ -74,11 +74,11 @@ typedef struct {
  */
 typedef struct {
     screen_cell_t cells[SCREEN_BUFFER_MAX_COLS];
-    int length; // Number of characters in this line
-    bool dirty; // True if line content changed since last render
+    int length; /// Number of characters in this line
+    bool dirty; /// True if line content changed since last render
 
-    screen_line_prefix_t *prefix; // Optional prefix (NULL if none)
-    bool prefix_dirty;            // True if prefix changed since last render
+    screen_line_prefix_t *prefix; /// Optional prefix (NULL if none)
+    bool prefix_dirty;            /// True if prefix changed since last render
 } screen_line_t;
 
 /**
@@ -90,33 +90,33 @@ typedef struct {
  */
 typedef struct {
     screen_line_t lines[SCREEN_BUFFER_MAX_ROWS];
-    int num_rows;          // Number of rows currently used (command only)
-    int terminal_width;    // Terminal width in columns
-    int cursor_row;        // Cursor row position (0-based, within command)
-    int cursor_col;        // Cursor column position (0-based)
-    int command_start_row; // Row where command text starts (after prompt)
-    int command_start_col; // Column where command text starts (after prompt)
+    int num_rows;          /// Number of rows currently used (command only)
+    int terminal_width;    /// Terminal width in columns
+    int cursor_row;        /// Cursor row position (0-based, within command)
+    int cursor_col;        /// Cursor column position (0-based)
+    int command_start_row; /// Row where command text starts (after prompt)
+    int command_start_col; /// Column where command text starts (after prompt)
 
-    // Menu/overlay tracking - tracks content displayed after command text
-    // This allows cursor positioning to account for all displayed content
-    int menu_lines;         // Number of lines the menu occupies (0 if none)
-    int ghost_text_lines;   // Extra lines from autosuggestion wrapping (0 if
-                            // none)
-    int total_display_rows; // Total rows: num_rows + ghost_text_lines +
-                            // menu_lines
-    int command_end_row;    // Row where command text ends (before ghost/menu)
-    int command_end_col;    // Column where command text ends
+    /// Menu/overlay tracking - tracks content displayed after command text
+    /// This allows cursor positioning to account for all displayed content
+    int menu_lines;         /// Number of lines the menu occupies (0 if none)
+    int ghost_text_lines;   /// Extra lines from autosuggestion wrapping (0 if
+                            /// none)
+    int total_display_rows; /// Total rows: num_rows + ghost_text_lines +
+                            /// menu_lines
+    int command_end_row;    /// Row where command text ends (before ghost/menu)
+    int command_end_col;    /// Column where command text ends
 
-    // RPROMPT tracking - right-aligned prompt on command_start_row
-    char rprompt_text[512];   // Rendered RPROMPT string (may contain ANSI)
-    int rprompt_visual_width; // Visual width excluding ANSI escapes
-    bool rprompt_fits;        // True if rprompt fits on prompt row
-    int rprompt_col;          // Starting column (0-based) for rprompt display
+    /// RPROMPT tracking - right-aligned prompt on command_start_row
+    char rprompt_text[512];   /// Rendered RPROMPT string (may contain ANSI)
+    int rprompt_visual_width; /// Visual width excluding ANSI escapes
+    bool rprompt_fits;        /// True if rprompt fits on prompt row
+    int rprompt_col;          /// Starting column (0-based) for rprompt display
 } screen_buffer_t;
 
-// ============================================================================
-// FUNCTION DECLARATIONS
-// ============================================================================
+/// ============================================================================
+/// FUNCTION DECLARATIONS
+/// ============================================================================
 
 /**
  * Initialize a screen buffer
@@ -238,9 +238,9 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length);
  */
 void screen_buffer_copy(screen_buffer_t *dest, const screen_buffer_t *src);
 
-// ============================================================================
-// PREFIX SUPPORT FUNCTIONS (Phase 2: Continuation Prompts)
-// ============================================================================
+/// ============================================================================
+/// PREFIX SUPPORT FUNCTIONS (Phase 2: Continuation Prompts)
+/// ============================================================================
 
 /**
  * Set prefix for a line (e.g., continuation prompt)
@@ -462,8 +462,116 @@ int screen_buffer_get_total_display_rows(const screen_buffer_t *buffer);
  */
 int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer);
 
+/// ============================================================================
+/// LINE INDEX (paginator cursor-math helper)
+/// ============================================================================
+///
+/// A line-index splits a `const char *` content blob into logical lines
+/// (\n-terminated) and records, per line: the byte offset into the
+/// content, the byte length (excluding the trailing newline), and the
+/// visual_height when wrapped at the given terminal width. Visual width
+/// per line is computed using screen_buffer_visual_width, which already
+/// handles ANSI escape skipping and UTF-8 wide-character (CJK / emoji)
+/// width.
+///
+/// The index is *immutable* with respect to its source content: the
+/// caller owns the content blob and must keep it alive as long as the
+/// index is in use. A SIGWINCH-style terminal width change is handled
+/// by recomputing visual_height per entry via screen_line_index_rewidth.
+///
+/// This module is pure cursor math — no terminal I/O, no allocation
+/// of the source content, no concurrency. The pager layer (which lives
+/// elsewhere) composes a screen_buffer view from a slice of the index;
+/// streaming / append-aware variants are layered on top in later steps.
+
+/**
+ * @brief One logical line in a paginated content blob
+ */
+typedef struct {
+    size_t byte_offset;   ///< Byte offset into the source content
+    size_t byte_length;   ///< Length in bytes; excludes the trailing '\n'
+    size_t visual_height; ///< Wrapped rows on the index's terminal_width
+} screen_line_index_entry_t;
+
+/**
+ * @brief Line-index over a const-char content blob
+ *
+ * `entries` is a malloc'd array of `count` items; `capacity` is the
+ * current allocation. `terminal_width` is the width used to compute
+ * each entry's `visual_height` (used for resize invalidation, see
+ * screen_line_index_rewidth). `total_visual_rows` is the sum of all
+ * `visual_height` values across entries — useful for pager scroll
+ * math (how many rows the paginated view will take when fully
+ * unrolled).
+ */
+typedef struct {
+    screen_line_index_entry_t *entries;
+    size_t count;
+    size_t capacity;
+    int terminal_width;
+    size_t total_visual_rows;
+} screen_line_index_t;
+
+/**
+ * @brief Build a line index over `content`
+ *
+ * `content` may contain embedded NULs (caller passes explicit `len`),
+ * may or may not end with a newline, may contain ANSI escape sequences
+ * (skipped for visual-width purposes), and may contain UTF-8 wide
+ * characters (counted as 2 visual columns each).
+ *
+ * `terminal_width` must be positive. A width of 0 or negative is
+ * treated as 1 for safety (each visual column always contributes at
+ * least one row).
+ *
+ * Empty content (`len == 0`) yields a zero-entry index; the function
+ * still initializes the struct to a safe state and returns 0.
+ *
+ * On success, returns 0; the caller releases the entries array with
+ * screen_line_index_free. On OOM, returns -1 and the struct is
+ * left in a safe (empty) state.
+ *
+ * @param out             Index to populate; freed first if non-empty
+ * @param content         Source content (caller owns; must outlive index)
+ * @param len             Length of content in bytes
+ * @param terminal_width  Width in columns for visual_height calculation
+ * @return 0 on success, -1 on OOM
+ */
+int screen_line_index_build(screen_line_index_t *out, const char *content,
+                            size_t len, int terminal_width);
+
+/**
+ * @brief Recompute visual_height entries for a new terminal width
+ *
+ * Used on SIGWINCH-style resize: byte_offset and byte_length are
+ * width-invariant and stay the same; only visual_height per entry
+ * and total_visual_rows change. Idempotent — re-calling with the same
+ * width is a no-op other than CPU cost.
+ *
+ * Requires the original content to still be live (the function does
+ * not re-derive byte spans; it just recomputes visual widths using
+ * the byte_offset / byte_length already on each entry).
+ *
+ * @param idx               Index to recompute in place
+ * @param content           Original content the index was built from
+ * @param len               Length of content
+ * @param new_terminal_width New terminal width in columns
+ */
+void screen_line_index_rewidth(screen_line_index_t *idx, const char *content,
+                               size_t len, int new_terminal_width);
+
+/**
+ * @brief Release the index's entries array
+ *
+ * Leaves the struct in a safe re-buildable state (entries=NULL,
+ * count=0, capacity=0). Does not free the struct itself.
+ *
+ * @param idx Index to release
+ */
+void screen_line_index_free(screen_line_index_t *idx);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SCREEN_BUFFER_H */
+#endif /// SCREEN_BUFFER_H

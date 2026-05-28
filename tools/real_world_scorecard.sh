@@ -24,7 +24,10 @@ if [ ! -d "$ROOT" ]; then
     exit 0
 fi
 
-SCRIPTS=$(find "$ROOT" -name '*.sh' -type f | sort)
+SCRIPTS=$(find "$ROOT" \
+    -path '*/_harness/*' -prune -o \
+    \( -name '*.sh' -o -name '*.bash' -o -name '*.zsh' \) \
+    -type f -print | sort)
 if [ -z "$SCRIPTS" ]; then
     echo "no scripts under $ROOT (yet)"
     exit 0
@@ -34,8 +37,17 @@ fi
 TMP=$(mktemp -t real_world.XXXXXX)
 trap 'rm -f "$TMP"' EXIT
 
+# diff_oracle's default --allowlist path is relative to its CWD
+# (tests/fuzz/differential/known_divergences.txt). meson runs the
+# scorecard from the build directory so that relative path doesn't
+# resolve. Compute the absolute allowlist path from the corpus root:
+# tests/real_world/ lives at the repo top, so the grandparent of the
+# corpus root is the repo root.
+ALLOWLIST="$(dirname "$(dirname "$ROOT")")/tests/fuzz/differential/known_divergences.txt"
+
 # shellcheck disable=SC2086  # SCRIPTS is intentionally word-split
-"$DIFF_ORACLE" --lush "$LUSH_BIN" $SCRIPTS > "$TMP" 2>&1 || true
+"$DIFF_ORACLE" --allowlist "$ALLOWLIST" --lush "$LUSH_BIN" $SCRIPTS \
+    > "$TMP" 2>&1 || true
 
 python3 - "$TMP" "$ROOT" <<'PYEOF'
 import json, sys, os

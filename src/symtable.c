@@ -25,7 +25,10 @@
 #include "symtable.h"
 
 #include "ht.h"
+#include "identifier.h"
 #include "init.h"
+#include "lle/unicode_case.h"
+#include "lle/unicode_compare.h"
 #include "lush.h"
 #include "shell_mode.h"
 
@@ -37,45 +40,48 @@
 #include <time.h>
 #include <unistd.h>
 
-// ============================================================================
-// GLOBAL STATE
-// ============================================================================
+/// ============================================================================
+/// GLOBAL STATE
+/// ============================================================================
 
-// Global manager
+/// Global manager
 static symtable_manager_t *global_manager = NULL;
 
-// Legacy compatibility structures
+/// Forward declaration so scope-pop / manager-free paths can reach
+/// the helper before its definition further down.
+static void free_arrays_in_scope(symtable_scope_t *scope);
+
+/// Legacy compatibility structures
 static symtable_t dummy_symtable = {0, NULL, NULL};
 
-// Special variable tracking
-static time_t shell_start_time = 0;  // For $SECONDS
-static unsigned int random_seed = 0; // For $RANDOM
-static int current_lineno = 0;       // For $LINENO
+/// Special variable tracking
+static time_t shell_start_time = 0;  /// For $SECONDS
+static unsigned int random_seed = 0; /// For $RANDOM
+static int current_lineno = 0;       /// For $LINENO
 
-// Constants
+/// Constants
 #define DEFAULT_HT_FLAGS (HT_STR_NONE | HT_SEED_RANDOM)
 #define MAX_SCOPE_DEPTH 256
 #define METADATA_SEPARATOR "|"
 #define METADATA_BUFFER_SIZE 64
 
-// Forward declarations
-static void cleanup_array_storage(void);
+/// Forward declarations
 
-// ============================================================================
-// STRUCTURES
-// ============================================================================
+/// ============================================================================
+/// STRUCTURES
+/// ============================================================================
 
-// Enhanced manager structure
+/// Enhanced manager structure
 struct symtable_manager {
-    symtable_scope_t *current_scope; // Current active scope
-    symtable_scope_t *global_scope;  // Global scope reference
-    size_t max_scope_level;          // Maximum nesting depth
-    bool debug_mode;                 // Debug output enabled
+    symtable_scope_t *current_scope; /// Current active scope
+    symtable_scope_t *global_scope;  /// Global scope reference
+    size_t max_scope_level;          /// Maximum nesting depth
+    bool debug_mode;                 /// Debug output enabled
 };
 
-// ============================================================================
-// METADATA SERIALIZATION UTILITIES
-// ============================================================================
+/// ============================================================================
+/// METADATA SERIALIZATION UTILITIES
+/// ============================================================================
 
 /**
  * @brief Serialize variable metadata into a string format
@@ -95,7 +101,7 @@ static char *serialize_variable(const char *value, symvar_type_t type,
         value = "";
     }
 
-    // Calculate needed size
+    /// Calculate needed size
     size_t value_len = strlen(value);
     size_t total_size = value_len + METADATA_BUFFER_SIZE;
 
@@ -132,12 +138,13 @@ static symvar_t *deserialize_variable(const char *name,
         return NULL;
     }
 
-    // Initialize defaults
+    /// Initialize defaults
     var->name = strdup(name);
     var->value = NULL;
     var->type = SYMVAR_STRING;
     var->flags = SYMVAR_NONE;
     var->scope_level = 0;
+    var->array = NULL;
     var->next = NULL;
 
     if (!var->name) {
@@ -145,7 +152,7 @@ static symvar_t *deserialize_variable(const char *name,
         return NULL;
     }
 
-    // Parse serialized string manually to handle empty values correctly
+    /// Parse serialized string manually to handle empty values correctly
     char *serialized_copy = strdup(serialized);
     if (!serialized_copy) {
         free(var->name);
@@ -153,7 +160,7 @@ static symvar_t *deserialize_variable(const char *name,
         return NULL;
     }
 
-    // Find the separators manually to handle empty fields
+    /// Find the separators manually to handle empty fields
     char *pos = serialized_copy;
     char *sep1 = strstr(pos, METADATA_SEPARATOR);
     if (sep1) {
@@ -180,9 +187,20 @@ static symvar_t *deserialize_variable(const char *name,
 
     free(serialized_copy);
 
-    // Ensure we have a value
+    /// Ensure we have a value
     if (!var->value) {
         var->value = strdup("");
+    }
+
+    /// For SYMVAR_ARRAY entries, value is the array_value_t pointer as
+    /// a hex string; parse it back into the typed array field so
+    /// callers reading symvar.array directly see the live pointer
+    /// without re-scanning value on every access.
+    if (var->type == SYMVAR_ARRAY && var->value && var->value[0]) {
+        void *ptr = NULL;
+        if (sscanf(var->value, "%p", &ptr) == 1) {
+            var->array = (array_value_t *)ptr;
+        }
     }
 
     return var;
@@ -205,9 +223,9 @@ static void free_symvar(symvar_t *var) {
     free(var);
 }
 
-// ============================================================================
-// CORE IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// CORE IMPLEMENTATION
+/// ============================================================================
 
 /**
  * @brief Create a new symbol table manager
@@ -223,7 +241,7 @@ symtable_manager_t *symtable_manager_new(void) {
         return NULL;
     }
 
-    // Create global scope
+    /// Create global scope
     symtable_scope_t *global = calloc(1, sizeof(symtable_scope_t));
     if (!global) {
         free(manager);
@@ -267,12 +285,17 @@ void symtable_manager_free(symtable_manager_t *manager) {
         return;
     }
 
-    // Pop all scopes to free memory
+    /// Pop all scopes to free memory. Each scope first surrenders
+    /// any array_value_t backing memory bound at that level
+    /// (free_arrays_in_scope) before its vars_ht is destroyed --
+    /// otherwise the serialized hex pointers vanish and we leak the
+    /// arrays.
     while (manager->current_scope &&
            manager->current_scope != manager->global_scope) {
         symtable_scope_t *old_scope = manager->current_scope;
         manager->current_scope = old_scope->parent;
 
+        free_arrays_in_scope(old_scope);
         if (old_scope->vars_ht) {
             ht_strstr_destroy(old_scope->vars_ht);
         }
@@ -280,8 +303,9 @@ void symtable_manager_free(symtable_manager_t *manager) {
         free(old_scope);
     }
 
-    // Free global scope
+    /// Free global scope (same array-cleanup-then-destroy sequence).
     if (manager->global_scope) {
+        free_arrays_in_scope(manager->global_scope);
         if (manager->global_scope->vars_ht) {
             ht_strstr_destroy(manager->global_scope->vars_ht);
         }
@@ -396,6 +420,102 @@ int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
 }
 
 /**
+ * @brief Capture the current scope for a future lexical-scope push.
+ *
+ * Returns an opaque borrowed pointer to the scope that was current at
+ * call time. Caller stores it in a `typed_fn` record (or equivalent)
+ * and feeds it to symtable_push_lexical_scope when invoking the
+ * closure. The pointer must NOT be freed by the caller; it is owned
+ * by the symtable's scope stack.
+ *
+ * @param manager Symbol table manager
+ * @return Opaque pointer to the current scope, or NULL on error
+ */
+void *symtable_capture_scope_for_lexical(symtable_manager_t *manager) {
+    if (!manager) {
+        return NULL;
+    }
+    return manager->current_scope;
+}
+
+/**
+ * @brief Push a SCOPE_LEXICAL frame with a captured parent.
+ *
+ * Identical to symtable_push_scope(SCOPE_LEXICAL, name) except that
+ * the new frame's `parent` is the supplied captured pointer, not the
+ * dynamic current_scope. This is what gives typed-function (`fn`)
+ * bodies lexical (closure) semantics per SEMANTICS §5.3: free names
+ * inside the body resolve through the declaration-site scope chain,
+ * not the call-site chain.
+ *
+ * `level` is one more than the captured parent's level (preserving
+ * the depth-limit check), and the scope's lifecycle on pop is the
+ * same as for any other scope -- only the parent linkage differs.
+ *
+ * @param manager Symbol table manager
+ * @param name Scope name for diagnostics (typically the fn name)
+ * @param captured_parent Opaque pointer from
+ *                        symtable_capture_scope_for_lexical
+ * @return 0 on success, -1 on error
+ */
+int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
+                                void *captured_parent) {
+    if (!manager || !name || !captured_parent) {
+        return -1;
+    }
+    symtable_scope_t *parent = (symtable_scope_t *)captured_parent;
+
+    if (manager->current_scope->level >= MAX_SCOPE_DEPTH) {
+        if (manager->debug_mode) {
+            fprintf(stderr, "ERROR: Maximum scope depth exceeded\n");
+        }
+        return -1;
+    }
+
+    symtable_scope_t *new_scope = calloc(1, sizeof(symtable_scope_t));
+    if (!new_scope) {
+        return -1;
+    }
+
+    new_scope->scope_type = SCOPE_LEXICAL;
+    new_scope->level = manager->current_scope->level + 1;
+    new_scope->vars_ht = ht_strstr_create(DEFAULT_HT_FLAGS);
+    new_scope->parent = parent;
+    new_scope->scope_name = strdup(name);
+
+    if (!new_scope->vars_ht || !new_scope->scope_name) {
+        if (new_scope->vars_ht) {
+            ht_strstr_destroy(new_scope->vars_ht);
+        }
+        free(new_scope->scope_name);
+        free(new_scope);
+        return -1;
+    }
+
+    /// Stash the dynamic caller so pop can restore it. The lexical
+    /// frame's `parent` field points at the captured scope (lookup
+    /// direction), but the SCOPE STACK is still LIFO -- pop must
+    /// return to whoever pushed us, not to the captured site. We
+    /// piggyback the link through a side field on the manager so
+    /// existing pop machinery can find it without growing the public
+    /// struct shape.
+    new_scope->dynamic_caller = manager->current_scope;
+
+    manager->current_scope = new_scope;
+    if (new_scope->level > manager->max_scope_level) {
+        manager->max_scope_level = new_scope->level;
+    }
+
+    if (manager->debug_mode) {
+        printf("DEBUG: Pushed lexical scope '%s' (level %zu, captured "
+               "parent level %zu)\n",
+               name, new_scope->level, parent->level);
+    }
+
+    return 0;
+}
+
+/**
  * @brief Pop the current scope from the scope stack
  *
  * Removes the current scope, freeing its hash table and memory,
@@ -404,20 +524,54 @@ int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
  * @param manager Symbol table manager
  * @return 0 on success, -1 if at global scope or invalid manager
  */
+/// Walk a scope's vars_ht and free the array_value_t backing every
+/// SYMVAR_ARRAY entry. Must run before ht_strstr_destroy on the scope,
+/// otherwise the serialized hex pointers go away and we leak the
+/// arrays. The scope's vars_ht itself is freed by the caller.
+static void free_arrays_in_scope(symtable_scope_t *scope) {
+    if (!scope || !scope->vars_ht) {
+        return;
+    }
+    ht_enum_t *e = ht_strstr_enum_create(scope->vars_ht);
+    if (!e) {
+        return;
+    }
+    const char *key;
+    const char *serialized;
+    while (ht_strstr_enum_next(e, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && var->type == SYMVAR_ARRAY && var->array) {
+            symtable_array_free(var->array);
+        }
+        free_symvar(var);
+    }
+    ht_strstr_enum_destroy(e);
+}
+
 int symtable_pop_scope(symtable_manager_t *manager) {
     if (!manager || !manager->current_scope ||
         manager->current_scope == manager->global_scope) {
-        return -1; // Can't pop global scope
+        return -1; /// Can't pop global scope
     }
 
     symtable_scope_t *old_scope = manager->current_scope;
-    manager->current_scope = old_scope->parent;
+    /// Lexical (typed-fn) frames keep their `parent` pointing at the
+    /// captured declaration site for lookup; the LIFO restore goes to
+    /// the dynamic_caller stashed at push time.
+    if (old_scope->scope_type == SCOPE_LEXICAL && old_scope->dynamic_caller) {
+        manager->current_scope = old_scope->dynamic_caller;
+    } else {
+        manager->current_scope = old_scope->parent;
+    }
 
     if (manager->debug_mode) {
         printf("DEBUG: Popped scope '%s' (level %zu)\n", old_scope->scope_name,
                old_scope->level);
     }
 
+    /// Free any array_value_t backing memory bound at this scope
+    /// before destroying the hashtable.
+    free_arrays_in_scope(old_scope);
     ht_strstr_destroy(old_scope->vars_ht);
     free(old_scope->scope_name);
     free(old_scope);
@@ -471,7 +625,7 @@ bool symtable_in_function_scope(symtable_manager_t *manager) {
         return false;
     }
 
-    // Walk the scope stack looking for a function scope
+    /// Walk the scope stack looking for a function scope
     symtable_scope_t *scope = manager->current_scope;
     while (scope) {
         if (scope->scope_type == SCOPE_FUNCTION) {
@@ -480,6 +634,13 @@ bool symtable_in_function_scope(symtable_manager_t *manager) {
         scope = scope->parent;
     }
     return false;
+}
+
+scope_type_t symtable_current_scope_type(symtable_manager_t *manager) {
+    if (!manager || !manager->current_scope) {
+        return SCOPE_GLOBAL;
+    }
+    return manager->current_scope->scope_type;
 }
 
 /**
@@ -500,14 +661,47 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    // Serialize variable data
+    /// NFC-normalize the name on ingest so NFC and NFD encodings of
+    /// the same user-visible identifier collide as one binding (the
+    /// project-wide NFC-everywhere policy). Pure-ASCII names round-trip
+    /// unchanged. The canonical form is used for the readonly probe,
+    /// the hashtable insert, and any debug output.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
+    /// Readonly enforcement (current scope). If an entry already lives
+    /// in this scope and carries SYMVAR_READONLY, refuse the write and
+    /// return SYMTABLE_ERR_READONLY so callers can surface a specific
+    /// error message. The check looks at the existing serialized entry
+    /// rather than the incoming `flags` argument so re-asserting the
+    /// readonly bit (`readonly X=1` twice) is correctly refused -- bash
+    /// matches this behavior.
+    const char *existing_serialized =
+        ht_strstr_get(manager->current_scope->vars_ht, name);
+    if (existing_serialized) {
+        symvar_t *existing = deserialize_variable(name, existing_serialized);
+        if (existing) {
+            bool readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
+            free_symvar(existing);
+            if (readonly_blocked) {
+                free(canon);
+                return SYMTABLE_ERR_READONLY;
+            }
+        }
+    }
+
+    /// Serialize variable data
     char *serialized = serialize_variable(value, SYMVAR_STRING, flags,
                                           manager->current_scope->level);
     if (!serialized) {
+        free(canon);
         return -1;
     }
 
-    // Insert into current scope's hash table
+    /// Insert into current scope's hash table
     ht_strstr_insert(manager->current_scope->vars_ht, name, serialized);
 
     free(serialized);
@@ -516,13 +710,19 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
         printf("DEBUG: Set variable '%s'='%s'\n", name, value ? value : "");
     }
 
+    free(canon);
     return 0;
 }
 
 /**
  * @brief Set a local variable in the current scope
  *
- * Convenience wrapper that sets a variable with the SYMVAR_LOCAL flag.
+ * Writes to the current scope hash table. The "local" property is
+ * carried by the scope structure itself (current vs. parent scopes),
+ * not by a flag on the variable record. Equivalent in effect to
+ * symtable_set_var with SYMVAR_NONE; kept as a separate entry point
+ * so callers expressing "this is intentionally a local write" do not
+ * have to know the flag-vs-scope distinction.
  *
  * @param manager Symbol table manager
  * @param name Variable name
@@ -531,7 +731,7 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
  */
 int symtable_set_local_var(symtable_manager_t *manager, const char *name,
                            const char *value) {
-    return symtable_set_var(manager, name, value, SYMVAR_LOCAL);
+    return symtable_set_var(manager, name, value, SYMVAR_NONE);
 }
 
 /**
@@ -551,13 +751,13 @@ int symtable_set_global_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    // Temporarily switch to global scope
+    /// Temporarily switch to global scope
     symtable_scope_t *old_scope = manager->current_scope;
     manager->current_scope = manager->global_scope;
 
     int result = symtable_set_var(manager, name, value, SYMVAR_NONE);
 
-    // Restore original scope
+    /// Restore original scope
     manager->current_scope = old_scope;
 
     return result;
@@ -569,37 +769,63 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    // Walk scope chain from current scope upward looking for the variable.
-    // If found, update that scope (preserves locality). If not, fall through
-    // to global write (POSIX default for unprefixed assignments).
+    /// NFC-normalize so the scope-walk probe matches the canonical form
+    /// stored by symtable_set_var. Without this, an `=` assignment from
+    /// an NFD-encoded reference would miss the existing NFC binding and
+    /// drop the new value into the global scope.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
+    /// Walk scope chain from current scope upward looking for the variable.
+    /// If found, update that scope (preserves locality). If not, fall through
+    /// to global write (POSIX default for unprefixed assignments).
+    ///
+    /// Readonly enforcement spans the chain: if the matching entry in
+    /// any scope carries SYMVAR_READONLY, the write is refused with
+    /// SYMTABLE_ERR_READONLY. This catches the canonical cross-scope
+    /// case (`readonly X=1` at global; `X=2` inside a function) -- bash
+    /// matches this behavior, refusing the inner assignment rather
+    /// than silently shadowing.
     symtable_scope_t *scope = manager->current_scope;
     while (scope) {
         const char *serialized = ht_strstr_get(scope->vars_ht, name);
         if (serialized) {
-            // Preserve the existing flags so locality and other attributes
-            // (export, readonly bookkeeping, etc.) survive the assignment.
-            // Mask out the unset sentinel since we are setting a value.
+            /// Preserve the existing flags so locality and other attributes
+            /// (export, readonly bookkeeping, etc.) survive the assignment.
+            /// Mask out the unset sentinel since we are setting a value.
             symvar_flags_t flags = SYMVAR_NONE;
+            bool readonly_blocked = false;
             symvar_t *existing = deserialize_variable(name, serialized);
             if (existing) {
                 flags = existing->flags & ~SYMVAR_UNSET;
+                readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
                 free_symvar(existing);
             }
+            if (readonly_blocked) {
+                free(canon);
+                return SYMTABLE_ERR_READONLY;
+            }
 
-            // Temporarily switch current_scope so symtable_set_var writes
-            // to the scope where the variable actually lives. Restore on
-            // the way out.
+            /// Temporarily switch current_scope so symtable_set_var writes
+            /// to the scope where the variable actually lives. Restore on
+            /// the way out.
             symtable_scope_t *old_scope = manager->current_scope;
             manager->current_scope = scope;
             int result = symtable_set_var(manager, name, value, flags);
             manager->current_scope = old_scope;
+            free(canon);
             return result;
         }
         scope = scope->parent;
     }
 
-    // Variable does not exist in any scope — create it globally per POSIX.
-    return symtable_set_global_var(manager, name, value);
+    /// Variable does not exist in any scope — create it globally per POSIX.
+    int result = symtable_set_global_var(manager, name, value);
+    free(canon);
+    return result;
 }
 
 /**
@@ -612,18 +838,37 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
  * @param name Variable name to look up
  * @return Allocated copy of value, or NULL if not found
  */
+static char *symtable_get_var_impl(symtable_manager_t *manager,
+                                   const char *name);
+
 char *symtable_get_var(symtable_manager_t *manager, const char *name) {
     if (!manager || !name) {
         return NULL;
     }
+    /// NFC-normalize on the read side so a lookup with NFD bytes
+    /// resolves the same binding stored under the NFC form. ASCII
+    /// names round-trip unchanged. The thin wrapper keeps the
+    /// existing function body intact -- the impl runs against the
+    /// canonical name, then the wrapper frees the buffer once
+    /// regardless of which return path the impl took.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return NULL;
+    }
+    char *result = symtable_get_var_impl(manager, canon);
+    free(canon);
+    return result;
+}
 
-    // Handle special dynamic variables
+static char *symtable_get_var_impl(symtable_manager_t *manager,
+                                   const char *name) {
+    /// Handle special dynamic variables
     if (strcmp(name, "RANDOM") == 0) {
-        // Initialize random seed on first use
+        /// Initialize random seed on first use
         if (random_seed == 0) {
             random_seed = (unsigned int)time(NULL) ^ (unsigned int)getpid();
         }
-        // Simple LCG random number generator (same as bash uses)
+        /// Simple LCG random number generator (same as bash uses)
         random_seed = random_seed * 1103515245 + 12345;
         int value = (random_seed / 65536) % 32768;
         char buffer[16];
@@ -632,7 +877,7 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
     }
 
     if (strcmp(name, "SECONDS") == 0) {
-        // Initialize start time on first use
+        /// Initialize start time on first use
         if (shell_start_time == 0) {
             shell_start_time = time(NULL);
         }
@@ -648,7 +893,7 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
         return strdup(buffer);
     }
 
-    // Handle $- (current shell option flags)
+    /// Handle $- (current shell option flags)
     if (strcmp(name, "-") == 0) {
         char flags[32];
         int pos = 0;
@@ -686,7 +931,7 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
         return strdup(flags);
     }
 
-    // Resolve nameref if applicable
+    /// Resolve nameref if applicable
     const char *resolved_name = name;
     if (symtable_is_nameref(manager, name)) {
         const char *target = symtable_resolve_nameref(manager, name, 10);
@@ -697,6 +942,18 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
 
     symvar_t *var = find_var(manager->current_scope, resolved_name);
     if (!var) {
+        return NULL;
+    }
+
+    /// Array bindings are not scalars; symtable_get_var returns NULL
+    /// so the array path (symtable_get_array / symtable_lookup) is the
+    /// only way to read them. Without this filter, get_var would
+    /// return the hex pointer string stored in var->value -- harmless
+    /// for the common bare-${arr} call sites already migrated to
+    /// symtable_lookup, but a leak for paths like ${!ref} indirection
+    /// that resolve the name and then call get_var.
+    if (var->type == SYMVAR_ARRAY) {
+        free_symvar(var);
         return NULL;
     }
 
@@ -721,8 +978,31 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
         return -1;
     }
 
-    // Mark as unset rather than removing
-    return symtable_set_var(manager, name, "", SYMVAR_UNSET);
+    /// NFC-normalize so unset by either encoding hits the canonical
+    /// binding. set_var below also normalizes; doing it here too keeps
+    /// the find_var probe consistent.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
+    /// For array bindings: free the underlying array_value_t. Read
+    /// the binding via find_var so we honor the scope chain (locals
+    /// shadow globals) and so we can drop the array's backing memory
+    /// before the scope entry gets overwritten with the UNSET marker.
+    if (manager->current_scope) {
+        symvar_t *var = find_var(manager->current_scope, name);
+        if (var && var->type == SYMVAR_ARRAY && var->array) {
+            symtable_array_free(var->array);
+        }
+        free_symvar(var);
+    }
+
+    /// Mark as unset rather than removing
+    int rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
+    free(canon);
+    return rc;
 }
 
 /* ============================================================================
@@ -739,7 +1019,7 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
  * @param manager Manager instance
  * @param name Nameref variable name
  * @param target Name of the variable to reference
- * @param flags Additional flags (SYMVAR_LOCAL, etc.)
+ * @param flags Additional flags (SYMVAR_NAMEREF_FLAG, SYMVAR_EXPORTED, etc.)
  * @return 0 on success, -1 on error
  */
 int symtable_set_nameref(symtable_manager_t *manager, const char *name,
@@ -748,12 +1028,12 @@ int symtable_set_nameref(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    // Cannot create a nameref to itself
+    /// Cannot create a nameref to itself
     if (strcmp(name, target) == 0) {
         return -1;
     }
 
-    // Set the variable with the target name as value and nameref flag
+    /// Set the variable with the target name as value and nameref flag
     return symtable_set_var(manager, name, target, flags | SYMVAR_NAMEREF_FLAG);
 }
 
@@ -776,23 +1056,23 @@ const char *symtable_resolve_nameref(symtable_manager_t *manager,
 
     symvar_t *var = find_var(manager->current_scope, name);
     if (!var) {
-        return name; // Not found, return original name
+        return name; /// Not found, return original name
     }
 
-    // Check if this is a nameref
+    /// Check if this is a nameref
     if (!(var->flags & SYMVAR_NAMEREF_FLAG)) {
         free_symvar(var);
-        return name; // Not a nameref, return original name
+        return name; /// Not a nameref, return original name
     }
 
-    // Get the target name
+    /// Get the target name
     const char *target = var->value;
     if (!target || !*target) {
         free_symvar(var);
-        return name; // No target, return original
+        return name; /// No target, return original
     }
 
-    // Make a copy since we need to free var
+    /// Make a copy since we need to free var
     char *target_copy = strdup(target);
     free_symvar(var);
 
@@ -800,20 +1080,20 @@ const char *symtable_resolve_nameref(symtable_manager_t *manager,
         return name;
     }
 
-    // Recursively resolve (with depth limit)
+    /// Recursively resolve (with depth limit)
     const char *resolved =
         symtable_resolve_nameref(manager, target_copy, max_depth - 1);
 
-    // If resolution returns the copy, we need to keep it
-    // Otherwise, free the copy
+    /// If resolution returns the copy, we need to keep it
+    /// Otherwise, free the copy
     if (resolved != target_copy) {
         free(target_copy);
         return resolved;
     }
 
-    // The resolved name is our copy - caller shouldn't free this
-    // This is a limitation - we should use a static buffer or allocate
-    // For now, return the copy (small memory leak potential)
+    /// The resolved name is our copy - caller shouldn't free this
+    /// This is a limitation - we should use a static buffer or allocate
+    /// For now, return the copy (small memory leak potential)
     return target_copy;
 }
 
@@ -878,17 +1158,48 @@ int symtable_set_flags(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    // Get current value
+    /// Get current value
     char *value = symtable_get_var(manager, name);
     if (!value) {
-        // Variable doesn't exist, create it with empty value
+        /// Variable doesn't exist, create it with empty value
         value = strdup("");
     }
 
-    // Set with new flags
+    /// Set with new flags
     int result = symtable_set_var(manager, name, value, flags);
     free(value);
     return result;
+}
+
+char *symtable_apply_case_attr_alloc(const char *value, symvar_flags_t flags) {
+    if (!value || *value == '\0') {
+        return NULL;
+    }
+    bool lower = (flags & SYMVAR_LOWERCASE) != 0;
+    bool upper = (flags & SYMVAR_UPPERCASE) != 0;
+    if (!lower && !upper) {
+        return NULL;
+    }
+    /// Case folding can grow byte length on some codepoints (German
+    /// ß -> SS being the canonical example). 4x input length plus a
+    /// small floor covers the worst case for the project's case
+    /// table; values longer than the resulting buffer would have to
+    /// be implausibly fold-heavy, so a single allocation suffices.
+    size_t input_len = strlen(value);
+    size_t output_size = input_len * 4 + 8;
+    char *output = malloc(output_size);
+    if (!output) {
+        return NULL;
+    }
+    size_t written =
+        lower ? lle_utf8_tolower(value, input_len, output, output_size)
+              : lle_utf8_toupper(value, input_len, output, output_size);
+    if (written == (size_t)-1) {
+        free(output);
+        return NULL;
+    }
+    output[written] = '\0';
+    return output;
 }
 
 /**
@@ -929,16 +1240,16 @@ int symtable_export_var(symtable_manager_t *manager, const char *name) {
         return -1;
     }
 
-    // Get current value
+    /// Get current value
     char *value = symtable_get_var(manager, name);
     if (!value) {
         return -1;
     }
 
-    // Reset with export flag
+    /// Reset with export flag
     int result = symtable_set_var(manager, name, value, SYMVAR_EXPORTED);
 
-    // Actually export to system environment
+    /// Actually export to system environment
     if (result == 0) {
         setenv(name, value, 1);
     }
@@ -960,7 +1271,7 @@ int symtable_export_var(symtable_manager_t *manager, const char *name) {
  */
 char **symtable_get_environ(symtable_manager_t *manager) {
     if (!manager || !manager->global_scope || !manager->global_scope->vars_ht) {
-        // Return empty environment
+        /// Return empty environment
         char **env = malloc(sizeof(char *));
         if (env) {
             env[0] = NULL;
@@ -968,7 +1279,7 @@ char **symtable_get_environ(symtable_manager_t *manager) {
         return env;
     }
 
-    // Initial capacity for environment array
+    /// Initial capacity for environment array
     size_t capacity = 64;
     size_t count = 0;
     char **env = malloc(capacity * sizeof(char *));
@@ -976,7 +1287,7 @@ char **symtable_get_environ(symtable_manager_t *manager) {
         return NULL;
     }
 
-    // Iterate through all variables in the global scope
+    /// Iterate through all variables in the global scope
     ht_enum_t *e = ht_strstr_enum_create(manager->global_scope->vars_ht);
     if (!e) {
         free(env);
@@ -986,29 +1297,29 @@ char **symtable_get_environ(symtable_manager_t *manager) {
     const char *name;
     const char *serialized;
     while (ht_strstr_enum_next(e, &name, &serialized)) {
-        // Deserialize to check flags
+        /// Deserialize to check flags
         symvar_t *var = deserialize_variable(name, serialized);
         if (!var) {
             continue;
         }
 
-        // Check if variable is exported
+        /// Check if variable is exported
         if (var->flags & SYMVAR_EXPORTED) {
-            // Build "name=value" string
+            /// Build "name=value" string
             size_t name_len = strlen(name);
             size_t value_len = var->value ? strlen(var->value) : 0;
-            char *entry = malloc(name_len + 1 + value_len + 1); // name=value\0
+            char *entry = malloc(name_len + 1 + value_len + 1); /// name=value\0
             if (entry) {
                 snprintf(entry, name_len + 1 + value_len + 1, "%s=%s", name,
                          var->value ? var->value : "");
 
-                // Grow array if needed
+                /// Grow array if needed
                 if (count + 1 >= capacity) {
                     capacity *= 2;
                     char **new_env = realloc(env, capacity * sizeof(char *));
                     if (!new_env) {
                         free(entry);
-                        // Free what we've allocated so far
+                        /// Free what we've allocated so far
                         for (size_t i = 0; i < count; i++) {
                             free(env[i]);
                         }
@@ -1026,7 +1337,7 @@ char **symtable_get_environ(symtable_manager_t *manager) {
             }
         }
 
-        // Free the deserialized variable
+        /// Free the deserialized variable
         free(var->name);
         free(var->value);
         free(var);
@@ -1034,7 +1345,7 @@ char **symtable_get_environ(symtable_manager_t *manager) {
 
     ht_strstr_enum_destroy(e);
 
-    // NULL-terminate the array
+    /// NULL-terminate the array
     env[count] = NULL;
 
     return env;
@@ -1073,7 +1384,7 @@ void symtable_dump_scope(symtable_manager_t *manager, scope_type_t scope) {
         return;
     }
 
-    // Find the requested scope in the scope chain
+    /// Find the requested scope in the scope chain
     symtable_scope_t *target_scope = NULL;
     symtable_scope_t *current = manager->current_scope;
 
@@ -1107,6 +1418,9 @@ void symtable_dump_scope(symtable_manager_t *manager, scope_type_t scope) {
     case SCOPE_CONDITIONAL:
         scope_name = "conditional";
         break;
+    case SCOPE_LEXICAL:
+        scope_name = "lexical (fn)";
+        break;
     }
 
     printf("=== %s scope (level %zu) ===\n", scope_name, target_scope->level);
@@ -1116,7 +1430,7 @@ void symtable_dump_scope(symtable_manager_t *manager, scope_type_t scope) {
         return;
     }
 
-    // Enumerate all variables in this scope's hashtable
+    /// Enumerate all variables in this scope's hashtable
     ht_enum_t *enum_iter = ht_strstr_enum_create(target_scope->vars_ht);
     if (!enum_iter) {
         printf("  (enumeration failed)\n");
@@ -1159,7 +1473,7 @@ void symtable_dump_all_scopes(symtable_manager_t *manager) {
     printf("Max scope level: %zu\n", manager->max_scope_level);
     printf("\n");
 
-    // Walk through the scope chain from current to global
+    /// Walk through the scope chain from current to global
     symtable_scope_t *current = manager->current_scope;
     int scope_count = 0;
 
@@ -1184,6 +1498,9 @@ void symtable_dump_all_scopes(symtable_manager_t *manager) {
         case SCOPE_CONDITIONAL:
             type_name = "conditional";
             break;
+        case SCOPE_LEXICAL:
+            type_name = "lexical";
+            break;
         }
 
         printf("--- Scope #%d: %s (%s, level %zu) ---\n", scope_count++,
@@ -1192,7 +1509,7 @@ void symtable_dump_all_scopes(symtable_manager_t *manager) {
         if (!current->vars_ht) {
             printf("  (no hashtable)\n");
         } else {
-            // Enumerate variables in this scope
+            /// Enumerate variables in this scope
             ht_enum_t *enum_iter = ht_strstr_enum_create(current->vars_ht);
             if (!enum_iter) {
                 printf("  (enumeration failed)\n");
@@ -1221,9 +1538,9 @@ void symtable_dump_all_scopes(symtable_manager_t *manager) {
     printf("=== End Scope Dump ===\n");
 }
 
-// ============================================================================
-// CONVENIENCE API (High-level functions for common operations)
-// ============================================================================
+/// ============================================================================
+/// CONVENIENCE API (High-level functions for common operations)
+/// ============================================================================
 
 /**
  * @brief Get access to the global symbol table manager
@@ -1399,7 +1716,7 @@ int symtable_export_global(const char *name) {
  * @return 0 on success, -1 on failure
  */
 int symtable_unexport_global(const char *name) {
-    // Get current value and reset without export flag
+    /// Get current value and reset without export flag
     char *value = symtable_get_global(name);
     if (!value) {
         return -1;
@@ -1413,7 +1730,13 @@ int symtable_unexport_global(const char *name) {
 /**
  * @brief Set a special shell variable
  *
- * Special variables like $?, $!, $$ have the SYMVAR_SPECIAL_VAR flag.
+ * Special variables like $?, $!, $$ are dispatched by name (RANDOM,
+ * SECONDS, etc. have dedicated handling in symtable_get_var); the
+ * previous SYMVAR_SPECIAL_VAR flag carried no observable behavior
+ * because no read path consulted it. This entry point remains as a
+ * documented intent-marker for callers that want to express "this is
+ * a shell-internal value" without expecting the flag system to do
+ * anything special.
  *
  * @param name Variable name
  * @param value Variable value
@@ -1423,7 +1746,7 @@ int symtable_set_special_global(const char *name, const char *value) {
     if (!global_manager) {
         return -1;
     }
-    return symtable_set_var(global_manager, name, value, SYMVAR_SPECIAL_VAR);
+    return symtable_set_var(global_manager, name, value, SYMVAR_NONE);
 }
 
 /**
@@ -1534,10 +1857,39 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
 
     const char *key, *serialized;
     while (ht_strstr_enum_next(enum_iter, &key, &serialized)) {
-        /* Deserialize to get clean value */
+        /// Deserialize to get clean value
         symvar_t *var = deserialize_variable(key, serialized);
         if (var && !(var->flags & SYMVAR_UNSET)) {
             callback(key, var->value, userdata);
+        }
+        free_symvar(var);
+    }
+
+    ht_strstr_enum_destroy(enum_iter);
+}
+
+void symtable_enumerate_current_scope_vars(symtable_manager_t *manager,
+                                           void (*callback)(const char *name,
+                                                            const char *value,
+                                                            symvar_type_t type,
+                                                            void *userdata),
+                                           void *userdata) {
+    if (!manager || !manager->current_scope ||
+        !manager->current_scope->vars_ht || !callback) {
+        return;
+    }
+
+    ht_enum_t *enum_iter =
+        ht_strstr_enum_create(manager->current_scope->vars_ht);
+    if (!enum_iter) {
+        return;
+    }
+
+    const char *key, *serialized;
+    while (ht_strstr_enum_next(enum_iter, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && !(var->flags & SYMVAR_UNSET)) {
+            callback(key, var->value, var->type, userdata);
         }
         free_symvar(var);
     }
@@ -1551,7 +1903,7 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
  * @return Number of variables in global scope (currently unimplemented)
  */
 size_t symtable_count_global_vars(void) {
-    // TODO: Implement variable counting
+    /// TODO: Implement variable counting
     return 0;
 }
 
@@ -1577,9 +1929,9 @@ char **symtable_get_environment_array(void) {
  */
 void symtable_free_environment_array(char **env) { symtable_free_environ(env); }
 
-// ============================================================================
-// SYSTEM INTERFACE (Essential functions for shell operation)
-// ============================================================================
+/// ============================================================================
+/// SYSTEM INTERFACE (Essential functions for shell operation)
+/// ============================================================================
 
 /**
  * @brief Initialize the global symbol table
@@ -1589,7 +1941,7 @@ void symtable_free_environment_array(char **env) { symtable_free_environ(env); }
  */
 void init_symtable(void) {
     if (global_manager) {
-        return; // Already initialized
+        return; /// Already initialized
     }
 
     global_manager = symtable_manager_new();
@@ -1606,9 +1958,10 @@ void init_symtable(void) {
  * Should be called during shell shutdown.
  */
 void free_global_symtable(void) {
-    // Free array storage first (arrays are separate from regular variables)
-    cleanup_array_storage();
-
+    /// Storage unification: arrays live in scope hashtables (their
+    /// backing memory is reclaimed via free_arrays_in_scope as each
+    /// scope is destroyed in symtable_manager_free), so there is no
+    /// longer a separate side-table to clean up.
     if (global_manager) {
         symtable_manager_free(global_manager);
         global_manager = NULL;
@@ -1627,7 +1980,7 @@ void set_exit_status(int status) {
     snprintf(status_str, sizeof(status_str), "%d", status);
     symtable_set_special_global("?", status_str);
 
-    // Also update the global variable for consistency
+    /// Also update the global variable for consistency
     last_exit_status = status;
 }
 
@@ -1645,9 +1998,9 @@ char **get_environ_array(void) { return symtable_get_environment_array(); }
  */
 void free_environ_array(char **env) { symtable_free_environment_array(env); }
 
-// ============================================================================
-// LEGACY COMPATIBILITY (For string management and other subsystems)
-// ============================================================================
+/// ============================================================================
+/// LEGACY COMPATIBILITY (For string management and other subsystems)
+/// ============================================================================
 
 /**
  * @brief Create a new symbol table (legacy compatibility)
@@ -1718,12 +2071,12 @@ symtable_entry_t *add_to_symtable(char *name) {
         return NULL;
     }
 
-    // Set variable with empty value if it doesn't exist
+    /// Set variable with empty value if it doesn't exist
     if (!symtable_var_exists(global_manager, name)) {
         symtable_set_var(global_manager, name, "", SYMVAR_NONE);
     }
 
-    // Return a dummy pointer for compatibility
+    /// Return a dummy pointer for compatibility
     return (symtable_entry_t *)1;
 }
 
@@ -1815,9 +2168,9 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val) {
     (void)val;
 }
 
-// ============================================================================
-// ENHANCED API COMPATIBILITY
-// ============================================================================
+/// ============================================================================
+/// ENHANCED API COMPATIBILITY
+/// ============================================================================
 
 /**
  * @brief Check if libhashtable implementation is available
@@ -1827,7 +2180,7 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val) {
  * @return Always true
  */
 bool symtable_libht_available(void) {
-    return true; // Always available since this is the main implementation
+    return true; /// Always available since this is the main implementation
 }
 
 /**
@@ -2054,9 +2407,9 @@ void symtable_benchmark_opt_comparison(int iterations) {
  */
 int symtable_opt_test(void) { return symtable_libht_test(); }
 
-// ============================================================================
-// SPECIAL VARIABLE SETTERS
-// ============================================================================
+/// ============================================================================
+/// SPECIAL VARIABLE SETTERS
+/// ============================================================================
 
 /**
  * @brief Set the current line number for $LINENO
@@ -2092,9 +2445,9 @@ void symtable_seed_random(unsigned int seed) {
     }
 }
 
-// ============================================================================
-// ARRAY VARIABLE IMPLEMENTATION (Phase 1: Extended Language Support)
-// ============================================================================
+/// ============================================================================
+/// ARRAY VARIABLE IMPLEMENTATION (Phase 1: Extended Language Support)
+/// ============================================================================
 
 /** Initial capacity for indexed arrays */
 #define ARRAY_INITIAL_CAPACITY 8
@@ -2116,7 +2469,7 @@ array_value_t *symtable_array_create(bool is_associative) {
     array->max_index = 0;
 
     if (is_associative) {
-        // Create hash table for associative array
+        /// Create hash table for associative array
         array->assoc_map = ht_strstr_create(DEFAULT_HT_FLAGS);
         if (!array->assoc_map) {
             free(array);
@@ -2126,7 +2479,7 @@ array_value_t *symtable_array_create(bool is_associative) {
         array->indices = NULL;
         array->capacity = 0;
     } else {
-        // Allocate initial capacity for indexed array
+        /// Allocate initial capacity for indexed array
         array->capacity = ARRAY_INITIAL_CAPACITY;
         array->elements = calloc(array->capacity, sizeof(char *));
         array->indices = calloc(array->capacity, sizeof(int));
@@ -2151,11 +2504,11 @@ void symtable_array_free(array_value_t *array) {
     }
 
     if (array->is_associative) {
-        // Free associative array hash table
+        /// Free associative array hash table
         if (array->assoc_map) {
             ht_strstr_destroy(array->assoc_map);
         }
-        // Free insertion-order tracking (strdup'd keys + the array)
+        /// Free insertion-order tracking (strdup'd keys + the array)
         if (array->assoc_insertion_order) {
             for (size_t i = 0; i < array->assoc_insertion_count; i++) {
                 free(array->assoc_insertion_order[i]);
@@ -2163,7 +2516,7 @@ void symtable_array_free(array_value_t *array) {
             free(array->assoc_insertion_order);
         }
     } else {
-        // Free indexed array elements
+        /// Free indexed array elements
         if (array->elements) {
             for (size_t i = 0; i < array->count; i++) {
                 free(array->elements[i]);
@@ -2188,7 +2541,7 @@ static size_t array_find_index_pos(array_value_t *array, int index,
                                    bool *found) {
     *found = false;
 
-    // Binary search for the index
+    /// Binary search for the index
     size_t left = 0;
     size_t right = array->count;
 
@@ -2204,12 +2557,10 @@ static size_t array_find_index_pos(array_value_t *array, int index,
         }
     }
 
-    return left; // Insertion point
+    return left; /// Insertion point
 }
 
-/**
- * @brief Ensure array has capacity for one more element
- */
+/// @brief Ensure array has capacity for one more element
 static int array_ensure_capacity(array_value_t *array) {
     if (array->count >= array->capacity) {
         size_t new_capacity = array->capacity * ARRAY_GROWTH_FACTOR;
@@ -2222,7 +2573,7 @@ static int array_ensure_capacity(array_value_t *array) {
         int *new_indices = realloc(array->indices, new_capacity * sizeof(int));
 
         if (!new_elements || !new_indices) {
-            // Restore on partial failure
+            /// Restore on partial failure
             if (new_elements)
                 array->elements = new_elements;
             if (new_indices)
@@ -2234,7 +2585,7 @@ static int array_ensure_capacity(array_value_t *array) {
         array->indices = new_indices;
         array->capacity = new_capacity;
 
-        // Zero new memory
+        /// Zero new memory
         for (size_t i = array->count; i < new_capacity; i++) {
             array->elements[i] = NULL;
             array->indices[i] = 0;
@@ -2256,11 +2607,11 @@ int symtable_array_set_index(array_value_t *array, int index,
         return -1;
     }
 
-    // Handle negative indices (Bash-style: -1 = last element)
+    /// Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return -1; // Still negative = out of bounds
+            return -1; /// Still negative = out of bounds
         }
     }
 
@@ -2268,16 +2619,16 @@ int symtable_array_set_index(array_value_t *array, int index,
     size_t pos = array_find_index_pos(array, index, &found);
 
     if (found) {
-        // Update existing element
+        /// Update existing element
         free(array->elements[pos]);
         array->elements[pos] = value ? strdup(value) : NULL;
     } else {
-        // Insert new element
+        /// Insert new element
         if (array_ensure_capacity(array) < 0) {
             return -1;
         }
 
-        // Shift elements to make room
+        /// Shift elements to make room
         for (size_t i = array->count; i > pos; i--) {
             array->elements[i] = array->elements[i - 1];
             array->indices[i] = array->indices[i - 1];
@@ -2306,11 +2657,11 @@ const char *symtable_array_get_index(array_value_t *array, int index) {
         return NULL;
     }
 
-    // Handle negative indices (Bash-style: -1 = last element)
+    /// Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return NULL; // Still negative = out of bounds
+            return NULL; /// Still negative = out of bounds
         }
     }
 
@@ -2325,22 +2676,50 @@ const char *symtable_array_get_index(array_value_t *array, int index) {
 }
 
 /**
+ * @brief Normalize an associative-array key to NFC for hash lookup
+ *
+ * Wraps lle_unicode_normalize_nfc_alloc so callers can hand off the
+ * NULL-input check / fallback policy in one line. The hashtable
+ * hashes its keys bytewise; storing NFC bytes (and looking them up
+ * by NFC bytes) lets NFC vs NFD pairs of the same user-visible
+ * string collapse to a single entry. ASCII inputs hit the primitive
+ * fast path and round-trip via strdup with no normalization
+ * machinery exercised.
+ *
+ * Returns a heap-allocated NFC copy (caller frees) or NULL if the
+ * primitive could not allocate. Callers fall back to the raw key
+ * bytes on NULL so a memory-tight system stays functional with
+ * byte-level semantics; without this fallback, a NULL return would
+ * propagate as a failed set/get/unset.
+ */
+static char *assoc_key_nfc(const char *key) {
+    return lle_unicode_normalize_nfc_alloc(key);
+}
+
+/**
  * @brief Set an element in an associative array
+ *
+ * Keys are stored in NFC; NFC and NFD encodings of the same
+ * user-visible string therefore collapse to a single entry. The
+ * insertion-order list (zsh-style iteration) also holds NFC keys
+ * so listings emit canonical bytes.
  */
 int symtable_array_set_assoc(array_value_t *array, const char *key,
                              const char *value) {
     if (!array || !array->is_associative || !key) {
         return -1;
     }
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
 
-    bool is_new = !ht_strstr_get(array->assoc_map, key);
+    bool is_new = !ht_strstr_get(array->assoc_map, lookup_key);
 
-    // Check if key exists and update count
+    /// Check if key exists and update count
     if (is_new) {
         array->count++;
-        /* Append to insertion-order list. zsh semantic: a key keeps
-         * its original position when overwritten; only first-set
-         * appends. (Issue #69.) */
+        /// Append to insertion-order list. zsh semantic: a key keeps
+        /// its original position when overwritten; only first-set
+        /// appends. (Issue #69.)
         if (array->assoc_insertion_count >= array->assoc_insertion_capacity) {
             size_t new_cap = array->assoc_insertion_capacity
                                  ? array->assoc_insertion_capacity * 2
@@ -2351,12 +2730,12 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
                 array->assoc_insertion_order = grown;
                 array->assoc_insertion_capacity = new_cap;
             }
-            /* If realloc fails, we still set the value; iteration just
-             * won't include this key in insertion order. Hashtable
-             * fallback path remains correct. */
+            /// If realloc fails, we still set the value; iteration just
+            /// won't include this key in insertion order. Hashtable
+            /// fallback path remains correct.
         }
         if (array->assoc_insertion_count < array->assoc_insertion_capacity) {
-            char *key_copy = strdup(key);
+            char *key_copy = strdup(lookup_key);
             if (key_copy) {
                 array->assoc_insertion_order[array->assoc_insertion_count++] =
                     key_copy;
@@ -2364,19 +2743,26 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
         }
     }
 
-    ht_strstr_insert(array->assoc_map, key, value ? value : "");
+    ht_strstr_insert(array->assoc_map, lookup_key, value ? value : "");
+    free(nfc);
     return 0;
 }
 
 /**
  * @brief Get an element from an associative array
+ *
+ * Lookup key is NFC-normalized so callers passing either NFC or NFD
+ * encodings of the same user-visible string find the same entry.
  */
 const char *symtable_array_get_assoc(array_value_t *array, const char *key) {
     if (!array || !array->is_associative || !key) {
         return NULL;
     }
-
-    return ht_strstr_get(array->assoc_map, key);
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
+    const char *result = ht_strstr_get(array->assoc_map, lookup_key);
+    free(nfc);
+    return result;
 }
 
 /**
@@ -2420,11 +2806,11 @@ int symtable_array_unset_index(array_value_t *array, int index) {
         return -1;
     }
 
-    // Handle negative indices (Bash-style: -1 = last element)
+    /// Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return -1; // Still negative = out of bounds
+            return -1; /// Still negative = out of bounds
         }
     }
 
@@ -2432,20 +2818,20 @@ int symtable_array_unset_index(array_value_t *array, int index) {
     size_t pos = array_find_index_pos(array, index, &found);
 
     if (!found) {
-        return 0; // Not an error to unset nonexistent element
+        return 0; /// Not an error to unset nonexistent element
     }
 
-    // Free the element
+    /// Free the element
     free(array->elements[pos]);
 
-    // Shift remaining elements
+    /// Shift remaining elements
     for (size_t i = pos; i < array->count - 1; i++) {
         array->elements[i] = array->elements[i + 1];
         array->indices[i] = array->indices[i + 1];
     }
     array->count--;
 
-    // Recalculate max_index if we removed the max
+    /// Recalculate max_index if we removed the max
     if ((size_t)index == array->max_index && array->count > 0) {
         array->max_index = (size_t)array->indices[array->count - 1];
     } else if (array->count == 0) {
@@ -2462,16 +2848,21 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
     if (!array || !array->is_associative || !key) {
         return -1;
     }
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
 
-    if (ht_strstr_get(array->assoc_map, key)) {
-        ht_strstr_remove(array->assoc_map, key);
+    if (ht_strstr_get(array->assoc_map, lookup_key)) {
+        ht_strstr_remove(array->assoc_map, lookup_key);
         array->count--;
 
-        /* Remove from insertion-order list. Linear scan + memmove down;
-         * acceptable since assoc-array unset is uncommon and the list
-         * is typically small. (Issue #69.) */
+        /// Remove from insertion-order list. Linear scan + memmove down;
+        /// acceptable since assoc-array unset is uncommon and the list
+        /// is typically small. The stored entries are NFC bytes
+        /// (set path uses lookup_key, which is the NFC form), so the
+        /// strcmp here matches byte-for-byte against the same canonical
+        /// form. (Issue #69.)
         for (size_t i = 0; i < array->assoc_insertion_count; i++) {
-            if (strcmp(array->assoc_insertion_order[i], key) == 0) {
+            if (strcmp(array->assoc_insertion_order[i], lookup_key) == 0) {
                 free(array->assoc_insertion_order[i]);
                 size_t to_move = array->assoc_insertion_count - i - 1;
                 if (to_move > 0) {
@@ -2485,6 +2876,7 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
         }
     }
 
+    free(nfc);
     return 0;
 }
 
@@ -2510,14 +2902,14 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /* Iteration order is mode-aware (Issue #69):
-         *   - zsh / lush mode: insertion order (matches zsh native;
-         *     lush curated default for predictability + determinism)
-         *   - bash / POSIX mode: hashtable bucket order (matches
-         *     bash's documented behavior for compat)
-         * If insertion-order tracking is empty (e.g. realloc failure
-         * during a previous set), fall back to hashtable order so we
-         * never return fewer keys than the caller expects. */
+        /// Iteration order is mode-aware (Issue #69):
+        ///   - zsh / lush mode: insertion order (matches zsh native;
+        ///     lush curated default for predictability + determinism)
+        ///   - bash / POSIX mode: hashtable bucket order (matches
+        ///     bash's documented behavior for compat)
+        /// If insertion-order tracking is empty (e.g. realloc failure
+        /// during a previous set), fall back to hashtable order so we
+        /// never return fewer keys than the caller expects.
         shell_mode_t mode = shell_mode_get();
         bool use_insertion_order =
             (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
@@ -2529,7 +2921,7 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
                 keys[i] = strdup(array->assoc_insertion_order[i]);
             }
         } else {
-            // Get keys from hash table (bucket order)
+            /// Get keys from hash table (bucket order)
             ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
             if (enumerator) {
                 size_t i = 0;
@@ -2543,7 +2935,7 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
             }
         }
     } else {
-        // Convert indices to strings
+        /// Convert indices to strings
         for (size_t i = 0; i < array->count; i++) {
             char buf[32];
             snprintf(buf, sizeof(buf), "%d", array->indices[i]);
@@ -2576,10 +2968,10 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /* Same mode-aware iteration as symtable_array_get_keys —
-         * critical that BOTH functions use the same order so that
-         * keys[i] and values[i] pair correctly when callers fetch
-         * both (e.g. ${(kv)assoc_map}). (Issue #69.) */
+        /// Same mode-aware iteration as symtable_array_get_keys —
+        /// critical that BOTH functions use the same order so that
+        /// keys[i] and values[i] pair correctly when callers fetch
+        /// both (e.g. ${(kv)assoc_map}). (Issue #69.)
         shell_mode_t mode = shell_mode_get();
         bool use_insertion_order =
             (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
@@ -2593,7 +2985,7 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
                 values[i] = strdup(v ? v : "");
             }
         } else {
-            // Get values from hash table (bucket order)
+            /// Get values from hash table (bucket order)
             ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
             if (enumerator) {
                 size_t i = 0;
@@ -2607,7 +2999,7 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
             }
         }
     } else {
-        // Copy indexed array values
+        /// Copy indexed array values
         for (size_t i = 0; i < array->count; i++) {
             values[i] =
                 array->elements[i] ? strdup(array->elements[i]) : strdup("");
@@ -2625,13 +3017,13 @@ char *symtable_array_expand(array_value_t *array, const char *sep) {
         return strdup("");
     }
 
-    // Default separator is space
+    /// Default separator is space
     if (!sep) {
         sep = " ";
     }
     size_t sep_len = strlen(sep);
 
-    // Calculate total length needed
+    /// Calculate total length needed
     size_t total_len = 0;
     size_t value_count;
     char **values = symtable_array_get_values(array, &value_count);
@@ -2655,7 +3047,7 @@ char *symtable_array_expand(array_value_t *array, const char *sep) {
         return strdup("");
     }
 
-    // Build the result string
+    /// Build the result string
     result[0] = '\0';
     for (size_t i = 0; i < value_count; i++) {
         if (i > 0) {
@@ -2669,72 +3061,61 @@ char *symtable_array_expand(array_value_t *array, const char *sep) {
     return result;
 }
 
-// ============================================================================
-// ARRAY VARIABLE MANAGEMENT (Global storage integration)
-// ============================================================================
+/// ============================================================================
+/// ARRAY VARIABLE MANAGEMENT (Global storage integration)
+/// ============================================================================
 
-/** Hash table for array storage (separate from regular variables) */
-static ht_strstr_t *array_storage = NULL;
-
-/** Initialize array storage if needed */
-static void ensure_array_storage(void) {
-    if (!array_storage) {
-        array_storage = ht_strstr_create(DEFAULT_HT_FLAGS);
-    }
-}
-
-/**
- * @brief Free all arrays and the array storage hash table
- *
- * Called during shell shutdown to release all array memory.
- */
-static void cleanup_array_storage(void) {
-    if (!array_storage) {
-        return;
-    }
-
-    // Iterate through all arrays and free them
-    ht_enum_t *e = ht_strstr_enum_create(array_storage);
-    if (e) {
-        const char *key;
-        const char *ptr_str;
-        while (ht_strstr_enum_next(e, &key, &ptr_str)) {
-            void *ptr;
-            if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
-                symtable_array_free((array_value_t *)ptr);
-            }
-        }
-        ht_strstr_enum_destroy(e);
-    }
-
-    ht_strstr_destroy(array_storage);
-    array_storage = NULL;
-}
+/// Storage unification: the global array_storage side-table has been
+/// removed. Arrays live in per-scope vars_ht as SYMVAR_ARRAY-tagged
+/// entries; the backing memory is freed by free_arrays_in_scope when
+/// each scope is destroyed (see symtable_pop_scope and
+/// symtable_manager_free).
 
 /**
  * @brief Set a variable as an array
+ *
+ * Single storage path: write a SYMVAR_ARRAY-tagged entry into the
+ * current scope's vars_ht. The pointer is encoded as a hex string
+ * in the serialized value field so the existing ht_strstr storage
+ * can carry it verbatim; deserialize parses it back into
+ * symvar.array on read.
  */
 int symtable_set_array(const char *name, array_value_t *array) {
-    if (!name || !array) {
+    if (!name || !array || !global_manager || !global_manager->current_scope) {
         return -1;
     }
 
-    ensure_array_storage();
-    if (!array_storage) {
+    /// NFC-normalize the name so NFC- and NFD-encoded references to the
+    /// same identifier write the same binding (project NFC-everywhere).
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
         return -1;
     }
+    name = canon;
 
-    // Free existing array if present
+    /// Free any existing array bound to this name -- assignment to an
+    /// already-array variable replaces the underlying array_value_t.
+    /// symtable_get_array walks the scope chain; if it finds an old
+    /// array, free its backing memory before we overwrite.
     array_value_t *existing = symtable_get_array(name);
-    if (existing) {
+    if (existing && existing != array) {
         symtable_array_free(existing);
     }
 
-    // Store pointer as string (hacky but works with existing ht_strstr)
+    /// Encode the pointer as a hex string in the serialized value;
+    /// deserialize will parse it back into symvar.array.
     char ptr_str[32];
     snprintf(ptr_str, sizeof(ptr_str), "%p", (void *)array);
 
-    ht_strstr_insert(array_storage, name, ptr_str);
+    char *serialized = serialize_variable(ptr_str, SYMVAR_ARRAY, SYMVAR_NONE,
+                                          global_manager->current_scope->level);
+    if (!serialized) {
+        free(canon);
+        return -1;
+    }
+    ht_strstr_insert(global_manager->current_scope->vars_ht, name, serialized);
+    free(serialized);
+    free(canon);
     return 0;
 }
 
@@ -2742,21 +3123,51 @@ int symtable_set_array(const char *name, array_value_t *array) {
  * @brief Get an array variable
  */
 array_value_t *symtable_get_array(const char *name) {
-    if (!name || !array_storage) {
+    if (!name) {
+        return NULL;
+    }
+    if (!global_manager || !global_manager->current_scope) {
         return NULL;
     }
 
-    const char *ptr_str = ht_strstr_get(array_storage, name);
-    if (!ptr_str) {
+    /// NFC-normalize on the read side too -- a lookup with NFD bytes
+    /// must resolve the same binding stored under the NFC form.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
         return NULL;
     }
 
-    void *ptr;
-    if (sscanf(ptr_str, "%p", &ptr) != 1) {
+    /// Single source of truth: the scope chain. Arrays live in
+    /// per-scope vars_ht the same way scalars do (storage
+    /// unification phase B), so a local array defined in a function
+    /// dies when the function scope is popped -- matching bash. The
+    /// global array_storage side-table is still allocated (set_array
+    /// also writes there for the lle_shell_hooks PROMPT_COMMAND walk
+    /// and the shutdown cleanup that frees array_value_t backing
+    /// memory) but is no longer consulted as a get fallback: that
+    /// fallback was leaking local arrays out of their function scope.
+    symvar_t *var = find_var(global_manager->current_scope, canon);
+    free(canon);
+    if (!var) {
         return NULL;
     }
+    array_value_t *result = (var->type == SYMVAR_ARRAY) ? var->array : NULL;
+    free_symvar(var);
+    return result;
+}
 
-    return (array_value_t *)ptr;
+symvar_flags_t symtable_array_get_flags(const char *name) {
+    array_value_t *arr = symtable_get_array(name);
+    return arr ? arr->flags : SYMVAR_NONE;
+}
+
+int symtable_array_add_flags(const char *name, symvar_flags_t add) {
+    array_value_t *arr = symtable_get_array(name);
+    if (!arr) {
+        return -1;
+    }
+    arr->flags |= add;
+    return 0;
 }
 
 /**
@@ -2764,6 +3175,53 @@ array_value_t *symtable_get_array(const char *name) {
  */
 bool symtable_is_array(const char *name) {
     return symtable_get_array(name) != NULL;
+}
+
+/*
+ * Implementation of symtable_lookup. Contract documented in symtable.h.
+ * Walks the array side-table first (catches both indexed lists and
+ * associative maps, distinguished by the is_associative flag inside
+ * array_value_t); on miss falls through to the scalar scope chain.
+ * NULL on both paths returns LUSH_VALUE_NONE.
+ */
+bool symtable_lookup(const char *name, lush_value_view_t *out) {
+    if (!name || !out) {
+        return false;
+    }
+    out->kind = LUSH_VALUE_NONE;
+    out->scalar_value = NULL;
+    out->array = NULL;
+
+    array_value_t *arr = symtable_get_array(name);
+    if (arr) {
+        out->kind = arr->is_associative ? LUSH_VALUE_MAP : LUSH_VALUE_LIST;
+        out->array = arr;
+        return true;
+    }
+
+    char *scalar = symtable_get_var(symtable_manager(), name);
+    if (scalar) {
+        out->kind = LUSH_VALUE_SCALAR;
+        out->scalar_value = scalar;
+        return true;
+    }
+
+    return false;
+}
+
+/*
+ * Implementation of lush_value_view_clear. Contract documented in
+ * symtable.h. Idempotent: zeroes the struct after freeing so a
+ * follow-up call is safe.
+ */
+void lush_value_view_clear(lush_value_view_t *view) {
+    if (!view) {
+        return;
+    }
+    free(view->scalar_value);
+    view->scalar_value = NULL;
+    view->array = NULL;
+    view->kind = LUSH_VALUE_NONE;
 }
 
 /**
@@ -2779,9 +3237,17 @@ int symtable_set_array_element(const char *name, const char *subscript,
         return -1;
     }
 
+    /// Whole-array readonly enforcement: if the existing array
+    /// carries SYMVAR_READONLY (set by `declare -ar`, `declare -Ar`,
+    /// or `readonly NAME` against an existing array), refuse the
+    /// element write with the same sentinel the scalar paths use.
+    /// New-array creation falls through the NULL branch below.
     array_value_t *array = symtable_get_array(name);
+    if (array && (array->flags & SYMVAR_READONLY)) {
+        return SYMTABLE_ERR_READONLY;
+    }
     if (!array) {
-        // Create new indexed array
+        /// Create new indexed array
         array = symtable_array_create(false);
         if (!array) {
             return -1;
@@ -2795,25 +3261,25 @@ int symtable_set_array_element(const char *name, const char *subscript,
     if (array->is_associative) {
         return symtable_array_set_assoc(array, subscript, value);
     } else {
-        // Parse subscript as integer
+        /// Parse subscript as integer
         char *endptr;
         long index = strtol(subscript, &endptr, 10);
         if (*endptr != '\0') {
-            // Not a valid integer - could be associative key
-            // For now, treat as error for indexed array
+            /// Not a valid integer - could be associative key
+            /// For now, treat as error for indexed array
             return -1;
         }
 
-        // Adjust for 1-indexed arrays (zsh mode)
-        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        // internal 0
+        /// Adjust for 1-indexed arrays (zsh mode)
+        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
+        /// internal 0
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
-                return -1; // In 1-indexed mode, index 0 and below are invalid
+                return -1; /// In 1-indexed mode, index 0 and below are invalid
             }
-            index--; // Convert 1-indexed to 0-indexed internally
+            index--; /// Convert 1-indexed to 0-indexed internally
         } else if (index < 0) {
-            return -1; // 0-indexed mode doesn't allow negative here
+            return -1; /// 0-indexed mode doesn't allow negative here
         }
 
         return symtable_array_set_index(array, (int)index, value);
@@ -2847,16 +3313,17 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
             return NULL;
         }
 
-        // Adjust for 1-indexed arrays (zsh mode)
-        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        // internal 0
+        /// Adjust for 1-indexed arrays (zsh mode)
+        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
+        /// internal 0
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
-                return NULL; // In 1-indexed mode, index 0 and below are invalid
+                return NULL; /// In 1-indexed mode, index 0 and below are
+                             /// invalid
             }
-            index--; // Convert 1-indexed to 0-indexed internally
+            index--; /// Convert 1-indexed to 0-indexed internally
         } else if (index < 0) {
-            return NULL; // 0-indexed mode doesn't allow negative here
+            return NULL; /// 0-indexed mode doesn't allow negative here
         }
 
         result = symtable_array_get_index(array, (int)index);
@@ -2865,29 +3332,35 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
     return result ? strdup(result) : NULL;
 }
 
-/**
- * @brief Enumerate all arrays with callback
+/*
+ * Implementation of symtable_enumerate_arrays. Contract documented in
+ * symtable.h. With the storage unification, arrays live in the global
+ * scope's vars_ht (or in active local scopes); this iteration walks
+ * the global scope's hashtable and invokes the callback for every
+ * SYMVAR_ARRAY entry that's not currently UNSET. Local-scope arrays
+ * are intentionally not surfaced -- they're transient to function
+ * invocations and out of scope for shell-level enumeration.
  */
 void symtable_enumerate_arrays(void (*callback)(const char *name,
                                                 array_value_t *array,
                                                 void *userdata),
                                void *userdata) {
-    if (!callback || !array_storage) {
+    if (!callback || !global_manager || !global_manager->global_scope ||
+        !global_manager->global_scope->vars_ht) {
         return;
     }
-
-    ht_enum_t *e = ht_strstr_enum_create(array_storage);
+    ht_enum_t *e = ht_strstr_enum_create(global_manager->global_scope->vars_ht);
     if (!e) {
         return;
     }
-
-    const char *name, *ptr_str;
-    while (ht_strstr_enum_next(e, &name, &ptr_str)) {
-        void *ptr;
-        if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
-            callback(name, (array_value_t *)ptr, userdata);
+    const char *key, *serialized;
+    while (ht_strstr_enum_next(e, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && var->type == SYMVAR_ARRAY && var->array &&
+            !(var->flags & SYMVAR_UNSET)) {
+            callback(key, var->array, userdata);
         }
+        free_symvar(var);
     }
-
     ht_strstr_enum_destroy(e);
 }

@@ -45,10 +45,10 @@ extern "C" {
  * @brief Notification type for visual styling
  */
 typedef enum {
-    LLE_NOTIFICATION_HINT,    /**< Dim gray - unobtrusive hints */
-    LLE_NOTIFICATION_INFO,    /**< Cyan - informational messages */
-    LLE_NOTIFICATION_WARNING, /**< Yellow - warning messages */
-    LLE_NOTIFICATION_ERROR    /**< Red - error messages */
+    LLE_NOTIFICATION_HINT,    ///< Dim gray - unobtrusive hints
+    LLE_NOTIFICATION_INFO,    ///< Cyan - informational messages
+    LLE_NOTIFICATION_WARNING, ///< Yellow - warning messages
+    LLE_NOTIFICATION_ERROR    ///< Red - error messages
 } lle_notification_type_t;
 
 /**
@@ -59,8 +59,8 @@ typedef enum {
  */
 typedef enum {
     LLE_NOTIF_ACTION_NONE = 0,
-    LLE_NOTIF_ACTION_UP_ARROW,   /**< Up arrow at first line */
-    LLE_NOTIF_ACTION_DOWN_ARROW, /**< Down arrow at last line */
+    LLE_NOTIF_ACTION_UP_ARROW,   ///< Up arrow at first line
+    LLE_NOTIF_ACTION_DOWN_ARROW, ///< Down arrow at last line
 } lle_notification_trigger_action_t;
 
 /**
@@ -70,12 +70,11 @@ typedef enum {
  * and trigger information for suppress-on-repeat logic.
  */
 typedef struct lle_notification_state {
-    char
-        message[LLE_NOTIFICATION_MAX_MESSAGE]; /**< Notification message text */
-    lle_notification_type_t type;              /**< Visual style type */
-    bool visible; /**< Whether notification is currently visible */
+    char message[LLE_NOTIFICATION_MAX_MESSAGE]; ///< Notification message text
+    lle_notification_type_t type;               ///< Visual style type
+    bool visible; ///< Whether notification is currently visible
     lle_notification_trigger_action_t
-        trigger_action; /**< Action that triggered this notification */
+        trigger_action; ///< Action that triggered this notification
 } lle_notification_state_t;
 
 /* ============================================================================
@@ -201,4 +200,4 @@ lle_notification_get_trigger_action(const lle_notification_state_t *state);
 }
 #endif
 
-#endif /* LLE_NOTIFICATION_H */
+#endif /// LLE_NOTIFICATION_H

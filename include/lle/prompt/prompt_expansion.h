@@ -70,4 +70,4 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
 }
 #endif
 
-#endif /* LLE_PROMPT_EXPANSION_H */
+#endif // LLE_PROMPT_EXPANSION_H

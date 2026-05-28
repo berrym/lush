@@ -238,4 +238,4 @@ static const char *test_framework_current_name = "(none)";
         }                                                                      \
     } while (0)
 
-#endif /* LUSH_TEST_FRAMEWORK_H */
+#endif // LUSH_TEST_FRAMEWORK_H

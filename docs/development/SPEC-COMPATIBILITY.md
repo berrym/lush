@@ -1,8 +1,19 @@
 # Lush Compatibility Specification
 
-**Status**: APPROVED  
-**Date**: 2026-01-12  
+**Status**: APPROVED
+**Date**: 2026-01-12
 **Decisions Made**: Session 119
+
+**Reading note (2026-05-23):** the four-surface configuration model
+named here has since been codified in two canonical documents that
+take precedence on conflict: [`PHILOSOPHY.md`](../PHILOSOPHY.md)
+sections 2-5 (identity, polyglot, configuration surfaces, POSIX-as-
+baseline) and [`CONFIGURATION.md`](../CONFIGURATION.md) (the `mode`,
+`set`, `setopt`/`shopt`, `config` surfaces with the decision tree).
+The value model that scripts cross when "shell profiles" change is
+specified in [`SEMANTICS.md`](../SEMANTICS.md). Treat this document
+as the original architectural decisions and verification targets;
+treat the canonical docs as the current normative reference.
 
 ---
 

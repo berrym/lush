@@ -1,6 +1,11 @@
 # Builtin Commands Reference
 
-**All 50 shell builtin commands in Lush v1.5.0**
+**All 65 registered builtin entries (60 distinct commands) in Lush v1.5.0**
+
+Five entries are aliases that share an implementation: `.` ↔ `source`,
+`[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
+`printenv` ↔ `env`. The canonical registry lives in
+`src/builtins/builtins.c` (the static `builtins[]` array).
 
 ---
 
@@ -16,16 +21,19 @@
 
 ## Overview
 
-Lush provides 48 builtin commands. These execute within the shell process without spawning external programs, making them faster and giving them access to shell internals.
+Lush provides 60 distinct builtin commands (65 registry entries including
+five aliases). These execute within the shell process without spawning
+external programs, making them faster and giving them access to shell
+internals.
 
 ### Builtin Categories
 
 | Category | Commands |
 |----------|----------|
 | POSIX Standard | `:`, `.`, `break`, `continue`, `eval`, `exec`, `exit`, `export`, `readonly`, `return`, `set`, `shift`, `trap`, `unset` |
-| POSIX Utilities | `alias`, `bg`, `cd`, `command`, `fc`, `fg`, `getopts`, `hash`, `jobs`, `pwd`, `read`, `test`, `times`, `type`, `ulimit`, `umask`, `unalias`, `wait` |
-| Extended | `declare`, `echo`, `false`, `help`, `history`, `local`, `printf`, `source`, `true`, `typeset`, `[` |
-| Lush-Specific | `clear`, `config`, `debug`, `display`, `network`, `setopt`, `terminal`, `unsetopt` |
+| POSIX Utilities | `alias`, `bg`, `cd`, `command`, `disown`, `env`, `fc`, `fg`, `getopts`, `hash`, `jobs`, `printenv`, `pwd`, `read`, `test`, `times`, `type`, `ulimit`, `umask`, `unalias`, `wait` |
+| Extended | `declare`, `dirs`, `echo`, `false`, `help`, `history`, `let`, `local`, `mapfile`, `popd`, `print`, `printf`, `pushd`, `readarray`, `shopt`, `source`, `true`, `typeset`, `[` |
+| Lush-Specific | `analyze`, `clear`, `config`, `debug`, `display`, `lint`, `mode`, `network`, `setopt`, `terminal`, `unsetopt` |
 
 ---
 
@@ -155,10 +163,16 @@ Set shell options and positional parameters.
 
 ```bash
 # Set options
-set -e                # Exit on error
-set -u                # Error on unset variables
-set -x                # Trace execution
+set -e                # Exit on error (errexit)
+set -u                # Error on unset variables (nounset)
+set -x                # Trace execution (xtrace)
+set -n                # Read commands but don't execute (noexec)
 set -o errexit        # Long form
+
+# Trap inheritance into functions
+set -o errtrace       # ERR trap follows into function bodies (-E)
+set -o functrace      # DEBUG/RETURN traps follow into function bodies (-T)
+set -o pipefail       # Pipeline fails on any non-zero stage
 
 # Disable options
 set +e                # Disable exit on error
@@ -174,7 +188,12 @@ set
 set -o
 ```
 
-See [CONFIGURATION.md](CONFIGURATION.md) for all options.
+`errtrace` and `functrace` shape the inheritance of the ERR / DEBUG /
+RETURN pseudo-signal traps. Without them, an ERR trap fires only at a
+function's call site on non-zero return, and DEBUG/RETURN do not fire
+inside function bodies -- matching bash's defaults. With them, the
+trap follows execution into the body. See [CONFIGURATION.md](CONFIGURATION.md)
+for the complete option list.
 
 ### `shift`
 
@@ -259,6 +278,32 @@ command ls            # Run ls, not alias
 command -v ls         # Show how ls would be executed
 command -V ls         # Verbose description
 command -p ls         # Use default PATH
+```
+
+### `disown`
+
+Remove jobs from the shell's job list, or mark them so they don't
+receive SIGHUP when the shell exits.
+
+```bash
+sleep 100 &
+disown                # Drop the most-recent job from job control
+disown %1             # Drop job 1
+disown -h %2          # Keep job 2, but don't send SIGHUP on shell exit
+disown -a             # Drop all jobs
+```
+
+### `env` / `printenv`
+
+Print or modify the process environment. `printenv` is an alias for
+`env` with no command argument.
+
+```bash
+env                   # Print all environment variables
+env FOO=bar cmd args  # Run cmd with FOO=bar added/overridden
+env -i cmd            # Run cmd with an empty environment
+printenv              # Same as `env` with no args
+printenv FOO          # Print just FOO
 ```
 
 ### `fc`
@@ -438,7 +483,7 @@ Declare variables with attributes.
 ```bash
 declare var=value     # Declare variable
 declare -i num=42     # Integer
-declare -a arr        # Indexed array
+declare -a arr        # Indexed array (use this form for arrays)
 declare -A map        # Associative array
 declare -r const=val  # Read-only
 declare -x var        # Export
@@ -448,6 +493,28 @@ declare -n ref=other  # Nameref
 declare -p var        # Print declaration
 declare -f func       # Print function
 declare -F            # List function names
+
+# Array literals as arguments
+declare -a arr=(a b c)        # Three-element indexed array
+declare arr=(a b c)           # Auto-promoted to indexed array
+declare data="(literal)"      # Stays scalar (quoted -- not an array)
+```
+
+The parser distinguishes the unquoted `name=(...)` array-literal form
+from a quoted scalar like `data="(literal)"` via an internal sentinel
+prefix on argv (see `src/parser.c`); `declare` and `typeset` route
+the array form into `symtable_set_array`, the scalar form into
+`symtable_set_var`.
+
+### `dirs`
+
+Display the directory stack maintained by `pushd` / `popd`.
+
+```bash
+dirs                  # Print stack on one line
+dirs -p               # One entry per line
+dirs -v               # Numbered entries
+dirs -c               # Clear the stack
 ```
 
 ### `echo`
@@ -496,17 +563,74 @@ history -r            # Read from file
 history -w            # Write to file
 ```
 
+### `let`
+
+Evaluate arithmetic expressions; exits non-zero if the last expression
+is 0.
+
+```bash
+let x=5+3             # x is set to 8
+let "x = 5 + 3"       # Same, with quoted spaces
+let x++ y--           # Multiple expressions
+let "x > 0" && echo positive
+```
+
 ### `local`
 
-Declare local variables in functions.
+Declare local variables in functions. The variable dies with the
+function scope -- matching bash and zsh, and verified by lush's
+storage-unification work (arrays now respect scope identically to
+scalars).
 
 ```bash
 my_func() {
-    local var=value   # Local to function
-    local -i num=42   # Local integer
-    local -a arr      # Local array
-    local -n ref=$1   # Local nameref
+    local var=value         # Local scalar
+    local -i num=42         # Local integer
+    local -a arr            # Local indexed array (declaration)
+    local arr=(a b c)       # Local indexed array (literal)
+    local -n ref=$1         # Local nameref
+    local data="(literal)"  # Scalar -- quoted (...) is not an array
 }
+```
+
+The unquoted `local arr=(...)` form is distinguished from
+`local data="(...)"` at parser level (see `declare` above); both
+forms can coexist in the same function.
+
+### `mapfile` / `readarray`
+
+Read lines from stdin into an indexed array.
+
+```bash
+mapfile -t lines < input.txt    # Read file into lines[], strip newlines
+mapfile -t -n 10 first10        # Read at most 10 lines
+mapfile -t -s 2 rest             # Skip first 2 lines
+readarray -t arr < <(seq 1 5)    # Same as mapfile; bash alias
+```
+
+### `popd`
+
+Pop a directory off the stack and change to the new top. See `pushd`
+for the inverse.
+
+```bash
+popd                  # Pop top of stack, cd to new top
+popd +1               # Remove entry at offset 1
+popd -n               # Pop without changing directory
+```
+
+### `print`
+
+Zsh-style print. Like `echo` but with more options.
+
+```bash
+print "Hello"               # Print with trailing newline
+print -n "no newline"       # Suppress trailing newline
+print -l one two three      # One argument per line
+print -r "raw \n"           # Disable backslash escape processing
+print -u 2 "to stderr"      # Print to fd 2
+print -f "%d items\n" 7     # printf-style
+print -P "%F{red}red%f"     # Process zsh prompt-style escapes
 ```
 
 ### `printf`
@@ -523,6 +647,34 @@ printf "%*s\n" 10 "dynamic"
 printf "%.*f\n" 2 3.14159
 ```
 
+### `pushd`
+
+Push the current directory onto the stack and change to a new
+directory. Use `popd` to return, `dirs` to inspect.
+
+```bash
+pushd /tmp            # Push pwd, cd /tmp
+pushd                 # Swap top two stack entries
+pushd +1              # Rotate stack
+pushd -n /opt         # Push without changing directory
+```
+
+### `shopt`
+
+Bash-style shell options. Operates on the same feature matrix as
+`setopt`/`unsetopt` (the spelling differs; the effect doesn't).
+
+```bash
+shopt                       # List all options with state
+shopt -s extglob            # Enable extended globbing
+shopt -u nullglob           # Disable nullglob
+shopt -p extglob            # Print as `shopt -s extglob`
+shopt extglob               # Test current state (exit 0 = on)
+```
+
+See [CONFIGURATION.md](CONFIGURATION.md) for the full feature matrix
+and the canonical lush spelling.
+
 ### `true`
 
 Return success status.
@@ -537,6 +689,19 @@ done
 ---
 
 ## Lush-Specific Builtins
+
+### `analyze`
+
+Run the full script analyzer (info / warnings / errors), the same
+machine that powers `--analyze` on the command line and the predictive
+type-mismatch warnings in `debug analyze`. Useful as a pre-commit /
+pre-deploy gate.
+
+```bash
+analyze script.sh                 # Full analysis with default format
+analyze --format=json script.sh   # JSON output for tooling
+analyze --strict script.sh        # Treat warnings as errors
+```
 
 ### `clear`
 
@@ -600,17 +765,93 @@ See [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) for complete documentation.
 
 ### `display`
 
-Control display system.
+Manage the layered display system and the Lush Line Editor (LLE). The
+top-level surface and its `lle` sub-router live in
+`src/builtins/bin_display.c`; per-subcommand handlers live in
+`src/builtins/display/lle_*.c`.
 
 ```bash
-display status        # System status
-display lle diagnostics  # LLE status
-display features      # Enabled features
-display themes        # Available themes
-display stats         # Performance stats
-display config        # Configuration
-display help          # Full documentation
+# Top-level
+display status         # Display-controller status snapshot
+display features       # Enabled rendering features
+display themes         # Available themes
+display stats          # Performance counters
+display config         # Effective display config
+display help           # Inline help
 ```
+
+#### `display lle` subcommands
+
+```bash
+# Status / diagnostics
+display lle status              # LLE state + capability snapshot
+display lle diagnostics         # LLE health + warnings
+display lle reset               # Hard reset; --soft / --terminal variants
+
+# Feature toggles (sugar over config.display.* keys)
+display lle autosuggestions on|off
+display lle syntax on|off
+display lle transient on|off
+display lle hot-reload on|off
+display lle newline-before on|off
+display lle multiline on|off
+
+# Theme + completion
+display lle theme [list|set <name>|export]
+display lle completion [list|reload|help]
+
+# Keybindings (sugar over ~/.config/lush/keybindings.toml)
+display lle keybindings [list|reload|actions]
+
+# History
+display lle history [status|dedup|nav-dedup|nav-unique]
+
+# Customization surfaces (LLE Phase 3)
+display lle widget  [list|add NAME 'CMD'|remove NAME|show NAME]
+display lle hook    [list|add HOOK WIDGET|remove HOOK WIDGET]
+display lle segment [list|add NAME VAR|remove NAME|show NAME]
+```
+
+The customization trio composes by design: `widget` defines the work,
+`hook` decides when to invoke it (line-init / pre-command /
+post-command / completion-start / etc.), `segment` surfaces the
+result in the prompt by tracking a shell variable. See
+[CONFIGURATION.md](CONFIGURATION.md) for the configuration-surface
+model these subcommands fit into.
+
+### `lint`
+
+Lint a script for style and correctness issues, optionally applying
+the safe automatic fixes. Companion to `analyze` -- where `analyze`
+reports everything, `lint` focuses on actionable issues.
+
+```bash
+lint script.sh                # Report issues
+lint --fix script.sh          # Apply safe automatic fixes
+lint --unsafe-fixes script.sh # Apply all fixes, including ones a
+                              # reviewer should look at
+lint --dry-run script.sh      # Preview fixes without applying
+```
+
+### `mode`
+
+Select the active shell mode preset. The four presets (`posix`,
+`bash`, `zsh`, `lush`) configure the feature matrix and a small set
+of defaults; per SEMANTICS.md they are presentation/preset
+configuration over a unified engine, NOT separate engines.
+
+```bash
+mode                  # Print the active mode
+mode lush             # Switch to lush mode (default)
+mode bash             # Switch to bash mode
+mode zsh              # Switch to zsh mode
+mode posix            # Switch to strict POSIX mode
+```
+
+`set -o posix`/`set -o bash`/`set -o zsh`/`set -o lush` are accepted
+as bridges, but `mode` is the canonical entry point. See
+[CONFIGURATION.md](CONFIGURATION.md) for the four-surface
+configuration model.
 
 ### `network`
 
@@ -717,21 +958,27 @@ terminal capabilities # Capability detection
 
 ## Quick Reference
 
-### All 50 Builtins
+### All 66 Builtins (61 distinct, alphabetical)
 
 ```
-:           .           [           alias       bg
-break       cd          clear       command     config
-continue    debug       declare     display     echo
-eval        exec        exit        export      false
-fc          fg          getopts     hash        help
-history     jobs        local       network     printf
-pwd         read        readonly    return      set
-setopt      shift       source      terminal    test
-times       trap        true        type        typeset
-ulimit      umask       unalias     unset       unsetopt
-wait
+:           .           [           alias       analyze
+bg          break       cd          clear       command
+config      continue    debug       declare     dirs
+disown      display     echo        env         eval
+exec        exit        export      false       fc
+fg          getopts     hash        help        history
+jobs        let         lint        local       mapfile
+mode        network     popd        print       printenv
+printf      pushd       pwd         read        readarray
+readonly    return      set         setopt      shift
+shopt       source      terminal    test        times
+trap        true        type        typeset     ulimit
+umask       unalias     unset       unsetopt    wait
 ```
+
+Five entries are aliases (same underlying impl): `.` ↔ `source`,
+`[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
+`printenv` ↔ `env`. Distinct command count is 60.
 
 ### By Purpose
 
@@ -740,20 +987,23 @@ wait
 | Flow control | `break`, `continue`, `return`, `exit` |
 | Loops | `for`, `while`, `until` (keywords, not builtins) |
 | Conditionals | `test`, `[`, `if` (keyword) |
-| Variables | `declare`, `export`, `local`, `readonly`, `unset`, `typeset` |
+| Variables | `declare`, `export`, `local`, `readonly`, `unset`, `typeset`, `let` |
 | Functions | `return`, `local`, `declare -f` |
-| Jobs | `bg`, `fg`, `jobs`, `wait` |
+| Jobs | `bg`, `disown`, `fg`, `jobs`, `wait` |
 | Signals | `trap` |
-| I/O | `echo`, `printf`, `read` |
-| Directory | `cd`, `pwd` |
+| I/O | `echo`, `print`, `printf`, `read`, `mapfile`, `readarray` |
+| Directory | `cd`, `pwd`, `pushd`, `popd`, `dirs` |
 | History | `fc`, `history` |
 | Aliases | `alias`, `unalias` |
-| Shell config | `set`, `setopt`, `unsetopt`, `config` |
+| Shell config | `set`, `setopt`, `unsetopt`, `shopt`, `mode`, `config` |
 | Commands | `command`, `type`, `hash`, `eval`, `exec`, `.`, `source` |
+| Environment | `env`, `printenv`, `export` |
 | Debugging | `debug` |
+| Static analysis | `analyze`, `lint` |
 | Display | `display`, `clear`, `terminal` |
 | Resources | `ulimit`, `umask`, `times` |
 | Options | `getopts`, `shift` |
+| Networking | `network` |
 
 ### Exit Codes
 

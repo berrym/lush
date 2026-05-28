@@ -7,6 +7,7 @@
  */
 
 #include "builtins.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -24,11 +25,11 @@
  */
 int bin_local(int argc, char **argv) {
     if (argc == 1) {
-        // No arguments - just return success (bash behavior)
+        /// No arguments - just return success (bash behavior)
         return 0;
     }
 
-    // Get the current symbol table manager
+    /// Get the current symbol table manager
     symtable_manager_t *manager = symtable_get_global_manager();
     if (!manager) {
         executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
@@ -37,7 +38,17 @@ int bin_local(int argc, char **argv) {
         return 1;
     }
 
-    // Check if we're in a function scope
+    /// Zsh's local is a thin alias for typeset/declare with the full
+    /// option grammar (-a, -A, -i, -r, -x, ...) and accepts top-level
+    /// calls (treats them as declaring a global). Delegate to bin_declare
+    /// for the whole package when running under zsh mode. Bash and POSIX
+    /// modes keep the strict bin_local semantics: top-level call errors,
+    /// and the only recognized option is -n (nameref).
+    if (shell_mode_get() == SHELL_MODE_ZSH) {
+        return bin_declare(argc, argv);
+    }
+
+    /// Check if we're in a function scope.
     size_t current_level = symtable_current_level(manager);
     if (current_level == 0) {
         source_location_t loc = builtin_get_source_location();
@@ -74,20 +85,20 @@ int bin_local(int argc, char **argv) {
         return 1;
     }
 
-    // Parse options
+    /// Parse options
     bool opt_nameref = false;
     int opt_idx = 1;
 
     while (opt_idx < argc && argv[opt_idx][0] == '-') {
         const char *opt = argv[opt_idx];
 
-        // Handle -- to stop option processing
+        /// Handle -- to stop option processing
         if (strcmp(opt, "--") == 0) {
             opt_idx++;
             break;
         }
 
-        // Process each character in the option string
+        /// Process each character in the option string
         for (int i = 1; opt[i]; i++) {
             switch (opt[i]) {
             case 'n':
@@ -104,13 +115,24 @@ int bin_local(int argc, char **argv) {
         opt_idx++;
     }
 
-    // Process each argument
+    /// Process each argument
     for (int i = opt_idx; i < argc; i++) {
         char *arg = argv[i];
+        /// Parser-internal sentinel: an arg whose first byte is \x1F
+        /// came from the unquoted `name=(...)` array-literal form
+        /// (see src/parser.c). Strip the sentinel and remember we are
+        /// looking at an array-literal assignment; without the
+        /// sentinel, the same value shape (after quote-stripping)
+        /// could equally be a scalar `local data="(...)"`.
+        bool is_array_literal = false;
+        if (arg[0] == '\x1F') {
+            arg++;
+            is_array_literal = true;
+        }
         char *eq = strchr(arg, '=');
 
         if (eq) {
-            // Assignment: local var=value or local -n ref=target
+            /// Assignment: local var=value or local -n ref=target
             size_t name_len = eq - arg;
             char *name = malloc(name_len + 1);
             if (!name) {
@@ -123,7 +145,7 @@ int bin_local(int argc, char **argv) {
             strncpy(name, arg, name_len);
             name[name_len] = '\0';
 
-            // Validate variable name
+            /// Validate variable name
             if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
                 executor_error_report(
                     current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -145,8 +167,11 @@ int bin_local(int argc, char **argv) {
             char *value = eq + 1;
 
             if (opt_nameref) {
-                // Create local nameref: local -n ref=target
-                symvar_flags_t flags = SYMVAR_LOCAL | SYMVAR_NAMEREF_FLAG;
+                /// Create local nameref: local -n ref=target.
+                /// Locality is determined by the scope this write
+                /// targets (the function's current scope), not by a
+                /// flag bit; the prior SYMVAR_LOCAL is gone.
+                symvar_flags_t flags = SYMVAR_NAMEREF_FLAG;
                 if (symtable_set_nameref(manager, name, value, flags) != 0) {
                     executor_error_report(current_executor,
                                           SHELL_ERR_SCOPE_ERROR,
@@ -155,8 +180,71 @@ int bin_local(int argc, char **argv) {
                     free(name);
                     return 1;
                 }
+            } else if (is_array_literal && value && value[0] == '(') {
+                /// Array literal: local arr=(a b c). The parser
+                /// recognized the unquoted (...) form and prefixed the
+                /// argv with the sentinel above. Build the array
+                /// element-by-element, matching bin_declare's existing
+                /// -a parser.
+                array_value_t *arr = symtable_array_create(false);
+                if (!arr) {
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_SCOPE_ERROR,
+                                          builtin_get_source_location(),
+                                          "failed to create array");
+                    free(name);
+                    return 1;
+                }
+                const char *p = value + 1;
+                int idx = 0;
+                while (*p && *p != ')') {
+                    while (*p && isspace(*p)) {
+                        p++;
+                    }
+                    if (*p == ')' || !*p) {
+                        break;
+                    }
+                    const char *elem_start = p;
+                    bool in_quote = false;
+                    char quote_char = 0;
+                    while (*p && (in_quote || (!isspace(*p) && *p != ')'))) {
+                        if (!in_quote && (*p == '"' || *p == '\'')) {
+                            in_quote = true;
+                            quote_char = *p;
+                        } else if (in_quote && *p == quote_char) {
+                            in_quote = false;
+                        }
+                        p++;
+                    }
+                    size_t elem_len = (size_t)(p - elem_start);
+                    if (elem_len > 0) {
+                        char *elem = malloc(elem_len + 1);
+                        if (elem) {
+                            const char *src = elem_start;
+                            size_t copy_len = elem_len;
+                            if (copy_len >= 2 &&
+                                (src[0] == '"' || src[0] == '\'') &&
+                                src[copy_len - 1] == src[0]) {
+                                src++;
+                                copy_len -= 2;
+                            }
+                            memcpy(elem, src, copy_len);
+                            elem[copy_len] = '\0';
+                            symtable_array_set_index(arr, idx++, elem);
+                            free(elem);
+                        }
+                    }
+                }
+                if (symtable_set_array(name, arr) != 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_SCOPE_ERROR,
+                        builtin_get_source_location(), "failed to store array");
+                    symtable_array_free(arr);
+                    free(name);
+                    return 1;
+                }
             } else {
-                // Set the local variable
+                /// Set the local variable
                 if (symtable_set_local_var(manager, name, value) != 0) {
                     executor_error_report(current_executor,
                                           SHELL_ERR_SCOPE_ERROR,
@@ -169,8 +257,8 @@ int bin_local(int argc, char **argv) {
 
             free(name);
         } else {
-            // Declaration only: local var
-            // Validate variable name
+            /// Declaration only: local var
+            /// Validate variable name
             if (!arg[0] || (!isalpha(arg[0]) && arg[0] != '_')) {
                 executor_error_report(
                     current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -226,7 +314,7 @@ int bin_local(int argc, char **argv) {
                 return 1;
             }
 
-            // Declare the local variable with empty value
+            /// Declare the local variable with empty value
             if (symtable_set_local_var(manager, arg, "") != 0) {
                 executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
                                       builtin_get_source_location(),

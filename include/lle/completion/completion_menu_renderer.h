@@ -59,14 +59,14 @@ extern "C" {
  * Controls how menu is formatted and displayed.
  */
 typedef struct {
-    bool show_category_headers;   // Show "completing <type>" headers
-    bool show_type_indicators;    // Show type indicators (e.g., "/", "$")
-    bool use_multi_column;        // Use multi-column layout
-    bool highlight_selection;     // Highlight selected item
-    size_t max_rows;              // Maximum rows to render
-    size_t terminal_width;        // Terminal width for layout
-    const char *selection_prefix; // Prefix for selected item (e.g., "> ")
-    const char *item_separator;   // Separator between items (default: "  ")
+    bool show_category_headers;   /**< Show "completing <type>" headers */
+    bool show_type_indicators;    /**< Show type indicators (e.g., "/", "$") */
+    bool use_multi_column;        /**< Use multi-column layout */
+    bool highlight_selection;     /**< Highlight selected item */
+    size_t max_rows;              /**< Maximum rows to render */
+    size_t terminal_width;        /**< Terminal width for layout */
+    const char *selection_prefix; /**< Prefix for selected item (e.g., "> ") */
+    const char *item_separator; /**< Separator between items (default: "  ") */
 } lle_menu_render_options_t;
 
 /**
@@ -75,11 +75,11 @@ typedef struct {
  * Information about what was rendered.
  */
 typedef struct {
-    size_t items_rendered;   // Number of items rendered
-    size_t rows_used;        // Number of rows used
-    size_t categories_shown; // Number of category headers shown
-    size_t columns_used;     // Columns used in multi-column layout
-    bool truncated;          // True if menu was truncated
+    size_t items_rendered;   /**< Number of items rendered */
+    size_t rows_used;        /**< Number of rows used */
+    size_t categories_shown; /**< Number of category headers shown */
+    size_t columns_used;     /**< Columns used in multi-column layout */
+    bool truncated;          /**< True if menu was truncated */
 } lle_menu_render_stats_t;
 
 // ============================================================================
@@ -216,4 +216,4 @@ lle_menu_renderer_estimate_size(const lle_completion_menu_state_t *state,
 }
 #endif
 
-#endif /* LLE_COMPLETION_MENU_RENDERER_H */
+#endif // LLE_COMPLETION_MENU_RENDERER_H

@@ -16,6 +16,7 @@
 #include "builtins.h"
 #include "executor.h"
 #include "init.h"
+#include "lle/unicode_compare.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -27,25 +28,25 @@
 #include <termios.h>
 #include <unistd.h>
 
-// Global auto-correction configuration
+/// Global auto-correction configuration
 static autocorrect_config_t autocorrect_config = {0};
 
-// Statistics tracking
+/// Statistics tracking
 static struct {
     int corrections_offered;
     int corrections_accepted;
     int commands_learned;
 } autocorrect_stats = {0};
 
-// Debug flag
+/// Debug flag
 static bool debug_enabled = false;
 
-// Learned commands cache (simple array for now)
+/// Learned commands cache (simple array for now)
 #define MAX_LEARNED_COMMANDS 1000
 static char *learned_commands[MAX_LEARNED_COMMANDS];
 static int learned_commands_count = 0;
 
-/* Forward declarations for internal helper functions */
+/// Forward declarations for internal helper functions
 static void sort_corrections_by_score(correction_t *corrections, int count);
 static bool is_executable_file(const char *path);
 
@@ -53,16 +54,16 @@ static bool is_executable_file(const char *path);
  * Initialize auto-correction system
  */
 int autocorrect_init(void) {
-    // Set default configuration
+    /// Set default configuration
     autocorrect_get_default_config(&autocorrect_config);
 
-    // Initialize learned commands array
+    /// Initialize learned commands array
     for (int i = 0; i < MAX_LEARNED_COMMANDS; i++) {
         learned_commands[i] = NULL;
     }
     learned_commands_count = 0;
 
-    // Reset statistics
+    /// Reset statistics
     autocorrect_reset_stats();
 
     if (debug_enabled) {
@@ -76,7 +77,7 @@ int autocorrect_init(void) {
  * Cleanup auto-correction system
  */
 void autocorrect_cleanup(void) {
-    // Free learned commands
+    /// Free learned commands
     for (int i = 0; i < learned_commands_count; i++) {
         if (learned_commands[i]) {
             free(learned_commands[i]);
@@ -128,43 +129,44 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         return 0;
     }
 
-    /* Always zero the results struct before any further early return
-     * so callers can safely call autocorrect_free_results() on it
-     * regardless of whether we found suggestions, ran at all, or
-     * bailed because autocorrect is disabled. The previous code
-     * exited on the !enabled check before the memset, leaving the
-     * caller with an uninitialised stack struct that free_results
-     * then passed to free() on the next "command not found" event
-     * (issue #60: bad-free in autocorrect_free_results). */
+    /// Always zero the results struct before any further early return
+    /// so callers can safely call autocorrect_free_results() on it
+    /// regardless of whether we found suggestions, ran at all, or
+    /// bailed because autocorrect is disabled. The previous code
+    /// exited on the !enabled check before the memset, leaving the
+    /// caller with an uninitialized stack struct that free_results
+    /// then passed to free() on the next "command not found" event
+    /// (issue #60: bad-free in autocorrect_free_results).
     memset(results, 0, sizeof(correction_results_t));
 
     if (!autocorrect_config.enabled) {
         return 0;
     }
 
-    /* Skip autocorrect in non-interactive shells. The "did you mean ...?"
-     * suggestions are useful only when the user reads them; in scripts
-     * and tight command-not-found loops they are wasted CPU. Per #84
-     * sample profile, autocorrect_suggest_path_commands accounts for
-     * ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
-     * because every iteration walks $PATH, stat()s every binary, and
-     * runs Damerau-Levenshtein fuzzy matching. Skipping in non-
-     * interactive mode eliminates the amplifier entirely; interactive
-     * users still get suggestions on real misspellings. */
+    /// Skip autocorrect in non-interactive shells. The "did you mean ...?"
+    /// suggestions are useful only when the user reads them; in scripts
+    /// and tight command-not-found loops they are wasted CPU. Per #84
+    /// sample profile, autocorrect_suggest_path_commands accounts for
+    /// ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
+    /// because every iteration walks $PATH, stat()s every binary, and
+    /// runs Damerau-Levenshtein fuzzy matching. Skipping in non-
+    /// interactive mode eliminates the amplifier entirely; interactive
+    /// users still get suggestions on real misspellings.
     if (!is_interactive_shell()) {
         return 0;
     }
 
     results->original_command = strdup(command);
 
-    // Temporary array to collect all suggestions from all sources
-    // Each source can contribute up to MAX_CORRECTIONS, then we sort and take
-    // best
-    correction_t temp_suggestions[MAX_CORRECTIONS * 4]; // Space for all sources
+    /// Temporary array to collect all suggestions from all sources
+    /// Each source can contribute up to MAX_CORRECTIONS, then we sort and take
+    /// best
+    correction_t
+        temp_suggestions[MAX_CORRECTIONS * 4]; /// Space for all sources
     int temp_count = 0;
     int max_per_source = MAX_CORRECTIONS;
 
-    // Find builtin suggestions
+    /// Find builtin suggestions
     if (autocorrect_config.correct_builtins &&
         temp_count < MAX_CORRECTIONS * 4) {
         int builtin_count = autocorrect_suggest_builtins(
@@ -178,7 +180,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    // Find function suggestions
+    /// Find function suggestions
     if (executor && temp_count < MAX_CORRECTIONS * 4) {
         int function_count = autocorrect_suggest_functions(
             executor, command, &temp_suggestions[temp_count], max_per_source,
@@ -191,7 +193,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    // Find PATH command suggestions
+    /// Find PATH command suggestions
     if (autocorrect_config.correct_external &&
         temp_count < MAX_CORRECTIONS * 4) {
         int path_count = autocorrect_suggest_path_commands(
@@ -205,7 +207,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    // Find history suggestions
+    /// Find history suggestions
     if (autocorrect_config.learn_from_history &&
         temp_count < MAX_CORRECTIONS * 4) {
         int history_count = autocorrect_suggest_from_history(
@@ -219,11 +221,11 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    // Sort suggestions by score (highest first)
+    /// Sort suggestions by score (highest first)
     sort_corrections_by_score(temp_suggestions, temp_count);
 
-    // Copy top suggestions to results, filtering by threshold, max count, and
-    // duplicates
+    /// Copy top suggestions to results, filtering by threshold, max count, and
+    /// duplicates
     int max_to_copy = (autocorrect_config.max_suggestions < MAX_CORRECTIONS)
                           ? autocorrect_config.max_suggestions
                           : MAX_CORRECTIONS;
@@ -231,24 +233,30 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     for (int i = 0; i < temp_count && results->count < max_to_copy; i++) {
         if (temp_suggestions[i].score >=
             autocorrect_config.similarity_threshold) {
-            // Check for duplicates (same command from different sources)
+            /// Check for duplicates (same command from different
+            /// sources). Compare under NFC equivalence so a PATH-
+            /// supplied name and a builtin / alias / function name
+            /// that differ only in Unicode normalization collapse
+            /// to a single suggestion. ASCII names (the common case
+            /// for shell commands) hit the primitive's fast path.
             bool is_duplicate = false;
             for (int j = 0; j < results->count; j++) {
-                if (strcmp(results->suggestions[j].command,
-                           temp_suggestions[i].command) == 0) {
+                if (lle_unicode_strings_equal(results->suggestions[j].command,
+                                              temp_suggestions[i].command,
+                                              NULL)) {
                     is_duplicate = true;
                     break;
                 }
             }
             if (!is_duplicate) {
                 results->suggestions[results->count] = temp_suggestions[i];
-                temp_suggestions[i].command = NULL; // Transferred ownership
+                temp_suggestions[i].command = NULL; /// Transferred ownership
                 results->count++;
             }
         }
     }
 
-    // Free any temp_suggestions that were not copied to results
+    /// Free any temp_suggestions that were not copied to results
     for (int i = 0; i < temp_count; i++) {
         if (temp_suggestions[i].command) {
             free(temp_suggestions[i].command);
@@ -256,7 +264,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    // Update statistics
+    /// Update statistics
     if (results->count > 0) {
         autocorrect_stats.corrections_offered++;
     }
@@ -279,7 +287,7 @@ bool autocorrect_prompt_user(const correction_results_t *results,
         return false;
     }
 
-    // Don't prompt if not running in an interactive terminal
+    /// Don't prompt if not running in an interactive terminal
     if (!isatty(STDIN_FILENO)) {
         return false;
     }
@@ -304,15 +312,15 @@ bool autocorrect_prompt_user(const correction_results_t *results,
     printf("\nSelect (0-%d): ", results->count);
     fflush(stdout);
 
-    /* Ensure terminal is in canonical mode with proper CR->NL translation.
-     * This is needed because LLE may have left terminal in a state where
-     * ICRNL is disabled, causing fgets() to see raw CR (^M) instead of NL. */
+    /// Ensure terminal is in canonical mode with proper CR->NL translation.
+    /// This is needed because LLE may have left terminal in a state where
+    /// ICRNL is disabled, causing fgets() to see raw CR (^M) instead of NL.
     struct termios orig_term, cooked_term;
     bool term_modified = false;
     if (tcgetattr(STDIN_FILENO, &orig_term) == 0) {
         cooked_term = orig_term;
-        cooked_term.c_iflag |= ICRNL;           /* Translate CR to NL */
-        cooked_term.c_lflag |= (ICANON | ECHO); /* Canonical mode with echo */
+        cooked_term.c_iflag |= ICRNL;           /// Translate CR to NL
+        cooked_term.c_lflag |= (ICANON | ECHO); /// Canonical mode with echo
         if (tcsetattr(STDIN_FILENO, TCSANOW, &cooked_term) == 0) {
             term_modified = true;
         }
@@ -326,7 +334,7 @@ bool autocorrect_prompt_user(const correction_results_t *results,
         return false;
     }
 
-    /* Restore original terminal state */
+    /// Restore original terminal state
     if (term_modified) {
         tcsetattr(STDIN_FILENO, TCSANOW, &orig_term);
     }
@@ -382,10 +390,10 @@ int autocorrect_similarity_score(const char *command1, const char *command2,
         return 0;
     }
 
-    /* Use libfuzzy with appropriate options */
+    /// Use libfuzzy with appropriate options
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = case_sensitive;
-    /* Unicode normalization enabled by default for proper matching */
+    /// Unicode normalization enabled by default for proper matching
 
     return fuzzy_match_score(command1, command2, &opts);
 }
@@ -398,14 +406,20 @@ void autocorrect_learn_command(const char *command) {
         return;
     }
 
-    // Check if command already exists
+    /// Check if command already exists. NFC-equivalent so the
+    /// learning store does not grow a second entry for a command
+    /// the user typed once in one normalization form and once in
+    /// the other (rare in interactive practice but observable when
+    /// command names come from heterogeneous sources -- e.g. PATH
+    /// scan on macOS NFD + history line on NFC).
     for (int i = 0; i < learned_commands_count; i++) {
-        if (learned_commands[i] && strcmp(learned_commands[i], command) == 0) {
-            return; // Already learned
+        if (learned_commands[i] &&
+            lle_unicode_strings_equal(learned_commands[i], command, NULL)) {
+            return; /// Already learned
         }
     }
 
-    // Add new command if there's space
+    /// Add new command if there's space
     if (learned_commands_count < MAX_LEARNED_COMMANDS) {
         learned_commands[learned_commands_count] = strdup(command);
         if (learned_commands[learned_commands_count]) {
@@ -427,20 +441,20 @@ bool autocorrect_command_exists(executor_t *executor, const char *command) {
         return false;
     }
 
-    // Check if it's a builtin (only when compiled with full shell)
+    /// Check if it's a builtin (only when compiled with full shell)
 #ifndef AUTOCORRECT_STANDALONE_TEST
     if (is_builtin(command)) {
         return true;
     }
 #endif
 
-    // Check if it's a function (requires executor context)
+    /// Check if it's a function (requires executor context)
     if (executor) {
-        // This would need to be implemented with access to executor's function
-        // table For now, we'll skip function checking
+        /// This would need to be implemented with access to executor's function
+        /// table For now, we'll skip function checking
     }
 
-    // Check PATH
+    /// Check PATH
     char *path = getenv("PATH");
     if (!path) {
         return false;
@@ -473,7 +487,7 @@ bool autocorrect_command_exists(executor_t *executor, const char *command) {
  * Now delegates to libfuzzy for Unicode-aware matching
  */
 int autocorrect_levenshtein_distance(const char *s1, const char *s2) {
-    /* Use libfuzzy with case-insensitive matching (original behavior) */
+    /// Use libfuzzy with case-insensitive matching (original behavior)
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = false;
     return fuzzy_levenshtein_distance(s1, s2, &opts);
@@ -484,7 +498,7 @@ int autocorrect_levenshtein_distance(const char *s1, const char *s2) {
  * Now delegates to libfuzzy for Unicode-aware matching
  */
 int autocorrect_jaro_winkler_score(const char *s1, const char *s2) {
-    /* Use libfuzzy with case-insensitive matching (original behavior) */
+    /// Use libfuzzy with case-insensitive matching (original behavior)
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = false;
     return fuzzy_jaro_winkler_score(s1, s2, &opts);
@@ -518,7 +532,7 @@ int autocorrect_subsequence_score(const char *pattern, const char *text,
 int autocorrect_suggest_builtins(const char *command, correction_t *suggestions,
                                  int max_suggestions, bool case_sensitive) {
 #ifdef AUTOCORRECT_STANDALONE_TEST
-    // For standalone testing, skip suggestions to avoid dependencies
+    /// For standalone testing, skip suggestions to avoid dependencies
     (void)command;
     (void)suggestions;
     (void)max_suggestions;
@@ -527,7 +541,7 @@ int autocorrect_suggest_builtins(const char *command, correction_t *suggestions,
 #else
     int count = 0;
 
-    // Get list of builtin commands
+    /// Get list of builtin commands
     const char *builtins[] = {
         "cd",     "pwd",   "echo",   "printf",  "test",     "[",
         "true",   "false", ":",      ".",       "break",    "continue",
@@ -558,8 +572,8 @@ int autocorrect_suggest_builtins(const char *command, correction_t *suggestions,
 int autocorrect_suggest_functions(executor_t *executor, const char *command,
                                   correction_t *suggestions,
                                   int max_suggestions, bool case_sensitive) {
-    // This would require access to executor's function table
-    // Currently focusing on builtins and PATH commands
+    /// This would require access to executor's function table
+    /// Currently focusing on builtins and PATH commands
     (void)executor;
     (void)command;
     (void)suggestions;
@@ -574,84 +588,51 @@ int autocorrect_suggest_functions(executor_t *executor, const char *command,
 /**
  * @brief Fast pre-filter using Damerau-Levenshtein distance
  *
- * Quickly eliminates candidates that are too different before
- * doing expensive Unicode-aware fuzzy matching. Uses Damerau-Levenshtein
- * which counts transpositions (like gti->git) as 1 edit, not 2.
+ * Quickly eliminates candidates that are too different before doing
+ * expensive Unicode-aware fuzzy matching. Delegates to libfuzzy's
+ * Damerau-Levenshtein, which iterates codepoints (not bytes) and
+ * case-folds via the project's Unicode case table -- so names like
+ * "Café" / "café" or "naïve" / "Naïve" are correctly identified
+ * as near-matches in the PATH scan.
  *
- * @param s1 First string
- * @param s2 Second string
+ * The codepoint-length cap of FAST_EDIT_DISTANCE_CP_CAP keeps the
+ * pre-filter bounded for absurd dirents (the libfuzzy matrix is
+ * O(len1*len2) heap allocations); 32 codepoints comfortably covers
+ * any reasonable command name in any script (POSIX shell variable
+ * names are also capped at this magnitude in practice).
+ *
+ * @param s1 First string (UTF-8)
+ * @param s2 Second string (UTF-8)
  * @param max_dist Maximum distance to consider (returns max_dist+1 if exceeded)
  * @return Edit distance, or max_dist+1 if too different
  */
+#define FAST_EDIT_DISTANCE_CP_CAP 32
+
 static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2);
+    fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
+    opts.case_sensitive = false;
+    opts.use_damerau = true;
+    opts.max_distance = max_dist;
 
-    /* Quick length check */
-    if (len1 > 32 || len2 > 32)
+    /// Bound the matrix allocation against pathological dirents.
+    /// fuzzy_string_length counts codepoints (after optional NFC
+    /// normalization per opts), so a 33-codepoint Cyrillic name and
+    /// a 33-character ASCII name are treated identically -- unlike
+    /// the prior byte cap which would reject the Cyrillic name at
+    /// roughly half the visible length.
+    int cp1 = fuzzy_string_length(s1, &opts);
+    int cp2 = fuzzy_string_length(s2, &opts);
+    if (cp1 > FAST_EDIT_DISTANCE_CP_CAP || cp2 > FAST_EDIT_DISTANCE_CP_CAP) {
         return max_dist + 1;
-    int len_diff = (int)len1 - (int)len2;
-    if (len_diff < 0)
-        len_diff = -len_diff;
-    if (len_diff > max_dist)
-        return max_dist + 1;
-
-    /* Full matrix for Damerau-Levenshtein (need prev-prev row for
-     * transpositions) */
-    int matrix[34][34];
-
-    for (size_t i = 0; i <= len1; i++)
-        matrix[i][0] = (int)i;
-    for (size_t j = 0; j <= len2; j++)
-        matrix[0][j] = (int)j;
-
-    for (size_t i = 1; i <= len1; i++) {
-        int row_min = (int)i;
-
-        for (size_t j = 1; j <= len2; j++) {
-            /* Case-insensitive comparison */
-            char c1 = s1[i - 1];
-            char c2 = s2[j - 1];
-            if (c1 >= 'A' && c1 <= 'Z')
-                c1 += 32;
-            if (c2 >= 'A' && c2 <= 'Z')
-                c2 += 32;
-
-            int cost = (c1 == c2) ? 0 : 1;
-            int del = matrix[i - 1][j] + 1;
-            int ins = matrix[i][j - 1] + 1;
-            int sub = matrix[i - 1][j - 1] + cost;
-
-            int min_val =
-                del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
-
-            /* Check for transposition (Damerau extension) */
-            if (i > 1 && j > 1) {
-                char prev_c1 = s1[i - 2];
-                char prev_c2 = s2[j - 2];
-                if (prev_c1 >= 'A' && prev_c1 <= 'Z')
-                    prev_c1 += 32;
-                if (prev_c2 >= 'A' && prev_c2 <= 'Z')
-                    prev_c2 += 32;
-
-                if (c1 == prev_c2 && c2 == prev_c1) {
-                    int trans = matrix[i - 2][j - 2] + 1;
-                    if (trans < min_val)
-                        min_val = trans;
-                }
-            }
-
-            matrix[i][j] = min_val;
-            if (min_val < row_min)
-                row_min = min_val;
-        }
-
-        /* Early termination if entire row exceeds threshold */
-        if (row_min > max_dist)
-            return max_dist + 1;
     }
-
-    return matrix[len1][len2];
+    int len_diff = cp1 - cp2;
+    if (len_diff < 0) {
+        len_diff = -len_diff;
+    }
+    if (len_diff > max_dist) {
+        return max_dist + 1;
+    }
+    return fuzzy_damerau_levenshtein_distance(s1, s2, &opts);
 }
 
 int autocorrect_suggest_path_commands(const char *command,
@@ -669,11 +650,11 @@ int autocorrect_suggest_path_commands(const char *command,
         return 0;
     }
 
-    /* Pre-filter threshold: commands within 3 edits are candidates */
+    /// Pre-filter threshold: commands within 3 edits are candidates
     const int prefilter_max_dist = 3;
 
-    /* Collect more candidates than requested, then sort and take best.
-     * Use local array to avoid overflowing caller's buffer. */
+    /// Collect more candidates than requested, then sort and take best.
+    /// Use local array to avoid overflowing caller's buffer.
     const int max_candidates = 50;
     correction_t candidates[50];
     int candidate_count = 0;
@@ -689,10 +670,10 @@ int autocorrect_suggest_path_commands(const char *command,
         struct dirent *entry;
         while ((entry = readdir(dp)) && candidate_count < max_candidates) {
             if (entry->d_name[0] == '.') {
-                continue; /* Skip hidden files */
+                continue; /// Skip hidden files
             }
 
-            /* Fast pre-filter: skip if edit distance > threshold */
+            /// Fast pre-filter: skip if edit distance > threshold
             int edit_dist =
                 fast_edit_distance(command, entry->d_name, prefilter_max_dist);
             if (edit_dist > prefilter_max_dist) {
@@ -703,8 +684,8 @@ int autocorrect_suggest_path_commands(const char *command,
             snprintf(full_path, sizeof(full_path), "%s/%s", dir, entry->d_name);
 
             if (is_executable_file(full_path)) {
-                /* Full Unicode-aware scoring for candidates that passed
-                 * pre-filter */
+                /// Full Unicode-aware scoring for candidates that passed
+                /// pre-filter
                 int score = autocorrect_similarity_score(command, entry->d_name,
                                                          case_sensitive);
 
@@ -723,17 +704,17 @@ int autocorrect_suggest_path_commands(const char *command,
 
     free(path_copy);
 
-    /* Sort candidates by score (descending) */
+    /// Sort candidates by score (descending)
     sort_corrections_by_score(candidates, candidate_count);
 
-    /* Copy top results to caller's buffer */
+    /// Copy top results to caller's buffer
     int result_count =
         candidate_count < max_suggestions ? candidate_count : max_suggestions;
     for (int i = 0; i < result_count; i++) {
         suggestions[i] = candidates[i];
     }
 
-    /* Free unused candidates */
+    /// Free unused candidates
     for (int i = result_count; i < candidate_count; i++) {
         free(candidates[i].command);
     }
@@ -749,7 +730,7 @@ int autocorrect_suggest_from_history(const char *command,
                                      int max_suggestions, bool case_sensitive) {
     int count = 0;
 
-    // Check learned commands
+    /// Check learned commands
     for (int i = 0; i < learned_commands_count && count < max_suggestions;
          i++) {
         if (learned_commands[i]) {
@@ -859,7 +840,7 @@ void autocorrect_set_debug(bool enabled) { debug_enabled = enabled; }
  * @param count Number of corrections in the array.
  */
 static void sort_corrections_by_score(correction_t *corrections, int count) {
-    // Simple bubble sort by score (descending)
+    /// Simple bubble sort by score (descending)
     for (int i = 0; i < count - 1; i++) {
         for (int j = 0; j < count - i - 1; j++) {
             if (corrections[j].score < corrections[j + 1].score) {

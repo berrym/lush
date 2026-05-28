@@ -35,7 +35,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/*                      WIDGET HOOK TRIGGERS LIFECYCLE                        */
+/// WIDGET HOOK TRIGGERS LIFECYCLE
 /* ========================================================================== */
 
 /**
@@ -57,7 +57,7 @@ lle_widget_hook_triggers_init(lle_widget_hook_triggers_t **triggers,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate trigger system structure */
+    /// Allocate trigger system structure
     lle_widget_hook_triggers_t *wh =
         lle_pool_alloc(sizeof(lle_widget_hook_triggers_t));
     if (!wh) {
@@ -66,29 +66,28 @@ lle_widget_hook_triggers_init(lle_widget_hook_triggers_t **triggers,
 
     memset(wh, 0, sizeof(lle_widget_hook_triggers_t));
 
-    /* Store references */
-    wh->hooks_manager = hooks_manager; /* May be NULL */
+    /// Store references
+    wh->hooks_manager = hooks_manager; /// May be NULL
     wh->memory_pool = memory_pool;
 
-    /* Initialize trigger mapping structures */
+    /// Initialize trigger mapping structures
     wh->trigger_map =
-        NULL; /* Would be initialized when hooks manager available */
+        NULL; /// Would be initialized when hooks manager available
     wh->execution_queue =
-        NULL; /* Would be initialized when hooks manager available */
+        NULL; /// Would be initialized when hooks manager available
     wh->condition_engine =
-        NULL; /* Would be initialized when hooks manager available */
+        NULL; /// Would be initialized when hooks manager available
     wh->hook_filters =
-        NULL; /* Would be initialized when hooks manager available */
-    wh->hook_cache =
-        NULL; /* Would be initialized when hooks manager available */
+        NULL;              /// Would be initialized when hooks manager available
+    wh->hook_cache = NULL; /// Would be initialized when hooks manager available
 
-    /* Initialize performance metrics */
+    /// Initialize performance metrics
     wh->hooks_triggered = 0;
     wh->hooks_executed = 0;
     wh->total_execution_time_us = 0;
     wh->max_execution_time_us = 0;
 
-    /* Initialize state */
+    /// Initialize state
     wh->hook_execution_enabled = true;
 
     *triggers = wh;
@@ -109,7 +108,7 @@ lle_widget_hook_triggers_destroy(lle_widget_hook_triggers_t *triggers) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Clean up trigger mapping structures if allocated */
+    /// Clean up trigger mapping structures if allocated
     if (triggers->trigger_map) {
         lle_pool_free(triggers->trigger_map);
     }
@@ -130,14 +129,14 @@ lle_widget_hook_triggers_destroy(lle_widget_hook_triggers_t *triggers) {
         lle_pool_free(triggers->hook_cache);
     }
 
-    /* Free trigger system structure */
+    /// Free trigger system structure
     lle_pool_free(triggers);
 
     return LLE_SUCCESS;
 }
 
 /* ========================================================================== */
-/*                      WIDGET HOOK TRIGGER FUNCTIONS                         */
+/// WIDGET HOOK TRIGGER FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -157,61 +156,61 @@ lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
     }
 
     if (!parser->widget_hook_triggers) {
-        /* No widget hook triggers configured */
+        /// No widget hook triggers configured
         return LLE_SUCCESS;
     }
 
     lle_widget_hook_triggers_t *wh = parser->widget_hook_triggers;
 
-    /* Check if hook execution is enabled */
+    /// Check if hook execution is enabled
     if (!wh->hook_execution_enabled) {
         return LLE_SUCCESS;
     }
 
-    /* Check if hooks manager is available */
+    /// Check if hooks manager is available
     if (!wh->hooks_manager) {
-        /* Hooks manager not yet initialized - skip triggering */
+        /// Hooks manager not yet initialized - skip triggering
         return LLE_SUCCESS;
     }
 
-    /* Record start time for performance tracking */
+    /// Record start time for performance tracking
     uint64_t start_time = lle_event_get_timestamp_us();
 
-    /* Determine which hook to trigger based on input type */
+    /// Determine which hook to trigger based on input type
     bool should_trigger = false;
 
-    /* Map input types to hook types */
+    /// Map input types to hook types
     switch (input->type) {
     case LLE_PARSED_INPUT_TYPE_TEXT:
-        /* Text input could trigger buffer-modified hook */
+        /// Text input could trigger buffer-modified hook
         should_trigger = true;
         break;
 
     case LLE_PARSED_INPUT_TYPE_KEY:
-        /* Some key events might trigger hooks */
-        /* For now, don't trigger on every key */
+        /// Some key events might trigger hooks
+        /// For now, don't trigger on every key
         should_trigger = false;
         break;
 
     default:
-        /* Other input types don't trigger hooks yet */
+        /// Other input types don't trigger hooks yet
         should_trigger = false;
         break;
     }
 
     lle_result_t result = LLE_SUCCESS;
 
-    /* Hook triggering is tracked. Actual hook execution happens at a higher
-     * level where editor context is available. The input parser detects when
-     * hooks should trigger and sets appropriate flags in the parsed input
-     * structure. The caller (typically lle_readline or command processing) then
-     * triggers the hooks with the full editor context via
-     * lle_widget_hook_trigger(). */
+    /// Hook triggering is tracked. Actual hook execution happens at a higher
+    /// level where editor context is available. The input parser detects when
+    /// hooks should trigger and sets appropriate flags in the parsed input
+    /// structure. The caller (typically lle_readline or command processing)
+    /// then triggers the hooks with the full editor context via
+    /// lle_widget_hook_trigger().
     if (should_trigger) {
         __atomic_fetch_add(&wh->hooks_triggered, 1, __ATOMIC_SEQ_CST);
     }
 
-    /* Track execution time */
+    /// Track execution time
     uint64_t execution_time = lle_event_get_timestamp_us() - start_time;
     __atomic_fetch_add(&wh->total_execution_time_us, execution_time,
                        __ATOMIC_SEQ_CST);

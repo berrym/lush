@@ -26,9 +26,7 @@ static int g_test_widget_call_count = 0;
 static lle_editor_t *g_test_editor_arg = NULL;
 static void *g_test_user_data_arg = NULL;
 
-/**
- * Simple test widget that sets a flag when called
- */
+/// @brief Simple test widget that sets a flag when called
 static lle_result_t test_widget_callback(lle_editor_t *editor,
                                          void *user_data) {
     g_test_widget_called = 1;
@@ -38,9 +36,7 @@ static lle_result_t test_widget_callback(lle_editor_t *editor,
     return LLE_SUCCESS;
 }
 
-/**
- * Test widget that returns an error
- */
+/// @brief Test widget that returns an error
 static lle_result_t test_widget_error_callback(lle_editor_t *editor,
                                                void *user_data) {
     (void)editor;
@@ -48,9 +44,7 @@ static lle_result_t test_widget_error_callback(lle_editor_t *editor,
     return LLE_ERROR_INVALID_STATE;
 }
 
-/**
- * Reset test globals
- */
+/// @brief Reset test globals
 static void reset_test_globals(void) {
     g_test_widget_called = 0;
     g_test_widget_call_count = 0;
@@ -58,18 +52,14 @@ static void reset_test_globals(void) {
     g_test_user_data_arg = NULL;
 }
 
-/**
- * Create minimal test editor
- */
+/// @brief Create minimal test editor
 static lle_editor_t *create_test_editor(void) {
     lle_editor_t *editor = malloc(sizeof(lle_editor_t));
     memset(editor, 0, sizeof(lle_editor_t));
     return editor;
 }
 
-/**
- * Free test editor
- */
+/// @brief Free test editor
 static void free_test_editor(lle_editor_t *editor) {
     if (editor) {
         free(editor);
@@ -113,11 +103,11 @@ TEST(widget_registry_init_null_params) {
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    /* NULL registry pointer */
+    /// NULL registry pointer
     lle_result_t result = lle_widget_registry_init(NULL, pool);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* NULL memory pool */
+    /// NULL memory pool
     result = lle_widget_registry_init(&registry, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
     ASSERT(registry == NULL);
@@ -138,7 +128,7 @@ TEST(widget_register) {
 
     ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
-    /* Register a widget */
+    /// Register a widget
     lle_result_t result = lle_widget_register(
         registry, "test-widget", test_widget_callback, LLE_WIDGET_USER, NULL);
     ASSERT(result == LLE_SUCCESS);
@@ -162,11 +152,11 @@ TEST(widget_register_duplicate) {
 
     ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
-    /* Register first widget */
+    /// Register first widget
     ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
-    /* Try to register with same name */
+    /// Try to register with same name
     lle_result_t result = lle_widget_register(
         registry, "test-widget", test_widget_callback, LLE_WIDGET_USER, NULL);
     ASSERT(result == LLE_ERROR_ALREADY_EXISTS);
@@ -191,7 +181,7 @@ TEST(widget_lookup) {
     ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
-    /* Lookup existing widget */
+    /// Lookup existing widget
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
     ASSERT(widget != NULL);
     ASSERT(strcmp(widget->name, "test-widget") == 0);
@@ -199,7 +189,7 @@ TEST(widget_lookup) {
     ASSERT(widget->type == LLE_WIDGET_USER);
     ASSERT(widget->enabled == true);
 
-    /* Lookup non-existent widget */
+    /// Lookup non-existent widget
     widget = lle_widget_lookup(registry, "nonexistent");
     ASSERT(widget == NULL);
 
@@ -226,7 +216,7 @@ TEST(widget_execute) {
     ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, &user_data) == LLE_SUCCESS);
 
-    /* Execute widget */
+    /// Execute widget
     lle_result_t result = lle_widget_execute(registry, "test-widget", editor);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(g_test_widget_called == 1);
@@ -234,7 +224,7 @@ TEST(widget_execute) {
     ASSERT(g_test_editor_arg == editor);
     ASSERT(g_test_user_data_arg == &user_data);
 
-    /* Verify execution count updated */
+    /// Verify execution count updated
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
     ASSERT(widget->execution_count == 1);
 
@@ -260,11 +250,11 @@ TEST(widget_execute_error) {
                                test_widget_error_callback, LLE_WIDGET_USER,
                                NULL) == LLE_SUCCESS);
 
-    /* Execute widget that returns error */
+    /// Execute widget that returns error
     lle_result_t result = lle_widget_execute(registry, "error-widget", editor);
     ASSERT(result == LLE_ERROR_INVALID_STATE);
 
-    /* Verify execution count still updated */
+    /// Verify execution count still updated
     lle_widget_t *widget = lle_widget_lookup(registry, "error-widget");
     ASSERT(widget->execution_count == 1);
 
@@ -289,12 +279,12 @@ TEST(widget_unregister) {
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
     ASSERT(registry->widget_count == 1);
 
-    /* Unregister widget */
+    /// Unregister widget
     lle_result_t result = lle_widget_unregister(registry, "test-widget");
     ASSERT(result == LLE_SUCCESS);
     ASSERT(registry->widget_count == 0);
 
-    /* Verify widget no longer exists */
+    /// Verify widget no longer exists
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
     ASSERT(widget == NULL);
 
@@ -318,25 +308,25 @@ TEST(widget_enable_disable) {
     ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
-    /* Widget starts enabled */
+    /// Widget starts enabled
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
     ASSERT(widget->enabled == true);
 
-    /* Disable widget */
+    /// Disable widget
     ASSERT(lle_widget_disable(registry, "test-widget") == LLE_SUCCESS);
     ASSERT(widget->enabled == false);
 
-    /* Try to execute disabled widget */
+    /// Try to execute disabled widget
     reset_test_globals();
     lle_result_t result = lle_widget_execute(registry, "test-widget", editor);
     ASSERT(result == LLE_ERROR_DISABLED);
     ASSERT(g_test_widget_called == 0);
 
-    /* Re-enable widget */
+    /// Re-enable widget
     ASSERT(lle_widget_enable(registry, "test-widget") == LLE_SUCCESS);
     ASSERT(widget->enabled == true);
 
-    /* Execute now works */
+    /// Execute now works
     result = lle_widget_execute(registry, "test-widget", editor);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(g_test_widget_called == 1);
@@ -359,7 +349,7 @@ TEST(multiple_widget_types) {
 
     ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
-    /* Register widgets of different types */
+    /// Register widgets of different types
     ASSERT(lle_widget_register(registry, "builtin-widget", test_widget_callback,
                                LLE_WIDGET_BUILTIN, NULL) == LLE_SUCCESS);
     ASSERT(lle_widget_register(registry, "user-widget", test_widget_callback,
@@ -369,7 +359,7 @@ TEST(multiple_widget_types) {
 
     ASSERT(registry->widget_count == 3);
 
-    /* Verify types */
+    /// Verify types
     ASSERT(lle_widget_lookup(registry, "builtin-widget")->type ==
            LLE_WIDGET_BUILTIN);
     ASSERT(lle_widget_lookup(registry, "user-widget")->type == LLE_WIDGET_USER);

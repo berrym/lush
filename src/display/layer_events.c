@@ -42,26 +42,26 @@
 
 #include "layer_events.h"
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define MAX_EVENT_TYPE_NAME_LENGTH 64
 #define MAX_LAYER_NAME_LENGTH 32
-#define EVENT_SYSTEM_MAGIC 0x4C415945 // "LAYE" in hex
+#define EVENT_SYSTEM_MAGIC 0x4C415945 /// "LAYE" in hex
 
-// Default configuration values
+/// Default configuration values
 #define DEFAULT_MAX_QUEUE_SIZE 256
 #define DEFAULT_MAX_SUBSCRIBERS 32
 #define DEFAULT_PROCESSING_TIMEOUT_MS 50
 
-// Performance thresholds
+/// Performance thresholds
 #define PERFORMANCE_WARNING_QUEUE_SIZE 200
 #define PERFORMANCE_WARNING_PROCESSING_TIME_MS 10
 
-// ============================================================================
-// INTERNAL DATA STRUCTURES
-// ============================================================================
+/// ============================================================================
+/// INTERNAL DATA STRUCTURES
+/// ============================================================================
 
 /**
  * Event queue entry
@@ -94,38 +94,38 @@ typedef struct subscriber_entry {
  * Event system internal structure
  */
 struct layer_event_system {
-    uint32_t magic;               // Magic number for validation
-    bool initialized;             // Initialization status
-    layer_events_config_t config; // System configuration
+    uint32_t magic;               /// Magic number for validation
+    bool initialized;             /// Initialization status
+    layer_events_config_t config; /// System configuration
 
-    // Event queues (one per priority level)
-    event_queue_t queues[4]; // Critical, High, Normal, Low
+    /// Event queues (one per priority level)
+    event_queue_t queues[4]; /// Critical, High, Normal, Low
 
-    // Subscriber management
-    subscriber_entry_t *subscribers; // Subscriber linked list
-    uint32_t subscriber_count;       // Number of active subscribers
+    /// Subscriber management
+    subscriber_entry_t *subscribers; /// Subscriber linked list
+    uint32_t subscriber_count;       /// Number of active subscribers
 
-    // Event generation
-    uint32_t next_sequence_number; // Global sequence counter
-    uint32_t next_event_id;        // Unique event ID counter
+    /// Event generation
+    uint32_t next_sequence_number; /// Global sequence counter
+    uint32_t next_event_id;        /// Unique event ID counter
 
-    // Statistics and monitoring
-    layer_event_stats_t stats; // Performance statistics
-    bool debug_enabled;        // Debug logging enabled
+    /// Statistics and monitoring
+    layer_event_stats_t stats; /// Performance statistics
+    bool debug_enabled;        /// Debug logging enabled
 
-    // Internal state
-    layer_events_error_t last_error; // Last error that occurred
+    /// Internal state
+    layer_events_error_t last_error; /// Last error that occurred
 };
 
-// ============================================================================
-// STATIC VARIABLES
-// ============================================================================
+/// ============================================================================
+/// STATIC VARIABLES
+/// ============================================================================
 
 static bool layer_events_global_initialized = false;
 
-// ============================================================================
-// FORWARD DECLARATIONS
-// ============================================================================
+/// ============================================================================
+/// FORWARD DECLARATIONS
+/// ============================================================================
 
 static event_queue_entry_t *create_queue_entry(const layer_event_t *event);
 static void destroy_queue_entry(event_queue_entry_t *entry);
@@ -143,9 +143,9 @@ static bool validate_event_system(const layer_event_system_t *events);
 static uint64_t get_timestamp_ns(void);
 static void debug_log(layer_event_system_t *events, const char *format, ...);
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Create a new layer events system
@@ -161,14 +161,14 @@ layer_event_system_t *layer_events_create(const layer_events_config_t *config) {
     events->magic = EVENT_SYSTEM_MAGIC;
     events->initialized = false;
 
-    // Set configuration (use defaults if config is NULL)
+    /// Set configuration (use defaults if config is NULL)
     if (config) {
         events->config = *config;
     } else {
         events->config = layer_events_create_default_config();
     }
 
-    // Initialize queues
+    /// Initialize queues
     for (int i = 0; i < 4; i++) {
         events->queues[i].head = NULL;
         events->queues[i].tail = NULL;
@@ -176,15 +176,15 @@ layer_event_system_t *layer_events_create(const layer_events_config_t *config) {
         events->queues[i].max_size = events->config.max_queue_size;
     }
 
-    // Initialize subscriber list
+    /// Initialize subscriber list
     events->subscribers = NULL;
     events->subscriber_count = 0;
 
-    // Initialize counters
+    /// Initialize counters
     events->next_sequence_number = 1;
     events->next_event_id = 1;
 
-    // Initialize statistics
+    /// Initialize statistics
     memset(&events->stats, 0, sizeof(layer_event_stats_t));
 
     events->debug_enabled = events->config.enable_debugging;
@@ -204,12 +204,12 @@ layer_events_error_t layer_events_init(layer_event_system_t *events) {
     }
 
     if (events->initialized) {
-        return LAYER_EVENTS_SUCCESS; // Already initialized
+        return LAYER_EVENTS_SUCCESS; /// Already initialized
     }
 
     debug_log(events, "Initializing layer events system");
 
-    // Validate configuration
+    /// Validate configuration
     if (events->config.max_queue_size == 0 ||
         events->config.max_subscribers == 0) {
         events->last_error = LAYER_EVENTS_ERROR_INVALID_PARAM;
@@ -236,7 +236,7 @@ layer_events_error_t layer_events_cleanup(layer_event_system_t *events) {
 
     debug_log(events, "Cleaning up layer events system");
 
-    // Clear all event queues
+    /// Clear all event queues
     for (int priority = 0; priority < 4; priority++) {
         event_queue_t *queue = &events->queues[priority];
         event_queue_entry_t *entry = queue->head;
@@ -253,7 +253,7 @@ layer_events_error_t layer_events_cleanup(layer_event_system_t *events) {
         queue->size = 0;
     }
 
-    // Clear subscriber list
+    /// Clear subscriber list
     subscriber_entry_t *subscriber = events->subscribers;
     while (subscriber) {
         subscriber_entry_t *next = subscriber->next;
@@ -281,15 +281,15 @@ void layer_events_destroy(layer_event_system_t *events) {
 
     if (events->magic == EVENT_SYSTEM_MAGIC) {
         layer_events_cleanup(events);
-        events->magic = 0; // Clear magic number
+        events->magic = 0; /// Clear magic number
     }
 
     free(events);
 }
 
-// ============================================================================
-// EVENT PUBLISHING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT PUBLISHING FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Publish an event to the system
@@ -320,7 +320,7 @@ layer_events_error_t layer_events_publish(layer_event_system_t *events,
 
     events->stats.events_published++;
 
-    // Create a copy of the event with system-generated fields
+    /// Create a copy of the event with system-generated fields
     layer_event_t event_copy = *event;
     event_copy.timestamp = get_timestamp_ns();
     event_copy.sequence_number = events->next_sequence_number++;
@@ -329,7 +329,7 @@ layer_events_error_t layer_events_publish(layer_event_system_t *events,
     event_copy.last_processing_time = 0;
     event_copy.processed = false;
 
-    // Handle immediate processing for NO_QUEUE flag
+    /// Handle immediate processing for NO_QUEUE flag
     if (event->flags & LAYER_EVENT_FLAG_NO_QUEUE) {
         layer_events_error_t result = notify_subscribers(events, &event_copy);
         if (result == LAYER_EVENTS_SUCCESS) {
@@ -340,7 +340,7 @@ layer_events_error_t layer_events_publish(layer_event_system_t *events,
         return result;
     }
 
-    // Queue the event for later processing
+    /// Queue the event for later processing
     layer_events_error_t result = enqueue_event(events, &event_copy);
     if (result != LAYER_EVENTS_SUCCESS) {
         events->last_error = result;
@@ -392,11 +392,11 @@ layer_events_error_t layer_events_publish_content_changed(
     layer_event_t event = {0};
     event.type = LAYER_EVENT_CONTENT_CHANGED;
     event.source_layer = source_layer;
-    event.target_layer = 0; // Broadcast
+    event.target_layer = 0; /// Broadcast
     event.priority = LAYER_EVENT_PRIORITY_NORMAL;
     event.flags = LAYER_EVENT_FLAG_BROADCAST;
 
-    // Create a copy of the content string to avoid dangling pointers
+    /// Create a copy of the content string to avoid dangling pointers
     char *content_copy = NULL;
     if (content && content_length > 0) {
         content_copy = malloc(content_length + 1);
@@ -429,7 +429,7 @@ layer_events_error_t layer_events_publish_size_changed(
     layer_event_t event = {0};
     event.type = LAYER_EVENT_SIZE_CHANGED;
     event.source_layer = source_layer;
-    event.target_layer = 0; // Broadcast
+    event.target_layer = 0; /// Broadcast
     event.priority = LAYER_EVENT_PRIORITY_HIGH;
     event.flags = LAYER_EVENT_FLAG_BROADCAST;
 
@@ -441,9 +441,9 @@ layer_events_error_t layer_events_publish_size_changed(
     return layer_events_publish(events, &event);
 }
 
-// ============================================================================
-// EVENT SUBSCRIPTION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT SUBSCRIPTION FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Subscribe to events of a specific type
@@ -476,15 +476,15 @@ layer_events_subscribe(layer_event_system_t *events,
         return LAYER_EVENTS_ERROR_MAX_SUBSCRIBERS;
     }
 
-    // Check if already subscribed
+    /// Check if already subscribed
     if (find_subscriber(events, event_type, subscriber_id)) {
-        return LAYER_EVENTS_SUCCESS; // Already subscribed
+        return LAYER_EVENTS_SUCCESS; /// Already subscribed
     }
 
     debug_log(events, "Subscribing layer %d to event type %d", subscriber_id,
               event_type);
 
-    // Create new subscriber entry
+    /// Create new subscriber entry
     subscriber_entry_t *entry = malloc(sizeof(subscriber_entry_t));
     if (!entry) {
         events->last_error = LAYER_EVENTS_ERROR_MEMORY_ALLOCATION;
@@ -501,7 +501,7 @@ layer_events_subscribe(layer_event_system_t *events,
     entry->subscriber.events_processed = 0;
     entry->subscriber.last_event_time = 0;
 
-    // Add to subscriber list
+    /// Add to subscriber list
     entry->next = events->subscribers;
     events->subscribers = entry;
     events->subscriber_count++;
@@ -590,9 +590,9 @@ layer_events_error_t layer_events_unsubscribe_all(layer_event_system_t *events,
     return LAYER_EVENTS_SUCCESS;
 }
 
-// ============================================================================
-// EVENT PROCESSING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT PROCESSING FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Process pending events in the queue
@@ -616,12 +616,12 @@ int layer_events_process_pending(layer_event_system_t *events,
     uint64_t timeout_ns = timeout_ms * 1000000ULL;
     int processed_count = 0;
 
-    // Process events in priority order: Critical, High, Normal, Low
+    /// Process events in priority order: Critical, High, Normal, Low
     for (int priority = LAYER_EVENT_PRIORITY_CRITICAL;
          priority >= LAYER_EVENT_PRIORITY_LOW; priority--) {
 
         while (true) {
-            // Check timeout
+            /// Check timeout
             if (timeout_ms > 0) {
                 uint64_t elapsed = get_timestamp_ns() - start_time;
                 if (elapsed >= timeout_ns) {
@@ -629,19 +629,19 @@ int layer_events_process_pending(layer_event_system_t *events,
                 }
             }
 
-            // Check max events limit
+            /// Check max events limit
             if (max_events > 0 && processed_count >= (int)max_events) {
                 return processed_count;
             }
 
-            // Get next event from this priority queue
+            /// Get next event from this priority queue
             layer_event_t *event =
                 dequeue_event(events, (layer_event_priority_t)priority);
             if (!event) {
-                break; // No more events at this priority
+                break; /// No more events at this priority
             }
 
-            // Process the event
+            /// Process the event
             uint64_t processing_start = get_timestamp_ns();
             layer_events_error_t result = notify_subscribers(events, event);
             uint64_t processing_time = get_timestamp_ns() - processing_start;
@@ -655,7 +655,7 @@ int layer_events_process_pending(layer_event_system_t *events,
                 events->stats.events_failed++;
             }
 
-            // Check for performance warnings
+            /// Check for performance warnings
             if (events->config.enable_performance_monitoring) {
                 uint64_t processing_time_ms = processing_time / 1000000;
                 if (processing_time_ms >
@@ -699,7 +699,7 @@ int layer_events_process_priority(layer_event_system_t *events,
     while (max_events == 0 || processed_count < (int)max_events) {
         layer_event_t *event = dequeue_event(events, priority);
         if (!event) {
-            break; // No more events at this priority
+            break; /// No more events at this priority
         }
 
         layer_events_error_t result = notify_subscribers(events, event);
@@ -755,9 +755,9 @@ uint32_t layer_events_get_pending_count(layer_event_system_t *events) {
     return total;
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Get the string name of an event type
@@ -868,12 +868,12 @@ bool layer_events_validate_event(const layer_event_t *event) {
         return false;
     }
 
-    // Check event type is valid
+    /// Check event type is valid
     if (event->type <= LAYER_EVENT_NONE) {
         return false;
     }
 
-    // Check priority is valid
+    /// Check priority is valid
     if (event->priority < LAYER_EVENT_PRIORITY_LOW ||
         event->priority > LAYER_EVENT_PRIORITY_CRITICAL) {
         return false;
@@ -894,7 +894,7 @@ layer_event_stats_t layer_events_get_statistics(layer_event_system_t *events) {
         return empty_stats;
     }
 
-    // Update current queue size
+    /// Update current queue size
     events->stats.current_queue_size = layer_events_get_pending_count(events);
 
     return events->stats;
@@ -972,9 +972,9 @@ const char *layer_events_error_string(layer_events_error_t error) {
     }
 }
 
-// ============================================================================
-// STATIC HELPER FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// STATIC HELPER FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Create a new queue entry for an event
@@ -1024,7 +1024,7 @@ static layer_events_error_t enqueue_event(layer_event_system_t *events,
         return LAYER_EVENTS_ERROR_MEMORY_ALLOCATION;
     }
 
-    // Add to tail of queue
+    /// Add to tail of queue
     if (queue->tail) {
         queue->tail->next = entry;
         entry->prev = queue->tail;
@@ -1065,7 +1065,7 @@ static layer_event_t *dequeue_event(layer_event_system_t *events,
 
     *event = entry->event;
 
-    // Remove from head of queue
+    /// Remove from head of queue
     queue->head = entry->next;
     if (queue->head) {
         queue->head->prev = NULL;
@@ -1097,7 +1097,7 @@ static layer_events_error_t notify_subscribers(layer_event_system_t *events,
             subscriber->subscriber.active &&
             event->priority >= subscriber->subscriber.min_priority) {
 
-            // Check if event is targeted to this subscriber
+            /// Check if event is targeted to this subscriber
             if (event->target_layer != 0 &&
                 event->target_layer != subscriber->subscriber.subscriber_id) {
                 subscriber = subscriber->next;
@@ -1161,14 +1161,14 @@ static void cleanup_event_data(layer_event_t *event) {
         return;
     }
 
-    // Clean up content changed data
+    /// Clean up content changed data
     if (event->type == LAYER_EVENT_CONTENT_CHANGED &&
         event->data.content_changed.new_content) {
         free((void *)event->data.content_changed.new_content);
         event->data.content_changed.new_content = NULL;
     }
 
-    // Clean up custom data if cleanup function is provided
+    /// Clean up custom data if cleanup function is provided
     if (event->data.custom_data.cleanup_func && event->data.custom_data.data) {
         event->data.custom_data.cleanup_func(event->data.custom_data.data);
         event->data.custom_data.data = NULL;

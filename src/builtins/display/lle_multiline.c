@@ -12,7 +12,7 @@
 #include "config_registry.h"
 
 int display_lle_multiline(int argc, char **argv) {
-    /* Control multiline editing */
+    // Control multiline editing
     if (argc < 2) {
         printf("Multiline editing: %s\n",
                config.lle_enable_multiline_editing ? "enabled" : "disabled");

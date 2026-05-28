@@ -26,23 +26,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Mock memory pool instance - just a non-NULL pointer for validation */
+/// Mock memory pool instance - just a non-NULL pointer for validation
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Test event handler state */
+/// Test event handler state
 static int handler_call_count = 0;
 static lle_event_t *last_handled_event = NULL;
 static void *last_handler_user_data = NULL;
 static lle_result_t handler_return_value = LLE_SUCCESS;
 
 /* ========================================================================== */
-/*                          TEST HELPER FUNCTIONS                             */
+/// TEST HELPER FUNCTIONS
 /* ========================================================================== */
 
-/**
- * @brief Reset handler state before each test
- */
+/// @brief Reset handler state before each test
 static void reset_handler_state(void) {
     handler_call_count = 0;
     last_handled_event = NULL;
@@ -50,9 +48,7 @@ static void reset_handler_state(void) {
     handler_return_value = LLE_SUCCESS;
 }
 
-/**
- * @brief Test event handler callback
- */
+/// @brief Test event handler callback
 static lle_result_t test_event_handler(lle_event_t *event, void *user_data) {
     handler_call_count++;
     last_handled_event = event;
@@ -61,7 +57,7 @@ static lle_result_t test_event_handler(lle_event_t *event, void *user_data) {
 }
 
 /* ========================================================================== */
-/*                        EVENT SYSTEM LIFECYCLE TESTS                        */
+/// EVENT SYSTEM LIFECYCLE TESTS
 /* ========================================================================== */
 
 TEST(event_system_init_success) {
@@ -113,7 +109,7 @@ TEST(event_system_stop_null_system) {
 }
 
 /* ========================================================================== */
-/*                          EVENT CREATION TESTS                              */
+/// EVENT CREATION TESTS
 /* ========================================================================== */
 
 TEST(event_create_success_no_data) {
@@ -224,7 +220,7 @@ TEST(event_clone_success) {
 }
 
 /* ========================================================================== */
-/*                          EVENT QUEUE TESTS                                 */
+/// EVENT QUEUE TESTS
 /* ========================================================================== */
 
 TEST(event_enqueue_success) {
@@ -374,7 +370,7 @@ TEST(event_queue_empty_check) {
 }
 
 /* ========================================================================== */
-/*                       EVENT HANDLER TESTS                                  */
+/// EVENT HANDLER TESTS
 /* ========================================================================== */
 
 TEST(handler_register_success) {
@@ -532,7 +528,7 @@ TEST(event_process_queue_success) {
     lle_event_handler_register(system, LLE_EVENT_KEY_PRESS, test_event_handler,
                                NULL, "test");
 
-    /* Enqueue 3 events */
+    /// Enqueue 3 events
     for (int i = 0; i < 3; i++) {
         lle_event_t *event = NULL;
         lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
@@ -556,7 +552,7 @@ TEST(event_process_queue_max_events) {
     lle_event_handler_register(system, LLE_EVENT_KEY_PRESS, test_event_handler,
                                NULL, "test");
 
-    /* Enqueue 10 events */
+    /// Enqueue 10 events
     for (int i = 0; i < 10; i++) {
         lle_event_t *event = NULL;
         lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
@@ -573,7 +569,7 @@ TEST(event_process_queue_max_events) {
 }
 
 /* ========================================================================== */
-/*                          STATISTICS TESTS                                  */
+/// STATISTICS TESTS
 /* ========================================================================== */
 
 TEST(statistics_events_created) {
@@ -620,7 +616,7 @@ TEST(statistics_events_dispatched) {
 }
 
 /* ========================================================================== */
-/*                          UTILITY FUNCTION TESTS                            */
+/// UTILITY FUNCTION TESTS
 /* ========================================================================== */
 
 TEST(event_type_name_returns_valid) {
@@ -643,7 +639,7 @@ TEST(event_type_name_unknown) {
 }
 
 /* ========================================================================== */
-/*                            MAIN TEST RUNNER                                */
+/// MAIN TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {

@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * RESULT STRING TESTS
@@ -205,7 +205,7 @@ TEST(manager_create_custom_config) {
 }
 
 TEST(manager_destroy_null) {
-    /* Should not crash */
+    /// Should not crash
     lush_plugin_manager_destroy(NULL);
 }
 
@@ -218,7 +218,7 @@ TEST(manager_set_executor) {
     lush_plugin_manager_t *manager = NULL;
     lush_plugin_manager_create(&manager, NULL);
 
-    /* Use a fake executor pointer - we're just testing the setter */
+    /// Use a fake executor pointer - we're just testing the setter
     struct executor *fake_executor = (struct executor *)0x12345678;
     lush_plugin_manager_set_executor(manager, fake_executor);
     ASSERT_EQ(manager->executor, fake_executor, "Executor should be set");
@@ -227,7 +227,7 @@ TEST(manager_set_executor) {
 }
 
 TEST(manager_set_executor_null_manager) {
-    /* Should not crash */
+    /// Should not crash
     lush_plugin_manager_set_executor(NULL, NULL);
 }
 
@@ -235,7 +235,7 @@ TEST(manager_set_symtable) {
     lush_plugin_manager_t *manager = NULL;
     lush_plugin_manager_create(&manager, NULL);
 
-    /* Use a fake symtable pointer */
+    /// Use a fake symtable pointer
     struct symtable *fake_symtable = (struct symtable *)0xABCDEF00;
     lush_plugin_manager_set_symtable(manager, fake_symtable);
     ASSERT_EQ(manager->symtable, fake_symtable, "Symtable should be set");
@@ -244,7 +244,7 @@ TEST(manager_set_symtable) {
 }
 
 TEST(manager_set_symtable_null_manager) {
-    /* Should not crash */
+    /// Should not crash
     lush_plugin_manager_set_symtable(NULL, NULL);
 }
 
@@ -291,19 +291,19 @@ TEST(manager_load_inactive_manager) {
     ASSERT_EQ(result, LUSH_PLUGIN_ERROR,
               "Inactive manager should return error");
 
-    /* Restore for cleanup */
+    /// Restore for cleanup
     manager->active = true;
     lush_plugin_manager_destroy(manager);
 }
 
 TEST(manager_load_max_plugins_reached) {
     lush_plugin_manager_config_t config = {
-        .max_plugins = 0 /* Will set to 0 to simulate already at max */
+        .max_plugins = 0 /// Will set to 0 to simulate already at max
     };
     lush_plugin_manager_t *manager = NULL;
     lush_plugin_manager_create(&manager, &config);
 
-    /* Manually set plugin count to 1 and max to 1 to simulate limit */
+    /// Manually set plugin count to 1 and max to 1 to simulate limit
     manager->config.max_plugins = 1;
     manager->plugin_count = 1;
 
@@ -436,7 +436,7 @@ TEST(manager_list_empty) {
     lush_plugin_manager_t *manager = NULL;
     lush_plugin_manager_create(&manager, NULL);
 
-    size_t count = 10; /* Start with non-zero to verify it gets updated */
+    size_t count = 10; /// Start with non-zero to verify it gets updated
     lush_plugin_result_t result =
         lush_plugin_manager_list(manager, NULL, &count);
     ASSERT_EQ(result, LUSH_PLUGIN_OK, "List should succeed");
@@ -512,8 +512,7 @@ TEST(has_permission_multiple) {
     lush_plugin_context_t ctx = {.granted_permissions =
                                      LUSH_PLUGIN_PERM_READ_VARS};
 
-    /* Test that asking for multiple permissions when only one is granted fails
-     */
+    /// Test that asking for multiple permissions when only one is granted fails
     lush_plugin_permission_t multi =
         LUSH_PLUGIN_PERM_READ_VARS | LUSH_PLUGIN_PERM_WRITE_VARS;
     ASSERT_FALSE(lush_plugin_has_permission(&ctx, multi),
@@ -539,7 +538,7 @@ TEST(has_permission_all) {
  * ============================================================================
  */
 
-/* Dummy builtin function for testing */
+/// Dummy builtin function for testing
 static int dummy_builtin(int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -571,7 +570,7 @@ TEST(register_builtin_null_fn) {
 TEST(register_builtin_no_permission) {
     lush_plugin_t plugin = {0};
     lush_plugin_context_t ctx = {
-        .plugin = &plugin, .granted_permissions = 0 /* No permissions */
+        .plugin = &plugin, .granted_permissions = 0 /// No permissions
     };
     lush_plugin_result_t result =
         lush_plugin_register_builtin(&ctx, "test", dummy_builtin);
@@ -604,7 +603,7 @@ TEST(unregister_builtin_null_name) {
  * ============================================================================
  */
 
-/* Dummy hook function for testing */
+/// Dummy hook function for testing
 static void dummy_hook(lush_plugin_context_t *ctx, const char *event_data) {
     (void)ctx;
     (void)event_data;
@@ -634,7 +633,7 @@ TEST(register_hook_null_fn) {
 
 TEST(register_hook_no_permission) {
     lush_plugin_context_t ctx = {
-        .granted_permissions = 0 /* No permissions */
+        .granted_permissions = 0 /// No permissions
     };
     lush_plugin_result_t result =
         lush_plugin_register_hook(&ctx, "precmd", dummy_hook);
@@ -680,7 +679,7 @@ TEST(register_hook_invalid_name) {
  * ============================================================================
  */
 
-/* Dummy completion function for testing */
+/// Dummy completion function for testing
 static int dummy_completion(lush_plugin_context_t *ctx, const char *line,
                             size_t cursor, char ***completions, size_t *count) {
     (void)ctx;
@@ -715,7 +714,7 @@ TEST(register_completion_null_fn) {
 
 TEST(register_completion_no_permission) {
     lush_plugin_context_t ctx = {
-        .granted_permissions = 0 /* No permissions */
+        .granted_permissions = 0 /// No permissions
     };
     lush_plugin_result_t result =
         lush_plugin_register_completion(&ctx, "test", dummy_completion);
@@ -737,7 +736,7 @@ TEST(register_completion_with_permission) {
  * ============================================================================
  */
 
-/* Dummy event function for testing */
+/// Dummy event function for testing
 static void dummy_event(lush_plugin_context_t *ctx, int event_type,
                         void *event_data) {
     (void)ctx;
@@ -760,7 +759,7 @@ TEST(subscribe_event_null_fn) {
 
 TEST(subscribe_event_no_permission) {
     lush_plugin_context_t ctx = {
-        .granted_permissions = 0 /* No permissions */
+        .granted_permissions = 0 /// No permissions
     };
     lush_plugin_result_t result =
         lush_plugin_subscribe_event(&ctx, 0, dummy_event);
@@ -796,7 +795,7 @@ TEST(get_var_null_name) {
 
 TEST(get_var_no_permission) {
     lush_plugin_context_t ctx = {
-        .granted_permissions = 0 /* No permissions */
+        .granted_permissions = 0 /// No permissions
     };
     const char *result = lush_plugin_get_var(&ctx, "HOME");
     ASSERT_NULL(result, "No permission should return NULL");
@@ -816,7 +815,7 @@ TEST(set_var_null_name) {
 
 TEST(set_var_no_permission) {
     lush_plugin_context_t ctx = {
-        .granted_permissions = 0 /* No permissions */
+        .granted_permissions = 0 /// No permissions
     };
     lush_plugin_result_t result = lush_plugin_set_var(&ctx, "TEST", "value");
     ASSERT_EQ(result, LUSH_PLUGIN_ERROR_PERMISSION_DENIED,
@@ -836,13 +835,13 @@ TEST(set_var_with_permission) {
  */
 
 TEST(log_null_context) {
-    /* Should not crash */
+    /// Should not crash
     lush_plugin_log(NULL, 1, "Test message");
 }
 
 TEST(log_null_format) {
     lush_plugin_context_t ctx = {0};
-    /* Should not crash */
+    /// Should not crash
     lush_plugin_log(&ctx, 1, NULL);
 }
 
@@ -851,7 +850,7 @@ TEST(log_with_valid_context) {
     lush_plugin_t plugin = {.def = &def};
     lush_plugin_context_t ctx = {.plugin = &plugin};
 
-    /* Should not crash - output goes to stderr */
+    /// Should not crash - output goes to stderr
     lush_plugin_log(&ctx, 0, "Debug message %d", 42);
     lush_plugin_log(&ctx, 1, "Info message");
     lush_plugin_log(&ctx, 2, "Warning message");
@@ -865,7 +864,7 @@ TEST(log_with_valid_context) {
  */
 
 TEST(permission_flags_defined) {
-    /* Verify permission flags are properly defined and unique */
+    /// Verify permission flags are properly defined and unique
     ASSERT_TRUE(LUSH_PLUGIN_PERM_NONE == 0, "PERM_NONE should be 0");
     ASSERT_TRUE(LUSH_PLUGIN_PERM_READ_VARS != 0,
                 "PERM_READ_VARS should not be 0");
@@ -880,7 +879,7 @@ TEST(permission_flags_defined) {
                 "PERM_COMPLETIONS should not be 0");
     ASSERT_TRUE(LUSH_PLUGIN_PERM_EVENTS != 0, "PERM_EVENTS should not be 0");
 
-    /* Verify PERM_ALL includes all permissions */
+    /// Verify PERM_ALL includes all permissions
     lush_plugin_permission_t all =
         LUSH_PLUGIN_PERM_READ_VARS | LUSH_PLUGIN_PERM_WRITE_VARS |
         LUSH_PLUGIN_PERM_EXEC | LUSH_PLUGIN_PERM_REGISTER_BUILTIN |

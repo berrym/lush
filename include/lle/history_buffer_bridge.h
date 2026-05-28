@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+/// Forward declarations
 typedef struct lle_history_buffer_bridge lle_history_buffer_bridge_t;
 typedef struct lle_history_core lle_history_core_t;
 typedef struct lle_multiline_parser lle_multiline_parser_t;
@@ -37,8 +37,8 @@ typedef struct lle_buffer_t lle_buffer_t;
  * @brief Transfer direction enumeration
  */
 typedef enum lle_transfer_direction {
-    LLE_TRANSFER_HISTORY_TO_BUFFER = 0, /**< Load from history into buffer */
-    LLE_TRANSFER_BUFFER_TO_HISTORY      /**< Save from buffer to history */
+    LLE_TRANSFER_HISTORY_TO_BUFFER = 0, ///< Load from history into buffer
+    LLE_TRANSFER_BUFFER_TO_HISTORY      ///< Save from buffer to history
 } lle_transfer_direction_t;
 
 /**
@@ -47,22 +47,22 @@ typedef enum lle_transfer_direction {
 typedef struct lle_transfer_options {
     bool apply_reconstruction; /**< Apply reconstruction when loading to buffer
                                 */
-    bool parse_multiline;      /**< Parse multiline structure when loading */
-    bool preserve_indentation; /**< Preserve indentation */
-    bool create_new_entry;     /**< Create new entry vs update existing */
-    void *reserved[4];         /**< Reserved for future use */
+    bool parse_multiline;      ///< Parse multiline structure when loading
+    bool preserve_indentation; ///< Preserve indentation
+    bool create_new_entry;     ///< Create new entry vs update existing
+    void *reserved[4];         ///< Reserved for future use
 } lle_transfer_options_t;
 
 /**
  * @brief Transfer result structure
  */
 typedef struct lle_transfer_result {
-    bool success;             /**< Success flag */
-    size_t entry_index;       /**< Entry index (for history operations) */
-    size_t buffer_position;   /**< Buffer position (for buffer operations) */
-    size_t bytes_transferred; /**< Bytes transferred */
-    bool is_multiline;        /**< Whether multiline structure was detected */
-    void *reserved[2];        /**< Reserved for future use */
+    bool success;             ///< Success flag
+    size_t entry_index;       ///< Entry index (for history operations)
+    size_t buffer_position;   ///< Buffer position (for buffer operations)
+    size_t bytes_transferred; ///< Bytes transferred
+    bool is_multiline;        ///< Whether multiline structure was detected
+    void *reserved[2];        ///< Reserved for future use
 } lle_transfer_result_t;
 
 /**
@@ -161,4 +161,4 @@ lle_history_buffer_bridge_get_default_options(lle_transfer_options_t *options);
 }
 #endif
 
-#endif /* LLE_HISTORY_BUFFER_BRIDGE_H */
+#endif /// LLE_HISTORY_BUFFER_BRIDGE_H

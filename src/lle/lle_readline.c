@@ -56,38 +56,39 @@
  * Future steps will integrate with full LLE system initialization.
  */
 
-#include "config.h" /* For config_values_t and history config options */
-#include "config_registry.h" /* For completion.chain_directories */
+#include "lle/lle_readline.h" /// Public readline API + debug-prompt setter
+#include "config.h"           /// For config_values_t and history config options
+#include "config_registry.h"  /// For completion.chain_directories
 #include "display/display_controller.h"
 #include "display/prompt_layer.h"
-#include "display_integration.h" /* Lush display integration */
+#include "display_integration.h" /// Lush display integration
 #include "input_continuation.h"
-#include "lle/arena.h" /* Hierarchical arena allocator */
+#include "lle/arena.h" /// Hierarchical arena allocator
 #include "lle/buffer_management.h"
-#include "lle/completion/completion_system.h" /* Completion system for menu visibility */
+#include "lle/completion/completion_system.h" /// Completion system for menu visibility
 #include "lle/completion/splicer.h"
 #include "lle/completion/word_context.h"
-#include "lle/display_integration.h" /* Spec 08: Complete display integration */
+#include "lle/display_integration.h" /// Spec 08: Complete display integration
 #include "lle/error_handling.h"
 #include "lle/event_system.h"
-#include "lle/history.h"    /* History system for UP/DOWN navigation */
-#include "lle/keybinding.h" /* Keybinding manager for Group 1+ migration */
-#include "lle/keybinding_actions.h"    /* Smart arrow navigation functions */
-#include "lle/keybinding_config.h"     /* User keybinding configuration */
-#include "lle/lle_editor.h"            /* Proper LLE editor architecture */
-#include "lle/lle_readline_state.h"    /* State machine for input handling */
-#include "lle/lle_shell_integration.h" /* Spec 26: Shell integration */
-#include "lle/lle_watchdog.h" /* Watchdog timer for deadlock detection */
+#include "lle/history.h"    /// History system for UP/DOWN navigation
+#include "lle/keybinding.h" /// Keybinding manager for Group 1+ migration
+#include "lle/keybinding_actions.h"    /// Smart arrow navigation functions
+#include "lle/keybinding_config.h"     /// User keybinding configuration
+#include "lle/lle_editor.h"            /// Proper LLE editor architecture
+#include "lle/lle_readline_state.h"    /// State machine for input handling
+#include "lle/lle_shell_integration.h" /// Spec 26: Shell integration
+#include "lle/lle_watchdog.h"          /// Watchdog timer for deadlock detection
 #include "lle/memory_management.h"
-#include "lle/notification.h"        /* Notification system for hints */
-#include "lle/prompt/composer.h"     /* lle_composer_set_theme */
-#include "lle/prompt/theme_loader.h" /* lle_theme_check_hot_reload */
+#include "lle/notification.h"        /// Notification system for hints
+#include "lle/prompt/composer.h"     /// lle_composer_set_theme
+#include "lle/prompt/theme_loader.h" /// lle_theme_check_hot_reload
 #include "lle/terminal_abstraction.h"
-#include "lle/unicode_compare.h" /* TR#29 compliant Unicode prefix matching */
-#include "lle/widget_hooks.h"    /* Widget hooks for lifecycle events */
-#include "signals.h"             /* For SIGINT flag coordination with LLE */
+#include "lle/unicode_compare.h" /// TR#29 compliant Unicode prefix matching
+#include "lle/widget_hooks.h"    /// Widget hooks for lifecycle events
+#include "signals.h"             /// For SIGINT flag coordination with LLE
 
-/* Forward declarations for history action functions */
+/// Forward declarations for history action functions
 lle_result_t lle_history_previous(lle_editor_t *editor);
 lle_result_t lle_history_next(lle_editor_t *editor);
 
@@ -99,8 +100,20 @@ lle_result_t lle_history_next(lle_editor_t *editor);
 #include <time.h>
 #include <unistd.h>
 
-/* Global LLE editor instance (proper architecture) */
+/// Global LLE editor instance (proper architecture)
 static lle_editor_t *global_lle_editor = NULL;
+
+/* In-process debug-prompt history (lazy-created on first
+ * lle_readline_no_history call). The debug prompt swaps the editor's
+ * history_system pointer to this one for the duration of the call so
+ * arrow-key recall and ctrl-r reverse search operate on past debug
+ * commands instead of shell history. It is never persisted; it lives
+ * for the process lifetime. */
+static lle_history_core_t *g_debug_history = NULL;
+
+/* The debug-prompt-active flag lives in lle_debug_prompt_state.c so
+ * that consumers (the completion sources) can read it without their
+ * .o files chaining lle_readline.c.o into the link surface. */
 
 /**
  * @brief Get the global LLE editor instance
@@ -112,11 +125,11 @@ static lle_editor_t *global_lle_editor = NULL;
  * Allows other modules to access the editor for adding history, etc.
  */
 lle_editor_t *lle_get_global_editor(void) {
-    /* Prefer shell integration's editor (Spec 26) */
+    /// Prefer shell integration's editor (Spec 26)
     if (g_lle_integration && g_lle_integration->editor) {
         return g_lle_integration->editor;
     }
-    /* Fallback for backward compatibility */
+    /// Fallback for backward compatibility
     return global_lle_editor;
 }
 
@@ -132,30 +145,29 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
     if (!hist_config)
         return;
 
-    /* Initialize to zero */
+    /// Initialize to zero
     memset(hist_config, 0, sizeof(lle_history_config_t));
 
-    /* Capacity settings */
+    /// Capacity settings
     hist_config->max_entries =
         config.history_size > 0 ? config.history_size : 5000;
-    hist_config->max_command_length =
-        8192; /* Support long multiline commands */
+    hist_config->max_command_length = 8192; /// Support long multiline commands
 
-    /* File settings */
+    /// File settings
     if (config.lle_history_file && config.lle_history_file[0] != '\0') {
         hist_config->history_file_path = config.lle_history_file;
     } else {
-        hist_config->history_file_path = NULL; /* Use default ~/.lush_history */
+        hist_config->history_file_path = NULL; /// Use default ~/.lush_history
     }
-    hist_config->auto_save = true;    /* Always auto-save for safety */
-    hist_config->load_on_init = true; /* Load existing history on startup */
+    hist_config->auto_save = true;    /// Always auto-save for safety
+    hist_config->load_on_init = true; /// Load existing history on startup
 
-    /* Deduplication behavior */
+    /// Deduplication behavior
     hist_config->ignore_duplicates =
         config.lle_enable_deduplication &&
         (config.lle_dedup_scope != LLE_DEDUP_SCOPE_NONE);
 
-    /* Map config dedup strategy to history dedup strategy */
+    /// Map config dedup strategy to history dedup strategy
     switch (config.lle_dedup_strategy) {
     case LLE_DEDUP_STRATEGY_IGNORE:
         hist_config->dedup_strategy = LLE_DEDUP_IGNORE;
@@ -175,7 +187,7 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
         break;
     }
 
-    /* Map dedup scope (issue #41) */
+    /// Map dedup scope (issue #41)
     switch (config.lle_dedup_scope) {
     case LLE_DEDUP_SCOPE_NONE:
         hist_config->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_NONE;
@@ -194,19 +206,19 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
         break;
     }
 
-    /* Configure Unicode normalization for dedup comparison */
+    /// Configure Unicode normalization for dedup comparison
     hist_config->unicode_normalize = config.lle_dedup_unicode_normalize;
 
     hist_config->ignore_space_prefix =
-        false; /* Standard bash behavior: space = don't save */
+        false; /// Standard bash behavior: space = don't save
 
-    /* Metadata to save */
+    /// Metadata to save
     hist_config->save_timestamps =
-        config.history_timestamps; /* Use global setting */
+        config.history_timestamps; /// Use global setting
     hist_config->save_working_dir = config.lle_enable_forensic_tracking;
     hist_config->save_exit_codes = config.lle_enable_forensic_tracking;
 
-    /* Performance settings */
+    /// Performance settings
     hist_config->initial_capacity =
         config.lle_enable_history_cache && config.lle_cache_size > 0
             ? config.lle_cache_size
@@ -216,7 +228,7 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
                                           */
 }
 
-/* Event handler context for Step 6 */
+/// Event handler context for Step 6
 typedef struct readline_context {
     lle_buffer_t *buffer;
     bool *done;
@@ -224,34 +236,34 @@ typedef struct readline_context {
     lle_terminal_abstraction_t *term;
     const char *prompt;
     continuation_state_t
-        *continuation_state; /* Step 6: Shared multiline parser state */
-    char *kill_buffer; /* Step 5 enhancement: Simple kill buffer for yank */
-    size_t kill_buffer_size; /* Allocated size of kill buffer */
+        *continuation_state; ///< Step 6: Shared multiline parser state
+    char *kill_buffer; ///< Step 5 enhancement: Simple kill buffer for yank
+    size_t kill_buffer_size; ///< Allocated size of kill buffer
 
-    /* Memory management - edit arena for per-readline allocations */
-    lle_arena_t *edit_arena; /* Edit-session arena (child of session arena) */
+    /// Memory management - edit arena for per-readline allocations
+    lle_arena_t *edit_arena; ///< Edit-session arena (child of session arena)
 
-    /* LLE Editor - proper architecture */
-    lle_editor_t *editor; /* Full LLE editor context */
+    /// LLE Editor - proper architecture
+    lle_editor_t *editor; ///< Full LLE editor context
 
-    /* Keybinding manager - incremental migration (Group 1+) */
+    /// Keybinding manager - incremental migration (Group 1+)
     lle_keybinding_manager_t
-        *keybinding_manager; /* Replaces hardcoded keybindings */
+        *keybinding_manager; ///< Replaces hardcoded keybindings
 
-    /* Fish-style autosuggestions - direct LLE history integration */
-    char *current_suggestion; /* Current suggestion text (the part to append) */
-    size_t suggestion_alloc_size; /* Allocated size of suggestion buffer */
+    /// Fish-style autosuggestions - direct LLE history integration
+    char *current_suggestion; ///< Current suggestion text (the part to append)
+    size_t suggestion_alloc_size; ///< Allocated size of suggestion buffer
     bool suppress_autosuggestion; /* Temporarily suppress autosuggestion
                                      regeneration */
 
     /* Explicit state machine for input handling
      * Provides guaranteed exit paths and replaces implicit flag checks */
-    lle_readline_state_t state;          /* Current state */
-    lle_readline_state_t previous_state; /* For debugging/recovery */
+    lle_readline_state_t state;          ///< Current state
+    lle_readline_state_t previous_state; ///< For debugging/recovery
 
-    /* Notification system for transient hints (multiline history hint, etc.) */
+    /// Notification system for transient hints (multiline history hint, etc.)
     lle_notification_state_t
-        notification; /* Notification state (inline, not pointer) */
+        notification; ///< Notification state (inline, not pointer)
 } readline_context_t;
 
 /* ============================================================================
@@ -278,9 +290,9 @@ static bool begin_change_sequence(readline_context_t *ctx,
         return false;
     }
 
-    /* Don't start a new sequence if one is already in progress */
+    /// Don't start a new sequence if one is already in progress
     if (ctx->buffer->current_sequence) {
-        return true; /* Already have a sequence */
+        return true; /// Already have a sequence
     }
 
     lle_change_sequence_t *seq = NULL;
@@ -330,28 +342,28 @@ static void end_change_sequence(readline_context_t *ctx) {
  * @param ctx Readline context with buffer and editor
  */
 static void update_autosuggestion(readline_context_t *ctx) {
-    /* Clear existing suggestion */
+    /// Clear existing suggestion
     if (ctx->current_suggestion) {
         ctx->current_suggestion[0] = '\0';
     }
 
-    /* Bail out conditions */
+    /// Bail out conditions
     if (!ctx || !ctx->buffer || !ctx->editor || !ctx->editor->history_system) {
         return;
     }
 
-    /* Check if autosuggestion regeneration is suppressed (e.g., during Ctrl+G
-     * clear) */
+    /// Check if autosuggestion regeneration is suppressed (e.g., during Ctrl+G
+    /// clear)
     if (ctx->suppress_autosuggestion) {
         return;
     }
 
-    /* Only suggest when cursor at end */
+    /// Only suggest when cursor at end
     if (ctx->buffer->cursor.byte_offset != ctx->buffer->length) {
         return;
     }
 
-    /* Need at least 2 characters */
+    /// Need at least 2 characters
     if (ctx->buffer->length < 2) {
         return;
     }
@@ -361,17 +373,17 @@ static void update_autosuggestion(readline_context_t *ctx) {
         return;
     }
 
-    /* Don't suggest if ends with space */
+    /// Don't suggest if ends with space
     if (input[ctx->buffer->length - 1] == ' ') {
         return;
     }
 
-    /* Don't suggest in multiline mode */
+    /// Don't suggest in multiline mode
     if (strchr(input, '\n') != NULL) {
         return;
     }
 
-    /* Search LLE history for prefix match (most recent first) */
+    /// Search LLE history for prefix match (most recent first)
     lle_history_core_t *history = ctx->editor->history_system;
     size_t count = 0;
     lle_history_get_entry_count(history, &count);
@@ -382,17 +394,17 @@ static void update_autosuggestion(readline_context_t *ctx) {
 
     size_t input_len = ctx->buffer->length;
 
-/* Limit history search to prevent hangs with very large histories */
+/// Limit history search to prevent hangs with very large histories
 #define MAX_SUGGESTION_SEARCH_ITERATIONS 5000
     size_t iterations = 0;
 
-    /* Search backwards (most recent first) */
+    /// Search backwards (most recent first)
     for (size_t i = count;
          i > 0 && iterations < MAX_SUGGESTION_SEARCH_ITERATIONS;
          i--, iterations++) {
-        /* Check watchdog every 500 iterations to allow abort on timeout */
+        /// Check watchdog every 500 iterations to allow abort on timeout
         if (iterations > 0 && (iterations % 500) == 0 && lle_watchdog_check()) {
-            return; /* Watchdog fired - abort suggestion search */
+            return; /// Watchdog fired - abort suggestion search
         }
 
         lle_history_entry_t *entry = NULL;
@@ -403,32 +415,31 @@ static void update_autosuggestion(readline_context_t *ctx) {
             continue;
         }
 
-        /* Skip multiline history entries - don't suggest them for single-line
-         * input This prevents suggesting "echo \"\nhello\"" when user types
-         * "echo"
-         *
-         * Note: LLE history stores newlines as escaped "\n" (two chars:
-         * backslash + n) not as actual newline bytes. Check for both formats.
-         */
+        /// Skip multiline history entries - don't suggest them for single-line
+        /// input This prevents suggesting "echo \"\nhello\"" when user types
+        /// "echo"
+        ///
+        /// Note: LLE history stores newlines as escaped "\n" (two chars:
+        /// backslash + n) not as actual newline bytes. Check for both formats.
         if (strchr(entry->command, '\n') != NULL ||
             strstr(entry->command, "\\n") != NULL) {
             continue;
         }
 
-        /* Check for prefix match using Unicode-aware comparison (TR#29
-         * compliant) This handles NFC normalization to ensure equivalent
-         * Unicode sequences match regardless of encoding (e.g., precomposed vs
-         * decomposed) */
+        /// Check for prefix match using Unicode-aware comparison (TR#29
+        /// compliant) This handles NFC normalization to ensure equivalent
+        /// Unicode sequences match regardless of encoding (e.g., precomposed vs
+        /// decomposed)
         if (lle_unicode_is_prefix(input, input_len, entry->command,
                                   strlen(entry->command), NULL)) {
-            /* Found a match - get the remaining text */
+            /// Found a match - get the remaining text
             const char *remaining = entry->command + input_len;
 
-            /* Only suggest if there's something to add */
+            /// Only suggest if there's something to add
             if (*remaining) {
                 size_t remaining_len = strlen(remaining);
 
-                /* Ensure buffer is large enough */
+                /// Ensure buffer is large enough
                 if (remaining_len + 1 > ctx->suggestion_alloc_size) {
                     size_t new_size = remaining_len + 64;
                     char *new_buf = realloc(ctx->current_suggestion, new_size);
@@ -436,12 +447,12 @@ static void update_autosuggestion(readline_context_t *ctx) {
                         ctx->current_suggestion = new_buf;
                         ctx->suggestion_alloc_size = new_size;
                     } else {
-                        return; /* Allocation failed */
+                        return; /// Allocation failed
                     }
                 }
 
                 strcpy(ctx->current_suggestion, remaining);
-                return; /* Found best match */
+                return; /// Found best match
             }
         }
     }
@@ -458,13 +469,13 @@ static bool has_autosuggestion(readline_context_t *ctx) {
     if (!ctx)
         return false;
 
-    /* Check local suggestion buffer */
+    /// Check local suggestion buffer
     if (ctx->current_suggestion && ctx->current_suggestion[0] != '\0') {
         return true;
     }
 
-    /* Also check display controller - it may have a suggestion we don't know
-     * about */
+    /// Also check display controller - it may have a suggestion we don't know
+    /// about
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         const char *dc_suggestion = display_controller_get_autosuggestion(dc);
@@ -485,20 +496,20 @@ static bool accept_autosuggestion(readline_context_t *ctx) {
         return false;
     }
 
-    /* Insert suggestion text at cursor (which is at end) */
+    /// Insert suggestion text at cursor (which is at end)
     size_t suggestion_len = strlen(ctx->current_suggestion);
     lle_result_t result =
         lle_buffer_insert_text(ctx->buffer, ctx->buffer->cursor.byte_offset,
                                ctx->current_suggestion, suggestion_len);
 
     if (result == LLE_SUCCESS) {
-        /* Sync cursor manager */
+        /// Sync cursor manager
         if (ctx->editor && ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
         }
 
-        /* Clear suggestion after acceptance */
+        /// Clear suggestion after acceptance
         ctx->current_suggestion[0] = '\0';
         return true;
     }
@@ -506,7 +517,7 @@ static bool accept_autosuggestion(readline_context_t *ctx) {
     return false;
 }
 
-/* Forward declaration for refresh_display */
+/// Forward declaration for refresh_display
 static void refresh_display(readline_context_t *ctx);
 
 /**
@@ -526,8 +537,8 @@ lle_result_t lle_forward_char_or_accept_suggestion(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Priority 1: If completion menu is active, delegate to lle_forward_char
-     * which handles menu navigation (move right in multi-column menu) */
+    /// Priority 1: If completion menu is active, delegate to lle_forward_char
+    /// which handles menu navigation (move right in multi-column menu)
     if (ctx->editor) {
         bool menu_active = false;
 
@@ -538,15 +549,15 @@ lle_result_t lle_forward_char_or_accept_suggestion(readline_context_t *ctx) {
         }
 
         if (menu_active) {
-            /* Delegate to lle_forward_char which handles menu navigation */
+            /// Delegate to lle_forward_char which handles menu navigation
             lle_result_t result = lle_forward_char(ctx->editor);
             refresh_display(ctx);
             return result;
         }
     }
 
-    /* Priority 2: Fish-style autosuggestion - if at end of buffer with
-     * suggestion, accept it */
+    /// Priority 2: Fish-style autosuggestion - if at end of buffer with
+    /// suggestion, accept it
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -555,7 +566,7 @@ lle_result_t lle_forward_char_or_accept_suggestion(readline_context_t *ctx) {
         }
     }
 
-    /* Priority 3: Normal behavior - move cursor right */
+    /// Priority 3: Normal behavior - move cursor right
     if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
         ctx->editor && ctx->editor->cursor_manager) {
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
@@ -583,9 +594,9 @@ lle_result_t lle_end_of_line_or_accept_suggestion(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Fish-style: If already at end of buffer with suggestion, accept it
-     * Note: Suggestion acceptance only applies at absolute buffer end,
-     * since suggestions extend the entire command, not individual lines */
+    /// Fish-style: If already at end of buffer with suggestion, accept it
+    /// Note: Suggestion acceptance only applies at absolute buffer end,
+    /// since suggestions extend the entire command, not individual lines
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -594,18 +605,18 @@ lle_result_t lle_end_of_line_or_accept_suggestion(readline_context_t *ctx) {
         }
     }
 
-    /* Normal behavior: move cursor to end of CURRENT LINE (not buffer)
-     * This is critical for multiline mode - Ctrl+E should move to end of
-     * the current logical line, while Alt+> moves to end of buffer */
+    /// Normal behavior: move cursor to end of CURRENT LINE (not buffer)
+    /// This is critical for multiline mode - Ctrl+E should move to end of
+    /// the current logical line, while Alt+> moves to end of buffer
     if (ctx->editor) {
         lle_end_of_line(ctx->editor);
-        /* Sync buffer cursor from editor after the move */
+        /// Sync buffer cursor from editor after the move
         if (ctx->editor->cursor_manager) {
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
         }
     } else {
-        /* Fallback for no editor: move to buffer end (single-line behavior) */
+        /// Fallback for no editor: move to buffer end (single-line behavior)
         ctx->buffer->cursor.byte_offset = ctx->buffer->length;
     }
 
@@ -630,19 +641,19 @@ static size_t find_next_word_boundary_in_suggestion(const char *suggestion) {
 
     size_t pos = 0;
 
-    /* Skip leading whitespace */
+    /// Skip leading whitespace
     while (suggestion[pos] &&
            (suggestion[pos] == ' ' || suggestion[pos] == '\t')) {
         pos++;
     }
 
-    /* Find end of word (non-whitespace characters) */
+    /// Find end of word (non-whitespace characters)
     while (suggestion[pos] && suggestion[pos] != ' ' &&
            suggestion[pos] != '\t') {
         pos++;
     }
 
-    /* Include one trailing space if present (feels more natural) */
+    /// Include one trailing space if present (feels more natural)
     if (suggestion[pos] == ' ') {
         pos++;
     }
@@ -664,32 +675,32 @@ static bool accept_partial_autosuggestion(readline_context_t *ctx) {
         return false;
     }
 
-    /* Find next word boundary */
+    /// Find next word boundary
     size_t word_len =
         find_next_word_boundary_in_suggestion(ctx->current_suggestion);
     if (word_len == 0) {
         return false;
     }
 
-    /* Insert just the word portion at cursor (which is at end) */
+    /// Insert just the word portion at cursor (which is at end)
     lle_result_t result =
         lle_buffer_insert_text(ctx->buffer, ctx->buffer->cursor.byte_offset,
                                ctx->current_suggestion, word_len);
 
     if (result == LLE_SUCCESS) {
-        /* Sync cursor manager */
+        /// Sync cursor manager
         if (ctx->editor && ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
         }
 
-        /* Update suggestion to show remaining text */
+        /// Update suggestion to show remaining text
         size_t remaining_len = strlen(ctx->current_suggestion) - word_len;
         if (remaining_len > 0) {
             memmove(ctx->current_suggestion, ctx->current_suggestion + word_len,
-                    remaining_len + 1); /* +1 for null terminator */
+                    remaining_len + 1); /// +1 for null terminator
         } else {
-            /* No more suggestion text */
+            /// No more suggestion text
             ctx->current_suggestion[0] = '\0';
         }
 
@@ -711,27 +722,27 @@ static void refresh_display_keep_suggestion(readline_context_t *ctx) {
         return;
     }
 
-    /* Pass existing suggestion to display controller (don't regenerate) */
+    /// Pass existing suggestion to display controller (don't regenerate)
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_set_autosuggestion(dc, ctx->current_suggestion);
     }
 
-    /* Get the global Spec 08 display integration instance */
+    /// Get the global Spec 08 display integration instance
     lle_display_integration_t *display_integration =
         lle_display_integration_get_global();
     if (!display_integration) {
         return;
     }
 
-    /* Get render controller from display integration */
+    /// Get render controller from display integration
     lle_render_controller_t *render_controller =
         display_integration->render_controller;
     if (!render_controller) {
         return;
     }
 
-    /* Render buffer content through Spec 08 render system */
+    /// Render buffer content through Spec 08 render system
     lle_render_output_t *render_output = NULL;
     lle_result_t result = lle_render_buffer_content(
         render_controller, ctx->buffer, &ctx->buffer->cursor, &render_output);
@@ -740,14 +751,14 @@ static void refresh_display_keep_suggestion(readline_context_t *ctx) {
         return;
     }
 
-    /* Send rendered output through display_bridge */
+    /// Send rendered output through display_bridge
     lle_display_bridge_t *display_bridge = display_integration->display_bridge;
     if (display_bridge) {
         lle_display_bridge_send_output(display_bridge, render_output,
                                        &ctx->buffer->cursor);
     }
 
-    /* Free the render output */
+    /// Free the render output
     lle_render_output_free(render_output);
 }
 
@@ -767,20 +778,20 @@ lle_forward_word_or_accept_partial_suggestion(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Fish-style: If at end of buffer with suggestion, accept one word */
+    /// Fish-style: If at end of buffer with suggestion, accept one word
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_partial_autosuggestion(ctx)) {
-            /* Use special refresh that keeps remaining suggestion intact */
+            /// Use special refresh that keeps remaining suggestion intact
             refresh_display_keep_suggestion(ctx);
             return LLE_SUCCESS;
         }
     }
 
-    /* Normal behavior: move cursor forward by one word */
+    /// Normal behavior: move cursor forward by one word
     if (ctx->editor) {
         lle_forward_word(ctx->editor);
-        /* Sync buffer cursor from editor */
+        /// Sync buffer cursor from editor
         if (ctx->editor->cursor_manager) {
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
@@ -812,14 +823,14 @@ static bool is_input_incomplete(const char *buffer_data,
         return false;
     }
 
-    /* Reset state for fresh analysis */
+    /// Reset state for fresh analysis
     continuation_state_cleanup(state);
     continuation_state_init(state);
 
-    /* Analyze the entire buffer content */
+    /// Analyze the entire buffer content
     continuation_analyze_line(buffer_data, state);
 
-    /* Check if continuation is needed */
+    /// Check if continuation is needed
     return continuation_needs_continuation(state);
 }
 
@@ -839,44 +850,43 @@ static void refresh_display(readline_context_t *ctx) {
         return;
     }
 
-    /* Early abort if watchdog has fired - don't do expensive rendering */
+    /// Early abort if watchdog has fired - don't do expensive rendering
     if (lle_watchdog_check()) {
         return;
     }
 
-    /* Fish-style autosuggestions using LLE history
-     *
-     * This must happen BEFORE rendering so the ghost text is available
-     * for display_controller to render in dc_handle_redraw_needed().
-     *
-     * We generate the suggestion here using LLE history (not GNU readline
-     * history) and pass it directly to display_controller for rendering.
-     */
+    /// Fish-style autosuggestions using LLE history
+    ///
+    /// This must happen BEFORE rendering so the ghost text is available
+    /// for display_controller to render in dc_handle_redraw_needed().
+    ///
+    /// We generate the suggestion here using LLE history (not GNU readline
+    /// history) and pass it directly to display_controller for rendering.
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
-        /* Generate suggestion from LLE history */
+        /// Generate suggestion from LLE history
         update_autosuggestion(ctx);
 
-        /* Pass suggestion to display controller for rendering */
+        /// Pass suggestion to display controller for rendering
         display_controller_set_autosuggestion(dc, ctx->current_suggestion);
     }
 
-    /* Get the global Spec 08 display integration instance */
+    /// Get the global Spec 08 display integration instance
     lle_display_integration_t *display_integration =
         lle_display_integration_get_global();
     if (!display_integration) {
-        /* Spec 08 display integration not initialized - cannot render */
+        /// Spec 08 display integration not initialized - cannot render
         return;
     }
 
-    /* Get render controller from display integration */
+    /// Get render controller from display integration
     lle_render_controller_t *render_controller =
         display_integration->render_controller;
     if (!render_controller) {
         return;
     }
 
-    /* Render buffer content through Spec 08 render system */
+    /// Render buffer content through Spec 08 render system
     lle_render_output_t *render_output = NULL;
     lle_result_t result = lle_render_buffer_content(
         render_controller, ctx->buffer, &ctx->buffer->cursor, &render_output);
@@ -885,64 +895,61 @@ static void refresh_display(readline_context_t *ctx) {
         return;
     }
 
-    /* SPEC 08 COMPLIANT: Send rendered output through display_bridge to
-     * command_layer
-     *
-     * This is THE CORRECT ARCHITECTURE per Spec 08:
-     * 1. render_controller produces rendered output
-     * 2. display_bridge sends output to command_layer
-     * 3. command_layer sends to display_controller
-     * 4. display_controller handles terminal I/O
-     *
-     * NO DIRECT TERMINAL WRITES - this is a critical architectural principle!
-     *
-     * IMPORTANT: Always send to display_bridge even if buffer is empty, because
-     * we still need to display the prompt. The prompt is rendered separately by
-     * the prompt_layer and combined in the display_controller.
-     */
+    /// SPEC 08 COMPLIANT: Send rendered output through display_bridge to
+    /// command_layer
+    ///
+    /// This is THE CORRECT ARCHITECTURE per Spec 08:
+    /// 1. render_controller produces rendered output
+    /// 2. display_bridge sends output to command_layer
+    /// 3. command_layer sends to display_controller
+    /// 4. display_controller handles terminal I/O
+    ///
+    /// NO DIRECT TERMINAL WRITES - this is a critical architectural principle!
+    ///
+    /// IMPORTANT: Always send to display_bridge even if buffer is empty,
+    /// because we still need to display the prompt. The prompt is rendered
+    /// separately by the prompt_layer and combined in the display_controller.
     lle_display_bridge_t *display_bridge = display_integration->display_bridge;
     if (display_bridge) {
         result = lle_display_bridge_send_output(display_bridge, render_output,
                                                 &ctx->buffer->cursor);
 
         if (result != LLE_SUCCESS) {
-            /* Log error but continue - display bridge will track consecutive
-             * errors */
+            /// Log error but continue - display bridge will track consecutive
+            /// errors
         }
     }
 
-    /* Free the render output */
+    /// Free the render output
     lle_render_output_free(render_output);
 }
 
-/**
- * @brief Event handler for character input
- * Step 4: Handler modifies buffer and refreshes display
- */
+/// @brief Event handler for character input
+/// Step 4: Handler modifies buffer and refreshes display
 static lle_result_t handle_character_input(lle_event_t *event,
                                            void *user_data) {
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Get UTF-8 character from event */
+    /// Get UTF-8 character from event
     const char *utf8_char = event->event_data.key.utf8_char;
     size_t char_len = strlen(utf8_char);
 
-    /* CRITICAL: Reset history navigation when user types a character */
-    /* This follows bash/readline behavior: typing exits history mode */
+    /// CRITICAL: Reset history navigation when user types a character
+    /// This follows bash/readline behavior: typing exits history mode
     if (ctx->editor && ctx->editor->history_navigation_pos > 0) {
         ctx->editor->history_navigation_pos = 0;
-        /* Clear the seen set for unique-only navigation mode */
+        /// Clear the seen set for unique-only navigation mode
         ctx->editor->history_nav_seen_count = 0;
     }
 
-    /* Re-enable autosuggestion if it was suppressed (e.g., by Ctrl+G) */
+    /// Re-enable autosuggestion if it was suppressed (e.g., by Ctrl+G)
     ctx->suppress_autosuggestion = false;
 
-    /* Clear completion menu on character input */
+    /// Clear completion menu on character input
     if (ctx->editor) {
         bool menu_cleared = false;
 
-        /* Check and clear completion system */
+        /// Check and clear completion system
         if (ctx->editor->completion_system &&
             lle_completion_system_is_menu_visible(
                 ctx->editor->completion_system)) {
@@ -950,7 +957,7 @@ static lle_result_t handle_character_input(lle_event_t *event,
             menu_cleared = true;
         }
 
-        /* Clear menu from display controller if any menu was cleared */
+        /// Clear menu from display controller if any menu was cleared
         if (menu_cleared) {
             display_controller_t *dc = display_integration_get_controller();
             if (dc) {
@@ -959,7 +966,7 @@ static lle_result_t handle_character_input(lle_event_t *event,
         }
     }
 
-    /* Dismiss notification on character input (any action should dismiss it) */
+    /// Dismiss notification on character input (any action should dismiss it)
     if (lle_notification_is_visible(&ctx->notification)) {
         lle_notification_dismiss(&ctx->notification);
         display_controller_t *dc = display_integration_get_controller();
@@ -968,23 +975,23 @@ static lle_result_t handle_character_input(lle_event_t *event,
         }
     }
 
-    /* Begin change sequence for undo tracking */
+    /// Begin change sequence for undo tracking
     begin_change_sequence(ctx, "insert char");
 
-    /* Insert character into buffer at cursor position */
+    /// Insert character into buffer at cursor position
     lle_result_t result = lle_buffer_insert_text(
         ctx->buffer, ctx->buffer->cursor.byte_offset, utf8_char, char_len);
 
-    /* End change sequence */
+    /// End change sequence
     end_change_sequence(ctx);
 
-    /* Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX) */
+    /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
     if (result == LLE_SUCCESS && ctx->editor && ctx->editor->cursor_manager) {
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
     }
 
-    /* Refresh display after buffer modification */
+    /// Refresh display after buffer modification
     if (result == LLE_SUCCESS) {
         refresh_display(ctx);
     }
@@ -992,25 +999,23 @@ static lle_result_t handle_character_input(lle_event_t *event,
     return result;
 }
 
-/**
- * @brief Event handler for backspace
- * Step 4: Handler modifies buffer and refreshes display
- * PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
- */
+/// @brief Event handler for backspace
+/// Step 4: Handler modifies buffer and refreshes display
+/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* CRITICAL FIX: Reset history navigation when user backspaces */
-    /* This follows bash/readline behavior: editing exits history mode */
+    /// CRITICAL FIX: Reset history navigation when user backspaces
+    /// This follows bash/readline behavior: editing exits history mode
     if (ctx->editor && ctx->editor->history_navigation_pos > 0) {
         ctx->editor->history_navigation_pos = 0;
         ctx->editor->history_nav_seen_count = 0;
     }
 
-    /* CRITICAL FIX: Clear completion menu on backspace */
-    /* Prevents stale menu state with indices pointing to deleted buffer
-     * positions */
+    /// CRITICAL FIX: Clear completion menu on backspace
+    /// Prevents stale menu state with indices pointing to deleted buffer
+    /// positions
     if (ctx->editor) {
         bool menu_cleared = false;
 
@@ -1025,56 +1030,56 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
             display_controller_t *dc = display_integration_get_controller();
             if (dc) {
                 display_controller_clear_completion_menu(dc);
-                /* Also clear autosuggestion to prevent conflict with stale menu
-                 */
+                /// Also clear autosuggestion to prevent conflict with stale
+                /// menu
                 display_controller_set_autosuggestion(dc, NULL);
             }
-            /* Clear current suggestion in context */
+            /// Clear current suggestion in context
             if (ctx->current_suggestion) {
                 ctx->current_suggestion[0] = '\0';
             }
-            /* Suppress autosuggestion regeneration for this refresh cycle */
+            /// Suppress autosuggestion regeneration for this refresh cycle
             ctx->suppress_autosuggestion = true;
         }
     }
 
     if (ctx->buffer->cursor.byte_offset > 0 && ctx->editor &&
         ctx->editor->cursor_manager) {
-        /* Sync cursor manager position with buffer cursor before moving */
+        /// Sync cursor manager position with buffer cursor before moving
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
 
-        /* Now check if we can move back (after sync) */
+        /// Now check if we can move back (after sync)
         if (ctx->buffer->cursor.grapheme_index == 0) {
-            return LLE_SUCCESS; /* Already at beginning */
+            return LLE_SUCCESS; /// Already at beginning
         }
 
-        /* Move cursor back by one grapheme to find the start of the grapheme to
-         * delete */
+        /// Move cursor back by one grapheme to find the start of the grapheme
+        /// to delete
         size_t current_byte = ctx->buffer->cursor.byte_offset;
 
         lle_result_t result = lle_cursor_manager_move_by_graphemes(
             ctx->editor->cursor_manager, -1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
 
             size_t grapheme_start = ctx->buffer->cursor.byte_offset;
             size_t grapheme_len = current_byte - grapheme_start;
 
-            /* Begin change sequence for undo tracking */
+            /// Begin change sequence for undo tracking
             begin_change_sequence(ctx, "backspace");
 
-            /* Delete the entire grapheme cluster */
+            /// Delete the entire grapheme cluster
             result = lle_buffer_delete_text(ctx->buffer, grapheme_start,
                                             grapheme_len);
 
-            /* End change sequence */
+            /// End change sequence
             end_change_sequence(ctx);
 
-            /* Refresh display after buffer modification */
+            /// Refresh display after buffer modification
             if (result == LLE_SUCCESS) {
                 refresh_display(ctx);
             }
@@ -1086,24 +1091,21 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Enter key
- * Step 6: Check for multiline continuation before completing
- */
+/// @brief Event handler for Enter key
+/// Step 6: Check for multiline continuation before completing
 static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Check for incomplete input using shared continuation parser */
+    /// Check for incomplete input using shared continuation parser
     bool incomplete =
         is_input_incomplete(ctx->buffer->data, ctx->continuation_state);
 
     if (incomplete) {
-        /* SAFETY CHECK: Limit maximum line count to prevent infinite loops
-         * If the parser has a bug and always reports incomplete, this prevents
-         * the shell from inserting newlines forever. 1000 lines is generous
-         * for any legitimate shell command but prevents runaway input.
-         */
+        /// SAFETY CHECK: Limit maximum line count to prevent infinite loops
+        /// If the parser has a bug and always reports incomplete, this prevents
+        /// the shell from inserting newlines forever. 1000 lines is generous
+        /// for any legitimate shell command but prevents runaway input.
         size_t line_count = 1;
         for (const char *p = ctx->buffer->data; *p; p++) {
             if (*p == '\n') {
@@ -1115,16 +1117,16 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
             fprintf(stderr,
                     "\nlle: maximum line count (%zu) reached, forcing accept\n",
                     MAX_MULTILINE_LINES);
-            incomplete = false; /* Force accept */
+            incomplete = false; /// Force accept
         }
     }
 
     if (incomplete) {
-        /* Input incomplete - insert newline and continue */
+        /// Input incomplete - insert newline and continue
         lle_result_t result = lle_buffer_insert_text(
             ctx->buffer, ctx->buffer->cursor.byte_offset, "\n", 1);
 
-        /* Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX) */
+        /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
         if (result == LLE_SUCCESS && ctx->editor &&
             ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
@@ -1138,10 +1140,10 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         return result;
     }
 
-    /* Line complete - accept entire buffer regardless of cursor position */
+    /// Line complete - accept entire buffer regardless of cursor position
 
-    /* Clear autosuggestion ghost text before accepting line
-     * Without this, partial suggestions remain visible after Enter */
+    /// Clear autosuggestion ghost text before accepting line
+    /// Without this, partial suggestions remain visible after Enter
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_set_autosuggestion(dc, NULL);
@@ -1150,19 +1152,27 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         ctx->current_suggestion[0] = '\0';
     }
 
-    /* Add to LLE history before completing */
+    /// Add to LLE history before completing. The editor's
+    /// history_system may be the shell history or, during the
+    /// debugger's break-prompt, the in-process debug history (swapped
+    /// by lle_readline_no_history); the add path is identical for both.
+    /// Persistence to ~/.lush_history is gated on NOT being at the
+    /// debug prompt -- debug commands never reach the shell history
+    /// file.
     if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
 
-        /* Save to history file (auto-save enabled in config) */
-        const char *home = getenv("HOME");
-        if (home) {
-            char history_path[1024];
-            snprintf(history_path, sizeof(history_path), "%s/.lush_history",
-                     home);
-            lle_history_save_to_file(ctx->editor->history_system, history_path);
+        if (!lle_in_debug_prompt()) {
+            const char *home = getenv("HOME");
+            if (home) {
+                char history_path[1024];
+                snprintf(history_path, sizeof(history_path), "%s/.lush_history",
+                         home);
+                lle_history_save_to_file(ctx->editor->history_system,
+                                         history_path);
+            }
         }
     }
 
@@ -1203,16 +1213,16 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If completion menu is active, finalize the cycled selection
-     * before accepting the line. The preview phase placed the
-     * candidate's literal text in the buffer (no close-quote, no
-     * trailing space, no slash); accept-phase appends the type-
-     * driven suffix -- "/" for directories, the matching close-
-     * quote (when a quote is open) plus a space for everything
-     * else. After the splice we clear the menu and continue with
-     * the rest of the accept-line flow so the now-finalized buffer
-     * is what gets submitted (or extended on a follow-up TAB
-     * inside a directory). */
+    /// If completion menu is active, finalize the cycled selection
+    /// before accepting the line. The preview phase placed the
+    /// candidate's literal text in the buffer (no close-quote, no
+    /// trailing space, no slash); accept-phase appends the type-
+    /// driven suffix -- "/" for directories, the matching close-
+    /// quote (when a quote is open) plus a space for everything
+    /// else. After the splice we clear the menu and continue with
+    /// the rest of the accept-line flow so the now-finalized buffer
+    /// is what gets submitted (or extended on a follow-up TAB
+    /// inside a directory).
     if (ctx->editor && ctx->editor->completion_system &&
         lle_completion_system_is_menu_visible(ctx->editor->completion_system)) {
 
@@ -1247,19 +1257,19 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
             }
         }
 
-        /* Clear the completion menu now that the selection is
-         * finalized. */
+        /// Clear the completion menu now that the selection is
+        /// finalized.
         lle_completion_system_clear(ctx->editor->completion_system);
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_completion_menu(dc);
         }
 
-        /* Directory-chain (issue #85): if the accepted item was a
-         * directory and completion.chain_directories is on, re-trigger
-         * completion at the new cursor position so the next-level menu
-         * opens immediately. Mirrors the same gate at the TAB
-         * single-match site in keybinding_actions.c. */
+        /// Directory-chain (issue #85): if the accepted item was a
+        /// directory and completion.chain_directories is on, re-trigger
+        /// completion at the new cursor position so the next-level menu
+        /// opens immediately. Mirrors the same gate at the TAB
+        /// single-match site in keybinding_actions.c.
         bool chain = false;
         (void)config_registry_get_boolean("completion.chain_directories",
                                           &chain);
@@ -1267,29 +1277,29 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
             (void)lle_complete(ctx->editor);
         }
 
-        /* Directory selections leave the cursor inside an open
-         * quote with a trailing "/" and the user generally wants to
-         * keep typing; non-directory selections terminate the
-         * argument with a close-quote (if needed) and a trailing
-         * space. Either way, the user's first ENTER finalizes the
-         * cycle but does NOT submit the line -- a second ENTER
-         * submits the now-finalized buffer. This matches the
-         * existing readline behavior; only the buffer-finalization
-         * step is new. */
+        /// Directory selections leave the cursor inside an open
+        /// quote with a trailing "/" and the user generally wants to
+        /// keep typing; non-directory selections terminate the
+        /// argument with a close-quote (if needed) and a trailing
+        /// space. Either way, the user's first ENTER finalizes the
+        /// cycle but does NOT submit the line -- a second ENTER
+        /// submits the now-finalized buffer. This matches the
+        /// existing readline behavior; only the buffer-finalization
+        /// step is new.
         refresh_display(ctx);
         return LLE_SUCCESS;
     }
 
-    /* Check for incomplete input using shared continuation parser */
+    /// Check for incomplete input using shared continuation parser
     bool incomplete =
         is_input_incomplete(ctx->buffer->data, ctx->continuation_state);
 
     if (incomplete) {
-        /* Input incomplete - insert newline and continue editing */
+        /// Input incomplete - insert newline and continue editing
         lle_result_t result = lle_buffer_insert_text(
             ctx->buffer, ctx->buffer->cursor.byte_offset, "\n", 1);
 
-        /* Synchronize cursor fields after insert */
+        /// Synchronize cursor fields after insert
         if (result == LLE_SUCCESS && ctx->editor &&
             ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
@@ -1303,53 +1313,60 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         return result;
     }
 
-    /* Line complete - accept entire buffer regardless of cursor position */
+    /// Line complete - accept entire buffer regardless of cursor position
 
-    /* CRITICAL: Move buffer cursor to end before accepting
-     *
-     * Issue #1 Fix: When accepting multiline input, the buffer cursor must be
-     * positioned at the end before the display system renders. This ensures
-     * the screen cursor is positioned after all lines when returning to shell.
-     *
-     * This is the architecturally correct solution: move the cursor in the
-     * buffer (LLE's responsibility) and let the display system render it
-     * naturally (display system's responsibility). No direct terminal writes
-     * from LLE.
-     */
+    /// CRITICAL: Move buffer cursor to end before accepting
+    ///
+    /// Issue #1 Fix: When accepting multiline input, the buffer cursor must be
+    /// positioned at the end before the display system renders. This ensures
+    /// the screen cursor is positioned after all lines when returning to shell.
+    ///
+    /// This is the architecturally correct solution: move the cursor in the
+    /// buffer (LLE's responsibility) and let the display system render it
+    /// naturally (display system's responsibility). No direct terminal writes
+    /// from LLE.
     if (ctx->buffer->length > 0 &&
         ctx->buffer->cursor.byte_offset != ctx->buffer->length) {
-        /* Move buffer cursor to end */
+        /// Move buffer cursor to end
         ctx->buffer->cursor.byte_offset = ctx->buffer->length;
         ctx->buffer->cursor.codepoint_index = ctx->buffer->length;
         ctx->buffer->cursor.grapheme_index = ctx->buffer->length;
 
-        /* Sync cursor_manager with new position */
+        /// Sync cursor_manager with new position
         if (ctx->editor && ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                    ctx->buffer->length);
         }
 
-        /* Refresh display to render cursor at new position */
+        /// Refresh display to render cursor at new position
         refresh_display(ctx);
     }
 
-    /* Add to LLE history before completing */
+    /// Add to LLE history before completing. The editor's
+    /// history_system may be the shell history or, during the
+    /// debugger's break-prompt, the in-process debug history (swapped
+    /// by lle_readline_no_history); the add path is identical for both.
+    /// Persistence to ~/.lush_history is gated on NOT being at the
+    /// debug prompt -- debug commands never reach the shell history
+    /// file.
     if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
 
-        /* Save to history file (auto-save enabled in config) */
-        const char *home = getenv("HOME");
-        if (home) {
-            char history_path[1024];
-            snprintf(history_path, sizeof(history_path), "%s/.lush_history",
-                     home);
-            lle_history_save_to_file(ctx->editor->history_system, history_path);
+        if (!lle_in_debug_prompt()) {
+            const char *home = getenv("HOME");
+            if (home) {
+                char history_path[1024];
+                snprintf(history_path, sizeof(history_path), "%s/.lush_history",
+                         home);
+                lle_history_save_to_file(ctx->editor->history_system,
+                                         history_path);
+            }
         }
     }
 
-    /* Signal completion to readline loop */
+    /// Signal completion to readline loop
     *ctx->done = true;
     *ctx->final_line =
         ctx->buffer->data ? strdup(ctx->buffer->data) : strdup("");
@@ -1367,42 +1384,42 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
  * - Non-empty line: Deletes character at cursor (same as Delete key)
  */
 static lle_result_t handle_eof(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (ctx->buffer->length == 0) {
-        /* EOF on empty line - exit shell */
+        /// EOF on empty line - exit shell
         *ctx->done = true;
         *ctx->final_line = NULL;
     } else {
-        /* Non-empty line - delete grapheme cluster at cursor (same as Delete
-         * key) */
+        /// Non-empty line - delete grapheme cluster at cursor (same as Delete
+        /// key)
         if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
             ctx->editor && ctx->editor->cursor_manager) {
-            /* Sync cursor manager position with buffer cursor before moving */
+            /// Sync cursor manager position with buffer cursor before moving
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
 
-            /* Move cursor forward by one grapheme to find the end of the
-             * grapheme to delete */
+            /// Move cursor forward by one grapheme to find the end of the
+            /// grapheme to delete
             size_t grapheme_start = ctx->buffer->cursor.byte_offset;
 
             lle_result_t result = lle_cursor_manager_move_by_graphemes(
                 ctx->editor->cursor_manager, 1);
             if (result == LLE_SUCCESS) {
-                /* CRITICAL: Sync buffer cursor back from cursor manager after
-                 * movement */
+                /// CRITICAL: Sync buffer cursor back from cursor manager after
+                /// movement
                 lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                                 &ctx->buffer->cursor);
 
                 size_t grapheme_end = ctx->buffer->cursor.byte_offset;
                 size_t grapheme_len = grapheme_end - grapheme_start;
 
-                /* Delete the entire grapheme cluster */
+                /// Delete the entire grapheme cluster
                 result = lle_buffer_delete_text(ctx->buffer, grapheme_start,
                                                 grapheme_len);
 
-                /* Refresh display after buffer modification */
+                /// Refresh display after buffer modification
                 if (result == LLE_SUCCESS) {
                     refresh_display(ctx);
                 }
@@ -1432,16 +1449,16 @@ static lle_result_t handle_eof(lle_event_t *event, void *user_data) {
  * lle_abort_line_context() is now used when keybinding manager is available.
  */
 static lle_result_t handle_abort(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Record Ctrl+G for panic detection (triple Ctrl+G triggers hard reset) */
+    /// Record Ctrl+G for panic detection (triple Ctrl+G triggers hard reset)
     lle_record_ctrl_g();
 
-    /* Signal done with empty result - this aborts the readline */
+    /// Signal done with empty result - this aborts the readline
     *ctx->done = true;
     *ctx->final_line =
-        strdup(""); /* Return empty string, not NULL (NULL signals EOF) */
+        strdup(""); /// Return empty string, not NULL (NULL signals EOF)
 
     return LLE_SUCCESS;
 }
@@ -1472,27 +1489,27 @@ lle_result_t lle_abort_line_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Tier 0: Check if notification is visible - dismiss it first */
+    /// Tier 0: Check if notification is visible - dismiss it first
     if (lle_notification_is_visible(&ctx->notification)) {
         lle_notification_dismiss(&ctx->notification);
 
-        /* Clear from display controller */
+        /// Clear from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_notification(dc);
         }
 
-        /* Refresh display to clear notification from screen */
+        /// Refresh display to clear notification from screen
         refresh_display(ctx);
 
-        return LLE_SUCCESS; /* Notification dismissed, don't abort line */
+        return LLE_SUCCESS; /// Notification dismissed, don't abort line
     }
 
-    /* Tier 1: Check if completion menu is active - if so, dismiss it first */
+    /// Tier 1: Check if completion menu is active - if so, dismiss it first
     if (ctx->editor) {
         bool menu_visible = false;
 
-        /* Check completion system */
+        /// Check completion system
         if (ctx->editor->completion_system &&
             lle_completion_system_is_menu_visible(
                 ctx->editor->completion_system)) {
@@ -1500,101 +1517,100 @@ lle_result_t lle_abort_line_context(readline_context_t *ctx) {
         }
 
         if (menu_visible) {
-            /* Dismiss completion menu - don't abort line yet */
+            /// Dismiss completion menu - don't abort line yet
             if (ctx->editor->completion_system) {
                 lle_completion_system_clear(ctx->editor->completion_system);
             }
 
-            /* Clear menu from display controller */
+            /// Clear menu from display controller
             display_controller_t *dc = display_integration_get_controller();
             if (dc) {
                 display_controller_clear_completion_menu(dc);
             }
 
-            /* Refresh display to clear menu from screen */
+            /// Refresh display to clear menu from screen
             refresh_display(ctx);
 
-            return LLE_SUCCESS; /* Menu dismissed, don't abort line */
+            return LLE_SUCCESS; /// Menu dismissed, don't abort line
         }
     }
 
-    /* Check if autosuggestion is visible - if so, clear it first */
+    /// Check if autosuggestion is visible - if so, clear it first
     if (has_autosuggestion(ctx)) {
-        /* Clear the local autosuggestion buffer (if allocated) */
+        /// Clear the local autosuggestion buffer (if allocated)
         if (ctx->current_suggestion) {
             ctx->current_suggestion[0] = '\0';
         }
 
-        /* Suppress autosuggestion regeneration during this refresh
-         * Otherwise refresh_display() will immediately regenerate it */
+        /// Suppress autosuggestion regeneration during this refresh
+        /// Otherwise refresh_display() will immediately regenerate it
         ctx->suppress_autosuggestion = true;
 
-        /* Clear from display controller */
+        /// Clear from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_set_autosuggestion(dc, NULL);
         }
 
-        /* Refresh display to redraw without ghost text */
+        /// Refresh display to redraw without ghost text
         refresh_display(ctx);
 
-        return LLE_SUCCESS; /* Suggestion cleared, don't abort line */
+        return LLE_SUCCESS; /// Suggestion cleared, don't abort line
     }
 
-    /* No completion menu or autosuggestion active - abort the line
-     *
-     * ZSH-style behavior: Always abort, even on empty buffer.
-     * This serves as a recovery mechanism - if the display or editor gets into
-     * a weird state, Ctrl+G guarantees a fresh start with a new prompt.
-     * Unlike the no-op approach, this ensures users always have an escape
-     * hatch.
-     */
+    /// No completion menu or autosuggestion active - abort the line
+    ///
+    /// ZSH-style behavior: Always abort, even on empty buffer.
+    /// This serves as a recovery mechanism - if the display or editor gets into
+    /// a weird state, Ctrl+G guarantees a fresh start with a new prompt.
+    /// Unlike the no-op approach, this ensures users always have an escape
+    /// hatch.
 
-    /* Clear display before aborting to ensure clean state
-     * This clears any ghost text, completion menu residue, etc. */
+    /// Clear display before aborting to ensure clean state
+    /// This clears any ghost text, completion menu residue, etc.
 
-    /* Clear completion system state (CRITICAL: must clear both system AND
-     * display) */
+    /// Clear completion system state (CRITICAL: must clear both system AND
+    /// display)
     if (ctx->editor && ctx->editor->completion_system) {
         lle_completion_system_clear(ctx->editor->completion_system);
     }
 
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
-        /* Clear autosuggestion from display */
+        /// Clear autosuggestion from display
         display_controller_set_autosuggestion(dc, NULL);
-        /* Clear completion menu if any */
+        /// Clear completion menu if any
         display_controller_clear_completion_menu(dc);
-        /* Clear notification if any */
+        /// Clear notification if any
         display_controller_clear_notification(dc);
     }
 
-    /* Clear notification state */
+    /// Clear notification state
     lle_notification_dismiss(&ctx->notification);
 
-    /* Suppress autosuggestion during final refresh */
+    /// Suppress autosuggestion during final refresh
     ctx->suppress_autosuggestion = true;
 
-    /* Clear local suggestion buffer */
+    /// Clear local suggestion buffer
     if (ctx->current_suggestion) {
         ctx->current_suggestion[0] = '\0';
     }
 
-    /* Final refresh to clear ghost text from screen before abort */
+    /// Final refresh to clear ghost text from screen before abort
     refresh_display(ctx);
 
-    /* Reset display state for fresh prompt on next lle_readline() call.
-     * Don't call dc_finalize_input() here - it will be called in lle_readline()
-     * cleanup when final_line is returned. Calling it here would cause double
-     * newline. */
+    /// Reset display state for fresh prompt on next lle_readline() call.
+    /// Don't call dc_finalize_input() here - it will be called in
+    /// lle_readline() cleanup when final_line is returned. Calling it here
+    /// would cause double newline.
     dc_reset_prompt_display_state();
 
-    /* Record Ctrl+G for panic detection (triple Ctrl+G triggers hard reset) */
+    /// Record Ctrl+G for panic detection (triple Ctrl+G triggers hard reset)
     lle_record_ctrl_g();
 
     *ctx->done = true;
     *ctx->final_line =
-        strdup(""); /* Return empty string, not NULL (NULL signals EOF) */
+        strdup(""); /// Return empty string, not NULL (NULL signals EOF)
 
     return LLE_SUCCESS;
 }
@@ -1618,27 +1634,27 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Tier 0: Check if notification is visible - dismiss it first */
+    /// Tier 0: Check if notification is visible - dismiss it first
     if (lle_notification_is_visible(&ctx->notification)) {
         lle_notification_dismiss(&ctx->notification);
 
-        /* Clear from display controller */
+        /// Clear from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_notification(dc);
         }
 
-        /* Refresh display to clear notification from screen */
+        /// Refresh display to clear notification from screen
         refresh_display(ctx);
 
-        return LLE_SUCCESS; /* Notification dismissed, stop here */
+        return LLE_SUCCESS; /// Notification dismissed, stop here
     }
 
-    /* Tier 1: Check if completion menu is active - dismiss it first */
+    /// Tier 1: Check if completion menu is active - dismiss it first
     if (ctx->editor) {
         bool menu_visible = false;
 
-        /* Check completion system */
+        /// Check completion system
         if (ctx->editor->completion_system &&
             lle_completion_system_is_menu_visible(
                 ctx->editor->completion_system)) {
@@ -1646,106 +1662,101 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
         }
 
         if (menu_visible) {
-            /* NOTE: ESC dismisses menu but keeps current buffer state.
-             * Restoring original pre-completion text would require storing
-             * the buffer state before completion started, which is not yet
-             * implemented. Current behavior matches many shells where ESC
-             * just dismisses the menu without reverting the text. */
+            /// NOTE: ESC dismisses menu but keeps current buffer state.
+            /// Restoring original pre-completion text would require storing
+            /// the buffer state before completion started, which is not yet
+            /// implemented. Current behavior matches many shells where ESC
+            /// just dismisses the menu without reverting the text.
 
             if (ctx->editor->completion_system) {
                 lle_completion_system_clear(ctx->editor->completion_system);
             }
 
-            /* Clear menu from display controller */
+            /// Clear menu from display controller
             display_controller_t *dc = display_integration_get_controller();
             if (dc) {
                 display_controller_clear_completion_menu(dc);
             }
 
-            /* Refresh display to clear menu from screen */
+            /// Refresh display to clear menu from screen
             refresh_display(ctx);
 
-            return LLE_SUCCESS; /* Menu dismissed, stop here */
+            return LLE_SUCCESS; /// Menu dismissed, stop here
         }
     }
 
-    /* Tier 2: Check if autosuggestion is visible - clear it */
+    /// Tier 2: Check if autosuggestion is visible - clear it
     if (has_autosuggestion(ctx)) {
-        /* Clear the local autosuggestion buffer */
+        /// Clear the local autosuggestion buffer
         if (ctx->current_suggestion) {
             ctx->current_suggestion[0] = '\0';
         }
 
-        /* Suppress autosuggestion regeneration during this refresh
-         * Otherwise refresh_display() will immediately regenerate it */
+        /// Suppress autosuggestion regeneration during this refresh
+        /// Otherwise refresh_display() will immediately regenerate it
         ctx->suppress_autosuggestion = true;
 
-        /* Clear from display controller */
+        /// Clear from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_set_autosuggestion(dc, NULL);
         }
 
-        /* Refresh display to redraw without ghost text */
+        /// Refresh display to redraw without ghost text
         refresh_display(ctx);
 
-        return LLE_SUCCESS; /* Suggestion cleared, stop here */
+        return LLE_SUCCESS; /// Suggestion cleared, stop here
     }
 
-    /* Tier 3: Nothing to dismiss - ESC is a no-op (unlike Ctrl-G which aborts)
-     */
+    /// Tier 3: Nothing to dismiss - ESC is a no-op (unlike Ctrl-G which aborts)
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-L (clear screen and redraw)
- * Step 5 enhancement: Trigger full screen refresh
- */
+/// @brief Event handler for Ctrl-L (clear screen and redraw)
+/// Step 5 enhancement: Trigger full screen refresh
 static lle_result_t handle_clear_screen(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Get the global display integration instance */
+    /// Get the global display integration instance
     lle_display_integration_t *display_integration =
         lle_display_integration_get_global();
     if (!display_integration || !display_integration->lush_display) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Clear screen through display controller */
+    /// Clear screen through display controller
     display_controller_error_t result =
         display_controller_clear_screen(display_integration->lush_display);
     if (result != DISPLAY_CONTROLLER_SUCCESS) {
         return LLE_ERROR_DISPLAY_INTEGRATION;
     }
 
-    /* Refresh display to redraw the prompt and current input */
+    /// Refresh display to redraw the prompt and current input
     refresh_display(ctx);
 
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-W (kill word backwards)
- * Step 5 enhancement: Delete word before cursor and save to kill buffer
- */
+/// @brief Event handler for Ctrl-W (kill word backwards)
+/// Step 5 enhancement: Delete word before cursor and save to kill buffer
 static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (ctx->buffer->cursor.byte_offset == 0) {
-        return LLE_SUCCESS; /* At beginning, nothing to kill */
+        return LLE_SUCCESS; /// At beginning, nothing to kill
     }
 
     const char *data = ctx->buffer->data;
     size_t pos = ctx->buffer->cursor.byte_offset;
 
-    /* Scan backwards past whitespace */
+    /// Scan backwards past whitespace
     while (pos > 0 && (data[pos - 1] == ' ' || data[pos - 1] == '\t')) {
         pos--;
     }
 
-    /* Scan backwards past non-whitespace (the word) */
+    /// Scan backwards past non-whitespace (the word)
     size_t word_start = pos;
     while (word_start > 0 && data[word_start - 1] != ' ' &&
            data[word_start - 1] != '\t') {
@@ -1755,7 +1766,7 @@ static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
     if (word_start < pos) {
         size_t kill_len = pos - word_start;
 
-        /* Save killed text to kill buffer */
+        /// Save killed text to kill buffer
         if (ctx->kill_buffer_size < kill_len + 1) {
             char *new_buf = realloc(ctx->kill_buffer, kill_len + 1);
             if (new_buf) {
@@ -1769,14 +1780,14 @@ static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
             ctx->kill_buffer[kill_len] = '\0';
         }
 
-        /* Begin change sequence for undo tracking */
+        /// Begin change sequence for undo tracking
         begin_change_sequence(ctx, "kill-word");
 
-        /* Delete the word */
+        /// Delete the word
         lle_result_t result =
             lle_buffer_delete_text(ctx->buffer, word_start, kill_len);
 
-        /* End change sequence */
+        /// End change sequence
         end_change_sequence(ctx);
 
         if (result == LLE_SUCCESS) {
@@ -1789,29 +1800,27 @@ static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-Y (yank from kill buffer)
- * Step 5 enhancement: Insert killed text at cursor
- */
+/// @brief Event handler for Ctrl-Y (yank from kill buffer)
+/// Step 5 enhancement: Insert killed text at cursor
 static lle_result_t handle_yank(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Insert kill buffer contents at cursor if we have something */
+    /// Insert kill buffer contents at cursor if we have something
     if (ctx->kill_buffer && ctx->kill_buffer[0] != '\0') {
         size_t kill_len = strlen(ctx->kill_buffer);
 
-        /* Begin change sequence for undo tracking */
+        /// Begin change sequence for undo tracking
         begin_change_sequence(ctx, "yank");
 
         lle_result_t result =
             lle_buffer_insert_text(ctx->buffer, ctx->buffer->cursor.byte_offset,
                                    ctx->kill_buffer, kill_len);
 
-        /* End change sequence */
+        /// End change sequence
         end_change_sequence(ctx);
 
-        /* Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX) */
+        /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
         if (result == LLE_SUCCESS && ctx->editor &&
             ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
@@ -1828,30 +1837,28 @@ static lle_result_t handle_yank(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl+_ (undo)
- * Undoes the last change sequence using change_tracker
- */
+/// @brief Event handler for Ctrl+_ (undo)
+/// Undoes the last change sequence using change_tracker
 static lle_result_t handle_undo(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (!ctx || !ctx->editor || !ctx->editor->change_tracker) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if undo is available */
+    /// Check if undo is available
     if (!lle_change_tracker_can_undo(ctx->editor->change_tracker)) {
-        /* Nothing to undo - could beep here */
+        /// Nothing to undo - could beep here
         return LLE_SUCCESS;
     }
 
-    /* Perform undo */
+    /// Perform undo
     lle_result_t result =
         lle_change_tracker_undo(ctx->editor->change_tracker, ctx->buffer);
 
     if (result == LLE_SUCCESS) {
-        /* Sync cursor manager with buffer cursor position */
+        /// Sync cursor manager with buffer cursor position
         if (ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
@@ -1862,30 +1869,28 @@ static lle_result_t handle_undo(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for Alt+_ or Ctrl+Shift+_ (redo)
- * Redoes the last undone change sequence using change_tracker
- */
+/// @brief Event handler for Alt+_ or Ctrl+Shift+_ (redo)
+/// Redoes the last undone change sequence using change_tracker
 static lle_result_t handle_redo(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (!ctx || !ctx->editor || !ctx->editor->change_tracker) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if redo is available */
+    /// Check if redo is available
     if (!lle_change_tracker_can_redo(ctx->editor->change_tracker)) {
-        /* Nothing to redo - could beep here */
+        /// Nothing to redo - could beep here
         return LLE_SUCCESS;
     }
 
-    /* Perform redo */
+    /// Perform redo
     lle_result_t result =
         lle_change_tracker_redo(ctx->editor->change_tracker, ctx->buffer);
 
     if (result == LLE_SUCCESS) {
-        /* Sync cursor manager with buffer cursor position */
+        /// Sync cursor manager with buffer cursor position
         if (ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
@@ -1896,25 +1901,22 @@ static lle_result_t handle_redo(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for TAB key
- * Triggers completion via lle_complete()
- */
+/// @brief Event handler for TAB key
+/// Triggers completion via lle_complete()
 static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (!ctx || !ctx->editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Call completion function to set up menu */
+    /// Call completion function to set up menu
     lle_result_t result = lle_complete(ctx->editor);
 
-    /* Refresh display to render buffer content with menu appended
-     * The menu was set by lle_complete(), and command_layer_set_command()
-     * will re-append it after syntax highlighting thanks to our fix
-     */
+    /// Refresh display to render buffer content with menu appended
+    /// The menu was set by lle_complete(), and command_layer_set_command()
+    /// will re-append it after syntax highlighting thanks to our fix
     if (result == LLE_SUCCESS) {
         refresh_display(ctx);
     }
@@ -1922,27 +1924,24 @@ static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for Left arrow key
- * Step 5: Move cursor left one grapheme cluster
- * PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
- */
+/// @brief Event handler for Left arrow key
+/// Step 5: Move cursor left one grapheme cluster
+/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Move cursor left by one grapheme cluster if not at beginning */
+    /// Move cursor left by one grapheme cluster if not at beginning
     if (ctx->buffer->cursor.grapheme_index > 0 && ctx->editor &&
         ctx->editor->cursor_manager) {
-        /* Sync cursor manager position with buffer cursor before moving */
+        /// Sync cursor manager position with buffer cursor before moving
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
 
-        /* Move cursor by graphemes */
+        /// Move cursor by graphemes
         lle_cursor_manager_move_by_graphemes(ctx->editor->cursor_manager, -1);
 
-        /* CRITICAL: Sync buffer cursor back from cursor manager after movement
-         */
+        /// CRITICAL: Sync buffer cursor back from cursor manager after movement
         lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                         &ctx->buffer->cursor);
 
@@ -1952,18 +1951,16 @@ static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Right arrow key
- * Step 5: Move cursor right one grapheme cluster
- * PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
- */
+/// @brief Event handler for Right arrow key
+/// Step 5: Move cursor right one grapheme cluster
+/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Fish-style autosuggestion acceptance:
-     * If cursor is at end of buffer AND an autosuggestion is available,
-     * accept the suggestion instead of normal cursor movement. */
+    /// Fish-style autosuggestion acceptance:
+    /// If cursor is at end of buffer AND an autosuggestion is available,
+    /// accept the suggestion instead of normal cursor movement.
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -1972,19 +1969,17 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
         }
     }
 
-    /* Normal behavior: Move cursor right by one grapheme cluster if not at end
-     */
+    /// Normal behavior: Move cursor right by one grapheme cluster if not at end
     if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
         ctx->editor && ctx->editor->cursor_manager) {
-        /* Sync cursor manager position with buffer cursor before moving */
+        /// Sync cursor manager position with buffer cursor before moving
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
 
-        /* Move cursor by graphemes */
+        /// Move cursor by graphemes
         lle_cursor_manager_move_by_graphemes(ctx->editor->cursor_manager, 1);
 
-        /* CRITICAL: Sync buffer cursor back from cursor manager after movement
-         */
+        /// CRITICAL: Sync buffer cursor back from cursor manager after movement
         lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                         &ctx->buffer->cursor);
 
@@ -1994,33 +1989,30 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Home key
- * Step 5: Move cursor to beginning of line
- */
+/// @brief Event handler for Home key
+/// Step 5: Move cursor to beginning of line
 static lle_result_t handle_home(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Move to beginning */
+    /// Move to beginning
     ctx->buffer->cursor.byte_offset = 0;
     refresh_display(ctx);
 
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for End key
- * Step 5: Move cursor to end of line
- * Fish-style: Accept autosuggestion if cursor already at end
- */
+/// @brief Event handler for End key
+/// Step 5: Move cursor to end of line
+/// Fish-style: Accept autosuggestion if cursor already at end
 static lle_result_t handle_end(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Fish-style autosuggestion acceptance:
-     * If cursor is already at end of buffer AND an autosuggestion is available,
-     * accept the suggestion. Otherwise, move cursor to end normally. */
+    /// Fish-style autosuggestion acceptance:
+    /// If cursor is already at end of buffer AND an autosuggestion is
+    /// available, accept the suggestion. Otherwise, move cursor to end
+    /// normally.
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -2029,55 +2021,53 @@ static lle_result_t handle_end(lle_event_t *event, void *user_data) {
         }
     }
 
-    /* Normal behavior: Move cursor to end */
+    /// Normal behavior: Move cursor to end
     ctx->buffer->cursor.byte_offset = ctx->buffer->length;
     refresh_display(ctx);
 
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Delete key
- * Step 5: Delete character at cursor position
- * PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
- */
+/// @brief Event handler for Delete key
+/// Step 5: Delete character at cursor position
+/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Delete grapheme cluster at cursor if not at end */
+    /// Delete grapheme cluster at cursor if not at end
     if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
         ctx->editor && ctx->editor->cursor_manager) {
-        /* Sync cursor manager position with buffer cursor before moving */
+        /// Sync cursor manager position with buffer cursor before moving
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
 
-        /* Move cursor forward by one grapheme to find the end of the grapheme
-         * to delete */
+        /// Move cursor forward by one grapheme to find the end of the grapheme
+        /// to delete
         size_t grapheme_start = ctx->buffer->cursor.byte_offset;
 
         lle_result_t result = lle_cursor_manager_move_by_graphemes(
             ctx->editor->cursor_manager, 1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
 
             size_t grapheme_end = ctx->buffer->cursor.byte_offset;
             size_t grapheme_len = grapheme_end - grapheme_start;
 
-            /* Begin change sequence for undo tracking */
+            /// Begin change sequence for undo tracking
             begin_change_sequence(ctx, "delete");
 
-            /* Delete the entire grapheme cluster */
+            /// Delete the entire grapheme cluster
             result = lle_buffer_delete_text(ctx->buffer, grapheme_start,
                                             grapheme_len);
 
-            /* End change sequence */
+            /// End change sequence
             end_change_sequence(ctx);
 
-            /* Refresh display after buffer modification */
+            /// Refresh display after buffer modification
             if (result == LLE_SUCCESS) {
                 refresh_display(ctx);
             }
@@ -2089,21 +2079,19 @@ static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-K
- * Step 5: Kill (delete) text from cursor to end of line
- * Step 5 enhancement: Save killed text to kill buffer
- */
+/// @brief Event handler for Ctrl-K
+/// Step 5: Kill (delete) text from cursor to end of line
+/// Step 5 enhancement: Save killed text to kill buffer
 static lle_result_t handle_kill_to_end(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Delete from cursor to end of buffer */
+    /// Delete from cursor to end of buffer
     if (ctx->buffer->cursor.byte_offset < ctx->buffer->length) {
         size_t delete_length =
             ctx->buffer->length - ctx->buffer->cursor.byte_offset;
 
-        /* Save killed text to kill buffer */
+        /// Save killed text to kill buffer
         if (ctx->kill_buffer_size < delete_length + 1) {
             char *new_buf = realloc(ctx->kill_buffer, delete_length + 1);
             if (new_buf) {
@@ -2119,13 +2107,13 @@ static lle_result_t handle_kill_to_end(lle_event_t *event, void *user_data) {
             ctx->kill_buffer[delete_length] = '\0';
         }
 
-        /* Begin change sequence for undo tracking */
+        /// Begin change sequence for undo tracking
         begin_change_sequence(ctx, "kill-to-end");
 
         lle_result_t result = lle_buffer_delete_text(
             ctx->buffer, ctx->buffer->cursor.byte_offset, delete_length);
 
-        /* End change sequence */
+        /// End change sequence
         end_change_sequence(ctx);
 
         if (result == LLE_SUCCESS) {
@@ -2138,20 +2126,18 @@ static lle_result_t handle_kill_to_end(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-U
- * Step 5: Kill (delete) entire line
- * Step 5 enhancement: Save killed text to kill buffer
- */
+/// @brief Event handler for Ctrl-U
+/// Step 5: Kill (delete) entire line
+/// Step 5 enhancement: Save killed text to kill buffer
 static lle_result_t handle_kill_line(lle_event_t *event, void *user_data) {
-    (void)event; /* Unused */
+    (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Ctrl-U: Kill from beginning of line to cursor (backward-kill-line) */
+    /// Ctrl-U: Kill from beginning of line to cursor (backward-kill-line)
     size_t kill_length = ctx->buffer->cursor.byte_offset;
 
     if (kill_length > 0) {
-        /* Save killed text to kill buffer */
+        /// Save killed text to kill buffer
         if (ctx->kill_buffer_size < kill_length + 1) {
             char *new_buf = realloc(ctx->kill_buffer, kill_length + 1);
             if (new_buf) {
@@ -2165,18 +2151,18 @@ static lle_result_t handle_kill_line(lle_event_t *event, void *user_data) {
             ctx->kill_buffer[kill_length] = '\0';
         }
 
-        /* Begin change sequence for undo tracking */
+        /// Begin change sequence for undo tracking
         begin_change_sequence(ctx, "kill-line");
 
         lle_result_t result =
             lle_buffer_delete_text(ctx->buffer, 0, kill_length);
 
-        /* End change sequence */
+        /// End change sequence
         end_change_sequence(ctx);
 
         if (result == LLE_SUCCESS) {
-            /* Cursor automatically moves to position 0 after deleting from
-             * start */
+            /// Cursor automatically moves to position 0 after deleting from
+            /// start
             refresh_display(ctx);
         }
 
@@ -2203,29 +2189,29 @@ static void show_multiline_history_hint(readline_context_t *ctx,
         return;
     }
 
-    /* Only show hint in context-aware mode (Lush default) */
+    /// Only show hint in context-aware mode (Lush default)
     if (config.lle_arrow_key_mode != LLE_ARROW_MODE_CONTEXT_AWARE) {
         return;
     }
 
-    /* Determine trigger action for suppress-on-repeat */
+    /// Determine trigger action for suppress-on-repeat
     lle_notification_trigger_action_t trigger =
         is_up_arrow ? LLE_NOTIF_ACTION_UP_ARROW : LLE_NOTIF_ACTION_DOWN_ARROW;
 
-    /* Check if same action is repeating - don't dismiss in that case */
+    /// Check if same action is repeating - don't dismiss in that case
     if (lle_notification_is_visible(&ctx->notification) &&
         ctx->notification.trigger_action == trigger) {
-        /* Same action repeating at boundary - keep notification visible */
+        /// Same action repeating at boundary - keep notification visible
         return;
     }
 
-    /* Show the hint notification */
+    /// Show the hint notification
     const char *msg =
         "Use Ctrl+P/Ctrl+N for history navigation in multiline mode";
     lle_notification_show_with_trigger(&ctx->notification, msg,
                                        LLE_NOTIFICATION_HINT, trigger);
 
-    /* Pass notification to display controller for rendering */
+    /// Pass notification to display controller for rendering
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_set_notification(dc, &ctx->notification);
@@ -2253,7 +2239,7 @@ maybe_dismiss_notification(readline_context_t *ctx,
                                                    action)) {
         lle_notification_dismiss(&ctx->notification);
 
-        /* Clear from display controller */
+        /// Clear from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_notification(dc);
@@ -2269,15 +2255,15 @@ maybe_dismiss_notification(readline_context_t *ctx,
  * to use Ctrl+P/Ctrl+N for history navigation.
  */
 lle_result_t lle_smart_up_arrow_context(readline_context_t *ctx) {
-    /* Check if editor is available */
+    /// Check if editor is available
     if (!ctx->editor || !ctx->editor->buffer) {
-        return LLE_SUCCESS; /* No editor available */
+        return LLE_SUCCESS; /// No editor available
     }
 
     lle_editor_t *editor = ctx->editor;
 
-    /* If completion menu is active, navigate within menu (delegate to smart
-     * arrow) */
+    /// If completion menu is active, navigate within menu (delegate to smart
+    /// arrow)
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
         lle_result_t result = lle_smart_up_arrow(editor);
@@ -2287,20 +2273,20 @@ lle_result_t lle_smart_up_arrow_context(readline_context_t *ctx) {
         return result;
     }
 
-    /* Check if buffer is multiline */
+    /// Check if buffer is multiline
     bool is_multiline =
         (editor->buffer->length > 0 &&
          memchr(editor->buffer->data, '\n', editor->buffer->length) != NULL);
 
     if (is_multiline) {
-        /* Multi-line mode: use extended function with boundary detection */
+        /// Multi-line mode: use extended function with boundary detection
         lle_line_nav_result_t nav = lle_previous_line_ex(editor);
 
         if (nav.hit_boundary) {
-            /* Hit first line - show hint about Ctrl+P/Ctrl+N */
+            /// Hit first line - show hint about Ctrl+P/Ctrl+N
             show_multiline_history_hint(ctx, true);
         } else {
-            /* Moved successfully - dismiss any existing notification */
+            /// Moved successfully - dismiss any existing notification
             maybe_dismiss_notification(ctx, LLE_NOTIF_ACTION_UP_ARROW);
         }
 
@@ -2309,7 +2295,7 @@ lle_result_t lle_smart_up_arrow_context(readline_context_t *ctx) {
         }
         return nav.result;
     } else {
-        /* Single-line mode: navigate history, dismiss any notification */
+        /// Single-line mode: navigate history, dismiss any notification
         maybe_dismiss_notification(ctx, LLE_NOTIF_ACTION_NONE);
         lle_result_t result = lle_history_previous(editor);
         if (result == LLE_SUCCESS) {
@@ -2328,15 +2314,15 @@ lle_result_t lle_smart_up_arrow_context(readline_context_t *ctx) {
  */
 lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
 
-    /* Check if editor is available */
+    /// Check if editor is available
     if (!ctx->editor || !ctx->editor->buffer) {
-        return LLE_SUCCESS; /* No editor available */
+        return LLE_SUCCESS; /// No editor available
     }
 
     lle_editor_t *editor = ctx->editor;
 
-    /* If completion menu is active, navigate within menu (delegate to smart
-     * arrow) */
+    /// If completion menu is active, navigate within menu (delegate to smart
+    /// arrow)
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
         lle_result_t result = lle_smart_down_arrow(editor);
@@ -2346,20 +2332,20 @@ lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
         return result;
     }
 
-    /* Check if buffer is multiline */
+    /// Check if buffer is multiline
     bool is_multiline =
         (editor->buffer->length > 0 &&
          memchr(editor->buffer->data, '\n', editor->buffer->length) != NULL);
 
     if (is_multiline) {
-        /* Multi-line mode: use extended function with boundary detection */
+        /// Multi-line mode: use extended function with boundary detection
         lle_line_nav_result_t nav = lle_next_line_ex(editor);
 
         if (nav.hit_boundary) {
-            /* Hit last line - show hint about Ctrl+P/Ctrl+N */
+            /// Hit last line - show hint about Ctrl+P/Ctrl+N
             show_multiline_history_hint(ctx, false);
         } else {
-            /* Moved successfully - dismiss any existing notification */
+            /// Moved successfully - dismiss any existing notification
             maybe_dismiss_notification(ctx, LLE_NOTIF_ACTION_DOWN_ARROW);
         }
 
@@ -2368,7 +2354,7 @@ lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
         }
         return nav.result;
     } else {
-        /* Single-line mode: navigate history, dismiss any notification */
+        /// Single-line mode: navigate history, dismiss any notification
         maybe_dismiss_notification(ctx, LLE_NOTIF_ACTION_NONE);
         lle_result_t result = lle_history_next(editor);
         if (result == LLE_SUCCESS) {
@@ -2378,17 +2364,13 @@ lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
     }
 }
 
-/**
- * @brief Event handler wrapper for up arrow (calls context-aware function)
- */
+/// @brief Event handler wrapper for up arrow (calls context-aware function)
 static lle_result_t handle_arrow_up(lle_event_t *event, void *user_data) {
     (void)event;
     return lle_smart_up_arrow_context((readline_context_t *)user_data);
 }
 
-/**
- * @brief Event handler wrapper for down arrow (calls context-aware function)
- */
+/// @brief Event handler wrapper for down arrow (calls context-aware function)
 static lle_result_t handle_arrow_down(lle_event_t *event, void *user_data) {
     (void)event;
     return lle_smart_down_arrow_context((readline_context_t *)user_data);
@@ -2412,25 +2394,25 @@ static void refresh_search_display(readline_context_t *ctx) {
     if (!ctx)
         return;
 
-    /* Get the search prompt (e.g., "(reverse-i-search)`query': ") */
+    /// Get the search prompt (e.g., "(reverse-i-search)`query': ")
     const char *search_prompt = lle_history_interactive_search_get_prompt();
 
-    /* Get the currently matched command (to show in buffer area) */
+    /// Get the currently matched command (to show in buffer area)
     const char *current_match =
         lle_history_interactive_search_get_current_command();
 
-    /* Clear line and move to beginning.
-     * \r = carriage return, \033[K = clear to end of line.
-     * (void)! suppresses -Wunused-result; terminal output failures here
-     * have no recoverable path in the search-display refresh. */
+    /// Clear line and move to beginning.
+    /// \r = carriage return, \033[K = clear to end of line.
+    /// (void)! suppresses -Wunused-result; terminal output failures here
+    /// have no recoverable path in the search-display refresh.
     (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
-    /* Write the search prompt */
+    /// Write the search prompt
     if (search_prompt && *search_prompt) {
         (void)!write(STDOUT_FILENO, search_prompt, strlen(search_prompt));
     }
 
-    /* Write the matched command */
+    /// Write the matched command
     if (current_match && *current_match) {
         (void)!write(STDOUT_FILENO, current_match, strlen(current_match));
     }
@@ -2446,36 +2428,34 @@ static void exit_search_mode_and_refresh(readline_context_t *ctx) {
     if (!ctx)
         return;
 
-    /* Clear the search line */
+    /// Clear the search line
     (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
-    /* Clear autosuggestion to prevent ghost text */
+    /// Clear autosuggestion to prevent ghost text
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_set_autosuggestion(dc, NULL);
     }
 
-    /* Suppress autosuggestion regeneration temporarily */
+    /// Suppress autosuggestion regeneration temporarily
     ctx->suppress_autosuggestion = true;
 
-    /* Restore normal prompt in the prompt layer */
+    /// Restore normal prompt in the prompt layer
     if (dc && dc->compositor && dc->compositor->prompt_layer && ctx->prompt) {
         prompt_layer_set_content(dc->compositor->prompt_layer, ctx->prompt);
     }
 
-    /* Reset the prompt display state to force full redraw */
+    /// Reset the prompt display state to force full redraw
     dc_reset_prompt_display_state();
 
-    /* Refresh display with the buffer content */
+    /// Refresh display with the buffer content
     refresh_display(ctx);
 
-    /* Re-enable autosuggestion */
+    /// Re-enable autosuggestion
     ctx->suppress_autosuggestion = false;
 }
 
-/**
- * @brief Enter interactive search mode (Ctrl+R handler)
- */
+/// @brief Enter interactive search mode (Ctrl+R handler)
 static lle_result_t handle_interactive_search_start(lle_event_t *event,
                                                     void *user_data) {
     (void)event;
@@ -2485,19 +2465,19 @@ static lle_result_t handle_interactive_search_start(lle_event_t *event,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* editor->history_system IS the history_core directly */
+    /// editor->history_system IS the history_core directly
     lle_history_core_t *history_core = ctx->editor->history_system;
 
-    /* Save current buffer content and cursor for cancel operation */
+    /// Save current buffer content and cursor for cancel operation
     const char *current_line = ctx->buffer->data ? ctx->buffer->data : "";
     size_t cursor_pos = ctx->buffer->cursor.byte_offset;
 
-    /* Initialize search session */
+    /// Initialize search session
     lle_result_t result = lle_history_interactive_search_init(
         history_core, current_line, cursor_pos);
 
     if (result == LLE_SUCCESS) {
-        /* Refresh display to show search prompt */
+        /// Refresh display to show search prompt
         refresh_search_display(ctx);
     }
 
@@ -2522,95 +2502,95 @@ static bool handle_search_mode_input(readline_context_t *ctx,
                                      uint32_t codepoint, bool is_ctrl,
                                      uint32_t special_key) {
     if (!lle_history_interactive_search_is_active()) {
-        return false; /* Not in search mode */
+        return false; /// Not in search mode
     }
 
-    /* Ctrl+R during search: move to next (older) match */
+    /// Ctrl+R during search: move to next (older) match
     if (is_ctrl && codepoint == 'R') {
         lle_history_interactive_search_next();
         refresh_search_display(ctx);
         return true;
     }
 
-    /* Ctrl+S during search: move to previous (newer) match */
+    /// Ctrl+S during search: move to previous (newer) match
     if (is_ctrl && codepoint == 'S') {
         lle_history_interactive_search_prev();
         refresh_search_display(ctx);
         return true;
     }
 
-    /* Ctrl+G or Ctrl+C: cancel search, restore original line */
+    /// Ctrl+G or Ctrl+C: cancel search, restore original line
     if (is_ctrl && (codepoint == 'G' || codepoint == 'C')) {
         const char *original = lle_history_interactive_search_cancel();
 
-        /* Restore original buffer content */
+        /// Restore original buffer content
         lle_buffer_clear(ctx->buffer);
         if (original && *original) {
             lle_buffer_insert_text(ctx->buffer, 0, original, strlen(original));
         }
 
-        /* Exit search mode and restore display */
+        /// Exit search mode and restore display
         exit_search_mode_and_refresh(ctx);
         return true;
     }
 
-    /* Enter: accept current match */
+    /// Enter: accept current match
     if (codepoint == '\n' || codepoint == '\r' ||
         special_key == LLE_KEY_ENTER) {
         const char *selected = lle_history_interactive_search_accept();
 
-        /* Put selected command in buffer */
+        /// Put selected command in buffer
         lle_buffer_clear(ctx->buffer);
         if (selected && *selected) {
             lle_buffer_insert_text(ctx->buffer, 0, selected, strlen(selected));
-            /* Move cursor to end */
+            /// Move cursor to end
             ctx->buffer->cursor.byte_offset = ctx->buffer->length;
             ctx->buffer->cursor.grapheme_index =
-                ctx->buffer->length; /* Approximate */
+                ctx->buffer->length; /// Approximate
         }
 
-        /* Exit search mode and restore display */
+        /// Exit search mode and restore display
         exit_search_mode_and_refresh(ctx);
         return true;
     }
 
-    /* Backspace: remove last character from query */
+    /// Backspace: remove last character from query
     if (codepoint == 127 || codepoint == 8) {
         lle_history_interactive_search_backspace();
         refresh_search_display(ctx);
         return true;
     }
 
-    /* Escape: cancel search */
+    /// Escape: cancel search
     if (codepoint == 0x1B || special_key == LLE_KEY_ESCAPE) {
         const char *original = lle_history_interactive_search_cancel();
 
-        /* Restore original buffer content */
+        /// Restore original buffer content
         lle_buffer_clear(ctx->buffer);
         if (original && *original) {
             lle_buffer_insert_text(ctx->buffer, 0, original, strlen(original));
         }
 
-        /* Exit search mode and restore display */
+        /// Exit search mode and restore display
         exit_search_mode_and_refresh(ctx);
         return true;
     }
 
-    /* Printable characters: add to search query */
+    /// Printable characters: add to search query
     if (codepoint >= 32 && codepoint < 127 && !is_ctrl) {
         lle_history_interactive_search_update_query((char)codepoint);
         refresh_search_display(ctx);
         return true;
     }
 
-    /* Arrow keys and other special keys: exit search mode, process key normally
-     */
+    /// Arrow keys and other special keys: exit search mode, process key
+    /// normally
     if (special_key == LLE_KEY_UP || special_key == LLE_KEY_DOWN ||
         special_key == LLE_KEY_LEFT || special_key == LLE_KEY_RIGHT) {
-        /* Accept current match and exit search */
+        /// Accept current match and exit search
         const char *selected = lle_history_interactive_search_accept();
 
-        /* Put selected command in buffer */
+        /// Put selected command in buffer
         lle_buffer_clear(ctx->buffer);
         if (selected && *selected) {
             lle_buffer_insert_text(ctx->buffer, 0, selected, strlen(selected));
@@ -2618,14 +2598,14 @@ static bool handle_search_mode_input(readline_context_t *ctx,
             ctx->buffer->cursor.grapheme_index = ctx->buffer->length;
         }
 
-        /* Exit search mode and restore display */
+        /// Exit search mode and restore display
         exit_search_mode_and_refresh(ctx);
 
-        /* Return false so the arrow key gets processed normally */
+        /// Return false so the arrow key gets processed normally
         return false;
     }
 
-    /* Any other key: exit search mode and let the key be processed normally */
+    /// Any other key: exit search mode and let the key be processed normally
     const char *selected = lle_history_interactive_search_accept();
     lle_buffer_clear(ctx->buffer);
     if (selected && *selected) {
@@ -2634,10 +2614,10 @@ static bool handle_search_mode_input(readline_context_t *ctx,
         ctx->buffer->cursor.grapheme_index = ctx->buffer->length;
     }
 
-    /* Exit search mode and restore display */
+    /// Exit search mode and restore display
     exit_search_mode_and_refresh(ctx);
 
-    return false; /* Let caller process the key */
+    return false; /// Let caller process the key
 }
 
 /**
@@ -2655,7 +2635,7 @@ static bool handle_search_mode_input(readline_context_t *ctx,
 static lle_result_t execute_keybinding_action(
     readline_context_t *ctx, const char *key_sequence,
     lle_result_t (*fallback_handler)(lle_event_t *, void *)) {
-    /* Try keybinding manager first (Group 1+ migration) */
+    /// Try keybinding manager first (Group 1+ migration)
     if (ctx->keybinding_manager && ctx->editor) {
         lle_keybinding_action_t *action = NULL;
         lle_result_t result = lle_keybinding_manager_lookup(
@@ -2664,20 +2644,19 @@ static lle_result_t execute_keybinding_action(
         if (result == LLE_SUCCESS && action != NULL) {
             lle_result_t exec_result;
 
-            /* Dispatch based on action type */
+            /// Dispatch based on action type
             if (action->type == LLE_ACTION_TYPE_SIMPLE) {
-                /* Simple action: operate on editor, then handle special flags
-                 */
+                /// Simple action: operate on editor, then handle special flags
                 exec_result = action->func.simple(ctx->editor);
 
-                /* Check for EOF request (legacy flag - used by Ctrl-D) */
+                /// Check for EOF request (legacy flag - used by Ctrl-D)
                 if (ctx->editor->eof_requested) {
                     *ctx->done = true;
                     *ctx->final_line = NULL;
                     return exec_result;
                 }
 
-                /* Check for abort request (legacy flag - used by Ctrl-G) */
+                /// Check for abort request (legacy flag - used by Ctrl-G)
                 if (ctx->editor->abort_requested) {
                     *ctx->done = true;
                     *ctx->final_line = strdup(""); /* Return empty string, not
@@ -2685,26 +2664,26 @@ static lle_result_t execute_keybinding_action(
                     return exec_result;
                 }
 
-                /* Refresh display after simple action */
+                /// Refresh display after simple action
                 if (exec_result == LLE_SUCCESS) {
                     refresh_display(ctx);
                 }
 
                 return exec_result;
             } else if (action->type == LLE_ACTION_TYPE_CONTEXT) {
-                /* Context-aware action: has full access, handles everything
-                 * including display refresh */
+                /// Context-aware action: has full access, handles everything
+                /// including display refresh
                 exec_result = action->func.context(ctx);
                 return exec_result;
             }
 
-            /* Unknown action type - should never happen */
+            /// Unknown action type - should never happen
             return LLE_ERROR_FATAL_INTERNAL;
         }
     }
 
-    /* Fallback to hardcoded handler if keybinding manager not available or
-     * lookup failed */
+    /// Fallback to hardcoded handler if keybinding manager not available or
+    /// lookup failed
     if (fallback_handler) {
         return fallback_handler(NULL, ctx);
     }
@@ -2735,33 +2714,31 @@ static lle_result_t execute_keybinding_action(
 char *lle_readline(const char *prompt) {
     lle_result_t result;
 
-    /*
-     * CRITICAL: Check if stdin is a TTY before attempting raw mode.
-     *
-     * When the shell is forced into interactive mode with -i but stdin is
-     * a pipe or file, we cannot use raw mode terminal features. Fall back
-     * to simple getline() for input while still showing the prompt.
-     *
-     * This handles: echo "cmd" | lush -i
-     */
+    /// CRITICAL: Check if stdin is a TTY before attempting raw mode.
+    ///
+    /// When the shell is forced into interactive mode with -i but stdin is
+    /// a pipe or file, we cannot use raw mode terminal features. Fall back
+    /// to simple getline() for input while still showing the prompt.
+    ///
+    /// This handles: echo "cmd" | lush -i
     if (!isatty(STDIN_FILENO)) {
-        /* Print prompt to stdout if provided */
+        /// Print prompt to stdout if provided
         if (prompt && *prompt) {
             fputs(prompt, stdout);
             fflush(stdout);
         }
 
-        /* Use simple getline for non-TTY stdin */
+        /// Use simple getline for non-TTY stdin
         char *line = NULL;
         size_t len = 0;
         ssize_t read = getline(&line, &len, stdin);
 
         if (read == -1) {
             free(line);
-            return NULL; /* EOF or error */
+            return NULL; /// EOF or error
         }
 
-        /* Remove trailing newline */
+        /// Remove trailing newline
         if (read > 0 && line[read - 1] == '\n') {
             line[read - 1] = '\0';
         }
@@ -2769,22 +2746,22 @@ char *lle_readline(const char *prompt) {
         return line;
     }
 
-    /* Reset prompt display state for new input session */
+    /// Reset prompt display state for new input session
     dc_reset_prompt_display_state();
 
-    /* Get display controller from display_integration */
+    /// Get display controller from display_integration
     void *display_controller = display_integration_get_controller();
 
-    /* === STEP 1: Create terminal abstraction instance === */
+    /// === STEP 1: Create terminal abstraction instance ===
     lle_terminal_abstraction_t *term = NULL;
     result = lle_terminal_abstraction_init(
         &term, (lush_display_context_t *)display_controller);
     if (result != LLE_SUCCESS || term == NULL) {
-        /* Failed to initialize terminal abstraction */
+        /// Failed to initialize terminal abstraction
         return NULL;
     }
 
-    /* === STEP 2: Get unix interface for raw mode === */
+    /// === STEP 2: Get unix interface for raw mode ===
     if (term->unix_interface == NULL) {
         lle_terminal_abstraction_destroy(term);
         return NULL;
@@ -2792,105 +2769,103 @@ char *lle_readline(const char *prompt) {
 
     lle_unix_interface_t *unix_iface = term->unix_interface;
 
-    /* === STEP 3: Enter raw mode === */
+    /// === STEP 3: Enter raw mode ===
     result = lle_unix_interface_enter_raw_mode(unix_iface);
     if (result != LLE_SUCCESS) {
-        /* Failed to enter raw mode */
+        /// Failed to enter raw mode
         lle_terminal_abstraction_destroy(term);
         return NULL;
     }
 
-    /* Notify signal handler that LLE readline is active
-     * This allows SIGINT (Ctrl+C) to be handled properly by setting a flag
-     * that we check in the input loop, rather than using the default behavior
-     */
+    /// Notify signal handler that LLE readline is active
+    /// This allows SIGINT (Ctrl+C) to be handled properly by setting a flag
+    /// that we check in the input loop, rather than using the default behavior
     set_lle_readline_active(1);
 
-    /* === STEP 4: Create buffer for line editing === */
+    /// === STEP 4: Create buffer for line editing ===
     lle_buffer_t *buffer = NULL;
     result = lle_buffer_create(&buffer, global_memory_pool, 256);
     if (result != LLE_SUCCESS || buffer == NULL) {
-        /* Failed to create buffer */
+        /// Failed to create buffer
         lle_unix_interface_exit_raw_mode(unix_iface);
         lle_terminal_abstraction_destroy(term);
         return NULL;
     }
 
-    /* Enable change tracking for undo/redo support */
+    /// Enable change tracking for undo/redo support
     buffer->change_tracking_enabled = true;
 
-    /* === STEP 5: Create event system === */
-    /* Step 3: Add event system for decoupled architecture */
+    /// === STEP 5: Create event system ===
+    /// Step 3: Add event system for decoupled architecture
     lle_event_system_t *event_system = NULL;
     result = lle_event_system_init(&event_system,
                                    (lle_memory_pool_t *)global_memory_pool);
     if (result != LLE_SUCCESS || event_system == NULL) {
-        /* Failed to create event system */
+        /// Failed to create event system
         lle_buffer_destroy(buffer);
         lle_unix_interface_exit_raw_mode(unix_iface);
         lle_terminal_abstraction_destroy(term);
         return NULL;
     }
 
-    /* === STEP 5.5: Create continuation state === */
-    /* Step 6: Initialize shared multiline parser state */
+    /// === STEP 5.5: Create continuation state ===
+    /// Step 6: Initialize shared multiline parser state
     continuation_state_t continuation_state;
     continuation_state_init(&continuation_state);
 
-    /* === STEP 5.55: Create edit-session arena === */
-    /* Arena for per-readline allocations (kill buffer, suggestions, etc.)
-     * Child of session arena - automatically freed when session ends,
-     * but we explicitly destroy it at end of lle_readline() for prompt cleanup.
-     * 8KB initial size is sufficient for typical editing session. */
+    /// === STEP 5.55: Create edit-session arena ===
+    /// Arena for per-readline allocations (kill buffer, suggestions, etc.)
+    /// Child of session arena - automatically freed when session ends,
+    /// but we explicitly destroy it at end of lle_readline() for prompt
+    /// cleanup. 8KB initial size is sufficient for typical editing session.
     lle_arena_t *edit_arena = NULL;
     if (g_lle_integration && g_lle_integration->session_arena) {
         edit_arena = lle_arena_create(g_lle_integration->session_arena, "edit",
                                       8 * 1024);
     }
 
-    /* === STEP 5.6: Create kill buffer === */
-    /* Step 5 enhancement: Initialize kill buffer for yank operations
-     * Allocated from edit_arena if available, otherwise falls back to malloc */
+    /// === STEP 5.6: Create kill buffer ===
+    /// Step 5 enhancement: Initialize kill buffer for yank operations
+    /// Allocated from edit_arena if available, otherwise falls back to malloc
     char *kill_buffer = NULL;
     size_t kill_buffer_size = 0;
 
-    /* === STEP 5.7: Get display controller for prompt display === */
+    /// === STEP 5.7: Get display controller for prompt display ===
     display_controller_t *display = display_integration_get_controller();
 
-    /* === STEP 5.8: Initialize LLE display integration (Spec 08) === */
+    /// === STEP 5.8: Initialize LLE display integration (Spec 08) ===
     lle_display_integration_t *lle_display_integ =
         lle_display_integration_get_global();
     if (!lle_display_integ && display) {
-        /* Initialize display integration if not already initialized */
+        /// Initialize display integration if not already initialized
         result = lle_display_integration_init(
-            &lle_display_integ, NULL, /* editor context - not needed yet */
+            &lle_display_integ, NULL, /// editor context - not needed yet
             display, (lle_memory_pool_t *)global_memory_pool);
-        /* Non-fatal if display integration fails - LLE will still work for
-         * input */
+        /// Non-fatal if display integration fails - LLE will still work for
+        /// input
     }
 
-    /* === STEP 6: Register event handlers === */
-    /* Step 4: Register handlers that will modify buffer and refresh display */
+    /// === STEP 6: Register event handlers ===
+    /// Step 4: Register handlers that will modify buffer and refresh display
     bool done = false;
     char *final_line = NULL;
-    /* === STEP 6.5: Initialize LLE editor (proper architecture) === */
-    /* Spec 26: Use shell integration's editor if available, otherwise
-     * fall back to lazy initialization for backward compatibility.
-     */
+    /// === STEP 6.5: Initialize LLE editor (proper architecture) ===
+    /// Spec 26: Use shell integration's editor if available, otherwise
+    /// fall back to lazy initialization for backward compatibility.
     lle_editor_t *editor_to_use = NULL;
 
     if (g_lle_integration && g_lle_integration->editor) {
-        /* Use editor from shell integration (Spec 26) */
+        /// Use editor from shell integration (Spec 26)
         editor_to_use = g_lle_integration->editor;
     } else {
-        /* Fallback: Create global editor instance if it doesn't exist */
+        /// Fallback: Create global editor instance if it doesn't exist
         if (!global_lle_editor) {
             result = lle_editor_create(&global_lle_editor, global_memory_pool);
             if (result != LLE_SUCCESS || !global_lle_editor) {
-                /* Failed to create editor - non-fatal, history won't work */
+                /// Failed to create editor - non-fatal, history won't work
                 global_lle_editor = NULL;
             } else {
-                /* Initialize history subsystem with config from Lush */
+                /// Initialize history subsystem with config from Lush
                 lle_history_config_t hist_config;
                 populate_history_config_from_lush_config(&hist_config);
 
@@ -2900,7 +2875,7 @@ char *lle_readline(const char *prompt) {
 
                 if (result == LLE_SUCCESS &&
                     global_lle_editor->history_system) {
-                    /* Load existing history from LLE history file */
+                    /// Load existing history from LLE history file
                     const char *history_file = getenv("HOME");
                     char history_path[1024];
                     if (history_file) {
@@ -2915,57 +2890,55 @@ char *lle_readline(const char *prompt) {
         editor_to_use = global_lle_editor;
     }
 
-    /* Set buffer in editor if editor exists */
+    /// Set buffer in editor if editor exists
     if (editor_to_use) {
         editor_to_use->buffer = buffer;
 
-        /* Update cursor_manager's buffer reference to stay synchronized */
+        /// Update cursor_manager's buffer reference to stay synchronized
         if (editor_to_use->cursor_manager) {
             editor_to_use->cursor_manager->buffer = buffer;
         }
 
-        /* CRITICAL: Reset history navigation position for new readline session
-         */
-        /* Each readline() call starts fresh - not in history navigation mode */
+        /// CRITICAL: Reset history navigation position for new readline session
+        /// Each readline() call starts fresh - not in history navigation mode
         editor_to_use->history_navigation_pos = 0;
-        /* Clear the seen set for unique-only navigation mode */
+        /// Clear the seen set for unique-only navigation mode
         editor_to_use->history_nav_seen_count = 0;
     }
 
-    /* === STEP 6.6: Create keybinding manager and load Emacs preset === */
+    /// === STEP 6.6: Create keybinding manager and load Emacs preset ===
     lle_keybinding_manager_t *keybinding_manager = NULL;
     result =
         lle_keybinding_manager_create(&keybinding_manager, global_memory_pool);
     if (result != LLE_SUCCESS || keybinding_manager == NULL) {
-        /* Failed to create keybinding manager - non-fatal, will use hardcoded
-         * fallbacks */
+        /// Failed to create keybinding manager - non-fatal, will use hardcoded
+        /// fallbacks
         keybinding_manager = NULL;
     } else {
-        /* Load the full Emacs preset first - this provides all GNU Readline
-         * bindings */
+        /// Load the full Emacs preset first - this provides all GNU Readline
+        /// bindings
         result = lle_keybinding_manager_load_emacs_preset(keybinding_manager);
         if (result != LLE_SUCCESS) {
-            /* Preset load failed - continue with context-aware overrides only
-             */
+            /// Preset load failed - continue with context-aware overrides only
         }
 
-        /* Load user keybinding configuration from
-         * ~/.config/lush/keybindings.toml This allows users to override
-         * default Emacs bindings with custom ones. Errors are logged but don't
-         * prevent shell from starting. */
+        /// Load user keybinding configuration from
+        /// ~/.config/lush/keybindings.toml This allows users to override
+        /// default Emacs bindings with custom ones. Errors are logged but don't
+        /// prevent shell from starting.
         lle_keybinding_load_result_t load_result;
         lle_keybinding_load_user_config(keybinding_manager, &load_result);
-        /* Note: We don't check load_result here - user config is optional.
-         * If file doesn't exist, that's fine (LLE_ERROR_NOT_FOUND).
-         * If there are parse errors, they're logged to stderr. */
+        /// Note: We don't check load_result here - user config is optional.
+        /// If file doesn't exist, that's fine (LLE_ERROR_NOT_FOUND).
+        /// If there are parse errors, they're logged to stderr.
 
-        /* Override specific bindings with context-aware variants that need
-         * readline_context_t. These provide Fish-style autosuggestion
-         * acceptance and completion menu handling. The preset's simple actions
-         * are overridden where context awareness is needed. */
+        /// Override specific bindings with context-aware variants that need
+        /// readline_context_t. These provide Fish-style autosuggestion
+        /// acceptance and completion menu handling. The preset's simple actions
+        /// are overridden where context awareness is needed.
 
-        /* Fish-style autosuggestion acceptance: RIGHT/END/C-f/C-e accept
-         * suggestions */
+        /// Fish-style autosuggestion acceptance: RIGHT/END/C-f/C-e accept
+        /// suggestions
         lle_keybinding_manager_bind_context(
             keybinding_manager, "RIGHT", lle_forward_char_or_accept_suggestion,
             "forward-char-or-accept");
@@ -2979,31 +2952,28 @@ char *lle_readline(const char *prompt) {
             keybinding_manager, "C-f", lle_forward_char_or_accept_suggestion,
             "forward-char-or-accept");
 
-        /* Partial suggestion acceptance: Ctrl+RIGHT accepts one word at a time
-         */
+        /// Partial suggestion acceptance: Ctrl+RIGHT accepts one word at a time
         lle_keybinding_manager_bind_context(
             keybinding_manager, "C-RIGHT",
             lle_forward_word_or_accept_partial_suggestion,
             "forward-word-or-accept-partial");
 
-        /* Context-aware abort: first press dismisses completion menu, second
-         * aborts line */
+        /// Context-aware abort: first press dismisses completion menu, second
+        /// aborts line
         lle_keybinding_manager_bind_context(
             keybinding_manager, "C-g", lle_abort_line_context, "abort-line");
 
-        /* ESC: Context-aware escape - dismisses completion menu or
-         * autosuggestion */
+        /// ESC: Context-aware escape - dismisses completion menu or
+        /// autosuggestion
         lle_keybinding_manager_bind_context(keybinding_manager, "ESC",
                                             lle_escape_context, "escape");
 
-        /* ENTER: Context-aware accept line with multiline/completion awareness
-         */
+        /// ENTER: Context-aware accept line with multiline/completion awareness
         lle_keybinding_manager_bind_context(keybinding_manager, "ENTER",
                                             lle_accept_line_context,
                                             "accept-line");
 
-        /* UP/DOWN: Context-aware arrow keys with multiline notification hints
-         */
+        /// UP/DOWN: Context-aware arrow keys with multiline notification hints
         lle_keybinding_manager_bind_context(keybinding_manager, "UP",
                                             lle_smart_up_arrow_context,
                                             "smart-up-arrow");
@@ -3022,62 +2992,62 @@ char *lle_readline(const char *prompt) {
         .kill_buffer = kill_buffer,
         .kill_buffer_size = kill_buffer_size,
 
-        /* Memory management - edit arena for per-readline allocations */
+        /// Memory management - edit arena for per-readline allocations
         .edit_arena = edit_arena,
 
         /* LLE Editor - proper architecture (Spec 26: prefer shell integration)
          */
         .editor = editor_to_use,
 
-        /* Keybinding manager - Group 1+ migration */
+        /// Keybinding manager - Group 1+ migration
         .keybinding_manager = keybinding_manager,
 
-        /* Fish-style autosuggestions - LLE history integration */
+        /// Fish-style autosuggestions - LLE history integration
         .current_suggestion = NULL,
         .suggestion_alloc_size = 0,
         .suppress_autosuggestion = false,
 
-        /* State machine - start in IDLE state */
+        /// State machine - start in IDLE state
         .state = LLE_READLINE_STATE_IDLE,
         .previous_state = LLE_READLINE_STATE_IDLE,
 
-        /* Notification system - initialized to empty state */
+        /// Notification system - initialized to empty state
         .notification = {.message = {0},
                          .type = LLE_NOTIFICATION_HINT,
                          .visible = false,
-                         .trigger_action = LLE_NOTIF_ACTION_NONE}};
+                         .trigger_action = LLE_NOTIF_ACTION_NONE}
+    };
 
-    /* CRITICAL: Reset per-readline-call flags on editor
-     * The editor is persistent across readline calls, but these flags
-     * must be reset at the start of each new readline session.
-     * Without this reset, state persists across readline calls, causing
-     * all subsequent actions to behave incorrectly.
-     *
-     * State categories that MUST be reset:
-     * 1. Abort/EOF signals - prevent immediate exit on next readline
-     * 2. History navigation - start fresh each command
-     * 3. Interactive search - don't inherit previous search state
-     * 4. Special input modes - prevent stuck quoted insert mode
-     */
+    /// CRITICAL: Reset per-readline-call flags on editor
+    /// The editor is persistent across readline calls, but these flags
+    /// must be reset at the start of each new readline session.
+    /// Without this reset, state persists across readline calls, causing
+    /// all subsequent actions to behave incorrectly.
+    ///
+    /// State categories that MUST be reset:
+    /// 1. Abort/EOF signals - prevent immediate exit on next readline
+    /// 2. History navigation - start fresh each command
+    /// 3. Interactive search - don't inherit previous search state
+    /// 4. Special input modes - prevent stuck quoted insert mode
     if (editor_to_use) {
-        /* Category 1: Abort/EOF signals */
+        /// Category 1: Abort/EOF signals
         editor_to_use->abort_requested = false;
         editor_to_use->eof_requested = false;
 
-        /* Category 2: History navigation state */
+        /// Category 2: History navigation state
         editor_to_use->history_navigation_pos = 0;
         editor_to_use->history_nav_seen_count = 0;
-        /* Note: history_nav_seen_hashes array is reused, just reset count */
+        /// Note: history_nav_seen_hashes array is reused, just reset count
 
-        /* Category 3: Interactive search state */
+        /// Category 3: Interactive search state
         editor_to_use->history_search_active = false;
         editor_to_use->history_search_direction = 0;
 
-        /* Category 4: Special input modes */
+        /// Category 4: Special input modes
         editor_to_use->quoted_insert_mode = false;
     }
 
-    /* Register handler for character input */
+    /// Register handler for character input
     result = lle_event_handler_register(event_system, LLE_EVENT_KEY_PRESS,
                                         handle_character_input, &ctx,
                                         "character_input");
@@ -3089,48 +3059,46 @@ char *lle_readline(const char *prompt) {
         return NULL;
     }
 
-    /* === STEP 7: Display prompt === */
-    /* Step 4: Set prompt in prompt_layer and display initial prompt */
+    /// === STEP 7: Display prompt ===
+    /// Step 4: Set prompt in prompt_layer and display initial prompt
     if (lle_display_integ && lle_display_integ->lush_display) {
         display_controller_t *dc = lle_display_integ->lush_display;
         if (dc->compositor && dc->compositor->prompt_layer && prompt) {
-            /* Set the prompt content in the prompt_layer */
+            /// Set the prompt content in the prompt_layer
             prompt_layer_set_content(dc->compositor->prompt_layer, prompt);
         }
     }
 
-    /* Initial display refresh to show prompt */
+    /// Initial display refresh to show prompt
     refresh_display(&ctx);
 
-    /* === WIDGET HOOK: LINE_INIT === */
-    /* Trigger line-init hook at start of readline (ZSH zle-line-init) */
+    /// === WIDGET HOOK: LINE_INIT ===
+    /// Trigger line-init hook at start of readline (ZSH zle-line-init)
     if (editor_to_use && editor_to_use->widget_hooks_manager) {
         lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                 LLE_HOOK_LINE_INIT, editor_to_use);
     }
 
-    /* === STEP 8: Main input loop === */
+    /// === STEP 8: Main input loop ===
 
-    /* CRITICAL FIX: Timeout counter to prevent infinite loops
-     * If we get too many consecutive timeouts without any user input,
-     * something is wrong (e.g., terminal state corruption, fd closed).
-     * The watchdog (SIGALRM) handles actual processing freezes.
-     * Idle waiting for user input is normal and should not be interrupted.
-     */
+    /// CRITICAL FIX: Timeout counter to prevent infinite loops
+    /// If we get too many consecutive timeouts without any user input,
+    /// something is wrong (e.g., terminal state corruption, fd closed).
+    /// The watchdog (SIGALRM) handles actual processing freezes.
+    /// Idle waiting for user input is normal and should not be interrupted.
 
     while (!done) {
 
-        /* WATCHDOG: Pet the watchdog at the top of each iteration.
-         * This resets the 10-second alarm timer so it covers the ENTIRE
-         * iteration: rendering, completion, event processing, and input
-         * read. Previously only covered the input read, meaning hangs
-         * in rendering or completion went undetected. */
-        lle_watchdog_pet(0); /* 0 = use default timeout (10 seconds) */
+        /// WATCHDOG: Pet the watchdog at the top of each iteration.
+        /// This resets the 10-second alarm timer so it covers the ENTIRE
+        /// iteration: rendering, completion, event processing, and input
+        /// read. Previously only covered the input read, meaning hangs
+        /// in rendering or completion went undetected.
+        lle_watchdog_pet(0); /// 0 = use default timeout (10 seconds)
 
-        /* WATCHDOG: Check at start of each iteration (defense in depth).
-         * This catches cases where the previous iteration got stuck but
-         * somehow returned to the loop without hitting the post-read check.
-         */
+        /// WATCHDOG: Check at start of each iteration (defense in depth).
+        /// This catches cases where the previous iteration got stuck but
+        /// somehow returned to the loop without hitting the post-read check.
         if (lle_watchdog_check_and_clear()) {
             fprintf(stderr, "\nlle: watchdog timeout at loop start\n");
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3148,26 +3116,25 @@ char *lle_readline(const char *prompt) {
             continue;
         }
 
-        /* CRITICAL FIX: Reset suppress_autosuggestion at start of each
-         * iteration This flag is set during operations that temporarily
-         * suppress autosuggestion (e.g., Ctrl+G clearing, menu dismissal).
-         * Resetting here ensures the flag cannot stay stuck - it will be re-set
-         * if needed by the current operation. This prevents the bug where
-         * suppress_autosuggestion stays true forever if a handler sets it but
-         * doesn't reset it before returning.
-         */
+        /// CRITICAL FIX: Reset suppress_autosuggestion at start of each
+        /// iteration This flag is set during operations that temporarily
+        /// suppress autosuggestion (e.g., Ctrl+G clearing, menu dismissal).
+        /// Resetting here ensures the flag cannot stay stuck - it will be
+        /// re-set if needed by the current operation. This prevents the bug
+        /// where suppress_autosuggestion stays true forever if a handler sets
+        /// it but doesn't reset it before returning.
         ctx.suppress_autosuggestion = false;
 
-        /* Check if SIGINT was received (Ctrl+C)
-         * The signal handler sets a flag instead of interrupting directly,
-         * allowing us to handle it cleanly here in the input loop.
-         * This provides bash-like behavior: Ctrl+C aborts current line and
-         * displays a fresh prompt, rather than exiting the shell. */
+        /// Check if SIGINT was received (Ctrl+C)
+        /// The signal handler sets a flag instead of interrupting directly,
+        /// allowing us to handle it cleanly here in the input loop.
+        /// This provides bash-like behavior: Ctrl+C aborts current line and
+        /// displays a fresh prompt, rather than exiting the shell.
         if (check_and_clear_sigint_flag()) {
-            /* Echo ^C to show user that Ctrl+C was pressed */
+            /// Echo ^C to show user that Ctrl+C was pressed
             (void)!write(STDOUT_FILENO, "^C\n", 3);
 
-            /* Clear any completion menu or autosuggestion */
+            /// Clear any completion menu or autosuggestion
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_system_clear(ctx.editor->completion_system);
             }
@@ -3177,52 +3144,50 @@ char *lle_readline(const char *prompt) {
                 display_controller_clear_completion_menu(dc);
             }
 
-            /* Clear local suggestion buffer */
+            /// Clear local suggestion buffer
             if (ctx.current_suggestion) {
                 ctx.current_suggestion[0] = '\0';
             }
             ctx.suppress_autosuggestion = true;
 
-            /* Reset display state for fresh prompt */
+            /// Reset display state for fresh prompt
             dc_reset_prompt_display_state();
 
-            /* STATE MACHINE: Force abort state - this ALWAYS succeeds */
+            /// STATE MACHINE: Force abort state - this ALWAYS succeeds
             lle_readline_state_force_abort(&ctx);
 
-            /* Abort line - return empty string (not NULL, which signals EOF) */
+            /// Abort line - return empty string (not NULL, which signals EOF)
             done = true;
             final_line = strdup("");
             continue;
         }
 
-        /* Read next input event */
+        /// Read next input event
         lle_input_event_t *event = NULL;
 
-        /* Idle-poll cadence: 1 second.
-         *
-         * The previous 100ms value (10 Hz polling) burned ~87% of one
-         * CPU core on idle prompts -- every 100ms the loop ran
-         * clock_gettime, allocated an arena event, called select() and
-         * returned, accumulating to substantial CPU overhead per #83.
-         *
-         * 1 second is the sweet spot: still well within the 10-second
-         * watchdog budget (lle_watchdog_pet at the top of the loop
-         * resets a 10s alarm), still well within the 2-second
-         * theme-hot-reload polling granularity, and reduces idle CPU
-         * by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
-         * select() via EINTR immediately, so user responsiveness is
-         * unaffected.
-         */
+        /// Idle-poll cadence: 1 second.
+        ///
+        /// The previous 100ms value (10 Hz polling) burned ~87% of one
+        /// CPU core on idle prompts -- every 100ms the loop ran
+        /// clock_gettime, allocated an arena event, called select() and
+        /// returned, accumulating to substantial CPU overhead per #83.
+        ///
+        /// 1 second is the sweet spot: still well within the 10-second
+        /// watchdog budget (lle_watchdog_pet at the top of the loop
+        /// resets a 10s alarm), still well within the 2-second
+        /// theme-hot-reload polling granularity, and reduces idle CPU
+        /// by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
+        /// select() via EINTR immediately, so user responsiveness is
+        /// unaffected.
         result = lle_input_processor_read_next_event(
-            term->input_processor, &event, 1000 /* 1s idle-poll timeout */
+            term->input_processor, &event, 1000 /// 1s idle-poll timeout
         );
 
-        /* WATCHDOG: Check if watchdog fired during processing.
-         * This catches scenarios where event processing hangs.
-         */
+        /// WATCHDOG: Check if watchdog fired during processing.
+        /// This catches scenarios where event processing hangs.
         if (lle_watchdog_check_and_clear()) {
             fprintf(stderr, "\nlle: watchdog timeout - forcing recovery\n");
-            /* Attempt recovery: clear all subsystem state */
+            /// Attempt recovery: clear all subsystem state
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_system_clear(ctx.editor->completion_system);
             }
@@ -3233,18 +3198,18 @@ char *lle_readline(const char *prompt) {
             }
             dc_reset_prompt_display_state();
 
-            /* STATE MACHINE: Force timeout state */
+            /// STATE MACHINE: Force timeout state
             lle_readline_state_force_timeout(&ctx);
             done = true;
             final_line = strdup("");
             continue;
         }
 
-        /* Handle timeout and null events - just continue waiting
-         * Idle waiting for user input is completely normal.
-         * The watchdog catches actual processing freezes. */
+        /// Handle timeout and null events - just continue waiting
+        /// Idle waiting for user input is completely normal.
+        /// The watchdog catches actual processing freezes.
         if (result == LLE_ERROR_TIMEOUT || event == NULL) {
-            /* Theme hot-reload check (~every 2 seconds during idle) */
+            /// Theme hot-reload check (~every 2 seconds during idle)
             if (config.display_theme_hot_reload && g_lle_integration &&
                 g_lle_integration->prompt_composer) {
                 struct timespec now;
@@ -3267,22 +3232,22 @@ char *lle_readline(const char *prompt) {
             continue;
         }
 
-        /* ALSO check event type for timeout */
+        /// ALSO check event type for timeout
         if (event->type == LLE_INPUT_TYPE_TIMEOUT) {
             continue;
         }
 
-        /* STATE MACHINE: Transition from IDLE to EDITING on first real input */
+        /// STATE MACHINE: Transition from IDLE to EDITING on first real input
         if (ctx.state == LLE_READLINE_STATE_IDLE) {
             lle_readline_state_transition(&ctx, LLE_READLINE_STATE_EDITING);
         }
 
-        /* CRITICAL FIX: Re-check Ctrl+C after input read
-         * SIGINT can arrive during the blocking read call. We check again here
-         * to catch Ctrl+C pressed during the read, ensuring responsive
-         * handling. This fixes the race window where Ctrl+C between the initial
-         * check and the read would be delayed until the next iteration.
-         */
+        /// CRITICAL FIX: Re-check Ctrl+C after input read
+        /// SIGINT can arrive during the blocking read call. We check again here
+        /// to catch Ctrl+C pressed during the read, ensuring responsive
+        /// handling. This fixes the race window where Ctrl+C between the
+        /// initial check and the read would be delayed until the next
+        /// iteration.
         if (check_and_clear_sigint_flag()) {
             (void)!write(STDOUT_FILENO, "^C\n", 3);
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3297,25 +3262,25 @@ char *lle_readline(const char *prompt) {
                 ctx.current_suggestion[0] = '\0';
             }
             dc_reset_prompt_display_state();
-            /* STATE MACHINE: Force abort state */
+            /// STATE MACHINE: Force abort state
             lle_readline_state_force_abort(&ctx);
             done = true;
             final_line = strdup("");
             continue;
         }
 
-        /* Handle read errors */
+        /// Handle read errors
         if (result != LLE_SUCCESS) {
-            /* Error reading input - abort */
-            /* STATE MACHINE: Force error state */
+            /// Error reading input - abort
+            /// STATE MACHINE: Force error state
             lle_readline_state_force_error(&ctx);
             done = true;
             final_line = NULL;
             continue;
         }
 
-        /* === INTERACTIVE SEARCH MODE HANDLING === */
-        /* When Ctrl+R search is active, route input to search handler first */
+        /// === INTERACTIVE SEARCH MODE HANDLING ===
+        /// When Ctrl+R search is active, route input to search handler first
         if (lle_history_interactive_search_is_active()) {
             bool handled = false;
 
@@ -3332,206 +3297,207 @@ char *lle_readline(const char *prompt) {
             }
 
             if (handled) {
-                continue; /* Search mode consumed the input */
+                continue; /// Search mode consumed the input
             }
-            /* If not handled, fall through to normal processing */
+            /// If not handled, fall through to normal processing
         }
 
-        /* === STEP 9: Convert input event to LLE event and dispatch === */
-        /* Step 3: Use event system instead of direct buffer manipulation */
+        /// === STEP 9: Convert input event to LLE event and dispatch ===
+        /// Step 3: Use event system instead of direct buffer manipulation
 
         switch (event->type) {
         case LLE_INPUT_TYPE_CHARACTER: {
-            /* Regular character input */
+            /// Regular character input
             uint32_t codepoint = event->data.character.codepoint;
 
-            /* Check for Enter key (newline) */
+            /// Check for Enter key (newline)
             if (codepoint == '\n' || codepoint == '\r') {
-                /* GROUP 5 MIGRATION: ENTER routed through keybinding manager
-                 * (context-aware action) */
+                /// GROUP 5 MIGRATION: ENTER routed through keybinding manager
+                /// (context-aware action)
                 execute_keybinding_action(&ctx, "ENTER", handle_enter);
                 break;
             }
 
-            /* NOTE: Ctrl-A through Ctrl-Z are now handled as SPECIAL_KEY events
-             * with modifiers See SPECIAL_KEY case below for Ctrl+letter
-             * handling. Ctrl-C (codepoint == 3) is still handled via SIGINT
-             * signal (src/signals.c). */
+            /// NOTE: Ctrl-A through Ctrl-Z are now handled as SPECIAL_KEY
+            /// events with modifiers See SPECIAL_KEY case below for Ctrl+letter
+            /// handling. Ctrl-C (codepoint == 3) is still handled via SIGINT
+            /// signal (src/signals.c).
 
-            /* Check for backspace */
-            if (codepoint == 127 || codepoint == 8) { /* DEL or BS */
+            /// Check for backspace
+            if (codepoint == 127 || codepoint == 8) { /// DEL or BS
                 execute_keybinding_action(&ctx, "BACKSPACE", handle_backspace);
                 break;
             }
 
-            /* Check for TAB - trigger completion */
+            /// Check for TAB - trigger completion
             if (codepoint == '\t' || codepoint == 9) {
                 execute_keybinding_action(&ctx, "TAB", handle_tab);
                 break;
             }
 
-            /* Check for ESC (0x1B = 27) - dismiss completion menu */
-            /* ESC arrives as CHARACTER when timeout expires without escape
-             * sequence */
+            /// Check for ESC (0x1B = 27) - dismiss completion menu
+            /// ESC arrives as CHARACTER when timeout expires without escape
+            /// sequence
             if (codepoint == 0x1B || codepoint == 27) {
                 execute_keybinding_action(&ctx, "ESC", NULL);
                 break;
             }
 
-            /* Check for Ctrl+_ or Ctrl+/ (both send 0x1F = 31) - undo
-             * Both are standard Emacs/readline undo keybindings */
+            /// Check for Ctrl+_ or Ctrl+/ (both send 0x1F = 31) - undo
+            /// Both are standard Emacs/readline undo keybindings
             if (codepoint == 0x1F) {
                 execute_keybinding_action(&ctx, "C-_", handle_undo);
                 break;
             }
 
-            /* Check for Ctrl+^ (0x1E = 30) - redo
-             * Note: Ctrl+^ is typed as Ctrl+Shift+6 on most keyboards */
+            /// Check for Ctrl+^ (0x1E = 30) - redo
+            /// Note: Ctrl+^ is typed as Ctrl+Shift+6 on most keyboards
             if (codepoint == 0x1E) {
                 execute_keybinding_action(&ctx, "C-^", handle_redo);
                 break;
             }
 
-            /* Regular character - create LLE event and dispatch */
+            /// Regular character - create LLE event and dispatch
             lle_event_t *lle_event = NULL;
             result = lle_event_create(event_system, LLE_EVENT_KEY_PRESS, NULL,
                                       0, &lle_event);
             if (result == LLE_SUCCESS && lle_event != NULL) {
-                /* Set event data */
+                /// Set event data
                 lle_event->event_data.key.key_code = codepoint;
                 lle_event->event_data.key.modifiers = 0;
                 lle_event->event_data.key.is_special = false;
 
-                /* Copy UTF-8 bytes */
+                /// Copy UTF-8 bytes
                 size_t copy_len = event->data.character.byte_count;
                 if (copy_len > 7)
-                    copy_len = 7; /* utf8_char is char[8] */
+                    copy_len = 7; /// utf8_char is char[8]
                 memcpy(lle_event->event_data.key.utf8_char,
                        event->data.character.utf8_bytes, copy_len);
                 lle_event->event_data.key.utf8_char[copy_len] = '\0';
 
-                /* Dispatch event - handler will modify buffer */
+                /// Dispatch event - handler will modify buffer
                 lle_event_dispatch(event_system, lle_event);
 
-                /* Destroy event after dispatch to prevent memory leak */
+                /// Destroy event after dispatch to prevent memory leak
                 lle_event_destroy(event_system, lle_event);
             }
             break;
         }
 
         case LLE_INPUT_TYPE_SPECIAL_KEY: {
-            /* Special keys */
-            /* GROUP 5 MIGRATION: ENTER routed through keybinding manager
-             * (context-aware action) */
+            /// Special keys
+            /// GROUP 5 MIGRATION: ENTER routed through keybinding manager
+            /// (context-aware action)
             if (event->data.special_key.key == LLE_KEY_ENTER &&
                 !(event->data.special_key.modifiers & LLE_MOD_ALT)) {
-                /* Plain Enter - accept line */
+                /// Plain Enter - accept line
                 execute_keybinding_action(&ctx, "ENTER", handle_enter);
             }
-            /* Alt-Enter: Insert literal newline (for editing complete multiline
-               commands) */
+            /// Alt-Enter: Insert literal newline (for editing complete
+            /// multiline
+            ///                commands)
             else if (event->data.special_key.key == LLE_KEY_ENTER &&
                      (event->data.special_key.modifiers & LLE_MOD_ALT)) {
                 execute_keybinding_action(&ctx, "M-ENTER", NULL);
             }
-            /* GROUP 1 MIGRATION: Navigation keys routed through keybinding
-               manager */
+            /// GROUP 1 MIGRATION: Navigation keys routed through keybinding
+            ///                manager
             else if (event->data.special_key.key == LLE_KEY_LEFT) {
                 execute_keybinding_action(&ctx, "LEFT", handle_arrow_left);
             }
-            /* Ctrl+Right: Partial suggestion acceptance (must check before
-               plain RIGHT) */
+            /// Ctrl+Right: Partial suggestion acceptance (must check before
+            ///                plain RIGHT)
             else if (event->data.special_key.key == LLE_KEY_RIGHT &&
                      (event->data.special_key.modifiers & LLE_MOD_CTRL)) {
                 execute_keybinding_action(&ctx, "C-RIGHT", NULL);
             } else if (event->data.special_key.key == LLE_KEY_RIGHT) {
                 execute_keybinding_action(&ctx, "RIGHT", handle_arrow_right);
             }
-            /* History navigation with UP/DOWN arrows */
+            /// History navigation with UP/DOWN arrows
             else if (event->data.special_key.key == LLE_KEY_UP) {
                 execute_keybinding_action(&ctx, "UP", handle_arrow_up);
             } else if (event->data.special_key.key == LLE_KEY_DOWN) {
                 execute_keybinding_action(&ctx, "DOWN", handle_arrow_down);
             }
-            /* GROUP 1 MIGRATION: Home/End keys routed through keybinding
-               manager */
+            /// GROUP 1 MIGRATION: Home/End keys routed through keybinding
+            ///                manager
             else if (event->data.special_key.key == LLE_KEY_HOME) {
                 execute_keybinding_action(&ctx, "HOME", handle_home);
             } else if (event->data.special_key.key == LLE_KEY_END) {
                 execute_keybinding_action(&ctx, "END", handle_end);
             }
-            /* Step 5: Delete key */
+            /// Step 5: Delete key
             else if (event->data.special_key.key == LLE_KEY_DELETE) {
                 execute_keybinding_action(&ctx, "DELETE", handle_delete);
             }
-            /* Alt+Backspace: backward-kill-word */
+            /// Alt+Backspace: backward-kill-word
             else if (event->data.special_key.key == LLE_KEY_BACKSPACE &&
                      (event->data.special_key.modifiers & LLE_MOD_ALT)) {
                 execute_keybinding_action(&ctx, "M-BACKSPACE", NULL);
             }
-            /* ESC key - dismiss completion menu */
+            /// ESC key - dismiss completion menu
             else if (event->data.special_key.key == LLE_KEY_ESCAPE) {
                 execute_keybinding_action(&ctx, "ESC", NULL);
             }
-            /* Handle Ctrl+letter combinations (now SPECIAL_KEY events with
-               keycode) */
+            /// Handle Ctrl+letter combinations (now SPECIAL_KEY events with
+            ///                keycode)
             else if (event->data.special_key.key == LLE_KEY_UNKNOWN &&
                      (event->data.special_key.modifiers & LLE_MOD_CTRL)) {
                 uint32_t keycode = event->data.special_key.keycode;
 
                 switch (keycode) {
-                case 'A': /* Ctrl-A: Beginning of line */
+                case 'A': /// Ctrl-A: Beginning of line
                     execute_keybinding_action(&ctx, "C-a", handle_home);
                     break;
-                case 'B': /* Ctrl-B: Back one character */
+                case 'B': /// Ctrl-B: Back one character
                     execute_keybinding_action(&ctx, "C-b", handle_arrow_left);
                     break;
-                case 'D': /* Ctrl-D: EOF */
+                case 'D': /// Ctrl-D: EOF
                     execute_keybinding_action(&ctx, "C-d", handle_eof);
                     break;
-                case 'E': /* Ctrl-E: End of line */
+                case 'E': /// Ctrl-E: End of line
                     execute_keybinding_action(&ctx, "C-e", handle_end);
                     break;
-                case 'F': /* Ctrl-F: Forward one character */
+                case 'F': /// Ctrl-F: Forward one character
                     execute_keybinding_action(&ctx, "C-f", handle_arrow_right);
                     break;
-                case 'G': /* Ctrl-G: Abort/cancel line */
+                case 'G': /// Ctrl-G: Abort/cancel line
                     execute_keybinding_action(&ctx, "C-g", handle_abort);
                     break;
-                case 'K': /* Ctrl-K: Kill to end of line */
+                case 'K': /// Ctrl-K: Kill to end of line
                     execute_keybinding_action(&ctx, "C-k", handle_kill_to_end);
                     break;
-                case 'L': /* Ctrl-L: Clear screen */
+                case 'L': /// Ctrl-L: Clear screen
                     execute_keybinding_action(&ctx, "C-l", handle_clear_screen);
                     break;
-                case 'N': /* Ctrl-N: Next history (always navigate history) */
+                case 'N': /// Ctrl-N: Next history (always navigate history)
                     execute_keybinding_action(&ctx, "C-n", NULL);
                     break;
                 case 'P': /* Ctrl-P: Previous history (always navigate history)
                            */
                     execute_keybinding_action(&ctx, "C-p", NULL);
                     break;
-                case 'R': /* Ctrl-R: Interactive history search */
+                case 'R': /// Ctrl-R: Interactive history search
                     execute_keybinding_action(&ctx, "C-r",
                                               handle_interactive_search_start);
                     break;
                 case 'S': /* Ctrl-S: Forward search (when in search mode,
                              handled there) */
-                    /* In normal mode, Ctrl-S is often flow control (XOFF) -
-                     * ignore */
+                    /// In normal mode, Ctrl-S is often flow control (XOFF) -
+                    /// ignore
                     break;
-                case 'U': /* Ctrl-U: Kill entire line */
+                case 'U': /// Ctrl-U: Kill entire line
                     execute_keybinding_action(&ctx, "C-u", handle_kill_line);
                     break;
-                case 'W': /* Ctrl-W: Kill word backwards */
+                case 'W': /// Ctrl-W: Kill word backwards
                     execute_keybinding_action(&ctx, "C-w", handle_kill_word);
                     break;
-                case 'Y': /* Ctrl-Y: Yank */
+                case 'Y': /// Ctrl-Y: Yank
                     execute_keybinding_action(&ctx, "C-y", handle_yank);
                     break;
                 default: {
-                    /* Try keybinding manager for other Ctrl+letter combinations
-                     */
+                    /// Try keybinding manager for other Ctrl+letter
+                    /// combinations
                     char keybind[8];
                     snprintf(keybind, sizeof(keybind), "C-%c",
                              (char)tolower(keycode));
@@ -3540,42 +3506,41 @@ char *lle_readline(const char *prompt) {
                 }
                 }
             }
-            /* Handle Meta/Alt+letter combinations (Group 6 keybindings) */
+            /// Handle Meta/Alt+letter combinations (Group 6 keybindings)
             else if (event->data.special_key.key == LLE_KEY_UNKNOWN &&
                      (event->data.special_key.modifiers & LLE_MOD_ALT)) {
                 uint32_t keycode = event->data.special_key.keycode;
 
                 switch (keycode) {
-                case 'f': /* Alt-F: Forward word */
+                case 'f': /// Alt-F: Forward word
                     execute_keybinding_action(&ctx, "M-f", NULL);
                     break;
-                case 'b': /* Alt-B: Backward word */
+                case 'b': /// Alt-B: Backward word
                     execute_keybinding_action(&ctx, "M-b", NULL);
                     break;
-                case '<': /* Alt-<: Beginning of buffer */
+                case '<': /// Alt-<: Beginning of buffer
                     execute_keybinding_action(&ctx, "M-<", NULL);
                     break;
-                case '>': /* Alt->: End of buffer */
+                case '>': /// Alt->: End of buffer
                     execute_keybinding_action(&ctx, "M->", NULL);
                     break;
-                case 'c': /* Alt-C: Capitalize word */
+                case 'c': /// Alt-C: Capitalize word
                     execute_keybinding_action(&ctx, "M-c", NULL);
                     break;
-                case 'd': /* Alt-D: Kill word forward */
+                case 'd': /// Alt-D: Kill word forward
                     execute_keybinding_action(&ctx, "M-d", NULL);
                     break;
-                case 'l': /* Alt-L: Downcase word */
+                case 'l': /// Alt-L: Downcase word
                     execute_keybinding_action(&ctx, "M-l", NULL);
                     break;
-                case 'u': /* Alt-U: Upcase word */
+                case 'u': /// Alt-U: Upcase word
                     execute_keybinding_action(&ctx, "M-u", NULL);
                     break;
-                case '_': /* Alt-_: Redo (undo the undo) */
+                case '_': /// Alt-_: Redo (undo the undo)
                     execute_keybinding_action(&ctx, "M-_", handle_redo);
                     break;
                 default: {
-                    /* Try keybinding manager for other Alt+letter combinations
-                     */
+                    /// Try keybinding manager for other Alt+letter combinations
                     char keybind[8];
                     snprintf(keybind, sizeof(keybind), "M-%c", (char)keycode);
                     execute_keybinding_action(&ctx, keybind, NULL);
@@ -3583,19 +3548,19 @@ char *lle_readline(const char *prompt) {
                 }
                 }
             }
-            /* Other special keys ignored */
+            /// Other special keys ignored
             break;
         }
 
         case LLE_INPUT_TYPE_EOF: {
-            /* EOF received */
+            /// EOF received
             handle_eof(NULL, &ctx);
             break;
         }
 
         case LLE_INPUT_TYPE_SIGNAL: {
-            /* Signal received (Ctrl-C, etc.) */
-            if (event->data.signal.signal_number == 2) { /* SIGINT */
+            /// Signal received (Ctrl-C, etc.)
+            if (event->data.signal.signal_number == 2) { /// SIGINT
                 done = true;
                 final_line = NULL;
             }
@@ -3603,9 +3568,9 @@ char *lle_readline(const char *prompt) {
         }
 
         case LLE_INPUT_TYPE_WINDOW_RESIZE: {
-            /* Step 7: Window resize - refresh display with new dimensions */
-            /* If completion menu is active, recalculate layout for new terminal
-             * width */
+            /// Step 7: Window resize - refresh display with new dimensions
+            /// If completion menu is active, recalculate layout for new
+            /// terminal width
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_menu_state_t *menu =
                     lle_completion_system_get_menu(
@@ -3616,7 +3581,7 @@ char *lle_readline(const char *prompt) {
                 }
             }
 
-            /* Trigger terminal-resize hook for registered widgets */
+            /// Trigger terminal-resize hook for registered widgets
             if (editor_to_use && editor_to_use->widget_hooks_manager) {
                 lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                         LLE_HOOK_TERMINAL_RESIZE,
@@ -3628,69 +3593,67 @@ char *lle_readline(const char *prompt) {
         }
 
         case LLE_INPUT_TYPE_ERROR: {
-            /* Input error */
+            /// Input error
             done = true;
             final_line = NULL;
             break;
         }
 
         case LLE_INPUT_TYPE_TIMEOUT: {
-            /* Timeout - continue loop */
+            /// Timeout - continue loop
             break;
         }
 
         default: {
-            /* Unknown event type - ignore */
+            /// Unknown event type - ignore
             break;
         }
         }
 
-        /* WATCHDOG: Check after event dispatch (catches hangs in handlers).
-         * This is a secondary check - handlers should already abort early
-         * if watchdog fired, but this catches any that don't.
-         */
+        /// WATCHDOG: Check after event dispatch (catches hangs in handlers).
+        /// This is a secondary check - handlers should already abort early
+        /// if watchdog fired, but this catches any that don't.
         if (lle_watchdog_check()) {
-            /* Don't clear here - let the loop start check handle it.
-             * Just note that we detected it after dispatch. */
+            /// Don't clear here - let the loop start check handle it.
+            /// Just note that we detected it after dispatch.
         }
 
-        /* Event processed - in Step 1 we don't free events (managed by input
-         * processor) */
+        /// Event processed - in Step 1 we don't free events (managed by input
+        /// processor)
     }
 
-    /* === WIDGET HOOK: LINE_FINISH === */
-    /* Trigger line-finish hook at end of readline (ZSH zle-line-finish) */
+    /// === WIDGET HOOK: LINE_FINISH ===
+    /// Trigger line-finish hook at end of readline (ZSH zle-line-finish)
     if (editor_to_use && editor_to_use->widget_hooks_manager) {
         lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                 LLE_HOOK_LINE_FINISH, editor_to_use);
     }
 
-    /* === STEP 10: Exit raw mode and finalize input === */
+    /// === STEP 10: Exit raw mode and finalize input ===
 
-    /* Clear the LLE readline active flag before exiting raw mode
-     * This ensures the signal handler knows we're no longer in readline */
+    /// Clear the LLE readline active flag before exiting raw mode
+    /// This ensures the signal handler knows we're no longer in readline
     set_lle_readline_active(0);
 
     lle_unix_interface_exit_raw_mode(unix_iface);
 
-    /* If we got a line, fire LINE_ACCEPTED hook then finalize input.
-     *
-     * LINE_ACCEPTED Hook (Spec 25 Section 12):
-     * This hook fires when the user has pressed Enter and the line is
-     * complete, but BEFORE dc_finalize_input() which:
-     * 1. Writes \n to move cursor down
-     * 2. Resets screen buffer state (prompt metrics lost)
-     *
-     * At this point:
-     * - Cursor is at end of command line
-     * - Screen buffer has valid prompt metrics (command_start_row, etc.)
-     * - Handlers can use relative cursor movement to modify display
-     *
-     * Primary use case: Transient prompts - replace fancy prompt with
-     * minimal version in scrollback before cursor moves to output area.
-     */
+    /// If we got a line, fire LINE_ACCEPTED hook then finalize input.
+    ///
+    /// LINE_ACCEPTED Hook (Spec 25 Section 12):
+    /// This hook fires when the user has pressed Enter and the line is
+    /// complete, but BEFORE dc_finalize_input() which:
+    /// 1. Writes \n to move cursor down
+    /// 2. Resets screen buffer state (prompt metrics lost)
+    ///
+    /// At this point:
+    /// - Cursor is at end of command line
+    /// - Screen buffer has valid prompt metrics (command_start_row, etc.)
+    /// - Handlers can use relative cursor movement to modify display
+    ///
+    /// Primary use case: Transient prompts - replace fancy prompt with
+    /// minimal version in scrollback before cursor moves to output area.
     if (final_line) {
-        /* === WIDGET HOOK: LINE_ACCEPTED === */
+        /// === WIDGET HOOK: LINE_ACCEPTED ===
         if (editor_to_use && editor_to_use->widget_hooks_manager) {
             lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                     LLE_HOOK_LINE_ACCEPTED, editor_to_use);
@@ -3699,47 +3662,47 @@ char *lle_readline(const char *prompt) {
         dc_finalize_input();
     }
 
-    /* === STEP 11: Cleanup and return === */
-    /* Step 5 enhancement: Free kill buffer */
+    /// === STEP 11: Cleanup and return ===
+    /// Step 5 enhancement: Free kill buffer
     if (kill_buffer) {
         free(kill_buffer);
     }
 
-    /* Fish-style autosuggestions: Free suggestion buffer */
+    /// Fish-style autosuggestions: Free suggestion buffer
     if (ctx.current_suggestion) {
         free(ctx.current_suggestion);
     }
 
-    /* Group 1+ migration: Cleanup keybinding manager */
+    /// Group 1+ migration: Cleanup keybinding manager
     if (keybinding_manager) {
         lle_keybinding_manager_destroy(keybinding_manager);
     }
 
-    /* Clear completion system state at end of readline to prevent memory leaks.
-     * Any active completion results from TAB presses during this edit session
-     * need to be freed before the next readline call or shell exit. */
+    /// Clear completion system state at end of readline to prevent memory
+    /// leaks. Any active completion results from TAB presses during this edit
+    /// session need to be freed before the next readline call or shell exit.
     if (editor_to_use && editor_to_use->completion_system) {
         lle_completion_system_clear(editor_to_use->completion_system);
     }
 
-    /* Step 6: Cleanup continuation state, destroy event system, buffer, and
-     * terminal */
+    /// Step 6: Cleanup continuation state, destroy event system, buffer, and
+    /// terminal
     continuation_state_cleanup(&continuation_state);
     lle_event_system_destroy(event_system);
     lle_buffer_destroy(buffer);
 
-    /* Destroy edit-session arena - frees all per-readline allocations.
-     * Currently kill_buffer and current_suggestion are still using malloc,
-     * but future allocations can use lle_arena_alloc(edit_arena, ...) and
-     * will be automatically freed here. */
+    /// Destroy edit-session arena - frees all per-readline allocations.
+    /// Currently kill_buffer and current_suggestion are still using malloc,
+    /// but future allocations can use lle_arena_alloc(edit_arena, ...) and
+    /// will be automatically freed here.
     if (edit_arena) {
         lle_arena_destroy(edit_arena);
     }
 
-    /* Clear editor's buffer pointer to prevent double-free on shell exit.
-     * The buffer was created per-readline call and assigned to the persistent
-     * editor (g_lle_integration->editor). Now that we've destroyed it, we must
-     * clear the reference so lle_editor_destroy won't try to free it again. */
+    /// Clear editor's buffer pointer to prevent double-free on shell exit.
+    /// The buffer was created per-readline call and assigned to the persistent
+    /// editor (g_lle_integration->editor). Now that we've destroyed it, we must
+    /// clear the reference so lle_editor_destroy won't try to free it again.
     if (editor_to_use) {
         editor_to_use->buffer = NULL;
         if (editor_to_use->cursor_manager) {
@@ -3749,8 +3712,52 @@ char *lle_readline(const char *prompt) {
 
     lle_terminal_abstraction_destroy(term);
 
-    /* WATCHDOG: Stop watchdog on normal exit */
+    /// WATCHDOG: Stop watchdog on normal exit
     lle_watchdog_stop();
 
     return final_line;
+}
+
+/*
+ * Read a line exactly as lle_readline(), but record nothing to
+ * history -- no in-memory entry and no history-file write. For
+ * transient prompts whose input must not pollute the user's shell
+ * history; the debugger's (lush-debug) break-prompt is the first
+ * consumer. lle_readline() is non-reentrant by contract, so setting
+ * the file-static suppression flag across the call is safe.
+ */
+char *lle_readline_no_history(const char *prompt) {
+    /// Swap the editor's history to a separate in-process debug
+    /// history for the duration of this call. Arrow-key recall and
+    /// ctrl-r reverse search both read editor->history_system, so the
+    /// swap covers both transparently: at the (lush-debug) prompt
+    /// they walk past debug commands instead of shell history, and
+    /// shell history is untouched.
+    lle_editor_t *editor = lle_get_global_editor();
+    lle_history_core_t *saved_history = NULL;
+
+    if (editor && editor->lle_pool) {
+        if (!g_debug_history) {
+            lle_history_config_t *cfg = NULL;
+            if (lle_history_config_create_default(&cfg, editor->lle_pool) ==
+                    LLE_SUCCESS &&
+                cfg) {
+                (void)lle_history_core_create(&g_debug_history,
+                                              editor->lle_pool, cfg);
+            }
+        }
+        if (g_debug_history) {
+            saved_history = editor->history_system;
+            editor->history_system = g_debug_history;
+        }
+    }
+
+    lle_set_debug_prompt_active(true);
+    char *line = lle_readline(prompt);
+    lle_set_debug_prompt_active(false);
+
+    if (editor && saved_history) {
+        editor->history_system = saved_history;
+    }
+    return line;
 }

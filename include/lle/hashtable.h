@@ -25,12 +25,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Include LLE dependencies */
+/// Include LLE dependencies
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
 
-/* Include libhashtable */
+/// Include libhashtable
 #include "ht.h"
 
 /* ============================================================================
@@ -60,10 +60,10 @@ typedef struct lle_monitored_hashtable lle_monitored_hashtable_t;
  * @brief Lock types for thread-safe hashtables
  */
 typedef enum {
-    LLE_LOCK_NONE = 0, /**< No locking */
-    LLE_LOCK_MUTEX,    /**< Mutex lock */
-    LLE_LOCK_RWLOCK,   /**< Reader-writer lock */
-    LLE_LOCK_SPINLOCK  /**< Spinlock (if available) */
+    LLE_LOCK_NONE = 0, ///< No locking
+    LLE_LOCK_MUTEX,    ///< Mutex lock
+    LLE_LOCK_RWLOCK,   ///< Reader-writer lock
+    LLE_LOCK_SPINLOCK  ///< Spinlock (if available)
 } lle_lock_type_t;
 
 /* ============================================================================
@@ -75,88 +75,88 @@ typedef enum {
  * @brief Hashtable configuration structure
  */
 struct lle_hashtable_config {
-    /* Memory management */
-    lush_memory_pool_t *memory_pool; /**< Lush memory pool */
-    bool use_memory_pool;            /**< Enable memory pool integration */
+    /// Memory management
+    lush_memory_pool_t *memory_pool; ///< Lush memory pool
+    bool use_memory_pool;            ///< Enable memory pool integration
 
-    /* Hash configuration */
-    ht_hash hash_function; /**< Hash function (default: FNV1A) */
-    ht_keyeq key_equality; /**< Key comparison function */
-    uint64_t hash_seed;    /**< Hash seed (security) */
-    bool random_seed;      /**< Use random seed */
+    /// Hash configuration
+    ht_hash hash_function; ///< Hash function (default: FNV1A)
+    ht_keyeq key_equality; ///< Key comparison function
+    uint64_t hash_seed;    ///< Hash seed (security)
+    bool random_seed;      ///< Use random seed
 
-    /* Performance tuning */
-    uint32_t initial_capacity; /**< Initial capacity hint */
-    double max_load_factor;    /**< Load factor threshold (default: 0.75) */
-    uint32_t growth_factor;    /**< Growth factor (default: 2) */
-    uint32_t max_capacity;     /**< Maximum capacity limit */
+    /// Performance tuning
+    uint32_t initial_capacity; ///< Initial capacity hint
+    double max_load_factor;    ///< Load factor threshold (default: 0.75)
+    uint32_t growth_factor;    ///< Growth factor (default: 2)
+    uint32_t max_capacity;     ///< Maximum capacity limit
 
-    /* Thread safety */
-    bool thread_safe;            /**< Enable thread safety */
-    lle_lock_type_t lock_type;   /**< Lock type (rwlock, mutex) */
-    bool allow_concurrent_reads; /**< Concurrent read optimization */
+    /// Thread safety
+    bool thread_safe;            ///< Enable thread safety
+    lle_lock_type_t lock_type;   ///< Lock type (rwlock, mutex)
+    bool allow_concurrent_reads; ///< Concurrent read optimization
 
-    /* Monitoring and debugging */
-    bool performance_monitoring; /**< Enable performance monitoring */
-    bool debug_mode;             /**< Debug output enabled */
-    const char *hashtable_name;  /**< Name for monitoring/debugging */
+    /// Monitoring and debugging
+    bool performance_monitoring; ///< Enable performance monitoring
+    bool debug_mode;             ///< Debug output enabled
+    const char *hashtable_name;  ///< Name for monitoring/debugging
 };
 
 /**
  * @brief Memory context for hashtable memory pool integration
  */
 struct lle_hashtable_memory_context {
-    lush_memory_pool_t *pool;   /**< Memory pool reference */
-    size_t allocations;         /**< Allocation counter */
-    size_t deallocations;       /**< Deallocation counter */
-    size_t bytes_allocated;     /**< Total bytes allocated */
-    size_t bytes_freed;         /**< Total bytes freed */
-    const char *hashtable_name; /**< Name for debugging */
+    lush_memory_pool_t *pool;   ///< Memory pool reference
+    size_t allocations;         ///< Allocation counter
+    size_t deallocations;       ///< Deallocation counter
+    size_t bytes_allocated;     ///< Total bytes allocated
+    size_t bytes_freed;         ///< Total bytes freed
+    const char *hashtable_name; ///< Name for debugging
 };
 
 /**
  * @brief Performance metrics for hashtable operations
  */
 struct lle_hashtable_performance_metrics {
-    /* Operation counts */
-    uint64_t insert_operations;    /**< Insert operation count */
-    uint64_t lookup_operations;    /**< Lookup operation count */
-    uint64_t delete_operations;    /**< Delete operation count */
-    uint64_t iteration_operations; /**< Iteration operation count */
+    /// Operation counts
+    uint64_t insert_operations;    ///< Insert operation count
+    uint64_t lookup_operations;    ///< Lookup operation count
+    uint64_t delete_operations;    ///< Delete operation count
+    uint64_t iteration_operations; ///< Iteration operation count
 
-    /* Timing statistics (microseconds) */
-    uint64_t total_insert_time_us; /**< Total insert time */
-    uint64_t total_lookup_time_us; /**< Total lookup time */
-    uint64_t total_delete_time_us; /**< Total delete time */
+    /// Timing statistics (microseconds)
+    uint64_t total_insert_time_us; ///< Total insert time
+    uint64_t total_lookup_time_us; ///< Total lookup time
+    uint64_t total_delete_time_us; ///< Total delete time
 
-    /* Performance characteristics */
-    uint64_t max_insert_time_us; /**< Max insert time */
-    uint64_t max_lookup_time_us; /**< Max lookup time */
-    uint64_t avg_insert_time_us; /**< Average insert time */
-    uint64_t avg_lookup_time_us; /**< Average lookup time */
+    /// Performance characteristics
+    uint64_t max_insert_time_us; ///< Max insert time
+    uint64_t max_lookup_time_us; ///< Max lookup time
+    uint64_t avg_insert_time_us; ///< Average insert time
+    uint64_t avg_lookup_time_us; ///< Average lookup time
 
-    /* Hash quality metrics */
-    uint64_t collisions;        /**< Collision count */
-    uint64_t rehash_operations; /**< Rehash count */
-    double load_factor;         /**< Current load factor */
+    /// Hash quality metrics
+    uint64_t collisions;        ///< Collision count
+    uint64_t rehash_operations; ///< Rehash count
+    double load_factor;         ///< Current load factor
 
-    /* Memory usage */
-    size_t current_capacity;   /**< Current capacity */
-    size_t used_entries;       /**< Used entry count */
-    size_t memory_usage_bytes; /**< Total memory usage */
+    /// Memory usage
+    size_t current_capacity;   ///< Current capacity
+    size_t used_entries;       ///< Used entry count
+    size_t memory_usage_bytes; ///< Total memory usage
 };
 
 /**
  * @brief String-to-string hashtable wrapper
  */
 struct lle_strstr_hashtable {
-    ht_strstr_t *ht;                         /**< Underlying libhashtable */
-    lle_hashtable_memory_context_t *mem_ctx; /**< Memory context */
-    lle_hashtable_performance_metrics_t *metrics; /**< Performance metrics */
-    lle_hashtable_config_t *config;               /**< Configuration */
-    pthread_rwlock_t *lock;                       /**< Thread safety lock */
-    bool is_concurrent;                           /**< Thread-safe flag */
-    const char *name;                             /**< Hashtable name */
+    ht_strstr_t *ht;                              ///< Underlying libhashtable
+    lle_hashtable_memory_context_t *mem_ctx;      ///< Memory context
+    lle_hashtable_performance_metrics_t *metrics; ///< Performance metrics
+    lle_hashtable_config_t *config;               ///< Configuration
+    pthread_rwlock_t *lock;                       ///< Thread safety lock
+    bool is_concurrent;                           ///< Thread-safe flag
+    const char *name;                             ///< Hashtable name
     size_t entry_count; /**< Entry count (workaround for libhashtable
                            enumeration bug) */
 };
@@ -165,13 +165,13 @@ struct lle_strstr_hashtable {
  * @brief Generic hashtable wrapper
  */
 struct lle_generic_hashtable {
-    ht_t *ht;                                /**< Underlying libhashtable */
-    lle_hashtable_memory_context_t *mem_ctx; /**< Memory context */
-    lle_hashtable_performance_metrics_t *metrics; /**< Performance metrics */
-    lle_hashtable_config_t *config;               /**< Configuration */
-    pthread_rwlock_t *lock;                       /**< Thread safety lock */
-    bool is_concurrent;                           /**< Thread-safe flag */
-    const char *name;                             /**< Hashtable name */
+    ht_t *ht;                                     ///< Underlying libhashtable
+    lle_hashtable_memory_context_t *mem_ctx;      ///< Memory context
+    lle_hashtable_performance_metrics_t *metrics; ///< Performance metrics
+    lle_hashtable_config_t *config;               ///< Configuration
+    pthread_rwlock_t *lock;                       ///< Thread safety lock
+    bool is_concurrent;                           ///< Thread-safe flag
+    const char *name;                             ///< Hashtable name
     size_t entry_count; /**< Entry count (workaround for libhashtable
                            enumeration bug) */
 };
@@ -180,33 +180,33 @@ struct lle_generic_hashtable {
  * @brief Hashtable factory for creating configured hashtables
  */
 struct lle_hashtable_factory {
-    lush_memory_pool_t *memory_pool;        /**< Memory pool reference */
-    lle_hashtable_config_t *default_config; /**< Default configuration */
-    lle_hashtable_registry_t *registry;     /**< Registry for tracking */
-    ht_callbacks_t default_callbacks;       /**< Default memory callbacks */
-    bool memory_pool_integrated;            /**< Memory pool integration flag */
+    lush_memory_pool_t *memory_pool;        ///< Memory pool reference
+    lle_hashtable_config_t *default_config; ///< Default configuration
+    lle_hashtable_registry_t *registry;     ///< Registry for tracking
+    ht_callbacks_t default_callbacks;       ///< Default memory callbacks
+    bool memory_pool_integrated;            ///< Memory pool integration flag
 };
 
 /**
  * @brief Registry for tracking all active hashtables
  */
 struct lle_hashtable_registry {
-    lle_strstr_hashtable_t **hashtables; /**< Array of hashtables */
-    size_t count;                        /**< Active hashtable count */
-    size_t capacity;                     /**< Registry capacity */
-    pthread_mutex_t lock;                /**< Registry lock */
+    lle_strstr_hashtable_t **hashtables; ///< Array of hashtables
+    size_t count;                        ///< Active hashtable count
+    size_t capacity;                     ///< Registry capacity
+    pthread_mutex_t lock;                ///< Registry lock
 };
 
 /**
  * @brief Global hashtable system
  */
 struct lle_hashtable_system {
-    lush_memory_pool_t *memory_pool;       /**< Memory pool reference */
-    lle_hashtable_factory_t *factory;      /**< Hashtable factory */
-    lle_hashtable_monitor_t *monitor;      /**< Performance monitoring */
-    lle_hashtable_registry_t *registry;    /**< Active hashtable registry */
-    lle_hashtable_config_t default_config; /**< Default configuration */
-    bool initialized;                      /**< Initialization flag */
+    lush_memory_pool_t *memory_pool;       ///< Memory pool reference
+    lle_hashtable_factory_t *factory;      ///< Hashtable factory
+    lle_hashtable_monitor_t *monitor;      ///< Performance monitoring
+    lle_hashtable_registry_t *registry;    ///< Active hashtable registry
+    lle_hashtable_config_t default_config; ///< Default configuration
+    bool initialized;                      ///< Initialization flag
 };
 
 /* ============================================================================
@@ -393,4 +393,4 @@ lle_result_t lle_hashtable_registry_add(lle_hashtable_registry_t *registry,
 lle_result_t lle_hashtable_registry_remove(lle_hashtable_registry_t *registry,
                                            lle_strstr_hashtable_t *hashtable);
 
-#endif /* LLE_HASHTABLE_H */
+#endif /// LLE_HASHTABLE_H

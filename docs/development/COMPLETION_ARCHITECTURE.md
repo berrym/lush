@@ -18,7 +18,7 @@ analyzers, the unclear source/engine boundary, the bugs that came from
 sources owning escape policy — and put the foundation in place. The
 remaining spec components are future work on top of that foundation, not
 dropped scope. [§12 Spec divergences](#12-spec-divergences) and
-[§14 Known gaps](#14-known-gaps-and-open-work) catalogue what's missing
+[§14 Known gaps](#14-known-gaps-and-open-work) catalog what's missing
 and where it is on the path forward.
 
 ---
@@ -314,7 +314,7 @@ typedef struct lle_completion_item {
 
 | Source | Default score | Rationale |
 |---|---|---|
-| Aliases | 950 | User-defined; higher than commands the user did not customise |
+| Aliases | 950 | User-defined; higher than commands the user did not customize |
 | Builtins | 900 | Always available |
 | Commands (PATH) | 800 | External, common case |
 | SSH hosts | 800–950 (incl. priority) | Configured hosts rank higher than known-only |
@@ -604,7 +604,7 @@ access (`ssh_hosts.c:356-385`). Cache TTL is 5 minutes
 (`SSH_CONFIG_CACHE_TIMEOUT = 300`, `ssh_hosts.c:35`). Cache capacity is
 `MAX_SSH_HOSTS = 1000` (`ssh_hosts.c:36`).
 
-The source recognises three prefix forms in
+The source recognizes three prefix forms in
 `context->dequoted_filename_prefix`:
 
 | Form | Behavior |
@@ -1019,7 +1019,7 @@ Three caches, with very different shapes:
 
 ### 10.1 SSH host cache
 
-`src/lle/completion/ssh_hosts.c`. Global, singleton, lazily initialised
+`src/lle/completion/ssh_hosts.c`. Global, singleton, lazily initialized
 on first call to `get_ssh_host_cache()` (line 391). Refreshes itself on
 TTL expiry (`SSH_CONFIG_CACHE_TIMEOUT = 300` seconds, line 35) or when
 the `needs_refresh` flag is set. Capacity `MAX_SSH_HOSTS = 1000` (line
@@ -1221,10 +1221,10 @@ rather than a blocker on the current architecture.
   enforcement becomes important once fuzzy matching widens the
   candidate pool.
 - **Menu char-input filtering**: `lle_completion_menu_handle_char` is
-  stubbed; the planned behaviour is "type while menu is open to filter
+  stubbed; the planned behavior is "type while menu is open to filter
   the visible items," similar to fish's UI.
-- **HEREDOC_BODY / FOR_IN_LIST / CASE_PATTERN specialisation**:
-  analyzer detects these context types; sources don't yet specialise.
+- **HEREDOC_BODY / FOR_IN_LIST / CASE_PATTERN specialization**:
+  analyzer detects these context types; sources don't yet specialize.
   Source-side work item.
 - **`expanded_directory` resolution under in-progress expansion**:
   when typed-but-unclosed `${`, `$((`, etc. are present, sources fall
@@ -1423,7 +1423,7 @@ if (res != LLE_SUCCESS) return res;
 ```
 
 **Step 4**: Add tests. Mirror `tests/lle/unit/test_ssh_completion.c` for
-behaviour-driven coverage with fixture files where appropriate; mirror
+behavior-driven coverage with fixture files where appropriate; mirror
 `tests/lle/unit/test_completion_types.c` for pure-API tests. Wire the
 test target into `meson.build`.
 

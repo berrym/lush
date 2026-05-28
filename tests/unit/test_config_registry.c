@@ -63,26 +63,18 @@
  */
 
 static const creg_option_t shell_options[] = {
-    {"mode",
-     CREG_VALUE_STRING,
-     {.type = CREG_VALUE_STRING, .data.string = "lush"},
-     "Shell mode",
-     true},
+    {   "mode",
+     CREG_VALUE_STRING,  {.type = CREG_VALUE_STRING, .data.string = "lush"},
+     "Shell mode", true     },
     {"errexit",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit on error",
-     true},
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Exit on error", true  },
     {"nounset",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Error on unset",
-     true},
-    {"xtrace",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Trace execution",
-     true},
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Error on unset", true },
+    { "xtrace",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Trace execution", true},
 };
 
 static const creg_section_t shell_section = {
@@ -97,20 +89,14 @@ static const creg_section_t shell_section = {
 
 static const creg_option_t history_options[] = {
     {"enabled",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable history",
-     true},
-    {"size",
-     CREG_VALUE_INTEGER,
-     {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
-     "History size",
-     true},
-    {"file",
-     CREG_VALUE_STRING,
-     {.type = CREG_VALUE_STRING, .data.string = "~/.lush_history"},
-     "History file",
-     true},
+     CREG_VALUE_BOOLEAN,            {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable history", true},
+    {   "size",
+     CREG_VALUE_INTEGER,           {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
+     "History size", true  },
+    {   "file",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "~/.lush_history"},
+     "History file", true  },
 };
 
 static const creg_section_t history_section = {
@@ -129,18 +115,18 @@ static const creg_section_t history_section = {
  */
 
 TEST(init_cleanup) {
-    /* Registry should already be initialized by RUN_TEST */
+    /// Registry should already be initialized by RUN_TEST
     ASSERT(config_registry_is_initialized());
 
     config_registry_cleanup();
     ASSERT(!config_registry_is_initialized());
 
-    /* Re-init for cleanup in RUN_TEST */
+    /// Re-init for cleanup in RUN_TEST
     config_registry_init();
 }
 
 TEST(double_init) {
-    /* Double init should be safe */
+    /// Double init should be safe
     creg_result_t result = config_registry_init();
     ASSERT_EQ(result, CREG_SUCCESS);
     ASSERT(config_registry_is_initialized());
@@ -175,7 +161,7 @@ TEST(register_duplicate_section) {
     creg_result_t result = config_registry_register_section(&shell_section);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Duplicate registration should be a no-op */
+    /// Duplicate registration should be a no-op
     result = config_registry_register_section(&shell_section);
     ASSERT_EQ(result, CREG_SUCCESS);
 }
@@ -260,7 +246,7 @@ TEST(set_nonexistent_key) {
 TEST(type_mismatch) {
     config_registry_register_section(&shell_section);
 
-    /* shell.mode is a string, try to set as boolean */
+    /// shell.mode is a string, try to set as boolean
     creg_result_t result = config_registry_set_boolean("shell.mode", true);
     ASSERT_EQ(result, CREG_ERROR_TYPE_MISMATCH);
 }
@@ -304,7 +290,7 @@ TEST(subscribe_exact_key) {
         config_registry_subscribe("shell.errexit", test_change_callback, NULL);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Change the value */
+    /// Change the value
     result = config_registry_set_boolean("shell.errexit", true);
     ASSERT_EQ(result, CREG_SUCCESS);
 
@@ -321,7 +307,7 @@ TEST(subscribe_section_wildcard) {
         config_registry_subscribe("shell.*", test_change_callback, NULL);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Change multiple values in shell section */
+    /// Change multiple values in shell section
     config_registry_set_boolean("shell.errexit", true);
     config_registry_set_boolean("shell.nounset", true);
 
@@ -337,7 +323,7 @@ TEST(subscribe_global_wildcard) {
         config_registry_subscribe("*", test_change_callback, NULL);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Change values in different sections */
+    /// Change values in different sections
     config_registry_set_boolean("shell.errexit", true);
     config_registry_set_integer("history.size", 5000);
 
@@ -350,7 +336,7 @@ TEST(no_notification_on_same_value) {
     notification_count = 0;
     config_registry_subscribe("shell.errexit", test_change_callback, NULL);
 
-    /* Set to same value (default is false) */
+    /// Set to same value (default is false)
     config_registry_set_boolean("shell.errexit", false);
 
     ASSERT_EQ(notification_count, 0);
@@ -362,11 +348,11 @@ TEST(unsubscribe) {
     notification_count = 0;
     config_registry_subscribe("shell.errexit", test_change_callback, NULL);
 
-    /* Unsubscribe */
+    /// Unsubscribe
     creg_result_t result = config_registry_unsubscribe(test_change_callback);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Change should not notify */
+    /// Change should not notify
     config_registry_set_boolean("shell.errexit", true);
     ASSERT_EQ(notification_count, 0);
 }
@@ -379,14 +365,14 @@ TEST(unsubscribe) {
 TEST(reset_key) {
     config_registry_register_section(&shell_section);
 
-    /* Change value */
+    /// Change value
     config_registry_set_boolean("shell.errexit", true);
 
     bool val;
     config_registry_get_boolean("shell.errexit", &val);
     ASSERT(val == true);
 
-    /* Reset to default */
+    /// Reset to default
     creg_result_t result = config_registry_reset("shell.errexit");
     ASSERT_EQ(result, CREG_SUCCESS);
 
@@ -397,16 +383,16 @@ TEST(reset_key) {
 TEST(reset_section) {
     config_registry_register_section(&shell_section);
 
-    /* Change multiple values */
+    /// Change multiple values
     config_registry_set_boolean("shell.errexit", true);
     config_registry_set_boolean("shell.nounset", true);
     config_registry_set_boolean("shell.xtrace", true);
 
-    /* Reset section */
+    /// Reset section
     creg_result_t result = config_registry_reset_section("shell");
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* All should be back to defaults */
+    /// All should be back to defaults
     bool val;
     config_registry_get_boolean("shell.errexit", &val);
     ASSERT(val == false);
@@ -419,14 +405,14 @@ TEST(reset_section) {
 TEST(is_default) {
     config_registry_register_section(&shell_section);
 
-    /* Initially should be default */
+    /// Initially should be default
     ASSERT(config_registry_is_default("shell.errexit"));
 
-    /* Change it */
+    /// Change it
     config_registry_set_boolean("shell.errexit", true);
     ASSERT(!config_registry_is_default("shell.errexit"));
 
-    /* Reset */
+    /// Reset
     config_registry_reset("shell.errexit");
     ASSERT(config_registry_is_default("shell.errexit"));
 }
@@ -434,10 +420,10 @@ TEST(is_default) {
 TEST(get_default_value_explicit) {
     config_registry_register_section(&history_section);
 
-    /* Change the current value */
+    /// Change the current value
     config_registry_set_integer("history.size", 99999);
 
-    /* Get default should return original */
+    /// Get default should return original
     creg_value_t def;
     creg_result_t result = config_registry_get_default("history.size", &def);
     ASSERT_EQ(result, CREG_SUCCESS);
@@ -453,12 +439,12 @@ TEST(save_and_load) {
     config_registry_register_section(&shell_section);
     config_registry_register_section(&history_section);
 
-    /* Set non-default values */
+    /// Set non-default values
     config_registry_set_string("shell.mode", "bash");
     config_registry_set_boolean("shell.errexit", true);
     config_registry_set_integer("history.size", 50000);
 
-    /* Save to temp file */
+    /// Save to temp file
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
@@ -467,19 +453,19 @@ TEST(save_and_load) {
     creg_result_t result = config_registry_save(tmpfile);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Reset to defaults */
+    /// Reset to defaults
     config_registry_reset_all();
 
-    /* Verify reset */
+    /// Verify reset
     char buf[64];
     config_registry_get_string("shell.mode", buf, sizeof(buf));
     ASSERT_STR_EQ(buf, "lush");
 
-    /* Load from file */
+    /// Load from file
     result = config_registry_load(tmpfile);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Verify loaded values */
+    /// Verify loaded values
     config_registry_get_string("shell.mode", buf, sizeof(buf));
     ASSERT_STR_EQ(buf, "bash");
 
@@ -491,17 +477,17 @@ TEST(save_and_load) {
     config_registry_get_integer("history.size", &size);
     ASSERT_EQ(size, 50000);
 
-    /* Cleanup */
+    /// Cleanup
     unlink(tmpfile);
 }
 
 TEST(save_sparse_format) {
     config_registry_register_section(&shell_section);
 
-    /* Only change one value */
+    /// Only change one value
     config_registry_set_boolean("shell.errexit", true);
 
-    /* Save to temp file */
+    /// Save to temp file
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
@@ -510,7 +496,7 @@ TEST(save_sparse_format) {
     creg_result_t result = config_registry_save(tmpfile);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /* Read file and verify sparse format (only non-default values) */
+    /// Read file and verify sparse format (only non-default values)
     FILE *f = fopen(tmpfile, "r");
     ASSERT(f != NULL);
 
@@ -519,10 +505,10 @@ TEST(save_sparse_format) {
     content[len] = '\0';
     fclose(f);
 
-    /* Should contain errexit = true */
+    /// Should contain errexit = true
     ASSERT(strstr(content, "errexit = true") != NULL);
 
-    /* Should NOT contain mode, nounset, xtrace (they're at defaults) */
+    /// Should NOT contain mode, nounset, xtrace (they're at defaults)
     ASSERT(strstr(content, "mode =") == NULL);
     ASSERT(strstr(content, "nounset =") == NULL);
     ASSERT(strstr(content, "xtrace =") == NULL);
@@ -539,7 +525,7 @@ TEST(load_nonexistent_file) {
 TEST(load_empty_file) {
     config_registry_register_section(&shell_section);
 
-    /* Create empty temp file */
+    /// Create empty temp file
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
@@ -614,10 +600,9 @@ static void test_sync_from_runtime(void) { sync_from_runtime_called++; }
 TEST(on_load_hook) {
     creg_option_t opts[] = {
         {"test",
-         CREG_VALUE_BOOLEAN,
-         {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL,
-         true}};
+         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         NULL, true}
+    };
     creg_section_t sec = {
         .name = "test",
         .options = opts,
@@ -627,7 +612,7 @@ TEST(on_load_hook) {
 
     config_registry_register_section(&sec);
 
-    /* Create temp file with content */
+    /// Create temp file with content
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
@@ -644,10 +629,9 @@ TEST(on_load_hook) {
 TEST(sync_hooks) {
     creg_option_t opts[] = {
         {"test",
-         CREG_VALUE_BOOLEAN,
-         {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL,
-         true}};
+         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         NULL, true}
+    };
     creg_section_t sec = {
         .name = "test",
         .options = opts,
@@ -682,7 +666,7 @@ TEST(mode_default_unregistered_option_fails) {
 
 TEST(mode_default_type_mismatch_fails) {
     config_registry_register_section(&shell_section);
-    /* errexit is BOOLEAN; passing INTEGER should fail */
+    /// errexit is BOOLEAN; passing INTEGER should fail
     creg_value_t v = creg_value_integer(42);
     creg_result_t r =
         config_registry_set_mode_default("shell.errexit", SHELL_MODE_LUSH, &v);
@@ -692,27 +676,27 @@ TEST(mode_default_type_mismatch_fails) {
 TEST(mode_default_applies_for_registered_mode) {
     config_registry_register_section(&shell_section);
 
-    /* Register a per-mode default: errexit=true under POSIX, false elsewhere
-     * (default). */
+    /// Register a per-mode default: errexit=true under POSIX, false elsewhere
+    /// (default).
     creg_value_t posix_default = creg_value_boolean(true);
     ASSERT_EQ(config_registry_set_mode_default(
                   "shell.errexit", SHELL_MODE_POSIX, &posix_default),
               CREG_SUCCESS);
 
-    /* Apply POSIX defaults: errexit should now be true. */
+    /// Apply POSIX defaults: errexit should now be true.
     ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_POSIX),
               CREG_SUCCESS);
     bool got = false;
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
     ASSERT(got == true);
 
-    /* Apply LUSH defaults: errexit has no per-mode default for LUSH, so
-     * the value persists from the prior apply. */
+    /// Apply LUSH defaults: errexit has no per-mode default for LUSH, so
+    /// the value persists from the prior apply.
     ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_LUSH),
               CREG_SUCCESS);
     got = false;
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
-    ASSERT(got == true); /* unchanged because LUSH has no override */
+    ASSERT(got == true); /// unchanged because LUSH has no override
 }
 
 TEST(mode_default_replaces_prior_value_for_same_mode) {
@@ -732,7 +716,7 @@ TEST(mode_default_replaces_prior_value_for_same_mode) {
               CREG_SUCCESS);
     bool got = true;
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
-    ASSERT(got == false); /* second registration won */
+    ASSERT(got == false); /// second registration won
 }
 
 TEST(mode_default_independent_per_mode) {
@@ -748,18 +732,18 @@ TEST(mode_default_independent_per_mode) {
                                                SHELL_MODE_POSIX, &posix_v),
               CREG_SUCCESS);
 
-    /* Apply BASH defaults: errexit -> true */
+    /// Apply BASH defaults: errexit -> true
     config_registry_apply_mode_defaults(SHELL_MODE_BASH);
     bool got;
     config_registry_get_boolean("shell.errexit", &got);
     ASSERT(got == true);
 
-    /* Apply POSIX defaults: errexit -> false */
+    /// Apply POSIX defaults: errexit -> false
     config_registry_apply_mode_defaults(SHELL_MODE_POSIX);
     config_registry_get_boolean("shell.errexit", &got);
     ASSERT(got == false);
 
-    /* Back to BASH: errexit -> true again (re-seed-every-time). */
+    /// Back to BASH: errexit -> true again (re-seed-every-time).
     config_registry_apply_mode_defaults(SHELL_MODE_BASH);
     config_registry_get_boolean("shell.errexit", &got);
     ASSERT(got == true);

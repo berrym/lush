@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase3_day9.c
+ * @brief Functional tests for history phase3 day9
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_history_phase3_day9.c - Interactive Search Tests (Spec 09 Phase 3 Day 9)
  *
  * Comprehensive test suite for the LLE History Interactive Search (Ctrl+R):
@@ -19,14 +27,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test memory mock provided by test_memory_mock.c */
+/// Test memory mock provided by test_memory_mock.c
 
-/* Test result tracking */
+/// Test result tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Helper macros */
+/// Helper macros
 #define TEST_START(name)                                                       \
     do {                                                                       \
         tests_run++;                                                           \
@@ -82,33 +90,33 @@ static int tests_failed = 0;
 void test_session_init(void) {
     TEST_START("Interactive Search Session Init");
 
-    /* Create history core */
+    /// Create history core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Add some test entries */
+    /// Add some test entries
     lle_history_add_entry(core, "ls -la", 0, NULL);
     lle_history_add_entry(core, "cd /tmp", 0, NULL);
     lle_history_add_entry(core, "git status", 0, NULL);
 
-    /* Initialize search session */
+    /// Initialize search session
     result = lle_history_interactive_search_init(core, "current line", 0);
     ASSERT_EQ(result, LLE_SUCCESS, "Session init should succeed");
 
-    /* Check state */
+    /// Check state
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_TRUE(state == LLE_SEARCH_STATE_ACTIVE ||
                     state == LLE_SEARCH_STATE_NO_RESULTS,
                 "State should be active or no results");
 
-    /* Check query is empty initially */
+    /// Check query is empty initially
     const char *query = lle_history_interactive_search_get_query();
     ASSERT_NOT_NULL(query, "Query should not be NULL");
     ASSERT_EQ(strlen(query), 0, "Initial query should be empty");
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -118,16 +126,16 @@ void test_session_init(void) {
 void test_session_init_null_params(void) {
     TEST_START("Interactive Search Init - NULL Parameters");
 
-    /* NULL core should fail */
+    /// NULL core should fail
     lle_result_t result = lle_history_interactive_search_init(NULL, "line", 0);
     ASSERT_TRUE(result != LLE_SUCCESS, "Init with NULL core should fail");
 
-    /* NULL line should be accepted (some systems allow it) */
+    /// NULL line should be accepted (some systems allow it)
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
     result = lle_history_interactive_search_init(core, NULL, 0);
-    /* Should either succeed or fail gracefully */
+    /// Should either succeed or fail gracefully
 
     if (result == LLE_SUCCESS) {
         lle_history_interactive_search_cancel();
@@ -152,10 +160,10 @@ void test_query_update(void) {
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "git commit", 0, NULL);
 
-    /* Init session */
+    /// Init session
     lle_history_interactive_search_init(core, "", 0);
 
-    /* Build query character by character */
+    /// Build query character by character
     lle_history_interactive_search_update_query('g');
     const char *query1 = lle_history_interactive_search_get_query();
     ASSERT_NOT_NULL(query1, "Query should not be NULL");
@@ -169,7 +177,7 @@ void test_query_update(void) {
     const char *query3 = lle_history_interactive_search_get_query();
     ASSERT_TRUE(strcmp(query3, "git") == 0, "Query should be 'git'");
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -184,7 +192,7 @@ void test_query_backspace(void) {
 
     lle_history_add_entry(core, "test command", 0, NULL);
 
-    /* Init and build query */
+    /// Init and build query
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('a');
     lle_history_interactive_search_update_query('b');
@@ -193,7 +201,7 @@ void test_query_backspace(void) {
     const char *query1 = lle_history_interactive_search_get_query();
     ASSERT_TRUE(strcmp(query1, "abc") == 0, "Query should be 'abc'");
 
-    /* Backspace */
+    /// Backspace
     lle_history_interactive_search_backspace();
     const char *query2 = lle_history_interactive_search_get_query();
     ASSERT_TRUE(strcmp(query2, "ab") == 0,
@@ -204,7 +212,7 @@ void test_query_backspace(void) {
     ASSERT_TRUE(strcmp(query3, "a") == 0,
                 "Query should be 'a' after second backspace");
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -217,18 +225,18 @@ void test_query_backspace_empty(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Init with empty query */
+    /// Init with empty query
     lle_history_interactive_search_init(core, "", 0);
 
-    /* Backspace on empty should not crash */
+    /// Backspace on empty should not crash
     (void)lle_history_interactive_search_backspace();
-    /* Should either succeed or return appropriate error */
+    /// Should either succeed or return appropriate error
 
     const char *query = lle_history_interactive_search_get_query();
     ASSERT_NOT_NULL(query, "Query should not be NULL");
     ASSERT_EQ(strlen(query), 0, "Query should still be empty");
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -246,27 +254,27 @@ void test_navigation_next(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add multiple matching entries */
+    /// Add multiple matching entries
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "git commit", 0, NULL);
     lle_history_add_entry(core, "git push", 0, NULL);
 
-    /* Init and search for "git" */
+    /// Init and search for "git"
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('g');
     lle_history_interactive_search_update_query('i');
     lle_history_interactive_search_update_query('t');
 
-    /* Should find matches */
+    /// Should find matches
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_ACTIVE, "Should have active results");
 
-    /* Navigate to next result */
+    /// Navigate to next result
     (void)lle_history_interactive_search_next();
-    /* Should either succeed or indicate end of results */
+    /// Should either succeed or indicate end of results
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -283,17 +291,17 @@ void test_navigation_prev(void) {
     lle_history_add_entry(core, "test2", 0, NULL);
     lle_history_add_entry(core, "test3", 0, NULL);
 
-    /* Init and search */
+    /// Init and search
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('t');
     lle_history_interactive_search_update_query('e');
 
-    /* Navigate next then prev */
+    /// Navigate next then prev
     lle_history_interactive_search_next();
     (void)lle_history_interactive_search_prev();
-    /* Should either succeed or indicate start of results */
+    /// Should either succeed or indicate start of results
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -308,22 +316,22 @@ void test_navigation_no_results(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Init and search for non-existent */
+    /// Init and search for non-existent
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('x');
     lle_history_interactive_search_update_query('y');
     lle_history_interactive_search_update_query('z');
 
-    /* Should have no results */
+    /// Should have no results
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_NO_RESULTS, "Should have no results");
 
-    /* Navigation should not crash */
+    /// Navigation should not crash
     lle_history_interactive_search_next();
     lle_history_interactive_search_prev();
 
-    /* Cleanup */
+    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
 
@@ -343,16 +351,16 @@ void test_accept_search(void) {
 
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /* Init and search */
+    /// Init and search
     lle_history_interactive_search_init(core, "original", 0);
     lle_history_interactive_search_update_query('l');
     lle_history_interactive_search_update_query('s');
 
-    /* Accept should return the matched command */
+    /// Accept should return the matched command
     const char *result = lle_history_interactive_search_accept();
     ASSERT_NOT_NULL(result, "Accept should return result");
 
-    /* State should be inactive after accept */
+    /// State should be inactive after accept
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_INACTIVE,
@@ -371,17 +379,17 @@ void test_cancel_search(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Init and search */
+    /// Init and search
     lle_history_interactive_search_init(core, "original", 0);
     lle_history_interactive_search_update_query('t');
 
-    /* Cancel should restore original line */
+    /// Cancel should restore original line
     const char *result = lle_history_interactive_search_cancel();
     ASSERT_NOT_NULL(result, "Cancel should return original line");
     ASSERT_TRUE(strcmp(result, "original") == 0,
                 "Should restore original line");
 
-    /* State should be inactive */
+    /// State should be inactive
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_INACTIVE,
@@ -400,13 +408,13 @@ void test_accept_no_results(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Search for non-existent */
+    /// Search for non-existent
     lle_history_interactive_search_init(core, "original", 0);
     lle_history_interactive_search_update_query('x');
 
-    /* Accept with no results should not crash */
+    /// Accept with no results should not crash
     (void)lle_history_interactive_search_accept();
-    /* Should return original or empty string */
+    /// Should return original or empty string
 
     lle_history_core_destroy(core);
 
@@ -426,20 +434,20 @@ void test_state_transitions(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Initial state should be inactive */
+    /// Initial state should be inactive
     lle_interactive_search_state_t state1 =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state1, LLE_SEARCH_STATE_INACTIVE,
               "Initial state should be inactive");
 
-    /* After init, should be active or no results */
+    /// After init, should be active or no results
     lle_history_interactive_search_init(core, "", 0);
     lle_interactive_search_state_t state2 =
         lle_history_interactive_search_get_state();
     ASSERT_TRUE(state2 != LLE_SEARCH_STATE_INACTIVE,
                 "State should not be inactive after init");
 
-    /* After cancel, should be inactive */
+    /// After cancel, should be inactive
     lle_history_interactive_search_cancel();
     lle_interactive_search_state_t state3 =
         lle_history_interactive_search_get_state();
@@ -459,12 +467,12 @@ void test_search_with_results_state(void) {
 
     lle_history_add_entry(core, "test command", 0, NULL);
 
-    /* Search for existing command */
+    /// Search for existing command
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('t');
     lle_history_interactive_search_update_query('e');
 
-    /* Should have active results */
+    /// Should have active results
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_ACTIVE,
@@ -484,12 +492,12 @@ void test_search_no_results_state(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Search for non-existent */
+    /// Search for non-existent
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('z');
     lle_history_interactive_search_update_query('z');
 
-    /* Should have no results state */
+    /// Should have no results state
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_NO_RESULTS, "State should be no results");
@@ -513,15 +521,15 @@ void test_prompt_string(void) {
 
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /* Init search */
+    /// Init search
     lle_history_interactive_search_init(core, "", 0);
 
-    /* Get prompt string */
+    /// Get prompt string
     const char *prompt = lle_history_interactive_search_get_prompt();
     ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
 
-    /* Prompt should contain search indicator */
-    /* Common formats: "(reverse-i-search)", "bck-i-search", etc. */
+    /// Prompt should contain search indicator
+    /// Common formats: "(reverse-i-search)", "bck-i-search", etc.
 
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
@@ -543,12 +551,12 @@ void test_multiple_sessions(void) {
     lle_history_add_entry(core, "test1", 0, NULL);
     lle_history_add_entry(core, "test2", 0, NULL);
 
-    /* First session */
+    /// First session
     lle_history_interactive_search_init(core, "line1", 0);
     lle_history_interactive_search_update_query('t');
     lle_history_interactive_search_cancel();
 
-    /* Second session should work independently */
+    /// Second session should work independently
     lle_history_interactive_search_init(core, "line2", 0);
     lle_history_interactive_search_update_query('t');
     const char *query = lle_history_interactive_search_get_query();
@@ -564,17 +572,17 @@ void test_multiple_sessions(void) {
 void test_operations_without_init(void) {
     TEST_START("Interactive Search Operations Without Init");
 
-    /* Operations without init should fail gracefully */
+    /// Operations without init should fail gracefully
 
-    /* Update query without init */
+    /// Update query without init
     lle_result_t result1 = lle_history_interactive_search_update_query('a');
     ASSERT_TRUE(result1 != LLE_SUCCESS, "Update without init should fail");
 
-    /* Backspace without init */
+    /// Backspace without init
     lle_result_t result2 = lle_history_interactive_search_backspace();
     ASSERT_TRUE(result2 != LLE_SUCCESS, "Backspace without init should fail");
 
-    /* Next without init */
+    /// Next without init
     lle_result_t result3 = lle_history_interactive_search_next();
     ASSERT_TRUE(result3 != LLE_SUCCESS, "Next without init should fail");
 

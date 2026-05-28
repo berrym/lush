@@ -18,9 +18,9 @@
 #include "lle/completion/completion_menu_state.h"
 #include <string.h>
 
-// ============================================================================
-// DEFAULT CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// DEFAULT CONFIGURATION
+/// ============================================================================
 
 /**
  * @brief Get default menu configuration
@@ -36,9 +36,9 @@ lle_completion_menu_config_t lle_completion_menu_default_config(void) {
     return config;
 }
 
-// ============================================================================
-// CATEGORY POSITION CALCULATION
-// ============================================================================
+/// ============================================================================
+/// CATEGORY POSITION CALCULATION
+/// ============================================================================
 
 /**
  * @brief Calculate category positions in result set
@@ -57,7 +57,7 @@ calculate_category_positions(lle_completion_menu_state_t *state) {
         return LLE_SUCCESS;
     }
 
-    // Count unique categories
+    /// Count unique categories
     size_t cat_count = 0;
     lle_completion_type_t current_type = LLE_COMPLETION_TYPE_UNKNOWN;
 
@@ -74,14 +74,14 @@ calculate_category_positions(lle_completion_menu_state_t *state) {
         return LLE_SUCCESS;
     }
 
-    // Allocate category positions array
+    /// Allocate category positions array
     state->category_positions =
         (size_t *)lle_pool_alloc(sizeof(size_t) * cat_count);
     if (!state->category_positions) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Fill category positions
+    /// Fill category positions
     size_t cat_index = 0;
     current_type = LLE_COMPLETION_TYPE_UNKNOWN;
 
@@ -96,9 +96,9 @@ calculate_category_positions(lle_completion_menu_state_t *state) {
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Create a new completion menu state
@@ -117,7 +117,7 @@ lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate state structure
+    /// Allocate state structure
     lle_completion_menu_state_t *new_state =
         (lle_completion_menu_state_t *)lle_pool_alloc(
             sizeof(lle_completion_menu_state_t));
@@ -125,25 +125,25 @@ lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize state
+    /// Initialize state
     new_state->result = result;
     new_state->selected_index = 0;
     new_state->first_visible = 0;
     new_state->visible_count = 0;
-    new_state->target_column = 0; // Sticky column for UP/DOWN navigation
+    new_state->target_column = 0; /// Sticky column for UP/DOWN navigation
     new_state->category_positions = NULL;
     new_state->category_count = 0;
-    new_state->menu_active = true; // Menu is active when created
+    new_state->menu_active = true; /// Menu is active when created
     new_state->memory_pool = memory_pool;
 
-    // Copy configuration or use defaults
+    /// Copy configuration or use defaults
     if (config) {
         new_state->config = *config;
     } else {
         new_state->config = lle_completion_menu_default_config();
     }
 
-    // Calculate visible count
+    /// Calculate visible count
     size_t total_items = result->count;
     if (new_state->config.enable_scrolling) {
         new_state->visible_count =
@@ -154,7 +154,7 @@ lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
         new_state->visible_count = total_items;
     }
 
-    // Calculate category positions
+    /// Calculate category positions
     lle_result_t res = calculate_category_positions(new_state);
     if (res != LLE_SUCCESS) {
         lle_pool_free(new_state);
@@ -176,21 +176,21 @@ lle_completion_menu_state_free(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Free category positions if allocated
+    /// Free category positions if allocated
     if (state->category_positions) {
         lle_pool_free(state->category_positions);
     }
 
-    // Free state structure
-    // Note: result is owned by caller, so we don't free it
+    /// Free state structure
+    /// Note: result is owned by caller, so we don't free it
     lle_pool_free(state);
 
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// STATE QUERIES
-// ============================================================================
+/// ============================================================================
+/// STATE QUERIES
+/// ============================================================================
 
 /**
  * @brief Check if menu should be shown based on item count
@@ -310,9 +310,9 @@ size_t lle_completion_menu_get_category_count(
     return state->category_count;
 }
 
-// ============================================================================
-// LAYOUT FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LAYOUT FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Calculate visual width of text (excluding ANSI codes)
@@ -357,10 +357,10 @@ lle_completion_menu_update_layout(lle_completion_menu_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Store terminal width
+    /// Store terminal width
     state->terminal_width = terminal_width > 0 ? terminal_width : 80;
 
-    // Calculate max item width
+    /// Calculate max item width
     size_t max_item_width = 0;
     if (state->result && state->result->count > 0) {
         for (size_t i = 0; i < state->result->count; i++) {
@@ -373,16 +373,16 @@ lle_completion_menu_update_layout(lle_completion_menu_state_t *state,
         }
     }
 
-    // Add padding for selection indicator and spacing
-    const size_t padding = 4; // "  " separator + selection indicator space
+    /// Add padding for selection indicator and spacing
+    const size_t padding = 4; /// "  " separator + selection indicator space
     state->column_width = max_item_width + padding;
 
-    // Ensure minimum column width
+    /// Ensure minimum column width
     if (state->column_width < 10) {
         state->column_width = 10;
     }
 
-    // Calculate number of columns that fit
+    /// Calculate number of columns that fit
     if (state->column_width >= state->terminal_width) {
         state->num_columns = 1;
     } else {
@@ -390,7 +390,7 @@ lle_completion_menu_update_layout(lle_completion_menu_state_t *state,
         if (state->num_columns == 0) {
             state->num_columns = 1;
         }
-        // Cap at reasonable maximum
+        /// Cap at reasonable maximum
         if (state->num_columns > 6) {
             state->num_columns = 6;
         }
@@ -407,7 +407,7 @@ lle_completion_menu_update_layout(lle_completion_menu_state_t *state,
 size_t
 lle_completion_menu_get_num_columns(const lle_completion_menu_state_t *state) {
     if (!state || state->num_columns == 0) {
-        return 1; // Default to single column
+        return 1; /// Default to single column
     }
 
     return state->num_columns;

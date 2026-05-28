@@ -17,26 +17,26 @@
 #include <string.h>
 #include <time.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_MAX_ENTRIES 100
-#define DEFAULT_ENTRY_TTL_MS 300000 /* 5 minutes */
+#define DEFAULT_ENTRY_TTL_MS 300000 // 5 minutes
 
-/* Edit cache implementation */
+// Edit cache implementation
 struct lle_edit_cache {
     lle_memory_pool_t *memory_pool;
     lle_edit_cache_config_t config;
 
-    /* LRU list (most recent at head) */
+    // LRU list (most recent at head)
     lle_edit_cache_entry_t *head;
     lle_edit_cache_entry_t *tail;
 
-    /* Statistics */
+    // Statistics
     lle_edit_cache_stats_t stats;
 
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static void move_to_head(lle_edit_cache_t *cache,
                          lle_edit_cache_entry_t *entry);
 static void remove_from_list(lle_edit_cache_t *cache,
@@ -89,7 +89,7 @@ lle_result_t lle_edit_cache_create(lle_edit_cache_t **cache,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* memory_pool can be NULL - will use global pool */
+    // memory_pool can be NULL - will use global pool
 
     lle_edit_cache_t *new_cache = lle_pool_alloc(sizeof(lle_edit_cache_t));
     if (!new_cache) {
@@ -98,7 +98,7 @@ lle_result_t lle_edit_cache_create(lle_edit_cache_t **cache,
 
     memset(new_cache, 0, sizeof(lle_edit_cache_t));
 
-    new_cache->memory_pool = memory_pool; /* Can be NULL */
+    new_cache->memory_pool = memory_pool; // Can be NULL
 
     if (config) {
         memcpy(&new_cache->config, config, sizeof(lle_edit_cache_config_t));
@@ -126,7 +126,7 @@ lle_result_t lle_edit_cache_destroy(lle_edit_cache_t *cache) {
     }
 
     cache->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -152,14 +152,14 @@ lle_result_t lle_edit_cache_lookup(lle_edit_cache_t *cache,
 
     *entry = NULL;
 
-    /* Search for entry */
+    // Search for entry
     lle_edit_cache_entry_t *current = cache->head;
     while (current) {
         if (current->history_index == history_index) {
-            /* Check if expired */
+            // Check if expired
             if (cache->config.entry_ttl_ms > 0 &&
                 is_expired(current, cache->config.entry_ttl_ms)) {
-                /* Remove expired entry */
+                // Remove expired entry
                 remove_from_list(cache, current);
                 cache->stats.current_entries--;
                 cache->stats.expirations++;
@@ -167,17 +167,17 @@ lle_result_t lle_edit_cache_lookup(lle_edit_cache_t *cache,
                 return LLE_SUCCESS;
             }
 
-            /* Cache hit */
+            // Cache hit
             *entry = current;
             cache->stats.hits++;
 
-            /* Update access metadata */
+            // Update access metadata
             if (cache->config.track_access) {
                 clock_gettime(CLOCK_MONOTONIC, &current->last_accessed);
                 current->access_count++;
             }
 
-            /* Move to head (most recently used) */
+            // Move to head (most recently used)
             move_to_head(cache, current);
 
             return LLE_SUCCESS;
@@ -185,7 +185,7 @@ lle_result_t lle_edit_cache_lookup(lle_edit_cache_t *cache,
         current = current->next;
     }
 
-    /* Cache miss */
+    // Cache miss
     cache->stats.misses++;
 
     return LLE_SUCCESS;
@@ -212,22 +212,22 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if entry already exists */
+    // Check if entry already exists
     lle_edit_cache_entry_t *existing = NULL;
     lle_edit_cache_lookup(cache, history_index, &existing);
 
     if (existing) {
-        /* Update existing entry */
-        /* For simplicity, we'll invalidate and re-insert */
+        // Update existing entry
+        // For simplicity, we'll invalidate and re-insert
         lle_edit_cache_invalidate(cache, history_index);
     }
 
-    /* Check if we need to evict */
+    // Check if we need to evict
     if (cache->stats.current_entries >= cache->config.max_entries) {
         evict_lru(cache);
     }
 
-    /* Allocate new entry */
+    // Allocate new entry
     lle_edit_cache_entry_t *new_entry =
         lle_pool_alloc(sizeof(lle_edit_cache_entry_t));
     if (!new_entry) {
@@ -239,7 +239,7 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
     new_entry->history_index = history_index;
     new_entry->entry_id = entry_id;
 
-    /* Copy original text */
+    // Copy original text
     new_entry->original_text = lle_pool_alloc(original_length + 1);
     if (!new_entry->original_text) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -248,7 +248,7 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
     new_entry->original_text[original_length] = '\0';
     new_entry->original_length = original_length;
 
-    /* Copy reconstructed text if provided */
+    // Copy reconstructed text if provided
     if (reconstructed_text && reconstructed_length > 0) {
         new_entry->reconstructed_text =
             lle_pool_alloc(reconstructed_length + 1);
@@ -261,12 +261,12 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
         new_entry->reconstructed_length = reconstructed_length;
     }
 
-    /* Set timestamps */
+    // Set timestamps
     clock_gettime(CLOCK_MONOTONIC, &new_entry->cached_at);
     new_entry->last_accessed = new_entry->cached_at;
     new_entry->access_count = 0;
 
-    /* Add to head of list */
+    // Add to head of list
     new_entry->next = cache->head;
     new_entry->prev = NULL;
 
@@ -296,7 +296,7 @@ lle_result_t lle_edit_cache_invalidate(lle_edit_cache_t *cache,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Find and remove entry */
+    // Find and remove entry
     lle_edit_cache_entry_t *current = cache->head;
     while (current) {
         if (current->history_index == history_index) {
@@ -324,7 +324,7 @@ lle_result_t lle_edit_cache_clear(lle_edit_cache_t *cache) {
     cache->tail = NULL;
     cache->stats.current_entries = 0;
 
-    /* Memory pool owns allocations */
+    // Memory pool owns allocations
 
     return LLE_SUCCESS;
 }
@@ -366,7 +366,7 @@ lle_result_t lle_edit_cache_evict_expired(lle_edit_cache_t *cache,
     if (cache->config.entry_ttl_ms == 0) {
         if (expired_count)
             *expired_count = 0;
-        return LLE_SUCCESS; /* No TTL configured */
+        return LLE_SUCCESS; // No TTL configured
     }
 
     size_t count = 0;
@@ -405,10 +405,10 @@ lle_result_t lle_edit_cache_evict_expired(lle_edit_cache_t *cache,
 static void move_to_head(lle_edit_cache_t *cache,
                          lle_edit_cache_entry_t *entry) {
     if (cache->head == entry) {
-        return; /* Already at head */
+        return; // Already at head
     }
 
-    /* Remove from current position */
+    // Remove from current position
     if (entry->prev) {
         entry->prev->next = entry->next;
     }
@@ -419,7 +419,7 @@ static void move_to_head(lle_edit_cache_t *cache,
         cache->tail = entry->prev;
     }
 
-    /* Add to head */
+    // Add to head
     entry->next = cache->head;
     entry->prev = NULL;
 
@@ -459,7 +459,7 @@ static void remove_from_list(lle_edit_cache_t *cache,
  */
 static void evict_lru(lle_edit_cache_t *cache) {
     if (!cache->tail) {
-        return; /* Cache is empty */
+        return; // Cache is empty
     }
 
     lle_edit_cache_entry_t *lru = cache->tail;

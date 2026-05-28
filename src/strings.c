@@ -250,10 +250,10 @@ size_t str_skip_whitespace(char *s) {
  * @return Number of characters stripped
  */
 size_t str_strip_leading_whitespace(char *s) {
-    char buf[MAXLINE + 1] = {'\0'}; // buffer to store modified string
-    size_t offset = 0;              // loop counter
+    char buf[MAXLINE + 1] = {'\0'}; /// buffer to store modified string
+    size_t offset = 0;              /// loop counter
 
-    // Iterate over leading whitespace ignoring it
+    /// Iterate over leading whitespace ignoring it
     for (offset = 0; offset <= strlen(s) && isspace((int)s[offset]); offset++)
         ;
 
@@ -261,7 +261,7 @@ size_t str_strip_leading_whitespace(char *s) {
         return 0;
     }
 
-    // Copy the rest of the string into buf
+    /// Copy the rest of the string into buf
     for (size_t i = 0; s[offset]; offset++, i++) {
         buf[i] = s[offset];
     }
@@ -270,7 +270,7 @@ size_t str_strip_leading_whitespace(char *s) {
         return 0;
     }
 
-    // Overwrite s with buf
+    /// Overwrite s with buf
     memset(s, '\0', strlen(s));
     strcpy(s, buf);
 
@@ -389,13 +389,13 @@ char find_opening_quote_type(char *s) {
  * @return Index of last matching quote, or 0 if not found/imbalanced
  */
 size_t find_last_quote(char *s) {
-    // check the type of quote we have
+    /// check the type of quote we have
     char quote = s[0];
     if (quote != '\'' && quote != '"' && quote != '`') {
         return 0;
     }
 
-    // find the matching closing quote
+    /// find the matching closing quote
     size_t i = 0, last = 0, count = 1, len = strlen(s);
     while (++i < len) {
         if (s[i] == quote) {
@@ -409,7 +409,7 @@ size_t find_last_quote(char *s) {
         }
     }
 
-    // if quotes are balanced return the index of the last quote
+    /// if quotes are balanced return the index of the last quote
     if ((count % 2) == 0) {
         return last;
     }
@@ -427,16 +427,16 @@ size_t find_last_quote(char *s) {
  * @return Index of closing quote, or 0 if not found
  */
 size_t find_closing_quote(char *s) {
-    // check the type of quote we have
+    /// check the type of quote we have
     char quote = s[0];
     if (quote != '\'' && quote != '"' && quote != '`') {
         return 0;
     }
-    // find the matching closing quote
+    /// find the matching closing quote
     size_t i = 0, len = strlen(s);
     while (++i < len) {
         if (s[i] == '\\' && i + 1 < len) {
-            // Skip escaped character (including escaped quotes)
+            /// Skip escaped character (including escaped quotes)
             i++;
             continue;
         }
@@ -457,29 +457,29 @@ size_t find_closing_quote(char *s) {
  * @return Index of closing brace, or 0 if not found
  */
 size_t find_closing_brace(char *s) {
-    // check the type of opening brace we have
+    /// check the type of opening brace we have
     char opening_brace = s[0], closing_brace;
     if (opening_brace != '{' && opening_brace != '(') {
         return 0;
     }
 
-    // determine the closing brace according to the opening brace
+    /// determine the closing brace according to the opening brace
     if (opening_brace == '{') {
         closing_brace = '}';
     } else {
         closing_brace = ')';
     }
 
-    // find the matching closing brace
+    /// find the matching closing brace
     size_t ob_count = 1, cb_count = 0;
     size_t i = 0, len = strlen(s);
     while (++i < len) {
         if ((s[i] == '"') || (s[i] == '\'') || (s[i] == '`')) {
-            // skip escaped quotes
+            /// skip escaped quotes
             if (s[i - 1] == '\\') {
                 continue;
             }
-            // skip quoted substrings
+            /// skip quoted substrings
             char quote = s[i];
             while (++i < len) {
                 if (s[i] == quote && s[i - 1] != '\\') {
@@ -491,7 +491,7 @@ size_t find_closing_brace(char *s) {
             }
             continue;
         }
-        // keep the count of opening and closing braces
+        /// keep the count of opening and closing braces
         if (s[i - 1] != '\\') {
             if (s[i] == opening_brace) {
                 ob_count++;
@@ -500,7 +500,7 @@ size_t find_closing_brace(char *s) {
             }
         }
 
-        // break when we have a matching number of opening and closing braces
+        /// break when we have a matching number of opening and closing braces
         if (ob_count == cb_count) {
             break;
         }
@@ -526,7 +526,7 @@ size_t find_closing_brace(char *s) {
 char *quote_val(char *val, bool add_quotes) {
     char *res = NULL;
     size_t len;
-    // empty string
+    /// empty string
     if (val == NULL || !*val) {
         len = add_quotes ? 3 : 1;
         res = calloc(len, sizeof(char));
@@ -537,7 +537,7 @@ char *quote_val(char *val, bool add_quotes) {
         return res;
     }
 
-    // count the number of quotes needed
+    /// count the number of quotes needed
     len = 0;
     char *v = val, *p;
     while (*v) {
@@ -556,12 +556,12 @@ char *quote_val(char *val, bool add_quotes) {
 
     len += strlen(val);
 
-    // add two for the opening and closing quotes
+    /// add two for the opening and closing quotes
     if (add_quotes) {
         len += 2;
     }
 
-    // alloc memory for quoted string
+    /// alloc memory for quoted string
     res = alloc_str(len + 1, false);
     if (res == NULL) {
         return NULL;
@@ -569,12 +569,12 @@ char *quote_val(char *val, bool add_quotes) {
 
     p = res;
 
-    // add opening quote (optional)
+    /// add opening quote (optional)
     if (add_quotes) {
         *p++ = '"';
     }
 
-    // copy quoted val
+    /// copy quoted val
     v = val;
     while (*v) {
         switch (*v) {
@@ -582,19 +582,19 @@ char *quote_val(char *val, bool add_quotes) {
         case '`':
         case '$':
         case '"':
-            // add '\' for quoting
+            /// add '\' for quoting
             *p++ = '\\';
-            // copy char
+            /// copy char
             *p++ = *v++;
             break;
         default:
-            // copy next char
+            /// copy next char
             *p++ = *v++;
             break;
         }
     }
 
-    // add closing quote (optional)
+    /// add closing quote (optional)
     if (add_quotes) {
         *p++ = '"';
     }
@@ -617,14 +617,14 @@ char *quote_val(char *val, bool add_quotes) {
 bool check_buffer_bounds(const size_t *count, size_t *len, char ***buf) {
     if (*count >= *len) {
         if ((*buf) == NULL) {
-            // first call. alloc memory for the buffer
+            /// first call. alloc memory for the buffer
             *buf = calloc(32, sizeof(char **));
             if ((*buf) == NULL) {
                 return false;
             }
             *len = 32;
         } else {
-            // subsequent calls. extend the buffer
+            /// subsequent calls. extend the buffer
             const size_t newlen = (*len) * 2;
             char **tmp = realloc(*buf, newlen * sizeof(char **));
             if (tmp == NULL) {
@@ -679,10 +679,10 @@ char *process_token_escapes(const char *str) {
 
     size_t src_idx = 0, dst_idx = 0;
 
-    // Skip opening quote if present
+    /// Skip opening quote if present
     if (str[0] == '"') {
         src_idx = 1;
-        len--; // Adjust for skipped quote
+        len--; /// Adjust for skipped quote
     }
 
     while (src_idx < len && str[src_idx] != '"') {
@@ -737,11 +737,11 @@ char *process_token_escapes(const char *str) {
             case '5':
             case '6':
             case '7':
-                // Octal escape sequence
+                /// Octal escape sequence
                 {
                     int octal_val = 0;
                     int octal_digits = 0;
-                    src_idx++; // Skip backslash
+                    src_idx++; /// Skip backslash
                     while (src_idx < len && octal_digits < 3 &&
                            str[src_idx] >= '0' && str[src_idx] <= '7') {
                         octal_val = octal_val * 8 + (str[src_idx] - '0');
@@ -752,11 +752,11 @@ char *process_token_escapes(const char *str) {
                 }
                 break;
             case 'x':
-                // Hexadecimal escape sequence
+                /// Hexadecimal escape sequence
                 if (src_idx + 3 < len && isxdigit(str[src_idx + 2]) &&
                     isxdigit(str[src_idx + 3])) {
                     int hex_val = 0;
-                    src_idx += 2; // Skip \x
+                    src_idx += 2; /// Skip \x
                     for (int i = 0;
                          i < 2 && src_idx < len && isxdigit(str[src_idx]);
                          i++) {
@@ -772,14 +772,14 @@ char *process_token_escapes(const char *str) {
                     }
                     result[dst_idx++] = (char)hex_val;
                 } else {
-                    // Invalid hex escape, keep literal
+                    /// Invalid hex escape, keep literal
                     result[dst_idx++] = '\\';
                     result[dst_idx++] = 'x';
                     src_idx += 2;
                 }
                 break;
             default:
-                // Unknown escape, keep literal
+                /// Unknown escape, keep literal
                 result[dst_idx++] = '\\';
                 result[dst_idx++] = next;
                 src_idx += 2;

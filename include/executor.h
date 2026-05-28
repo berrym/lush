@@ -22,27 +22,27 @@
 /** Maximum depth of error context stack */
 #define EXECUTOR_CONTEXT_STACK_MAX 16
 
-// Function parameter definition
+/// Function parameter definition
 typedef struct function_param {
-    char *name;                  // Parameter name
-    char *default_value;         // Default value (NULL if required)
-    bool is_required;            // True if parameter is required
-    struct function_param *next; // Next parameter in list
+    char *name;                  ///< Parameter name
+    char *default_value;         ///< Default value (NULL if required)
+    bool is_required;            ///< True if parameter is required
+    struct function_param *next; ///< Next parameter in list
 } function_param_t;
 
-// Function definition storage
+/// Function definition storage
 typedef struct function_def {
-    char *name;                // Function name
-    node_t *body;              // Function body AST
-    function_param_t *params;  // Parameter list (NULL for no params)
-    int param_count;           // Number of parameters
-    struct function_def *next; // Next function in list
+    char *name;                ///< Function name
+    node_t *body;              ///< Function body AST
+    function_param_t *params;  ///< Parameter list (NULL for no params)
+    int param_count;           ///< Number of parameters
+    struct function_def *next; ///< Next function in list
 } function_def_t;
 
-// Job states
+/// Job states
 typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } job_state_t;
 
-// Process in a job
+/// Process in a job
 typedef struct process {
     pid_t pid;
     char *command;
@@ -50,52 +50,51 @@ typedef struct process {
     struct process *next;
 } process_t;
 
-// Job control structure
+/// Job control structure
 typedef struct job {
     int job_id;
     pid_t pgid;
     job_state_t state;
     bool foreground;
-    bool no_sighup; /**< If true, job won't receive SIGHUP on shell exit */
+    bool no_sighup; ///< If true, job won't receive SIGHUP on shell exit
     process_t *processes;
     char *command_line;
     struct job *next;
 } job_t;
 
-// Loop control states
+/// Loop control states
 typedef enum {
-    LOOP_NORMAL,  // Normal execution
-    LOOP_BREAK,   // Break out of loop
-    LOOP_CONTINUE // Continue to next iteration
+    LOOP_NORMAL,  ///< Normal execution
+    LOOP_BREAK,   ///< Break out of loop
+    LOOP_CONTINUE ///< Continue to next iteration
 } loop_control_t;
 
-// Execution context for maintaining state
+/// Execution context for maintaining state
 typedef struct executor {
-    bool interactive;             // Interactive mode flag
-    bool debug;                   // Debug mode flag
-    int exit_status;              // Last command exit status
-    const char *error_message;    // Last error message
-    bool has_error;               // Error flag
-    symtable_manager_t *symtable; // Symbol table manager
-    function_def_t *functions;    // Function definition table
-    job_t *jobs;                  // Job control list
-    int next_job_id;              // Next job ID to assign
-    pid_t shell_pgid;             // Shell process group ID
-    loop_control_t loop_control;  // Loop control state
-    int loop_depth;               // Current loop nesting depth
+    bool interactive;             ///< Interactive mode flag
+    bool debug;                   ///< Debug mode flag
+    int exit_status;              ///< Last command exit status
+    const char *error_message;    ///< Last error message
+    bool has_error;               ///< Error flag
+    symtable_manager_t *symtable; ///< Symbol table manager
+    function_def_t *functions;    ///< Function definition table
+    job_t *jobs;                  ///< Job control list
+    int next_job_id;              ///< Next job ID to assign
+    pid_t shell_pgid;             ///< Shell process group ID
+    loop_control_t loop_control;  ///< Loop control state
+    int loop_depth;               ///< Current loop nesting depth
 
-    // Script execution context for debugging
-    char *current_script_file; // Current script file being executed
-    int current_script_line;   // Current line number in script
-    bool in_script_execution;  // True if executing from script file
+    /// Script execution context for breakpoint matching
+    char *current_script_file; ///< Current script file being executed
+    bool in_script_execution;  ///< True if executing from script file
 
-    // Sourced script tracking (Phase 6: return from sourced scripts)
-    int source_depth;   // Depth of nested source commands (0 = not sourced)
-    bool source_return; // True if return was called in sourced script
+    /// Sourced script tracking (Phase 6: return from sourced scripts)
+    int source_depth;   ///< Depth of nested source commands (0 = not sourced)
+    bool source_return; ///< True if return was called in sourced script
 
-    // Expansion error tracking
-    bool expansion_error;      // True if error occurred during expansion
-    int expansion_exit_status; // Exit status from expansion errors
+    /// Expansion error tracking
+    bool expansion_error;      ///< True if error occurred during expansion
+    int expansion_exit_status; ///< Exit status from expansion errors
 
     /* POSIX-required shell-level exit. A handful of error sites are
      * defined by IEEE 1003.1 to cause a non-interactive shell to exit
@@ -109,10 +108,10 @@ typedef struct executor {
     bool shell_exit_requested;
     int shell_exit_status;
 
-    // Error context stack (Phase 3: context-aware error management)
-    char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; // "while executing X"
+    /// Error context stack (Phase 3: context-aware error management)
+    char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; ///< "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
-    size_t context_depth; // Current depth of context stack
+    size_t context_depth; ///< Current depth of context stack
 
     /* Location of the currently-executing simple command. Set at the
      * top of execute_command() from command->loc and restored on exit,
@@ -124,10 +123,23 @@ typedef struct executor {
      * currently executing. */
     source_location_t active_loc;
 
-    // Process substitution fd tracking (for cleanup after command execution)
-    int procsub_fds[32];    // File descriptors from process substitutions
-    pid_t procsub_pids[32]; // Child PIDs from process substitutions
-    int procsub_fd_count;   // Number of tracked fds/pids
+    /// Process substitution fd tracking (for cleanup after command execution)
+    int procsub_fds[32];    ///< File descriptors from process substitutions
+    pid_t procsub_pids[32]; ///< Child PIDs from process substitutions
+    int procsub_fd_count;   ///< Number of tracked fds/pids
+
+    /* Variable-allocated fd registry. Every `exec {var}<file`/`{var}>file`
+     * / `{var}>&N` redirection that allocates a new fd (via
+     * find_available_fd) appends its number here. `{var}>&-` removes its
+     * entry on explicit close. executor_free() closes whatever remains —
+     * a script that allocates fds without ever closing them does not leak
+     * through shell-exit. Subshells fork()-inherit the array (process-
+     * local from then on), so child cleanup never affects parent fds.
+     * Dynamic-grown; alloc_fd_cap is the allocation, alloc_fd_count the
+     * live entries. Touched only by helpers in redirection.c. */
+    int *alloc_fds;
+    size_t alloc_fd_count;
+    size_t alloc_fd_cap;
 
     /* Source-text retention for the structured-error system. The
      * executor stashes the input text (and its file-relative starting
@@ -142,6 +154,26 @@ typedef struct executor {
     const char *source_text;
     size_t source_starting_line;
 
+    /**
+     * Typed-function (`fn`) registry. Stored separately from
+     * `functions` (POSIX form) because the two have different scoping
+     * disciplines: typed-fn bodies use lexical (closure) scoping over
+     * the captured declaration site, while POSIX-form functions use
+     * dynamic scoping through the live call chain. Owned by the
+     * executor; freed by executor_free.
+     */
+    struct typed_fn *typed_fns;
+
+    /**
+     * In-flight typed return state. NODE_FN_RETURN populates these
+     * and yields a SHELL_FN_RETURN_STATUS unwind code; execute_typed_fn_call
+     * consumes them at the call site, kind-checks against the declared
+     * return kind, and clears the state. NODE_LET_FN binds the value
+     * into the caller's scope. Treat this slot as live only during
+     * the call-to-return unwind window.
+     */
+    bool typed_fn_return_pending;
+    lush_value_view_t typed_fn_return_value;
 } executor_t;
 
 /** Global executor instance */
@@ -173,6 +205,35 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable);
  * @param executor Executor to free
  */
 void executor_free(executor_t *executor);
+
+/**
+ * @brief Track a variable-allocated file descriptor for shell-exit cleanup
+ *
+ * Append `fd` to the executor's variable-fd-alloc registry. Called from
+ * setup_fd_alloc_redirection() each time `exec {var}<...` / `exec {var}>...`
+ * / `exec {var}>&N` opens a new descriptor via find_available_fd(). The fd
+ * will be close()d in executor_free() if not explicitly closed sooner via
+ * `{var}>&-`. Idempotent on capacity exhaustion: returns without tracking
+ * (the fd is still allocated and usable; just won't be auto-cleaned at
+ * shell exit).
+ *
+ * @param executor Executor context
+ * @param fd       File descriptor number to track
+ */
+void executor_track_alloc_fd(executor_t *executor, int fd);
+
+/**
+ * @brief Stop tracking a variable-allocated file descriptor
+ *
+ * Remove `fd` from the registry, if present. Called from
+ * setup_fd_alloc_redirection() when `{var}>&-` explicitly closes a fd; the
+ * registry should not double-close on shell exit. No-op if the fd was
+ * never tracked (e.g. user closed an fd they didn't allocate via {var}<).
+ *
+ * @param executor Executor context
+ * @param fd       File descriptor number to stop tracking
+ */
+void executor_untrack_alloc_fd(executor_t *executor, int fd);
 
 /* ============================================================================
  * Primary Execution
@@ -327,6 +388,26 @@ void executor_clear_context(executor_t *executor);
  */
 void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
+
+/**
+ * @brief Reject a mixed-script identifier when the hardening flag is set
+ *
+ * Author-time guard for the UAX #39 homograph vector: an identifier
+ * drawing letters from more than one script (Latin `p` + Cyrillic `а`
+ * in `pаsswd`). When FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off (the
+ * default in every mode) this is a no-op returning false. When on, a
+ * mixed-script @p name reports a structured error at @p loc and returns
+ * true so the caller aborts the definition. Call only at author
+ * boundaries (assignment, declare/typeset, function, alias); never on
+ * the environment-import path.
+ *
+ * @param executor Executor for error reporting and context stack
+ * @param name Candidate identifier name
+ * @param loc Source location for the diagnostic
+ * @return true if rejected (error already reported); false to proceed
+ */
+bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,
+                                        source_location_t loc);
 
 /* ============================================================================
  * Variable Expansion
@@ -490,14 +571,12 @@ void free_function_params(function_param_t *params);
  */
 
 /**
- * @brief Set script execution context for debugging
+ * @brief Set script execution context for breakpoint matching
  *
  * @param executor Executor context
- * @param script_file Script file path
- * @param line_number Current line number
+ * @param script_file Script file path (NULL to clear)
  */
-void executor_set_script_context(executor_t *executor, const char *script_file,
-                                 int line_number);
+void executor_set_script_context(executor_t *executor, const char *script_file);
 
 /**
  * @brief Clear script execution context
@@ -513,14 +592,6 @@ void executor_clear_script_context(executor_t *executor);
  * @return Script file path or NULL
  */
 const char *executor_get_current_script_file(executor_t *executor);
-
-/**
- * @brief Get current script line number
- *
- * @param executor Executor context
- * @return Line number or 0 if not in script
- */
-int executor_get_current_script_line(executor_t *executor);
 
 /* ============================================================================
  * Security
@@ -625,4 +696,4 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
 void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
-#endif // EXECUTOR_H
+#endif /// EXECUTOR_H

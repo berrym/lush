@@ -36,24 +36,24 @@ lle_result_t lle_input_utf8_processor_init(lle_utf8_processor_t **processor,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate processor structure
+    /// Allocate processor structure
     lle_utf8_processor_t *new_proc =
         lle_pool_alloc(sizeof(lle_utf8_processor_t));
     if (!new_proc) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize all fields to zero
+    /// Initialize all fields to zero
     memset(new_proc, 0, sizeof(lle_utf8_processor_t));
 
-    // Initialize state
+    /// Initialize state
     new_proc->utf8_pos = 0;
     new_proc->expected_bytes = 0;
     new_proc->current_codepoint = 0;
     new_proc->previous_codepoint = 0;
     new_proc->in_grapheme_cluster = false;
 
-    // Initialize statistics
+    /// Initialize statistics
     new_proc->codepoints_processed = 0;
     new_proc->grapheme_clusters_detected = 0;
     new_proc->invalid_sequences_handled = 0;
@@ -90,15 +90,15 @@ lle_result_t lle_input_utf8_processor_reset(lle_utf8_processor_t *processor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Clear UTF-8 buffer
+    /// Clear UTF-8 buffer
     memset(processor->utf8_buffer, 0, sizeof(processor->utf8_buffer));
     processor->utf8_pos = 0;
     processor->expected_bytes = 0;
     processor->current_codepoint = 0;
     processor->in_grapheme_cluster = false;
 
-    // Note: We don't reset previous_codepoint or statistics
-    // to maintain continuity for grapheme boundary detection
+    /// Note: We don't reset previous_codepoint or statistics
+    /// to maintain continuity for grapheme boundary detection
 
     return LLE_SUCCESS;
 }
@@ -132,7 +132,7 @@ lle_input_utf8_processor_bytes_needed(const lle_utf8_processor_t *processor) {
     }
 
     if (processor->utf8_pos >= processor->expected_bytes) {
-        return 0; // Sequence is complete
+        return 0; /// Sequence is complete
     }
 
     return processor->expected_bytes - processor->utf8_pos;
@@ -160,100 +160,100 @@ lle_result_t lle_input_utf8_processor_process_byte(
     *codepoint_out = 0;
     *is_grapheme_boundary = false;
 
-    // If we're not currently processing a sequence, check if this is a start
-    // byte
+    /// If we're not currently processing a sequence, check if this is a start
+    /// byte
     if (processor->utf8_pos == 0) {
         int seq_len = lle_utf8_sequence_length(byte);
         if (seq_len == 0) {
-            // Invalid start byte - handle error
+            /// Invalid start byte - handle error
             processor->invalid_sequences_handled++;
             return LLE_ERROR_INVALID_ENCODING;
         }
 
-        // Start new sequence
+        /// Start new sequence
         processor->utf8_buffer[0] = byte;
         processor->utf8_pos = 1;
         processor->expected_bytes = seq_len;
 
-        // Single-byte ASCII - complete immediately
+        /// Single-byte ASCII - complete immediately
         if (seq_len == 1) {
             processor->previous_codepoint = processor->current_codepoint;
             processor->current_codepoint = byte;
             *codepoint_out = byte;
             processor->codepoints_processed++;
 
-            // ASCII always starts a new grapheme cluster
+            /// ASCII always starts a new grapheme cluster
             *is_grapheme_boundary = true;
             processor->grapheme_clusters_detected++;
 
-            // Reset for next sequence
+            /// Reset for next sequence
             processor->utf8_pos = 0;
             processor->expected_bytes = 0;
 
             return LLE_SUCCESS;
         }
 
-        // Multi-byte sequence - need more bytes
+        /// Multi-byte sequence - need more bytes
         return LLE_SUCCESS;
     }
 
-    // We're in the middle of a multi-byte sequence
-    // Validate that this is a continuation byte (10xxxxxx)
+    /// We're in the middle of a multi-byte sequence
+    /// Validate that this is a continuation byte (10xxxxxx)
     if ((byte & 0xC0) != 0x80) {
-        // Invalid continuation byte - reset and try to recover
+        /// Invalid continuation byte - reset and try to recover
         processor->invalid_sequences_handled++;
         processor->utf8_pos = 0;
         processor->expected_bytes = 0;
         return LLE_ERROR_INVALID_ENCODING;
     }
 
-    // Add continuation byte to buffer
+    /// Add continuation byte to buffer
     processor->utf8_buffer[processor->utf8_pos++] = byte;
 
-    // Check if sequence is complete
+    /// Check if sequence is complete
     if (processor->utf8_pos < processor->expected_bytes) {
-        // Still need more bytes
+        /// Still need more bytes
         return LLE_SUCCESS;
     }
 
-    // Sequence is complete - validate and decode
+    /// Sequence is complete - validate and decode
     if (!lle_utf8_is_valid_sequence(processor->utf8_buffer,
                                     processor->expected_bytes)) {
-        // Invalid sequence - reset and report error
+        /// Invalid sequence - reset and report error
         processor->invalid_sequences_handled++;
         processor->utf8_pos = 0;
         processor->expected_bytes = 0;
         return LLE_ERROR_INVALID_ENCODING;
     }
 
-    // Decode codepoint
+    /// Decode codepoint
     uint32_t codepoint = 0;
     int decoded_len = lle_utf8_decode_codepoint(
         processor->utf8_buffer, processor->expected_bytes, &codepoint);
     if (decoded_len <= 0) {
-        // Decoding failed - reset and report error
+        /// Decoding failed - reset and report error
         processor->invalid_sequences_handled++;
         processor->utf8_pos = 0;
         processor->expected_bytes = 0;
         return LLE_ERROR_INVALID_ENCODING;
     }
 
-    // Successfully decoded codepoint
+    /// Successfully decoded codepoint
     processor->previous_codepoint = processor->current_codepoint;
     processor->current_codepoint = codepoint;
     *codepoint_out = codepoint;
     processor->codepoints_processed++;
 
-    // Check for grapheme boundary
-    // For streaming input, we need to check if the new codepoint
-    // forms a boundary with the previous one
+    /// Check for grapheme boundary
+    /// For streaming input, we need to check if the new codepoint
+    /// forms a boundary with the previous one
     if (processor->previous_codepoint == 0) {
-        // First codepoint is always a boundary
+        /// First codepoint is always a boundary
         *is_grapheme_boundary = true;
         processor->grapheme_clusters_detected++;
     } else {
-        // Use the existing grapheme boundary detection
-        // We need to construct a temporary buffer with prev + current
+        /// Use the existing grapheme boundary detection
+        /// We need to construct a temporary buffer with prev + current
         char boundary_test[8];
         int prev_len = lle_utf8_encode_codepoint(processor->previous_codepoint,
                                                  boundary_test);
@@ -268,13 +268,13 @@ lle_result_t lle_input_utf8_processor_process_byte(
                 processor->grapheme_clusters_detected++;
             }
         } else {
-            // Encoding failed - assume boundary
+            /// Encoding failed - assume boundary
             *is_grapheme_boundary = true;
             processor->grapheme_clusters_detected++;
         }
     }
 
-    // Reset for next sequence
+    /// Reset for next sequence
     processor->utf8_pos = 0;
     processor->expected_bytes = 0;
 
@@ -316,14 +316,14 @@ lle_result_t lle_input_utf8_processor_process_buffer(
         lle_result_t result = lle_input_utf8_processor_process_byte(
             processor, (unsigned char)buffer[pos], &codepoint, &is_boundary);
 
-        pos++; // Always consume the byte
+        pos++; /// Always consume the byte
 
         if (result == LLE_ERROR_INVALID_ENCODING) {
-            // Skip invalid byte and continue
+            /// Skip invalid byte and continue
             continue;
         }
 
-        // If we got a complete codepoint, add it to output
+        /// If we got a complete codepoint, add it to output
         if (codepoint != 0) {
             codepoints[*codepoints_decoded].codepoint = codepoint;
             codepoints[*codepoints_decoded].is_grapheme_boundary = is_boundary;

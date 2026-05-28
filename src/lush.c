@@ -52,7 +52,7 @@ static bool is_background_command(const char *command) {
         return false;
     }
 
-    /* Find last non-whitespace character */
+    /// Find last non-whitespace character
     size_t i = len;
     while (i > 0 && isspace((unsigned char)command[i - 1])) {
         i--;
@@ -62,12 +62,12 @@ static bool is_background_command(const char *command) {
         return false;
     }
 
-    /* Check if ends with '&' */
+    /// Check if ends with '&'
     if (command[i - 1] != '&') {
         return false;
     }
 
-    /* Make sure it's not '&&' (logical AND) */
+    /// Make sure it's not '&&' (logical AND)
     if (i >= 2 && command[i - 2] == '&') {
         return false;
     }
@@ -75,11 +75,11 @@ static bool is_background_command(const char *command) {
     return true;
 }
 
-// Forward declarations
+/// Forward declarations
 extern posix_history_manager_t *global_posix_history;
 void executor_update_job_status(executor_t *executor);
 
-// Global executor for persistent function definitions across commands
+/// Global executor for persistent function definitions across commands
 static executor_t *global_executor = NULL;
 
 /**
@@ -94,32 +94,30 @@ static executor_t *global_executor = NULL;
  * @return Exit status of the last command executed (POSIX requirement)
  */
 int main(int argc, char **argv) {
-    FILE *in = NULL;   // input file stream pointer
-    char *line = NULL; // pointer to a line of input read
+    FILE *in = NULL;   /// input file stream pointer
+    char *line = NULL; /// pointer to a line of input read
 
-    // Initialize special shell variables
+    /// Initialize special shell variables
     shell_pid = getpid();
     shell_argc = argc;
     shell_argv = argv;
     last_exit_status = 0;
 
-    // Perform startup tasks
+    /// Perform startup tasks
     init(argc, argv, &in);
 
-    // Handle command mode (-c option)
+    /// Handle command mode (-c option)
     if (shell_opts.command_mode && shell_opts.command_string) {
-        // Print the command if verbose mode is enabled
+        /// Print the command if verbose mode is enabled
         if (shell_opts.verbose) {
             fprintf(stderr, "%s\n", shell_opts.command_string);
         }
 
-        /**
-         * @brief Fire pre-command event for command mode (Spec 26)
-         *
-         * Command mode (-c) must also fire shell events for consistency
-         * with the event system. This enables proper tracking even for
-         * single-command invocations.
-         */
+        /// @brief Fire pre-command event for command mode (Spec 26)
+        ///
+        /// Command mode (-c) must also fire shell events for consistency
+        /// with the event system. This enables proper tracking even for
+        /// single-command invocations.
         uint64_t cmd_start_us = 0;
         if (g_lle_integration) {
             struct timespec ts;
@@ -130,13 +128,11 @@ int main(int argc, char **argv) {
             lle_fire_pre_command(shell_opts.command_string, is_bg);
         }
 
-        // Execute the command string and exit. -c is a single logical
-        // input with no surrounding source file, so line 1.
+        /// Execute the command string and exit. -c is a single logical
+        /// input with no surrounding source file, so line 1.
         int exit_status = parse_and_execute(shell_opts.command_string, 1);
 
-        /**
-         * @brief Fire post-command event for command mode (Spec 26)
-         */
+        /// @brief Fire post-command event for command mode (Spec 26)
         if (g_lle_integration) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -146,24 +142,24 @@ int main(int argc, char **argv) {
                                   cmd_end_us - cmd_start_us);
         }
 
-        // Flush output buffers before exit to ensure all output is displayed
+        /// Flush output buffers before exit to ensure all output is displayed
         fflush(stdout);
         fflush(stderr);
 
-        // Clean up and exit
+        /// Clean up and exit
         free(shell_opts.command_string);
 
-        // Execute EXIT traps before terminating
+        /// Execute EXIT traps before terminating
         execute_exit_traps();
         exit(exit_status);
     }
 
-    // Handle analyze mode (--analyze option) - full analysis
+    /// Handle analyze mode (--analyze option) - full analysis
     if (shell_opts.analyze_mode) {
-        // Determine file to analyze: explicit argument or first positional arg
+        /// Determine file to analyze: explicit argument or first positional arg
         const char *file_to_analyze = shell_opts.analyze_file;
         if (!file_to_analyze && argc > 1) {
-            // Find first non-option argument
+            /// Find first non-option argument
             for (int i = 1; i < argc; i++) {
                 if (argv[i][0] != '-') {
                     file_to_analyze = argv[i];
@@ -177,7 +173,7 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        // Initialize debug context for analysis
+        /// Initialize debug context for analysis
         debug_context_t *ctx = debug_init();
         if (!ctx) {
             fprintf(stderr, "%s: failed to initialize analysis context\n",
@@ -185,30 +181,30 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        // Enable context so debug_printf works for output
+        /// Enable context so debug_printf works for output
         debug_enable(ctx, true);
 
-        // Run full analysis (includes report output)
+        /// Run full analysis (includes report output)
         debug_analyze_script(ctx, file_to_analyze);
 
-        // Determine exit code based on issues found
+        /// Determine exit code based on issues found
         int exit_status = 0;
         if (ctx->issue_count > 0) {
-            // Check severity levels
+            /// Check severity levels
             analysis_issue_t *issue = ctx->analysis_issues;
             while (issue) {
                 if (strcmp(issue->severity, "error") == 0) {
-                    exit_status = 2; // Errors found
+                    exit_status = 2; /// Errors found
                     break;
                 } else if (strcmp(issue->severity, "warning") == 0 &&
                            exit_status < 1) {
-                    exit_status = 1; // Warnings found
+                    exit_status = 1; /// Warnings found
                 }
                 issue = issue->next;
             }
         }
 
-        // Cleanup
+        /// Cleanup
         debug_cleanup(ctx);
         if (shell_opts.analyze_file) {
             free(shell_opts.analyze_file);
@@ -220,12 +216,12 @@ int main(int argc, char **argv) {
         exit(exit_status);
     }
 
-    // Handle lint mode (--lint option) - actionable issues with optional fix
+    /// Handle lint mode (--lint option) - actionable issues with optional fix
     if (shell_opts.lint_mode) {
-        // Determine file to lint: explicit argument or first positional arg
+        /// Determine file to lint: explicit argument or first positional arg
         const char *file_to_lint = shell_opts.analyze_file;
         if (!file_to_lint && argc > 1) {
-            // Find first non-option argument
+            /// Find first non-option argument
             for (int i = 1; i < argc; i++) {
                 if (argv[i][0] != '-') {
                     file_to_lint = argv[i];
@@ -239,41 +235,41 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        // Initialize debug context for linting
+        /// Initialize debug context for linting
         debug_context_t *ctx = debug_init();
         if (!ctx) {
             fprintf(stderr, "%s: failed to initialize lint context\n", argv[0]);
             exit(EXIT_FAILURE);
         }
 
-        // Enable context so debug_printf works for output
+        /// Enable context so debug_printf works for output
         debug_enable(ctx, true);
 
-        // Run lint analysis with optional fix
+        /// Run lint analysis with optional fix
         int remaining =
             debug_lint_script(ctx, file_to_lint, shell_opts.fix_mode,
                               shell_opts.unsafe_fixes, shell_opts.dry_run);
 
-        // Determine exit code
+        /// Determine exit code
         int exit_status = 0;
         if (remaining < 0) {
-            exit_status = 3; // Fix application error
+            exit_status = 3; /// Fix application error
         } else if (remaining > 0) {
-            // Check severity levels of remaining issues
+            /// Check severity levels of remaining issues
             analysis_issue_t *issue = ctx->analysis_issues;
             while (issue) {
                 if (strcmp(issue->severity, "error") == 0) {
-                    exit_status = 2; // Errors found
+                    exit_status = 2; /// Errors found
                     break;
                 } else if (strcmp(issue->severity, "warning") == 0 &&
                            exit_status < 1) {
-                    exit_status = 1; // Warnings found
+                    exit_status = 1; /// Warnings found
                 }
                 issue = issue->next;
             }
         }
 
-        // Cleanup
+        /// Cleanup
         debug_cleanup(ctx);
         if (shell_opts.analyze_file) {
             free(shell_opts.analyze_file);
@@ -285,40 +281,39 @@ int main(int argc, char **argv) {
         exit(exit_status);
     }
 
-    /* Cumulative line counter for non-interactive (file) mode. Tracks
-     * the file-line of the FIRST character of the next batch the read
-     * loop hands to parse_and_execute. After each batch we advance by
-     * the number of source lines that batch consumed (counted by
-     * get_unified_input via its lines_consumed out-pointer) so multi-
-     * statement scripts produce file-relative source locations in
-     * structured-error output. Interactive REPL leaves this at 1
-     * always: each prompt batch is its own logical context.
-     */
+    /// Cumulative line counter for non-interactive (file) mode. Tracks
+    /// the file-line of the FIRST character of the next batch the read
+    /// loop hands to parse_and_execute. After each batch we advance by
+    /// the number of source lines that batch consumed (counted by
+    /// get_unified_input via its lines_consumed out-pointer) so multi-
+    /// statement scripts produce file-relative source locations in
+    /// structured-error output. Interactive REPL leaves this at 1
+    /// always: each prompt batch is its own logical context.
     size_t current_file_line = 1;
 
-    // Read input (buffering complete syntactic units) until user exits
-    // or EOF is read from either stdin or input file
+    /// Read input (buffering complete syntactic units) until user exits
+    /// or EOF is read from either stdin or input file
     while (!exit_flag) {
-        // Execute any trap commands deferred from signal handlers.
-        // Signal handlers only set a bitmask (async-signal-safe); the
-        // actual trap command execution happens here in main loop context.
+        /// Execute any trap commands deferred from signal handlers.
+        /// Signal handlers only set a bitmask (async-signal-safe); the
+        /// actual trap command execution happens here in main loop context.
         execute_pending_traps();
 
-        // Read complete command(s) using unified input system
-        // This ensures consistent parsing behavior between interactive and
-        // non-interactive modes
+        /// Read complete command(s) using unified input system
+        /// This ensures consistent parsing behavior between interactive and
+        /// non-interactive modes
         size_t batch_lines = 0;
         line = get_unified_input_at(in, &batch_lines);
 
         if (line == NULL) {
-            // Check if this was due to SIGINT (Ctrl+C) rather than real EOF
+            /// Check if this was due to SIGINT (Ctrl+C) rather than real EOF
             if (check_and_clear_sigint_flag()) {
-                // SIGINT received - just continue to show new prompt
-                // The signal handler already printed newline
+                /// SIGINT received - just continue to show new prompt
+                /// The signal handler already printed newline
                 continue;
             }
-            // Real EOF encountered - print newline to prevent shell prompt
-            // artifacts
+            /// Real EOF encountered - print newline to prevent shell prompt
+            /// artifacts
             if (is_interactive_shell()) {
                 printf("\n");
                 fflush(stdout);
@@ -327,16 +322,14 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        // Add command to history if in interactive mode (handled by readline)
-        // History is automatically managed by the readline integration
+        /// Add command to history if in interactive mode (handled by readline)
+        /// History is automatically managed by the readline integration
 
-        /**
-         * @brief Fire pre-command event for LLE shell integration (Spec 26)
-         *
-         * Records command start time and notifies handlers before execution.
-         * Detects background commands (ending with &) to set is_background
-         * flag.
-         */
+        /// @brief Fire pre-command event for LLE shell integration (Spec 26)
+        ///
+        /// Records command start time and notifies handlers before execution.
+        /// Detects background commands (ending with &) to set is_background
+        /// flag.
         uint64_t cmd_start_us = 0;
         if (g_lle_integration) {
             struct timespec ts;
@@ -347,37 +340,36 @@ int main(int argc, char **argv) {
             lle_fire_pre_command(line, is_bg);
         }
 
-        // Execute using unified modern parser and store exit status.
-        // For non-interactive (file) mode we pass the cumulative file
-        // line so error reporting tracks the original script position;
-        // interactive mode passes 1 (each batch is its own context).
+        /// Execute using unified modern parser and store exit status.
+        /// For non-interactive (file) mode we pass the cumulative file
+        /// line so error reporting tracks the original script position;
+        /// interactive mode passes 1 (each batch is its own context).
         size_t batch_starting_line =
             is_interactive_shell() ? 1 : current_file_line;
         int exit_status = parse_and_execute(line, batch_starting_line);
         last_exit_status = exit_status;
         set_exit_status(exit_status);
 
-        /* POSIX-required shell abort (e.g. ${var:?word} on a null-or-
-         * unset parameter in a non-interactive shell). The trigger
-         * sites raise this flag via executor_request_posix_exit() and
-         * every loop body / command list short-circuits up to here.
-         * Honor it before consuming any more script input. */
+        /// POSIX-required shell abort (e.g. ${var:?word} on a null-or-
+        /// unset parameter in a non-interactive shell). The trigger
+        /// sites raise this flag via executor_request_posix_exit() and
+        /// every loop body / command list short-circuits up to here.
+        /// Honor it before consuming any more script input.
         if (global_executor && global_executor->shell_exit_requested) {
             last_exit_status = global_executor->shell_exit_status;
             set_exit_status(last_exit_status);
             exit_flag = true;
         }
 
-        /* Advance cumulative line counter by the number of source
-         * lines consumed by this batch. Interactive mode skips this
-         * since the counter stays at 1. */
+        /// Advance cumulative line counter by the number of source
+        /// lines consumed by this batch. Interactive mode skips this
+        /// since the counter stays at 1.
         if (!is_interactive_shell()) {
             current_file_line += batch_lines;
         }
 
-        /* Fire post-command event for LLE shell integration (Spec 26)
-         * Provides exit code and execution duration for prompt and history.
-         */
+        /// Fire post-command event for LLE shell integration (Spec 26)
+        /// Provides exit code and execution duration for prompt and history.
         if (g_lle_integration) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -386,25 +378,25 @@ int main(int argc, char **argv) {
             lle_fire_post_command(line, exit_status, cmd_end_us - cmd_start_us);
         }
 
-        // Post-command display integration for layered display caching
-        // Enables the layered display system to handle post-command prompt
-        // rendering and achieve >75% cache hit rate targets
+        /// Post-command display integration for layered display caching
+        /// Enables the layered display system to handle post-command prompt
+        /// rendering and achieve >75% cache hit rate targets
         display_integration_post_command_update(line);
 
-        // Check notify option (-b): asynchronous background job notification
+        /// Check notify option (-b): asynchronous background job notification
         if (shell_opts.notify && global_executor) {
             executor_update_job_status(global_executor);
         }
 
-        // Check onecmd option (-t): exit after executing one command
+        /// Check onecmd option (-t): exit after executing one command
         if (shell_opts.onecmd) {
             exit_flag = true;
         }
 
-        // Free the line buffer (returned by get_unified_input)
+        /// Free the line buffer (returned by get_unified_input)
         free(line);
         if (!is_interactive_shell()) {
-            // Also cleanup global input state for non-interactive mode
+            /// Also cleanup global input state for non-interactive mode
             free_input_buffers();
         }
     }
@@ -413,24 +405,24 @@ int main(int argc, char **argv) {
         fclose(in);
     }
 
-    // For login shells: send SIGHUP to background jobs and execute logout
-    // scripts
+    /// For login shells: send SIGHUP to background jobs and execute logout
+    /// scripts
     if (is_login_shell()) {
-        // Send SIGHUP to all background jobs (standard login shell behavior)
-        // This must happen before logout scripts so jobs can be cleaned up
+        /// Send SIGHUP to all background jobs (standard login shell behavior)
+        /// This must happen before logout scripts so jobs can be cleaned up
         send_sighup_to_jobs();
 
         config_execute_logout_scripts();
     }
 
-    // Cleanup is handled by atexit() handlers registered in init.c
-    // This prevents double cleanup when exit() command is used
+    /// Cleanup is handled by atexit() handlers registered in init.c
+    /// This prevents double cleanup when exit() command is used
 
-    /* Run EXIT traps BEFORE tearing down the executor: the trap body
-     * is parsed and executed by the executor itself, so it must still
-     * exist (otherwise execute_exit_traps falls back to /bin/sh, and
-     * any reference to a user-defined function or shell variable in
-     * the trap body fails). */
+    /// Run EXIT traps BEFORE tearing down the executor: the trap body
+    /// is parsed and executed by the executor itself, so it must still
+    /// exist (otherwise execute_exit_traps falls back to /bin/sh, and
+    /// any reference to a user-defined function or shell variable in
+    /// the trap body fails).
     execute_exit_traps();
 
     if (global_executor) {
@@ -438,7 +430,7 @@ int main(int argc, char **argv) {
         global_executor = NULL;
     }
 
-    // Exit with the status of the last command executed (POSIX requirement)
+    /// Exit with the status of the last command executed (POSIX requirement)
     exit(last_exit_status);
 }
 
@@ -454,20 +446,20 @@ int main(int argc, char **argv) {
  * failure)
  */
 int parse_and_execute(const char *command, size_t starting_line) {
-    // Use global persistent executor for all commands to maintain function
-    // definitions
+    /// Use global persistent executor for all commands to maintain function
+    /// definitions
     if (!global_executor) {
         global_executor = executor_new();
         if (!global_executor) {
             return 1;
         }
 
-        // Set script context if running a script (not interactive)
-        // $0 contains the script name when running a script
+        /// Set script context if running a script (not interactive)
+        /// $0 contains the script name when running a script
         if (!is_interactive_shell()) {
             char *script_name = symtable_get_global("0");
             if (script_name) {
-                executor_set_script_context(global_executor, script_name, 1);
+                executor_set_script_context(global_executor, script_name);
                 free(script_name);
             }
         }
@@ -476,14 +468,15 @@ int parse_and_execute(const char *command, size_t starting_line) {
     int exit_status =
         executor_execute_command_line(global_executor, command, starting_line);
 
-    // Flush output streams after command execution
-    // This ensures output appears immediately, especially under valgrind/piping
+    /// Flush output streams after command execution
+    /// This ensures output appears immediately, especially under
+    /// valgrind/piping
     fflush(stdout);
     fflush(stderr);
 
-    // Print error messages to stderr if there were any errors
-    // (Skip if error_message is NULL - means it was already displayed via
-    // structured system)
+    /// Print error messages to stderr if there were any errors
+    /// (Skip if error_message is NULL - means it was already displayed via
+    /// structured system)
     if (executor_has_error(global_executor) &&
         executor_error(global_executor)) {
         fprintf(stderr, "lush: %s\n", executor_error(global_executor));

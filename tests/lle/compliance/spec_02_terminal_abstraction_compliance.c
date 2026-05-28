@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Test counter */
+/// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -36,11 +36,11 @@ static int tests_failed = 0;
 void test_terminal_abstraction_structure(void) {
     printf("[ TEST ] Terminal abstraction structure definition\n");
 
-    /* Verify structure can be declared */
+    /// Verify structure can be declared
     lle_terminal_abstraction_t *abs = NULL;
     TEST_ASSERT(abs == NULL, "Can declare lle_terminal_abstraction_t pointer");
 
-    /* Verify size is reasonable (non-zero, not too large) */
+    /// Verify size is reasonable (non-zero, not too large)
     size_t size = sizeof(lle_terminal_abstraction_t);
     TEST_ASSERT(size > 0, "Structure has non-zero size");
     TEST_ASSERT(size < 10000, "Structure size is reasonable");
@@ -57,7 +57,7 @@ void test_terminal_capabilities_structure(void) {
     lle_terminal_capabilities_t caps;
     memset(&caps, 0, sizeof(caps));
 
-    /* Verify boolean fields exist */
+    /// Verify boolean fields exist
     caps.is_tty = true;
     caps.supports_ansi_colors = true;
     caps.supports_256_colors = true;
@@ -67,7 +67,7 @@ void test_terminal_capabilities_structure(void) {
     TEST_ASSERT(caps.supports_ansi_colors == true,
                 "supports_ansi_colors field accessible");
 
-    /* Verify geometry fields exist */
+    /// Verify geometry fields exist
     caps.terminal_width = 80;
     caps.terminal_height = 24;
     TEST_ASSERT(caps.terminal_width == 80, "terminal_width field accessible");
@@ -85,7 +85,7 @@ void test_internal_state_structure(void) {
     lle_internal_state_t state;
     memset(&state, 0, sizeof(state));
 
-    /* Verify core fields exist */
+    /// Verify core fields exist
     state.cursor_position = 0;
     state.has_selection = false;
     state.buffer_modified = false;
@@ -107,7 +107,7 @@ void test_display_content_structure(void) {
     lle_display_content_t content;
     memset(&content, 0, sizeof(content));
 
-    /* Verify fields exist */
+    /// Verify fields exist
     content.line_count = 0;
     content.cursor_line = 0;
     content.cursor_column = 0;
@@ -129,7 +129,7 @@ void test_input_event_structure(void) {
     lle_input_event_t event;
     memset(&event, 0, sizeof(event));
 
-    /* Verify fields exist */
+    /// Verify fields exist
     event.type = LLE_INPUT_TYPE_CHARACTER;
     event.timestamp = 0;
     event.sequence_number = 0;
@@ -147,21 +147,21 @@ void test_input_event_structure(void) {
 void test_enum_definitions(void) {
     printf("[ TEST ] Enum type definitions\n");
 
-    /* Terminal type enum */
+    /// Terminal type enum
     lle_terminal_type_t term_type = LLE_TERMINAL_XTERM;
     TEST_ASSERT(term_type == LLE_TERMINAL_XTERM,
                 "lle_terminal_type_t enum defined");
 
-    /* Input type enum */
+    /// Input type enum
     lle_input_type_t input_type = LLE_INPUT_TYPE_CHARACTER;
     TEST_ASSERT(input_type == LLE_INPUT_TYPE_CHARACTER,
                 "lle_input_type_t enum defined");
 
-    /* Special key enum */
+    /// Special key enum
     lle_special_key_t special_key = LLE_KEY_UP;
     TEST_ASSERT(special_key == LLE_KEY_UP, "lle_special_key_t enum defined");
 
-    /* Key modifier enum */
+    /// Key modifier enum
     lle_key_modifier_t modifier = LLE_MOD_CTRL;
     TEST_ASSERT(modifier == LLE_MOD_CTRL, "lle_key_modifier_t enum defined");
 
@@ -176,7 +176,7 @@ void test_enum_definitions(void) {
 void test_function_declarations(void) {
     printf("[ TEST ] Function declarations (Layer 1 compliance)\n");
 
-    /* Verify key function pointers exist */
+    /// Verify key function pointers exist
     void *fn1 = (void *)lle_terminal_abstraction_init;
     void *fn2 = (void *)lle_terminal_abstraction_destroy;
     void *fn3 = (void *)lle_capabilities_detect_environment;

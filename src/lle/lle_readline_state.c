@@ -17,10 +17,10 @@
 /* Forward declare the readline context structure
  * The full definition is in lle_readline.c - we only need the state fields */
 typedef struct readline_context {
-    /* We access these fields through the public API */
+    /// We access these fields through the public API
     lle_readline_state_t state;
     lle_readline_state_t previous_state;
-    /* Other fields exist but we don't access them directly here */
+    /// Other fields exist but we don't access them directly here
 } readline_context_t;
 
 /**
@@ -66,45 +66,45 @@ const char *lle_readline_state_name(lle_readline_state_t state) {
  */
 static bool is_valid_transition(lle_readline_state_t from,
                                 lle_readline_state_t to) {
-    /* Terminal states can ALWAYS be reached - this is the escape hatch */
+    /// Terminal states can ALWAYS be reached - this is the escape hatch
     if (lle_readline_state_is_terminal(to)) {
         return true;
     }
 
-    /* Can't transition FROM a terminal state to a normal state */
+    /// Can't transition FROM a terminal state to a normal state
     if (lle_readline_state_is_terminal(from)) {
         return false;
     }
 
-    /* Normal state transitions */
+    /// Normal state transitions
     switch (from) {
     case LLE_READLINE_STATE_IDLE:
-        /* From IDLE, can go to EDITING on first input */
+        /// From IDLE, can go to EDITING on first input
         return to == LLE_READLINE_STATE_EDITING;
 
     case LLE_READLINE_STATE_EDITING:
-        /* From EDITING, can enter any modal state */
+        /// From EDITING, can enter any modal state
         return to == LLE_READLINE_STATE_COMPLETION ||
                to == LLE_READLINE_STATE_SEARCH ||
                to == LLE_READLINE_STATE_MULTILINE ||
                to == LLE_READLINE_STATE_QUOTED_INSERT;
 
     case LLE_READLINE_STATE_COMPLETION:
-        /* From COMPLETION, can go back to EDITING or enter other modes */
+        /// From COMPLETION, can go back to EDITING or enter other modes
         return to == LLE_READLINE_STATE_EDITING ||
                to == LLE_READLINE_STATE_SEARCH;
 
     case LLE_READLINE_STATE_SEARCH:
-        /* From SEARCH, can go back to EDITING */
+        /// From SEARCH, can go back to EDITING
         return to == LLE_READLINE_STATE_EDITING;
 
     case LLE_READLINE_STATE_MULTILINE:
-        /* From MULTILINE, can go to EDITING or back to MULTILINE */
+        /// From MULTILINE, can go to EDITING or back to MULTILINE
         return to == LLE_READLINE_STATE_EDITING ||
                to == LLE_READLINE_STATE_COMPLETION;
 
     case LLE_READLINE_STATE_QUOTED_INSERT:
-        /* From QUOTED_INSERT, always go back to EDITING after one char */
+        /// From QUOTED_INSERT, always go back to EDITING after one char
         return to == LLE_READLINE_STATE_EDITING;
 
     default:
@@ -135,9 +135,9 @@ lle_result_t lle_readline_state_transition(struct readline_context *ctx,
 
     lle_readline_state_t current = ctx->state;
 
-    /* Validate the transition */
+    /// Validate the transition
     if (!is_valid_transition(current, new_state)) {
-        /* Log invalid transition attempt for debugging */
+        /// Log invalid transition attempt for debugging
 #ifdef LLE_DEBUG
         fprintf(stderr, "lle: invalid state transition %s -> %s\n",
                 lle_readline_state_name(current),
@@ -146,7 +146,7 @@ lle_result_t lle_readline_state_transition(struct readline_context *ctx,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Perform the transition */
+    /// Perform the transition
     ctx->previous_state = current;
     ctx->state = new_state;
 

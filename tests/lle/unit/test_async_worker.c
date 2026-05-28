@@ -24,7 +24,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Callback state tracking — shared by completion-callback tests */
+/// Callback state tracking — shared by completion-callback tests
 static pthread_mutex_t callback_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t callback_cond = PTHREAD_COND_INITIALIZER;
 static int callback_count = 0;
@@ -32,7 +32,7 @@ static lle_async_response_t last_response;
 static bool response_received = false;
 
 /* ========================================================================== */
-/*                          TEST HELPER FUNCTIONS                             */
+/// TEST HELPER FUNCTIONS
 /* ========================================================================== */
 
 static void reset_callback_state(void) {
@@ -78,12 +78,12 @@ static bool wait_for_response(int timeout_ms) {
 }
 
 /* ========================================================================== */
-/*                              UNIT TESTS                                    */
+/// UNIT TESTS
 /* ========================================================================== */
 
-/* -------------------------------------------------------------------------- */
-/*                          LIFECYCLE TESTS                                   */
-/* -------------------------------------------------------------------------- */
+/// --------------------------------------------------------------------------
+/// LIFECYCLE TESTS
+/// --------------------------------------------------------------------------
 
 TEST(worker_init_null_output) {
     lle_result_t result = lle_async_worker_init(NULL, NULL, NULL);
@@ -153,9 +153,9 @@ TEST(worker_destroy_null_safe) {
     ASSERT_EQ(result, LLE_SUCCESS, "Destroy NULL should succeed");
 }
 
-/* -------------------------------------------------------------------------- */
-/*                          REQUEST TESTS                                     */
-/* -------------------------------------------------------------------------- */
+/// --------------------------------------------------------------------------
+/// REQUEST TESTS
+/// --------------------------------------------------------------------------
 
 TEST(request_create_git_status) {
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
@@ -169,13 +169,13 @@ TEST(request_create_git_status) {
 }
 
 TEST(request_free_null_safe) {
-    lle_async_request_free(NULL); /* Should not crash */
+    lle_async_request_free(NULL); /// Should not crash
 }
 
 TEST(submit_to_stopped_worker_fails) {
     lle_async_worker_t *worker = NULL;
     lle_async_worker_init(&worker, NULL, NULL);
-    /* Not started */
+    /// Not started
 
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
     lle_result_t result = lle_async_worker_submit(worker, req);
@@ -204,9 +204,9 @@ TEST(submit_after_shutdown_fails) {
     lle_async_worker_destroy(worker);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                        CALLBACK TESTS                                      */
-/* -------------------------------------------------------------------------- */
+/// --------------------------------------------------------------------------
+/// CALLBACK TESTS
+/// --------------------------------------------------------------------------
 
 TEST(callback_invoked_on_completion) {
     reset_callback_state();
@@ -215,7 +215,7 @@ TEST(callback_invoked_on_completion) {
     lle_async_worker_init(&worker, test_completion_callback, NULL);
     lle_async_worker_start(worker);
 
-    /* Get current directory for the request */
+    /// Get current directory for the request
     char cwd[PATH_MAX];
     ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
@@ -225,7 +225,7 @@ TEST(callback_invoked_on_completion) {
     lle_result_t result = lle_async_worker_submit(worker, req);
     ASSERT_EQ(result, LLE_SUCCESS, "Submit should succeed");
 
-    /* Wait for callback */
+    /// Wait for callback
     bool received = wait_for_response(5000);
     ASSERT_TRUE(received, "Should receive response within timeout");
 
@@ -246,11 +246,11 @@ TEST(git_status_detects_repo) {
     lle_async_worker_init(&worker, test_completion_callback, NULL);
     lle_async_worker_start(worker);
 
-    /* Use parent of build directory (should be the git repo) */
+    /// Use parent of build directory (should be the git repo)
     char cwd[PATH_MAX];
     ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
-    /* If we're in builddir, go up one level to the repo root */
+    /// If we're in builddir, go up one level to the repo root
     char *builddir = strstr(cwd, "/build");
     if (builddir) {
         *builddir = '\0';
@@ -263,7 +263,7 @@ TEST(git_status_detects_repo) {
     wait_for_response(5000);
 
     pthread_mutex_lock(&callback_mutex);
-    /* Assuming tests run from lush git repo */
+    /// Assuming tests run from lush git repo
     ASSERT_TRUE(last_response.data.git_status.is_git_repo,
                 "Should detect git repo");
     ASSERT_TRUE(strlen(last_response.data.git_status.branch) > 0 ||
@@ -290,7 +290,7 @@ TEST(git_status_non_repo) {
     bool received = wait_for_response(10000);
 
     if (!received) {
-        /* Timeout - force shutdown and skip assertions */
+        /// Timeout - force shutdown and skip assertions
         lle_async_worker_shutdown(worker);
         lle_async_worker_wait(worker);
         lle_async_worker_destroy(worker);
@@ -309,9 +309,9 @@ TEST(git_status_non_repo) {
     lle_async_worker_destroy(worker);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                        STATISTICS TESTS                                    */
-/* -------------------------------------------------------------------------- */
+/// --------------------------------------------------------------------------
+/// STATISTICS TESTS
+/// --------------------------------------------------------------------------
 
 TEST(statistics_tracking) {
     reset_callback_state();
@@ -325,7 +325,7 @@ TEST(statistics_tracking) {
     ASSERT_EQ(total_req, 0, "Initial requests should be 0");
     ASSERT_EQ(total_comp, 0, "Initial completed should be 0");
 
-    /* Submit a request */
+    /// Submit a request
     char cwd[PATH_MAX];
     ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
@@ -357,7 +357,7 @@ TEST(pending_count) {
 }
 
 /* ========================================================================== */
-/*                              TEST RUNNER                                   */
+/// TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {

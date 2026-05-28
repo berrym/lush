@@ -66,6 +66,7 @@ lle_sources += files(
   'unicode/unicode_grapheme.c',
   'unicode/unicode_compare.c',
   'unicode/unicode_case.c',
+  'unicode/unicode_class.c',
   'unicode/grapheme_detector.c',
   'unicode/char_width.c',
 )
@@ -270,7 +271,10 @@ lle_shell_sources = files(
 # ============================================================================
 
 lle_sources += files(
+  'lle_debug_prompt_state.c',
   'lle_editor.c',
+  'lle_pager.c',
+  'lle_pager_state.c',
   'lle_readline.c',
   'lle_readline_state.c',
   'lle_watchdog.c',

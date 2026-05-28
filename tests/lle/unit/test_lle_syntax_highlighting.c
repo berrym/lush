@@ -18,7 +18,7 @@
 #define TEST_PASS() ((void)0)
 #define TEST_FAIL(msg) TEST_FAIL_MSG(msg)
 
-/* Stubs for lush core functions */
+/// Stubs for lush core functions
 bool is_builtin(const char *name) {
     static const char *builtins[] = {
         "cd",       "echo", "exit",  "export", "alias",   "unalias",
@@ -36,10 +36,10 @@ bool is_builtin(const char *name) {
 
 char *lookup_alias(const char *name) {
     (void)name;
-    return NULL; /* No aliases in test */
+    return NULL; /// No aliases in test
 }
 
-/* Token type to string for debugging */
+/// Token type to string for debugging
 static const char *token_type_str(lle_syntax_token_type_t type) {
     switch (type) {
     case LLE_TOKEN_COMMAND_VALID:
@@ -77,7 +77,7 @@ static const char *token_type_str(lle_syntax_token_type_t type) {
     }
 }
 
-/* Test helper: get first non-whitespace token type */
+/// Test helper: get first non-whitespace token type
 static lle_syntax_token_type_t
 get_first_command_type(lle_syntax_highlighter_t *h, const char *input) {
     lle_syntax_highlight(h, input, strlen(input));
@@ -91,7 +91,7 @@ get_first_command_type(lle_syntax_highlighter_t *h, const char *input) {
     return LLE_TOKEN_UNKNOWN;
 }
 
-/* Test: Highlighter creation */
+/// Test: Highlighter creation
 TEST(highlighter_create) {
     TEST_START("highlighter_create");
     lle_syntax_highlighter_t *h = NULL;
@@ -104,12 +104,12 @@ TEST(highlighter_create) {
     }
 }
 
-/* Test: Builtin detection */
+/// Test: Builtin detection
 TEST(builtins) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
-    /* Classic builtins */
+    /// Classic builtins
     TEST_START("builtin: cd");
     if (get_first_command_type(h, "cd") == LLE_TOKEN_COMMAND_BUILTIN)
         TEST_PASS();
@@ -122,7 +122,7 @@ TEST(builtins) {
     else
         TEST_FAIL("echo not detected as builtin");
 
-    /* Lush-specific builtins */
+    /// Lush-specific builtins
     TEST_START("builtin: config");
     if (get_first_command_type(h, "config") == LLE_TOKEN_COMMAND_BUILTIN)
         TEST_PASS();
@@ -150,7 +150,7 @@ TEST(builtins) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: External commands */
+/// Test: External commands
 TEST(external_commands) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
@@ -176,7 +176,7 @@ TEST(external_commands) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: Invalid commands */
+/// Test: Invalid commands
 TEST(invalid_commands) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
@@ -193,7 +193,7 @@ TEST(invalid_commands) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: Keywords */
+/// Test: Keywords
 TEST(keywords) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
@@ -219,7 +219,7 @@ TEST(keywords) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: Pipes and operators */
+/// Test: Pipes and operators
 TEST(operators) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
@@ -241,7 +241,7 @@ TEST(operators) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: Variables */
+/// Test: Variables
 TEST(variables) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
@@ -272,6 +272,52 @@ TEST(variables) {
         TEST_PASS();
     else
         TEST_FAIL("special variable not detected");
+
+    TEST_START("sigil: @arr");
+    lle_syntax_highlight(h, "echo @arr", 9);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool found_at_sigil = false;
+    for (size_t i = 0; i < count; i++) {
+        if (tokens[i].type == LLE_TOKEN_VARIABLE &&
+            tokens[i].end - tokens[i].start == 4) {
+            found_at_sigil = true;
+        }
+    }
+    if (found_at_sigil)
+        TEST_PASS();
+    else
+        TEST_FAIL("@-sigil token not detected");
+
+    TEST_START("sigil: %map");
+    lle_syntax_highlight(h, "echo %map", 9);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool found_pct_sigil = false;
+    for (size_t i = 0; i < count; i++) {
+        if (tokens[i].type == LLE_TOKEN_VARIABLE &&
+            tokens[i].end - tokens[i].start == 4) {
+            found_pct_sigil = true;
+        }
+    }
+    if (found_pct_sigil)
+        TEST_PASS();
+    else
+        TEST_FAIL("%-sigil token not detected");
+
+    TEST_START("non-sigil: user@host stays bare");
+    lle_syntax_highlight(h, "echo user@host", 14);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool sigil_misfire = false;
+    for (size_t i = 0; i < count; i++) {
+        /// The user@host word must not be split into a variable token at the
+        /// mid-word `@`.
+        if (tokens[i].type == LLE_TOKEN_VARIABLE) {
+            sigil_misfire = true;
+        }
+    }
+    if (!sigil_misfire)
+        TEST_PASS();
+    else
+        TEST_FAIL("@ inside user@host wrongly highlighted as sigil");
 
     lle_syntax_highlighter_destroy(h);
 }
@@ -414,13 +460,13 @@ TEST(path_file_absolute) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: missing path resolves to PATH_INVALID, regardless of shape. */
+/// Test: missing path resolves to PATH_INVALID, regardless of shape.
 TEST(path_invalid_missing) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
-    /* This path can never collide with a real fixture -- the random
-     * suffix is chosen at compile time. */
+    /// This path can never collide with a real fixture -- the random
+    /// suffix is chosen at compile time.
     const char *input = "cat /tmp/lush_definitely_not_present_z9q3pq/x";
     lle_syntax_highlight(h, input, strlen(input));
 
@@ -453,8 +499,8 @@ TEST(path_dequote_backslash_space) {
         return;
     }
 
-    /* Create a file whose name contains spaces, exactly the case
-     * users hit when invoking `cat /tmp/foo/a\ test\ file.txt`. */
+    /// Create a file whose name contains spaces, exactly the case
+    /// users hit when invoking `cat /tmp/foo/a\ test\ file.txt`.
     char file[512];
     snprintf(file, sizeof(file), "%s/a test file.txt", dir);
     FILE *fp = fopen(file, "w");
@@ -467,7 +513,7 @@ TEST(path_dequote_backslash_space) {
     }
     fclose(fp);
 
-    /* Build the highlight input with backslash-escaped spaces. */
+    /// Build the highlight input with backslash-escaped spaces.
     char input[512];
     snprintf(input, sizeof(input), "cat %s/a\\ test\\ file.txt", dir);
     lle_syntax_highlight(h, input, strlen(input));
@@ -508,8 +554,8 @@ TEST(path_shape_relative_dir) {
         return;
     }
 
-    /* chdir into the parent of the test dir so `./<basename>` is a
-     * valid relative path to a real directory. */
+    /// chdir into the parent of the test dir so `./<basename>` is a
+    /// valid relative path to a real directory.
     char *saved_cwd = getcwd(NULL, 0);
     if (chdir("/tmp") != 0) {
         free(saved_cwd);
@@ -529,9 +575,9 @@ TEST(path_shape_relative_dir) {
 
     lle_syntax_token_type_t type = find_path_token(h);
 
-    /* Restore cwd before any assertion path that would skip cleanup.
-     * Best-effort: if chdir fails here the test still runs to its
-     * verdict; the harness will catch any cross-test cwd corruption. */
+    /// Restore cwd before any assertion path that would skip cleanup.
+    /// Best-effort: if chdir fails here the test still runs to its
+    /// verdict; the harness will catch any cross-test cwd corruption.
     if (saved_cwd) {
         (void)!chdir(saved_cwd);
         free(saved_cwd);
@@ -566,8 +612,8 @@ TEST(path_shape_home_dir) {
         return;
     }
 
-    /* Create a subdir inside the temp dir, then point HOME at the
-     * temp dir so `~/sub` resolves to it. */
+    /// Create a subdir inside the temp dir, then point HOME at the
+    /// temp dir so `~/sub` resolves to it.
     char sub[512];
     snprintf(sub, sizeof(sub), "%s/sub", dir);
     if (mkdir(sub, 0755) != 0) {
@@ -731,8 +777,8 @@ TEST(path_implicit_tilde_plus) {
         TEST_PASS();
     } else {
         char msg[128];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~+`, got %d", (int)type);
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~+`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     rmdir(dir);
@@ -772,8 +818,8 @@ TEST(path_implicit_tilde_minus) {
         TEST_PASS();
     } else {
         char msg[128];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~-`, got %d", (int)type);
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~-`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     rmdir(dir);
@@ -790,15 +836,15 @@ TEST(path_implicit_tilde_user) {
 
     struct passwd *pw = getpwuid(getuid());
     if (!pw || !pw->pw_name || !pw->pw_dir) {
-        /* No usable user fixture (CI sandboxes etc.) -- skip. */
+        /// No usable user fixture (CI sandboxes etc.) -- skip.
         TEST_PASS();
         lle_syntax_highlighter_destroy(h);
         return;
     }
     struct stat st;
     if (stat(pw->pw_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        /* User's home dir doesn't exist or isn't a directory --
-         * unusual but skip rather than fail spuriously. */
+        /// User's home dir doesn't exist or isn't a directory --
+        /// unusual but skip rather than fail spuriously.
         TEST_PASS();
         lle_syntax_highlighter_destroy(h);
         return;
@@ -813,8 +859,7 @@ TEST(path_implicit_tilde_user) {
         TEST_PASS();
     } else {
         char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~%s`, got %d",
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~%s`, got %d",
                  pw->pw_name, (int)type);
         TEST_FAIL(msg);
     }
@@ -828,7 +873,7 @@ TEST(path_implicit_tilde_unknown_user) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
-    /* Pick a username that almost certainly doesn't exist. */
+    /// Pick a username that almost certainly doesn't exist.
     const char *input = "ls ~nosuchuser_xyz_xyzzy_2026";
     lle_syntax_highlight(h, input, strlen(input));
     lle_syntax_token_type_t type = find_path_token(h);
@@ -838,7 +883,8 @@ TEST(path_implicit_tilde_unknown_user) {
     } else {
         char msg[128];
         snprintf(msg, sizeof(msg),
-                 "expected PATH_INVALID for unknown `~user`, got %d", (int)type);
+                 "expected PATH_INVALID for unknown `~user`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     lle_syntax_highlighter_destroy(h);
@@ -857,10 +903,10 @@ TEST(path_color_shape_specific_overrides_kind) {
     FILE *fp = fopen(file, "w");
     fclose(fp);
 
-    /* Apply distinct colors so we can tell which knob won the chain. */
+    /// Apply distinct colors so we can tell which knob won the chain.
     lle_syntax_colors_t override = {0};
-    override.path_file = 0x00111111;          /* kind-only fallback */
-    override.path_file_absolute = 0x00222222; /* shape-specific */
+    override.path_file = 0x00111111;          /// kind-only fallback
+    override.path_file_absolute = 0x00222222; /// shape-specific
     lle_syntax_highlighter_set_colors(h, &override);
 
     char input[512];
@@ -897,7 +943,7 @@ TEST(path_color_falls_to_kind_only) {
 
     lle_syntax_colors_t override = {0};
     override.path_file = 0x00111111;
-    /* path_file_absolute deliberately left at 0 (unset) */
+    /// path_file_absolute deliberately left at 0 (unset)
     lle_syntax_highlighter_set_colors(h, &override);
 
     char input[512];
@@ -920,7 +966,7 @@ TEST(path_color_falls_to_kind_only) {
     lle_syntax_highlighter_destroy(h);
 }
 
-/* Test: ANSI rendering */
+/// Test: ANSI rendering
 TEST(ansi_render) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);

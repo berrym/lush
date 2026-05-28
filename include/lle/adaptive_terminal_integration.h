@@ -43,23 +43,23 @@ extern "C" {
  * Separate from terminal type - mode is selected based on capabilities.
  */
 typedef enum {
-    LLE_ADAPTIVE_MODE_NONE = 0, /**< Non-interactive (scripts, pipes) */
-    LLE_ADAPTIVE_MODE_MINIMAL,  /**< Basic line editing, no terminal control */
-    LLE_ADAPTIVE_MODE_ENHANCED, /**< Editor terminals, display client approach
-                                 */
-    LLE_ADAPTIVE_MODE_NATIVE,   /**< Traditional TTY, full terminal control */
-    LLE_ADAPTIVE_MODE_MULTIPLEXED /**< Terminal multiplexers (tmux/screen) */
+    LLE_ADAPTIVE_MODE_NONE = 0,   ///< Non-interactive (scripts, pipes)
+    LLE_ADAPTIVE_MODE_MINIMAL,    ///< Basic line editing, no terminal control
+    LLE_ADAPTIVE_MODE_ENHANCED,   /**< Editor terminals, display client approach
+                                   */
+    LLE_ADAPTIVE_MODE_NATIVE,     ///< Traditional TTY, full terminal control
+    LLE_ADAPTIVE_MODE_MULTIPLEXED ///< Terminal multiplexers (tmux/screen)
 } lle_adaptive_mode_t;
 
 /**
  * Capability level indicates feature richness available in the environment.
  */
 typedef enum {
-    LLE_CAPABILITY_NONE = 0, /**< No interactive capabilities */
-    LLE_CAPABILITY_BASIC,    /**< Basic text I/O only */
-    LLE_CAPABILITY_STANDARD, /**< Colors, basic formatting */
-    LLE_CAPABILITY_FULL,     /**< 256 colors, cursor control */
-    LLE_CAPABILITY_PREMIUM   /**< Truecolor, advanced features */
+    LLE_CAPABILITY_NONE = 0, ///< No interactive capabilities
+    LLE_CAPABILITY_BASIC,    ///< Basic text I/O only
+    LLE_CAPABILITY_STANDARD, ///< Colors, basic formatting
+    LLE_CAPABILITY_FULL,     ///< 256 colors, cursor control
+    LLE_CAPABILITY_PREMIUM   ///< Truecolor, advanced features
 } lle_capability_level_t;
 
 /* ============================================================================
@@ -72,14 +72,14 @@ typedef enum {
  * Describes known terminal characteristics and preferred handling.
  */
 typedef struct {
-    const char *name;                        /**< Terminal identifier */
-    const char *term_program_pattern;        /**< TERM_PROGRAM pattern */
-    const char *term_pattern;                /**< TERM variable pattern */
-    const char *env_var_check;               /**< Additional env var */
-    lle_capability_level_t capability_level; /**< Expected capabilities */
-    lle_adaptive_mode_t preferred_mode;      /**< Preferred mode */
-    bool force_interactive;                  /**< Override stdin check */
-    bool requires_special_handling;          /**< Mode-specific code */
+    const char *name;                        ///< Terminal identifier
+    const char *term_program_pattern;        ///< TERM_PROGRAM pattern
+    const char *term_pattern;                ///< TERM variable pattern
+    const char *env_var_check;               ///< Additional env var
+    lle_capability_level_t capability_level; ///< Expected capabilities
+    lle_adaptive_mode_t preferred_mode;      ///< Preferred mode
+    bool force_interactive;                  ///< Override stdin check
+    bool requires_special_handling;          ///< Mode-specific code
 } lle_terminal_signature_t;
 
 /* ============================================================================
@@ -107,17 +107,17 @@ typedef enum {
  * Contains all information needed for mode selection and initialization.
  */
 typedef struct {
-    /* Basic terminal status */
+    /// Basic terminal status
     bool stdin_is_tty;
     bool stdout_is_tty;
     bool stderr_is_tty;
 
-    /* Environment analysis results */
+    /// Environment analysis results
     char term_name[64];
     char term_program[64];
     char colorterm[32];
 
-    /* Detected capabilities */
+    /// Detected capabilities
     bool supports_colors;
     bool supports_256_colors;
     bool supports_truecolor;
@@ -127,20 +127,20 @@ typedef struct {
     bool supports_bracketed_paste;
     bool supports_unicode;
 
-    /* Terminal dimensions */
-    int terminal_cols; /**< Terminal width in columns */
-    int terminal_rows; /**< Terminal height in rows */
+    /// Terminal dimensions
+    int terminal_cols; ///< Terminal width in columns
+    int terminal_rows; ///< Terminal height in rows
 
-    /* Multiplexer detection */
+    /// Multiplexer detection
     lle_multiplexer_type_t multiplexer_type;
 
-    /* Terminal classification */
+    /// Terminal classification
     const lle_terminal_signature_t *matched_signature;
     lle_capability_level_t capability_level;
     lle_adaptive_mode_t recommended_mode;
     bool detection_confidence_high;
 
-    /* Timing and performance */
+    /// Timing and performance
     uint64_t detection_time_us;
     bool probing_successful;
 } lle_terminal_detection_result_t;
@@ -162,7 +162,7 @@ typedef struct {
  * ============================================================================
  */
 
-/* Opaque types - defined in implementation files */
+/// Opaque types - defined in implementation files
 typedef struct lle_native_controller_t lle_native_controller_t;
 typedef struct lle_display_client_controller_t lle_display_client_controller_t;
 typedef struct lle_multiplexer_controller_t lle_multiplexer_controller_t;
@@ -184,7 +184,7 @@ typedef struct {
     lle_adaptive_mode_t mode;
     lle_terminal_detection_result_t *detection_result;
 
-    /* Control method implementations (mode-specific) */
+    /// Control method implementations (mode-specific)
     union {
         lle_native_controller_t *native;
         lle_display_client_controller_t *display_client;
@@ -192,20 +192,20 @@ typedef struct {
         lle_minimal_controller_t *minimal;
     } controller;
 
-    /* Common systems (available in all modes) */
-    void *buffer;          /* lle_buffer_t - avoid circular dependency */
-    void *history;         /* lle_history_core_t */
-    void *completion;      /* lle_completion_system_t */
-    void *input_processor; /* lle_input_processor_t */
+    /// Common systems (available in all modes)
+    void *buffer;          ///< lle_buffer_t - avoid circular dependency
+    void *history;         ///< lle_history_core_t
+    void *completion;      ///< lle_completion_system_t
+    void *input_processor; ///< lle_input_processor_t
 
-    /* Integration with Lush systems */
+    /// Integration with Lush systems
     lush_memory_pool_t *memory_pool;
-    void *display_context; /* lush_display_context_t */
+    void *display_context; ///< lush_display_context_t
 
-    /* Performance monitoring */
+    /// Performance monitoring
     lle_performance_monitor_t *performance_monitor;
 
-    /* Health status */
+    /// Health status
     bool healthy;
     uint32_t error_count;
     uint64_t last_health_check_us;
@@ -222,7 +222,7 @@ typedef struct {
 typedef struct {
     lle_adaptive_context_t *adaptive_context;
 
-    /* Unified operation interface */
+    /// Unified operation interface
     lle_result_t (*read_line)(lle_adaptive_context_t *ctx, const char *prompt,
                               char **line);
 
@@ -257,7 +257,7 @@ typedef struct {
     bool enable_history;
     bool enable_multiline_editing;
     bool enable_undo_redo;
-    int color_support_level; /**< 0=none, 1=basic, 2=256, 3=true */
+    int color_support_level; ///< 0=none, 1=basic, 2=256, 3=true
     lle_adaptive_mode_t recommended_mode;
 } lle_adaptive_config_recommendation_t;
 
@@ -559,4 +559,4 @@ void lle_terminal_detection_cache_cleanup(void);
 }
 #endif
 
-#endif /* LLE_ADAPTIVE_TERMINAL_INTEGRATION_H */
+#endif /// LLE_ADAPTIVE_TERMINAL_INTEGRATION_H

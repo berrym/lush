@@ -17,26 +17,50 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-// Forward declaration for libhashtable
+/// Forward declaration for libhashtable
 typedef struct ht_strstr ht_strstr_t;
 
-// Forward declarations
+/// Forward declarations
 typedef struct symtable_scope_enhanced symtable_scope_t;
 typedef struct symvar symvar_t;
 
-// Variable types
+/// Variable types
 typedef enum {
-    SYMVAR_STRING,   // Regular string variable
-    SYMVAR_INTEGER,  // Integer variable (for arithmetic)
-    SYMVAR_ARRAY,    // Array variable (bash extension)
-    SYMVAR_FUNCTION, // Function definition
-    SYMVAR_NAMEREF   // Nameref variable (reference to another variable)
+    SYMVAR_STRING,   ///< Regular string variable
+    SYMVAR_INTEGER,  ///< Integer variable (for arithmetic)
+    SYMVAR_ARRAY,    ///< Array variable (bash extension)
+    SYMVAR_FUNCTION, ///< Function definition
+    SYMVAR_NAMEREF   ///< Nameref variable (reference to another variable)
 } symvar_type_t;
 
 /* ============================================================================
  * ARRAY VALUE STORAGE (Phase 1: Extended Language Support)
  * ============================================================================
  */
+
+/// Variable flags
+///
+/// Bit values are kept stable across removals so callers that store
+/// the underlying mask see no shift if a value is later retired
+/// again. Bits (1 << 2), (1 << 3), and (1 << 8) are intentionally
+/// vacant -- the prior SYMVAR_LOCAL / SYMVAR_SPECIAL_VAR / SYMVAR_TRACE
+/// values were dead (set but never read; locality is tracked by the
+/// scope chain, special vars are dispatched by name, declare -t is a
+/// no-op on variables in bash itself) and were removed rather than
+/// kept as theatrical reservations. See the audit at 44e6970f.
+typedef enum {
+    SYMVAR_NONE = 0,
+    SYMVAR_EXPORTED = (1 << 0),     ///< Variable is exported to environment
+    SYMVAR_READONLY = (1 << 1),     ///< Variable is read-only
+    SYMVAR_UNSET = (1 << 4),        ///< Variable is explicitly unset
+    SYMVAR_NAMEREF_FLAG = (1 << 5), ///< Variable is a nameref (local -n)
+    SYMVAR_LOWERCASE = (1 << 6),    ///< Convert value to lowercase (declare -l)
+    SYMVAR_UPPERCASE = (1 << 7),    ///< Convert value to uppercase (declare -u)
+    /**
+     * Integer (declare -i): RHS of assignment is arith-evaluated
+     */
+    SYMVAR_INTEGER_ATTR = (1 << 9)
+} symvar_flags_t;
 
 /**
  * @brief Array value storage structure
@@ -46,13 +70,22 @@ typedef enum {
  * Associative arrays use a hash table for key-value storage.
  */
 typedef struct array_value {
-    char **elements;     /**< Sparse array of element values (indexed) */
-    int *indices;        /**< Parallel array of actual indices (for sparse) */
-    size_t count;        /**< Number of elements currently stored */
-    size_t capacity;     /**< Allocated capacity for elements/indices */
-    size_t max_index;    /**< Highest index used (for ${#arr[@]}) */
-    bool is_associative; /**< True if associative array (declare -A) */
-    ht_strstr_t *assoc_map; /**< Hash table for associative arrays */
+    char **elements;     ///< Sparse array of element values (indexed)
+    int *indices;        ///< Parallel array of actual indices (for sparse)
+    size_t count;        ///< Number of elements currently stored
+    size_t capacity;     ///< Allocated capacity for elements/indices
+    size_t max_index;    ///< Highest index used (for ${#arr[@]})
+    bool is_associative; ///< True if associative array (declare -A)
+    /**
+     * Variable attributes carried by the array itself. Mirrors the
+     * symvar_flags_t set used for scalars but lives on the array
+     * record so element-level writes (arr[idx]=value) can consult
+     * SYMVAR_READONLY without going through the scalar symbol table.
+     * Set by declare -ar / -Ar and by readonly NAME on an existing
+     * array; read by symtable_set_array_element.
+     */
+    symvar_flags_t flags;
+    ht_strstr_t *assoc_map; ///< Hash table for associative arrays
     /**
      * For associative arrays only: parallel ordered list of keys
      * recording the order in which each key was first set. Enables
@@ -66,83 +99,172 @@ typedef struct array_value {
      * key string; negligible compared to value strings.
      * (Issue #69.)
      */
-    char **assoc_insertion_order;    /**< Keys in first-set order */
-    size_t assoc_insertion_count;    /**< Number of keys tracked */
-    size_t assoc_insertion_capacity; /**< Allocated capacity */
+    char **assoc_insertion_order;    ///< Keys in first-set order
+    size_t assoc_insertion_count;    ///< Number of keys tracked
+    size_t assoc_insertion_capacity; ///< Allocated capacity
 } array_value_t;
 
-// Variable flags
-typedef enum {
-    SYMVAR_NONE = 0,
-    SYMVAR_EXPORTED = (1 << 0),     // Variable is exported to environment
-    SYMVAR_READONLY = (1 << 1),     // Variable is read-only
-    SYMVAR_LOCAL = (1 << 2),        // Variable is local to current scope
-    SYMVAR_SPECIAL_VAR = (1 << 3),  // Special system variable
-    SYMVAR_UNSET = (1 << 4),        // Variable is explicitly unset
-    SYMVAR_NAMEREF_FLAG = (1 << 5), // Variable is a nameref (local -n)
-    SYMVAR_LOWERCASE = (1 << 6),    // Convert value to lowercase (declare -l)
-    SYMVAR_UPPERCASE = (1 << 7),    // Convert value to uppercase (declare -u)
-    SYMVAR_TRACE = (1 << 8),        // Trace attribute (declare -t)
-    SYMVAR_INTEGER_ATTR = (1 << 9)  // Integer (declare -i): RHS of
-                                    // assignment is arith-evaluated
-} symvar_flags_t;
+/* ============================================================================
+ * UNIFIED VALUE VIEW (SEMANTICS.md section 3 first-class values)
+ * ============================================================================
+ *
+ * Single lookup primitive returning a kind-tagged view of whatever the
+ * symtable holds for a name. Bridges the historical split between
+ * symtable_get_var (returns owned char*) and symtable_get_array
+ * (returns borrowed array_value_t*), so call sites that need to
+ * branch on the kind of a value can do so through one query rather
+ * than the two-step "try array, fall back to scalar" dance that
+ * proliferates through the expansion engine.
+ *
+ * Ownership:
+ *   - scalar_value is OWNED by the view (caller frees, or calls
+ *     lush_value_view_clear); strdup'd from the symtable's storage
+ *     so symtable mutations between lookup and use are safe.
+ *   - array is BORROWED from the symtable's array side-table;
+ *     valid until the next unset / mutation of that array.
+ *
+ * Call sites migrate at their own pace; symtable_get_var /
+ * symtable_get_array continue to work and serve sites where the
+ * unified view would not be a net simplification (single-kind
+ * lookups, hot paths that pre-classified the kind elsewhere).
+ */
 
-// Scope types for different contexts
 typedef enum {
-    SCOPE_GLOBAL,     // Global shell scope
-    SCOPE_FUNCTION,   // Function local scope
-    SCOPE_LOOP,       // Loop iteration scope (for/while)
-    SCOPE_SUBSHELL,   // Subshell scope
-    SCOPE_CONDITIONAL // Conditional execution scope (if/case)
+    LUSH_VALUE_NONE = 0, ///< No binding under this name
+    LUSH_VALUE_SCALAR,   ///< Scalar string value
+    LUSH_VALUE_LIST,     ///< Indexed array (list per SEMANTICS section 3.1)
+    LUSH_VALUE_MAP       ///< Associative array (map per SEMANTICS section 3.1)
+} lush_value_kind_t;
+
+typedef struct lush_value_view {
+    lush_value_kind_t kind;
+    char *scalar_value;   ///< Owned strdup; non-NULL iff kind==SCALAR
+    array_value_t *array; ///< Borrowed; non-NULL iff kind==LIST or MAP
+} lush_value_view_t;
+
+/**
+ * @brief Return code: write blocked by readonly attribute
+ *
+ * symtable_set_var / symtable_assign_var / symtable_set_array_element
+ * return this value (instead of -1) when the write target already
+ * carries SYMVAR_READONLY anywhere in the scope chain. Callers that
+ * want to surface a user-facing "readonly variable" diagnostic
+ * distinguish this from a generic failure; callers that just need
+ * success/failure can continue treating non-zero as failure.
+ */
+#define SYMTABLE_ERR_READONLY (-2)
+
+/**
+ * @brief Apply SYMVAR_LOWERCASE / SYMVAR_UPPERCASE to a value
+ *
+ * If `flags` carries SYMVAR_LOWERCASE, returns a malloc'd lowercased
+ * copy of `value`; if it carries SYMVAR_UPPERCASE, returns an
+ * uppercased copy. Conversion goes through lle_utf8_tolower /
+ * lle_utf8_toupper so non-ASCII codepoints fold according to the
+ * project's Unicode case table.
+ *
+ * Returns NULL when no transformation applies (neither bit set, or
+ * `value` is NULL / empty), letting callers cheaply skip the
+ * allocation when the attribute is absent. Returns NULL on allocation
+ * failure or invalid UTF-8 in `value` -- callers should fall back to
+ * the untransformed value in those cases rather than failing the
+ * surrounding write.
+ *
+ * @param value Source string (UTF-8). May be NULL.
+ * @param flags Variable flags carrying the case attribute.
+ * @return Heap-allocated transformed copy (caller frees), or NULL.
+ */
+char *symtable_apply_case_attr_alloc(const char *value, symvar_flags_t flags);
+
+/// Scope types for different contexts
+typedef enum {
+    SCOPE_GLOBAL,      ///< Global shell scope
+    SCOPE_FUNCTION,    ///< POSIX-form function scope (dynamic-scoped)
+    SCOPE_LOOP,        ///< Loop iteration scope (for/while)
+    SCOPE_SUBSHELL,    ///< Subshell scope
+    SCOPE_CONDITIONAL, ///< Conditional execution scope (if/case)
+    /// Typed-function (`fn`) frame: free names in the body resolve
+    /// through the captured declaration-time scope, not the dynamic
+    /// caller's scope chain.
+    SCOPE_LEXICAL
 } scope_type_t;
 
-// Variable entry structure
+/**
+ * @brief Variable entry structure
+ *
+ * Deserialized form of one scope-table entry. Storage is kind-tagged
+ * via the type field:
+ *
+ *   - SYMVAR_STRING / SYMVAR_INTEGER / SYMVAR_NAMEREF / SYMVAR_FUNCTION:
+ *       value holds the scalar string; array is NULL.
+ *   - SYMVAR_ARRAY:
+ *       value holds the array_value_t pointer encoded as a hex string
+ *       (so the existing ht_strstr storage can carry it verbatim);
+ *       array is the parsed pointer for fast direct access.
+ *
+ * Callers read array directly when type==SYMVAR_ARRAY rather than
+ * re-parsing value, but the two fields are always consistent --
+ * serialize_variable encodes both from a single source.
+ */
 struct symvar {
-    char *name;           // Variable name
-    char *value;          // Variable value (string representation)
-    symvar_type_t type;   // Variable type
-    symvar_flags_t flags; // Variable flags
-    size_t scope_level;   // Scope level where defined
-    symvar_t *next;       // Next variable in hash chain
+    char *name;           ///< Variable name
+    char *value;          ///< Scalar string (or hex pointer for arrays)
+    symvar_type_t type;   ///< Variable type (selects which storage is live)
+    symvar_flags_t flags; ///< Variable flags
+    size_t scope_level;   ///< Scope level where defined
+    array_value_t *array; ///< List/Map storage; non-NULL iff type==ARRAY
+    symvar_t *next;       ///< Next variable in hash chain
 };
 
-// Enhanced symbol table scope structure using libhashtable
+/// Enhanced symbol table scope structure using libhashtable
 struct symtable_scope_enhanced {
-    scope_type_t scope_type;  // Type of scope
-    size_t level;             // Scope nesting level
-    ht_strstr_t *vars_ht;     // libhashtable ht_strstr_t for variables
-    symtable_scope_t *parent; // Parent scope
-    char *scope_name;         // Name of scope (for debugging)
+    scope_type_t scope_type; ///< Type of scope
+    size_t level;            ///< Scope nesting level
+    ht_strstr_t *vars_ht;    ///< libhashtable ht_strstr_t for variables
+    symtable_scope_t
+        *parent; ///< Parent scope (for variable lookup walk); for SCOPE_LEXICAL
+                 ///< this is the captured declaration-site parent, not the
+                 ///< dynamic caller.
+    /**
+     * SCOPE_LEXICAL only: the scope that was current at push time
+     * (i.e. the dynamic caller). The scope stack is LIFO regardless
+     * of scoping discipline, so pop must return here, not to `parent`.
+     * NULL for non-lexical frames.
+     */
+    symtable_scope_t *dynamic_caller;
+    char *scope_name; ///< Name of scope (for debugging)
 };
 
-// Symbol table manager (forward declaration for implementation)
+/// Symbol table manager (forward declaration for implementation)
 typedef struct symtable_manager symtable_manager_t;
 
-// Legacy compatibility structures (for string management system)
+/// Legacy compatibility structures (for string management system)
 typedef enum {
-    SYM_STR,
-    SYM_FUNC,
+    SYM_STR,  ///< String symbol
+    SYM_FUNC, ///< Function symbol
 } symbol_type_t;
 
 typedef struct symtable_entry {
-    char *name;
-    symbol_type_t val_type;
-    char *val;
-    unsigned int flags;
-    struct symtable_entry *next;
-    struct node *func_body;
+    char *name;                  ///< Symbol name
+    symbol_type_t val_type;      ///< Type of stored value
+    char *val;                   ///< String value (for SYM_STR)
+    unsigned int flags;          ///< Legacy flag bits (FLAG_*)
+    struct symtable_entry *next; ///< Next entry in the chain
+    struct node *func_body;      ///< Function body AST (for SYM_FUNC)
 } symtable_entry_t;
 
 typedef struct {
-    size_t level;
-    symtable_entry_t *head, *tail;
+    size_t level;           ///< Scope nesting level
+    symtable_entry_t *head, ///< First entry in the chain
+        *tail;              ///< Last entry in the chain
 } symtable_t;
 
 #define MAX_SYMTAB 256
 typedef struct {
-    size_t symtable_count;
-    symtable_t *symtable_list[MAX_SYMTAB];
-    symtable_t *global_symtable, *local_symtable;
+    size_t symtable_count;                 ///< Number of active symbol tables
+    symtable_t *symtable_list[MAX_SYMTAB]; ///< Stack of symbol tables
+    symtable_t *global_symtable,           ///< Global (outermost) symbol table
+        *local_symtable;                   ///< Current (innermost) symbol table
 } symtable_stack_t;
 
 /* ============================================================================
@@ -150,7 +272,7 @@ typedef struct {
  * ============================================================================
  */
 
-/* Manager Lifecycle */
+/// Manager Lifecycle
 
 /**
  * @brief Create a new symbol table manager
@@ -174,7 +296,7 @@ void symtable_manager_free(symtable_manager_t *manager);
  */
 void symtable_manager_set_debug(symtable_manager_t *manager, bool debug);
 
-/* Scope Management */
+/// Scope Management
 
 /**
  * @brief Push a new scope onto the scope stack
@@ -186,6 +308,48 @@ void symtable_manager_set_debug(symtable_manager_t *manager, bool debug);
  */
 int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
                         const char *name);
+
+/**
+ * @brief Capture the current scope as an opaque parent for a future
+ *        SCOPE_LEXICAL push.
+ *
+ * Used at typed-function (`fn`) declaration time to record the lexical
+ * environment the function should resolve free names against. The
+ * returned pointer is borrowed and remains valid until the captured
+ * scope is popped by the same manager; the caller must not free it.
+ * In the common case of top-level `fn` declarations, the captured
+ * scope is the global scope, which lives for the manager's entire
+ * lifetime.
+ *
+ * @param manager Manager instance
+ * @return Opaque pointer to the current scope, or NULL on error
+ */
+void *symtable_capture_scope_for_lexical(symtable_manager_t *manager);
+
+/**
+ * @brief Push a SCOPE_LEXICAL frame whose parent is the supplied
+ *        captured scope rather than the dynamic caller.
+ *
+ * The new frame inherits all lookup semantics of a normal scope
+ * frame -- variable resolution walks the parent chain -- but the
+ * parent is the capture site, not the live `current_scope` at push
+ * time. The result is lexical (closure) scoping: free names in the
+ * frame's body resolve through the declaration environment of the
+ * enclosing function, not through the dynamic call chain. Used to
+ * give a typed-function body its closure environment at call time.
+ *
+ * On pop, the frame restores the previous `current_scope` (the dynamic
+ * caller) -- the captured-parent linkage exists only for the duration
+ * of the lexical frame.
+ *
+ * @param manager Manager instance
+ * @param name Scope name for diagnostics (typically the fn name)
+ * @param captured_parent Opaque pointer returned by
+ *                        symtable_capture_scope_for_lexical
+ * @return 0 on success, -1 on error
+ */
+int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
+                                void *captured_parent);
 
 /**
  * @brief Pop the current scope from the stack
@@ -222,7 +386,21 @@ const char *symtable_current_scope_name(symtable_manager_t *manager);
  */
 bool symtable_in_function_scope(symtable_manager_t *manager);
 
-/* Variable Operations */
+/**
+ * @brief Get the type of the current (innermost) scope
+ *
+ * Returns SCOPE_GLOBAL when no scope is pushed, otherwise the
+ * scope_type of the innermost pushed scope (SCOPE_FUNCTION /
+ * SCOPE_LOOP / SCOPE_SUBSHELL / SCOPE_CONDITIONAL). Used by the
+ * debugger to label and gate its local-variable view.
+ *
+ * @param manager Manager instance
+ * @return Current scope type (SCOPE_GLOBAL if manager is NULL or no
+ *         scope is active).
+ */
+scope_type_t symtable_current_scope_type(symtable_manager_t *manager);
+
+/// Variable Operations
 
 /**
  * @brief Set a variable with flags
@@ -315,7 +493,7 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name);
  * @param manager Manager instance
  * @param name Nameref variable name
  * @param target Name of the variable to reference
- * @param flags Additional flags (SYMVAR_LOCAL, etc.)
+ * @param flags Additional flags (SYMVAR_NAMEREF_FLAG, SYMVAR_EXPORTED, etc.)
  * @return 0 on success, -1 on error
  */
 int symtable_set_nameref(symtable_manager_t *manager, const char *name,
@@ -374,7 +552,7 @@ int symtable_set_flags(symtable_manager_t *manager, const char *name,
  */
 bool symtable_var_exists(symtable_manager_t *manager, const char *name);
 
-/* Export/Environment Operations */
+/// Export/Environment Operations
 
 /**
  * @brief Mark a variable as exported
@@ -400,7 +578,7 @@ char **symtable_get_environ(symtable_manager_t *manager);
  */
 void symtable_free_environ(char **environ);
 
-/* Debugging */
+/// Debugging
 
 /**
  * @brief Dump variables in a specific scope
@@ -429,7 +607,7 @@ void symtable_dump_all_scopes(symtable_manager_t *manager);
  */
 symtable_manager_t *symtable_get_global_manager(void);
 
-/* Basic Variable Operations (Global Scope) */
+/// Basic Variable Operations (Global Scope)
 
 /**
  * @brief Get a global variable value
@@ -473,7 +651,7 @@ bool symtable_exists_global(const char *name);
  */
 int symtable_unset_global(const char *name);
 
-/* Integer Variable Operations */
+/// Integer Variable Operations
 
 /**
  * @brief Get a global variable as integer
@@ -493,7 +671,7 @@ int symtable_get_global_int(const char *name, int default_value);
  */
 int symtable_set_global_int(const char *name, int value);
 
-/* Boolean Variable Operations */
+/// Boolean Variable Operations
 
 /**
  * @brief Get a global variable as boolean
@@ -513,7 +691,7 @@ bool symtable_get_global_bool(const char *name, bool default_value);
  */
 int symtable_set_global_bool(const char *name, bool value);
 
-/* Export Operations */
+/// Export Operations
 
 /**
  * @brief Export a global variable to environment
@@ -531,7 +709,7 @@ int symtable_export_global(const char *name);
  */
 int symtable_unexport_global(const char *name);
 
-/* Special Variable Operations */
+/// Special Variable Operations
 
 /**
  * @brief Set a special system variable
@@ -559,7 +737,7 @@ char *symtable_get_special_global(const char *name);
  */
 int symtable_set_readonly_global(const char *name, const char *value);
 
-/* Debugging */
+/// Debugging
 
 /** @brief Dump global scope variables */
 void symtable_debug_dump_global_scope(void);
@@ -597,13 +775,35 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
                                     void *userdata);
 
 /**
+ * @brief Enumerate variables defined directly in the current scope
+ *
+ * Iterates entries in @p manager->current_scope->vars_ht only -- it does
+ * NOT walk the scope chain, so this returns just the variables declared
+ * in the innermost active scope (e.g. a function's locals). Array
+ * variables live in separate global storage and are reached through
+ * symtable_enumerate_arrays(); only scalar / integer / nameref entries
+ * appear here. Used by the debugger's local-variable inspection.
+ *
+ * @param manager Manager instance
+ * @param callback Called for each variable. @p type carries the symvar
+ *                 type so the consumer can label Scalar / Nameref / etc.
+ * @param userdata Opaque pointer passed through to the callback
+ */
+void symtable_enumerate_current_scope_vars(symtable_manager_t *manager,
+                                           void (*callback)(const char *name,
+                                                            const char *value,
+                                                            symvar_type_t type,
+                                                            void *userdata),
+                                           void *userdata);
+
+/**
  * @brief Count global variables
  *
  * @return Number of global variables
  */
 size_t symtable_count_global_vars(void);
 
-/* Environment Array */
+/// Environment Array
 
 /**
  * @brief Get environment as array for exec
@@ -629,13 +829,13 @@ void symtable_free_environment_array(char **env);
 #define symtable_get(mgr, name) symtable_get_var(mgr, name)
 #define symtable_export(mgr, name) symtable_export_var(mgr, name)
 
-/* Backward compatibility macros */
+/// Backward compatibility macros
 #define get_global_var(name) symtable_get_global(name)
 #define set_global_var(name, value) symtable_set_global(name, value)
 #define get_global_var_default(name, def) symtable_get_global_default(name, def)
 #define export_global_var(name) symtable_export_global(name)
 
-/* Advanced operations (direct modern API access) */
+/// Advanced operations (direct modern API access)
 #define symtable_manager() symtable_get_global_manager()
 #define symtable_push_function_scope(name)                                     \
     symtable_push_scope(symtable_manager(), SCOPE_FUNCTION, name)
@@ -682,7 +882,7 @@ void free_environ_array(char **env);
  * ============================================================================
  */
 
-/* Legacy flag definitions */
+/// Legacy flag definitions
 #define FLAG_EXPORT (1 << 0)
 #define FLAG_READONLY (1 << 1)
 #define FLAG_CMD_EXPORT (1 << 2)
@@ -694,18 +894,98 @@ void free_environ_array(char **env);
 #define FLAG_SPECIAL_VAR (1 << 8)
 #define FLAG_TEMP_VAR (1 << 9)
 
-/* Legacy functions (for string management system) */
+/// Legacy functions (for string management system)
+
+/**
+ * @brief Allocate a new legacy symbol table at the given scope level
+ *
+ * @param level Scope nesting level for the new table
+ * @return New symbol table on success, NULL on failure
+ */
 symtable_t *new_symtable(size_t level);
+
+/**
+ * @brief Push a fresh symbol table onto the legacy scope stack
+ *
+ * @return New top-of-stack symbol table on success, NULL on failure
+ */
 symtable_t *symtable_stack_push(void);
+
+/**
+ * @brief Pop the top symbol table off the legacy scope stack
+ *
+ * @return Popped symbol table on success, NULL on failure
+ */
 symtable_t *symtable_stack_pop(void);
+
+/**
+ * @brief Remove an entry from a legacy symbol table
+ *
+ * @param symtable Symbol table holding the entry
+ * @param entry Entry to remove
+ * @return 0 on success, -1 on error
+ */
 int remove_from_symtable(symtable_t *symtable, symtable_entry_t *entry);
+
+/**
+ * @brief Create and insert a new entry into the current legacy symbol table
+ *
+ * @param name Symbol name (copied/owned per legacy semantics)
+ * @return New symbol entry on success, NULL on failure
+ */
 symtable_entry_t *add_to_symtable(char *name);
+
+/**
+ * @brief Look up a symbol by name in a specific legacy symbol table
+ *
+ * @param symtable Symbol table to search
+ * @param name Symbol name to find
+ * @return Matching entry on success, NULL if not found
+ */
 symtable_entry_t *lookup_symbol(symtable_t *symtable, const char *name);
+
+/**
+ * @brief Look up a symbol by name across the legacy scope stack
+ *
+ * @param name Symbol name to find
+ * @return Matching entry on success, NULL if not found
+ */
 symtable_entry_t *get_symtable_entry(const char *name);
+
+/**
+ * @brief Get the innermost (current) legacy symbol table
+ *
+ * @return Current local symbol table on success, NULL if uninitialized
+ */
 symtable_t *get_local_symtable(void);
+
+/**
+ * @brief Get the outermost (global) legacy symbol table
+ *
+ * @return Global symbol table on success, NULL if uninitialized
+ */
 symtable_t *get_global_symtable(void);
+
+/**
+ * @brief Get the legacy symbol table stack
+ *
+ * @return Pointer to the symbol table stack on success, NULL if uninitialized
+ */
 symtable_stack_t *get_symtable_stack(void);
+
+/**
+ * @brief Free a legacy symbol table and all its entries
+ *
+ * @param symtable Symbol table to free
+ */
 void free_symtable(symtable_t *symtable);
+
+/**
+ * @brief Set the string value of a legacy symbol table entry
+ *
+ * @param entry Entry to update
+ * @param val New value (copied/owned per legacy semantics)
+ */
 void symtable_entry_setval(symtable_entry_t *entry, char *val);
 
 /* ============================================================================
@@ -713,26 +993,90 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val);
  * ============================================================================
  */
 
-/* Feature detection */
+/// Feature detection
+
+/**
+ * @brief Report whether the libhashtable-backed symbol table is available
+ *
+ * @return true if the enhanced (libhashtable) backend can be used
+ */
 bool symtable_libht_available(void);
+
+/**
+ * @brief Get a description of the active symbol table implementation
+ *
+ * @return Static string describing the selected backend
+ */
 const char *symtable_implementation_info(void);
 
-/* Enhanced API (feature flag controlled) */
+/// Enhanced API (feature flag controlled)
+
+/** @brief Initialize the libhashtable-backed symbol table */
 void init_symtable_libht(void);
+
+/** @brief Tear down the libhashtable-backed symbol table */
 void free_symtable_libht(void);
+
+/**
+ * @brief Get the underlying libhashtable manager handle
+ *
+ * @return Opaque pointer to the libhashtable manager, or NULL if uninitialized
+ */
 void *get_libht_manager(void);
 
-/* Enhanced variable operations */
+/// Enhanced variable operations
+
+/**
+ * @brief Set a variable using the enhanced (libhashtable) backend
+ *
+ * @param name Variable name
+ * @param value Variable value
+ * @param flags Variable flags
+ * @return 0 on success, -1 on error
+ */
 int symtable_set_var_enhanced(const char *name, const char *value,
                               symvar_flags_t flags);
+
+/**
+ * @brief Get a variable value using the enhanced (libhashtable) backend
+ *
+ * @param name Variable name
+ * @return Variable value or NULL if not found
+ */
 char *symtable_get_var_enhanced(const char *name);
 
-/* Enhanced scope operations */
+/// Enhanced scope operations
+
+/**
+ * @brief Push a scope using the enhanced (libhashtable) backend
+ *
+ * @param type Scope type to push
+ * @param name Scope name (for debugging)
+ * @return 0 on success, -1 on error
+ */
 int symtable_push_scope_enhanced(scope_type_t type, const char *name);
+
+/**
+ * @brief Pop the current scope using the enhanced (libhashtable) backend
+ *
+ * @return 0 on success, -1 on error
+ */
 int symtable_pop_scope_enhanced(void);
 
-/* Performance and testing */
+/// Performance and testing
+
+/**
+ * @brief Run a benchmark comparison between symbol table backends
+ *
+ * @param iterations Number of iterations to execute per backend
+ */
 void symtable_benchmark_comparison(int iterations);
+
+/**
+ * @brief Run the libhashtable symbol table self-test
+ *
+ * @return 0 on success, non-zero on failure
+ */
 int symtable_libht_test(void);
 
 /* ============================================================================
@@ -740,26 +1084,90 @@ int symtable_libht_test(void);
  * ============================================================================
  */
 
-/* Feature detection */
+/// Feature detection
+
+/**
+ * @brief Report whether the optimized (libhashtable v2) backend is available
+ *
+ * @return true if the optimized backend can be used
+ */
 bool symtable_opt_available(void);
+
+/**
+ * @brief Get a description of the optimized symbol table implementation
+ *
+ * @return Static string describing the optimized backend
+ */
 const char *symtable_opt_implementation_info(void);
 
-/* Optimized API (feature flag controlled) */
+/// Optimized API (feature flag controlled)
+
+/** @brief Initialize the optimized (libhashtable v2) symbol table */
 void init_symtable_opt(void);
+
+/** @brief Tear down the optimized (libhashtable v2) symbol table */
 void free_symtable_opt(void);
+
+/**
+ * @brief Get the underlying optimized manager handle
+ *
+ * @return Opaque pointer to the optimized manager, or NULL if uninitialized
+ */
 void *get_opt_manager(void);
 
-/* Optimized variable operations */
+/// Optimized variable operations
+
+/**
+ * @brief Set a variable using the optimized (libhashtable v2) backend
+ *
+ * @param name Variable name
+ * @param value Variable value
+ * @param flags Variable flags
+ * @return 0 on success, -1 on error
+ */
 int symtable_set_var_opt_api(const char *name, const char *value,
                              symvar_flags_t flags);
+
+/**
+ * @brief Get a variable value using the optimized (libhashtable v2) backend
+ *
+ * @param name Variable name
+ * @return Variable value or NULL if not found
+ */
 char *symtable_get_var_opt_api(const char *name);
 
-/* Optimized scope operations */
+/// Optimized scope operations
+
+/**
+ * @brief Push a scope using the optimized (libhashtable v2) backend
+ *
+ * @param type Scope type to push
+ * @param name Scope name (for debugging)
+ * @return 0 on success, -1 on error
+ */
 int symtable_push_scope_opt_api(scope_type_t type, const char *name);
+
+/**
+ * @brief Pop the current scope using the optimized (libhashtable v2) backend
+ *
+ * @return 0 on success, -1 on error
+ */
 int symtable_pop_scope_opt_api(void);
 
-/* Performance and testing */
+/// Performance and testing
+
+/**
+ * @brief Run a benchmark comparison for the optimized backend
+ *
+ * @param iterations Number of iterations to execute
+ */
 void symtable_benchmark_opt_comparison(int iterations);
+
+/**
+ * @brief Run the optimized symbol table self-test
+ *
+ * @return 0 on success, non-zero on failure
+ */
 int symtable_opt_test(void);
 
 /* ============================================================================
@@ -918,7 +1326,7 @@ char **symtable_array_get_values(array_value_t *array, size_t *count);
  */
 char *symtable_array_expand(array_value_t *array, const char *sep);
 
-/* Array Variable Management */
+/// Array Variable Management
 
 /**
  * @brief Set a variable as an array
@@ -936,6 +1344,66 @@ int symtable_set_array(const char *name, array_value_t *array);
  * @return Array value or NULL if not an array or not found
  */
 array_value_t *symtable_get_array(const char *name);
+
+/**
+ * @brief Read the attribute flags carried by an array
+ *
+ * Returns SYMVAR_NONE if the name is not bound to an array (or
+ * the array has no attributes set). Used by enforcement paths
+ * such as symtable_set_array_element (whole-array readonly).
+ *
+ * @param name Variable name
+ * @return Flags currently set on the array record
+ */
+symvar_flags_t symtable_array_get_flags(const char *name);
+
+/**
+ * @brief Add attribute flags to an array
+ *
+ * OR-merges @p add into the array's existing flags. No-op when the
+ * name is not bound to an array; returns -1 in that case so callers
+ * distinguish "applied" from "no array to apply to".
+ *
+ * @param name Variable name
+ * @param add  Flags to add (bitwise OR into existing)
+ * @return 0 on success, -1 if no array under @p name
+ */
+int symtable_array_add_flags(const char *name, symvar_flags_t add);
+
+/**
+ * @brief Unified value lookup (SEMANTICS section 3 first-class values)
+ *
+ * Populates @c out with whatever the symtable holds for @c name --
+ * scalar, list, or map -- with one call. Implementation walks the
+ * array side-table first (lists/maps), then the scalar scope chain
+ * (symtable_get_var) for a fallback to a scalar binding.
+ *
+ * On a hit, returns true and out->kind is one of LUSH_VALUE_SCALAR /
+ * LUSH_VALUE_LIST / LUSH_VALUE_MAP; out->scalar_value (owned) or
+ * out->array (borrowed) is populated accordingly. The caller MUST
+ * call lush_value_view_clear(&out) when done, even on a hit -- it is
+ * the only safe way to release a scalar strdup.
+ *
+ * On a miss, returns false; out->kind is LUSH_VALUE_NONE and the
+ * other fields are zeroed. lush_value_view_clear is a no-op on a
+ * cleared view, so the same call site can clear unconditionally.
+ *
+ * @param name Variable name (must not be NULL)
+ * @param out  Output view (must not be NULL; zeroed on entry)
+ * @return true if @c name is bound, false otherwise.
+ */
+bool symtable_lookup(const char *name, lush_value_view_t *out);
+
+/**
+ * @brief Free any owned storage in a value view
+ *
+ * Frees out->scalar_value if non-NULL and zeroes the struct. The
+ * array field is borrowed from the symtable and is not freed. Safe
+ * to call multiple times or on a never-populated view.
+ *
+ * @param view View to clear (NULL-safe; out fields zeroed on return)
+ */
+void lush_value_view_clear(lush_value_view_t *view);
 
 /**
  * @brief Check if a variable is an array
@@ -978,4 +1446,4 @@ void symtable_enumerate_arrays(void (*callback)(const char *name,
                                                 void *userdata),
                                void *userdata);
 
-#endif // SYMTABLE_H
+#endif /// SYMTABLE_H

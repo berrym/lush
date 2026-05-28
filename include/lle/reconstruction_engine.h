@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+/// Forward declarations
 typedef struct lle_reconstruction_engine lle_reconstruction_engine_t;
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 typedef struct lle_multiline_parser lle_multiline_parser_t;
@@ -32,25 +32,25 @@ typedef struct lle_multiline_parser lle_multiline_parser_t;
  * @brief Reconstruction options for command processing
  */
 typedef struct lle_reconstruction_options {
-    bool apply_indentation;    /**< Whether to apply automatic indentation */
-    char indent_char;          /**< Indentation character (' ' or '\t') */
-    uint8_t spaces_per_level;  /**< Spaces per indentation level */
-    bool preserve_line_breaks; /**< Whether to preserve original line breaks */
-    bool normalize_whitespace; /**< Whether to normalize whitespace */
-    size_t max_output_length;  /**< Maximum output length (safety limit) */
-    void *reserved[4];         /**< Reserved for future use */
+    bool apply_indentation;    ///< Whether to apply automatic indentation
+    char indent_char;          ///< Indentation character (' ' or '\t')
+    uint8_t spaces_per_level;  ///< Spaces per indentation level
+    bool preserve_line_breaks; ///< Whether to preserve original line breaks
+    bool normalize_whitespace; ///< Whether to normalize whitespace
+    size_t max_output_length;  ///< Maximum output length (safety limit)
+    void *reserved[4];         ///< Reserved for future use
 } lle_reconstruction_options_t;
 
 /**
  * @brief Reconstructed command result structure
  */
 typedef struct lle_reconstructed_command {
-    char *text;               /**< Reconstructed command text */
-    size_t length;            /**< Length of reconstructed text */
-    size_t line_count;        /**< Number of lines in result */
-    size_t *line_offsets;     /**< Offset of each line in text */
-    bool indentation_applied; /**< Whether indentation was applied */
-    void *reserved[2];        /**< Reserved for future use */
+    char *text;               ///< Reconstructed command text
+    size_t length;            ///< Length of reconstructed text
+    size_t line_count;        ///< Number of lines in result
+    size_t *line_offsets;     ///< Offset of each line in text
+    bool indentation_applied; ///< Whether indentation was applied
+    void *reserved[2];        ///< Reserved for future use
 } lle_reconstructed_command_t;
 
 /**
@@ -149,4 +149,4 @@ lle_result_t lle_reconstruction_engine_set_options(
 }
 #endif
 
-#endif /* LLE_RECONSTRUCTION_ENGINE_H */
+#endif /// LLE_RECONSTRUCTION_ENGINE_H

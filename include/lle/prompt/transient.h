@@ -86,4 +86,4 @@ static inline void lle_transient_init(lle_transient_state_t *state) {
 }
 #endif
 
-#endif /* LLE_PROMPT_TRANSIENT_H */
+#endif // LLE_PROMPT_TRANSIENT_H

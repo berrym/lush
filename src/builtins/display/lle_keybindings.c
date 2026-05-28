@@ -17,14 +17,14 @@
 #include "lle/lle_shell_integration.h"
 
 int display_lle_keybindings(int argc, char **argv) {
-    /* Keybinding management commands */
+    // Keybinding management commands
     lle_editor_t *editor = lle_get_global_editor();
 
-    /* Check for subcommand */
+    // Check for subcommand
     const char *kb_subcmd = (argc >= 2) ? argv[1] : "list";
 
     if (strcmp(kb_subcmd, "reload") == 0) {
-        /* Reload user keybindings from config file */
+        // Reload user keybindings from config file
         if (!editor || !editor->keybinding_manager) {
             fprintf(stderr, "display lle keybindings reload: LLE not active\n");
             fprintf(stderr, "Run 'display lle enable' first\n");
@@ -64,7 +64,7 @@ int display_lle_keybindings(int argc, char **argv) {
         }
 
     } else if (strcmp(kb_subcmd, "actions") == 0) {
-        /* List all available action names */
+        // List all available action names
         printf("LLE Available Actions\n");
         printf("=====================\n");
         printf("\nThese action names can be used in "
@@ -136,8 +136,7 @@ int display_lle_keybindings(int argc, char **argv) {
 
     } else if (strcmp(kb_subcmd, "list") == 0 ||
                strcmp(kb_subcmd, "help") == 0 || kb_subcmd[0] == '-') {
-        /* Show help if --help or just 'list' with no bindings to show
-         */
+        /// Show help if --help or just 'list' with no bindings to show
         if (strcmp(kb_subcmd, "help") == 0 ||
             strcmp(kb_subcmd, "--help") == 0) {
             printf("LLE Keybinding Commands\n");
@@ -158,7 +157,7 @@ int display_lle_keybindings(int argc, char **argv) {
         }
     }
 
-    /* Default: list active keybindings */
+    // Default: list active keybindings
     printf("LLE Active Keybindings (Emacs mode)\n");
     printf("====================================\n");
 
@@ -220,7 +219,7 @@ int display_lle_keybindings(int argc, char **argv) {
             printf("  (Unable to retrieve keybindings)\n");
         }
     } else {
-        /* Show default keybindings when LLE not active */
+        // Show default keybindings when LLE not active
         printf("\nNavigation:\n");
         printf("  C-a          beginning-of-line\n");
         printf("  C-e          end-of-line\n");

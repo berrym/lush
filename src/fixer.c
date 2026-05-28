@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Cross-platform forward declarations */
+/// Cross-platform forward declarations
 int strncasecmp(const char *s1, const char *s2, size_t n);
 int strcasecmp(const char *s1, const char *s2);
 
@@ -34,14 +34,12 @@ int strcasecmp(const char *s1, const char *s2);
  * ============================================================================
  */
 
-/**
- * @brief Compare fixes by position (for sorting end-to-start)
- */
+/// @brief Compare fixes by position (for sorting end-to-start)
 static int compare_fixes_reverse(const void *a, const void *b) {
     const fixer_fix_t *fa = (const fixer_fix_t *)a;
     const fixer_fix_t *fb = (const fixer_fix_t *)b;
 
-    /* Sort by byte offset, descending (end to start) */
+    /// Sort by byte offset, descending (end to start)
     if (fa->match_start > fb->match_start)
         return -1;
     if (fa->match_start < fb->match_start)
@@ -49,9 +47,7 @@ static int compare_fixes_reverse(const void *a, const void *b) {
     return 0;
 }
 
-/**
- * @brief Calculate byte offset from line and column
- */
+/// @brief Calculate byte offset from line and column
 static size_t calc_offset(const char *content, int line, int column) {
     size_t offset = 0;
     int current_line = 1;
@@ -63,7 +59,7 @@ static size_t calc_offset(const char *content, int line, int column) {
         offset++;
     }
 
-    /* Add column offset (1-based) */
+    /// Add column offset (1-based)
     if (column > 1) {
         offset += (size_t)(column - 1);
     }
@@ -71,7 +67,7 @@ static size_t calc_offset(const char *content, int line, int column) {
     return offset;
 }
 
-/* Suppress unused warning - will be used when line-based fixes are added */
+/// Suppress unused warning - will be used when line-based fixes are added
 static size_t (*calc_offset_ptr)(const char *, int, int) = calc_offset;
 
 /**
@@ -79,15 +75,13 @@ static size_t (*calc_offset_ptr)(const char *, int, int) = calc_offset;
  */
 typedef struct {
     fixer_context_t *fixer_ctx;
-    const char *target; /* Target shell name (string for flexibility) */
+    const char *target; ///< Target shell name (string for flexibility)
     const char *line;
     int line_num;
-    size_t line_offset; /* Byte offset of line start in content */
+    size_t line_offset; ///< Byte offset of line start in content
 } collect_ctx_t;
 
-/**
- * @brief Callback to check each compat entry for fixes
- */
+/// @brief Callback to check each compat entry for fixes
 static void collect_fix_callback(const compat_entry_t *entry, void *user_data) {
     collect_ctx_t *ctx = (collect_ctx_t *)user_data;
 
@@ -95,16 +89,16 @@ static void collect_fix_callback(const compat_entry_t *entry, void *user_data) {
         return;
     }
 
-    /* Get fix type for the target shell */
+    /// Get fix type for the target shell
     fix_type_t fix_type =
         compat_get_fix_type_for_target(&entry->lint.fix, ctx->target);
 
-    /* Skip entries without fixes for this target */
+    /// Skip entries without fixes for this target
     if (fix_type == FIX_TYPE_NONE) {
         return;
     }
 
-    /* Check if pattern matches this line */
+    /// Check if pattern matches this line
     regex_t regex;
     if (regcomp(&regex, entry->lint.pattern, REG_EXTENDED) != 0) {
         return;
@@ -112,7 +106,7 @@ static void collect_fix_callback(const compat_entry_t *entry, void *user_data) {
 
     regmatch_t match;
     if (regexec(&regex, ctx->line, 1, &match, 0) == 0) {
-        /* Pattern matched - create fix */
+        /// Pattern matched - create fix
         fixer_fix_t fix = {
             .line = ctx->line_num,
             .column = (int)(match.rm_so + 1),
@@ -176,17 +170,17 @@ fixer_result_t fixer_load_file(fixer_context_t *ctx, const char *path) {
         return FIXER_ERR_IO;
     }
 
-    /* Get file size */
+    /// Get file size
     fseek(fp, 0, SEEK_END);
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (size < 0 || size > 10 * 1024 * 1024) { /* Max 10MB */
+    if (size < 0 || size > 10 * 1024 * 1024) { /// Max 10MB
         fclose(fp);
         return FIXER_ERR_IO;
     }
 
-    /* Allocate and read */
+    /// Allocate and read
     char *content = malloc((size_t)size + 1);
     if (!content) {
         fclose(fp);
@@ -198,7 +192,7 @@ fixer_result_t fixer_load_file(fixer_context_t *ctx, const char *path) {
 
     content[read] = '\0';
 
-    /* Store in context */
+    /// Store in context
     free(ctx->content);
     free(ctx->script_path);
 
@@ -206,7 +200,7 @@ fixer_result_t fixer_load_file(fixer_context_t *ctx, const char *path) {
     ctx->content_len = read;
     ctx->script_path = strdup(path);
 
-    /* Reset fixes */
+    /// Reset fixes
     ctx->count = 0;
 
     return FIXER_OK;
@@ -243,27 +237,27 @@ size_t fixer_collect_fixes(fixer_context_t *ctx, shell_mode_t target) {
         return 0;
     }
 
-    /* Convert enum to string for internal use */
+    /// Convert enum to string for internal use
     const char *target_str = shell_mode_name(target);
 
-    /* Suppress unused warning */
+    /// Suppress unused warning
     (void)calc_offset_ptr;
 
     ctx->count = 0;
 
-    /* Check each line against all compat entries with fix patterns */
+    /// Check each line against all compat entries with fix patterns
     const char *line_start = ctx->content;
     size_t line_offset = 0;
     int line_num = 1;
 
     while (*line_start) {
-        /* Find end of line */
+        /// Find end of line
         const char *line_end = strchr(line_start, '\n');
         if (!line_end) {
             line_end = line_start + strlen(line_start);
         }
 
-        /* Extract line for pattern matching */
+        /// Extract line for pattern matching
         size_t line_len = (size_t)(line_end - line_start);
         char line[FIXER_MAX_LINE_LENGTH];
         if (line_len >= sizeof(line)) {
@@ -272,7 +266,7 @@ size_t fixer_collect_fixes(fixer_context_t *ctx, shell_mode_t target) {
         memcpy(line, line_start, line_len);
         line[line_len] = '\0';
 
-        /* Set up callback context for this line */
+        /// Set up callback context for this line
         collect_ctx_t collect_ctx = {
             .fixer_ctx = ctx,
             .target = target_str,
@@ -281,10 +275,10 @@ size_t fixer_collect_fixes(fixer_context_t *ctx, shell_mode_t target) {
             .line_offset = line_offset,
         };
 
-        /* Check all compat entries against this line */
+        /// Check all compat entries against this line
         compat_foreach_entry(collect_fix_callback, &collect_ctx);
 
-        /* Move to next line */
+        /// Move to next line
         line_num++;
         line_offset += line_len + ((*line_end) ? 1 : 0);
         line_start = (*line_end) ? line_end + 1 : line_end;
@@ -298,7 +292,7 @@ fixer_result_t fixer_add_fix(fixer_context_t *ctx, const fixer_fix_t *fix) {
         return FIXER_ERR_NOMEM;
     }
 
-    /* Grow array if needed */
+    /// Grow array if needed
     if (ctx->count >= ctx->capacity) {
         size_t new_cap = ctx->capacity * 2;
         fixer_fix_t *new_fixes =
@@ -366,7 +360,7 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
     }
 
     if (ctx->count == 0) {
-        /* No fixes - copy original */
+        /// No fixes - copy original
         if (ctx->content_len >= output_size) {
             return FIXER_ERR_NOMEM;
         }
@@ -376,12 +370,11 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
         return FIXER_OK;
     }
 
-    /* Sort fixes in reverse order (end to start) */
+    /// Sort fixes in reverse order (end to start)
     qsort(ctx->fixes, ctx->count, sizeof(fixer_fix_t), compare_fixes_reverse);
 
-    /* Start with a copy of the original */
-    char *working =
-        malloc(ctx->content_len * 2 + 1); /* Extra space for growth */
+    /// Start with a copy of the original
+    char *working = malloc(ctx->content_len * 2 + 1); /// Extra space for growth
     if (!working) {
         return FIXER_ERR_NOMEM;
     }
@@ -393,9 +386,9 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
     for (size_t i = 0; i < ctx->count; i++) {
         fixer_fix_t *fix = &ctx->fixes[i];
 
-        /* Skip based on fix type and options */
+        /// Skip based on fix type and options
         if (fix->type == FIX_TYPE_MANUAL) {
-            continue; /* Never auto-fix manual items */
+            continue; /// Never auto-fix manual items
         }
         if (fix->type == FIX_TYPE_UNSAFE && !options->include_unsafe) {
             continue;
@@ -408,15 +401,15 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
             continue;
         }
 
-        /* Apply replacement */
+        /// Apply replacement
         size_t repl_len = strlen(fix->replacement);
         size_t new_len = working_len - fix->match_length + repl_len;
 
-        /* Calculate tail position */
+        /// Calculate tail position
         size_t tail_start = fix->match_start + fix->match_length;
         size_t tail_len = working_len - tail_start;
 
-        /* If replacement is longer, grow buffer first */
+        /// If replacement is longer, grow buffer first
         if (repl_len > fix->match_length) {
             char *new_working = realloc(working, new_len + 1);
             if (!new_working) {
@@ -426,27 +419,27 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
             working = new_working;
         }
 
-        /* Shift tail (memmove handles overlap) */
+        /// Shift tail (memmove handles overlap)
         memmove(working + fix->match_start + repl_len, working + tail_start,
                 tail_len + 1);
 
-        /* Insert replacement */
+        /// Insert replacement
         memcpy(working + fix->match_start, fix->replacement, repl_len);
         working_len = new_len;
 
-        /* If replacement is shorter, shrink buffer after the move */
+        /// If replacement is shorter, shrink buffer after the move
         if (repl_len < fix->match_length) {
             char *new_working = realloc(working, new_len + 1);
             if (new_working) {
                 working = new_working;
             }
-            /* If realloc fails on shrink, we can continue with larger buffer */
+            /// If realloc fails on shrink, we can continue with larger buffer
         }
 
         applied++;
     }
 
-    /* Copy result to output */
+    /// Copy result to output
     if (working_len >= output_size) {
         free(working);
         return FIXER_ERR_NOMEM;
@@ -468,7 +461,7 @@ fixer_result_t fixer_apply_fixes_alloc(fixer_context_t *ctx,
         return FIXER_ERR_NOMEM;
     }
 
-    /* Estimate output size (2x original should be safe) */
+    /// Estimate output size (2x original should be safe)
     size_t buf_size = ctx->content_len * 2 + 1;
     char *buf = malloc(buf_size);
     if (!buf) {
@@ -491,9 +484,9 @@ bool fixer_verify_syntax(const char *content, shell_mode_t target) {
         return false;
     }
 
-    (void)target; /* Target shell mode for future use */
+    (void)target; /// Target shell mode for future use
 
-    /* Use the parser to verify */
+    /// Use the parser to verify
     parser_t *parser = parser_new(content);
     if (!parser) {
         return false;
@@ -516,7 +509,7 @@ fixer_result_t fixer_write_file(const char *path, const char *content,
         return FIXER_ERR_IO;
     }
 
-    /* Create backup if requested */
+    /// Create backup if requested
     if (create_backup) {
         char backup_path[1024];
         snprintf(backup_path, sizeof(backup_path), "%s.bak", path);
@@ -536,7 +529,7 @@ fixer_result_t fixer_write_file(const char *path, const char *content,
         }
     }
 
-    /* Write new content */
+    /// Write new content
     FILE *fp = fopen(path, "w");
     if (!fp) {
         return FIXER_ERR_IO;
@@ -560,7 +553,7 @@ int fixer_generate_diff(fixer_context_t *ctx, const fixer_options_t *options,
         return -1;
     }
 
-    /* Get fixed content */
+    /// Get fixed content
     char *fixed = NULL;
     size_t applied = 0;
 
@@ -573,32 +566,32 @@ int fixer_generate_diff(fixer_context_t *ctx, const fixer_options_t *options,
         return snprintf(output, output_size, "No changes to apply.\n");
     }
 
-    /* Generate simple diff output */
+    /// Generate simple diff output
     int written = 0;
     const char *path = ctx->script_path ? ctx->script_path : "<stdin>";
 
     written += snprintf(output + written, output_size - (size_t)written,
                         "--- %s\n+++ %s (fixed)\n", path, path);
 
-    /* Simple line-by-line diff */
+    /// Simple line-by-line diff
     const char *orig_line = ctx->content;
     const char *fixed_line = fixed;
     int line_num = 1;
 
     while (*orig_line || *fixed_line) {
-        /* Get original line */
+        /// Get original line
         const char *orig_end = strchr(orig_line, '\n');
         if (!orig_end)
             orig_end = orig_line + strlen(orig_line);
         size_t orig_len = (size_t)(orig_end - orig_line);
 
-        /* Get fixed line */
+        /// Get fixed line
         const char *fixed_end = strchr(fixed_line, '\n');
         if (!fixed_end)
             fixed_end = fixed_line + strlen(fixed_line);
         size_t fixed_len = (size_t)(fixed_end - fixed_line);
 
-        /* Compare and output diff */
+        /// Compare and output diff
         if (orig_len != fixed_len ||
             memcmp(orig_line, fixed_line, orig_len) != 0) {
             written += snprintf(output + written, output_size - (size_t)written,
@@ -724,9 +717,7 @@ const char *fixer_result_string(fixer_result_t result) {
  * ============================================================================
  */
 
-/**
- * @brief Get the line content at a given line number
- */
+/// @brief Get the line content at a given line number
 static const char *get_line_at(const char *content, int line_num,
                                size_t *line_len) {
     const char *p = content;
@@ -770,7 +761,7 @@ fixer_result_t fixer_interactive_init(fixer_interactive_t *session,
         session->options = *options;
     }
 
-    /* Allocate accepted flags array */
+    /// Allocate accepted flags array
     if (ctx->count > 0) {
         session->accepted = calloc(ctx->count, sizeof(bool));
         if (!session->accepted) {
@@ -800,23 +791,23 @@ bool fixer_interactive_next(fixer_interactive_t *session,
         return false;
     }
 
-    /* Find next applicable fix */
+    /// Find next applicable fix
     while (session->current < session->ctx->count) {
         const fixer_fix_t *f = &session->ctx->fixes[session->current];
 
-        /* Skip manual fixes - they can't be auto-applied */
+        /// Skip manual fixes - they can't be auto-applied
         if (f->type == FIX_TYPE_MANUAL) {
             session->current++;
             continue;
         }
 
-        /* Skip unsafe if not included */
+        /// Skip unsafe if not included
         if (f->type == FIX_TYPE_UNSAFE && !session->options.include_unsafe) {
             session->current++;
             continue;
         }
 
-        /* Skip fixes without replacement */
+        /// Skip fixes without replacement
         if (!f->replacement) {
             session->current++;
             continue;
@@ -847,7 +838,7 @@ void fixer_interactive_respond(fixer_interactive_t *session,
         break;
 
     case FIXER_RESPONSE_ALL:
-        /* Accept current and all remaining applicable fixes */
+        /// Accept current and all remaining applicable fixes
         session->apply_all = true;
         for (size_t i = session->current; i < session->ctx->count; i++) {
             const fixer_fix_t *f = &session->ctx->fixes[i];
@@ -862,17 +853,17 @@ void fixer_interactive_respond(fixer_interactive_t *session,
                 session->accepted[i] = true;
             }
         }
-        session->current = session->ctx->count; /* End the loop */
+        session->current = session->ctx->count; /// End the loop
         break;
 
     case FIXER_RESPONSE_QUIT:
         session->aborted = true;
-        session->current = session->ctx->count; /* End the loop */
+        session->current = session->ctx->count; /// End the loop
         break;
 
     case FIXER_RESPONSE_DIFF:
     case FIXER_RESPONSE_HELP:
-        /* These don't advance - handled by caller */
+        /// These don't advance - handled by caller
         break;
     }
 }
@@ -883,7 +874,7 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
         return FIXER_ERR_NOMEM;
     }
 
-    /* Count accepted fixes */
+    /// Count accepted fixes
     size_t accepted_count = 0;
     for (size_t i = 0; i < session->ctx->count; i++) {
         if (session->accepted[i]) {
@@ -892,7 +883,7 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
     }
 
     if (accepted_count == 0) {
-        /* No fixes to apply - return original content */
+        /// No fixes to apply - return original content
         *output = strdup(session->ctx->content);
         if (!*output) {
             return FIXER_ERR_NOMEM;
@@ -902,16 +893,16 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
         return FIXER_OK;
     }
 
-    /* Sort fixes in reverse order for application */
+    /// Sort fixes in reverse order for application
     qsort(session->ctx->fixes, session->ctx->count, sizeof(fixer_fix_t),
           compare_fixes_reverse);
 
-    /* We need to re-map accepted flags after sort - but since we sorted
-     * by match_start descending, we need to track which fixes were accepted
-     * by their original index. For simplicity, we'll apply all accepted
-     * fixes based on the match_start position. */
+    /// We need to re-map accepted flags after sort - but since we sorted
+    /// by match_start descending, we need to track which fixes were accepted
+    /// by their original index. For simplicity, we'll apply all accepted
+    /// fixes based on the match_start position.
 
-    /* Start with a copy of the original */
+    /// Start with a copy of the original
     size_t buf_size = session->ctx->content_len * 2 + 1;
     char *working = malloc(buf_size);
     if (!working) {
@@ -933,11 +924,11 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
             continue;
         }
 
-        /* Apply replacement */
+        /// Apply replacement
         size_t repl_len = strlen(fix->replacement);
         size_t new_len = working_len - fix->match_length + repl_len;
 
-        /* Make room if needed */
+        /// Make room if needed
         if (new_len >= buf_size) {
             buf_size = new_len * 2;
             char *new_working = realloc(working, buf_size);
@@ -948,13 +939,13 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
             working = new_working;
         }
 
-        /* Shift tail */
+        /// Shift tail
         size_t tail_start = fix->match_start + fix->match_length;
         size_t tail_len = working_len - tail_start;
         memmove(working + fix->match_start + repl_len, working + tail_start,
                 tail_len + 1);
 
-        /* Insert replacement */
+        /// Insert replacement
         memcpy(working + fix->match_start, fix->replacement, repl_len);
         working_len = new_len;
 
@@ -977,17 +968,17 @@ void fixer_print_fix_interactive(const fixer_context_t *ctx,
 
     const char *path = ctx->script_path ? ctx->script_path : "<stdin>";
 
-    /* Fix type indicator */
+    /// Fix type indicator
     const char *type_str;
     const char *type_color;
     switch (fix->type) {
     case FIX_TYPE_SAFE:
         type_str = "safe";
-        type_color = "\033[32m"; /* Green */
+        type_color = "\033[32m"; /// Green
         break;
     case FIX_TYPE_UNSAFE:
         type_str = "unsafe";
-        type_color = "\033[33m"; /* Yellow */
+        type_color = "\033[33m"; /// Yellow
         break;
     default:
         type_str = "fix";
@@ -1001,21 +992,21 @@ void fixer_print_fix_interactive(const fixer_context_t *ctx,
            type_str, path, fix->line);
     printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    /* Show the message */
+    /// Show the message
     if (fix->message) {
         printf("\n  %s\n", fix->message);
     }
 
-    /* Show the line context */
+    /// Show the line context
     size_t line_len = 0;
     const char *line = get_line_at(ctx->content, fix->line, &line_len);
 
     if (line && line_len > 0) {
         printf("\n  \033[31m- %.*s\033[0m\n", (int)line_len, line);
 
-        /* Show the replacement in context */
+        /// Show the replacement in context
         if (fix->replacement && fix->column > 0) {
-            /* Reconstruct the line with the fix applied */
+            /// Reconstruct the line with the fix applied
             int col = fix->column - 1;
             if (col >= 0 && (size_t)col < line_len) {
                 printf("  \033[32m+ %.*s%s%.*s\033[0m\n", col, line,
@@ -1049,7 +1040,7 @@ fixer_response_t fixer_read_response(void) {
         return FIXER_RESPONSE_QUIT;
     }
 
-    /* Handle just Enter as 'yes' */
+    /// Handle just Enter as 'yes'
     if (buf[0] == '\n') {
         return FIXER_RESPONSE_YES;
     }
@@ -1082,7 +1073,7 @@ fixer_response_t fixer_read_response(void) {
 
     default:
         printf("Unknown command '%c'. Press '?' for help.\n", buf[0]);
-        return fixer_read_response(); /* Retry */
+        return fixer_read_response(); /// Retry
     }
 }
 
@@ -1092,7 +1083,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         return -1;
     }
 
-    /* Count applicable fixes */
+    /// Count applicable fixes
     size_t applicable = 0;
     for (size_t i = 0; i < ctx->count; i++) {
         const fixer_fix_t *f = &ctx->fixes[i];
@@ -1113,24 +1104,24 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
     printf("\nInteractive fix mode: %zu fix(es) available\n", applicable);
     printf("Press '?' for help\n");
 
-    /* Initialize session */
+    /// Initialize session
     fixer_interactive_t session;
     if (fixer_interactive_init(&session, ctx, options) != FIXER_OK) {
         fprintf(stderr, "Failed to initialize interactive session\n");
         return -1;
     }
 
-    /* Process each fix */
+    /// Process each fix
     const fixer_fix_t *fix;
     size_t fix_index = 0;
 
     while (fixer_interactive_next(&session, &fix)) {
         fix_index++;
 
-        /* Show the fix */
+        /// Show the fix
         fixer_print_fix_interactive(ctx, fix, fix_index, applicable);
 
-        /* Get user response */
+        /// Get user response
         fixer_response_t response;
         do {
             response = fixer_read_response();
@@ -1138,7 +1129,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
             if (response == FIXER_RESPONSE_HELP) {
                 fixer_print_interactive_help();
             } else if (response == FIXER_RESPONSE_DIFF) {
-                /* Show just this fix as a diff */
+                /// Show just this fix as a diff
                 printf("\n");
                 if (fix->original && fix->replacement) {
                     printf("  @@ -%d,%d +%d,%d @@\n", fix->line, 1, fix->line,
@@ -1154,7 +1145,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         fixer_interactive_respond(&session, response);
     }
 
-    /* Count accepted */
+    /// Count accepted
     size_t accepted = 0;
     for (size_t i = 0; i < ctx->count; i++) {
         if (session.accepted[i]) {
@@ -1168,7 +1159,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         return 0;
     }
 
-    /* Apply accepted fixes */
+    /// Apply accepted fixes
     printf("\nApplying %zu fix(es)...\n", accepted);
 
     char *fixed_content = NULL;
@@ -1184,7 +1175,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         return -1;
     }
 
-    /* Verify syntax if requested */
+    /// Verify syntax if requested
     if (options->verify_syntax && fixed_content) {
         if (!fixer_verify_syntax(fixed_content, options->target)) {
             fprintf(stderr,
@@ -1195,7 +1186,7 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         }
     }
 
-    /* Write to file if not dry run */
+    /// Write to file if not dry run
     if (!options->dry_run && script_path && fixed_content) {
         result = fixer_write_file(script_path, fixed_content,
                                   options->create_backup);
@@ -1213,11 +1204,11 @@ int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
         }
     } else if (options->dry_run) {
         printf("\nDry run - would apply %zu fix(es):\n", applied);
-        /* Show diff */
+        /// Show diff
         if (fixed_content && ctx->content) {
             printf("--- %s\n", script_path ? script_path : "<stdin>");
             printf("+++ %s (fixed)\n", script_path ? script_path : "<stdin>");
-            /* Simple diff output */
+            /// Simple diff output
             printf("%s", fixed_content);
         }
     }

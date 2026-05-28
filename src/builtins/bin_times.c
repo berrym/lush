@@ -22,13 +22,13 @@
  * @return 0 on success, 1 on error
  */
 int bin_times(int argc, char **argv) {
-    (void)argc; // Suppress unused parameter warning
-    (void)argv; // Suppress unused parameter warning
+    (void)argc; /// Suppress unused parameter warning
+    (void)argv; /// Suppress unused parameter warning
 
     struct tms tms_buf;
     clock_t real_time;
 
-    // Get process times
+    /// Get process times
     real_time = times(&tms_buf);
     if (real_time == (clock_t)-1) {
         int saved_errno = errno;
@@ -40,20 +40,20 @@ int bin_times(int argc, char **argv) {
         return 1;
     }
 
-    // Get clock ticks per second for conversion
+    /// Get clock ticks per second for conversion
     long ticks_per_sec = sysconf(_SC_CLK_TCK);
     if (ticks_per_sec <= 0) {
-        ticks_per_sec = 100; // Default fallback
+        ticks_per_sec = 100; /// Default fallback
     }
 
-    // Convert ticks to seconds and format output
+    /// Convert ticks to seconds and format output
     double user_time = (double)tms_buf.tms_utime / ticks_per_sec;
     double system_time = (double)tms_buf.tms_stime / ticks_per_sec;
     double child_user_time = (double)tms_buf.tms_cutime / ticks_per_sec;
     double child_system_time = (double)tms_buf.tms_cstime / ticks_per_sec;
 
-    // Output in POSIX format: user_time system_time child_user_time
-    // child_system_time
+    /// Output in POSIX format: user_time system_time child_user_time
+    /// child_system_time
     printf("%.2dm%.3fs %.2dm%.3fs\n", (int)(user_time / 60),
            user_time - (int)(user_time / 60) * 60, (int)(system_time / 60),
            system_time - (int)(system_time / 60) * 60);

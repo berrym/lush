@@ -87,5 +87,26 @@ void error_syscall(const char *str) {
 int last_exit_status = 0;
 shell_options_t shell_opts = {0};
 
-/* Interactive shell stub */
+/// Interactive shell stub
 bool is_interactive_shell(void) { return false; }
+
+/// Debug subsystem stubs -- parser.c uses debug_trace_printf when
+/// instrumenting recognizer decisions. Tests don't link the debug
+/// subsystem so stub it as a no-op here.
+struct debug_context;
+struct debug_context *g_debug_context = NULL;
+void debug_trace_printf(struct debug_context *ctx, const char *format, ...) {
+    (void)ctx;
+    (void)format;
+}
+
+/// copy_ast_node lives in executor.c and is used by parse_function_definition
+/// to deep-copy a body across multi-name function definitions
+/// (`function NAME1 NAME2 { body }` zsh extension). Parser tests don't link
+/// executor; stub returns NULL which is treated as a body-copy failure by
+/// the caller (the parser tests don't exercise the multi-name form).
+#include "node.h"
+node_t *copy_ast_node(node_t *node) {
+    (void)node;
+    return NULL;
+}

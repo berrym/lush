@@ -14,7 +14,7 @@
 #include "lle/prompt/theme_loader.h"
 
 int display_lle_theme(int argc, char **argv) {
-    /* LLE prompt theme control */
+    // LLE prompt theme control
     if (!g_lle_integration || !g_lle_integration->prompt_composer) {
         fprintf(stderr,
                 "display lle theme: LLE prompt system not initialized\n");
@@ -28,7 +28,7 @@ int display_lle_theme(int argc, char **argv) {
         return 1;
     }
 
-    /* No subcommand - show current theme and usage */
+    // No subcommand - show current theme and usage
     if (argc < 2) {
         const lle_theme_t *active = lle_theme_registry_get_active(themes);
         printf("LLE Prompt Theme\n");
@@ -53,7 +53,7 @@ int display_lle_theme(int argc, char **argv) {
     const char *theme_subcmd = argv[1];
 
     if (strcmp(theme_subcmd, "list") == 0) {
-        /* List all available themes */
+        // List all available themes
         printf("Available LLE Prompt Themes:\n\n");
         const lle_theme_t *active = lle_theme_registry_get_active(themes);
 
@@ -71,7 +71,7 @@ int display_lle_theme(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(theme_subcmd, "set") == 0) {
-        /* Set active theme */
+        // Set active theme
         if (argc < 3) {
             fprintf(stderr, "display lle theme set: Missing theme name\n");
             fprintf(stderr, "Usage: display lle theme set <name>\n");
@@ -81,18 +81,17 @@ int display_lle_theme(int argc, char **argv) {
         }
 
         const char *theme_name = argv[2];
-        /* Use lle_composer_set_theme to properly clear cached templates
-         */
+        /// Use lle_composer_set_theme to properly clear cached templates
         lle_result_t result = lle_composer_set_theme(
             g_lle_integration->prompt_composer, theme_name);
 
         if (result == LLE_SUCCESS) {
-            /* Sync PS1/PS2 from the new theme */
+            // Sync PS1/PS2 from the new theme
             const lle_theme_t *new_theme =
                 lle_composer_get_theme(g_lle_integration->prompt_composer);
             if (new_theme) {
                 if (new_theme->layout.style != LLE_PROMPT_STYLE_POWERLINE) {
-                    /* Plain themes: write template to PS1 */
+                    // Plain themes: write template to PS1
                     if (strlen(new_theme->layout.ps1_format) > 0) {
                         symtable_set_global("PS1",
                                             new_theme->layout.ps1_format);
@@ -119,12 +118,12 @@ int display_lle_theme(int argc, char **argv) {
         }
 
     } else if (strcmp(theme_subcmd, "reload") == 0) {
-        /* Reload user themes from files */
+        // Reload user themes from files
         printf("Reloading themes from files...\n");
         size_t loaded = lle_theme_reload_user_themes(themes);
         printf("Loaded %zu new theme(s)\n", loaded);
 
-        /* Show theme directories */
+        // Show theme directories
         char user_dir[LLE_THEME_PATH_MAX];
         if (lle_theme_get_user_dir(user_dir, sizeof(user_dir)) == LLE_SUCCESS) {
             printf("User theme directory: %s\n", user_dir);
@@ -133,7 +132,7 @@ int display_lle_theme(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(theme_subcmd, "export") == 0) {
-        /* Export theme to TOML format */
+        // Export theme to TOML format
         if (argc < 3) {
             fprintf(stderr, "display lle theme export: Missing theme name\n");
             fprintf(stderr, "Usage: display lle theme export <name> [file]\n");
@@ -151,7 +150,7 @@ int display_lle_theme(int argc, char **argv) {
         }
 
         if (argc >= 4) {
-            /* Export to file */
+            // Export to file
             const char *filepath = argv[3];
             lle_result_t result = lle_theme_export_to_file(theme, filepath);
             if (result == LLE_SUCCESS) {
@@ -165,7 +164,7 @@ int display_lle_theme(int argc, char **argv) {
                 return 1;
             }
         } else {
-            /* Export to stdout */
+            // Export to stdout
             char *buffer = malloc(LLE_THEME_FILE_MAX_SIZE);
             if (!buffer) {
                 fprintf(stderr, "display lle theme export: Out of memory\n");

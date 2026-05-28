@@ -1,8 +1,20 @@
 # LLE Release Roadmap
 
-**Created**: 2025-11-30 (Session 37)  
-**Last Updated**: 2025-11-30  
-**Status**: Active Development  
+**Created**: 2025-11-30 (Session 37)
+**Last Updated**: 2025-11-30 (snapshot); reading note 2026-05-23
+**Status**: Active Development
+
+**Reading note (2026-05-23):** point-in-time snapshot from
+2025-11-30. Since then most of the "Missing" priority items have
+landed: Ctrl+R history search, undo/redo, `display lle`
+subcommands, builtin completion context, and the LLE Phase 3
+customization trio (`display lle widget`/`hook`/`segment`). The
+GNU-Readline fallback option remains the compile-time escape
+hatch; LLE has been the default for months. Current LLE feature
+status is in the [README](../../README.md) status table and
+[USER_GUIDE.md](../USER_GUIDE.md) "Line Editing (LLE)" section.
+Treat this document as a historical roadmap; the README/USER_GUIDE
+are the current truth.
 
 ---
 

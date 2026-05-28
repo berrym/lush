@@ -1,4 +1,12 @@
 /**
+ * @file test_memory_mock.h
+ * @brief Functional tests for memory mock
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Mock Memory Pool Header for LLE Testing
  *
  * Declares mock memory pool functions for standalone unit tests.
@@ -10,7 +18,7 @@
 #ifndef TEST_MEMORY_MOCK_H
 #define TEST_MEMORY_MOCK_H
 
-/* Prevent the real memory_management.h from being included */
+// Prevent the real memory_management.h from being included
 #define LLE_MEMORY_MANAGEMENT_H
 
 #include <stddef.h>
@@ -19,7 +27,7 @@
 extern "C" {
 #endif
 
-/* Mock memory pool type - simple stub */
+// Mock memory pool type - simple stub
 typedef struct lush_memory_pool_system_t {
     int dummy;
 } lush_memory_pool_system_t;
@@ -27,21 +35,21 @@ typedef struct lush_memory_pool_system_t {
 typedef lush_memory_pool_system_t lush_memory_pool_t;
 typedef lush_memory_pool_system_t lle_memory_pool_t;
 
-/* Mock optimizer type to satisfy performance.h dependencies */
+// Mock optimizer type to satisfy performance.h dependencies
 typedef struct lle_memory_optimizer {
     int dummy;
 } lle_memory_optimizer_t;
 
-/* Global memory pool instance */
+// Global memory pool instance
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Mock memory pool functions */
+// Mock memory pool functions
 void *lle_pool_alloc(size_t size);
 void lle_pool_free(void *ptr);
 void *lush_pool_alloc(lush_memory_pool_t *pool, size_t size);
 void lush_pool_free(lush_memory_pool_t *pool, void *ptr);
 
-/* LLE memory pool API */
+// LLE memory pool API
 lle_memory_pool_t *lle_pool_create(void);
 void lle_pool_destroy(lle_memory_pool_t *pool);
 int lle_pool_init(lle_memory_pool_t **pool, size_t size);
@@ -50,4 +58,4 @@ int lle_pool_init(lle_memory_pool_t **pool, size_t size);
 }
 #endif
 
-#endif /* TEST_MEMORY_MOCK_H */
+#endif // TEST_MEMORY_MOCK_H

@@ -22,10 +22,10 @@
  */
 
 typedef struct function_param {
-    char *name;                  /* Parameter name */
-    char *default_value;         /* Default value (NULL if required) */
-    bool is_required;            /* True if parameter is required */
-    struct function_param *next; /* Next parameter in list */
+    char *name;                  ///< Parameter name
+    char *default_value;         ///< Default value (NULL if required)
+    bool is_required;            ///< True if parameter is required
+    struct function_param *next; ///< Next parameter in list
 } function_param_t;
 
 function_param_t *create_function_param(const char *name,
@@ -60,6 +60,37 @@ void free_function_params(function_param_t *params) {
 bool is_posix_mode_enabled(void) { return false; }
 
 /* ============================================================================
+ * AST-copy / debug-trace stubs (from executor.c and debug.c)
+ * ============================================================================
+ *
+ * parser.c gained references to these when the zsh multi-name function
+ * definition (`function NAME1 NAME2 { body }`) landed: the multi-name
+ * path deep-copies the body via copy_ast_node, and the parse-trace
+ * instrumentation calls debug_trace_printf guarded on g_debug_context.
+ * The parser fuzz target exercises parsing only, so a NULL-returning
+ * copy and a no-op trace are the correct minimal shapes -- they keep
+ * the heavy executor/debug translation units out of the fuzz link
+ * while leaving the parse path fully fuzzable. Opaque pointer types
+ * suffice; the fuzzer never dereferences the copy result.
+ */
+
+struct node;
+
+struct node *copy_ast_node(struct node *node) {
+    (void)node;
+    return NULL;
+}
+
+struct debug_context;
+struct debug_context *g_debug_context = NULL;
+
+void debug_trace_printf(struct debug_context *ctx, const char *format, ...) {
+    (void)ctx;
+    (void)format;
+    /// Silent for fuzzing
+}
+
+/* ============================================================================
  * UTF-8 Support
  * ============================================================================
  *
@@ -78,13 +109,13 @@ bool is_posix_mode_enabled(void) { return false; }
 int error_return(int errcode, const char *fmt, ...) {
     (void)errcode;
     (void)fmt;
-    /* Silent for fuzzing */
+    /// Silent for fuzzing
     return errcode;
 }
 
 void error_syscall(const char *str) {
     (void)str;
-    /* Silent for fuzzing */
+    /// Silent for fuzzing
 }
 
 /* ============================================================================
@@ -92,4 +123,4 @@ void error_syscall(const char *str) {
  * ============================================================================
  */
 
-/* last_exit_status is defined in src/globals.c */
+/// last_exit_status is defined in src/globals.c

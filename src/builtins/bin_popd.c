@@ -68,7 +68,7 @@ int bin_popd(int argc, char **argv) {
     }
 
     if (argc == 1) {
-        // popd with no args: pop top and cd there
+        /// popd with no args: pop top and cd there
         char *dir = dirstack_pop();
         if (!dir) {
             {
@@ -121,7 +121,7 @@ int bin_popd(int argc, char **argv) {
             executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
                                   builtin_get_source_location(), "%s: %s", dir,
                                   strerror(saved_errno));
-            // Put it back
+            /// Put it back
             dirstack_push(dir);
             free(dir);
             free(cwd);
@@ -146,7 +146,7 @@ int bin_popd(int argc, char **argv) {
 
     char *arg = argv[1];
 
-    // Check for +N or -N removal
+    /// Check for +N or -N removal
     if (arg[0] == '+' || arg[0] == '-') {
         char *endptr;
         long n = strtol(arg + 1, &endptr, 10);
@@ -158,7 +158,7 @@ int bin_popd(int argc, char **argv) {
                 idx = dirstack_size() - (int)n;
             }
 
-            // +0 means current directory, can't remove that
+            /// +0 means current directory, can't remove that
             if (idx == 0) {
                 {
                     source_location_t loc = builtin_get_source_location();
@@ -203,7 +203,7 @@ int bin_popd(int argc, char **argv) {
                 return 1;
             }
 
-            // Adjust for cwd being position 0
+            /// Adjust for cwd being position 0
             int stack_idx = idx - 1;
 
             if (dirstack_remove(stack_idx) < 0) {

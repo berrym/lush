@@ -160,4 +160,4 @@ size_t lle_utf8_tolower_first(const char *input, size_t input_len, char *output,
 size_t lle_utf8_casefold(const char *input, size_t input_len, char *output,
                          size_t output_size);
 
-#endif /* LLE_UNICODE_CASE_H */
+#endif /// LLE_UNICODE_CASE_H

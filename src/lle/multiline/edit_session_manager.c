@@ -18,29 +18,29 @@
 #include <string.h>
 #include <time.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_MAX_SESSIONS 10
-#define DEFAULT_SESSION_TIMEOUT_MS 300000 /* 5 minutes */
+#define DEFAULT_SESSION_TIMEOUT_MS 300000 // 5 minutes
 #define DEFAULT_MAX_OPERATIONS 1000
 
-/* Edit session manager implementation */
+// Edit session manager implementation
 struct lle_edit_session_manager {
     lle_memory_pool_t *memory_pool;
     lle_history_core_t *history_core;
     lle_session_manager_config_t config;
 
-    /* Active sessions */
+    // Active sessions
     lle_edit_session_t *current_session;
     lle_edit_session_t **sessions;
     size_t session_count;
 
-    /* Session ID counter */
+    // Session ID counter
     uint64_t next_session_id;
 
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static lle_edit_session_t *
 create_edit_session(lle_edit_session_manager_t *manager, size_t entry_index);
 static void free_edit_session(lle_edit_session_t *session);
@@ -114,7 +114,7 @@ lle_edit_session_manager_create(lle_edit_session_manager_t **manager,
         lle_edit_session_manager_get_default_config(&new_manager->config);
     }
 
-    /* Allocate sessions array */
+    // Allocate sessions array
     new_manager->sessions = lle_pool_alloc(new_manager->config.max_sessions *
                                            sizeof(lle_edit_session_t *));
     if (!new_manager->sessions) {
@@ -145,7 +145,7 @@ lle_edit_session_manager_destroy(lle_edit_session_manager_t *manager) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Free all sessions */
+    // Free all sessions
     if (manager->sessions) {
         for (size_t i = 0; i < manager->config.max_sessions; i++) {
             if (manager->sessions[i]) {
@@ -155,7 +155,7 @@ lle_edit_session_manager_destroy(lle_edit_session_manager_t *manager) {
     }
 
     manager->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -180,12 +180,12 @@ lle_edit_session_manager_start_session(lle_edit_session_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if already at max sessions */
+    // Check if already at max sessions
     if (manager->session_count >= manager->config.max_sessions) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Verify entry exists */
+    // Verify entry exists
     size_t entry_count = 0;
     lle_result_t result =
         lle_history_get_entry_count(manager->history_core, &entry_count);
@@ -193,13 +193,13 @@ lle_edit_session_manager_start_session(lle_edit_session_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Create new session */
+    // Create new session
     lle_edit_session_t *new_session = create_edit_session(manager, entry_index);
     if (!new_session) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Add to sessions array */
+    // Add to sessions array
     for (size_t i = 0; i < manager->config.max_sessions; i++) {
         if (!manager->sessions[i]) {
             manager->sessions[i] = new_session;
@@ -208,7 +208,7 @@ lle_edit_session_manager_start_session(lle_edit_session_manager_t *manager,
         }
     }
 
-    /* Set as current session */
+    // Set as current session
     manager->current_session = new_session;
 
     *session = new_session;
@@ -246,15 +246,15 @@ lle_result_t lle_edit_session_manager_record_operation(
     }
 
     if (!manager->config.track_operations) {
-        return LLE_SUCCESS; /* Operation tracking disabled */
+        return LLE_SUCCESS; // Operation tracking disabled
     }
 
-    /* Check operation limit */
+    // Check operation limit
     if (session->operation_count >= manager->config.max_operations) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Allocate operation record */
+    // Allocate operation record
     lle_edit_operation_t *op = lle_pool_alloc(sizeof(lle_edit_operation_t));
     if (!op) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -263,7 +263,7 @@ lle_result_t lle_edit_session_manager_record_operation(
     memcpy(op, operation, sizeof(lle_edit_operation_t));
     op->next = NULL;
 
-    /* Copy text if present */
+    // Copy text if present
     if (operation->text && operation->text_length > 0) {
         op->text = lle_pool_alloc(operation->text_length + 1);
         if (!op->text) {
@@ -273,10 +273,10 @@ lle_result_t lle_edit_session_manager_record_operation(
         op->text[operation->text_length] = '\0';
     }
 
-    /* Get timestamp */
+    // Get timestamp
     clock_gettime(CLOCK_MONOTONIC, &op->timestamp);
 
-    /* Add to session operation list */
+    // Add to session operation list
     if (!session->first_operation) {
         session->first_operation = op;
         session->last_operation = op;
@@ -306,7 +306,7 @@ lle_edit_session_manager_update_text(lle_edit_session_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate new text buffer */
+    // Allocate new text buffer
     char *text_copy = lle_pool_alloc(new_length + 1);
     if (!text_copy) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -315,13 +315,13 @@ lle_edit_session_manager_update_text(lle_edit_session_manager_t *manager,
     memcpy(text_copy, new_text, new_length);
     text_copy[new_length] = '\0';
 
-    /* Update session */
+    // Update session
     session->current_text = text_copy;
     session->current_length = new_length;
     session->has_modifications = true;
     session->state = LLE_EDIT_SESSION_MODIFIED;
 
-    /* Update timestamp */
+    // Update timestamp
     clock_gettime(CLOCK_MONOTONIC, &session->last_modified);
 
     return LLE_SUCCESS;
@@ -347,22 +347,22 @@ lle_edit_session_manager_complete_session(lle_edit_session_manager_t *manager,
 
     session->state = LLE_EDIT_SESSION_COMPLETED;
 
-    /* If modifications were made, update the history entry */
+    // If modifications were made, update the history entry
     if (session->has_modifications && session->current_text) {
-        /* Get the history entry */
+        // Get the history entry
         lle_history_entry_t *entry = NULL;
         lle_result_t result = lle_history_get_entry_by_index(
             manager->history_core, session->entry_index, &entry);
 
         if (result == LLE_SUCCESS && entry) {
-            /* Update entry command text */
-            /* Note: This would normally call lle_history_update_entry() */
-            /* For now, we just mark the session as complete */
-            (void)entry; /* Suppress unused warning */
+            // Update entry command text
+            // Note: This would normally call lle_history_update_entry()
+            // For now, we just mark the session as complete
+            (void)entry; // Suppress unused warning
         }
     }
 
-    /* Remove from sessions array */
+    // Remove from sessions array
     for (size_t i = 0; i < manager->config.max_sessions; i++) {
         if (manager->sessions[i] == session) {
             manager->sessions[i] = NULL;
@@ -371,12 +371,12 @@ lle_edit_session_manager_complete_session(lle_edit_session_manager_t *manager,
         }
     }
 
-    /* Clear current session if this was it */
+    // Clear current session if this was it
     if (manager->current_session == session) {
         manager->current_session = NULL;
     }
 
-    /* Free session resources */
+    // Free session resources
     free_edit_session(session);
 
     return LLE_SUCCESS;
@@ -397,7 +397,7 @@ lle_edit_session_manager_cancel_session(lle_edit_session_manager_t *manager,
 
     session->state = LLE_EDIT_SESSION_CANCELING;
 
-    /* Remove from sessions array */
+    // Remove from sessions array
     for (size_t i = 0; i < manager->config.max_sessions; i++) {
         if (manager->sessions[i] == session) {
             manager->sessions[i] = NULL;
@@ -406,12 +406,12 @@ lle_edit_session_manager_cancel_session(lle_edit_session_manager_t *manager,
         }
     }
 
-    /* Clear current session if this was it */
+    // Clear current session if this was it
     if (manager->current_session == session) {
         manager->current_session = NULL;
     }
 
-    /* Free session resources */
+    // Free session resources
     free_edit_session(session);
 
     return LLE_SUCCESS;
@@ -435,7 +435,7 @@ lle_edit_session_manager_check_timeout(lle_edit_session_manager_t *manager,
     *timed_out = false;
 
     if (manager->config.session_timeout_ms == 0) {
-        return LLE_SUCCESS; /* No timeout configured */
+        return LLE_SUCCESS; // No timeout configured
     }
 
     struct timespec now;
@@ -475,7 +475,7 @@ create_edit_session(lle_edit_session_manager_t *manager, size_t entry_index) {
     session->state = LLE_EDIT_SESSION_ACTIVE;
     session->entry_index = entry_index;
 
-    /* Get original entry text */
+    // Get original entry text
     char *text = NULL;
     size_t length = 0;
     if (get_entry_text(manager->history_core, entry_index, &text, &length) ==
@@ -483,12 +483,12 @@ create_edit_session(lle_edit_session_manager_t *manager, size_t entry_index) {
         session->original_text = text;
         session->original_length = length;
 
-        /* Initialize current text as copy of original */
+        // Initialize current text as copy of original
         session->current_text = text;
         session->current_length = length;
     }
 
-    /* Initialize timestamps */
+    // Initialize timestamps
     clock_gettime(CLOCK_MONOTONIC, &session->start_time);
     session->last_modified = session->start_time;
 
@@ -510,8 +510,8 @@ create_edit_session(lle_edit_session_manager_t *manager, size_t entry_index) {
  * API completeness and potential future enhancements.
  */
 static void free_edit_session(lle_edit_session_t *session) {
-    /* Memory pool owns all allocations, no explicit frees needed */
-    /* This function exists for API completeness and future enhancements */
+    // Memory pool owns all allocations, no explicit frees needed
+    // This function exists for API completeness and future enhancements
     (void)session;
 }
 

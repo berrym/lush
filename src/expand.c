@@ -67,13 +67,13 @@ word_t *word_create(const char *str) {
         return NULL;
     }
 
-    // Allocate word structure
+    /// Allocate word structure
     word_t *word = calloc(1, sizeof(word_t));
     if (!word) {
         return NULL;
     }
 
-    // Allocate and copy the word text
+    /// Allocate and copy the word text
     size_t len = strlen(str);
     word->data = calloc(len + 1, sizeof(char));
     if (!word->data) {
@@ -118,13 +118,13 @@ char *word_list_to_string(word_t *head) {
         return NULL;
     }
 
-    // Calculate total length
+    /// Calculate total length
     size_t total_len = 0;
     for (word_t *w = head; w; w = w->next) {
-        total_len += w->len + 1; // +1 for space or null
+        total_len += w->len + 1; /// +1 for space or null
     }
 
-    // Allocate and build string
+    /// Allocate and build string
     char *result = calloc(total_len + 1, sizeof(char));
     if (!result) {
         return NULL;
@@ -156,21 +156,21 @@ char *expand_alias_recursive(const char *alias_name) {
         return NULL;
     }
 
-    // Look up the initial alias
+    /// Look up the initial alias
     char *alias_value = lookup_alias(alias_name);
     if (!alias_value) {
         return NULL;
     }
 
-    // Make a copy we can modify
+    /// Make a copy we can modify
     char *result = strdup(alias_value);
     if (!result) {
         return NULL;
     }
 
-    // Recursively expand any further aliases
-    // This is a simplified version - real implementation would need
-    // to handle word tokenization and prevent infinite recursion
+    /// Recursively expand any further aliases
+    /// This is a simplified version - real implementation would need
+    /// to handle word tokenization and prevent infinite recursion
 
     return result;
 }

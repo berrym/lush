@@ -9,6 +9,7 @@
  */
 
 #include "dirstack.h"
+#include "lle/lle_pager.h"
 #include "symtable.h"
 
 #include <stdio.h>
@@ -94,7 +95,7 @@ const char *dirstack_peek(int n) {
         return NULL;
     }
 
-    // Convert index from top to array index
+    /// Convert index from top to array index
     int idx = stack_top - n;
     if (idx < 0 || idx > stack_top) {
         return NULL;
@@ -113,10 +114,10 @@ int dirstack_remove(int n) {
         return -1;
     }
 
-    // Free the entry being removed
+    /// Free the entry being removed
     free(stack[idx]);
 
-    // Shift remaining entries down
+    /// Shift remaining entries down
     for (int i = idx; i < stack_top; i++) {
         stack[i] = stack[i + 1];
     }
@@ -153,7 +154,7 @@ int dirstack_rotate(int n) {
         return -1;
     }
 
-    // Handle negative indices (from bottom)
+    /// Handle negative indices (from bottom)
     int idx;
     if (n >= 0) {
         idx = stack_top - n;
@@ -166,19 +167,19 @@ int dirstack_rotate(int n) {
     }
 
     if (idx == stack_top) {
-        // Already at top, nothing to do
+        /// Already at top, nothing to do
         return 0;
     }
 
-    // Save the entry to rotate
+    /// Save the entry to rotate
     char *entry = stack[idx];
 
-    // Shift entries down
+    /// Shift entries down
     for (int i = idx; i < stack_top; i++) {
         stack[i] = stack[i + 1];
     }
 
-    // Put the rotated entry at top
+    /// Put the rotated entry at top
     stack[stack_top] = entry;
 
     dirstack_sync_variable();
@@ -186,43 +187,60 @@ int dirstack_rotate(int n) {
 }
 
 void dirstack_print(bool one_per_line, bool show_index) {
-    // First print the current directory
+    /// Buffer the listing through open_memstream and hand it to
+    /// lle_pager_present so deeply pushed stacks paginate in
+    /// interactive shells. The single-line form is short by
+    /// definition and will stream directly via the pager's
+    /// fits-in-one-screen branch. On memstream allocation failure
+    /// the per-iteration writes target stdout.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    FILE *sink = out ? out : stdout;
+
+    /// First print the current directory
     char *cwd = getcwd(NULL, 0);
     if (cwd) {
         if (show_index) {
-            printf(" 0  %s", cwd);
+            fprintf(sink, " 0  %s", cwd);
         } else {
-            printf("%s", cwd);
+            fprintf(sink, "%s", cwd);
         }
         free(cwd);
     }
 
-    // Then print the stack (top to bottom)
+    /// Then print the stack (top to bottom)
     for (int i = stack_top; i >= 0; i--) {
         if (one_per_line) {
-            printf("\n");
+            fputc('\n', sink);
             if (show_index) {
-                printf("%2d  %s", stack_top - i + 1, stack[i]);
+                fprintf(sink, "%2d  %s", stack_top - i + 1, stack[i]);
             } else {
-                printf("%s", stack[i]);
+                fprintf(sink, "%s", stack[i]);
             }
         } else {
-            printf(" %s", stack[i]);
+            fprintf(sink, " %s", stack[i]);
         }
     }
-    printf("\n");
+    fputc('\n', sink);
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
+    }
 }
 
 void dirstack_sync_variable(void) {
-    // Clear existing DIRSTACK array
+    /// Clear existing DIRSTACK array
     symtable_unset_global("DIRSTACK");
 
     if (!initialized || stack_top < 0) {
         return;
     }
 
-    // Create DIRSTACK as an indexed array with stack contents
-    // Stack top is index 0, bottom is highest index
+    /// Create DIRSTACK as an indexed array with stack contents
+    /// Stack top is index 0, bottom is highest index
     for (int i = stack_top; i >= 0; i--) {
         int array_idx = stack_top - i;
         char idx_str[16];

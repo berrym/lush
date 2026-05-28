@@ -1,10 +1,18 @@
+/**
+ * @file test_ssh_completion.c
+ * @brief Unit tests for ssh completion
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Lush Shell - SSH Host Completion Tests
  * Copyright (C) 2021-2026 Michael Berry
  *
  * Licensed under the MIT License. See LICENSE file for details.
  *
- * Behaviour tests for the SSH host completion source. The source is
+ * Behavior tests for the SSH host completion source. The source is
  * exercised through its public entry point lle_completion_source_ssh_hosts
  * with a real ssh_hosts cache populated from a fixture ~/.ssh/config in
  * a temporary HOME, mirroring how it is invoked at runtime by the
@@ -36,14 +44,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* Fixture management -------------------------------------------------- */
+/// Fixture management --------------------------------------------------
 
 /* Make a temp $HOME with $HOME/.ssh/config populated by `config_body`.
  * Caller must ssh_test_teardown() the result to restore environment and
  * reclaim disk fixtures. */
 typedef struct {
-    char *home;       /* heap-allocated; freed by teardown */
-    char *saved_home; /* prior $HOME (or NULL); restored by teardown */
+    char *home;       ///< heap-allocated; freed by teardown
+    char *saved_home; ///< prior $HOME (or NULL); restored by teardown
 } ssh_test_fixture_t;
 
 static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
@@ -53,10 +61,10 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
         return -1;
     fx->home = strdup(dir);
 
-    /* ssh_dir holds "${home}/.ssh"; config_path holds "${ssh_dir}/config".
-     * Buffers are sized so the chained snprintfs cannot truncate when
-     * home is a normal tmpdir path -- silences gcc -Wformat-truncation
-     * over the worst-case length estimate. */
+    /// ssh_dir holds "${home}/.ssh"; config_path holds "${ssh_dir}/config".
+    /// Buffers are sized so the chained snprintfs cannot truncate when
+    /// home is a normal tmpdir path -- silences gcc -Wformat-truncation
+    /// over the worst-case length estimate.
     char ssh_dir[1024];
     snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
     if (mkdir(ssh_dir, 0700) != 0) {
@@ -75,7 +83,7 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
     fputs(config_body, fp);
     fclose(fp);
 
-    /* Force the cache to re-read from the fixture HOME. */
+    /// Force the cache to re-read from the fixture HOME.
     ssh_hosts_cleanup();
 
     const char *prior = getenv("HOME");
@@ -89,12 +97,12 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
 }
 
 static void ssh_test_teardown(ssh_test_fixture_t *fx) {
-    /* Cleanup cache before the fixture filesystem disappears. */
+    /// Cleanup cache before the fixture filesystem disappears.
     ssh_hosts_cleanup();
 
     if (fx->home) {
         char ssh_dir[1024];
-        char config_path[1040]; /* see ssh_test_setup sizing rationale */
+        char config_path[1040]; /// see ssh_test_setup sizing rationale
         snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
         snprintf(config_path, sizeof(config_path), "%s/config", ssh_dir);
         unlink(config_path);
@@ -119,17 +127,17 @@ static void make_context(lle_word_context_t *ctx, const char *prefix) {
     ctx->dequoted_filename_prefix = (char *)prefix;
 }
 
-/* Tests --------------------------------------------------------------- */
+/// Tests ---------------------------------------------------------------
 
 TEST(ssh_source_emits_configured_host) {
-    /* Single Host stanza; bare prefix `exa` should match `example.com`. */
+    /// Single Host stanza; bare prefix `exa` should match `example.com`.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n  User alice\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
         return;
     }
 
-    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; /* LLE pool sentinel */
+    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; /// LLE pool sentinel
     lle_completion_result_t *result = NULL;
     lle_result_t r = lle_completion_result_create(pool, 8, &result);
     ASSERT(r == LLE_SUCCESS);
@@ -143,8 +151,8 @@ TEST(ssh_source_emits_configured_host) {
     bool found = false;
     for (size_t i = 0; i < result->count; i++) {
         const lle_completion_item_t *item = &result->items[i];
-        /* Default user from the stanza should be honoured when the
-         * user typed no `@` segment. */
+        /// Default user from the stanza should be honored when the
+        /// user typed no `@` segment.
         if (item->text && strcmp(item->text, "alice@example.com") == 0) {
             found = true;
             break;
@@ -158,9 +166,9 @@ TEST(ssh_source_emits_configured_host) {
 }
 
 TEST(ssh_source_preserves_user_at_prefix) {
-    /* When the user types `bob@`, the typed user wins over the User
-     * directive in the Host stanza -- otherwise we'd silently override
-     * the user's explicit choice. */
+    /// When the user types `bob@`, the typed user wins over the User
+    /// directive in the Host stanza -- otherwise we'd silently override
+    /// the user's explicit choice.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n  User alice\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
@@ -200,10 +208,10 @@ TEST(ssh_source_preserves_user_at_prefix) {
 }
 
 TEST(ssh_source_skips_remote_path_syntax) {
-    /* `host:path` is scp/sftp/rsync remote-path completion territory.
-     * The source must not emit host candidates once the user has typed
-     * the colon -- doing so would conflict with a future remote-path
-     * source. */
+    /// `host:path` is scp/sftp/rsync remote-path completion territory.
+    /// The source must not emit host candidates once the user has typed
+    /// the colon -- doing so would conflict with a future remote-path
+    /// source.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
@@ -227,7 +235,7 @@ TEST(ssh_source_skips_remote_path_syntax) {
     ssh_test_teardown(&fx);
 }
 
-/* /etc/hosts parser tests ------------------------------------------------ */
+/// /etc/hosts parser tests ------------------------------------------------
 
 /* Write `body` to a fresh temp file and return its path (heap-allocated;
  * caller frees and unlinks). NULL on failure. */
@@ -248,8 +256,8 @@ static char *write_temp_file(const char *body) {
 }
 
 TEST(etc_hosts_parses_primary_and_aliases) {
-    /* Standard /etc/hosts shape: IP, primary, two aliases. All three
-     * names should land in the cache. */
+    /// Standard /etc/hosts shape: IP, primary, two aliases. All three
+    /// names should land in the cache.
     const char *body = "127.0.0.1 localhost loopback lo\n"
                        "192.168.1.5 fileserver fs\n";
     char *path = write_temp_file(body);
@@ -284,8 +292,8 @@ TEST(etc_hosts_parses_primary_and_aliases) {
 }
 
 TEST(etc_hosts_skips_comments_and_blanks) {
-    /* `#`-prefixed comment lines, blank lines, and end-of-line comments
-     * must not produce candidates. */
+    /// `#`-prefixed comment lines, blank lines, and end-of-line comments
+    /// must not produce candidates.
     const char *body = "# leading comment\n"
                        "\n"
                        "10.0.0.1 alpha   # this is the gateway\n"
@@ -321,8 +329,8 @@ TEST(etc_hosts_skips_comments_and_blanks) {
 }
 
 TEST(etc_hosts_dedupes_against_higher_priority_source) {
-    /* If a host is already in the cache (e.g., from ssh_config) the
-     * /etc/hosts entry is skipped so the higher-priority entry wins. */
+    /// If a host is already in the cache (e.g., from ssh_config) the
+    /// /etc/hosts entry is skipped so the higher-priority entry wins.
     const char *body = "1.2.3.4 production-host\n";
     char *path = write_temp_file(body);
     if (!path) {
@@ -332,7 +340,7 @@ TEST(etc_hosts_dedupes_against_higher_priority_source) {
 
     ssh_host_cache_t *cache = ssh_host_cache_create(64);
 
-    /* Pre-populate with a fake higher-priority entry. */
+    /// Pre-populate with a fake higher-priority entry.
     ssh_host_t existing = {0};
     strncpy(existing.hostname, "production-host", SSH_MAX_HOSTNAME_LEN - 1);
     existing.priority = 100;
@@ -349,8 +357,7 @@ TEST(etc_hosts_dedupes_against_higher_priority_source) {
 
     if (n != 0) {
         char msg[64];
-        snprintf(msg, sizeof(msg),
-                 "expected 0 new hosts (dedupe), got %d", n);
+        snprintf(msg, sizeof(msg), "expected 0 new hosts (dedupe), got %d", n);
         TEST_FAIL_MSG(msg);
         return;
     }

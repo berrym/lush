@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * LEVENSHTEIN DISTANCE TESTS
@@ -45,15 +45,15 @@ TEST(levenshtein_empty_strings) {
 }
 
 TEST(levenshtein_single_char_diff) {
-    /* Substitution */
+    /// Substitution
     int dist1 = fuzzy_levenshtein_distance("cat", "bat", NULL);
     ASSERT_EQ(dist1, 1, "one substitution should be distance 1");
 
-    /* Insertion */
+    /// Insertion
     int dist2 = fuzzy_levenshtein_distance("cat", "cart", NULL);
     ASSERT_EQ(dist2, 1, "one insertion should be distance 1");
 
-    /* Deletion */
+    /// Deletion
     int dist3 = fuzzy_levenshtein_distance("cart", "cat", NULL);
     ASSERT_EQ(dist3, 1, "one deletion should be distance 1");
 }
@@ -83,19 +83,19 @@ TEST(damerau_identical) {
 }
 
 TEST(damerau_transposition) {
-    /* Transposition should count as 1 edit, not 2 */
+    /// Transposition should count as 1 edit, not 2
     int dist = fuzzy_damerau_levenshtein_distance("ab", "ba", NULL);
     ASSERT_EQ(dist, 1, "simple transposition should be distance 1");
 }
 
 TEST(damerau_typo_correction) {
-    /* Common typo: "teh" -> "the" */
+    /// Common typo: "teh" -> "the"
     int dist = fuzzy_damerau_levenshtein_distance("teh", "the", NULL);
     ASSERT_EQ(dist, 1, "transposition typo should be distance 1");
 }
 
 TEST(damerau_vs_levenshtein) {
-    /* Damerau should give lower distance for transpositions */
+    /// Damerau should give lower distance for transpositions
     int damerau = fuzzy_damerau_levenshtein_distance("ab", "ba", NULL);
     int levenshtein = fuzzy_levenshtein_distance("ab", "ba", NULL);
 
@@ -142,7 +142,7 @@ TEST(jaro_winkler_identical) {
 }
 
 TEST(jaro_winkler_prefix_bonus) {
-    /* Jaro-Winkler should give bonus for common prefix */
+    /// Jaro-Winkler should give bonus for common prefix
     int jaro = fuzzy_jaro_score("prefix", "prefox", NULL);
     int jaro_winkler = fuzzy_jaro_winkler_score("prefix", "prefox", NULL);
 
@@ -151,7 +151,7 @@ TEST(jaro_winkler_prefix_bonus) {
 }
 
 TEST(jaro_winkler_command_names) {
-    /* Good for command names like "gitcommit" vs "git-commit" */
+    /// Good for command names like "gitcommit" vs "git-commit"
     int score = fuzzy_jaro_winkler_score("gitcommit", "git-commit", NULL);
     ASSERT_GE(score, 70, "similar command names should have high score");
 }
@@ -281,11 +281,11 @@ TEST(is_match_below_threshold) {
 }
 
 TEST(is_match_threshold_boundary) {
-    /* Test with identical strings - should always pass */
+    /// Test with identical strings - should always pass
     bool result1 = fuzzy_match_is_match("hello", "hello", 95, NULL);
     ASSERT_TRUE(result1, "identical strings should pass high threshold");
 
-    /* Test with slightly different strings */
+    /// Test with slightly different strings
     bool result2 = fuzzy_match_is_match("hello", "hallo", 60, NULL);
     ASSERT_TRUE(result2, "similar strings should pass moderate threshold");
 }
@@ -304,7 +304,7 @@ TEST(match_best_basic) {
     ASSERT_GE(count, 1, "should find at least one match");
     ASSERT_LE(count, 3, "should not exceed max_results");
 
-    /* Results should be sorted by score (highest first) */
+    /// Results should be sorted by score (highest first)
     if (count >= 2) {
         ASSERT_GE(results[0].score, results[1].score,
                   "results should be sorted by score descending");
@@ -317,10 +317,10 @@ TEST(match_best_with_threshold) {
 
     int count = fuzzy_match_best("hello", candidates, 3, results, 3, 80, NULL);
 
-    /* Only "hello" should match with threshold 80 */
+    /// Only "hello" should match with threshold 80
     ASSERT_GE(count, 1, "should find exact match");
 
-    /* All results should be above threshold */
+    /// All results should be above threshold
     for (int i = 0; i < count; i++) {
         ASSERT_GE(results[i].score, 80,
                   "all results should be above threshold");
@@ -335,7 +335,7 @@ TEST(match_filter_basic) {
 
     ASSERT_GE(count, 1, "should find at least one match");
 
-    /* All indices should be valid */
+    /// All indices should be valid
     for (int i = 0; i < count; i++) {
         ASSERT_GE(indices[i], 0, "index should be non-negative");
         ASSERT_LE(indices[i], 3, "index should be within bounds");
@@ -411,7 +411,7 @@ TEST(options_fast) {
 int main(void) {
     printf("Running Fuzzy Match tests...\n");
 
-    /* Levenshtein distance tests */
+    /// Levenshtein distance tests
     printf("\n=== Levenshtein Distance Tests ===\n");
     RUN_TEST(levenshtein_identical);
     RUN_TEST(levenshtein_empty_strings);
@@ -419,27 +419,27 @@ int main(void) {
     RUN_TEST(levenshtein_multiple_edits);
     RUN_TEST(levenshtein_case_sensitive);
 
-    /* Damerau-Levenshtein distance tests */
+    /// Damerau-Levenshtein distance tests
     printf("\n=== Damerau-Levenshtein Distance Tests ===\n");
     RUN_TEST(damerau_identical);
     RUN_TEST(damerau_transposition);
     RUN_TEST(damerau_typo_correction);
     RUN_TEST(damerau_vs_levenshtein);
 
-    /* Jaro score tests */
+    /// Jaro score tests
     printf("\n=== Jaro Score Tests ===\n");
     RUN_TEST(jaro_identical);
     RUN_TEST(jaro_completely_different);
     RUN_TEST(jaro_partial_match);
     RUN_TEST(jaro_empty_strings);
 
-    /* Jaro-Winkler score tests */
+    /// Jaro-Winkler score tests
     printf("\n=== Jaro-Winkler Score Tests ===\n");
     RUN_TEST(jaro_winkler_identical);
     RUN_TEST(jaro_winkler_prefix_bonus);
     RUN_TEST(jaro_winkler_command_names);
 
-    /* Common prefix length tests */
+    /// Common prefix length tests
     printf("\n=== Common Prefix Length Tests ===\n");
     RUN_TEST(common_prefix_identical);
     RUN_TEST(common_prefix_partial);
@@ -447,7 +447,7 @@ int main(void) {
     RUN_TEST(common_prefix_empty);
     RUN_TEST(common_prefix_case_sensitive);
 
-    /* Subsequence matching tests */
+    /// Subsequence matching tests
     printf("\n=== Subsequence Matching Tests ===\n");
     RUN_TEST(is_subsequence_true);
     RUN_TEST(is_subsequence_false);
@@ -455,7 +455,7 @@ int main(void) {
     RUN_TEST(is_subsequence_empty_pattern);
     RUN_TEST(is_subsequence_score);
 
-    /* Combined match score tests */
+    /// Combined match score tests
     printf("\n=== Combined Match Score Tests ===\n");
     RUN_TEST(match_score_identical);
     RUN_TEST(match_score_similar);
@@ -464,19 +464,19 @@ int main(void) {
     RUN_TEST(match_score_case_insensitive);
     RUN_TEST(match_score_case_sensitive);
 
-    /* Is match threshold tests */
+    /// Is match threshold tests
     printf("\n=== Is Match Threshold Tests ===\n");
     RUN_TEST(is_match_above_threshold);
     RUN_TEST(is_match_below_threshold);
     RUN_TEST(is_match_threshold_boundary);
 
-    /* Batch matching tests */
+    /// Batch matching tests
     printf("\n=== Batch Matching Tests ===\n");
     RUN_TEST(match_best_basic);
     RUN_TEST(match_best_with_threshold);
     RUN_TEST(match_filter_basic);
 
-    /* Utility function tests */
+    /// Utility function tests
     printf("\n=== Utility Function Tests ===\n");
     RUN_TEST(distance_to_score_zero);
     RUN_TEST(distance_to_score_full);
@@ -484,7 +484,7 @@ int main(void) {
     RUN_TEST(string_length_ascii);
     RUN_TEST(string_length_empty);
 
-    /* Options preset tests */
+    /// Options preset tests
     printf("\n=== Options Preset Tests ===\n");
     RUN_TEST(options_default);
     RUN_TEST(options_strict);

@@ -197,6 +197,57 @@ this project worth building.
 
 ---
 
+## 7. The debugger keeps pace with the language
+
+Lush's integrated debugger is part of its identity (§1): "the IDE for
+shell developers" is only true while the debugger understands
+everything the shell can do. A debugger that has fallen behind the
+language it debugs is worse than no debugger -- it misleads with
+authority.
+
+So the rule: no change to the language surface, the value model, or
+observable execution semantics is complete until the debugger can
+still see it. A new construct, a new value kind, a new scoping
+discipline each carries a debugger obligation -- breakpoints still
+halt within it, stepping still steps through it, inspection still
+renders it truthfully. "Done" includes the debugger.
+
+This cannot be a rule enforced by memory. Memory-enforced rules decay,
+and this one already did: the debugger fell out of step with the
+executor as the shell grew around it -- its line tracking, its
+variable inspection, and the robustness of its break flow all decayed
+-- because nothing forced the parallel work and nothing tested it. The
+rule is therefore enforced by a gate -- an integration test suite that
+drives the debugger over representative scripts and asserts it can set
+breakpoints, halt, step, and inspect every value type. When a core
+change outpaces the debugger, that test goes red; red CI is an
+emergency, not a backlog item. The gate, not good intentions, holds
+the rule.
+
+The gate also scopes the rule honestly. A change the gate still passes
+needs no debugger work. A change that reddens it is not done until the
+debugger -- and the gate -- are green again.
+
+The current gate is `tests/unit/test_debug_integration.c` (driven by
+`meson test -C build`), with companion locks at `test_debug.c`,
+`test_debug_trace.c`, `test_debug_breakpoints.c`, and
+`test_debug_analysis.c`. As of this writing the debugger keeps pace
+through Tier 2: line tracking on `node->loc.line` (no
+command-ordinal counter); the break prompt is LLE-driven
+(`lle_readline_no_history`) with history recall, ctrl-r search,
+completion of the `(lush-debug)` command vocabulary, and a framed
+left-gutter UI rendered through the screen buffer; variable
+inspection queries the symtable directly via
+`symtable_enumerate_current_scope_vars` and renders the actual
+Scalar/List/Map kind; `type` / `t` exposes the kind explicitly;
+`debug analyze` statically warns on the §3.9 list-in-scalar
+pattern before the script runs. The two open obligations this rule
+will impose work for next: a typed-function form (§8) and
+lexical-scope resolution (§5.3); when those land they each carry a
+debugger obligation by this rule.
+
+---
+
 ## See also
 
 - [VISION.md](VISION.md) -- project philosophy and design ambitions.

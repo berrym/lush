@@ -19,22 +19,22 @@
  * @return 0 on success, 1 on invalid usage
  */
 int bin_unset(int argc, char **argv) {
-    // No arguments - silently succeed (POSIX behavior)
+    /// No arguments - silently succeed (POSIX behavior)
     if (argc < 2) {
         return 0;
     }
 
-    // Unset each variable specified
+    /// Unset each variable specified
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
 
-        /* Array-element form: `unset arr[N]` or `unset assoc[key]`
-         * removes just the matching element, not the whole array.
-         * Bash semantics; without this lush ignored the subscript
-         * and either no-op'd or tried to unset a scalar named
-         * "arr[N]" (issue #101). Detect a `[` in the name; if
-         * followed by a matching `]`, route through the array
-         * element-unset API. */
+        /// Array-element form: `unset arr[N]` or `unset assoc[key]`
+        /// removes just the matching element, not the whole array.
+        /// Bash semantics; without this lush ignored the subscript
+        /// and either no-op'd or tried to unset a scalar named
+        /// "arr[N]" (issue #101). Detect a `[` in the name; if
+        /// followed by a matching `]`, route through the array
+        /// element-unset API.
         const char *bracket = strchr(var_name, '[');
         if (bracket && bracket > var_name) {
             const char *close = strrchr(bracket, ']');
@@ -62,8 +62,8 @@ int bin_unset(int argc, char **argv) {
             }
         }
 
-        // Resolve nameref if applicable - unset the target, not the nameref
-        // itself
+        /// Resolve nameref if applicable - unset the target, not the nameref
+        /// itself
         symtable_manager_t *mgr = symtable_get_global_manager();
         if (mgr && symtable_is_nameref(mgr, var_name)) {
             const char *target = symtable_resolve_nameref(mgr, var_name, 10);
@@ -72,7 +72,7 @@ int bin_unset(int argc, char **argv) {
             }
         }
 
-        // Use legacy API function for unsetting variables
+        /// Use legacy API function for unsetting variables
         symtable_unset_global(var_name);
     }
     return 0;

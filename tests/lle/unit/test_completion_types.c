@@ -1,3 +1,11 @@
+/**
+ * @file test_completion_types.c
+ * @brief Unit tests for completion types
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Lush Shell - LLE Completion Types Unit Tests
  * Copyright (C) 2021-2026  Michael Berry
@@ -35,7 +43,7 @@ TEST(type_info_queries) {
 }
 
 TEST(completion_item_lifecycle) {
-    /* LLE uses a global memory pool — pass a dummy non-NULL pool. */
+    /// LLE uses a global memory pool — pass a dummy non-NULL pool.
     lle_memory_pool_t *pool = (lle_memory_pool_t *)1;
 
     lle_completion_item_t *item = NULL;
@@ -110,7 +118,7 @@ TEST(completion_result_lifecycle) {
     ASSERT(res == LLE_SUCCESS);
     ASSERT(result->count == 4);
 
-    /* Adding 5th item triggers capacity growth (capacity was 4). */
+    /// Adding 5th item triggers capacity growth (capacity was 4).
     res = lle_completion_result_add(result, "$HOME", "",
                                     LLE_COMPLETION_TYPE_VARIABLE, 500);
     ASSERT(res == LLE_SUCCESS);

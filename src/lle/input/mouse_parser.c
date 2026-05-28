@@ -110,22 +110,22 @@ static lle_result_t parse_x10_sequence(lle_mouse_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Verify prefix: ESC[M
+    /// Verify prefix: ESC[M
     if (data[0] != '\x1B' || data[1] != '[' || data[2] != 'M') {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    // Extract button byte
+    /// Extract button byte
     unsigned char btn = (unsigned char)data[3];
     unsigned char x_byte = (unsigned char)data[4];
     unsigned char y_byte = (unsigned char)data[5];
 
-    // Decode button
+    /// Decode button
     int button_code = (btn - 32) & 0x03;
     bool is_motion = (btn - 32) & 0x20;
     bool is_wheel = (btn - 32) & 0x40;
 
-    // Decode modifiers
+    /// Decode modifiers
     event->modifiers = LLE_KEY_MOD_NONE;
     if ((btn - 32) & 0x04)
         event->modifiers |= LLE_KEY_MOD_SHIFT;
@@ -134,11 +134,11 @@ static lle_result_t parse_x10_sequence(lle_mouse_parser_t *parser,
     if ((btn - 32) & 0x10)
         event->modifiers |= LLE_KEY_MOD_CTRL;
 
-    // Decode coordinates (1-based, subtract 32 offset and convert to 0-based)
+    /// Decode coordinates (1-based, subtract 32 offset and convert to 0-based)
     event->x = (x_byte - 32 - 1);
     event->y = (y_byte - 32 - 1);
 
-    // Determine event type and button
+    /// Determine event type and button
     if (is_wheel) {
         event->type = LLE_MOUSE_EVENT_WHEEL;
         event->button = (button_code == 0) ? LLE_MOUSE_BUTTON_WHEEL_UP
@@ -148,27 +148,27 @@ static lle_result_t parse_x10_sequence(lle_mouse_parser_t *parser,
         event->type = LLE_MOUSE_EVENT_MOVE;
         event->button = LLE_MOUSE_BUTTON_NONE;
 
-        // Check if dragging
+        /// Check if dragging
         if (parser->pressed_buttons != LLE_MOUSE_BUTTON_NONE) {
             event->type = LLE_MOUSE_EVENT_DRAG;
             event->button = parser->pressed_buttons;
         }
     } else if (button_code == 3) {
-        // Button release
+        /// Button release
         event->type = LLE_MOUSE_EVENT_RELEASE;
         event->button = parser->pressed_buttons;
         parser->pressed_buttons = LLE_MOUSE_BUTTON_NONE;
     } else {
-        // Button press
+        /// Button press
         event->type = LLE_MOUSE_EVENT_PRESS;
         event->button =
-            (lle_mouse_button_t)(button_code + 1); // Convert 0-2 to 1-3
+            (lle_mouse_button_t)(button_code + 1); /// Convert 0-2 to 1-3
         parser->pressed_buttons = event->button;
     }
 
     event->timestamp = get_current_time_us();
 
-    // Update last position
+    /// Update last position
     parser->last_x = event->x;
     parser->last_y = event->y;
 
@@ -196,17 +196,17 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Verify prefix: ESC[<
+    /// Verify prefix: ESC[<
     if (data[0] != '\x1B' || data[1] != '[' || data[2] != '<') {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    // Parse button;x;y
+    /// Parse button;x;y
     int btn = 0, x = 0, y = 0;
     const char *ptr = data + 3;
     const char *end = data + data_len;
 
-    // Parse button
+    /// Parse button
     while (ptr < end && *ptr >= '0' && *ptr <= '9') {
         btn = btn * 10 + (*ptr - '0');
         ptr++;
@@ -215,9 +215,9 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
     if (ptr >= end || *ptr != ';') {
         return LLE_ERROR_INVALID_FORMAT;
     }
-    ptr++; // Skip semicolon
+    ptr++; /// Skip semicolon
 
-    // Parse x
+    /// Parse x
     while (ptr < end && *ptr >= '0' && *ptr <= '9') {
         x = x * 10 + (*ptr - '0');
         ptr++;
@@ -226,9 +226,9 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
     if (ptr >= end || *ptr != ';') {
         return LLE_ERROR_INVALID_FORMAT;
     }
-    ptr++; // Skip semicolon
+    ptr++; /// Skip semicolon
 
-    // Parse y
+    /// Parse y
     while (ptr < end && *ptr >= '0' && *ptr <= '9') {
         y = y * 10 + (*ptr - '0');
         ptr++;
@@ -238,18 +238,18 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    // Check terminator (M for press, m for release)
+    /// Check terminator (M for press, m for release)
     bool is_release = (*ptr == 'm');
     if (*ptr != 'M' && *ptr != 'm') {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    // Decode button
+    /// Decode button
     int button_code = btn & 0x03;
     bool is_motion = btn & 0x20;
     bool is_wheel = btn & 0x40;
 
-    // Decode modifiers
+    /// Decode modifiers
     event->modifiers = LLE_KEY_MOD_NONE;
     if (btn & 0x04)
         event->modifiers |= LLE_KEY_MOD_SHIFT;
@@ -258,11 +258,11 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
     if (btn & 0x10)
         event->modifiers |= LLE_KEY_MOD_CTRL;
 
-    // Set coordinates (SGR uses 1-based, convert to 0-based)
+    /// Set coordinates (SGR uses 1-based, convert to 0-based)
     event->x = x - 1;
     event->y = y - 1;
 
-    // Determine event type and button
+    /// Determine event type and button
     if (is_wheel) {
         event->type = LLE_MOUSE_EVENT_WHEEL;
         event->button = (button_code == 0) ? LLE_MOUSE_BUTTON_WHEEL_UP
@@ -272,7 +272,7 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
         event->type = LLE_MOUSE_EVENT_MOVE;
         event->button = LLE_MOUSE_BUTTON_NONE;
 
-        // Check if dragging
+        /// Check if dragging
         if (parser->pressed_buttons != LLE_MOUSE_BUTTON_NONE) {
             event->type = LLE_MOUSE_EVENT_DRAG;
             event->button = parser->pressed_buttons;
@@ -291,7 +291,7 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
 
     event->timestamp = get_current_time_us();
 
-    // Update last position
+    /// Update last position
     parser->last_x = event->x;
     parser->last_y = event->y;
 
@@ -313,7 +313,7 @@ static void detect_multi_click(lle_mouse_parser_t *parser,
     uint64_t current_time = event->timestamp;
     uint64_t time_diff = current_time - parser->last_click_time;
 
-    // Check if within double-click time window (500ms)
+    /// Check if within double-click time window (500ms)
     if (time_diff < (LLE_MOUSE_DOUBLE_CLICK_TIME_MS * 1000)) {
         parser->click_count++;
     } else {
@@ -322,7 +322,7 @@ static void detect_multi_click(lle_mouse_parser_t *parser,
 
     parser->last_click_time = current_time;
 
-    // Set multi-click flags
+    /// Set multi-click flags
     if (parser->click_count == 2) {
         event->double_click = true;
         event->triple_click = false;
@@ -361,7 +361,7 @@ lle_mouse_parser_parse_sequence(lle_mouse_parser_t *parser,
 
     *event_info = NULL;
 
-    // Allocate event structure
+    /// Allocate event structure
     lle_mouse_event_info_t *event =
         lle_pool_alloc(sizeof(lle_mouse_event_info_t));
     if (!event) {
@@ -372,17 +372,17 @@ lle_mouse_parser_parse_sequence(lle_mouse_parser_t *parser,
 
     lle_result_t result;
 
-    // Detect format and parse
+    /// Detect format and parse
     if (sequence_len >= 6 && sequence[0] == '\x1B' && sequence[1] == '[' &&
         sequence[2] == 'M') {
-        // X10 format
+        /// X10 format
         result = parse_x10_sequence(parser, sequence, sequence_len, event);
     } else if (sequence_len >= 9 && sequence[0] == '\x1B' &&
                sequence[1] == '[' && sequence[2] == '<') {
-        // SGR format
+        /// SGR format
         result = parse_sgr_sequence(parser, sequence, sequence_len, event);
     } else {
-        // Unknown format
+        /// Unknown format
         lle_pool_free(event);
         parser->invalid_mouse_sequences++;
         return LLE_ERROR_INVALID_FORMAT;
@@ -394,7 +394,7 @@ lle_mouse_parser_parse_sequence(lle_mouse_parser_t *parser,
         return result;
     }
 
-    // Detect multi-click
+    /// Detect multi-click
     detect_multi_click(parser, event);
 
     parser->mouse_events_parsed++;
@@ -463,7 +463,7 @@ lle_result_t lle_mouse_parser_reset(lle_mouse_parser_t *parser) {
     parser->last_click_time = 0;
     parser->click_count = 0;
 
-    // Reset statistics
+    /// Reset statistics
     parser->mouse_events_parsed = 0;
     parser->invalid_mouse_sequences = 0;
 

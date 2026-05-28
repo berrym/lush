@@ -46,10 +46,10 @@
  * - LLE_SHELL_EVENT_POST_COMMAND -> LLE_EVENT_POST_COMMAND (0xD002)
  */
 typedef enum lle_shell_event_type {
-    LLE_SHELL_EVENT_DIRECTORY_CHANGED = 0, /**< Working directory changed */
-    LLE_SHELL_EVENT_PRE_COMMAND = 1,       /**< Before command execution */
-    LLE_SHELL_EVENT_POST_COMMAND = 2,      /**< After command execution */
-    LLE_SHELL_EVENT_TYPE_COUNT = 3         /**< Number of event types */
+    LLE_SHELL_EVENT_DIRECTORY_CHANGED = 0, ///< Working directory changed
+    LLE_SHELL_EVENT_PRE_COMMAND = 1,       ///< Before command execution
+    LLE_SHELL_EVENT_POST_COMMAND = 2,      ///< After command execution
+    LLE_SHELL_EVENT_TYPE_COUNT = 3         ///< Number of event types
 } lle_shell_event_type_t;
 
 /* ============================================================================
@@ -65,8 +65,8 @@ typedef enum lle_shell_event_type {
  * git status, autosuggestions, and prompt segments.
  */
 typedef struct lle_directory_changed_event {
-    const char *old_dir; /**< Previous working directory (may be NULL) */
-    const char *new_dir; /**< New working directory (must not be NULL) */
+    const char *old_dir; ///< Previous working directory (may be NULL)
+    const char *new_dir; ///< New working directory (must not be NULL)
 } lle_directory_changed_event_t;
 
 /**
@@ -76,8 +76,8 @@ typedef struct lle_directory_changed_event {
  * state for transient prompt display and command timing.
  */
 typedef struct lle_pre_command_event {
-    const char *command; /**< Command about to be executed */
-    bool is_background;  /**< True if command will run in background (&) */
+    const char *command; ///< Command about to be executed
+    bool is_background;  ///< True if command will run in background (&)
 } lle_pre_command_event_t;
 
 /**
@@ -87,9 +87,9 @@ typedef struct lle_pre_command_event {
  * for prompt status display, history annotation, and timing segments.
  */
 typedef struct lle_post_command_event {
-    const char *command;  /**< Command that was executed */
-    int exit_code;        /**< Command exit code (0 = success) */
-    uint64_t duration_us; /**< Execution duration in microseconds */
+    const char *command;  ///< Command that was executed
+    int exit_code;        ///< Command exit code (0 = success)
+    uint64_t duration_us; ///< Execution duration in microseconds
 } lle_post_command_event_t;
 
 /* ============================================================================
@@ -120,9 +120,9 @@ typedef void (*lle_shell_event_handler_t)(void *event_data, void *user_data);
  * @brief Handler registration entry
  */
 typedef struct lle_shell_handler_entry {
-    lle_shell_event_handler_t handler; /**< Handler callback function */
-    void *user_data;                   /**< User context for callback */
-    const char *name;                  /**< Handler name for debugging */
+    lle_shell_event_handler_t handler; ///< Handler callback function
+    void *user_data;                   ///< User context for callback
+    const char *name;                  ///< Handler name for debugging
 } lle_shell_handler_entry_t;
 
 /**
@@ -151,10 +151,10 @@ typedef struct lle_shell_event_hub {
     /** Whether hub is initialized */
     bool initialized;
 
-    /* Statistics */
-    uint64_t events_fired;      /**< Total events fired */
-    uint64_t directory_changes; /**< Directory change events */
-    uint64_t commands_executed; /**< Commands executed (post-command count) */
+    /// Statistics
+    uint64_t events_fired;      ///< Total events fired
+    uint64_t directory_changes; ///< Directory change events
+    uint64_t commands_executed; ///< Commands executed (post-command count)
 } lle_shell_event_hub_t;
 
 /* ============================================================================
@@ -302,4 +302,4 @@ uint64_t lle_shell_event_get_timestamp_us(void);
  */
 const char *lle_shell_event_type_name(lle_shell_event_type_t event_type);
 
-#endif /* LLE_SHELL_EVENT_HUB_H */
+#endif /// LLE_SHELL_EVENT_HUB_H

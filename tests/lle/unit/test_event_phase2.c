@@ -22,11 +22,11 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Mock memory pool */
+/// Mock memory pool
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Filter callback state */
+/// Filter callback state
 static int filter_call_count = 0;
 static lle_filter_result_t filter_return_value = LLE_FILTER_PASS;
 
@@ -71,12 +71,12 @@ TEST(filter_system_init) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(system != NULL);
 
-    /* Initialize filter system */
+    /// Initialize filter system
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(system->filter_system != NULL);
 
-    /* Double init should be safe */
+    /// Double init should be safe
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
@@ -91,21 +91,21 @@ TEST(filter_add_remove) {
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add filter */
+    /// Add filter
     result =
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add duplicate should fail */
+    /// Add duplicate should fail
     result =
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result != LLE_SUCCESS);
 
-    /* Remove filter */
+    /// Remove filter
     result = lle_event_filter_remove(system, "test_filter");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Remove non-existent should fail */
+    /// Remove non-existent should fail
     result = lle_event_filter_remove(system, "nonexistent");
     ASSERT(result != LLE_SUCCESS);
 
@@ -124,11 +124,11 @@ TEST(filter_enable_disable) {
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Disable filter */
+    /// Disable filter
     result = lle_event_filter_disable(system, "test_filter");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Enable filter */
+    /// Enable filter
     result = lle_event_filter_enable(system, "test_filter");
     ASSERT(result == LLE_SUCCESS);
 
@@ -143,7 +143,7 @@ TEST(filter_multiple_filters) {
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add multiple filters */
+    /// Add multiple filters
     result = lle_event_filter_add(system, "filter1", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
@@ -153,13 +153,13 @@ TEST(filter_multiple_filters) {
     result = lle_event_filter_add(system, "filter3", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Remove middle filter */
+    /// Remove middle filter
     result = lle_event_filter_remove(system, "filter2");
     ASSERT(result == LLE_SUCCESS);
 
-    /* Verify others still exist by trying to add duplicates */
+    /// Verify others still exist by trying to add duplicates
     result = lle_event_filter_add(system, "filter1", test_filter_pass, NULL);
-    ASSERT(result != LLE_SUCCESS); /* Should fail - already exists */
+    ASSERT(result != LLE_SUCCESS); /// Should fail - already exists
 
     lle_event_system_destroy(system);
 }
@@ -176,14 +176,14 @@ TEST(filter_statistics) {
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get stats */
+    /// Get stats
     uint64_t filtered = 0, passed = 0, blocked = 0, transformed = 0,
              errored = 0;
     result =
         lle_event_filter_get_stats(system, "test_filter", &filtered, &passed,
                                    &blocked, &transformed, &errored);
     ASSERT(result == LLE_SUCCESS);
-    /* Stats start at 0 */
+    /// Stats start at 0
 
     lle_event_system_destroy(system);
 }
@@ -198,7 +198,7 @@ TEST(timer_system_init) {
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Timer system is created on demand */
+    /// Timer system is created on demand
     result = lle_event_timer_system_init(system);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(system->timer_system != NULL);
@@ -214,22 +214,22 @@ TEST(timer_oneshot_add_cancel) {
     result = lle_event_timer_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Create event for timer */
+    /// Create event for timer
     lle_event_t *event = NULL;
     result = lle_event_create(system, LLE_EVENT_TIMER_EXPIRED, NULL, 0, &event);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add one-shot timer (100ms delay) */
+    /// Add one-shot timer (100ms delay)
     uint64_t timer_id = 0;
     result = lle_event_timer_add_oneshot(system, event, 100000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(timer_id > 0);
 
-    /* Cancel timer */
+    /// Cancel timer
     result = lle_event_timer_cancel(system, timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Cancel non-existent timer should fail */
+    /// Cancel non-existent timer should fail
     result = lle_event_timer_cancel(system, 99999);
     ASSERT(result != LLE_SUCCESS);
 
@@ -249,7 +249,7 @@ TEST(timer_repeating_add) {
         lle_event_create(system, LLE_EVENT_PERIODIC_UPDATE, NULL, 0, &event);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add repeating timer (50ms initial, 100ms interval) */
+    /// Add repeating timer (50ms initial, 100ms interval)
     uint64_t timer_id = 0;
     result =
         lle_event_timer_add_repeating(system, event, 50000, 100000, &timer_id);
@@ -276,11 +276,11 @@ TEST(timer_enable_disable) {
     result = lle_event_timer_add_oneshot(system, event, 100000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Disable timer */
+    /// Disable timer
     result = lle_event_timer_disable(system, timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Enable timer */
+    /// Enable timer
     result = lle_event_timer_enable(system, timer_id);
     ASSERT(result == LLE_SUCCESS);
 
@@ -305,7 +305,7 @@ TEST(timer_get_info) {
         lle_event_timer_add_repeating(system, event, 50000, 100000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get timer info */
+    /// Get timer info
     uint64_t next_fire = 0, fire_count = 0;
     bool is_repeating = false;
     result = lle_event_timer_get_info(system, timer_id, &next_fire, &fire_count,
@@ -326,11 +326,11 @@ TEST(timer_process_callable) {
     result = lle_event_timer_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Process timers with no timers - should succeed */
+    /// Process timers with no timers - should succeed
     result = lle_event_timer_process(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Add a timer with long delay */
+    /// Add a timer with long delay
     lle_event_t *event = NULL;
     result = lle_event_create(system, LLE_EVENT_TIMER_EXPIRED, NULL, 0, &event);
     ASSERT(result == LLE_SUCCESS);
@@ -339,7 +339,7 @@ TEST(timer_process_callable) {
     result = lle_event_timer_add_oneshot(system, event, 1000000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Process timers - none should fire yet */
+    /// Process timers - none should fire yet
     result = lle_event_timer_process(system);
     ASSERT(result == LLE_SUCCESS);
 
@@ -355,13 +355,13 @@ TEST(timer_statistics) {
     result = lle_event_timer_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get initial stats */
+    /// Get initial stats
     uint64_t created = 0, fired = 0, cancelled = 0;
     result = lle_event_timer_get_stats(system, &created, &fired, &cancelled);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(created == 0);
 
-    /* Add a timer */
+    /// Add a timer
     lle_event_t *event = NULL;
     result = lle_event_create(system, LLE_EVENT_TIMER_EXPIRED, NULL, 0, &event);
     ASSERT(result == LLE_SUCCESS);
@@ -370,7 +370,7 @@ TEST(timer_statistics) {
     result = lle_event_timer_add_oneshot(system, event, 1000000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Check stats again */
+    /// Check stats again
     result = lle_event_timer_get_stats(system, &created, &fired, &cancelled);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(created == 1);
@@ -389,7 +389,7 @@ TEST(enhanced_stats_init) {
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Initialize enhanced stats */
+    /// Initialize enhanced stats
     result = lle_event_enhanced_stats_init(system);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(system->enhanced_stats != NULL);
@@ -405,12 +405,12 @@ TEST(enhanced_stats_per_type) {
     result = lle_event_enhanced_stats_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get stats for specific type */
+    /// Get stats for specific type
     lle_event_type_stats_t stats;
     result =
         lle_event_enhanced_stats_get_type(system, LLE_EVENT_KEY_PRESS, &stats);
     ASSERT(result == LLE_SUCCESS);
-    ASSERT(stats.count == 0); /* No events processed yet */
+    ASSERT(stats.count == 0); /// No events processed yet
 
     lle_event_system_destroy(system);
 }
@@ -423,7 +423,7 @@ TEST(enhanced_stats_all_types) {
     result = lle_event_enhanced_stats_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get all type stats */
+    /// Get all type stats
     lle_event_type_stats_t *stats = NULL;
     size_t num_types = 0;
     result = lle_event_enhanced_stats_get_all_types(system, &stats, &num_types);
@@ -440,7 +440,7 @@ TEST(enhanced_stats_cycles) {
     result = lle_event_enhanced_stats_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get cycle stats */
+    /// Get cycle stats
     uint64_t total_cycles = 0, total_time = 0, min_time = 0, max_time = 0;
     result = lle_event_enhanced_stats_get_cycles(
         system, &total_cycles, &total_time, &min_time, &max_time);
@@ -459,7 +459,7 @@ TEST(priority_queue_exists) {
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Priority queue should be created during init */
+    /// Priority queue should be created during init
     ASSERT(system->priority_queue != NULL);
 
     lle_event_system_destroy(system);
@@ -470,7 +470,7 @@ TEST(critical_events_use_priority_queue) {
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Create CRITICAL priority event (TERMINAL_RESIZE is marked CRITICAL) */
+    /// Create CRITICAL priority event (TERMINAL_RESIZE is marked CRITICAL)
     lle_event_t *event = NULL;
     result =
         lle_event_create(system, LLE_EVENT_TERMINAL_RESIZE, NULL, 0, &event);
@@ -492,7 +492,7 @@ TEST(phase2_all_systems_together) {
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Initialize all Phase 2 systems */
+    /// Initialize all Phase 2 systems
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
@@ -502,7 +502,7 @@ TEST(phase2_all_systems_together) {
     result = lle_event_enhanced_stats_init(system);
     ASSERT(result == LLE_SUCCESS);
 
-    /* All systems should be initialized */
+    /// All systems should be initialized
     ASSERT(system->filter_system != NULL);
     ASSERT(system->timer_system != NULL);
     ASSERT(system->enhanced_stats != NULL);

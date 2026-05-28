@@ -325,8 +325,8 @@ lle_result_t lle_previous_line(lle_editor_t *editor);
  * boundary was hit (first line for up, last line for down).
  */
 typedef struct {
-    lle_result_t result; /**< Operation result code */
-    bool hit_boundary;   /**< True if cursor was already at boundary */
+    lle_result_t result; ///< Operation result code
+    bool hit_boundary;   ///< True if cursor was already at boundary
 } lle_line_nav_result_t;
 
 /**
@@ -699,4 +699,4 @@ lle_result_t lle_keybinding_load_emacs_preset(lle_editor_t *editor);
  */
 lle_result_t lle_keybinding_load_vi_preset(lle_editor_t *editor);
 
-#endif /* LLE_KEYBINDING_ACTIONS_H */
+#endif /// LLE_KEYBINDING_ACTIONS_H

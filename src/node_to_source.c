@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Dynamic string buffer for building output */
+/// Dynamic string buffer for building output
 typedef struct {
     char *data;
     size_t len;
@@ -47,12 +47,10 @@ static void strbuf_append(strbuf_t *buf, const char *str) {
     buf->len += len;
 }
 
-/* Forward declaration */
+/// Forward declaration
 static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth);
 
-/**
- * @brief Check if node is a redirection type
- */
+/// @brief Check if node is a redirection type
 static int is_redirection(node_t *node) {
     if (!node)
         return 0;
@@ -87,7 +85,7 @@ static void redir_to_source(node_t *node, strbuf_t *buf) {
     if (!node)
         return;
 
-    /* Get target from first child (NODE_VAR with filename) */
+    /// Get target from first child (NODE_VAR with filename)
     const char *target = "";
     if (node->first_child && node->first_child->val_type == VAL_STR &&
         node->first_child->val.str) {
@@ -150,9 +148,7 @@ static void redir_to_source(node_t *node, strbuf_t *buf) {
     }
 }
 
-/**
- * @brief Recursive implementation of node to source conversion
- */
+/// @brief Recursive implementation of node to source conversion
 static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     if (!node)
         return;
@@ -162,12 +158,12 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
 
     switch (node->type) {
     case NODE_COMMAND: {
-        /* val.str is the command name, or NULL for a pure cmd_prefix
-         * (assignments/redirs with no command word). Children are
-         * cmd_prefix NODE_ASSIGN nodes, arguments, and redirections. */
+        /// val.str is the command name, or NULL for a pure cmd_prefix
+        /// (assignments/redirs with no command word). Children are
+        /// cmd_prefix NODE_ASSIGN nodes, arguments, and redirections.
         bool emitted = false;
         if (str && str[0]) {
-            strbuf_append(buf, str); /* Command name */
+            strbuf_append(buf, str); /// Command name
             emitted = true;
         }
         node_t *child = node->first_child;
@@ -187,8 +183,8 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_ASSIGN:
-        /* cmd_prefix assignment: emit "var=value" verbatim (val.str
-         * already carries the var=, +=, and value text). */
+        /// cmd_prefix assignment: emit "var=value" verbatim (val.str
+        /// already carries the var=, +=, and value text).
         strbuf_append(buf, str);
         break;
 
@@ -209,7 +205,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_ARITH_EXP:
-        /* str already contains the full $((expr)) or just expr */
+        /// str already contains the full $((expr)) or just expr
         if (str[0] == '$') {
             strbuf_append(buf, str);
         } else {
@@ -220,7 +216,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_COMMAND_SUB:
-        /* str already contains the full $(cmd) or just cmd */
+        /// str already contains the full $(cmd) or just cmd
         if (str[0] == '$') {
             strbuf_append(buf, str);
         } else if (node->first_child) {
@@ -235,7 +231,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_PIPE: {
-        /* Pipe has two children: left and right */
+        /// Pipe has two children: left and right
         node_t *left = node->first_child;
         node_t *right = left ? left->next_sibling : NULL;
         if (left)
@@ -325,33 +321,33 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_IF: {
-        /* if condition; then body; [elif cond; then body;]* [else body;] fi */
+        /// if condition; then body; [elif cond; then body;]* [else body;] fi
         strbuf_append(buf, "if ");
         node_t *child = node->first_child;
         if (child) {
-            /* Condition */
+            /// Condition
             node_to_source_impl(child, buf, depth + 1);
             child = child->next_sibling;
         }
         strbuf_append(buf, "; then ");
         if (child) {
-            /* Then body */
+            /// Then body
             node_to_source_impl(child, buf, depth + 1);
             child = child->next_sibling;
         }
-        /* Handle elif/else - remaining children come in pairs (cond, body)
-           or single (else body) */
+        /// Handle elif/else - remaining children come in pairs (cond, body)
+        ///            or single (else body)
         while (child) {
             node_t *next = child->next_sibling;
             if (next) {
-                /* elif */
+                /// elif
                 strbuf_append(buf, "; elif ");
                 node_to_source_impl(child, buf, depth + 1);
                 strbuf_append(buf, "; then ");
                 node_to_source_impl(next, buf, depth + 1);
                 child = next->next_sibling;
             } else {
-                /* else */
+                /// else
                 strbuf_append(buf, "; else ");
                 node_to_source_impl(child, buf, depth + 1);
                 child = NULL;
@@ -362,13 +358,13 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_FOR: {
-        /* for var in words; do body; done */
+        /// for var in words; do body; done
         strbuf_append(buf, "for ");
-        strbuf_append(buf, str); /* variable name */
+        strbuf_append(buf, str); /// variable name
         node_t *child = node->first_child;
         if (child) {
             strbuf_append(buf, " in ");
-            /* Word list - first child contains words as its children */
+            /// Word list - first child contains words as its children
             node_t *word = child->first_child;
             int first = 1;
             while (word) {
@@ -389,7 +385,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_FOR_ARITH:
-        /* for (( init; test; update )); do body; done */
+        /// for (( init; test; update )); do body; done
         strbuf_append(buf, "for ((");
         strbuf_append(buf, str);
         strbuf_append(buf, ")); do ");
@@ -426,7 +422,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_CASE: {
-        /* case word in pattern) body;; ... esac */
+        /// case word in pattern) body;; ... esac
         strbuf_append(buf, "case ");
         strbuf_append(buf, str);
         strbuf_append(buf, " in ");
@@ -441,20 +437,20 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_CASE_ITEM: {
-        /* Pattern format: "<terminator_char><pattern>"
-           where terminator_char is '0'=;;, '1'=;&, '2'=;;& */
+        /// Pattern format: "<terminator_char><pattern>"
+        ///            where terminator_char is '0'=;;, '1'=;&, '2'=;;&
         const char *pattern = str;
         char terminator_char = '0';
         if (str[0] >= '0' && str[0] <= '2') {
             terminator_char = str[0];
-            pattern = str + 1; /* Skip prefix */
+            pattern = str + 1; /// Skip prefix
         }
         strbuf_append(buf, pattern);
         strbuf_append(buf, ") ");
         if (node->first_child) {
             node_to_source_impl(node->first_child, buf, depth);
         }
-        /* Output terminator based on prefix */
+        /// Output terminator based on prefix
         switch (terminator_char) {
         case '1':
             strbuf_append(buf, " ;&");
@@ -470,7 +466,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_FUNCTION:
-        strbuf_append(buf, str); /* function name */
+        strbuf_append(buf, str); /// function name
         strbuf_append(buf, "() { ");
         if (node->first_child) {
             node_to_source_impl(node->first_child, buf, depth + 1);
@@ -614,7 +610,7 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     default:
-        /* For any unhandled node type, try to output the string value */
+        /// For any unhandled node type, try to output the string value
         if (str[0]) {
             strbuf_append(buf, str);
         }
@@ -655,22 +651,22 @@ char *node_to_source(node_t *node) {
  * @return 1 if structurally equal, 0 if different
  */
 int node_equals(node_t *a, node_t *b) {
-    /* Both NULL is equal */
+    /// Both NULL is equal
     if (!a && !b)
         return 1;
-    /* One NULL, one not is unequal */
+    /// One NULL, one not is unequal
     if (!a || !b)
         return 0;
 
-    /* Type must match */
+    /// Type must match
     if (a->type != b->type)
         return 0;
 
-    /* Value type must match */
+    /// Value type must match
     if (a->val_type != b->val_type)
         return 0;
 
-    /* Value must match (for string values) */
+    /// Value must match (for string values)
     if (a->val_type == VAL_STR) {
         const char *sa = a->val.str ? a->val.str : "";
         const char *sb = b->val.str ? b->val.str : "";
@@ -681,11 +677,11 @@ int node_equals(node_t *a, node_t *b) {
             return 0;
     }
 
-    /* Child count must match */
+    /// Child count must match
     if (a->children != b->children)
         return 0;
 
-    /* Compare all children */
+    /// Compare all children
     node_t *ca = a->first_child;
     node_t *cb = b->first_child;
     while (ca && cb) {
@@ -695,7 +691,7 @@ int node_equals(node_t *a, node_t *b) {
         cb = cb->next_sibling;
     }
 
-    /* If one has more children, not equal */
+    /// If one has more children, not equal
     if (ca || cb)
         return 0;
 

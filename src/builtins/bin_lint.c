@@ -33,7 +33,7 @@ int bin_lint(int argc, char **argv) {
     const char *target_shell = NULL;
     const char *script_file = NULL;
 
-    /* Parse arguments */
+    /// Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: %s [OPTIONS] <script>\n", argv[0]);
@@ -101,48 +101,48 @@ int bin_lint(int argc, char **argv) {
         return 1;
     }
 
-    /* Set target shell if specified (stored as string for flexibility) */
+    /// Set target shell if specified (stored as string for flexibility)
     if (target_shell) {
         compat_set_target(target_shell);
     }
 
-    /* Set strict mode if requested */
+    /// Set strict mode if requested
     if (strict_mode) {
         compat_set_strict(true);
     }
 
-    /* Initialize debug context for analysis */
+    /// Initialize debug context for analysis
     debug_context_t *ctx = debug_init();
     if (!ctx) {
         fprintf(stderr, "%s: failed to initialize lint context\n", argv[0]);
         return 1;
     }
 
-    /* Enable context so debug_printf works for output */
+    /// Enable context so debug_printf works for output
     debug_enable(ctx, true);
 
-    /* Suppress unused variable warnings */
+    /// Suppress unused variable warnings
     (void)show_diff;
 
     int remaining;
 
     if (fix_interactive) {
-        /* Interactive fix mode - run analysis first, then interactive fixer */
+        /// Interactive fix mode - run analysis first, then interactive fixer
         remaining = debug_lint_script(ctx, script_file, false, false, false);
 
         if (remaining > 0) {
-            /* Load script for interactive fixing */
+            /// Load script for interactive fixing
             fixer_context_t fixer_ctx;
             if (fixer_init(&fixer_ctx) == FIXER_OK) {
                 if (fixer_load_file(&fixer_ctx, script_file) == FIXER_OK) {
-                    /* Get target shell */
+                    /// Get target shell
                     shell_mode_t target = SHELL_MODE_POSIX;
                     const char *target_str = compat_get_target();
                     if (target_str) {
                         shell_mode_parse(target_str, &target);
                     }
 
-                    /* Collect fixes */
+                    /// Collect fixes
                     size_t fixes_found =
                         fixer_collect_fixes(&fixer_ctx, target);
 
@@ -170,17 +170,17 @@ int bin_lint(int argc, char **argv) {
             }
         }
     } else {
-        /* Standard fix mode (automatic or none) */
+        /// Standard fix mode (automatic or none)
         remaining = debug_lint_script(ctx, script_file, fix_mode, unsafe_fixes,
                                       dry_run);
     }
 
-    /* Determine exit code */
+    /// Determine exit code
     int exit_status = 0;
     if (remaining < 0) {
-        exit_status = 3; /* Fix application error */
+        exit_status = 3; /// Fix application error
     } else if (remaining > 0) {
-        /* Check if we have errors or just warnings */
+        /// Check if we have errors or just warnings
         analysis_issue_t *issue = ctx->analysis_issues;
         while (issue) {
             if (strcmp(issue->severity, "error") == 0) {
@@ -193,16 +193,16 @@ int bin_lint(int argc, char **argv) {
             issue = issue->next;
         }
 
-        /* In strict mode, warnings become errors */
+        /// In strict mode, warnings become errors
         if (strict_mode && exit_status == 1) {
             exit_status = 2;
         }
     }
 
-    /* Cleanup */
+    /// Cleanup
     debug_cleanup(ctx);
 
-    /* Reset strict mode */
+    /// Reset strict mode
     if (strict_mode) {
         compat_set_strict(false);
     }

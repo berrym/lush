@@ -20,13 +20,13 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// ============================================================================
-// Test Framework
-// ============================================================================
+/// ============================================================================
+/// Test Framework
+/// ============================================================================
 
-// ============================================================================
-// Creation and Destruction Tests
-// ============================================================================
+/// ============================================================================
+/// Creation and Destruction Tests
+/// ============================================================================
 
 TEST(create_default_capacity) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -45,7 +45,7 @@ TEST(create_custom_capacity) {
 }
 
 TEST(create_minimum_capacity) {
-    // Requesting less than minimum should use minimum
+    /// Requesting less than minimum should use minimum
     posix_history_manager_t *mgr = posix_history_create(50);
     ASSERT_NOT_NULL(mgr, "Should create manager with min capacity");
     ASSERT_EQ(mgr->capacity, POSIX_HISTORY_MIN_ENTRIES,
@@ -54,7 +54,7 @@ TEST(create_minimum_capacity) {
 }
 
 TEST(create_maximum_capacity) {
-    // Requesting more than maximum should cap at max
+    /// Requesting more than maximum should cap at max
     posix_history_manager_t *mgr = posix_history_create(50000);
     ASSERT_NOT_NULL(mgr, "Should create manager with capped capacity");
     ASSERT_EQ(mgr->capacity, POSIX_HISTORY_MAX_ENTRIES,
@@ -63,14 +63,14 @@ TEST(create_maximum_capacity) {
 }
 
 TEST(destroy_null_safe) {
-    // Should not crash on NULL
+    /// Should not crash on NULL
     posix_history_destroy(NULL);
     ASSERT_TRUE(true, "Destroy NULL should not crash");
 }
 
-// ============================================================================
-// Entry Addition Tests
-// ============================================================================
+/// ============================================================================
+/// Entry Addition Tests
+/// ============================================================================
 
 TEST(add_single_entry) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -125,7 +125,7 @@ TEST(add_no_duplicates_enabled) {
     posix_history_set_no_duplicates(mgr, true);
 
     int n1 = posix_history_add(mgr, "ls -la");
-    int n2 = posix_history_add(mgr, "ls -la"); // Duplicate
+    int n2 = posix_history_add(mgr, "ls -la"); /// Duplicate
     int n3 = posix_history_add(mgr, "pwd");
 
     ASSERT_EQ(n1, 1, "First entry");
@@ -141,7 +141,7 @@ TEST(add_overflow_removes_oldest) {
         posix_history_create(POSIX_HISTORY_MIN_ENTRIES);
     ASSERT_NOT_NULL(mgr, "Manager creation");
 
-    // Fill to capacity
+    /// Fill to capacity
     for (size_t i = 0; i < mgr->capacity; i++) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "cmd%zu", i);
@@ -150,12 +150,12 @@ TEST(add_overflow_removes_oldest) {
 
     ASSERT_EQ(mgr->count, mgr->capacity, "Should be at capacity");
 
-    // First entry should be cmd0
+    /// First entry should be cmd0
     posix_history_entry_t *first = posix_history_get_by_index(mgr, 0);
     ASSERT_NOT_NULL(first, "First entry should exist");
     ASSERT_STR_EQ(first->command, "cmd0", "First should be cmd0");
 
-    // Add one more, cmd0 should be removed
+    /// Add one more, cmd0 should be removed
     posix_history_add(mgr, "overflow");
     ASSERT_EQ(mgr->count, mgr->capacity, "Count should still be at capacity");
 
@@ -166,9 +166,9 @@ TEST(add_overflow_removes_oldest) {
     posix_history_destroy(mgr);
 }
 
-// ============================================================================
-// Entry Retrieval Tests
-// ============================================================================
+/// ============================================================================
+/// Entry Retrieval Tests
+/// ============================================================================
 
 TEST(get_by_number) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -243,9 +243,9 @@ TEST(get_by_index_invalid) {
     posix_history_destroy(mgr);
 }
 
-// ============================================================================
-// Entry Deletion Tests
-// ============================================================================
+/// ============================================================================
+/// Entry Deletion Tests
+/// ============================================================================
 
 TEST(delete_entry) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -302,9 +302,9 @@ TEST(clear_null_manager) {
     ASSERT_FALSE(posix_history_clear(NULL), "Clear null manager fails");
 }
 
-// ============================================================================
-// Range and Number Resolution Tests
-// ============================================================================
+/// ============================================================================
+/// Range and Number Resolution Tests
+/// ============================================================================
 
 TEST(resolve_number_positive) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -346,7 +346,7 @@ TEST(resolve_number_string_prefix) {
     posix_history_add(mgr, "ls -la");
     posix_history_add(mgr, "echo world");
 
-    // Should find most recent match
+    /// Should find most recent match
     ASSERT_EQ(posix_history_resolve_number(mgr, "echo"), 3, "Most recent echo");
     ASSERT_EQ(posix_history_resolve_number(mgr, "ls"), 2, "ls command");
     ASSERT_EQ(posix_history_resolve_number(mgr, "notfound"), -1, "Not found");
@@ -448,9 +448,9 @@ TEST(get_valid_range_empty) {
     posix_history_destroy(mgr);
 }
 
-// ============================================================================
-// Configuration Tests
-// ============================================================================
+/// ============================================================================
+/// Configuration Tests
+/// ============================================================================
 
 TEST(set_filename) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -479,15 +479,15 @@ TEST(set_no_duplicates) {
     posix_history_set_no_duplicates(mgr, false);
     ASSERT_FALSE(mgr->no_duplicates, "Back to false");
 
-    // Should not crash with NULL
+    /// Should not crash with NULL
     posix_history_set_no_duplicates(NULL, true);
 
     posix_history_destroy(mgr);
 }
 
-// ============================================================================
-// Statistics and Validation Tests
-// ============================================================================
+/// ============================================================================
+/// Statistics and Validation Tests
+/// ============================================================================
 
 TEST(get_stats) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -546,14 +546,14 @@ TEST(validate_null) {
     ASSERT_FALSE(posix_history_validate(NULL), "Null manager invalid");
 }
 
-// ============================================================================
-// File Operations Tests
-// ============================================================================
+/// ============================================================================
+/// File Operations Tests
+/// ============================================================================
 
 TEST(save_and_load) {
     const char *testfile = "/tmp/test_posix_history_save_load.txt";
 
-    // Create and populate manager
+    /// Create and populate manager
     posix_history_manager_t *mgr1 = posix_history_create(0);
     ASSERT_NOT_NULL(mgr1, "Manager 1 creation");
 
@@ -561,13 +561,13 @@ TEST(save_and_load) {
     posix_history_add(mgr1, "ls -la");
     posix_history_add(mgr1, "pwd");
 
-    // Save to file
+    /// Save to file
     int saved = posix_history_save(mgr1, testfile, false);
     ASSERT_EQ(saved, 3, "Should save 3 entries");
 
     posix_history_destroy(mgr1);
 
-    // Create new manager and load
+    /// Create new manager and load
     posix_history_manager_t *mgr2 = posix_history_create(0);
     ASSERT_NOT_NULL(mgr2, "Manager 2 creation");
 
@@ -589,7 +589,7 @@ TEST(save_and_load) {
 
     posix_history_destroy(mgr2);
 
-    // Clean up
+    /// Clean up
     unlink(testfile);
 }
 
@@ -619,7 +619,7 @@ TEST(save_no_filename) {
 TEST(load_with_append) {
     const char *testfile = "/tmp/test_posix_history_append.txt";
 
-    // Create and populate manager
+    /// Create and populate manager
     posix_history_manager_t *mgr1 = posix_history_create(0);
     ASSERT_NOT_NULL(mgr1, "Manager 1 creation");
 
@@ -628,7 +628,7 @@ TEST(load_with_append) {
     posix_history_save(mgr1, testfile, false);
     posix_history_destroy(mgr1);
 
-    // Create manager with existing entries and load with append
+    /// Create manager with existing entries and load with append
     posix_history_manager_t *mgr2 = posix_history_create(0);
     ASSERT_NOT_NULL(mgr2, "Manager 2 creation");
 
@@ -641,18 +641,18 @@ TEST(load_with_append) {
 
     posix_history_destroy(mgr2);
 
-    // Clean up
+    /// Clean up
     unlink(testfile);
 }
 
-// ============================================================================
-// Editor Integration Tests
-// ============================================================================
+/// ============================================================================
+/// Editor Integration Tests
+/// ============================================================================
 
 TEST(get_default_editor) {
     char *editor = posix_history_get_default_editor();
     ASSERT_NOT_NULL(editor, "Should return an editor");
-    // Should be either from environment or default "vi"
+    /// Should be either from environment or default "vi"
     ASSERT(strlen(editor) > 0, "Editor should have content");
     free(editor);
 }
@@ -664,7 +664,7 @@ TEST(create_temp_file) {
                 "Create temp file");
     ASSERT_NOT_NULL(filename, "Filename returned");
 
-    // Verify file exists and has content
+    /// Verify file exists and has content
     char *content = posix_history_read_file_content(filename);
     ASSERT_NOT_NULL(content, "Content read");
     ASSERT_STR_EQ(content, "test content\n", "Content matches");
@@ -686,13 +686,13 @@ TEST(create_temp_file_invalid) {
 TEST(read_file_content) {
     const char *testfile = "/tmp/test_read_content.txt";
 
-    // Write test file
+    /// Write test file
     FILE *fp = fopen(testfile, "w");
     ASSERT_NOT_NULL(fp, "Create test file");
     fprintf(fp, "line1\nline2\nline3\n");
     fclose(fp);
 
-    // Read content
+    /// Read content
     char *content = posix_history_read_file_content(testfile);
     ASSERT_NOT_NULL(content, "Read content");
     ASSERT_STR_EQ(content, "line1\nline2\nline3\n", "Content matches");
@@ -707,16 +707,16 @@ TEST(read_file_content_null) {
                 "Non-existent file");
 }
 
-// ============================================================================
-// Error and Debug Tests
-// ============================================================================
+/// ============================================================================
+/// Error and Debug Tests
+/// ============================================================================
 
 TEST(get_last_error_after_failure) {
-    // Cause an error
+    /// Cause an error
     posix_history_manager_t *mgr = posix_history_create(0);
     ASSERT_NOT_NULL(mgr, "Manager creation");
 
-    posix_history_delete(mgr, 999); // This should set an error
+    posix_history_delete(mgr, 999); /// This should set an error
 
     const char *err = posix_history_get_last_error();
     ASSERT_NOT_NULL(err, "Error message set");
@@ -726,15 +726,15 @@ TEST(get_last_error_after_failure) {
 }
 
 TEST(set_debug_mode) {
-    // Just verify it doesn't crash
+    /// Just verify it doesn't crash
     posix_history_set_debug(true);
     posix_history_set_debug(false);
     ASSERT_TRUE(true, "Debug mode toggle works");
 }
 
-// ============================================================================
-// Entry Metadata Tests
-// ============================================================================
+/// ============================================================================
+/// Entry Metadata Tests
+/// ============================================================================
 
 TEST(entry_has_timestamp) {
     posix_history_manager_t *mgr = posix_history_create(0);
@@ -762,9 +762,9 @@ TEST(entry_has_length) {
     posix_history_destroy(mgr);
 }
 
-// ============================================================================
-// Main
-// ============================================================================
+/// ============================================================================
+/// Main
+/// ============================================================================
 
 int main(void) {
     printf("Running POSIX history tests...\n\n");

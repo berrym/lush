@@ -52,4 +52,4 @@ bool lle_is_grapheme_boundary(const char *ptr, const char *start,
  */
 size_t lle_utf8_count_graphemes(const char *text, size_t length);
 
-#endif /* LLE_UNICODE_GRAPHEME_H */
+#endif /// LLE_UNICODE_GRAPHEME_H

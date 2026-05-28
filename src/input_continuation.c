@@ -33,9 +33,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ============================================================================
-// UTF-8 HELPER (uses LLE's UTF-8 support)
-// ============================================================================
+/// ============================================================================
+/// UTF-8 HELPER (uses LLE's UTF-8 support)
+/// ============================================================================
 
 /**
  * @brief Get the byte length of a UTF-8 character at the given position
@@ -54,25 +54,25 @@ static int utf8_char_len(const char *p) {
 
     unsigned char c = (unsigned char)*p;
 
-    // ASCII (0x00-0x7F) - single byte
+    /// ASCII (0x00-0x7F) - single byte
     if (c < 0x80)
         return 1;
 
-    // Use LLE's UTF-8 sequence length detection
+    /// Use LLE's UTF-8 sequence length detection
     int len = lle_utf8_sequence_length(c);
 
-    // Validate the sequence
+    /// Validate the sequence
     if (len > 1 && lle_utf8_is_valid_sequence(p, len)) {
         return len;
     }
 
-    // Invalid sequence - skip one byte
+    /// Invalid sequence - skip one byte
     return 1;
 }
 
-// ============================================================================
-// STATE MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// STATE MANAGEMENT
+/// ============================================================================
 
 /**
  * @brief Initialize a continuation state structure to default values
@@ -108,9 +108,9 @@ void continuation_state_cleanup(continuation_state_t *state) {
     memset(state, 0, sizeof(continuation_state_t));
 }
 
-// ============================================================================
-// CONTEXT STACK MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CONTEXT STACK MANAGEMENT
+/// ============================================================================
 
 /**
  * @brief Push a context onto the context stack
@@ -147,7 +147,7 @@ static bool context_stack_pop(continuation_state_t *state,
     if (!state || state->context_stack_depth <= 0)
         return false;
 
-    // Check if top matches expected (for proper nesting validation)
+    /// Check if top matches expected (for proper nesting validation)
     continuation_context_type_t top =
         state->context_stack[state->context_stack_depth - 1];
     if (top == expected) {
@@ -155,7 +155,7 @@ static bool context_stack_pop(continuation_state_t *state,
         return true;
     }
 
-    // For loops, accept any loop type (for/while/until all end with 'done')
+    /// For loops, accept any loop type (for/while/until all end with 'done')
     if (expected == CONTEXT_FOR || expected == CONTEXT_WHILE ||
         expected == CONTEXT_UNTIL) {
         if (top == CONTEXT_FOR || top == CONTEXT_WHILE ||
@@ -206,9 +206,9 @@ context_stack_top(const continuation_state_t *state) {
     return state->context_stack[state->context_stack_depth - 1];
 }
 
-// ============================================================================
-// KEYWORD DETECTION
-// ============================================================================
+/// ============================================================================
+/// KEYWORD DETECTION
+/// ============================================================================
 
 /**
  * @brief Check if a word is a shell control flow keyword
@@ -250,18 +250,18 @@ bool continuation_is_terminator(const char *line) {
     if (!line)
         return false;
 
-    // Skip whitespace
+    /// Skip whitespace
     while (*line && isspace(*line))
         line++;
 
-    // Check for terminators
+    /// Check for terminators
     return (strncmp(line, "fi", 2) == 0 || strncmp(line, "done", 4) == 0 ||
             strncmp(line, "esac", 4) == 0 || strcmp(line, "}") == 0);
 }
 
-// ============================================================================
-// LINE ANALYSIS
-// ============================================================================
+/// ============================================================================
+/// LINE ANALYSIS
+/// ============================================================================
 
 /**
  * @brief Analyze a line of input to update continuation parsing state
@@ -286,29 +286,29 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
         unsigned char uc = (unsigned char)*p;
         char c = *p;
 
-        // UTF-8 multi-byte sequence handling:
-        // If this is a non-ASCII byte (high bit set), it's part of a UTF-8
-        // multi-byte character. Skip the entire sequence since shell syntax
-        // characters are all ASCII. This prevents misinterpreting UTF-8
-        // continuation bytes as shell metacharacters.
+        /// UTF-8 multi-byte sequence handling:
+        /// If this is a non-ASCII byte (high bit set), it's part of a UTF-8
+        /// multi-byte character. Skip the entire sequence since shell syntax
+        /// characters are all ASCII. This prevents misinterpreting UTF-8
+        /// continuation bytes as shell metacharacters.
         if (uc >= 0x80) {
             int char_len = utf8_char_len(p);
 
-            // If we're collecting a word, flush it first (UTF-8 chars break
-            // words for keyword detection purposes - keywords are ASCII only)
+            /// If we're collecting a word, flush it first (UTF-8 chars break
+            /// words for keyword detection purposes - keywords are ASCII only)
             if (word_pos > 0) {
                 word[word_pos] = '\0';
-                // Keywords are ASCII-only, so no need to check here
+                /// Keywords are ASCII-only, so no need to check here
                 word_pos = 0;
                 memset(word, 0, sizeof(word));
             }
 
-            // Skip the entire UTF-8 sequence
+            /// Skip the entire UTF-8 sequence
             p += (char_len > 0) ? char_len : 1;
             continue;
         }
 
-        // Handle escape sequences
+        /// Handle escape sequences
         if (state->escaped) {
             state->escaped = false;
             p++;
@@ -321,7 +321,7 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             continue;
         }
 
-        // Handle quotes
+        /// Handle quotes
         if (c == '\'' && !state->in_double_quote && !state->in_backtick) {
             state->in_single_quote = !state->in_single_quote;
             if (state->in_single_quote) {
@@ -339,20 +339,20 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             }
         }
 
-        // Skip if we're in quotes
+        /// Skip if we're in quotes
         if (state->in_single_quote || state->in_double_quote ||
             state->in_backtick) {
             p++;
             continue;
         }
 
-        // Handle parentheses, braces, brackets
+        /// Handle parentheses, braces, brackets
         if (c == '(') {
             state->paren_count++;
-            // Check for POSIX function definition: name() or name ()
-            // We just accumulated a word and now see '(' followed by ')'
+            /// Check for POSIX function definition: name() or name ()
+            /// We just accumulated a word and now see '(' followed by ')'
             if (word_pos > 0 && *(p + 1) == ')') {
-                // This is name() pattern - mark that we're in a POSIX func def
+                /// This is name() pattern - mark that we're in a POSIX func def
                 state->saw_posix_func_parens = true;
             }
         } else if (c == ')') {
@@ -367,23 +367,23 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             state->bracket_count--;
         }
 
-        // Handle here document detection (but not herestring <<<)
+        /// Handle here document detection (but not herestring <<<)
         if (c == '<' && *(p + 1) == '<' && *(p + 2) != '<' &&
             !state->in_here_doc) {
-            // Found <<, look for delimiter
+            /// Found <<, look for delimiter
             const char *delim_start = p + 2;
 
-            // Skip optional '-' for <<-
+            /// Skip optional '-' for <<-
             if (*delim_start == '-') {
                 delim_start++;
             }
 
-            // Skip whitespace
+            /// Skip whitespace
             while (*delim_start == ' ' || *delim_start == '\t') {
                 delim_start++;
             }
 
-            // Extract delimiter (up to end of line or whitespace)
+            /// Extract delimiter (up to end of line or whitespace)
             const char *delim_end = delim_start;
             while (*delim_end && *delim_end != '\n' && *delim_end != ' ' &&
                    *delim_end != '\t') {
@@ -391,20 +391,20 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             }
 
             if (delim_end > delim_start) {
-                // Handle quoted delimiters - strip surrounding quotes
+                /// Handle quoted delimiters - strip surrounding quotes
                 const char *actual_delim_start = delim_start;
                 const char *actual_delim_end = delim_end;
 
-                // Check for single or double quotes
+                /// Check for single or double quotes
                 if ((*delim_start == '\'' || *delim_start == '"') &&
                     delim_end > delim_start + 1 &&
                     *(delim_end - 1) == *delim_start) {
-                    // Strip quotes
+                    /// Strip quotes
                     actual_delim_start++;
                     actual_delim_end--;
                 }
 
-                // Found a delimiter, enter here document mode
+                /// Found a delimiter, enter here document mode
                 state->in_here_doc = true;
                 if (state->here_doc_delimiter) {
                     free(state->here_doc_delimiter);
@@ -419,22 +419,22 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             }
         }
 
-        // Check if current line is a here document delimiter (ends here doc)
+        /// Check if current line is a here document delimiter (ends here doc)
         if (state->in_here_doc && state->here_doc_delimiter) {
-            // Check if this entire line matches the delimiter
+            /// Check if this entire line matches the delimiter
             const char *line_start = line;
             while (*line_start == ' ' || *line_start == '\t') {
-                line_start++; // Skip leading whitespace
+                line_start++; /// Skip leading whitespace
             }
 
             if (strncmp(line_start, state->here_doc_delimiter,
                         strlen(state->here_doc_delimiter)) == 0) {
-                // Check if delimiter is followed by end of line or whitespace
+                /// Check if delimiter is followed by end of line or whitespace
                 const char *after_delim =
                     line_start + strlen(state->here_doc_delimiter);
                 if (*after_delim == '\0' || *after_delim == '\n' ||
                     *after_delim == ' ' || *after_delim == '\t') {
-                    // This line is the delimiter, end here document
+                    /// This line is the delimiter, end here document
                     state->in_here_doc = false;
                     free(state->here_doc_delimiter);
                     state->here_doc_delimiter = NULL;
@@ -442,18 +442,18 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             }
         }
 
-        // Collect words for keyword analysis
+        /// Collect words for keyword analysis
         if (isalnum(c) || c == '_') {
             if (word_pos < (int)sizeof(word) - 1) {
                 word[word_pos++] = c;
             }
         } else if (c == '{' || c == '}') {
-            // Handle { and } as single-character keywords
+            /// Handle { and } as single-character keywords
             if (word_pos > 0) {
-                // Process any accumulated word first
+                /// Process any accumulated word first
                 word[word_pos] = '\0';
 
-                // Check for control keywords
+                /// Check for control keywords
                 if (continuation_is_control_keyword(word)) {
 
                     if (strcmp(word, "if") == 0) {
@@ -510,29 +510,29 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
                 memset(word, 0, sizeof(word));
             }
 
-            // Now handle the { or } character as a single-character keyword
+            /// Now handle the { or } character as a single-character keyword
             if (c == '{') {
-                // Check if this is a POSIX function definition: name() { ... }
-                // saw_posix_func_parens is set when we saw the () pattern
+                /// Check if this is a POSIX function definition: name() { ... }
+                /// saw_posix_func_parens is set when we saw the () pattern
                 if (state->saw_posix_func_parens) {
-                    // This is a POSIX-style function definition
+                    /// This is a POSIX-style function definition
                     state->in_function_definition = true;
                     state->compound_command_depth++;
                     context_stack_push(state, CONTEXT_FUNCTION);
                     state->saw_posix_func_parens = false;
                 } else if (!state->in_function_definition) {
-                    // Regular brace group (not a function)
+                    /// Regular brace group (not a function)
                     state->compound_command_depth++;
                     context_stack_push(state, CONTEXT_BRACE_GROUP);
                 }
-                // If already in_function_definition (from 'function' keyword),
-                // don't push again - the keyword handler already did
+                /// If already in_function_definition (from 'function' keyword),
+                /// don't push again - the keyword handler already did
             } else if (c == '}') {
                 if (state->compound_command_depth > 0) {
                     state->compound_command_depth--;
                 }
                 context_stack_pop(state, CONTEXT_BRACE_GROUP);
-                // Also try popping function context
+                /// Also try popping function context
                 if (state->context_stack_depth > 0 &&
                     context_stack_top(state) == CONTEXT_FUNCTION) {
                     context_stack_pop(state, CONTEXT_FUNCTION);
@@ -546,7 +546,7 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             if (word_pos > 0) {
                 word[word_pos] = '\0';
 
-                // Check for control keywords
+                /// Check for control keywords
                 if (continuation_is_control_keyword(word)) {
 
                     if (strcmp(word, "if") == 0) {
@@ -618,30 +618,30 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
         p++;
     }
 
-    // Check if line ends with unescaped backslash (line continuation)
-    // Must check after loop completes to handle escaped flag correctly
+    /// Check if line ends with unescaped backslash (line continuation)
+    /// Must check after loop completes to handle escaped flag correctly
     if (state->escaped) {
         state->has_continuation = true;
-        state->escaped = false; // Reset for next line
+        state->escaped = false; /// Reset for next line
     }
 
-    // Check if line ends with pipe character (requires continuation)
-    // Need to check backwards from end, skipping whitespace
+    /// Check if line ends with pipe character (requires continuation)
+    /// Need to check backwards from end, skipping whitespace
     const char *end = line + strlen(line);
     while (end > line && isspace(*(end - 1))) {
         end--;
     }
     if (end > line && *(end - 1) == '|') {
-        // Line ends with pipe - needs continuation
+        /// Line ends with pipe - needs continuation
         state->has_continuation = true;
     }
 
-    // Handle remaining word at end of line
+    /// Handle remaining word at end of line
     if (word_pos > 0) {
         word[word_pos] = '\0';
 
         if (continuation_is_control_keyword(word)) {
-            // Handle keywords found at end of line
+            /// Handle keywords found at end of line
             if (strcmp(word, "then") == 0 || strcmp(word, "do") == 0) {
                 state->has_continuation = true;
             } else if (strcmp(word, "done") == 0) {
@@ -680,9 +680,9 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
     }
 }
 
-// ============================================================================
-// COMPLETION CHECKING
-// ============================================================================
+/// ============================================================================
+/// COMPLETION CHECKING
+/// ============================================================================
 
 /**
  * @brief Check if the current input is syntactically complete
@@ -698,36 +698,36 @@ bool continuation_is_complete(const continuation_state_t *state) {
     if (!state)
         return true;
 
-    // Check for unmatched quotes
+    /// Check for unmatched quotes
     if (state->in_single_quote || state->in_double_quote ||
         state->in_backtick) {
         return false;
     }
 
-    // Check for unmatched parentheses, braces, brackets
+    /// Check for unmatched parentheses, braces, brackets
     if (state->paren_count > 0 || state->brace_count > 0 ||
         state->bracket_count > 0) {
         return false;
     }
 
-    // Check for incomplete compound commands
+    /// Check for incomplete compound commands
     if (state->compound_command_depth > 0) {
         return false;
     }
 
-    // Check for line continuation
+    /// Check for line continuation
     if (state->has_continuation) {
         return false;
     }
 
-    // Check for incomplete control structures
+    /// Check for incomplete control structures
     if (state->in_if_statement || state->in_while_loop || state->in_for_loop ||
         state->in_until_loop || state->in_case_statement ||
         state->in_function_definition) {
         return false;
     }
 
-    // Check for here documents
+    /// Check for here documents
     if (state->in_here_doc) {
         return false;
     }
@@ -748,9 +748,9 @@ bool continuation_needs_continuation(const continuation_state_t *state) {
     return !continuation_is_complete(state);
 }
 
-// ============================================================================
-// PROMPT GENERATION
-// ============================================================================
+/// ============================================================================
+/// PROMPT GENERATION
+/// ============================================================================
 
 /**
  * @brief Get the appropriate continuation prompt for the current state
@@ -767,16 +767,16 @@ const char *continuation_get_prompt(const continuation_state_t *state) {
     if (!state)
         return "> ";
 
-    // Use PS2 from symbol table, with fallback
+    /// Use PS2 from symbol table, with fallback
     const char *ps2 = symtable_get_global_default("PS2", "> ");
 
-    // Quote state takes highest priority (not tracked in context stack)
+    /// Quote state takes highest priority (not tracked in context stack)
     if (state->in_single_quote || state->in_double_quote) {
         return "quote> ";
     }
 
-    // Use context stack for proper nested construct tracking
-    // The top of the stack represents the innermost active construct
+    /// Use context stack for proper nested construct tracking
+    /// The top of the stack represents the innermost active construct
     continuation_context_type_t current_ctx = context_stack_top(state);
 
     switch (current_ctx) {
@@ -799,8 +799,8 @@ const char *continuation_get_prompt(const continuation_state_t *state) {
         break;
     }
 
-    // Fallback to legacy boolean flags for backwards compatibility
-    // (in case context stack isn't being used consistently)
+    /// Fallback to legacy boolean flags for backwards compatibility
+    /// (in case context stack isn't being used consistently)
     if (state->in_function_definition) {
         return "func> ";
     } else if (state->in_if_statement) {

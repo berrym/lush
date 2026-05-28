@@ -6,6 +6,20 @@ echo "Running pre-commit checks..."
 CHECKS_FAILED=0
 
 # ============================================================================
+# COMMENT-STYLE + CLANG-FORMAT GATE
+# ============================================================================
+# Enforces lush's mixed C11/Doxygen comment style and clang-format
+# conformance on every staged .c/.h file. See scripts/check_comment_style.sh
+# for the rule set. Hard gate -- non-zero exit blocks the commit.
+
+if [ -x scripts/check_comment_style.sh ]; then
+    echo "Checking comment-style + clang-format conformance..."
+    if ! scripts/check_comment_style.sh --staged; then
+        CHECKS_FAILED=1
+    fi
+fi
+
+# ============================================================================
 # DOCUMENTATION POLICY ENFORCEMENT (SAFE | ORGANIZED | CLEAN | PRUNED)
 # ============================================================================
 

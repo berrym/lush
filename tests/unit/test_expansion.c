@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * HELPER FUNCTIONS
@@ -88,7 +88,7 @@ TEST(expand_ctx_check_null) {
 }
 
 TEST(expand_ctx_init_null) {
-    /* Should not crash with NULL */
+    /// Should not crash with NULL
     expand_ctx_init(NULL, EXPAND_NORMAL);
 }
 
@@ -126,18 +126,16 @@ TEST(braced_var_expansion) {
 }
 
 TEST(var_concatenation) {
-    /*
-     * KNOWN BUG: Variable concatenation with separator causes crash
-     * Issue #59: ${A}_${B} syntax causes memory corruption (double-free)
-     * The underscore between braced variables is incorrectly parsed.
-     * Command: A=hello; B=world; RESULT=${A}_${B}
-     * Expected: RESULT=hello_world
-     * Actual: malloc error - pointer being freed was not allocated
-     * TODO: Fix variable expansion parsing for adjacent expansions
-     */
+    /// KNOWN BUG: Variable concatenation with separator causes crash
+    /// Issue #59: ${A}_${B} syntax causes memory corruption (double-free)
+    /// The underscore between braced variables is incorrectly parsed.
+    /// Command: A=hello; B=world; RESULT=${A}_${B}
+    /// Expected: RESULT=hello_world
+    /// Actual: malloc error - pointer being freed was not allocated
+    /// TODO: Fix variable expansion parsing for adjacent expansions
     executor_t *exec = setup_executor();
 
-    /* Skip actual test until bug is fixed - just verify basic setup works */
+    /// Skip actual test until bug is fixed - just verify basic setup works
     executor_execute_command_line(exec, "A=hello", 1);
     executor_execute_command_line(exec, "B=world", 1);
 
@@ -170,7 +168,7 @@ TEST(unset_var_expands_empty) {
 TEST(default_value_unset) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR:-default} when VAR is unset */
+    /// ${VAR:-default} when VAR is unset
     executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}",
                                   1);
 
@@ -185,7 +183,7 @@ TEST(default_value_unset) {
 TEST(default_value_empty) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR:-default} when VAR is empty */
+    /// ${VAR:-default} when VAR is empty
     executor_execute_command_line(exec, "EMPTY_VAR=", 1);
     executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}",
                                   1);
@@ -201,7 +199,7 @@ TEST(default_value_empty) {
 TEST(default_value_set) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR:-default} when VAR is set */
+    /// ${VAR:-default} when VAR is set
     executor_execute_command_line(exec, "SET_VAR=actual", 1);
     executor_execute_command_line(exec, "RESULT=${SET_VAR:-default_value}", 1);
 
@@ -216,7 +214,7 @@ TEST(default_value_set) {
 TEST(alternate_value_set) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR:+alt} when VAR is set */
+    /// ${VAR:+alt} when VAR is set
     executor_execute_command_line(exec, "SET_VAR=something", 1);
     executor_execute_command_line(exec, "RESULT=${SET_VAR:+alternate}", 1);
 
@@ -231,7 +229,7 @@ TEST(alternate_value_set) {
 TEST(alternate_value_unset) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR:+alt} when VAR is unset */
+    /// ${VAR:+alt} when VAR is unset
     executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}",
                                   1);
 
@@ -274,7 +272,7 @@ TEST(string_length_empty) {
 TEST(prefix_removal) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR#pattern} - remove shortest prefix */
+    /// ${VAR#pattern} - remove shortest prefix
     executor_execute_command_line(exec, "VAR=foobar", 1);
     executor_execute_command_line(exec, "RESULT=${VAR#foo}", 1);
 
@@ -289,7 +287,7 @@ TEST(prefix_removal) {
 TEST(suffix_removal) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR%pattern} - remove shortest suffix */
+    /// ${VAR%pattern} - remove shortest suffix
     executor_execute_command_line(exec, "VAR=foobar", 1);
     executor_execute_command_line(exec, "RESULT=${VAR%bar}", 1);
 
@@ -304,7 +302,7 @@ TEST(suffix_removal) {
 TEST(substitution_first) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR/pattern/replacement} - replace first */
+    /// ${VAR/pattern/replacement} - replace first
     executor_execute_command_line(exec, "VAR=hello", 1);
     executor_execute_command_line(exec, "RESULT=${VAR/l/L}", 1);
 
@@ -319,7 +317,7 @@ TEST(substitution_first) {
 TEST(substitution_all) {
     executor_t *exec = setup_executor();
 
-    /* ${VAR//pattern/replacement} - replace all */
+    /// ${VAR//pattern/replacement} - replace all
     executor_execute_command_line(exec, "VAR=hello", 1);
     executor_execute_command_line(exec, "RESULT=${VAR//l/L}", 1);
 
@@ -479,7 +477,7 @@ TEST(arith_increment) {
     ASSERT_STR_EQ(result, "6", "++5 = 6");
     free(result);
 
-    /* X should also be updated */
+    /// X should also be updated
     char *x = symtable_get_var(exec->symtable, "X");
     ASSERT_NOT_NULL(x, "X should be set");
     ASSERT_STR_EQ(x, "6", "X should be 6 after increment");
@@ -568,8 +566,8 @@ TEST(special_var_dollar) {
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Verify it's a non-negative number (0 is valid in test context if not
-     * initialized) */
+    /// Verify it's a non-negative number (0 is valid in test context if not
+    /// initialized)
     ASSERT(atoi(result) >= 0, "$$ should be a non-negative number");
     free(result);
 
@@ -629,14 +627,12 @@ TEST(array_first_element) {
  */
 
 TEST(single_quotes_no_expansion) {
-    /*
-     * KNOWN BUG: Single quotes do not prevent variable expansion
-     * Issue #60: RESULT='$VAR' incorrectly expands $VAR
-     * Single quotes should prevent ALL expansion per POSIX
-     * Expected: RESULT=$VAR
-     * Actual: RESULT=value
-     * TODO: Fix tokenizer/executor to respect single quote semantics
-     */
+    /// KNOWN BUG: Single quotes do not prevent variable expansion
+    /// Issue #60: RESULT='$VAR' incorrectly expands $VAR
+    /// Single quotes should prevent ALL expansion per POSIX
+    /// Expected: RESULT=$VAR
+    /// Actual: RESULT=value
+    /// TODO: Fix tokenizer/executor to respect single quote semantics
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "VAR=value", 1);
@@ -644,8 +640,8 @@ TEST(single_quotes_no_expansion) {
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Temporarily check that variable is set - actual value check disabled
-     * until bug fixed */
+    /// Temporarily check that variable is set - actual value check disabled
+    /// until bug fixed
     ASSERT(result != NULL, "RESULT should be set to something");
     free(result);
 
@@ -667,15 +663,13 @@ TEST(double_quotes_with_expansion) {
 }
 
 TEST(escaped_dollar) {
-    /*
-     * KNOWN BUG: Escaped dollar sign not working correctly
-     * Related to Issue #60 - single quote regression
-     * RESULT=\$VAR causes "unterminated quoted string" error
-     * TODO: Fix after Issue #60 is resolved
-     */
+    /// KNOWN BUG: Escaped dollar sign not working correctly
+    /// Related to Issue #60 - single quote regression
+    /// RESULT=\$VAR causes "unterminated quoted string" error
+    /// TODO: Fix after Issue #60 is resolved
     executor_t *exec = setup_executor();
 
-    /* Skip actual test until escaping is fixed */
+    /// Skip actual test until escaping is fixed
     executor_execute_command_line(exec, "RESULT=literal", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -691,16 +685,14 @@ TEST(escaped_dollar) {
  */
 
 TEST(nested_var_expansion) {
-    /*
-     * KNOWN BUG: Single quotes don't preserve literal - Issue #60
-     * Expected: OUTER='hello $INNER' -> "hello $INNER" (literal)
-     * Actual: expands to "hello world"
-     * TODO: Re-enable after Issue #60 is fixed
-     */
+    /// KNOWN BUG: Single quotes don't preserve literal - Issue #60
+    /// Expected: OUTER='hello $INNER' -> "hello $INNER" (literal)
+    /// Actual: expands to "hello world"
+    /// TODO: Re-enable after Issue #60 is fixed
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "INNER=world", 1);
-    /* Just verify double quote expansion works for now */
+    /// Just verify double quote expansion works for now
     executor_execute_command_line(exec, "OUTER=\"hello $INNER\"", 1);
 
     char *result = symtable_get_var(exec->symtable, "OUTER");
@@ -731,19 +723,17 @@ TEST(nested_var_double_quotes) {
  */
 
 TEST(brace_adjacent_text) {
-    /*
-     * KNOWN BUG: Braced variable followed by adjacent text causes crash
-     * Related to Issue #59: ${VAR}text syntax causes memory corruption
-     * Command: PREFIX=hello; RESULT=${PREFIX}world
-     * Expected: RESULT=helloworld
-     * Actual: malloc error - pointer being freed was not allocated
-     * This is the same root cause as ${A}_${B} - the expansion code
-     * incorrectly handles braced variables followed by text.
-     * TODO: Fix variable expansion parsing for braced vars with adjacent text
-     */
+    /// KNOWN BUG: Braced variable followed by adjacent text causes crash
+    /// Related to Issue #59: ${VAR}text syntax causes memory corruption
+    /// Command: PREFIX=hello; RESULT=${PREFIX}world
+    /// Expected: RESULT=helloworld
+    /// Actual: malloc error - pointer being freed was not allocated
+    /// This is the same root cause as ${A}_${B} - the expansion code
+    /// incorrectly handles braced variables followed by text.
+    /// TODO: Fix variable expansion parsing for braced vars with adjacent text
     executor_t *exec = setup_executor();
 
-    /* Skip actual crash-inducing test until bug is fixed */
+    /// Skip actual crash-inducing test until bug is fixed
     executor_execute_command_line(exec, "PREFIX=hello", 1);
 
     char *prefix = symtable_get_var(exec->symtable, "PREFIX");
@@ -762,7 +752,7 @@ TEST(brace_adjacent_text) {
 int main(void) {
     printf("=== Expansion Tests ===\n\n");
 
-    /* Initialize required subsystems */
+    /// Initialize required subsystems
     init_symtable();
     init_aliases();
 

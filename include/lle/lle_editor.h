@@ -37,7 +37,7 @@ typedef struct lle_widget_hooks_manager lle_widget_hooks_manager_t;
 typedef struct lle_plugin_manager lle_plugin_manager_t;
 typedef struct lle_script_integration lle_script_integration_t;
 typedef struct lle_history_buffer_integration lle_history_buffer_integration_t;
-/* lle_cursor_manager_t is already defined in buffer_management.h */
+/// lle_cursor_manager_t is already defined in buffer_management.h
 
 /* ============================================================================
  * EDITOR STRUCTURE
@@ -48,9 +48,9 @@ typedef struct lle_history_buffer_integration lle_history_buffer_integration_t;
  * Editor mode enumeration
  */
 typedef enum {
-    LLE_EDITING_MODE_EMACS,     /* Emacs keybindings (default) */
-    LLE_EDITING_MODE_VI_INSERT, /* Vi insert mode */
-    LLE_EDITING_MODE_VI_COMMAND /* Vi command mode */
+    LLE_EDITING_MODE_EMACS,     ///< Emacs keybindings (default)
+    LLE_EDITING_MODE_VI_INSERT, ///< Vi insert mode
+    LLE_EDITING_MODE_VI_COMMAND /// Vi command mode
 } lle_editing_mode_t;
 
 /**
@@ -58,9 +58,9 @@ typedef enum {
  */
 typedef struct {
     bool enabled;
-    int count;             /* Repeat count for vi commands */
-    char pending_operator; /* Pending operator (d, c, y, etc.) */
-    bool visual_mode;      /* Visual selection mode */
+    int count;             ///< Repeat count for vi commands
+    char pending_operator; ///< Pending operator (d, c, y, etc.)
+    bool visual_mode;      ///< Visual selection mode
 } lle_vi_state_t;
 
 /**
@@ -83,68 +83,68 @@ typedef struct {
  * - Thread-safe when used from single editing thread
  */
 typedef struct lle_editor {
-    /* Core editing subsystems */
-    lle_buffer_t *buffer;                 /* Text buffer */
-    lle_cursor_manager_t *cursor_manager; /* Cursor position management */
-    lle_kill_ring_t *kill_ring;           /* Kill/yank ring */
-    lle_keybinding_manager_t *keybinding_manager; /* Key bindings */
-    lle_change_tracker_t *change_tracker; /* Undo/redo change tracking */
+    /// Core editing subsystems
+    lle_buffer_t *buffer;                 ///< Text buffer
+    lle_cursor_manager_t *cursor_manager; ///< Cursor position management
+    lle_kill_ring_t *kill_ring;           ///< Kill/yank ring
+    lle_keybinding_manager_t *keybinding_manager; ///< Key bindings
+    lle_change_tracker_t *change_tracker;         ///< Undo/redo change tracking
 
-    /* History and search */
-    lle_history_core_t *history_system; /* Command history */
+    /// History and search
+    lle_history_core_t *history_system; ///< Command history
     lle_history_buffer_integration_t
-        *history_buffer_integration; /* History<->buffer bridge */
+        *history_buffer_integration; ///< History<->buffer bridge
     size_t history_navigation_pos; /* Current position in history navigation (0
                                       = current line) */
-    bool history_search_active;    /* Interactive search active */
-    int history_search_direction;  /* 1=forward, -1=reverse */
+    bool history_search_active;    ///< Interactive search active
+    int history_search_direction;  ///< 1=forward, -1=reverse
 
-    /* Unique-only navigation tracking (for lle_dedup_navigation_unique) */
+    /// Unique-only navigation tracking (for lle_dedup_navigation_unique)
     uint32_t
-        *history_nav_seen_hashes;  /* Hash set of commands seen this session */
-    size_t history_nav_seen_count; /* Number of seen hashes */
-    size_t history_nav_seen_capacity; /* Capacity of seen hash array */
+        *history_nav_seen_hashes;  ///< Hash set of commands seen this session
+    size_t history_nav_seen_count; ///< Number of seen hashes
+    size_t history_nav_seen_capacity; ///< Capacity of seen hash array
 
     /* Navigation display stack for symmetric up/down navigation (issue #40)
      * Tracks which entries were actually displayed during up navigation
      * so down navigation can retrace the exact same path in reverse */
-    size_t *history_nav_display_stack;   /* Stack of displayed entry indices */
-    size_t history_nav_display_count;    /* Current stack depth */
-    size_t history_nav_display_capacity; /* Stack capacity */
+    size_t *history_nav_display_stack;   ///< Stack of displayed entry indices
+    size_t history_nav_display_count;    ///< Current stack depth
+    size_t history_nav_display_capacity; ///< Stack capacity
 
-    /* Display and output */
-    lle_display_controller_t *display_controller; /* Display management */
+    /// Display and output
+    lle_display_controller_t *display_controller; ///< Display management
 
-    /* Completion */
+    /// Completion
     struct lle_completion_system
-        *completion_system; /* Tab completion (Spec 12) */
+        *completion_system; ///< Tab completion (Spec 12)
 
-    /* Editing mode and state */
-    lle_editing_mode_t editing_mode;  /* Current editing mode */
-    lle_vi_state_t *vi_state;         /* Vi mode state (if enabled) */
-    lle_keymap_mode_t current_keymap; /* Active keymap */
+    /// Editing mode and state
+    lle_editing_mode_t editing_mode;  ///< Current editing mode
+    lle_vi_state_t *vi_state;         ///< Vi mode state (if enabled)
+    lle_keymap_mode_t current_keymap; ///< Active keymap
 
-    /* Special modes */
-    bool quoted_insert_mode; /* Ctrl-Q/Ctrl-V mode */
-    bool eof_requested;      /* EOF signal (Ctrl-D on empty line) */
-    bool abort_requested;    /* Abort signal (Ctrl-G) */
+    /// Special modes
+    bool quoted_insert_mode; ///< Ctrl-Q/Ctrl-V mode
+    bool eof_requested;      ///< EOF signal (Ctrl-D on empty line)
+    bool abort_requested;    ///< Abort signal (Ctrl-G)
 
-    /* Extensibility and Widgets */
-    lle_widget_registry_t *widget_registry; /* Widget system registry */
-    lle_widget_hooks_manager_t *widget_hooks_manager; /* Widget hooks manager */
-    lle_plugin_manager_t *plugin_manager; /* Plugin system (future) */
+    /// Extensibility and Widgets
+    lle_widget_registry_t *widget_registry; ///< Widget system registry
+    lle_widget_hooks_manager_t *widget_hooks_manager; ///< Widget hooks manager
+    lle_plugin_manager_t *plugin_manager; ///< Plugin system (future)
     lle_script_integration_t
-        *script_integration;      /* Script integration (future) */
-    void *history_edit_callbacks; /* History edit callbacks (opaque) */
+        *script_integration;      ///< Script integration (future)
+    void *history_edit_callbacks; ///< History edit callbacks (opaque)
 
-    /* Memory management */
-    lush_memory_pool_t *lush_pool; /* Lush memory pool (source) */
-    lle_memory_pool_t *lle_pool;   /* LLE memory pool (wrapper) */
+    /// Memory management
+    lush_memory_pool_t *lush_pool; ///< Lush memory pool (source)
+    lle_memory_pool_t *lle_pool;   ///< LLE memory pool (wrapper)
 
-    /* Editor statistics */
-    uint64_t total_keystrokes;   /* Total keys processed */
-    uint64_t command_count;      /* Commands executed */
-    uint64_t edit_session_start; /* Session start timestamp */
+    /// Editor statistics
+    uint64_t total_keystrokes;   ///< Total keys processed
+    uint64_t command_count;      ///< Commands executed
+    uint64_t edit_session_start; ///< Session start timestamp
 
 } lle_editor_t;
 
@@ -238,4 +238,4 @@ const char *lle_editor_get_content(const lle_editor_t *editor);
  */
 size_t lle_editor_get_content_length(const lle_editor_t *editor);
 
-#endif /* LLE_EDITOR_H */
+#endif /// LLE_EDITOR_H

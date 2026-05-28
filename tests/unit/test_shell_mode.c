@@ -25,7 +25,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -35,10 +35,10 @@
 TEST(init_default_mode) {
     shell_mode_init();
 
-    /* Default mode should be LUSH */
+    /// Default mode should be LUSH
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH, "Default mode should be LUSH");
 
-    /* Should not be in strict mode by default */
+    /// Should not be in strict mode by default
     ASSERT(!shell_mode_is_strict(),
            "Strict mode should be disabled by default");
 }
@@ -62,21 +62,21 @@ TEST(mode_names) {
 TEST(mode_switching) {
     shell_mode_init();
 
-    /* Switch to POSIX mode */
+    /// Switch to POSIX mode
     ASSERT(shell_mode_set(SHELL_MODE_POSIX), "Failed to set POSIX mode");
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_POSIX, "Mode should be POSIX");
     ASSERT(shell_mode_is(SHELL_MODE_POSIX),
            "shell_mode_is() should return true");
 
-    /* Switch to Bash mode */
+    /// Switch to Bash mode
     ASSERT(shell_mode_set(SHELL_MODE_BASH), "Failed to set Bash mode");
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_BASH, "Mode should be Bash");
 
-    /* Switch to Zsh mode */
+    /// Switch to Zsh mode
     ASSERT(shell_mode_set(SHELL_MODE_ZSH), "Failed to set Zsh mode");
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_ZSH, "Mode should be Zsh");
 
-    /* Switch back to Lush mode */
+    /// Switch back to Lush mode
     ASSERT(shell_mode_set(SHELL_MODE_LUSH), "Failed to set Lush mode");
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH, "Mode should be Lush");
 }
@@ -84,25 +84,25 @@ TEST(mode_switching) {
 TEST(strict_mode) {
     shell_mode_init();
 
-    /* Enable strict mode */
+    /// Enable strict mode
     shell_mode_set_strict(true);
     ASSERT(shell_mode_is_strict(), "Strict mode should be enabled");
 
-    /* Attempting to change mode should fail */
+    /// Attempting to change mode should fail
     ASSERT(!shell_mode_set(SHELL_MODE_BASH),
            "Mode change should fail in strict mode");
     ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
               "Mode should remain LUSH after failed change");
 
-    /* Disable strict mode */
+    /// Disable strict mode
     shell_mode_set_strict(false);
     ASSERT(!shell_mode_is_strict(), "Strict mode should be disabled");
 
-    /* Mode change should now succeed */
+    /// Mode change should now succeed
     ASSERT(shell_mode_set(SHELL_MODE_BASH),
            "Mode change should succeed after disabling strict mode");
 
-    /* Reset for other tests */
+    /// Reset for other tests
     shell_mode_init();
 }
 
@@ -115,7 +115,7 @@ TEST(posix_mode_features) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_POSIX);
 
-    /* POSIX mode should disable extended features */
+    /// POSIX mode should disable extended features
     ASSERT(!shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "POSIX should not allow indexed arrays");
     ASSERT(!shell_mode_allows(FEATURE_ASSOCIATIVE_ARRAYS),
@@ -134,7 +134,7 @@ TEST(bash_mode_features) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_BASH);
 
-    /* Bash mode should enable common features */
+    /// Bash mode should enable common features
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Bash should allow indexed arrays");
     ASSERT(shell_mode_allows(FEATURE_ASSOCIATIVE_ARRAYS),
@@ -144,11 +144,11 @@ TEST(bash_mode_features) {
     ASSERT(shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION),
            "Bash should allow process substitution");
 
-    /* Bash uses 0-indexed arrays */
+    /// Bash uses 0-indexed arrays
     ASSERT(shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED),
            "Bash should use 0-indexed arrays");
 
-    /* Bash has word splitting on by default */
+    /// Bash has word splitting on by default
     ASSERT(shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
            "Bash should have word splitting on by default");
 }
@@ -157,42 +157,42 @@ TEST(zsh_mode_features) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_ZSH);
 
-    /* Zsh mode should enable common features */
+    /// Zsh mode should enable common features
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Zsh should allow indexed arrays");
     ASSERT(shell_mode_allows(FEATURE_EXTENDED_TEST), "Zsh should allow [[ ]]");
 
-    /* Zsh uses 1-indexed arrays (0-indexed is false) */
+    /// Zsh uses 1-indexed arrays (0-indexed is false)
     ASSERT(!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED),
            "Zsh should use 1-indexed arrays");
 
-    /* Zsh has word splitting off by default */
+    /// Zsh has word splitting off by default
     ASSERT(!shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
            "Zsh should have word splitting off by default");
 
-    /* Zsh has anonymous functions */
+    /// Zsh has anonymous functions
     ASSERT(shell_mode_allows(FEATURE_ANONYMOUS_FUNCTIONS),
            "Zsh should allow anonymous functions");
 }
 
 TEST(lush_mode_features) {
     shell_mode_init();
-    /* Lush is the default mode */
+    /// Lush is the default mode
 
-    /* Lush cherry-picks best features */
+    /// Lush cherry-picks best features
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Lush should allow indexed arrays");
     ASSERT(shell_mode_allows(FEATURE_EXTENDED_TEST), "Lush should allow [[ ]]");
 
-    /* 0-indexed like Bash */
+    /// 0-indexed like Bash
     ASSERT(shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED),
            "Lush should use 0-indexed arrays (like Bash)");
 
-    /* Word splitting off like Zsh (safer) */
+    /// Word splitting off like Zsh (safer)
     ASSERT(!shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
            "Lush should have word splitting off (like Zsh)");
 
-    /* Anonymous functions like Zsh */
+    /// Anonymous functions like Zsh
     ASSERT(shell_mode_allows(FEATURE_ANONYMOUS_FUNCTIONS),
            "Lush should allow anonymous functions (like Zsh)");
 }
@@ -206,20 +206,20 @@ TEST(feature_enable_override) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_POSIX);
 
-    /* Verify feature is off in POSIX mode */
+    /// Verify feature is off in POSIX mode
     ASSERT(!shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be off in POSIX mode");
 
-    /* Enable the feature */
+    /// Enable the feature
     shell_feature_enable(FEATURE_INDEXED_ARRAYS);
 
-    /* Now it should be on */
+    /// Now it should be on
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be on after override");
     ASSERT(shell_feature_is_overridden(FEATURE_INDEXED_ARRAYS),
            "Feature should be marked as overridden");
 
-    /* Reset for other tests */
+    /// Reset for other tests
     shell_mode_init();
 }
 
@@ -227,18 +227,18 @@ TEST(feature_disable_override) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_BASH);
 
-    /* Verify feature is on in Bash mode */
+    /// Verify feature is on in Bash mode
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be on in Bash mode");
 
-    /* Disable the feature */
+    /// Disable the feature
     shell_feature_disable(FEATURE_INDEXED_ARRAYS);
 
-    /* Now it should be off */
+    /// Now it should be off
     ASSERT(!shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be off after override");
 
-    /* Reset for other tests */
+    /// Reset for other tests
     shell_mode_init();
 }
 
@@ -246,21 +246,21 @@ TEST(feature_reset) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_POSIX);
 
-    /* Enable a feature */
+    /// Enable a feature
     shell_feature_enable(FEATURE_INDEXED_ARRAYS);
     ASSERT(shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be on after override");
 
-    /* Reset the feature */
+    /// Reset the feature
     shell_feature_reset(FEATURE_INDEXED_ARRAYS);
 
-    /* Should be back to mode default (off for POSIX) */
+    /// Should be back to mode default (off for POSIX)
     ASSERT(!shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be off after reset to POSIX default");
     ASSERT(!shell_feature_is_overridden(FEATURE_INDEXED_ARRAYS),
            "Feature should no longer be overridden");
 
-    /* Reset for other tests */
+    /// Reset for other tests
     shell_mode_init();
 }
 
@@ -268,15 +268,15 @@ TEST(feature_reset_all) {
     shell_mode_init();
     shell_mode_set(SHELL_MODE_POSIX);
 
-    /* Enable multiple features */
+    /// Enable multiple features
     shell_feature_enable(FEATURE_INDEXED_ARRAYS);
     shell_feature_enable(FEATURE_EXTENDED_TEST);
     shell_feature_enable(FEATURE_PROCESS_SUBSTITUTION);
 
-    /* Reset all */
+    /// Reset all
     shell_feature_reset_all();
 
-    /* All should be back to POSIX defaults */
+    /// All should be back to POSIX defaults
     ASSERT(!shell_mode_allows(FEATURE_INDEXED_ARRAYS),
            "Arrays should be off after reset_all");
     ASSERT(!shell_mode_allows(FEATURE_EXTENDED_TEST),
@@ -284,7 +284,7 @@ TEST(feature_reset_all) {
     ASSERT(!shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION),
            "Process substitution should be off after reset_all");
 
-    /* Reset for other tests */
+    /// Reset for other tests
     shell_mode_init();
 }
 
@@ -294,7 +294,7 @@ TEST(feature_reset_all) {
  */
 
 TEST(feature_names) {
-    /* Check some feature names are defined */
+    /// Check some feature names are defined
     const char *name = shell_feature_name(FEATURE_INDEXED_ARRAYS);
     ASSERT(name != NULL, "Feature name should not be NULL");
     ASSERT(strlen(name) > 0, "Feature name should not be empty");
@@ -308,9 +308,9 @@ TEST(feature_names) {
 
 TEST(feature_parse) {
     shell_feature_t feature;
-    bool invert = true; /* seed non-default to verify reset */
+    bool invert = true; /// seed non-default to verify reset
 
-    /* Parse valid feature names */
+    /// Parse valid feature names
     ASSERT(shell_feature_parse("indexed_arrays", &feature, &invert),
            "Should parse 'indexed_arrays'");
     ASSERT_EQ(feature, FEATURE_INDEXED_ARRAYS, "Parsed feature should match");
@@ -321,24 +321,24 @@ TEST(feature_parse) {
     ASSERT_EQ(feature, FEATURE_EXTENDED_TEST, "Parsed feature should match");
     ASSERT(!invert, "Canonical name should not be inverted");
 
-    /* Inverted alias: bsd_echo bridges to xpg_echo with inverted semantic */
+    /// Inverted alias: bsd_echo bridges to xpg_echo with inverted semantic
     ASSERT(shell_feature_parse("bsd_echo", &feature, &invert),
            "Should parse zsh's 'bsd_echo' alias");
     ASSERT_EQ(feature, FEATURE_XPG_ECHO,
               "bsd_echo should map to FEATURE_XPG_ECHO");
     ASSERT(invert, "bsd_echo is the inverted alias for xpg_echo");
 
-    /* xpg_echo (canonical) is not inverted */
+    /// xpg_echo (canonical) is not inverted
     ASSERT(shell_feature_parse("xpg_echo", &feature, &invert),
            "Should parse 'xpg_echo'");
     ASSERT_EQ(feature, FEATURE_XPG_ECHO, "Parsed feature should match");
     ASSERT(!invert, "xpg_echo is the canonical (non-inverted) name");
 
-    /* NULL invert pointer is allowed (callers that don't care) */
+    /// NULL invert pointer is allowed (callers that don't care)
     ASSERT(shell_feature_parse("indexed_arrays", &feature, NULL),
            "Should accept NULL invert out-param");
 
-    /* Invalid feature name should fail */
+    /// Invalid feature name should fail
     ASSERT(!shell_feature_parse("not_a_real_feature", &feature, NULL),
            "Should fail to parse invalid feature name");
 }
@@ -403,11 +403,11 @@ TEST(shebang_lush) {
 TEST(shebang_invalid) {
     shell_mode_t mode;
 
-    /* Not a shebang */
+    /// Not a shebang
     ASSERT(!shell_mode_detect_from_shebang("echo hello", &mode),
            "Should not detect non-shebang line");
 
-    /* Unknown shell */
+    /// Unknown shell
     ASSERT(!shell_mode_detect_from_shebang("#!/bin/fish", &mode),
            "Should not detect unknown shell");
 }
@@ -418,12 +418,12 @@ TEST(shebang_invalid) {
  */
 
 TEST(mode_bounds) {
-    /* Verify enum bounds are correct */
+    /// Verify enum bounds are correct
     ASSERT(SHELL_MODE_POSIX >= 0, "POSIX mode should be non-negative");
     ASSERT(SHELL_MODE_LUSH < SHELL_MODE_COUNT, "LUSH should be within count");
     ASSERT_EQ(SHELL_MODE_COUNT, 4, "Should have 4 modes");
 
-    /* Verify mode names work for all modes */
+    /// Verify mode names work for all modes
     for (int i = 0; i < SHELL_MODE_COUNT; i++) {
         const char *name = shell_mode_name((shell_mode_t)i);
         ASSERT(name != NULL, "Mode name should not be NULL");

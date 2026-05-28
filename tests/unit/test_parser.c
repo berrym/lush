@@ -26,7 +26,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================================
  * LIFECYCLE TESTS
@@ -65,7 +65,7 @@ TEST(parse_simple_command) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    /* Root should be a command or command list */
+    /// Root should be a command or command list
     ASSERT(ast->type == NODE_COMMAND || ast->type == NODE_COMMAND_LIST,
            "Root should be command or command list");
 
@@ -110,7 +110,7 @@ TEST(parse_simple_pipe) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    /* Should have a PIPE or PIPELINE node somewhere in tree */
+    /// Should have a PIPE or PIPELINE node somewhere in tree
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -348,8 +348,8 @@ TEST(parse_for_loop) {
 }
 
 TEST(parse_for_loop_no_in) {
-    /* POSIX: for without 'in' iterates over positional params ($@)
-     * Issue #55 - FIXED: lush now supports this valid POSIX syntax */
+    /// POSIX: for without 'in' iterates over positional params ($@)
+    /// Issue #55 - FIXED: lush now supports this valid POSIX syntax
     parser_t *parser = parser_new("for arg; do echo $arg; done");
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
@@ -497,8 +497,8 @@ TEST(parse_case_with_patterns) {
  */
 
 TEST(parse_function_keyword) {
-    /* ksh/bash style: function name { body; }
-     * Issue #56 - FIXED: lush now supports this syntax */
+    /// ksh/bash style: function name { body; }
+    /// Issue #56 - FIXED: lush now supports this syntax
     parser_t *parser = parser_new("function foo { echo bar; }");
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
@@ -688,11 +688,11 @@ TEST(parse_function_trailing_redir_append) {
 }
 
 TEST(parse_function_trailing_redir_subshell_body) {
-    /* Cross-checks Issue #46 + #43: non-brace body + trailing redir.
-     * The redirection may end up attached to the subshell (consumed by
-     * parse_subshell's own trailing-redir call) rather than the function
-     * node; either is functionally equivalent at runtime. The test only
-     * asserts that the input parses cleanly. */
+    /// Cross-checks Issue #46 + #43: non-brace body + trailing redir.
+    /// The redirection may end up attached to the subshell (consumed by
+    /// parse_subshell's own trailing-redir call) rather than the function
+    /// node; either is functionally equivalent at runtime. The test only
+    /// asserts that the input parses cleanly.
     parser_t *parser = parser_new("f() ( echo x ) > /tmp/lush_test");
     ASSERT_NOT_NULL(parser, "parser_new failed");
     node_t *ast = parser_parse(parser);
@@ -903,11 +903,11 @@ TEST(parse_error_unclosed_if) {
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
     node_t *ast = parser_parse(parser);
-    /* Should either return NULL or have error flag set */
+    /// Should either return NULL or have error flag set
     if (ast) {
         free_node_tree(ast);
     }
-    /* Note: Some parsers may allow incomplete input for interactive use */
+    /// Note: Some parsers may allow incomplete input for interactive use
     parser_free(parser);
 }
 
@@ -956,10 +956,10 @@ TEST(parser_error_message_api) {
     parser_t *parser = parser_new("echo hello");
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
-    /* Valid input should have NULL or empty error */
+    /// Valid input should have NULL or empty error
     node_t *ast = parser_parse(parser);
     const char *err = parser_error(parser);
-    /* Error message may be NULL or empty string for success */
+    /// Error message may be NULL or empty string for success
     (void)err;
 
     if (ast)
@@ -972,7 +972,7 @@ TEST(parser_set_source_name) {
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
     parser_set_source_name(parser, "test_script.sh");
-    /* Should not crash */
+    /// Should not crash
 
     parser_free(parser);
 }

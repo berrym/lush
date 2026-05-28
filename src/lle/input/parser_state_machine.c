@@ -135,7 +135,7 @@ lle_result_t
 lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
                                  lle_input_parser_system_t *parser_sys,
                                  const char *data, size_t data_len) {
-    (void)parser_sys; /* Reserved for parser-system-aware processing */
+    (void)parser_sys; /// Reserved for parser-system-aware processing
     if (!state_machine || !data) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -144,50 +144,50 @@ lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
         return LLE_SUCCESS;
     }
 
-    /* The process function provides basic state routing hints based on input.
-     * The integration layer will do the actual parsing. */
+    /// The process function provides basic state routing hints based on input.
+    /// The integration layer will do the actual parsing.
 
-    /* Check current state and input to determine transitions */
+    /// Check current state and input to determine transitions
     switch (state_machine->current_state) {
     case LLE_PARSER_STATE_NORMAL:
-        /* Check if escape sequence is starting */
+        /// Check if escape sequence is starting
         if (data[0] == '\x1B') {
             lle_parser_state_machine_transition(state_machine,
                                                 LLE_PARSER_STATE_ESCAPE);
         }
-        /* Otherwise stay in NORMAL state for text processing */
+        /// Otherwise stay in NORMAL state for text processing
         break;
 
     case LLE_PARSER_STATE_ESCAPE:
-        /* Analyze second byte to determine sequence type */
+        /// Analyze second byte to determine sequence type
         if (data_len >= 2) {
             if (data[1] == '[') {
-                /* Could be CSI, mouse, or key sequence */
+                /// Could be CSI, mouse, or key sequence
                 if (data_len >= 3) {
                     if (data[2] == 'M' || data[2] == '<') {
-                        /* Mouse sequence */
+                        /// Mouse sequence
                         lle_parser_state_machine_transition(
                             state_machine, LLE_PARSER_STATE_MOUSE);
                     } else {
-                        /* CSI sequence */
+                        /// CSI sequence
                         lle_parser_state_machine_transition(
                             state_machine, LLE_PARSER_STATE_CSI);
                     }
                 }
             } else if (data[1] == ']') {
-                /* OSC sequence */
+                /// OSC sequence
                 lle_parser_state_machine_transition(state_machine,
                                                     LLE_PARSER_STATE_OSC);
             } else if (data[1] == 'P') {
-                /* DCS sequence */
+                /// DCS sequence
                 lle_parser_state_machine_transition(state_machine,
                                                     LLE_PARSER_STATE_DCS);
             } else if (data[1] == 'O' || data[1] == 'N') {
-                /* SS3 or SS2 - key sequence */
+                /// SS3 or SS2 - key sequence
                 lle_parser_state_machine_transition(
                     state_machine, LLE_PARSER_STATE_KEY_SEQUENCE);
             } else {
-                /* Other escape sequence - treat as key */
+                /// Other escape sequence - treat as key
                 lle_parser_state_machine_transition(
                     state_machine, LLE_PARSER_STATE_KEY_SEQUENCE);
             }
@@ -200,20 +200,20 @@ lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
     case LLE_PARSER_STATE_KEY_SEQUENCE:
     case LLE_PARSER_STATE_MOUSE:
     case LLE_PARSER_STATE_UTF8_MULTIBYTE:
-        /* These states are handled by the integration layer.
-         * The state machine just tracks that we're in these states.
-         * Integration layer will call transition() when parsing completes. */
+        /// These states are handled by the integration layer.
+        /// The state machine just tracks that we're in these states.
+        /// Integration layer will call transition() when parsing completes.
         break;
 
     case LLE_PARSER_STATE_ERROR_RECOVERY:
-        /* Error recovery - transition back to normal */
+        /// Error recovery - transition back to normal
         lle_parser_state_machine_transition(state_machine,
                                             LLE_PARSER_STATE_NORMAL);
         state_machine->error_recoveries++;
         break;
 
     default:
-        /* Unknown state - recover */
+        /// Unknown state - recover
         lle_parser_state_machine_transition(state_machine,
                                             LLE_PARSER_STATE_ERROR_RECOVERY);
         state_machine->error_recoveries++;

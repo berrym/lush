@@ -35,12 +35,12 @@ lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Already initialized */
+    /// Already initialized
     if (system->enhanced_stats) {
         return LLE_SUCCESS;
     }
 
-    /* Allocate enhanced stats structure */
+    /// Allocate enhanced stats structure
     lle_event_enhanced_stats_t *stats =
         lle_pool_alloc(sizeof(lle_event_enhanced_stats_t));
     if (!stats) {
@@ -49,7 +49,7 @@ lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system) {
 
     memset(stats, 0, sizeof(lle_event_enhanced_stats_t));
 
-    /* Allocate per-type statistics array */
+    /// Allocate per-type statistics array
     stats->type_stats_capacity = LLE_ENHANCED_STATS_INITIAL_CAPACITY;
     stats->type_stats = lle_pool_alloc(sizeof(lle_event_type_stats_t) *
                                        stats->type_stats_capacity);
@@ -62,11 +62,11 @@ lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system) {
            sizeof(lle_event_type_stats_t) * stats->type_stats_capacity);
     stats->type_stats_count = 0;
 
-    /* Initialize cycle stats with sentinel values */
+    /// Initialize cycle stats with sentinel values
     stats->min_cycle_time = UINT64_MAX;
     stats->max_cycle_time = 0;
 
-    /* Initialize mutex */
+    /// Initialize mutex
     pthread_mutex_init(&stats->stats_mutex, NULL);
 
     system->enhanced_stats = stats;
@@ -86,15 +86,15 @@ void lle_event_enhanced_stats_destroy(lle_event_system_t *system) {
 
     lle_event_enhanced_stats_t *stats = system->enhanced_stats;
 
-    /* Destroy mutex */
+    /// Destroy mutex
     pthread_mutex_destroy(&stats->stats_mutex);
 
-    /* Free type stats array */
+    /// Free type stats array
     if (stats->type_stats) {
         lle_pool_free(stats->type_stats);
     }
 
-    /* Free stats structure */
+    /// Free stats structure
     lle_pool_free(stats);
 
     system->enhanced_stats = NULL;
@@ -125,7 +125,7 @@ lle_event_enhanced_stats_get_type(lle_event_system_t *system,
 
     pthread_mutex_lock(&stats->stats_mutex);
 
-    /* Search for type */
+    /// Search for type
     for (size_t i = 0; i < stats->type_stats_count; i++) {
         if (stats->type_stats[i].event_type == type) {
             memcpy(stats_out, &stats->type_stats[i],
@@ -137,10 +137,10 @@ lle_event_enhanced_stats_get_type(lle_event_system_t *system,
 
     pthread_mutex_unlock(&stats->stats_mutex);
 
-    /* Type not found - return zeros */
+    /// Type not found - return zeros
     memset(stats_out, 0, sizeof(lle_event_type_stats_t));
     stats_out->event_type = type;
-    stats_out->min_processing_time = 0; /* Override sentinel */
+    stats_out->min_processing_time = 0; /// Override sentinel
 
     return LLE_SUCCESS;
 }
@@ -280,22 +280,22 @@ lle_result_t lle_event_enhanced_stats_reset(lle_event_system_t *system) {
 
     pthread_mutex_lock(&stats->stats_mutex);
 
-    /* Reset cycle stats */
+    /// Reset cycle stats
     stats->cycles_completed = 0;
     stats->total_cycle_time = 0;
     stats->min_cycle_time = UINT64_MAX;
     stats->max_cycle_time = 0;
 
-    /* Reset type stats */
+    /// Reset type stats
     memset(stats->type_stats, 0,
            sizeof(lle_event_type_stats_t) * stats->type_stats_capacity);
     stats->type_stats_count = 0;
 
-    /* Reset queue depth */
+    /// Reset queue depth
     stats->max_queue_depth_seen = 0;
     stats->max_priority_queue_depth_seen = 0;
 
-    /* Reset limit tracking */
+    /// Reset limit tracking
     stats->cycles_hit_time_limit = 0;
     stats->cycles_hit_event_limit = 0;
 
@@ -326,7 +326,7 @@ lle_event_processing_set_config(lle_event_system_t *system,
 
     pthread_mutex_lock(&system->system_mutex);
 
-    /* If enabling detailed stats and not yet initialized, initialize now */
+    /// If enabling detailed stats and not yet initialized, initialize now
     if (config->record_detailed_stats && !system->enhanced_stats) {
         lle_result_t result = lle_event_enhanced_stats_init(system);
         if (result != LLE_SUCCESS) {
@@ -335,7 +335,7 @@ lle_event_processing_set_config(lle_event_system_t *system,
         }
     }
 
-    /* Copy configuration */
+    /// Copy configuration
     system->processing_config = *config;
 
     pthread_mutex_unlock(&system->system_mutex);

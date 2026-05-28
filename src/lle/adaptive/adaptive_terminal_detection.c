@@ -24,13 +24,13 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Performance monitoring */
+// Performance monitoring
 static lle_detection_performance_stats_t detection_stats = {0};
 
-/* Detection cache */
+// Detection cache
 static lle_terminal_detection_result_t *cached_result = NULL;
 static uint64_t cache_timestamp_us = 0;
-#define CACHE_TTL_US 30000000 /* 30 seconds */
+#define CACHE_TTL_US 30000000 // 30 seconds
 
 /* ============================================================================
  * INTERNAL UTILITY FUNCTIONS
@@ -58,7 +58,7 @@ static bool pattern_match(const char *pattern, const char *string) {
         return false;
     }
 
-    /* Simple wildcard matching implementation */
+    // Simple wildcard matching implementation
     const char *p = pattern;
     const char *s = string;
     const char *star = NULL;
@@ -66,16 +66,16 @@ static bool pattern_match(const char *pattern, const char *string) {
 
     while (*s) {
         if (*p == '*') {
-            /* Remember position of * for backtracking */
+            // Remember position of * for backtracking
             star = p++;
             ss = s;
         } else if (*p == *s || (*p >= 'A' && *p <= 'Z' && *p + 32 == *s) ||
                    (*p >= 'a' && *p <= 'z' && *p - 32 == *s)) {
-            /* Match (case-insensitive) */
+            // Match (case-insensitive)
             p++;
             s++;
         } else if (star) {
-            /* Backtrack to * */
+            /// Backtrack to *
             p = star + 1;
             s = ++ss;
         } else {
@@ -83,7 +83,7 @@ static bool pattern_match(const char *pattern, const char *string) {
         }
     }
 
-    /* Skip trailing * in pattern */
+    // Skip trailing * in pattern
     while (*p == '*') {
         p++;
     }
@@ -127,7 +127,7 @@ analyze_environment_variables(lle_terminal_detection_result_t *detection) {
     const char *term_program = getenv("TERM_PROGRAM");
     const char *colorterm = getenv("COLORTERM");
 
-    /* Copy environment values */
+    // Copy environment values
     safe_strncpy(detection->term_name, term ? term : "",
                  sizeof(detection->term_name));
     safe_strncpy(detection->term_program, term_program ? term_program : "",
@@ -135,7 +135,7 @@ analyze_environment_variables(lle_terminal_detection_result_t *detection) {
     safe_strncpy(detection->colorterm, colorterm ? colorterm : "",
                  sizeof(detection->colorterm));
 
-    /* Basic capability inference from environment */
+    // Basic capability inference from environment
     detection->supports_truecolor =
         (colorterm && (strcmp(colorterm, "truecolor") == 0 ||
                        strcmp(colorterm, "24bit") == 0));
@@ -144,9 +144,9 @@ analyze_environment_variables(lle_terminal_detection_result_t *detection) {
         (term && (strstr(term, "color") || strstr(term, "256"))) ||
         detection->supports_truecolor;
     detection->supports_unicode =
-        (colorterm != NULL); /* COLORTERM usually implies UTF-8 */
+        (colorterm != NULL); // COLORTERM usually implies UTF-8
 
-    /* Detect terminal multiplexer */
+    // Detect terminal multiplexer
     const char *tmux = getenv("TMUX");
     const char *sty = getenv("STY");
 
@@ -182,12 +182,12 @@ lle_match_terminal_signature(const lle_terminal_detection_result_t *detection) {
     const lle_terminal_signature_t *signatures =
         lle_get_terminal_signature_database(&count);
 
-    /* Iterate through signatures in priority order */
+    // Iterate through signatures in priority order
     for (size_t i = 0; i < count; i++) {
         const lle_terminal_signature_t *sig = &signatures[i];
         bool match = true;
 
-        /* Check TERM_PROGRAM pattern */
+        // Check TERM_PROGRAM pattern
         if (sig->term_program_pattern) {
             if (detection->term_program[0] == '\0' ||
                 !pattern_match(sig->term_program_pattern,
@@ -196,7 +196,7 @@ lle_match_terminal_signature(const lle_terminal_detection_result_t *detection) {
             }
         }
 
-        /* Check TERM pattern */
+        // Check TERM pattern
         if (match && sig->term_pattern) {
             if (detection->term_name[0] == '\0' ||
                 !pattern_match(sig->term_pattern, detection->term_name)) {
@@ -204,7 +204,7 @@ lle_match_terminal_signature(const lle_terminal_detection_result_t *detection) {
             }
         }
 
-        /* Check additional environment variable */
+        // Check additional environment variable
         if (match && sig->env_var_check) {
             const char *env_val = getenv(sig->env_var_check);
             if (!env_val || env_val[0] == '\0') {
@@ -217,7 +217,7 @@ lle_match_terminal_signature(const lle_terminal_detection_result_t *detection) {
         }
     }
 
-    return NULL; /* No match found */
+    return NULL; // No match found
 }
 
 /* ============================================================================
@@ -232,17 +232,17 @@ lle_match_terminal_signature(const lle_terminal_detection_result_t *detection) {
  * @return true if terminal responded, false on timeout or error
  */
 static bool probe_capability_with_timeout(const char *query, int timeout_ms) {
-    /* Only probe if stdout is a TTY */
+    // Only probe if stdout is a TTY
     if (!isatty(STDOUT_FILENO)) {
         return false;
     }
 
-    /* Write query sequence */
+    // Write query sequence
     if (write(STDOUT_FILENO, query, strlen(query)) < 0) {
         return false;
     }
 
-    /* Wait for response with timeout */
+    // Wait for response with timeout
     fd_set readfds;
     struct timeval timeout;
 
@@ -255,13 +255,13 @@ static bool probe_capability_with_timeout(const char *query, int timeout_ms) {
     int result = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout);
 
     if (result > 0) {
-        /* Data available - read and discard response */
+        // Data available - read and discard response
         char buffer[256];
         ssize_t bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
         return bytes_read > 0;
     }
 
-    return false; /* Timeout or error */
+    return false; // Timeout or error
 }
 
 /**
@@ -275,27 +275,25 @@ static bool probe_capability_with_timeout(const char *query, int timeout_ms) {
 lle_result_t lle_probe_terminal_capabilities_safe(
     lle_terminal_detection_result_t *detection) {
 
-    /* Cannot probe without stdout TTY - mark as unsuccessful but not an error
-     */
+    /// Cannot probe without stdout TTY - mark as unsuccessful but not an error
     if (!detection->stdout_is_tty) {
         detection->probing_successful = false;
-        /* Set all probe flags to false - this is complete behavior for non-TTY
-         */
+        /// Set all probe flags to false - this is complete behavior for non-TTY
         detection->supports_cursor_positioning = false;
         detection->supports_cursor_queries = false;
         detection->supports_bracketed_paste = false;
         detection->supports_mouse = false;
-        return LLE_SUCCESS; /* Successfully determined we cannot probe */
+        return LLE_SUCCESS; // Successfully determined we cannot probe
     }
 
-    /* Save terminal state */
+    // Save terminal state
     struct termios saved_termios;
     if (tcgetattr(STDIN_FILENO, &saved_termios) != 0) {
         detection->probing_successful = false;
         return LLE_ERROR_TERMINAL_ABSTRACTION;
     }
 
-    /* Set raw mode for accurate probing */
+    // Set raw mode for accurate probing
     struct termios raw_termios = saved_termios;
     raw_termios.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw_termios.c_oflag &= ~(OPOST);
@@ -309,26 +307,26 @@ lle_result_t lle_probe_terminal_capabilities_safe(
         return LLE_ERROR_TERMINAL_ABSTRACTION;
     }
 
-    /* Progressive capability probing with timeout protection */
+    // Progressive capability probing with timeout protection
 
-    /* Test cursor positioning (DSR - Device Status Report) */
+    // Test cursor positioning (DSR - Device Status Report)
     detection->supports_cursor_positioning =
         probe_capability_with_timeout("\x1b[6n", 100);
 
-    /* If basic cursor support works, we likely have ANSI capability */
+    // If basic cursor support works, we likely have ANSI capability
     if (detection->supports_cursor_positioning) {
         detection->supports_cursor_queries = true;
     }
 
-    /* Test bracketed paste mode */
+    // Test bracketed paste mode
     detection->supports_bracketed_paste =
         probe_capability_with_timeout("\x1b[?2004h", 25);
 
-    /* Test mouse support */
+    // Test mouse support
     detection->supports_mouse =
         probe_capability_with_timeout("\x1b[?1000h", 50);
 
-    /* Restore terminal state */
+    // Restore terminal state
     tcsetattr(STDIN_FILENO, TCSANOW, &saved_termios);
 
     detection->probing_successful = true;
@@ -348,22 +346,22 @@ lle_result_t lle_probe_terminal_capabilities_safe(
 static lle_adaptive_mode_t
 determine_fallback_mode(const lle_terminal_detection_result_t *detection) {
 
-    /* No TTY at all - non-interactive */
+    // No TTY at all - non-interactive
     if (!detection->stdin_is_tty && !detection->stdout_is_tty) {
         return LLE_ADAPTIVE_MODE_NONE;
     }
 
-    /* Both stdin and stdout are TTY - native mode */
+    // Both stdin and stdout are TTY - native mode
     if (detection->stdin_is_tty && detection->stdout_is_tty) {
         return LLE_ADAPTIVE_MODE_NATIVE;
     }
 
-    /* Only stdout is TTY - enhanced mode (editor terminal pattern) */
+    // Only stdout is TTY - enhanced mode (editor terminal pattern)
     if (!detection->stdin_is_tty && detection->stdout_is_tty) {
         return LLE_ADAPTIVE_MODE_ENHANCED;
     }
 
-    /* Capable output but no TTY - minimal mode */
+    // Capable output but no TTY - minimal mode
     return LLE_ADAPTIVE_MODE_MINIMAL;
 }
 
@@ -377,24 +375,24 @@ validate_and_adjust_mode(const lle_terminal_detection_result_t *detection) {
 
     lle_adaptive_mode_t mode = detection->recommended_mode;
 
-    /* Validate mode is compatible with TTY status */
+    // Validate mode is compatible with TTY status
     switch (mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
-        /* Native mode requires stdin TTY */
+        // Native mode requires stdin TTY
         if (!detection->stdin_is_tty) {
             mode = LLE_ADAPTIVE_MODE_ENHANCED;
         }
         break;
 
     case LLE_ADAPTIVE_MODE_ENHANCED:
-        /* Enhanced mode requires stdout TTY */
+        // Enhanced mode requires stdout TTY
         if (!detection->stdout_is_tty) {
             mode = LLE_ADAPTIVE_MODE_MINIMAL;
         }
         break;
 
     case LLE_ADAPTIVE_MODE_MULTIPLEXED:
-        /* Multiplexed mode requires both TTYs */
+        // Multiplexed mode requires both TTYs
         if (!detection->stdin_is_tty || !detection->stdout_is_tty) {
             mode = LLE_ADAPTIVE_MODE_ENHANCED;
         }
@@ -402,7 +400,7 @@ validate_and_adjust_mode(const lle_terminal_detection_result_t *detection) {
 
     case LLE_ADAPTIVE_MODE_MINIMAL:
     case LLE_ADAPTIVE_MODE_NONE:
-        /* No validation needed */
+        // No validation needed
         break;
     }
 
@@ -429,11 +427,11 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate detection result using standard malloc, not the pool.
-     * This is intentional: the detection result is cached as a singleton
-     * and may outlive pool shutdown. Using the pool would cause double-free
-     * or use-after-free when the pool is cleaned up while cached_result
-     * still holds a reference. */
+    /// Allocate detection result using standard malloc, not the pool.
+    /// This is intentional: the detection result is cached as a singleton
+    /// and may outlive pool shutdown. Using the pool would cause double-free
+    /// or use-after-free when the pool is cleaned up while cached_result
+    /// still holds a reference.
     lle_terminal_detection_result_t *detection =
         calloc(1, sizeof(lle_terminal_detection_result_t));
     if (!detection) {
@@ -442,22 +440,22 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
 
     uint64_t start_time = get_current_time_us();
 
-    /* Step 1: Basic TTY status detection */
+    // Step 1: Basic TTY status detection
     detection->stdin_is_tty = isatty(STDIN_FILENO);
     detection->stdout_is_tty = isatty(STDOUT_FILENO);
     detection->stderr_is_tty = isatty(STDERR_FILENO);
 
-    /* Get terminal dimensions */
+    // Get terminal dimensions
     lle_get_terminal_size(&detection->terminal_cols, &detection->terminal_rows);
 
-    /* Step 2: Environment variable analysis */
+    // Step 2: Environment variable analysis
     lle_result_t env_result = analyze_environment_variables(detection);
     if (env_result != LLE_SUCCESS) {
-        /* Continue with conservative defaults */
+        // Continue with conservative defaults
         detection->capability_level = LLE_CAPABILITY_BASIC;
     }
 
-    /* Step 3: Terminal signature matching */
+    // Step 3: Terminal signature matching
     detection->matched_signature = lle_match_terminal_signature(detection);
     if (detection->matched_signature) {
         detection->capability_level =
@@ -466,16 +464,16 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
             detection->matched_signature->preferred_mode;
         detection->detection_confidence_high = true;
     } else {
-        /* Step 4: Runtime capability probing (for unknown terminals) */
+        // Step 4: Runtime capability probing (for unknown terminals)
         lle_result_t probe_result =
             lle_probe_terminal_capabilities_safe(detection);
         detection->probing_successful = (probe_result == LLE_SUCCESS);
         detection->detection_confidence_high = detection->probing_successful;
 
-        /* Step 5: Fallback mode determination */
+        // Step 5: Fallback mode determination
         detection->recommended_mode = determine_fallback_mode(detection);
 
-        /* Infer capability level from probing results */
+        // Infer capability level from probing results
         if (detection->supports_truecolor) {
             detection->capability_level = LLE_CAPABILITY_PREMIUM;
         } else if (detection->supports_256_colors) {
@@ -487,12 +485,12 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
         }
     }
 
-    /* Step 6: Final mode validation and adjustment */
+    // Step 6: Final mode validation and adjustment
     detection->recommended_mode = validate_and_adjust_mode(detection);
 
     detection->detection_time_us = get_current_time_us() - start_time;
 
-    /* Update statistics */
+    // Update statistics
     detection_stats.total_detections++;
     detection_stats.avg_detection_time_us =
         ((detection_stats.avg_detection_time_us *
@@ -524,20 +522,20 @@ lle_result_t lle_detect_terminal_capabilities_optimized(
 
     uint64_t current_time = get_current_time_us();
 
-    /* Check cache validity */
+    // Check cache validity
     if (cached_result && (current_time - cache_timestamp_us) < CACHE_TTL_US) {
-        /* Return cached result */
+        // Return cached result
         *result = cached_result;
         detection_stats.cache_hits++;
         return LLE_SUCCESS;
     }
 
-    /* Cache miss - perform full detection */
+    // Cache miss - perform full detection
     detection_stats.cache_misses++;
 
     lle_result_t res = lle_detect_terminal_capabilities_comprehensive(result);
     if (res == LLE_SUCCESS) {
-        /* Update cache */
+        // Update cache
         if (cached_result) {
             free(cached_result);
         }
@@ -652,7 +650,7 @@ bool lle_is_iterm2(const lle_terminal_detection_result_t *detection) {
                 strstr(detection->term_program, "iTerm") != NULL);
     }
 
-    /* Check environment directly */
+    // Check environment directly
     const char *term_program = getenv("TERM_PROGRAM");
     return (term_program && strstr(term_program, "iTerm") != NULL);
 }
@@ -667,7 +665,7 @@ bool lle_is_tmux(const lle_terminal_detection_result_t *detection) {
         return (detection->multiplexer_type == LLE_MUX_TYPE_TMUX);
     }
 
-    /* Check environment directly */
+    // Check environment directly
     const char *tmux = getenv("TMUX");
     return (tmux != NULL && tmux[0] != '\0');
 }
@@ -682,7 +680,7 @@ bool lle_is_screen(const lle_terminal_detection_result_t *detection) {
         return (detection->multiplexer_type == LLE_MUX_TYPE_SCREEN);
     }
 
-    /* Check environment directly */
+    // Check environment directly
     const char *term = getenv("TERM");
     const char *sty = getenv("STY");
 
@@ -700,7 +698,7 @@ bool lle_is_multiplexed(const lle_terminal_detection_result_t *detection) {
         return (detection->multiplexer_type != LLE_MUX_TYPE_NONE);
     }
 
-    /* Check for common multiplexers */
+    // Check for common multiplexers
     return lle_is_tmux(NULL) || lle_is_screen(NULL);
 }
 
@@ -737,7 +735,7 @@ lle_result_t lle_get_terminal_size(int *cols, int *rows) {
         return LLE_SUCCESS;
     }
 
-    /* Fallback to environment variables */
+    // Fallback to environment variables
     const char *columns = getenv("COLUMNS");
     const char *lines = getenv("LINES");
 
@@ -774,8 +772,8 @@ void lle_terminal_reset(void) {
         return;
     }
 
-    /* Reset all attributes, show cursor, move to new line.
-     * Best-effort terminal cleanup; nothing useful to do on failure. */
+    /// Reset all attributes, show cursor, move to new line.
+    /// Best-effort terminal cleanup; nothing useful to do on failure.
     static const char reset_seq[] = "\x1b[0m\x1b[?25h\n";
     (void)!write(STDOUT_FILENO, reset_seq, sizeof(reset_seq) - 1);
 }

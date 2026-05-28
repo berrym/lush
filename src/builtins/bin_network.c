@@ -27,7 +27,7 @@ int bin_network(int argc, char **argv) {
         return 1;
     }
 
-    /* No arguments - show SSH host count */
+    /// No arguments - show SSH host count
     if (argc == 1) {
         ssh_host_cache_t *cache = get_ssh_host_cache();
         printf("SSH Hosts Status:\n");
@@ -36,7 +36,7 @@ int bin_network(int argc, char **argv) {
         return 0;
     }
 
-    /* Handle subcommands */
+    /// Handle subcommands
     if (strcmp(argv[1], "hosts") == 0) {
         ssh_host_cache_t *cache = get_ssh_host_cache();
         if (!cache || cache->count == 0) {

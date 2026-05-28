@@ -25,15 +25,15 @@
  */
 int bin_ulimit(int argc, char **argv) {
     int opt;
-    int resource = RLIMIT_FSIZE; // Default to file size limit
+    int resource = RLIMIT_FSIZE; /// Default to file size limit
     bool show_all = false;
     bool hard_limit = false;
     char *limit_value = NULL;
 
-    // Reset getopt for this call
+    /// Reset getopt for this call
     optind = 1;
 
-    // Parse options
+    /// Parse options
     while ((opt = getopt(argc, argv, "aHSfntsuvh")) != -1) {
         switch (opt) {
         case 'a':
@@ -43,7 +43,7 @@ int bin_ulimit(int argc, char **argv) {
             hard_limit = true;
             break;
         case 'S':
-            hard_limit = false; // Soft limit (default)
+            hard_limit = false; /// Soft limit (default)
             break;
         case 'f':
             resource = RLIMIT_FSIZE;
@@ -103,13 +103,13 @@ int bin_ulimit(int argc, char **argv) {
         }
     }
 
-    // Get remaining argument (limit value)
+    /// Get remaining argument (limit value)
     if (optind < argc) {
         limit_value = argv[optind];
     }
 
     if (show_all) {
-        // Display all limits
+        /// Display all limits
         struct rlimit rlim;
 
 #ifdef RLIMIT_CORE
@@ -211,7 +211,7 @@ int bin_ulimit(int argc, char **argv) {
         return 0;
     }
 
-    // Handle specific resource
+    /// Handle specific resource
     struct rlimit rlim;
     if (getrlimit(resource, &rlim) != 0) {
         int saved_errno = errno;
@@ -224,19 +224,19 @@ int bin_ulimit(int argc, char **argv) {
     }
 
     if (limit_value == NULL) {
-        // Display current limit
+        /// Display current limit
         rlim_t current = hard_limit ? rlim.rlim_max : rlim.rlim_cur;
         if (current == RLIM_INFINITY) {
             printf("unlimited\n");
         } else {
-            // Convert to appropriate units
+            /// Convert to appropriate units
             switch (resource) {
             case RLIMIT_FSIZE:
 #ifdef RLIMIT_CORE
             case RLIMIT_CORE:
 #endif
                 printf("%lu\n",
-                       (unsigned long)(current / 512)); // 512-byte blocks
+                       (unsigned long)(current / 512)); /// 512-byte blocks
                 break;
 #ifdef RLIMIT_STACK
             case RLIMIT_STACK:
@@ -247,7 +247,7 @@ int bin_ulimit(int argc, char **argv) {
 #ifdef RLIMIT_AS
             case RLIMIT_AS:
                 printf("%lu\n",
-                       (unsigned long)(current / 1024)); // 1024-byte blocks
+                       (unsigned long)(current / 1024)); /// 1024-byte blocks
                 break;
 #endif
             default:
@@ -258,7 +258,7 @@ int bin_ulimit(int argc, char **argv) {
         return 0;
     }
 
-    // Set new limit
+    /// Set new limit
     rlim_t new_limit;
     if (strcmp(limit_value, "unlimited") == 0) {
         new_limit = RLIM_INFINITY;
@@ -270,13 +270,13 @@ int bin_ulimit(int argc, char **argv) {
             return 1;
         }
 
-        // Convert from display units to bytes
+        /// Convert from display units to bytes
         switch (resource) {
         case RLIMIT_FSIZE:
 #ifdef RLIMIT_CORE
         case RLIMIT_CORE:
 #endif
-            new_limit = val * 512; // 512-byte blocks
+            new_limit = val * 512; /// 512-byte blocks
             break;
 #ifdef RLIMIT_STACK
         case RLIMIT_STACK:
@@ -286,7 +286,7 @@ int bin_ulimit(int argc, char **argv) {
 #endif
 #ifdef RLIMIT_AS
         case RLIMIT_AS:
-            new_limit = val * 1024; // 1024-byte blocks
+            new_limit = val * 1024; /// 1024-byte blocks
             break;
 #endif
         default:
@@ -295,17 +295,17 @@ int bin_ulimit(int argc, char **argv) {
         }
     }
 
-    // Set the limit
+    /// Set the limit
     if (hard_limit) {
         rlim.rlim_max = new_limit;
-        // Can't set hard limit higher than current hard limit without
-        // privileges
+        /// Can't set hard limit higher than current hard limit without
+        /// privileges
         if (new_limit > rlim.rlim_max) {
             rlim.rlim_cur = rlim.rlim_max;
         }
     } else {
         rlim.rlim_cur = new_limit;
-        // Can't set soft limit higher than hard limit
+        /// Can't set soft limit higher than hard limit
         if (new_limit > rlim.rlim_max) {
             rlim.rlim_cur = rlim.rlim_max;
         }

@@ -111,12 +111,12 @@ static char *read_file(const char *path, size_t *out_size) {
         return NULL;
     }
 
-    /* Get file size */
+    /// Get file size
     fseek(fp, 0, SEEK_END);
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (size < 0 || size > 1024 * 1024) { /* 1MB limit */
+    if (size < 0 || size > 1024 * 1024) { /// 1MB limit
         fclose(fp);
         return NULL;
     }
@@ -238,7 +238,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
     *out_lines = NULL;
     *out_count = 0;
 
-    /* Create pipe for reading command output */
+    /// Create pipe for reading command output
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         return LLE_ERROR_IO_ERROR;
@@ -252,27 +252,27 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
     }
 
     if (pid == 0) {
-        /* Child process */
-        close(pipefd[0]); /* Close read end */
+        /// Child process
+        close(pipefd[0]); /// Close read end
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[1]);
 
-        /* Redirect stderr to /dev/null */
+        /// Redirect stderr to /dev/null
         int devnull = open("/dev/null", O_WRONLY);
         if (devnull >= 0) {
             dup2(devnull, STDERR_FILENO);
             close(devnull);
         }
 
-        /* Execute command via shell */
+        /// Execute command via shell
         execl("/bin/sh", "sh", "-c", command, (char *)NULL);
         _exit(127);
     }
 
-    /* Parent process */
-    close(pipefd[1]); /* Close write end */
+    /// Parent process
+    close(pipefd[1]); /// Close write end
 
-    /* Set up timeout */
+    /// Set up timeout
     struct timeval tv;
     tv.tv_sec = COMMAND_TIMEOUT_SECONDS;
     tv.tv_usec = 0;
@@ -281,7 +281,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
     FD_ZERO(&readfds);
     FD_SET(pipefd[0], &readfds);
 
-    /* Read output with timeout */
+    /// Read output with timeout
     char buffer[MAX_COMMAND_OUTPUT];
     size_t total_read = 0;
 
@@ -291,7 +291,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
 
         int ret = select(pipefd[0] + 1, &readfds, NULL, NULL, &tv);
         if (ret <= 0) {
-            /* Timeout or error */
+            /// Timeout or error
             break;
         }
 
@@ -306,16 +306,16 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
 
     close(pipefd[0]);
 
-    /* Kill child if still running (timeout) */
+    /// Kill child if still running (timeout)
     int status;
     pid_t result = waitpid(pid, &status, WNOHANG);
     if (result == 0) {
-        /* Child still running, kill it */
+        /// Child still running, kill it
         kill(pid, SIGKILL);
         waitpid(pid, &status, 0);
     }
 
-    /* Parse output into lines */
+    /// Parse output into lines
     size_t line_capacity = 64;
     char **lines = malloc(line_capacity * sizeof(char *));
     if (!lines) {
@@ -329,7 +329,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
         if (*p == '\n') {
             *p = '\0';
 
-            /* Skip empty lines */
+            /// Skip empty lines
             if (p > line_start) {
                 if (line_count >= line_capacity) {
                     line_capacity *= 2;
@@ -360,7 +360,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
         }
     }
 
-    /* Handle last line without newline */
+    /// Handle last line without newline
     if (*line_start) {
         if (line_count >= line_capacity) {
             line_capacity++;
@@ -413,7 +413,7 @@ static bool pattern_matches(const char *pattern, const char *command_name,
         return false;
     }
 
-    /* Extract first word from pattern */
+    /// Extract first word from pattern
     char pattern_cmd[64];
     const char *space = strchr(pattern, ' ');
 
@@ -428,14 +428,14 @@ static bool pattern_matches(const char *pattern, const char *command_name,
         snprintf(pattern_cmd, sizeof(pattern_cmd), "%s", pattern);
     }
 
-    /* Check if command matches */
+    /// Check if command matches
     if (strcmp(pattern_cmd, command_name) != 0) {
         return false;
     }
 
-    /* If pattern has subcommand, we need to be at argument >= 2 */
+    /// If pattern has subcommand, we need to be at argument >= 2
     if (space) {
-        /* Count words in pattern */
+        /// Count words in pattern
         int word_count = 1;
         for (const char *p = pattern; *p; p++) {
             if (*p == ' ' && *(p + 1) && *(p + 1) != ' ') {
@@ -443,7 +443,7 @@ static bool pattern_matches(const char *pattern, const char *command_name,
             }
         }
 
-        /* Must be at or past the pattern's argument position */
+        /// Must be at or past the pattern's argument position
         if (argument_index < word_count) {
             return false;
         }
@@ -472,12 +472,12 @@ static bool config_source_is_applicable(void *user_data,
         return false;
     }
 
-    /* Check argument position constraint */
+    /// Check argument position constraint
     if (config->argument > 0 && context->arg_index != config->argument) {
         return false;
     }
 
-    /* Check applies_to patterns */
+    /// Check applies_to patterns
     for (size_t i = 0; i < config->applies_to_count; i++) {
         if (pattern_matches(config->applies_to[i], context->command_name,
                             context->arg_index)) {
@@ -516,7 +516,7 @@ static lle_result_t config_source_generate(void *user_data,
     char **lines = NULL;
     size_t line_count = 0;
 
-    /* Check cache */
+    /// Check cache
     time_t now = time(NULL);
     bool use_cache = config->cache_seconds > 0 && config->cached_results &&
                      (now - config->cache_time) < config->cache_seconds;
@@ -525,42 +525,42 @@ static lle_result_t config_source_generate(void *user_data,
         lines = config->cached_results;
         line_count = config->cached_count;
     } else {
-        /* Execute command */
+        /// Execute command
         lle_result_t res =
             execute_command(config->command, &lines, &line_count);
         if (res != LLE_SUCCESS) {
-            return LLE_SUCCESS; /* Return empty results on command failure */
+            return LLE_SUCCESS; /// Return empty results on command failure
         }
 
-        /* Update cache if enabled */
+        /// Update cache if enabled
         if (config->cache_seconds > 0) {
-            /* Clear old cache */
+            /// Clear old cache
             lle_command_source_clear_cache(config);
 
-            /* Store new cache */
+            /// Store new cache
             config->cached_results = lines;
             config->cached_count = line_count;
             config->cache_time = now;
-            use_cache = true; /* Don't free lines - they're cached */
+            use_cache = true; /// Don't free lines - they're cached
         }
     }
 
-    /* Filter and add matching results */
+    /// Filter and add matching results
     size_t prefix_len = strlen(prefix);
 
     for (size_t i = 0; i < line_count; i++) {
-        /* Skip if doesn't match prefix */
+        /// Skip if doesn't match prefix
         if (prefix_len > 0 && strncmp(lines[i], prefix, prefix_len) != 0) {
             continue;
         }
 
-        /* Add to results */
+        /// Add to results
         lle_completion_add_item(
             result, lines[i], config->suffix ? config->suffix : " ",
-            config->description, 700); /* Medium-high priority */
+            config->description, 700); /// Medium-high priority
     }
 
-    /* Free lines if not cached */
+    /// Free lines if not cached
     if (!use_cache && lines) {
         for (size_t i = 0; i < line_count; i++) {
             free(lines[i]);
@@ -568,7 +568,7 @@ static lle_result_t config_source_generate(void *user_data,
         free(lines);
     }
 
-    (void)context; /* Unused in generate */
+    (void)context; /// Unused in generate
     return LLE_SUCCESS;
 }
 
@@ -605,7 +605,7 @@ get_or_create_source(config_parser_ctx_t *ctx, const char *name) {
 
     lle_completion_config_t *config = ctx->config;
 
-    /* Check if source already exists */
+    /// Check if source already exists
     for (size_t i = 0; i < config->source_count; i++) {
         if (config->sources[i].name &&
             strcmp(config->sources[i].name, name) == 0) {
@@ -613,7 +613,7 @@ get_or_create_source(config_parser_ctx_t *ctx, const char *name) {
         }
     }
 
-    /* Create new source */
+    /// Create new source
     if (config->source_count >= config->source_capacity) {
         size_t new_capacity =
             config->source_capacity == 0 ? 8 : config->source_capacity * 2;
@@ -621,7 +621,7 @@ get_or_create_source(config_parser_ctx_t *ctx, const char *name) {
             new_capacity = MAX_CONFIG_SOURCES;
         }
         if (config->source_count >= new_capacity) {
-            return NULL; /* At capacity */
+            return NULL; /// At capacity
         }
 
         lle_command_source_config_t *new_sources =
@@ -665,7 +665,7 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
                                            void *user_data) {
     config_parser_ctx_t *ctx = (config_parser_ctx_t *)user_data;
 
-    /* Only process [sources.NAME] sections */
+    /// Only process [sources.NAME] sections
     if (strncmp(section, "sources.", 8) != 0) {
         return LLE_SUCCESS;
     }
@@ -675,7 +675,7 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
         return LLE_SUCCESS;
     }
 
-    /* Get or create source */
+    /// Get or create source
     lle_command_source_config_t *source =
         get_or_create_source(ctx, source_name);
     if (!source) {
@@ -685,7 +685,7 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
         return ctx->error;
     }
 
-    /* Handle key-value pairs */
+    /// Handle key-value pairs
     if (strcmp(key, "description") == 0 &&
         value->type == LLE_THEME_VALUE_STRING) {
         free(source->description);
@@ -706,7 +706,7 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
         source->cache_seconds = (int)value->data.integer;
     } else if (strcmp(key, "applies_to") == 0 &&
                value->type == LLE_THEME_VALUE_ARRAY) {
-        /* Free existing */
+        /// Free existing
         if (source->applies_to) {
             for (size_t i = 0; i < source->applies_to_count; i++) {
                 free(source->applies_to[i]);
@@ -714,7 +714,7 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
             free(source->applies_to);
         }
 
-        /* Parse array */
+        /// Parse array
         size_t count = value->data.array.count;
         if (count > MAX_APPLIES_TO) {
             count = MAX_APPLIES_TO;
@@ -757,13 +757,13 @@ static lle_result_t config_parser_callback(const char *section, const char *key,
 lle_result_t lle_completion_load_config(void) {
     char *path = get_config_path();
     if (!path) {
-        return LLE_SUCCESS; /* No config path, not an error */
+        return LLE_SUCCESS; /// No config path, not an error
     }
 
     lle_result_t result = lle_completion_load_config_file(path);
     free(path);
 
-    /* LLE_ERROR_NOT_FOUND is OK - config file is optional */
+    /// LLE_ERROR_NOT_FOUND is OK - config file is optional
     if (result == LLE_ERROR_NOT_FOUND) {
         return LLE_SUCCESS;
     }
@@ -785,13 +785,13 @@ lle_result_t lle_completion_load_config_file(const char *path) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if file exists */
+    /// Check if file exists
     struct stat st;
     if (stat(path, &st) != 0) {
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Read file */
+    /// Read file
     size_t content_size;
     char *content = read_file(path, &content_size);
     if (!content) {
@@ -800,9 +800,9 @@ lle_result_t lle_completion_load_config_file(const char *path) {
 
     pthread_mutex_lock(&g_completion_config.mutex);
 
-    /* Clear existing config */
+    /// Clear existing config
     if (g_completion_config.initialized) {
-        /* Unregister existing sources */
+        /// Unregister existing sources
         for (size_t i = 0; i < g_completion_config.config.source_count; i++) {
             lle_completion_unregister_source(
                 g_completion_config.config.sources[i].name);
@@ -815,7 +815,7 @@ lle_result_t lle_completion_load_config_file(const char *path) {
                sizeof(g_completion_config.config));
     }
 
-    /* Initialize parser */
+    /// Initialize parser
     lle_theme_parser_t parser;
     lle_result_t result = lle_theme_parser_init(&parser, content);
     if (result != LLE_SUCCESS) {
@@ -824,7 +824,7 @@ lle_result_t lle_completion_load_config_file(const char *path) {
         return result;
     }
 
-    /* Parse config */
+    /// Parse config
     config_parser_ctx_t ctx = {.config = &g_completion_config.config,
                                .current_source_name = {0},
                                .current_source = NULL,
@@ -844,30 +844,30 @@ lle_result_t lle_completion_load_config_file(const char *path) {
         return ctx.error;
     }
 
-    /* Register parsed sources with custom source API */
+    /// Register parsed sources with custom source API
     for (size_t i = 0; i < g_completion_config.config.source_count; i++) {
         lle_command_source_config_t *src =
             &g_completion_config.config.sources[i];
 
-        /* Validate required fields */
+        /// Validate required fields
         if (!src->command || !src->applies_to || src->applies_to_count == 0) {
-            continue; /* Skip invalid sources */
+            continue; /// Skip invalid sources
         }
 
-        /* Register with custom source API */
+        /// Register with custom source API
         lle_custom_completion_source_t custom_source = {
             .name = src->name,
             .description = src->description,
-            .priority = 600, /* Medium priority */
+            .priority = 600, /// Medium priority
             .generate = config_source_generate,
             .is_applicable = config_source_is_applicable,
-            .cleanup = NULL, /* We manage cleanup ourselves */
+            .cleanup = NULL, /// We manage cleanup ourselves
             .user_data = src};
 
         lle_completion_register_source(&custom_source);
     }
 
-    /* Store config path and mtime */
+    /// Store config path and mtime
     g_completion_config.config.config_path = strdup(path);
     g_completion_config.config.config_mtime = st.st_mtime;
     g_completion_config.initialized = true;

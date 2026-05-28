@@ -21,9 +21,10 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// Constants and Limits
-// ============================================================================
+/* ============================================================================
+ * Constants and Limits
+ * ============================================================================
+ */
 
 /**
  * @brief Maximum history entries (POSIX minimum is 128, we support more)
@@ -55,80 +56,82 @@ extern "C" {
  */
 #define POSIX_HISTORY_WRAPAROUND_LIMIT 32767
 
-// ============================================================================
-// Data Structures
-// ============================================================================
+/* ============================================================================
+ * Data Structures
+ * ============================================================================
+ */
 
 /**
  * @brief History entry with POSIX-compliant numbering and metadata
  */
 typedef struct posix_history_entry {
-    int number;       /**< POSIX history number (1-based) */
-    char *command;    /**< Command text */
-    time_t timestamp; /**< When command was executed */
-    size_t length;    /**< Length of command text */
-    bool modified;    /**< Whether entry was modified during editing */
+    int number;       ///< POSIX history number (1-based)
+    char *command;    ///< Command text
+    time_t timestamp; ///< When command was executed
+    size_t length;    ///< Length of command text
+    bool modified;    ///< Whether entry was modified during editing
 } posix_history_entry_t;
 
 /**
  * @brief History range specification for fc and history commands
  */
 typedef struct posix_history_range {
-    int first;            /**< First entry number */
-    int last;             /**< Last entry number */
-    bool first_specified; /**< Whether first was explicitly specified */
-    bool last_specified;  /**< Whether last was explicitly specified */
-    bool valid;           /**< Whether range is valid */
+    int first;            ///< First entry number
+    int last;             ///< Last entry number
+    bool first_specified; ///< Whether first was explicitly specified
+    bool last_specified;  ///< Whether last was explicitly specified
+    bool valid;           ///< Whether range is valid
 } posix_history_range_t;
 
 /**
  * @brief fc command options
  */
 typedef struct posix_fc_options {
-    bool list_mode;              /**< -l: List mode instead of edit */
-    bool reverse_order;          /**< -r: Reverse chronological order */
-    bool suppress_numbers;       /**< -n: Suppress line numbers in list */
-    bool substitute_mode;        /**< -s: Substitute and re-execute */
-    char *editor;                /**< -e: Editor to use */
-    char *old_pattern;           /**< Pattern to replace in substitute mode */
-    char *new_pattern;           /**< Replacement pattern in substitute mode */
-    posix_history_range_t range; /**< History range to operate on */
+    bool list_mode;              ///< -l: List mode instead of edit
+    bool reverse_order;          ///< -r: Reverse chronological order
+    bool suppress_numbers;       ///< -n: Suppress line numbers in list
+    bool substitute_mode;        ///< -s: Substitute and re-execute
+    char *editor;                ///< -e: Editor to use
+    char *old_pattern;           ///< Pattern to replace in substitute mode
+    char *new_pattern;           ///< Replacement pattern in substitute mode
+    posix_history_range_t range; ///< History range to operate on
 } posix_fc_options_t;
 
 /**
  * @brief Enhanced history command options (bash/zsh compatible)
  */
 typedef struct posix_history_options {
-    bool clear_history;   /**< -c: Clear history */
-    bool delete_entry;    /**< -d: Delete specific entry */
-    bool read_file;       /**< -r: Read history from file */
-    bool write_file;      /**< -w: Write history to file */
-    bool append_file;     /**< -a: Append new entries to file */
-    bool read_new;        /**< -n: Read new entries from file */
-    bool show_timestamps; /**< -t: Show timestamps */
-    int delete_offset;    /**< Offset for -d option */
-    int count;            /**< Number of entries to show */
-    char *filename;       /**< Filename for file operations */
+    bool clear_history;   ///< -c: Clear history
+    bool delete_entry;    ///< -d: Delete specific entry
+    bool read_file;       ///< -r: Read history from file
+    bool write_file;      ///< -w: Write history to file
+    bool append_file;     ///< -a: Append new entries to file
+    bool read_new;        ///< -n: Read new entries from file
+    bool show_timestamps; ///< -t: Show timestamps
+    int delete_offset;    ///< Offset for -d option
+    int count;            ///< Number of entries to show
+    char *filename;       ///< Filename for file operations
 } posix_history_options_t;
 
 /**
  * @brief History manager state
  */
 typedef struct posix_history_manager {
-    posix_history_entry_t *entries; /**< Array of history entries */
-    size_t count;                   /**< Current number of entries */
-    size_t capacity;                /**< Maximum capacity */
-    int next_number;                /**< Next history number to assign */
-    int base_number;                /**< Base number for current session */
-    bool wraparound_occurred;       /**< Whether number wraparound occurred */
-    char *filename;                 /**< Current history file */
-    time_t last_save;               /**< Last save timestamp */
-    bool no_duplicates;             /**< Whether to avoid duplicate entries */
+    posix_history_entry_t *entries; ///< Array of history entries
+    size_t count;                   ///< Current number of entries
+    size_t capacity;                ///< Maximum capacity
+    int next_number;                ///< Next history number to assign
+    int base_number;                ///< Base number for current session
+    bool wraparound_occurred;       ///< Whether number wraparound occurred
+    char *filename;                 ///< Current history file
+    time_t last_save;               ///< Last save timestamp
+    bool no_duplicates;             ///< Whether to avoid duplicate entries
 } posix_history_manager_t;
 
-// ============================================================================
-// Core History Management Functions
-// ============================================================================
+/* ============================================================================
+ * Core History Management Functions
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new POSIX history manager
@@ -232,9 +235,10 @@ bool posix_history_delete(posix_history_manager_t *manager, int number);
  */
 bool posix_history_clear(posix_history_manager_t *manager);
 
-// ============================================================================
-// Range and Number Management
-// ============================================================================
+/* ============================================================================
+ * Range and Number Management
+ * ============================================================================
+ */
 
 /**
  * @brief Parse history range specification
@@ -287,9 +291,10 @@ int posix_history_resolve_number(posix_history_manager_t *manager,
 bool posix_history_get_valid_range(posix_history_manager_t *manager,
                                    int *min_number, int *max_number);
 
-// ============================================================================
-// File Operations
-// ============================================================================
+/* ============================================================================
+ * File Operations
+ * ============================================================================
+ */
 
 /**
  * @brief Load history from file
@@ -358,9 +363,10 @@ int posix_history_append_new(posix_history_manager_t *manager,
 int posix_history_read_new(posix_history_manager_t *manager,
                            const char *filename);
 
-// ============================================================================
-// POSIX fc Command Support
-// ============================================================================
+/* ============================================================================
+ * POSIX fc Command Support
+ * ============================================================================
+ */
 
 /**
  * @brief Execute fc command with given options
@@ -430,9 +436,10 @@ int posix_fc_edit(posix_history_manager_t *manager,
 int posix_fc_substitute(posix_history_manager_t *manager, int number,
                         const char *old_pattern, const char *new_pattern);
 
-// ============================================================================
-// Enhanced History Builtin Support
-// ============================================================================
+/* ============================================================================
+ * Enhanced History Builtin Support
+ * ============================================================================
+ */
 
 /**
  * @brief Execute enhanced history command
@@ -460,9 +467,10 @@ int posix_history_execute(posix_history_manager_t *manager,
 int posix_history_list(posix_history_manager_t *manager, int count,
                        bool show_timestamps);
 
-// ============================================================================
-// Utility and Configuration Functions
-// ============================================================================
+/* ============================================================================
+ * Utility and Configuration Functions
+ * ============================================================================
+ */
 
 /**
  * @brief Set default history filename
@@ -514,9 +522,10 @@ bool posix_history_get_stats(posix_history_manager_t *manager,
  */
 bool posix_history_validate(posix_history_manager_t *manager);
 
-// ============================================================================
-// Editor Integration
-// ============================================================================
+/* ============================================================================
+ * Editor Integration
+ * ============================================================================
+ */
 
 /**
  * @brief Get default editor for fc command
@@ -555,22 +564,23 @@ bool posix_history_create_temp_file(const char *content, char **filename);
  */
 char *posix_history_read_file_content(const char *filename);
 
-// ============================================================================
-// Error Handling and Debugging
-// ============================================================================
+/* ============================================================================
+ * Error Handling and Debugging
+ * ============================================================================
+ */
 
 /**
  * @brief History error codes
  */
 typedef enum {
-    POSIX_HISTORY_SUCCESS = 0,          /**< Operation successful */
-    POSIX_HISTORY_ERROR_INVALID_PARAM,  /**< Invalid parameter */
-    POSIX_HISTORY_ERROR_OUT_OF_MEMORY,  /**< Memory allocation failed */
-    POSIX_HISTORY_ERROR_FILE_IO,        /**< File I/O error */
-    POSIX_HISTORY_ERROR_INVALID_NUMBER, /**< Invalid history number */
-    POSIX_HISTORY_ERROR_INVALID_RANGE,  /**< Invalid range specification */
-    POSIX_HISTORY_ERROR_EDITOR_FAILED,  /**< Editor invocation failed */
-    POSIX_HISTORY_ERROR_COMMAND_FAILED  /**< Command execution failed */
+    POSIX_HISTORY_SUCCESS = 0,          ///< Operation successful
+    POSIX_HISTORY_ERROR_INVALID_PARAM,  ///< Invalid parameter
+    POSIX_HISTORY_ERROR_OUT_OF_MEMORY,  ///< Memory allocation failed
+    POSIX_HISTORY_ERROR_FILE_IO,        ///< File I/O error
+    POSIX_HISTORY_ERROR_INVALID_NUMBER, ///< Invalid history number
+    POSIX_HISTORY_ERROR_INVALID_RANGE,  ///< Invalid range specification
+    POSIX_HISTORY_ERROR_EDITOR_FAILED,  ///< Editor invocation failed
+    POSIX_HISTORY_ERROR_COMMAND_FAILED  ///< Command execution failed
 } posix_history_error_t;
 
 /**
@@ -591,9 +601,9 @@ const char *posix_history_get_last_error(void);
  */
 void posix_history_set_debug(bool enable);
 
-// ============================================================================
-// Enhanced History Integration Functions
-// ============================================================================
+/// ============================================================================
+/// Enhanced History Integration Functions
+/// ============================================================================
 
 /**
  * @brief Initialize enhanced history system
@@ -620,9 +630,9 @@ void enhanced_history_save(void);
  */
 void enhanced_history_cleanup(void);
 
-// ============================================================================
-// Global Instance
-// ============================================================================
+/// ============================================================================
+/// Global Instance
+/// ============================================================================
 
 /**
  * @brief Global POSIX history manager instance
@@ -633,4 +643,4 @@ extern posix_history_manager_t *global_posix_history;
 }
 #endif
 
-#endif /* POSIX_HISTORY_H */
+#endif /// POSIX_HISTORY_H

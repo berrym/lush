@@ -23,17 +23,17 @@
  * @return 0 on success, 1 on invalid mode
  */
 int bin_umask(int argc, char **argv) {
-    // If no arguments, display current umask
+    /// If no arguments, display current umask
     if (argc == 1) {
-        mode_t current_mask = umask(0); // Get current mask
-        umask(current_mask);            // Restore it
+        mode_t current_mask = umask(0); /// Get current mask
+        umask(current_mask);            /// Restore it
         printf("%04o\n", current_mask);
         return 0;
     }
 
-    // If one argument, set new umask
+    /// If one argument, set new umask
     if (argc == 2) {
-        // Check for empty argument
+        /// Check for empty argument
         if (argv[1][0] == '\0') {
             {
                 source_location_t loc = builtin_get_source_location();
@@ -79,9 +79,9 @@ int bin_umask(int argc, char **argv) {
         }
 
         char *endptr;
-        long mask_val = strtol(argv[1], &endptr, 8); // Parse as octal
+        long mask_val = strtol(argv[1], &endptr, 8); /// Parse as octal
 
-        // Validate argument
+        /// Validate argument
         if (*endptr != '\0' || mask_val < 0 || mask_val > 0777) {
             {
                 source_location_t loc = builtin_get_source_location();
@@ -130,7 +130,7 @@ int bin_umask(int argc, char **argv) {
         return 0;
     }
 
-    // Too many arguments
+    /// Too many arguments
     {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =

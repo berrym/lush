@@ -15,6 +15,8 @@
 #include "errors.h"
 #include "executor.h"
 #include "ht.h"
+#include "identifier.h"
+#include "lle/lle_pager.h"
 #include "shell_error.h"
 #include "tokenizer.h"
 
@@ -24,8 +26,8 @@
 #include <string.h>
 #include <unistd.h>
 
-ht_strstr_t *aliases = NULL; // alias hash table
-ht_enum_t *aliases_e = NULL; // alias enumeration object
+ht_strstr_t *aliases = NULL; /// alias hash table
+ht_enum_t *aliases_e = NULL; /// alias enumeration object
 
 /**
  * @brief Initialize the aliases hash table
@@ -38,7 +40,7 @@ void init_aliases(void) {
         aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
     }
 
-    // set some example aliases
+    /// set some example aliases
     set_alias("..", "cd ../");
     set_alias("...", "cd ../../");
     set_alias("l", "ls --color=auto");
@@ -73,25 +75,55 @@ char *lookup_alias(const char *key) {
     if (!aliases || !key) {
         return NULL;
     }
-    const char *val = ht_strstr_get(aliases, key);
+    /// NFC-normalize the key so a lookup with NFD bytes matches the
+    /// canonical form set_alias stored. ASCII keys (the overwhelming
+    /// common case for aliases) round-trip unchanged through the
+    /// canonicalizer's any-high-byte fast path. The returned pointer
+    /// is owned by the hash table; the caller must not free it.
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return NULL;
+    }
+    const char *val = ht_strstr_get(aliases, canon);
+    free(canon);
     return (char *)val;
 }
 
 /**
  * @brief Print all defined aliases
  *
- * Iterates through the alias hash table and prints each alias
- * in POSIX format: alias name='value'
+ * Iterates through the alias hash table, builds the full listing
+ * into an open_memstream buffer, and hands the buffer to
+ * lle_pager_present. POSIX format per line: `alias name='value'`.
+ *
+ * The pager's own decision tree resolves the call -- non-tty,
+ * disabled master switch, or short listings stream directly; long
+ * listings paginate. On memstream allocation failure the function
+ * falls back to the prior per-iteration printf loop so the listing
+ * still surfaces.
  */
 void print_aliases(void) {
     const char *k = NULL, *v = NULL;
-    aliases_e = ht_strstr_enum_create(aliases);
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
 
+    aliases_e = ht_strstr_enum_create(aliases);
     while (ht_strstr_enum_next(aliases_e, &k, &v)) {
-        // POSIX format: alias name='value'
-        printf("alias %s='%s'\n", k, v);
+        if (out) {
+            fprintf(out, "alias %s='%s'\n", k, v);
+        } else {
+            /// open_memstream allocation failure path
+            printf("alias %s='%s'\n", k, v);
+        }
     }
     ht_strstr_enum_destroy(aliases_e);
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
+    }
 }
 
 /**
@@ -108,8 +140,15 @@ bool set_alias(const char *key, const char *val) {
         return false;
     }
 
-    ht_strstr_insert(aliases, key, val);
-    char *alias = lookup_alias(key);
+    /// NFC-normalize the key on ingest so alias bindings collapse to
+    /// one canonical entry regardless of how the user typed the name.
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return false;
+    }
+    ht_strstr_insert(aliases, canon, val);
+    char *alias = lookup_alias(canon);
+    free(canon);
     return (alias != NULL);
 }
 
@@ -122,7 +161,12 @@ bool set_alias(const char *key, const char *val) {
  */
 void unset_alias(const char *key) {
     if (aliases && key) {
-        ht_strstr_remove(aliases, key);
+        char *canon = lush_ident_canonicalize_alloc(key);
+        if (!canon) {
+            return;
+        }
+        ht_strstr_remove(aliases, canon);
+        free(canon);
     }
 }
 
@@ -137,16 +181,16 @@ void unset_alias(const char *key) {
  * @return true if the character is valid, false otherwise
  */
 bool valid_alias_name_char(char c) {
-    // POSIX base: alphanumeric and underscore
+    /// POSIX base: alphanumeric and underscore
     if (isalnum((unsigned char)c) || c == '_') {
         return true;
     }
 
-    // Common extensions in practice
+    /// Common extensions in practice
     switch (c) {
-    case '.': // Often used for navigation aliases
-    case '-': // Common in command names
-    case '+': // Sometimes used
+    case '.': /// Often used for navigation aliases
+    case '-': /// Common in command names
+    case '+': /// Sometimes used
         return true;
     default:
         return false;
@@ -185,27 +229,61 @@ bool valid_alias_name(const char *key) {
         return false;
     }
 
-    // Check for empty string after trimming whitespace
+    /// Check for empty string after trimming whitespace
     const char *trimmed = skip_whitespace(key);
     if (!trimmed || !*trimmed) {
         return false;
     }
 
-    // First character cannot be a digit (POSIX requirement)
-    if (isdigit((unsigned char)*trimmed)) {
+    /// NFC-canonicalize so an NFD-encoded identifier (letter +
+    /// combining mark) validates on equal terms with the NFC form.
+    /// The canonical form is also what set_alias stores, so this
+    /// keeps validate / store / lookup in agreement.
+    char *canon = lush_ident_canonicalize_alloc(trimmed);
+    if (!canon) {
         return false;
     }
 
-    const char *p = trimmed;
-    while (*p && !isspace((unsigned char)*p)) {
-        if (!valid_alias_name_char(*p)) {
-            return false;
+    /// POSIX bans digit-first alias names but both bash and zsh permit them
+    /// (e.g. zsh's directory aliases `alias 1='cd +1' ... 9='cd +9'`). Match
+    /// the consensus: accept digit-first names too.
+
+    const char *start = canon;
+    const char *p = canon;
+    size_t rem = strlen(p);
+    bool ok = true;
+    while (rem > 0 && !isspace((unsigned char)*p)) {
+        unsigned char b = (unsigned char)*p;
+        if (b < 0x80) {
+            /// ASCII fast path: alnum/_ plus the .-+ extensions.
+            if (!valid_alias_name_char((char)b)) {
+                ok = false;
+                break;
+            }
+            p++;
+            rem--;
+        } else {
+            /// Non-ASCII: honor FEATURE_UNICODE_IDENTIFIERS via the
+            /// project-wide predicate. _continue accepts letter-or-digit
+            /// codepoints, which matches alias-name semantics (alias
+            /// permits digit-leading names, so _continue is correct here
+            /// rather than _start).
+            size_t n = lush_ident_match_continue(p, rem);
+            if (n == 0) {
+                ok = false;
+                break;
+            }
+            p += n;
+            rem -= n;
         }
-        p++;
     }
 
-    // Make sure we processed at least one character
-    return (p > trimmed);
+    /// Make sure we processed at least one character
+    if (ok && p == start) {
+        ok = false;
+    }
+    free(canon);
+    return ok;
 }
 
 /**
@@ -312,12 +390,12 @@ static bool parse_alias_assignment(const char *assignment, char **name,
         return false;
     }
 
-    // Extract name part
+    /// Extract name part
     size_t name_len = equals - assignment;
     const char *name_start = skip_whitespace(assignment);
     const char *name_end = equals;
 
-    // Trim trailing whitespace from name
+    /// Trim trailing whitespace from name
     while (name_end > name_start && isspace((unsigned char)*(name_end - 1))) {
         name_end--;
     }
@@ -334,17 +412,17 @@ static bool parse_alias_assignment(const char *assignment, char **name,
     strncpy(*name, name_start, name_len);
     (*name)[name_len] = '\0';
 
-    // Extract value part
+    /// Extract value part
     const char *value_start = skip_whitespace(equals + 1);
     const char *value_end = value_start + strlen(value_start);
 
-    // Trim trailing whitespace from value
+    /// Trim trailing whitespace from value
     while (value_end > value_start &&
            isspace((unsigned char)*(value_end - 1))) {
         value_end--;
     }
 
-    // Handle quoted values
+    /// Handle quoted values
     if (value_end > value_start) {
         char quote_char = 0;
         if ((*value_start == '\'' || *value_start == '"') &&
@@ -362,11 +440,11 @@ static bool parse_alias_assignment(const char *assignment, char **name,
             return false;
         }
 
-        // Copy value, handling escape sequences if in double quotes
+        /// Copy value, handling escape sequences if in double quotes
         size_t j = 0;
         for (const char *p = value_start; p < value_end; p++) {
             if (quote_char == '"' && *p == '\\' && p + 1 < value_end) {
-                // Handle common escape sequences in double quotes
+                /// Handle common escape sequences in double quotes
                 switch (*(p + 1)) {
                 case 'n':
                     (*value)[j++] = '\n';
@@ -402,7 +480,7 @@ static bool parse_alias_assignment(const char *assignment, char **name,
         }
         (*value)[j] = '\0';
     } else {
-        // Empty value
+        /// Empty value
         *value = malloc(1);
         if (!*value) {
             free(*name);
@@ -432,37 +510,37 @@ char *expand_aliases_recursive(const char *name, int max_depth) {
         return NULL;
     }
 
-    // Look up the initial alias
+    /// Look up the initial alias
     char *value = lookup_alias(name);
     if (!value) {
         return NULL;
     }
 
-    // Make a copy we can work with
+    /// Make a copy we can work with
     char *result = strdup(value);
     if (!result) {
         return NULL;
     }
 
-    // Use tokenizer to properly parse the alias value
+    /// Use tokenizer to properly parse the alias value
     tokenizer_t *tokenizer = tokenizer_new(result);
     if (!tokenizer) {
         free(result);
         return NULL;
     }
 
-    // Get the first token to check for recursive expansion
+    /// Get the first token to check for recursive expansion
     token_t *first_token = tokenizer_current(tokenizer);
     if (!first_token || first_token->type != TOK_WORD) {
         tokenizer_free(tokenizer);
-        return result; // Return as-is if no valid word token
+        return result; /// Return as-is if no valid word token
     }
 
-    // Check if the first word is also an alias
+    /// Check if the first word is also an alias
     char *recursive =
         expand_aliases_recursive(first_token->text, max_depth - 1);
     if (recursive) {
-        // Build new command with expanded first word
+        /// Build new command with expanded first word
         size_t recursive_len = strlen(recursive);
         size_t remaining_len = strlen(result) - strlen(first_token->text);
         char *new_result = malloc(recursive_len + remaining_len + 2);
@@ -470,7 +548,7 @@ char *expand_aliases_recursive(const char *name, int max_depth) {
         if (new_result) {
             strcpy(new_result, recursive);
 
-            // Add the rest of the original command after the first word
+            /// Add the rest of the original command after the first word
             const char *rest = result + strlen(first_token->text);
             if (*rest) {
                 strcat(new_result, rest);
@@ -504,26 +582,26 @@ char *expand_first_word_alias(const char *command) {
         return NULL;
     }
 
-    // Use tokenizer to properly identify the first word
+    /// Use tokenizer to properly identify the first word
     tokenizer_t *tokenizer = tokenizer_new(command);
     if (!tokenizer) {
-        return strdup(command); // Return original on tokenizer failure
+        return strdup(command); /// Return original on tokenizer failure
     }
 
     token_t *first_token = tokenizer_current(tokenizer);
     if (!first_token || first_token->type != TOK_WORD) {
         tokenizer_free(tokenizer);
-        return strdup(command); // Return original if no word token
+        return strdup(command); /// Return original if no word token
     }
 
-    // Try to expand the first word as an alias
+    /// Try to expand the first word as an alias
     char *alias_value = lookup_alias(first_token->text);
     if (!alias_value) {
         tokenizer_free(tokenizer);
-        return strdup(command); // No alias found, return original
+        return strdup(command); /// No alias found, return original
     }
 
-    // Construct the new command with the alias expansion
+    /// Construct the new command with the alias expansion
     const char *rest_of_command = command + strlen(first_token->text);
     size_t alias_len = strlen(alias_value);
     size_t rest_len = strlen(rest_of_command);
@@ -590,35 +668,35 @@ bool contains_shell_operators(const char *value) {
             continue;
         }
 
-        // Check for shell operators outside of quotes
+        /// Check for shell operators outside of quotes
         if (!in_single_quote && !in_double_quote) {
             switch (*p) {
-            case '|': // Pipe
+            case '|': /// Pipe
                 if (*(p + 1) == '|') {
-                    return true; // Logical OR ||
+                    return true; /// Logical OR ||
                 }
-                return true; // Pipe |
-            case '&':        // Background or logical AND
+                return true; /// Pipe |
+            case '&':        /// Background or logical AND
                 if (*(p + 1) == '&') {
-                    return true; // Logical AND &&
+                    return true; /// Logical AND &&
                 }
-                return true; // Background &
-            case '>':        // Redirect out
-            case '<':        // Redirect in
+                return true; /// Background &
+            case '>':        /// Redirect out
+            case '<':        /// Redirect in
                 return true;
-            case ';': // Command separator
+            case ';': /// Command separator
                 return true;
-            case '(': // Subshell
+            case '(': /// Subshell
             case ')':
                 return true;
-            case '{': // Command group
+            case '{': /// Command group
             case '}':
                 return true;
-            case '`': // Command substitution
+            case '`': /// Command substitution
                 return true;
-            case '$': // Variable expansion or command substitution
+            case '$': /// Variable expansion or command substitution
                 if (*(p + 1) == '(') {
-                    return true; // Command substitution $(...)
+                    return true; /// Command substitution $(...)
                 }
                 break;
             }
@@ -643,7 +721,7 @@ char *expand_alias_with_shell_operators(const char *command) {
         return NULL;
     }
 
-    // Use tokenizer to get the first word
+    /// Use tokenizer to get the first word
     tokenizer_t *tokenizer = tokenizer_new(command);
     if (!tokenizer) {
         return NULL;
@@ -655,22 +733,22 @@ char *expand_alias_with_shell_operators(const char *command) {
         return NULL;
     }
 
-    // Check if first word is an alias
+    /// Check if first word is an alias
     char *alias_value = lookup_alias(first_token->text);
     if (!alias_value) {
         tokenizer_free(tokenizer);
         return NULL;
     }
 
-    // Get the rest of the command after the first word
+    /// Get the rest of the command after the first word
     const char *rest_of_command = command + strlen(first_token->text);
 
-    // Skip whitespace after first word
+    /// Skip whitespace after first word
     while (*rest_of_command && isspace((unsigned char)*rest_of_command)) {
         rest_of_command++;
     }
 
-    // Build the expanded command
+    /// Build the expanded command
     size_t alias_len = strlen(alias_value);
     size_t rest_len = strlen(rest_of_command);
     size_t total_len = alias_len + (rest_len > 0 ? rest_len + 1 : 0) + 1;
@@ -703,7 +781,7 @@ char *expand_alias_with_shell_operators(const char *command) {
  * @return 0 on success, 1 if any alias operation failed
  */
 int bin_alias(int argc, char **argv) {
-    // No arguments: print all aliases
+    /// No arguments: print all aliases
     if (argc == 1) {
         print_aliases();
         return 0;
@@ -711,14 +789,29 @@ int bin_alias(int argc, char **argv) {
 
     int exit_status = 0;
 
-    // Process each argument
-    for (int i = 1; i < argc; i++) {
+    /// `--` ends option parsing; subsequent tokens are alias names or
+    /// assignments even if they begin with `-`. Both bash and zsh accept
+    /// this. Lush has no `-` flags for `alias` today, but the convention
+    /// is still required so scripts like `alias -- -='cd -'` parse — the
+    /// bare `-` would otherwise be flagged as a not-found lookup target.
+    int start = 1;
+    if (argc >= 2 && strcmp(argv[1], "--") == 0) {
+        start = 2;
+        if (argc == 2) {
+            /// `alias --` alone is equivalent to `alias` with no args.
+            print_aliases();
+            return 0;
+        }
+    }
+
+    /// Process each argument
+    for (int i = start; i < argc; i++) {
         char *name = NULL;
         char *value = NULL;
 
-        // Try to parse as assignment (name=value)
+        /// Try to parse as assignment (name=value)
         if (parse_alias_assignment(argv[i], &name, &value)) {
-            // Check if name is valid
+            /// Check if name is valid
             if (!valid_alias_name(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -729,8 +822,17 @@ int bin_alias(int argc, char **argv) {
                 exit_status = 1;
                 continue;
             }
+            /// Optional homograph guard (off unless
+            /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS).
+            if (executor_reject_mixed_script_ident(
+                    current_executor, name, builtin_get_source_location())) {
+                free(name);
+                free(value);
+                exit_status = 1;
+                continue;
+            }
 
-            // Can't alias builtin commands or keywords
+            /// Can't alias builtin commands or keywords
             if (is_builtin(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -742,7 +844,7 @@ int bin_alias(int argc, char **argv) {
                 continue;
             }
 
-            // Set the alias
+            /// Set the alias
             if (!set_alias(name, value)) {
                 executor_error_report(current_executor, SHELL_ERR_ALIAS_ERROR,
                                       builtin_get_source_location(),
@@ -753,7 +855,7 @@ int bin_alias(int argc, char **argv) {
             free(name);
             free(value);
         } else {
-            // Not an assignment, treat as name lookup
+            /// Not an assignment, treat as name lookup
             char *alias_value = lookup_alias(argv[i]);
             if (alias_value) {
                 printf("alias %s='%s'\n", argv[i], alias_value);
@@ -787,7 +889,7 @@ int bin_unalias(int argc, char **argv) {
 
     int exit_status = 0;
 
-    // Handle -a option (remove all aliases)
+    /// Handle -a option (remove all aliases)
     if (argc == 2 && strcmp(argv[1], "-a") == 0) {
         if (aliases) {
             ht_strstr_destroy(aliases);
@@ -796,7 +898,7 @@ int bin_unalias(int argc, char **argv) {
         return 0;
     }
 
-    // Process each name argument
+    /// Process each name argument
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-a") == 0) {
             source_location_t loc = builtin_get_source_location();

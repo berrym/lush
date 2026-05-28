@@ -31,9 +31,9 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test counters */
+/// Test counters
 
-/* Test framework macros */
+/// Test framework macros
 
 #define ASSERT_PARSES(input)                                                   \
     do {                                                                       \
@@ -79,7 +79,7 @@
  */
 
 TEST(case_empty_arm_simple) {
-    /* Basic empty case arm - the bug we just fixed */
+    /// Basic empty case arm - the bug we just fixed
     ASSERT_PARSES("case x in\n"
                   "    a) ;;\n"
                   "    *) echo default ;;\n"
@@ -87,14 +87,14 @@ TEST(case_empty_arm_simple) {
 }
 
 TEST(case_empty_arm_first) {
-    /* Empty arm as first case */
+    /// Empty arm as first case
     ASSERT_PARSES("case x in\n"
                   "    *) ;;\n"
                   "esac");
 }
 
 TEST(case_multiple_empty_arms) {
-    /* Multiple consecutive empty arms */
+    /// Multiple consecutive empty arms
     ASSERT_PARSES("case x in\n"
                   "    a) ;;\n"
                   "    b) ;;\n"
@@ -104,7 +104,7 @@ TEST(case_multiple_empty_arms) {
 }
 
 TEST(case_all_empty_arms) {
-    /* All arms empty */
+    /// All arms empty
     ASSERT_PARSES("case x in\n"
                   "    a) ;;\n"
                   "    b) ;;\n"
@@ -113,12 +113,12 @@ TEST(case_all_empty_arms) {
 }
 
 TEST(case_empty_arm_inline) {
-    /* Empty arm with inline ;; */
+    /// Empty arm with inline ;;
     ASSERT_PARSES("case x in a) ;; *) echo x ;; esac");
 }
 
 TEST(case_empty_arm_with_comment) {
-    /* Empty arm with comment before ;; */
+    /// Empty arm with comment before ;;
     ASSERT_PARSES("case x in\n"
                   "    a)\n"
                   "        # this arm intentionally empty\n"
@@ -128,7 +128,7 @@ TEST(case_empty_arm_with_comment) {
 }
 
 TEST(case_cargo_env_pattern) {
-    /* Real-world pattern from ~/.cargo/env */
+    /// Real-world pattern from ~/.cargo/env
     ASSERT_PARSES("case \":${PATH}:\" in\n"
                   "    *:\"$HOME/.cargo/bin\":*)\n"
                   "        ;;\n"
@@ -140,7 +140,7 @@ TEST(case_cargo_env_pattern) {
 }
 
 TEST(case_fallthrough_empty) {
-    /* Empty arm with fallthrough */
+    /// Empty arm with fallthrough
     ASSERT_PARSES("case x in\n"
                   "    a) ;&\n"
                   "    b) echo b ;;\n"
@@ -148,7 +148,7 @@ TEST(case_fallthrough_empty) {
 }
 
 TEST(case_continue_empty) {
-    /* Empty arm with continue */
+    /// Empty arm with continue
     ASSERT_PARSES("case x in\n"
                   "    a) ;;&\n"
                   "    b) echo b ;;\n"
@@ -161,7 +161,7 @@ TEST(case_continue_empty) {
  */
 
 TEST(if_empty_then) {
-    /* Empty then clause with only comment */
+    /// Empty then clause with only comment
     ASSERT_PARSES("if true; then\n"
                   "    # empty\n"
                   "    :\n"
@@ -169,42 +169,42 @@ TEST(if_empty_then) {
 }
 
 TEST(if_colon_body) {
-    /* Minimal non-empty body using : */
+    /// Minimal non-empty body using :
     ASSERT_PARSES("if true; then :; fi");
 }
 
 TEST(if_else_empty_branches) {
-    /* Both branches minimal */
+    /// Both branches minimal
     ASSERT_PARSES("if true; then :; else :; fi");
 }
 
 TEST(while_minimal_body) {
-    /* While with minimal body */
+    /// While with minimal body
     ASSERT_PARSES("while false; do :; done");
 }
 
 TEST(for_minimal_body) {
-    /* For with minimal body */
+    /// For with minimal body
     ASSERT_PARSES("for x in a; do :; done");
 }
 
 TEST(until_minimal_body) {
-    /* Until with minimal body */
+    /// Until with minimal body
     ASSERT_PARSES("until true; do :; done");
 }
 
 TEST(function_minimal_body) {
-    /* Function with minimal body */
+    /// Function with minimal body
     ASSERT_PARSES("foo() { :; }");
 }
 
 TEST(brace_group_minimal) {
-    /* Brace group with minimal body */
+    /// Brace group with minimal body
     ASSERT_PARSES("{ :; }");
 }
 
 TEST(subshell_minimal) {
-    /* Subshell with minimal body */
+    /// Subshell with minimal body
     ASSERT_PARSES("( : )");
 }
 
@@ -214,54 +214,54 @@ TEST(subshell_minimal) {
  */
 
 TEST(multiple_newlines) {
-    /* Multiple newlines between commands */
+    /// Multiple newlines between commands
     ASSERT_PARSES("echo a\n\n\necho b");
 }
 
 TEST(trailing_semicolon) {
-    /* Trailing semicolon */
+    /// Trailing semicolon
     ASSERT_PARSES("echo a;");
 }
 
 TEST(multiple_semicolons_separate_commands) {
-    /* Semicolons between commands (not ;;) */
+    /// Semicolons between commands (not ;;)
     ASSERT_PARSES("echo a; echo b; echo c");
 }
 
 TEST(newline_after_pipe) {
-    /* Newline after pipe operator */
+    /// Newline after pipe operator
     ASSERT_PARSES("echo a |\ncat");
 }
 
 TEST(newline_after_and) {
-    /* Newline after && */
+    /// Newline after &&
     ASSERT_PARSES("true &&\necho yes");
 }
 
 TEST(newline_after_or) {
-    /* Newline after || */
+    /// Newline after ||
     ASSERT_PARSES("false ||\necho no");
 }
 
 TEST(tabs_as_whitespace) {
-    /* Tabs for indentation */
+    /// Tabs for indentation
     ASSERT_PARSES("if true; then\n\techo indented\nfi");
 }
 
 TEST(mixed_whitespace) {
-    /* Mixed tabs and spaces */
+    /// Mixed tabs and spaces
     ASSERT_PARSES("echo \t a \t b");
 }
 
 TEST(whitespace_in_expansion) {
-    /* Whitespace around variable */
+    /// Whitespace around variable
     ASSERT_PARSES("echo $VAR");
     ASSERT_PARSES("echo ${VAR}");
     ASSERT_PARSES("echo \"$VAR\"");
 }
 
 TEST(semicolon_newline_mix) {
-    /* Mixed separators */
+    /// Mixed separators
     ASSERT_PARSES("echo a;\necho b\necho c;");
 }
 
@@ -271,22 +271,22 @@ TEST(semicolon_newline_mix) {
  */
 
 TEST(comment_after_command) {
-    /* Comment after command */
+    /// Comment after command
     ASSERT_PARSES("echo hello # this is a comment");
 }
 
 TEST(comment_own_line) {
-    /* Comment on its own line */
+    /// Comment on its own line
     ASSERT_PARSES("# comment\necho hello");
 }
 
 TEST(comment_between_commands) {
-    /* Comment between commands */
+    /// Comment between commands
     ASSERT_PARSES("echo a\n# comment\necho b");
 }
 
 TEST(comment_in_if) {
-    /* Comment inside if */
+    /// Comment inside if
     ASSERT_PARSES("if true; then\n"
                   "    # comment in if\n"
                   "    echo yes\n"
@@ -294,7 +294,7 @@ TEST(comment_in_if) {
 }
 
 TEST(comment_in_for) {
-    /* Comment inside for */
+    /// Comment inside for
     ASSERT_PARSES("for x in a b c; do\n"
                   "    # comment in loop\n"
                   "    echo $x\n"
@@ -302,7 +302,7 @@ TEST(comment_in_for) {
 }
 
 TEST(comment_in_while) {
-    /* Comment inside while */
+    /// Comment inside while
     ASSERT_PARSES("while true; do\n"
                   "    # comment\n"
                   "    break\n"
@@ -310,7 +310,7 @@ TEST(comment_in_while) {
 }
 
 TEST(comment_in_case) {
-    /* Comment inside case */
+    /// Comment inside case
     ASSERT_PARSES("case x in\n"
                   "    # comment before pattern\n"
                   "    a)\n"
@@ -321,7 +321,7 @@ TEST(comment_in_case) {
 }
 
 TEST(comment_in_function) {
-    /* Comment inside function */
+    /// Comment inside function
     ASSERT_PARSES("foo() {\n"
                   "    # function comment\n"
                   "    echo foo\n"
@@ -329,17 +329,17 @@ TEST(comment_in_function) {
 }
 
 TEST(comment_after_redirect) {
-    /* Comment after redirection */
+    /// Comment after redirection
     ASSERT_PARSES("echo hello > file # redirect comment");
 }
 
 TEST(comment_in_pipeline) {
-    /* Comment in pipeline (tricky - should be part of first command) */
+    /// Comment in pipeline (tricky - should be part of first command)
     ASSERT_PARSES("echo a # comment\necho b | cat");
 }
 
 TEST(hash_in_string_not_comment) {
-    /* Hash inside string is not a comment */
+    /// Hash inside string is not a comment
     ASSERT_PARSES("echo \"hello # world\"");
     ASSERT_PARSES("echo 'hello # world'");
 }
@@ -350,33 +350,33 @@ TEST(hash_in_string_not_comment) {
  */
 
 TEST(heredoc_simple) {
-    /* Simple heredoc */
+    /// Simple heredoc
     ASSERT_PARSES("cat <<EOF\nhello\nEOF");
 }
 
 TEST(heredoc_quoted_delimiter) {
-    /* Quoted delimiter (no expansion) */
+    /// Quoted delimiter (no expansion)
     ASSERT_PARSES("cat <<'EOF'\n$VAR\nEOF");
     ASSERT_PARSES("cat <<\"EOF\"\nhello\nEOF");
 }
 
 TEST(heredoc_with_tab_strip) {
-    /* Tab-stripping heredoc */
+    /// Tab-stripping heredoc
     ASSERT_PARSES("cat <<-EOF\n\thello\n\tEOF");
 }
 
 TEST(heredoc_empty_content) {
-    /* Heredoc with no content */
+    /// Heredoc with no content
     ASSERT_PARSES("cat <<EOF\nEOF");
 }
 
 TEST(heredoc_with_variable) {
-    /* Heredoc with variable expansion */
+    /// Heredoc with variable expansion
     ASSERT_PARSES("cat <<EOF\nhello $USER\nEOF");
 }
 
 TEST(heredoc_in_function) {
-    /* Heredoc inside function */
+    /// Heredoc inside function
     ASSERT_PARSES("foo() {\n"
                   "    cat <<EOF\n"
                   "hello\n"
@@ -385,7 +385,7 @@ TEST(heredoc_in_function) {
 }
 
 TEST(heredoc_in_if) {
-    /* Heredoc inside if */
+    /// Heredoc inside if
     ASSERT_PARSES("if true; then\n"
                   "    cat <<EOF\n"
                   "hello\n"
@@ -394,12 +394,12 @@ TEST(heredoc_in_if) {
 }
 
 TEST(heredoc_followed_by_command) {
-    /* Command after heredoc */
+    /// Command after heredoc
     ASSERT_PARSES("cat <<EOF\nhello\nEOF\necho done");
 }
 
 TEST(herestring_simple) {
-    /* Herestring */
+    /// Herestring
     ASSERT_PARSES("cat <<<'hello'");
     ASSERT_PARSES("cat <<<\"hello $USER\"");
     ASSERT_PARSES("cat <<<hello");
@@ -411,50 +411,50 @@ TEST(herestring_simple) {
  */
 
 TEST(adjacent_quotes) {
-    /* Adjacent quoted strings */
+    /// Adjacent quoted strings
     ASSERT_PARSES("echo \"hello\"'world'");
     ASSERT_PARSES("echo 'a'\"b\"'c'");
 }
 
 TEST(empty_strings) {
-    /* Empty quoted strings */
+    /// Empty quoted strings
     ASSERT_PARSES("echo \"\"");
     ASSERT_PARSES("echo ''");
     ASSERT_PARSES("echo \"\"\"\"");
 }
 
 TEST(quote_in_variable) {
-    /* Quotes in parameter expansion default */
+    /// Quotes in parameter expansion default
     ASSERT_PARSES("echo \"${VAR:-'default'}\"");
     ASSERT_PARSES("echo \"${VAR:-\"default\"}\"");
 }
 
 TEST(escaped_quotes) {
-    /* Escaped quotes */
+    /// Escaped quotes
     ASSERT_PARSES("echo \"hello \\\"world\\\"\"");
-    ASSERT_PARSES("echo 'it'\\''s'"); /* Escaped single quote trick */
+    ASSERT_PARSES("echo 'it'\\''s'"); /// Escaped single quote trick
 }
 
 TEST(nested_command_substitution_quotes) {
-    /* Quotes in nested command substitution */
+    /// Quotes in nested command substitution
     ASSERT_PARSES("echo \"$(echo \"nested\")\"");
     ASSERT_PARSES("echo \"$(echo 'single')\"");
 }
 
 TEST(dollar_in_single_quotes) {
-    /* Dollar sign in single quotes (literal) */
+    /// Dollar sign in single quotes (literal)
     ASSERT_PARSES("echo '$VAR'");
 }
 
 TEST(backslash_in_double_quotes) {
-    /* Backslash escaping in double quotes */
+    /// Backslash escaping in double quotes
     ASSERT_PARSES("echo \"\\$VAR\"");
     ASSERT_PARSES("echo \"\\\\\"");
     ASSERT_PARSES("echo \"\\`\"");
 }
 
 TEST(multiline_string) {
-    /* String spanning multiple lines */
+    /// String spanning multiple lines
     ASSERT_PARSES("echo \"hello\nworld\"");
 }
 
@@ -464,7 +464,7 @@ TEST(multiline_string) {
  */
 
 TEST(nested_if_2_levels) {
-    /* 2 levels of nested if */
+    /// 2 levels of nested if
     ASSERT_PARSES("if true; then\n"
                   "    if true; then\n"
                   "        echo nested\n"
@@ -473,7 +473,7 @@ TEST(nested_if_2_levels) {
 }
 
 TEST(nested_if_3_levels) {
-    /* 3 levels of nested if */
+    /// 3 levels of nested if
     ASSERT_PARSES("if true; then\n"
                   "    if true; then\n"
                   "        if true; then\n"
@@ -484,7 +484,7 @@ TEST(nested_if_3_levels) {
 }
 
 TEST(nested_loops) {
-    /* Nested loops */
+    /// Nested loops
     ASSERT_PARSES("for i in 1 2; do\n"
                   "    for j in a b; do\n"
                   "        echo $i $j\n"
@@ -493,7 +493,7 @@ TEST(nested_loops) {
 }
 
 TEST(nested_case_in_if) {
-    /* Case inside if */
+    /// Case inside if
     ASSERT_PARSES("if true; then\n"
                   "    case x in\n"
                   "        a) echo a ;;\n"
@@ -502,7 +502,7 @@ TEST(nested_case_in_if) {
 }
 
 TEST(nested_if_in_case) {
-    /* If inside case */
+    /// If inside case
     ASSERT_PARSES("case x in\n"
                   "    a)\n"
                   "        if true; then\n"
@@ -513,7 +513,7 @@ TEST(nested_if_in_case) {
 }
 
 TEST(nested_function_with_control) {
-    /* Function containing control structures */
+    /// Function containing control structures
     ASSERT_PARSES("foo() {\n"
                   "    if true; then\n"
                   "        for x in a b; do\n"
@@ -524,22 +524,22 @@ TEST(nested_function_with_control) {
 }
 
 TEST(nested_subshells) {
-    /* Nested subshells */
+    /// Nested subshells
     ASSERT_PARSES("( ( ( echo deep ) ) )");
 }
 
 TEST(nested_brace_groups) {
-    /* Nested brace groups */
+    /// Nested brace groups
     ASSERT_PARSES("{ { { echo deep; }; }; }");
 }
 
 TEST(nested_command_substitution) {
-    /* Nested command substitution */
+    /// Nested command substitution
     ASSERT_PARSES("echo $(echo $(echo nested))");
 }
 
 TEST(nested_arithmetic) {
-    /* Nested arithmetic */
+    /// Nested arithmetic
     ASSERT_PARSES("echo $((1 + $((2 + 3))))");
 }
 
@@ -549,32 +549,32 @@ TEST(nested_arithmetic) {
  */
 
 TEST(long_pipeline) {
-    /* Long pipeline */
+    /// Long pipeline
     ASSERT_PARSES("cat file | grep pattern | sort | uniq | head");
 }
 
 TEST(pipeline_with_redirects) {
-    /* Pipeline with redirections */
+    /// Pipeline with redirections
     ASSERT_PARSES("cat < input | grep x > output 2>&1");
 }
 
 TEST(background_in_list) {
-    /* Background job in command list */
+    /// Background job in command list
     ASSERT_PARSES("sleep 1 & echo started");
 }
 
 TEST(complex_logical_chain) {
-    /* Complex logical operators */
+    /// Complex logical operators
     ASSERT_PARSES("true && echo yes || echo no && echo done");
 }
 
 TEST(grouped_logical) {
-    /* Grouped logical expressions */
+    /// Grouped logical expressions
     ASSERT_PARSES("{ true && false; } || echo failed");
 }
 
 TEST(subshell_in_pipeline) {
-    /* Subshell in pipeline */
+    /// Subshell in pipeline
     ASSERT_PARSES("( echo hello; echo world ) | cat");
 }
 
@@ -584,30 +584,30 @@ TEST(subshell_in_pipeline) {
  */
 
 TEST(multiple_redirects) {
-    /* Multiple redirections */
+    /// Multiple redirections
     ASSERT_PARSES("cmd < in > out 2> err");
 }
 
 TEST(fd_redirects) {
-    /* File descriptor redirections */
+    /// File descriptor redirections
     ASSERT_PARSES("cmd 2>&1");
     ASSERT_PARSES("cmd 1>&2");
     ASSERT_PARSES("cmd 3>&-");
 }
 
 TEST(redirect_append) {
-    /* Append redirections */
+    /// Append redirections
     ASSERT_PARSES("echo hello >> file");
     ASSERT_PARSES("cmd &>> file");
 }
 
 TEST(redirect_noclobber) {
-    /* Noclobber redirect */
+    /// Noclobber redirect
     ASSERT_PARSES("echo hello >| file");
 }
 
 TEST(redirect_with_variable) {
-    /* Redirection target with variable */
+    /// Redirection target with variable
     ASSERT_PARSES("echo hello > $FILE");
     ASSERT_PARSES("echo hello > \"$FILE\"");
 }
@@ -618,12 +618,12 @@ TEST(redirect_with_variable) {
  */
 
 TEST(special_variables) {
-    /* Special shell variables */
+    /// Special shell variables
     ASSERT_PARSES("echo $$ $! $? $# $@ $* $0 $1");
 }
 
 TEST(brace_expansion_variable) {
-    /* Variable with braces */
+    /// Variable with braces
     ASSERT_PARSES("echo ${VAR}");
     ASSERT_PARSES("echo ${VAR:-default}");
     ASSERT_PARSES("echo ${VAR:=default}");
@@ -632,18 +632,18 @@ TEST(brace_expansion_variable) {
 }
 
 TEST(variable_length) {
-    /* Variable length */
+    /// Variable length
     ASSERT_PARSES("echo ${#VAR}");
 }
 
 TEST(variable_substring) {
-    /* Substring expansion */
+    /// Substring expansion
     ASSERT_PARSES("echo ${VAR:0:5}");
     ASSERT_PARSES("echo ${VAR:2}");
 }
 
 TEST(variable_pattern) {
-    /* Pattern removal */
+    /// Pattern removal
     ASSERT_PARSES("echo ${VAR#pattern}");
     ASSERT_PARSES("echo ${VAR##pattern}");
     ASSERT_PARSES("echo ${VAR%pattern}");
@@ -651,13 +651,13 @@ TEST(variable_pattern) {
 }
 
 TEST(variable_replacement) {
-    /* Pattern replacement */
+    /// Pattern replacement
     ASSERT_PARSES("echo ${VAR/old/new}");
     ASSERT_PARSES("echo ${VAR//old/new}");
 }
 
 TEST(arithmetic_expansion) {
-    /* Arithmetic expansion */
+    /// Arithmetic expansion
     ASSERT_PARSES("echo $((1 + 2))");
     ASSERT_PARSES("echo $((VAR * 2))");
     ASSERT_PARSES("echo $((a > b ? a : b))");
@@ -669,20 +669,20 @@ TEST(arithmetic_expansion) {
  */
 
 TEST(array_assignment) {
-    /* Array assignment */
+    /// Array assignment
     ASSERT_PARSES("arr=(a b c)");
     ASSERT_PARSES("arr=(\"hello world\" 'single' plain)");
 }
 
 TEST(array_index) {
-    /* Array indexing */
+    /// Array indexing
     ASSERT_PARSES("echo ${arr[0]}");
     ASSERT_PARSES("echo ${arr[@]}");
     ASSERT_PARSES("echo ${arr[*]}");
 }
 
 TEST(array_length) {
-    /* Array length */
+    /// Array length
     ASSERT_PARSES("echo ${#arr[@]}");
 }
 
@@ -692,13 +692,13 @@ TEST(array_length) {
  */
 
 TEST(extended_test_basic) {
-    /* Basic extended test */
+    /// Basic extended test
     ASSERT_PARSES("[[ -f file ]]");
     ASSERT_PARSES("[[ -d dir ]]");
 }
 
 TEST(extended_test_string) {
-    /* String comparisons */
+    /// String comparisons
     ASSERT_PARSES("[[ $a == $b ]]");
     ASSERT_PARSES("[[ $a != $b ]]");
     ASSERT_PARSES("[[ $a < $b ]]");
@@ -706,19 +706,19 @@ TEST(extended_test_string) {
 }
 
 TEST(extended_test_regex) {
-    /* Regex matching */
+    /// Regex matching
     ASSERT_PARSES("[[ $str =~ ^[0-9]+$ ]]");
 }
 
 TEST(extended_test_logical) {
-    /* Logical operators in [[ ]] */
+    /// Logical operators in [[ ]]
     ASSERT_PARSES("[[ -f file && -r file ]]");
     ASSERT_PARSES("[[ -f file || -d file ]]");
     ASSERT_PARSES("[[ ! -f file ]]");
 }
 
 TEST(extended_test_grouping) {
-    /* Grouping in [[ ]] */
+    /// Grouping in [[ ]]
     ASSERT_PARSES("[[ ( -f file ) && ( -r file ) ]]");
 }
 
@@ -728,17 +728,17 @@ TEST(extended_test_grouping) {
  */
 
 TEST(process_sub_input) {
-    /* Process substitution as input */
+    /// Process substitution as input
     ASSERT_PARSES("diff <(ls dir1) <(ls dir2)");
 }
 
 TEST(process_sub_output) {
-    /* Process substitution as output */
+    /// Process substitution as output
     ASSERT_PARSES("tee >(cat > file)");
 }
 
 TEST(process_sub_in_loop) {
-    /* Process substitution as redirection target - Issue #20 fixed */
+    /// Process substitution as redirection target - Issue #20 fixed
     ASSERT_PARSES("while read line; do echo $line; done < <(cat file)");
     ASSERT_PARSES("cat < <(echo hello)");
     ASSERT_PARSES("diff <(cat file1) <(cat file2)");
@@ -750,22 +750,22 @@ TEST(process_sub_in_loop) {
  */
 
 TEST(function_posix_style) {
-    /* POSIX function syntax */
+    /// POSIX function syntax
     ASSERT_PARSES("foo() { echo foo; }");
 }
 
 TEST(function_ksh_style) {
-    /* ksh/bash function syntax */
+    /// ksh/bash function syntax
     ASSERT_PARSES("function foo { echo foo; }");
 }
 
 TEST(function_with_local) {
-    /* Function with local variables */
+    /// Function with local variables
     ASSERT_PARSES("foo() { local x=1; echo $x; }");
 }
 
 TEST(function_multiline) {
-    /* Multiline function */
+    /// Multiline function
     ASSERT_PARSES("foo() {\n"
                   "    echo line1\n"
                   "    echo line2\n"
@@ -778,63 +778,66 @@ TEST(function_multiline) {
  */
 
 TEST(error_unclosed_if) {
-    /* Unclosed if */
+    /// Unclosed if
     ASSERT_PARSE_FAILS("if true; then echo yes");
 }
 
 TEST(error_unclosed_for) {
-    /* Unclosed for */
+    /// Unclosed for
     ASSERT_PARSE_FAILS("for x in a b; do echo $x");
 }
 
 TEST(error_unclosed_while) {
-    /* Unclosed while */
+    /// Unclosed while
     ASSERT_PARSE_FAILS("while true; do echo loop");
 }
 
 TEST(error_unclosed_case) {
-    /* Unclosed case */
+    /// Unclosed case
     ASSERT_PARSE_FAILS("case x in a) echo a;;");
 }
 
 TEST(error_unclosed_quote) {
-    /* Unclosed quote */
+    /// Unclosed quote
     ASSERT_PARSE_FAILS("echo \"hello");
     ASSERT_PARSE_FAILS("echo 'hello");
 }
 
 TEST(error_unclosed_paren) {
-    /* Unclosed parenthesis */
+    /// Unclosed parenthesis
     ASSERT_PARSE_FAILS("( echo hello");
 }
 
 TEST(error_unclosed_brace) {
-    /* Unclosed brace */
+    /// Unclosed brace
     ASSERT_PARSE_FAILS("{ echo hello");
 }
 
 TEST(error_missing_do) {
-    /* Missing do in loop */
-    ASSERT_PARSE_FAILS("for x in a b; echo $x; done");
+    /// Missing do in `while` loop. The `for` form is intentionally permissive:
+    /// zsh's short `for NAME in WORDS<sep> sublist` (no `do`/`done`) is
+    /// supported, so a malformed `for` of that shape parses as the short form
+    /// and is not an error.
+    ASSERT_PARSE_FAILS("while true; echo yes; done");
 }
 
 TEST(error_missing_then) {
-    /* Missing then in if */
+    /// Missing then in if
     ASSERT_PARSE_FAILS("if true; echo yes; fi");
 }
 
 TEST(error_stray_fi) {
-    /* Stray fi without if */
+    /// Stray fi without if
     ASSERT_PARSE_FAILS("fi");
 }
 
 TEST(error_stray_done) {
-    /* Stray done without loop */
+    /// Stray done without loop
     ASSERT_PARSE_FAILS("done");
 }
 
 TEST(error_stray_esac) {
-    /* Stray esac without case */
+    /// Stray esac without case
     ASSERT_PARSE_FAILS("esac");
 }
 

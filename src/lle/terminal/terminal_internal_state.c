@@ -41,7 +41,7 @@ lle_result_t lle_command_buffer_init(lle_command_buffer_t **buffer,
     }
 
     if (initial_capacity < 64) {
-        initial_capacity = 64; /* Minimum capacity */
+        initial_capacity = 64; /// Minimum capacity
     }
 
     lle_command_buffer_t *buf = calloc(1, sizeof(lle_command_buffer_t));
@@ -49,7 +49,7 @@ lle_result_t lle_command_buffer_init(lle_command_buffer_t **buffer,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Allocate buffer data */
+    /// Allocate buffer data
     buf->data = calloc(initial_capacity, 1);
     if (!buf->data) {
         free(buf);
@@ -97,16 +97,16 @@ void lle_command_buffer_destroy(lle_command_buffer_t *buffer) {
 static lle_result_t ensure_capacity(lle_command_buffer_t *buffer,
                                     size_t required) {
     if (buffer->capacity >= required) {
-        return LLE_SUCCESS; /* Already have enough capacity */
+        return LLE_SUCCESS; /// Already have enough capacity
     }
 
-    /* Calculate new capacity (grow by 1.5x) */
+    /// Calculate new capacity (grow by 1.5x)
     size_t new_capacity = buffer->capacity;
     while (new_capacity < required) {
         new_capacity = new_capacity + (new_capacity / 2);
     }
 
-    /* Reallocate buffer */
+    /// Reallocate buffer
     char *new_data = realloc(buffer->data, new_capacity);
     if (!new_data) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -140,29 +140,29 @@ lle_result_t lle_command_buffer_insert(lle_command_buffer_t *buffer,
     }
 
     if (length == 0) {
-        return LLE_SUCCESS; /* Nothing to insert */
+        return LLE_SUCCESS; /// Nothing to insert
     }
 
-    /* Ensure we have capacity for new text */
+    /// Ensure we have capacity for new text
     lle_result_t result = ensure_capacity(buffer, buffer->length + length + 1);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Move existing content after insertion point to make room */
+    /// Move existing content after insertion point to make room
     if (position < buffer->length) {
         memmove(buffer->data + position + length, buffer->data + position,
                 buffer->length - position);
     }
 
-    /* Copy new text into buffer */
+    /// Copy new text into buffer
     memcpy(buffer->data + position, text, length);
 
-    /* Update buffer state */
+    /// Update buffer state
     buffer->length += length;
-    buffer->data[buffer->length] = '\0'; /* Null terminate */
+    buffer->data[buffer->length] = '\0'; /// Null terminate
 
-    /* Track change for optimization */
+    /// Track change for optimization
     buffer->last_change_offset = position;
     buffer->last_change_length = length;
     buffer->needs_full_refresh = false;
@@ -189,25 +189,25 @@ lle_result_t lle_command_buffer_delete(lle_command_buffer_t *buffer,
     }
 
     if (length == 0) {
-        return LLE_SUCCESS; /* Nothing to delete */
+        return LLE_SUCCESS; /// Nothing to delete
     }
 
-    /* Clamp length to available content */
+    /// Clamp length to available content
     if (position + length > buffer->length) {
         length = buffer->length - position;
     }
 
-    /* Move content after deletion point backward */
+    /// Move content after deletion point backward
     if (position + length < buffer->length) {
         memmove(buffer->data + position, buffer->data + position + length,
                 buffer->length - (position + length));
     }
 
-    /* Update buffer state */
+    /// Update buffer state
     buffer->length -= length;
-    buffer->data[buffer->length] = '\0'; /* Null terminate */
+    buffer->data[buffer->length] = '\0'; /// Null terminate
 
-    /* Track change for optimization */
+    /// Track change for optimization
     buffer->last_change_offset = position;
     buffer->last_change_length = length;
     buffer->needs_full_refresh = false;
@@ -259,7 +259,7 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize command buffer */
+    /// Initialize command buffer
     lle_result_t result =
         lle_command_buffer_init(&internal_state->command_buffer, 1024);
     if (result != LLE_SUCCESS) {
@@ -267,8 +267,8 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
         return result;
     }
 
-    /* Initialize display lines array */
-    internal_state->display_capacity = 10; /* Initial capacity */
+    /// Initialize display lines array
+    internal_state->display_capacity = 10; /// Initial capacity
     internal_state->display_lines =
         calloc(internal_state->display_capacity, sizeof(lle_display_line_t));
     if (!internal_state->display_lines) {
@@ -277,12 +277,12 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Allocate content for each display line */
+    /// Allocate content for each display line
     for (size_t i = 0; i < internal_state->display_capacity; i++) {
         internal_state->display_lines[i].capacity = 256;
         internal_state->display_lines[i].content = calloc(256, 1);
         if (!internal_state->display_lines[i].content) {
-            /* Clean up previously allocated lines */
+            /// Clean up previously allocated lines
             for (size_t j = 0; j < i; j++) {
                 free(internal_state->display_lines[j].content);
             }
@@ -295,13 +295,13 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
         internal_state->display_lines[i].contains_cursor = false;
     }
 
-    /* Set initial terminal geometry from capabilities */
+    /// Set initial terminal geometry from capabilities
     internal_state->terminal_width =
         caps->terminal_width > 0 ? caps->terminal_width : 80;
     internal_state->terminal_height =
         caps->terminal_height > 0 ? caps->terminal_height : 24;
 
-    /* Initialize state */
+    /// Initialize state
     internal_state->cursor_position = 0;
     internal_state->display_line_count = 0;
     internal_state->display_offset = 0;
@@ -328,12 +328,12 @@ void lle_internal_state_destroy(lle_internal_state_t *state) {
         return;
     }
 
-    /* Destroy command buffer */
+    /// Destroy command buffer
     if (state->command_buffer) {
         lle_command_buffer_destroy(state->command_buffer);
     }
 
-    /* Free display lines */
+    /// Free display lines
     if (state->display_lines) {
         for (size_t i = 0; i < state->display_capacity; i++) {
             if (state->display_lines[i].content) {
@@ -362,17 +362,17 @@ lle_result_t lle_internal_state_insert_text(lle_internal_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Insert into command buffer (authoritative) */
+    /// Insert into command buffer (authoritative)
     lle_result_t result = lle_command_buffer_insert(
         state->command_buffer, position, text, text_length);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Update cursor position */
+    /// Update cursor position
     state->cursor_position = position + text_length;
 
-    /* Mark buffer as modified */
+    /// Mark buffer as modified
     state->buffer_modified = true;
     state->modification_count++;
     state->last_update_time = lle_get_current_time_microseconds();
@@ -394,14 +394,14 @@ lle_result_t lle_internal_state_delete_text(lle_internal_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Delete from command buffer (authoritative) */
+    /// Delete from command buffer (authoritative)
     lle_result_t result =
         lle_command_buffer_delete(state->command_buffer, position, length);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Update cursor position */
+    /// Update cursor position
     if (state->cursor_position > position) {
         if (state->cursor_position <= position + length) {
             state->cursor_position = position;
@@ -410,7 +410,7 @@ lle_result_t lle_internal_state_delete_text(lle_internal_state_t *state,
         }
     }
 
-    /* Mark buffer as modified */
+    /// Mark buffer as modified
     state->buffer_modified = true;
     state->modification_count++;
     state->last_update_time = lle_get_current_time_microseconds();
@@ -435,21 +435,21 @@ lle_result_t lle_internal_state_calculate_cursor_display_position(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Calculate visual column accounting for prompt width and line wrapping */
+    /// Calculate visual column accounting for prompt width and line wrapping
     size_t visual_column = state->prompt_width + state->cursor_position;
 
-    /* Account for horizontal scroll offset */
+    /// Account for horizontal scroll offset
     if (visual_column < state->display_offset) {
         visual_column = 0;
     } else {
         visual_column -= state->display_offset;
     }
 
-    /* Calculate line wrapping */
+    /// Calculate line wrapping
     *display_line = visual_column / state->terminal_width;
     *display_column = visual_column % state->terminal_width;
 
-    /* Account for vertical offset */
+    /// Account for vertical offset
     if (*display_line >= state->vertical_offset) {
         *display_line -= state->vertical_offset;
     } else {
@@ -473,11 +473,11 @@ lle_result_t lle_internal_state_update_geometry(lle_internal_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Update terminal dimensions */
+    /// Update terminal dimensions
     state->terminal_width = width > 0 ? width : 80;
     state->terminal_height = height > 0 ? height : 24;
 
-    /* Force full refresh on next display generation */
+    /// Force full refresh on next display generation
     if (state->command_buffer) {
         state->command_buffer->needs_full_refresh = true;
     }

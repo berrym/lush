@@ -19,9 +19,9 @@
  * @brief Shell type constants
  */
 enum {
-    SHELL_NON_INTERACTIVE = 0, /**< Script files, -c commands, piped input */
-    SHELL_INTERACTIVE = 1,     /**< Interactive shell (stdin is terminal) */
-    SHELL_LOGIN = 2            /**< Login shell (argv[0] starts with - or -l) */
+    SHELL_NON_INTERACTIVE = 0, ///< Script files, -c commands, piped input
+    SHELL_INTERACTIVE = 1,     ///< Interactive shell (stdin is terminal)
+    SHELL_LOGIN = 2            ///< Login shell (argv[0] starts with - or -l)
 };
 
 /** @brief Legacy alias for SHELL_NON_INTERACTIVE */

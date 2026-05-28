@@ -280,4 +280,4 @@ void lle_theme_batch_result_cleanup(lle_theme_batch_result_t *result);
 }
 #endif
 
-#endif /* LLE_PROMPT_THEME_LOADER_H */
+#endif // LLE_PROMPT_THEME_LOADER_H

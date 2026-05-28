@@ -54,6 +54,7 @@ inc = include_directories('include',
 
 src = ['src/arithmetic.c',
        'src/autocorrect.c',
+       'src/autoload.c',
        'src/builtins/alias.c',
        'src/builtins/bin_analyze.c',
        'src/builtins/bin_bg.c',
@@ -95,7 +96,6 @@ src = ['src/arithmetic.c',
        'src/builtins/bin_pwd.c',
        'src/builtins/bin_read.c',
        'src/builtins/bin_readonly.c',
-       'src/builtins/bin_return_value.c',
        'src/builtins/bin_return.c',
        'src/builtins/bin_setopt.c',
        'src/builtins/bin_shift.c',
@@ -126,6 +126,15 @@ src = ['src/arithmetic.c',
        'src/builtins/display/lle_syntax.c',
        'src/builtins/display/lle_theme.c',
        'src/builtins/display/lle_transient.c',
+       'src/builtins/display/lle_widget.c',
+       'src/builtins/display/lle_hook.c',
+       'src/builtins/display/lle_segment.c',
+       'src/builtins/display/lle_pager.c',
+       'src/builtins/display/lle_inspect_widget.c',
+       'src/builtins/bin_zsh_stubs.c',
+       'src/builtins/bin_bindkey.c',
+       'src/builtins/bin_zle.c',
+       'src/builtins/bin_zstyle.c',
        'src/builtins/fc.c',
        'src/compat.c',
        'src/config_registry.c',
@@ -135,6 +144,7 @@ src = ['src/arithmetic.c',
        'src/debug/debug_core.c',
        'src/debug/debug_profile.c',
        'src/debug/debug_trace.c',
+       'src/debug/debug_view.c',
        'src/dirstack.c',
        'src/display_integration.c',
        'src/display/autosuggestions_layer.c',
@@ -143,6 +153,8 @@ src = ['src/arithmetic.c',
        'src/display/composition_engine.c',
        'src/display/display_controller.c',
        'src/display/layer_events.c',
+       'src/display/pager_input.c',
+       'src/display/pager_layer.c',
        'src/display/prompt_layer.c',
        'src/display/screen_buffer_menu.c',
        'src/display/screen_buffer.c',
@@ -170,6 +182,8 @@ src = ['src/arithmetic.c',
        'src/node.c',
        'src/opts.c',
        'src/parser.c',
+       'src/pattern_match.c',
+       'src/identifier.c',
        'src/posix_history.c',
        'src/posix_opts.c',
        'src/redirection.c',
@@ -272,6 +286,8 @@ display_sources = [
   'src/display/screen_buffer.c',
   'src/display/screen_buffer_menu.c',
   'src/display/autosuggestions_layer.c',
+  'src/display/pager_layer.c',
+  'src/display/pager_input.c',
   'src/display_integration.c',
   'src/globals.c',
   'src/strings.c',
@@ -326,6 +342,7 @@ if lle_sources.length() > 0
                               ['tests/lle/functional/multiline_manager_test.c',
                                'tests/lle/functional/test_memory_mock.c',
                                'src/input_continuation.c',
+                               'src/identifier.c',
                                'src/symtable.c',
                                'src/shell_mode.c',
                                'src/libhashtable/ht.c',
@@ -945,6 +962,7 @@ endif
                                               ['tests/lle/functional/test_history_phase4_complete.c',
                                                'tests/lle/functional/test_memory_mock.c',
                                                'src/input_continuation.c',
+                                               'src/identifier.c',
                                                'src/symtable.c',
                                                'src/shell_mode.c',
                                                'src/libhashtable/ht.c',
@@ -970,6 +988,18 @@ endif
                                            include_directories: [inc, include_directories('tests')],
                                            dependencies: [lle_dep])
     test('LLE Unicode Case and Compare', test_unicode_case_compare,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
+  # Unicode General-Category Classification Unit Tests
+  # Tests unicode_class.h predicates (is_alpha, is_digit, is_space, etc.)
+  if fs.exists('tests/lle/unit/test_unicode_class.c')
+    test_unicode_class = executable('test_unicode_class',
+                                    'tests/lle/unit/test_unicode_class.c',
+                                    include_directories: [inc, include_directories('tests')],
+                                    dependencies: [lle_dep])
+    test('LLE Unicode Class', test_unicode_class,
          suite: 'lle-unit',
          timeout: 30)
   endif
@@ -1154,6 +1184,7 @@ endif
     test_word_context = executable('test_word_context',
                                    'tests/lle/unit/test_word_context.c',
                                    'tests/lle/functional/test_completion_mock.c',
+                                   'src/identifier.c',
                                    include_directories: [inc, include_directories('tests')],
                                    link_with: lle_lib,
                                    dependencies: [ncurses_link_dep])
@@ -1313,7 +1344,9 @@ if fs.exists('tests/unit/test_tokenizer.c')
   test_tokenizer = executable('test_tokenizer',
                               'tests/unit/test_tokenizer.c',
                               'src/tokenizer.c',
+                           'src/identifier.c',
                               'src/shell_mode.c',
+                              'src/identifier.c',
                               include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep])
   test('Tokenizer', test_tokenizer,
@@ -1329,6 +1362,7 @@ if fs.exists('tests/unit/test_parser.c')
                            'tests/unit/test_parser.c',
                            'src/parser.c',
                            'src/tokenizer.c',
+                           'src/identifier.c',
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
@@ -1351,6 +1385,7 @@ if fs.exists('tests/unit/test_parser_fuzzer.c')
                            'tests/unit/test_parser_fuzzer.c',
                            'src/parser.c',
                            'src/tokenizer.c',
+                           'src/identifier.c',
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
@@ -1373,6 +1408,7 @@ if fs.exists('tests/unit/test_parser_negative.c')
                            'tests/unit/test_parser_negative.c',
                            'src/parser.c',
                            'src/tokenizer.c',
+                           'src/identifier.c',
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
@@ -1395,6 +1431,7 @@ if fs.exists('tests/unit/test_ast_roundtrip.c')
                            'tests/unit/test_ast_roundtrip.c',
                            'src/parser.c',
                            'src/tokenizer.c',
+                           'src/identifier.c',
                            'src/node.c',
                            'src/node_to_source.c',
                            'src/shell_mode.c',
@@ -1418,12 +1455,14 @@ endif
 if fs.exists('tests/unit/test_symtable.c')
   test_symtable = executable('test_symtable',
                              'tests/unit/test_symtable.c',
+                             'src/identifier.c',
                              'src/symtable.c',
                              'src/libhashtable/ht.c',
                              'src/libhashtable/ht_fnv1a.c',
                              'src/libhashtable/ht_strstr.c',
                              'tests/unit/test_symtable_stubs.c',
-                             include_directories: [inc, include_directories('tests')])
+                             include_directories: [inc, include_directories('tests')],
+                             dependencies: [lle_dep])
   test('Symbol Table', test_symtable,
        suite: 'unit',
        timeout: 30)
@@ -1721,6 +1760,29 @@ if fs.exists('tests/unit/test_debug_breakpoints.c')
 endif
 
 # ============================================================================
+# Debugger Integration Gate (PHILOSOPHY section 7)
+# Drives the real executor with a live debug context: breakpoints fire,
+# stay silent when they should, honour the script-execution gate, and
+# execution survives the break.
+if fs.exists('tests/unit/test_debug_integration.c')
+  test_debug_integration_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_debug_integration_sources += s
+    endif
+  endforeach
+  test_debug_integration = executable('test_debug_integration',
+                                      'tests/unit/test_debug_integration.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_debug_integration_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('Debug Integration Gate', test_debug_integration,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
 # Display Controller Tests
 # Tests display controller: configuration, error handling, completion menu, autosuggestions
 if fs.exists('tests/unit/test_display_controller.c')
@@ -1778,6 +1840,106 @@ if fs.exists('tests/unit/test_screen_buffer.c')
                                   include_directories: [inc, include_directories('tests')],
                                   dependencies: [lle_dep, libm])
   test('Screen Buffer', test_screen_buffer,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pager Layer Tests
+# ============================================================================
+if fs.exists('tests/unit/test_pager_layer.c')
+  test_pager_layer_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_pager_layer_sources += s
+    endif
+  endforeach
+  test_pager_layer = executable('test_pager_layer',
+                                'tests/unit/test_pager_layer.c',
+                                'tests/unit/test_executor_stubs.c',
+                                test_pager_layer_sources + lle_shell_sources,
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep, libm])
+  test('Pager Layer', test_pager_layer,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pager Input Tests
+# ============================================================================
+if fs.exists('tests/unit/test_pager_input.c')
+  test_pager_input_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_pager_input_sources += s
+    endif
+  endforeach
+  test_pager_input = executable('test_pager_input',
+                                'tests/unit/test_pager_input.c',
+                                'tests/unit/test_executor_stubs.c',
+                                test_pager_input_sources + lle_shell_sources,
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep, libm])
+  test('Pager Input', test_pager_input,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# lle_pager_present Public API Tests
+# ============================================================================
+if fs.exists('tests/unit/test_lle_pager_present.c')
+  test_lle_pager_present_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_lle_pager_present_sources += s
+    endif
+  endforeach
+  test_lle_pager_present = executable('test_lle_pager_present',
+                                      'tests/unit/test_lle_pager_present.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_lle_pager_present_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('LLE Pager Present', test_lle_pager_present,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pager Render Tests (display-controller pager branch)
+# ============================================================================
+if fs.exists('tests/unit/test_pager_render.c')
+  test_pager_render_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_pager_render_sources += s
+    endif
+  endforeach
+  test_pager_render = executable('test_pager_render',
+                                 'tests/unit/test_pager_render.c',
+                                 'tests/unit/test_executor_stubs.c',
+                                 test_pager_render_sources + lle_shell_sources,
+                                 include_directories: [inc, include_directories('tests')],
+                                 dependencies: [lle_dep, libm])
+  test('Pager Render', test_pager_render,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Screen Buffer Line-Index Tests
+# ============================================================================
+if fs.exists('tests/unit/test_screen_line_index.c')
+  test_screen_line_index_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_screen_line_index_sources += s
+    endif
+  endforeach
+  test_screen_line_index = executable('test_screen_line_index',
+                                      'tests/unit/test_screen_line_index.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_screen_line_index_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('Screen Line Index', test_screen_line_index,
        suite: 'unit',
        timeout: 30)
 endif
@@ -1883,6 +2045,7 @@ if fuzzing_enabled
   fuzz_common_sources = [
     'src/parser.c',
     'src/tokenizer.c',
+                           'src/identifier.c',
     'src/node.c',
     'src/shell_mode.c',
     'src/shell_error.c',
@@ -1899,6 +2062,19 @@ if fuzzing_enabled
     # comes along for the ride; both are hermetic.
     'src/lle/unicode/utf8_support.c',
     'src/lle/unicode/unicode_grapheme.c',
+    # identifier.c (in this list) drives the Unicode identifier predicate:
+    # unicode_class.c provides lle_unicode_is_alpha/_alnum and unicode_case.c
+    # provides the is_lower/is_upper/tolower/toupper case primitives it (and
+    # symtable.c) consume. unicode_compare.c provides
+    # lle_unicode_normalize_nfc_alloc (symtable.c's NFC history work) and
+    # lle_unicode_strings_equal (parser.c). grapheme_detector.c provides
+    # get_grapheme_break_property, which lush_ident_match_continue consults
+    # to accept UAX #31 Continue combining marks (NFD identifiers). All
+    # hermetic; no liblle.a needed.
+    'src/lle/unicode/unicode_class.c',
+    'src/lle/unicode/unicode_case.c',
+    'src/lle/unicode/unicode_compare.c',
+    'src/lle/unicode/grapheme_detector.c',
     'tests/fuzz/fuzz_stubs.c',
   ]
 
@@ -2187,6 +2363,37 @@ if fs.exists('tests/unit/test_redirection.c')
        timeout: 30)
 endif
 
+# Autoload Tests
+if fs.exists('tests/unit/test_autoload.c')
+  test_autoload_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_autoload_sources += s
+    endif
+  endforeach
+  test_autoload = executable('test_autoload',
+                             'tests/unit/test_autoload.c',
+                             'tests/unit/test_executor_stubs.c',
+                             test_autoload_sources + lle_shell_sources,
+                             include_directories: [inc, include_directories('tests')],
+                             dependencies: [lle_dep, libm])
+  test('Autoload', test_autoload,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pattern Matcher Tests
+if fs.exists('tests/unit/test_pattern_match.c')
+  test_pattern_match = executable('test_pattern_match',
+                                  'tests/unit/test_pattern_match.c',
+                                  'src/pattern_match.c',
+                                  include_directories: [inc, include_directories('tests')],
+                                  dependencies: [lle_dep])
+  test('Pattern Match', test_pattern_match,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Compatibility Database Tests
 if fs.exists('tests/unit/test_compat.c')
   test_compat_sources = []
@@ -2242,24 +2449,6 @@ if fs.exists('tests/unit/test_hashtable.c')
        timeout: 30)
 endif
 
-# Debug Core Tests
-if fs.exists('tests/unit/test_debug_core.c')
-  test_debug_core_sources = []
-  foreach s : src
-    if not s.endswith('lush.c')
-      test_debug_core_sources += s
-    endif
-  endforeach
-  test_debug_core = executable('test_debug_core',
-                               'tests/unit/test_debug_core.c',
-                               'tests/unit/test_executor_stubs.c',
-                               test_debug_core_sources + lle_shell_sources,
-                               include_directories: [inc, include_directories('tests')],
-                               dependencies: [lle_dep, libm])
-  test('Debug Core', test_debug_core,
-       suite: 'unit',
-       timeout: 30)
-endif
 
 # Node to Source Tests
 if fs.exists('tests/unit/test_node_to_source.c')
@@ -2268,6 +2457,7 @@ if fs.exists('tests/unit/test_node_to_source.c')
                                    'src/node_to_source.c',
                                    'src/parser.c',
                                    'src/tokenizer.c',
+                           'src/identifier.c',
                                    'src/node.c',
                                    'src/shell_mode.c',
                                    'src/shell_error.c',

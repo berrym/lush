@@ -1,11 +1,23 @@
 # Screen Buffer Component Specification
 
-**Component**: Screen Buffer System  
-**Version**: 1.0.0  
-**Created**: 2025-11-04  
-**Status**: Implemented and Tested  
-**Location**: `src/display/screen_buffer.{c,h}`  
-**Purpose**: Virtual terminal screen representation for optimal line-wrapped display rendering
+**Component**: Screen Buffer System
+**Version**: 1.0.0
+**Created**: 2025-11-04
+**Status**: Implemented and Tested
+**Location**: `src/display/screen_buffer.{c,h}`
+**Purpose**: Virtual terminal screen representation for accurate
+line-wrapped cursor calculation and rendering
+
+**Reading note (2026-05-23):** the original "Foundation for
+Optimization: differential updates" framing in §2 is **not the
+current implementation**. Lush uses prompt-once + clear-and-redraw
+(`display_controller` is the sole stdout writer for the REPL); the
+`dirty` flag, `screen_buffer_diff`, and `screen_buffer_apply_diff`
+hooks are scaffolding kept in place for future re-evaluation but
+are not on any render path today. Treat any "differential update"
+language in this document as design context, not as current
+behavior. See [`../../CLAUDE.md`](../../CLAUDE.md) "Display System"
+for the authoritative summary of how rendering actually works.
 
 ---
 

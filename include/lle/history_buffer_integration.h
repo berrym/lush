@@ -55,37 +55,37 @@ typedef struct lle_edit_change lle_edit_change_t;
  * ============================================================================
  */
 
-/* Edit session state enum is defined in edit_session_manager.h */
-/* Include that header to get the enum definition */
+/// Edit session state enum is defined in edit_session_manager.h
+/// Include that header to get the enum definition
 #include "lle/edit_session_manager.h"
 
 /**
  * Command structure type (shell constructs)
  */
 typedef enum lle_command_type {
-    LLE_CMD_TYPE_SIMPLE = 0,     /* Simple command */
-    LLE_CMD_TYPE_PIPELINE,       /* Pipeline (|) */
-    LLE_CMD_TYPE_COMPOUND,       /* Compound command (&&, ||, ;) */
-    LLE_CMD_TYPE_FOR_LOOP,       /* for loop */
-    LLE_CMD_TYPE_WHILE_LOOP,     /* while loop */
-    LLE_CMD_TYPE_UNTIL_LOOP,     /* until loop */
-    LLE_CMD_TYPE_IF_STATEMENT,   /* if statement */
-    LLE_CMD_TYPE_CASE_STATEMENT, /* case statement */
-    LLE_CMD_TYPE_FUNCTION,       /* Function definition */
-    LLE_CMD_TYPE_SUBSHELL,       /* Subshell ( ) */
-    LLE_CMD_TYPE_COMMAND_GROUP,  /* Command group { } */
-    LLE_CMD_TYPE_UNKNOWN         /* Unknown/unparseable */
+    LLE_CMD_TYPE_SIMPLE = 0,     ///< Simple command
+    LLE_CMD_TYPE_PIPELINE,       ///< Pipeline (|)
+    LLE_CMD_TYPE_COMPOUND,       ///< Compound command (&&, ||, ;)
+    LLE_CMD_TYPE_FOR_LOOP,       ///< for loop
+    LLE_CMD_TYPE_WHILE_LOOP,     ///< while loop
+    LLE_CMD_TYPE_UNTIL_LOOP,     ///< until loop
+    LLE_CMD_TYPE_IF_STATEMENT,   ///< if statement
+    LLE_CMD_TYPE_CASE_STATEMENT, ///< case statement
+    LLE_CMD_TYPE_FUNCTION,       ///< Function definition
+    LLE_CMD_TYPE_SUBSHELL,       ///< Subshell ( )
+    LLE_CMD_TYPE_COMMAND_GROUP,  ///< Command group { }
+    LLE_CMD_TYPE_UNKNOWN         /// Unknown/unparseable
 } lle_command_type_t;
 
 /**
  * Integration state tracking
  */
 typedef enum lle_integration_state_type {
-    LLE_INTEGRATION_UNINITIALIZED = 0, /* System not initialized */
-    LLE_INTEGRATION_READY,             /* Ready for operations */
-    LLE_INTEGRATION_BUSY,              /* Operation in progress */
-    LLE_INTEGRATION_ERROR,             /* Error state */
-    LLE_INTEGRATION_SHUTDOWN           /* Shutting down */
+    LLE_INTEGRATION_UNINITIALIZED = 0, ///< System not initialized
+    LLE_INTEGRATION_READY,             ///< Ready for operations
+    LLE_INTEGRATION_BUSY,              ///< Operation in progress
+    LLE_INTEGRATION_ERROR,             ///< Error state
+    LLE_INTEGRATION_SHUTDOWN           /// Shutting down
 } lle_integration_state_type_t;
 
 /* ============================================================================
@@ -184,65 +184,65 @@ struct lle_history_edit_callbacks {
  * Integration configuration
  */
 struct lle_integration_config {
-    bool enable_multiline_reconstruction; /* Enable multiline reconstruction */
-    bool preserve_original_formatting;    /* Preserve original indentation */
-    bool enable_structure_analysis;       /* Enable shell construct analysis */
-    bool enable_edit_caching;             /* Enable reconstruction caching */
-    uint32_t max_cache_entries;           /* Maximum cache entries */
-    uint32_t max_reconstruction_depth;    /* Maximum nesting depth */
-    uint32_t reconstruction_timeout_ms;   /* Reconstruction timeout */
+    bool enable_multiline_reconstruction; ///< Enable multiline reconstruction
+    bool preserve_original_formatting;    ///< Preserve original indentation
+    bool enable_structure_analysis;       ///< Enable shell construct analysis
+    bool enable_edit_caching;             ///< Enable reconstruction caching
+    uint32_t max_cache_entries;           ///< Maximum cache entries
+    uint32_t max_reconstruction_depth;    ///< Maximum nesting depth
+    uint32_t reconstruction_timeout_ms;   ///< Reconstruction timeout
 };
 
 /**
  * Integration state
  */
 struct lle_integration_state {
-    lle_integration_state_type_t state;  /* Current state */
-    uint64_t active_sessions;            /* Number of active edit sessions */
-    uint64_t total_edits;                /* Total edits performed */
-    uint64_t successful_reconstructions; /* Successful reconstructions */
-    uint64_t failed_reconstructions;     /* Failed reconstructions */
-    uint64_t cache_hits;                 /* Cache hits */
-    uint64_t cache_misses;               /* Cache misses */
-    uint64_t last_operation_time_us; /* Last operation time (microseconds) */
+    lle_integration_state_type_t state;  ///< Current state
+    uint64_t active_sessions;            ///< Number of active edit sessions
+    uint64_t total_edits;                ///< Total edits performed
+    uint64_t successful_reconstructions; ///< Successful reconstructions
+    uint64_t failed_reconstructions;     ///< Failed reconstructions
+    uint64_t cache_hits;                 ///< Cache hits
+    uint64_t cache_misses;               ///< Cache misses
+    uint64_t last_operation_time_us;     ///< Last operation time (microseconds)
 };
 
 /**
  * Main history-buffer integration system
  */
 struct lle_history_buffer_integration {
-    /* Core components */
-    lle_history_core_t *history_core; /* History core reference */
-    lle_buffer_t *editing_buffer;     /* Buffer system reference */
+    /// Core components
+    lle_history_core_t *history_core; ///< History core reference
+    lle_buffer_t *editing_buffer;     ///< Buffer system reference
     lle_reconstruction_engine_t
-        *reconstruction; /* Command reconstruction engine */
-    lle_edit_session_manager_t *session_manager; /* Edit session management */
+        *reconstruction; ///< Command reconstruction engine
+    lle_edit_session_manager_t *session_manager; ///< Edit session management
 
-    /* Multiline support */
-    lle_multiline_parser_t *multiline_parser; /* Multiline structure parser */
-    lle_structure_analyzer_t *structure_analyzer; /* Shell construct analyzer */
-    lle_formatting_engine_t *formatter; /* Intelligent formatting engine */
+    /// Multiline support
+    lle_multiline_parser_t *multiline_parser; ///< Multiline structure parser
+    lle_structure_analyzer_t *structure_analyzer; ///< Shell construct analyzer
+    lle_formatting_engine_t *formatter; ///< Intelligent formatting engine
 
-    /* Callback system */
-    lle_history_edit_callbacks_t *edit_callbacks; /* Edit event callbacks */
-    lle_callback_registry_t *callback_registry;   /* Callback management */
+    /// Callback system
+    lle_history_edit_callbacks_t *edit_callbacks; ///< Edit event callbacks
+    lle_callback_registry_t *callback_registry;   ///< Callback management
 
-    /* Performance optimization */
-    lle_edit_cache_t *edit_cache;            /* Edit operation caching */
-    lle_memory_pool_t *memory_pool;          /* Memory pool integration */
-    lle_performance_monitor_t *perf_monitor; /* Performance monitoring */
+    /// Performance optimization
+    lle_edit_cache_t *edit_cache;            ///< Edit operation caching
+    lle_memory_pool_t *memory_pool;          ///< Memory pool integration
+    lle_performance_monitor_t *perf_monitor; ///< Performance monitoring
 
-    /* Configuration and state */
-    lle_integration_config_t *config;       /* Integration configuration */
-    lle_integration_state_t *current_state; /* Current integration state */
+    /// Configuration and state
+    lle_integration_config_t *config;       ///< Integration configuration
+    lle_integration_state_t *current_state; ///< Current integration state
 
-    /* Event system integration */
-    lle_event_system_t *event_system; /* Event system reference */
+    /// Event system integration
+    lle_event_system_t *event_system; ///< Event system reference
 
-    /* Synchronization */
-    pthread_rwlock_t integration_lock; /* Thread-safe access */
-    bool system_active;                /* Integration system status */
-    uint64_t session_counter;          /* Edit session counter */
+    /// Synchronization
+    pthread_rwlock_t integration_lock; ///< Thread-safe access
+    bool system_active;                ///< Integration system status
+    uint64_t session_counter;          ///< Edit session counter
 };
 
 /* ============================================================================
@@ -382,10 +382,10 @@ lle_history_session_cancel(lle_history_buffer_integration_t *integration);
  * ============================================================================
  */
 
-/* Forward declaration for cache stats */
+/// Forward declaration for cache stats
 typedef struct lle_edit_cache_stats lle_edit_cache_stats_t;
 
-/* Include edit_cache.h to get stats structure definition */
+/// Include edit_cache.h to get stats structure definition
 #include "lle/edit_cache.h"
 
 /**
@@ -428,4 +428,4 @@ lle_result_t lle_history_buffer_integration_clear_cache(
 lle_result_t lle_history_buffer_integration_maintain_cache(
     lle_history_buffer_integration_t *integration, size_t *expired_count);
 
-#endif /* LLE_HISTORY_BUFFER_INTEGRATION_H */
+#endif /// LLE_HISTORY_BUFFER_INTEGRATION_H

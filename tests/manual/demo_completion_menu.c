@@ -1,3 +1,11 @@
+/**
+ * @file demo_completion_menu.c
+ * @brief Manual completion menu demo
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Interactive Completion Menu Demo
  *
@@ -21,9 +29,9 @@
 #include <termios.h>
 #include <unistd.h>
 
-// ============================================================================
-// Mock implementations to avoid linking with full lush
-// ============================================================================
+/// ============================================================================
+/// Mock implementations to avoid linking with full lush
+/// ============================================================================
 
 typedef struct builtin_s {
     const char *name;
@@ -31,31 +39,31 @@ typedef struct builtin_s {
     void *func;
 } builtin;
 
-// Mock builtin list
+/// Mock builtin list
 builtin builtins[] = {
-    {"cd", "Change directory", NULL},
-    {"echo", "Echo arguments", NULL},
-    {"pwd", "Print working directory", NULL},
-    {"exit", "Exit shell", NULL},
-    {"help", "Show help", NULL},
+    {  "cd",        "Change directory", NULL},
+    {"echo",          "Echo arguments", NULL},
+    { "pwd", "Print working directory", NULL},
+    {"exit",              "Exit shell", NULL},
+    {"help",               "Show help", NULL},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);
 
-// Mock alias lookup
+/// Mock alias lookup
 char *lookup_alias(const char *name) {
     (void)name;
     return NULL;
 }
 
-// Mock readline integration (need to include readline_integration.h for
-// typedef)
+/// Mock readline integration (need to include readline_integration.h for
+/// typedef)
 void lush_add_completion(lush_completions_t *lc, const char *completion) {
     (void)lc;
     (void)completion;
 }
 
-// Terminal mode management
+/// Terminal mode management
 static struct termios original_termios;
 
 static void disable_raw_mode(void) {
@@ -71,7 +79,7 @@ static void enable_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// Read a key with escape sequence handling
+/// Read a key with escape sequence handling
 static int read_key(void) {
     char c;
     if (read(STDIN_FILENO, &c, 1) != 1)
@@ -87,13 +95,13 @@ static int read_key(void) {
         if (seq[0] == '[') {
             switch (seq[1]) {
             case 'A':
-                return 1000; // Up
+                return 1000; /// Up
             case 'B':
-                return 1001; // Down
+                return 1001; /// Down
             case 'C':
-                return 1002; // Right
+                return 1002; /// Right
             case 'D':
-                return 1003; // Left
+                return 1003; /// Left
             }
         }
     }
@@ -101,45 +109,45 @@ static int read_key(void) {
     return c;
 }
 
-// Create sample completion result
+/// Create sample completion result
 static completion_result_t *create_sample_completions(void) {
     completion_result_t *result = completion_result_create(32);
 
-    // Add builtins
+    /// Add builtins
     completion_result_add(result, "cd", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "echo", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "pwd", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "exit", " ", COMPLETION_TYPE_BUILTIN, 900);
 
-    // Add aliases
+    /// Add aliases
     completion_result_add(result, "ll", " ", COMPLETION_TYPE_ALIAS, 950);
     completion_result_add(result, "la", " ", COMPLETION_TYPE_ALIAS, 950);
 
-    // Add commands
+    /// Add commands
     completion_result_add(result, "ls", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "grep", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "cat", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "vim", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "git", " ", COMPLETION_TYPE_COMMAND, 800);
 
-    // Add files
+    /// Add files
     completion_result_add(result, "file1.txt", " ", COMPLETION_TYPE_FILE, 600);
     completion_result_add(result, "file2.c", " ", COMPLETION_TYPE_FILE, 600);
     completion_result_add(result, "readme.md", " ", COMPLETION_TYPE_FILE, 600);
 
-    // Add directories
+    /// Add directories
     completion_result_add(result, "src/", "/", COMPLETION_TYPE_DIRECTORY, 700);
     completion_result_add(result, "include/", "/", COMPLETION_TYPE_DIRECTORY,
                           700);
     completion_result_add(result, "tests/", "/", COMPLETION_TYPE_DIRECTORY,
                           700);
 
-    // Add variables
+    /// Add variables
     completion_result_add(result, "$HOME", "", COMPLETION_TYPE_VARIABLE, 500);
     completion_result_add(result, "$PATH", "", COMPLETION_TYPE_VARIABLE, 500);
     completion_result_add(result, "$USER", "", COMPLETION_TYPE_VARIABLE, 500);
 
-    // Sort by type and relevance
+    /// Sort by type and relevance
     completion_result_sort(result);
 
     return result;
@@ -162,7 +170,7 @@ int main(void) {
     printf("\n");
     printf("Creating sample completions...\n");
 
-    // Create sample completion result
+    /// Create sample completion result
     completion_result_t *result = create_sample_completions();
     if (!result) {
         fprintf(stderr, "Failed to create completions\n");
@@ -176,7 +184,7 @@ int main(void) {
     printf("Created %zu completions in %zu categories\n", result->count,
            category_count);
 
-    // Create menu
+    /// Create menu
     completion_menu_t *menu = completion_menu_create(result, NULL);
     if (!menu) {
         fprintf(stderr, "Failed to create menu\n");
@@ -187,40 +195,40 @@ int main(void) {
     printf("\nPress any key to show menu...\n");
     getchar();
 
-    // Display menu
+    /// Display menu
     printf("\nCompletion Menu:\n");
     completion_menu_display(menu);
 
-    // Enable raw mode for key reading
+    /// Enable raw mode for key reading
     enable_raw_mode();
 
     printf("\nNavigate with arrow keys. Press Enter to select, Escape to "
            "exit.\n\n");
 
-    // Event loop
+    /// Event loop
     bool running = true;
     while (running) {
         int key = read_key();
         bool changed = false;
 
         switch (key) {
-        case 1000: // Up
+        case 1000: /// Up
             changed = completion_menu_navigate(menu, MENU_NAV_UP);
             break;
 
-        case 1001: // Down
+        case 1001: /// Down
             changed = completion_menu_navigate(menu, MENU_NAV_DOWN);
             break;
 
-        case 1002: // Right
+        case 1002: /// Right
             changed = completion_menu_navigate(menu, MENU_NAV_RIGHT);
             break;
 
-        case 1003: // Left
+        case 1003: /// Left
             changed = completion_menu_navigate(menu, MENU_NAV_LEFT);
             break;
 
-        case '\r': // Enter
+        case '\r': /// Enter
         case '\n': {
             const char *selected = completion_menu_get_selected_text(menu);
             disable_raw_mode();
@@ -229,8 +237,8 @@ int main(void) {
             running = false;
         } break;
 
-        case '\x1b': // Escape
-        case 3:      // Ctrl-C
+        case '\x1b': /// Escape
+        case 3:      /// Ctrl-C
             disable_raw_mode();
             completion_menu_clear(menu);
             printf("\nCancelled.\n");
@@ -238,13 +246,13 @@ int main(void) {
             break;
         }
 
-        // Refresh display if navigation changed
+        /// Refresh display if navigation changed
         if (changed && running) {
             completion_menu_refresh(menu);
         }
     }
 
-    // Cleanup
+    /// Cleanup
     completion_menu_free(menu);
     completion_result_free(result);
 

@@ -30,10 +30,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h> /* For pid_t, uid_t, gid_t */
+#include <sys/types.h> /// For pid_t, uid_t, gid_t
 #include <time.h>
 
-/* Forward declaration for event system integration */
+/// Forward declaration for event system integration
 struct lle_event_system;
 struct lle_event;
 
@@ -42,13 +42,13 @@ struct lle_event;
  * ============================================================================
  */
 
-/* Core types */
+/// Core types
 typedef struct lle_history_entry lle_history_entry_t;
 typedef struct lle_history_core lle_history_core_t;
 typedef struct lle_history_config lle_history_config_t;
 typedef struct lle_history_stats lle_history_stats_t;
 
-/* Advanced types (Phase 2+) */
+/// Advanced types (Phase 2+)
 typedef struct lle_history_search_engine lle_history_search_engine_t;
 typedef struct lle_history_dedup_engine lle_history_dedup_engine_t;
 /* Note: lle_history_system_t already defined in performance.h - no redefinition
@@ -59,11 +59,11 @@ typedef struct lle_history_dedup_engine lle_history_dedup_engine_t;
  * Full documentation in DEDUPLICATION API section below.
  */
 typedef enum lle_history_dedup_strategy {
-    LLE_DEDUP_IGNORE = 0,     /* Ignore all duplicates (reject new) */
-    LLE_DEDUP_KEEP_RECENT,    /* Keep most recent, discard older */
-    LLE_DEDUP_KEEP_FREQUENT,  /* Keep entry with highest usage count */
-    LLE_DEDUP_MERGE_METADATA, /* Merge forensic metadata, keep existing */
-    LLE_DEDUP_KEEP_ALL        /* No deduplication (keep all instances) */
+    LLE_DEDUP_IGNORE = 0,     ///< Ignore all duplicates (reject new)
+    LLE_DEDUP_KEEP_RECENT,    ///< Keep most recent, discard older
+    LLE_DEDUP_KEEP_FREQUENT,  ///< Keep entry with highest usage count
+    LLE_DEDUP_MERGE_METADATA, ///< Merge forensic metadata, keep existing
+    LLE_DEDUP_KEEP_ALL        /// No deduplication (keep all instances)
 } lle_history_dedup_strategy_t;
 
 /**
@@ -71,11 +71,11 @@ typedef enum lle_history_dedup_strategy {
  * Determines how far back in history to check for duplicates.
  */
 typedef enum lle_history_dedup_scope {
-    LLE_HISTORY_DEDUP_SCOPE_NONE = 0, /* No deduplication */
+    LLE_HISTORY_DEDUP_SCOPE_NONE = 0, ///< No deduplication
     LLE_HISTORY_DEDUP_SCOPE_SESSION,  /* Within current session (~1000 entries)
                                        */
-    LLE_HISTORY_DEDUP_SCOPE_RECENT,   /* Last N entries (default 100) */
-    LLE_HISTORY_DEDUP_SCOPE_GLOBAL    /* Entire history */
+    LLE_HISTORY_DEDUP_SCOPE_RECENT,   ///< Last N entries (default 100)
+    LLE_HISTORY_DEDUP_SCOPE_GLOBAL    /// Entire history
 } lle_history_dedup_scope_t;
 
 /* ============================================================================
@@ -83,22 +83,22 @@ typedef enum lle_history_dedup_scope {
  * ============================================================================
  */
 
-/* History size limits */
-#define LLE_HISTORY_DEFAULT_CAPACITY 10000 /* Default max entries */
-#define LLE_HISTORY_INITIAL_CAPACITY 1000  /* Initial allocation */
-#define LLE_HISTORY_MAX_CAPACITY 100000    /* Absolute maximum */
-#define LLE_HISTORY_MIN_CAPACITY 100       /* Minimum entries */
+/// History size limits
+#define LLE_HISTORY_DEFAULT_CAPACITY 10000 /// Default max entries
+#define LLE_HISTORY_INITIAL_CAPACITY 1000  /// Initial allocation
+#define LLE_HISTORY_MAX_CAPACITY 100000    /// Absolute maximum
+#define LLE_HISTORY_MIN_CAPACITY 100       /// Minimum entries
 
-/* Command size limits */
-#define LLE_HISTORY_MAX_COMMAND_LENGTH 32768 /* 32KB max command */
-#define LLE_HISTORY_MAX_PATH_LENGTH 4096     /* Max path length */
+/// Command size limits
+#define LLE_HISTORY_MAX_COMMAND_LENGTH 32768 /// 32KB max command
+#define LLE_HISTORY_MAX_PATH_LENGTH 4096     /// Max path length
 
-/* Performance targets */
-#define LLE_HISTORY_ADD_TARGET_US 100     /* 100μs target for add */
-#define LLE_HISTORY_RETRIEVE_TARGET_US 50 /* 50μs target for retrieve */
-#define LLE_HISTORY_SEARCH_TARGET_MS 10   /* 10ms target for search */
+/// Performance targets
+#define LLE_HISTORY_ADD_TARGET_US 100     /// 100μs target for add
+#define LLE_HISTORY_RETRIEVE_TARGET_US 50 /// 50μs target for retrieve
+#define LLE_HISTORY_SEARCH_TARGET_MS 10   /// 10ms target for search
 
-/* File format */
+/// File format
 #define LLE_HISTORY_FILE_MAGIC "LLE_HISTORY_V1"
 #define LLE_HISTORY_FILE_VERSION 1
 #define LLE_HISTORY_DEFAULT_FILE ".lush_history"
@@ -112,23 +112,23 @@ typedef enum lle_history_dedup_scope {
  * History entry state
  */
 typedef enum lle_history_entry_state {
-    LLE_HISTORY_STATE_ACTIVE = 0, /* Active entry */
-    LLE_HISTORY_STATE_DELETED,    /* Soft deleted (for undo) */
-    LLE_HISTORY_STATE_ARCHIVED,   /* Archived (moved to old storage) */
-    LLE_HISTORY_STATE_CORRUPTED   /* Corrupted entry */
+    LLE_HISTORY_STATE_ACTIVE = 0, ///< Active entry
+    LLE_HISTORY_STATE_DELETED,    ///< Soft deleted (for undo)
+    LLE_HISTORY_STATE_ARCHIVED,   ///< Archived (moved to old storage)
+    LLE_HISTORY_STATE_CORRUPTED   /// Corrupted entry
 } lle_history_entry_state_t;
 
 /**
  * History operation type (for performance monitoring)
  */
 typedef enum lle_history_operation {
-    LLE_HISTORY_OP_ADD = 0,  /* Add entry */
-    LLE_HISTORY_OP_RETRIEVE, /* Retrieve entry */
-    LLE_HISTORY_OP_SEARCH,   /* Search entries */
-    LLE_HISTORY_OP_SAVE,     /* Save to disk */
-    LLE_HISTORY_OP_LOAD,     /* Load from disk */
-    LLE_HISTORY_OP_DELETE,   /* Delete entry */
-    LLE_HISTORY_OP_COUNT     /* Number of operation types */
+    LLE_HISTORY_OP_ADD = 0,  ///< Add entry
+    LLE_HISTORY_OP_RETRIEVE, ///< Retrieve entry
+    LLE_HISTORY_OP_SEARCH,   ///< Search entries
+    LLE_HISTORY_OP_SAVE,     ///< Save to disk
+    LLE_HISTORY_OP_LOAD,     ///< Load from disk
+    LLE_HISTORY_OP_DELETE,   ///< Delete entry
+    LLE_HISTORY_OP_COUNT     /// Number of operation types
 } lle_history_operation_t;
 
 /* ============================================================================
@@ -143,130 +143,130 @@ typedef enum lle_history_operation {
  * Phase 4: Advanced fields (forensics, multiline, etc.)
  */
 struct lle_history_entry {
-    /* Core entry data - Phase 1 */
-    uint64_t entry_id;     /* Unique entry identifier */
-    char *command;         /* Command text */
-    size_t command_length; /* Command length in bytes */
-    uint64_t timestamp;    /* Unix timestamp (seconds) */
-    int exit_code;         /* Command exit status */
+    /// Core entry data - Phase 1
+    uint64_t entry_id;     ///< Unique entry identifier
+    char *command;         ///< Command text
+    size_t command_length; ///< Command length in bytes
+    uint64_t timestamp;    ///< Unix timestamp (seconds)
+    int exit_code;         ///< Command exit status
 
-    /* Basic metadata - Phase 1 */
-    char *working_directory;         /* Working directory when executed */
-    lle_history_entry_state_t state; /* Entry state */
+    /// Basic metadata - Phase 1
+    char *working_directory;         ///< Working directory when executed
+    lle_history_entry_state_t state; ///< Entry state
 
-    /* Phase 4: Advanced features (initialized to NULL/0 in Phase 1) */
-    char *original_multiline; /* Original multiline format (Phase 4) */
-    bool is_multiline;        /* Multiline flag (Phase 4) */
-    uint32_t duration_ms;     /* Execution duration (Phase 4) */
-    uint32_t edit_count;      /* Edit count (Phase 4) */
+    /// Phase 4: Advanced features (initialized to NULL/0 in Phase 1)
+    char *original_multiline; ///< Original multiline format (Phase 4)
+    bool is_multiline;        ///< Multiline flag (Phase 4)
+    uint32_t duration_ms;     ///< Execution duration (Phase 4)
+    uint32_t edit_count;      ///< Edit count (Phase 4)
 
-    /* Phase 4 Day 11: Forensic metadata */
-    pid_t process_id;          /* Process ID when executed */
-    pid_t session_id;          /* Session ID for command */
-    uid_t user_id;             /* User ID when executed */
-    gid_t group_id;            /* Group ID when executed */
-    char *terminal_name;       /* Terminal name (e.g., "/dev/pts/0") */
-    uint64_t start_time_ns;    /* High-precision start time (nanoseconds) */
-    uint64_t end_time_ns;      /* High-precision end time (nanoseconds) */
-    uint32_t usage_count;      /* Number of times this command was used */
-    uint64_t last_access_time; /* Last time this entry was accessed */
+    /// Phase 4 Day 11: Forensic metadata
+    pid_t process_id;          ///< Process ID when executed
+    pid_t session_id;          ///< Session ID for command
+    uid_t user_id;             ///< User ID when executed
+    gid_t group_id;            ///< Group ID when executed
+    char *terminal_name;       ///< Terminal name (e.g., "/dev/pts/0")
+    uint64_t start_time_ns;    ///< High-precision start time (nanoseconds)
+    uint64_t end_time_ns;      ///< High-precision end time (nanoseconds)
+    uint32_t usage_count;      ///< Number of times this command was used
+    uint64_t last_access_time; ///< Last time this entry was accessed
 
-    /* Internal management */
-    struct lle_history_entry *next; /* Linked list next */
-    struct lle_history_entry *prev; /* Linked list prev */
+    /// Internal management
+    struct lle_history_entry *next; ///< Linked list next
+    struct lle_history_entry *prev; ///< Linked list prev
 };
 
 /**
  * History statistics
  */
 struct lle_history_stats {
-    /* Entry counts */
-    size_t total_entries;   /* Total entries added */
-    size_t active_entries;  /* Active entries */
-    size_t deleted_entries; /* Deleted entries */
+    /// Entry counts
+    size_t total_entries;   ///< Total entries added
+    size_t active_entries;  ///< Active entries
+    size_t deleted_entries; ///< Deleted entries
 
-    /* Operation counts */
-    uint64_t add_count;      /* Number of adds */
-    uint64_t retrieve_count; /* Number of retrieves */
-    uint64_t search_count;   /* Number of searches */
-    uint64_t save_count;     /* Number of saves */
-    uint64_t load_count;     /* Number of loads */
+    /// Operation counts
+    uint64_t add_count;      ///< Number of adds
+    uint64_t retrieve_count; ///< Number of retrieves
+    uint64_t search_count;   ///< Number of searches
+    uint64_t save_count;     ///< Number of saves
+    uint64_t load_count;     ///< Number of loads
 
-    /* Performance metrics (microseconds) */
-    uint64_t total_add_time_us;      /* Total add time */
-    uint64_t total_retrieve_time_us; /* Total retrieve time */
-    uint64_t total_search_time_us;   /* Total search time */
+    /// Performance metrics (microseconds)
+    uint64_t total_add_time_us;      ///< Total add time
+    uint64_t total_retrieve_time_us; ///< Total retrieve time
+    uint64_t total_search_time_us;   ///< Total search time
 
-    /* Memory usage */
-    size_t memory_used_bytes; /* Memory currently used */
-    size_t peak_memory_bytes; /* Peak memory usage */
+    /// Memory usage
+    size_t memory_used_bytes; ///< Memory currently used
+    size_t peak_memory_bytes; ///< Peak memory usage
 
-    /* File statistics */
-    size_t file_size_bytes; /* History file size */
-    time_t last_save_time;  /* Last save timestamp */
-    time_t last_load_time;  /* Last load timestamp */
+    /// File statistics
+    size_t file_size_bytes; ///< History file size
+    time_t last_save_time;  ///< Last save timestamp
+    time_t last_load_time;  ///< Last load timestamp
 };
 
 /**
  * History configuration
  */
 struct lle_history_config {
-    /* Capacity settings */
-    size_t max_entries;        /* Maximum entries to keep */
-    size_t max_command_length; /* Maximum command length */
+    /// Capacity settings
+    size_t max_entries;        ///< Maximum entries to keep
+    size_t max_command_length; ///< Maximum command length
 
-    /* File settings */
-    char *history_file_path; /* Path to history file */
-    bool auto_save;          /* Auto-save on add */
-    bool load_on_init;       /* Load file on initialization */
+    /// File settings
+    char *history_file_path; ///< Path to history file
+    bool auto_save;          ///< Auto-save on add
+    bool load_on_init;       ///< Load file on initialization
 
-    /* Behavior settings */
-    bool ignore_duplicates;                      /* Ignore duplicate commands */
-    lle_history_dedup_strategy_t dedup_strategy; /* Deduplication strategy */
-    lle_history_dedup_scope_t dedup_scope;       /* Deduplication scope */
-    bool unicode_normalize;   /* Use Unicode NFC normalization for dedup */
-    bool ignore_space_prefix; /* Ignore commands starting with space */
-    bool save_timestamps;     /* Save timestamp metadata */
-    bool save_working_dir;    /* Save working directory */
-    bool save_exit_codes;     /* Save exit codes */
+    /// Behavior settings
+    bool ignore_duplicates;                      ///< Ignore duplicate commands
+    lle_history_dedup_strategy_t dedup_strategy; ///< Deduplication strategy
+    lle_history_dedup_scope_t dedup_scope;       ///< Deduplication scope
+    bool unicode_normalize;   ///< Use Unicode NFC normalization for dedup
+    bool ignore_space_prefix; ///< Ignore commands starting with space
+    bool save_timestamps;     ///< Save timestamp metadata
+    bool save_working_dir;    ///< Save working directory
+    bool save_exit_codes;     ///< Save exit codes
 
-    /* Performance settings */
-    size_t initial_capacity; /* Initial array capacity */
-    bool use_indexing;       /* Use hashtable indexing */
+    /// Performance settings
+    size_t initial_capacity; ///< Initial array capacity
+    bool use_indexing;       ///< Use hashtable indexing
 };
 
 /**
  * History core engine - central management
  */
 struct lle_history_core {
-    /* Entry storage - Phase 1 */
-    lle_history_entry_t **entries; /* Dynamic array of entry pointers */
-    size_t entry_count;            /* Current number of entries */
-    size_t entry_capacity;         /* Current array capacity */
-    uint64_t next_entry_id;        /* Next unique ID to assign */
+    /// Entry storage - Phase 1
+    lle_history_entry_t **entries; ///< Dynamic array of entry pointers
+    size_t entry_count;            ///< Current number of entries
+    size_t entry_capacity;         ///< Current array capacity
+    uint64_t next_entry_id;        ///< Next unique ID to assign
 
-    /* Linked list pointers (for efficient iteration) */
-    lle_history_entry_t *first_entry; /* First entry in list */
-    lle_history_entry_t *last_entry;  /* Last entry in list */
+    /// Linked list pointers (for efficient iteration)
+    lle_history_entry_t *first_entry; ///< First entry in list
+    lle_history_entry_t *last_entry;  ///< Last entry in list
 
-    /* Indexing - Phase 2 */
-    lle_hashtable_t *entry_lookup; /* ID -> entry hashtable (Phase 2) */
+    /// Indexing - Phase 2
+    lle_hashtable_t *entry_lookup; ///< ID -> entry hashtable (Phase 2)
 
-    /* Advanced engines - Phase 4 */
+    /// Advanced engines - Phase 4
     lle_history_dedup_engine_t
-        *dedup_engine; /* Deduplication engine (Phase 4 Day 12) */
+        *dedup_engine; ///< Deduplication engine (Phase 4 Day 12)
 
-    /* Configuration and statistics */
-    lle_history_config_t *config; /* Configuration */
-    lle_history_stats_t stats;    /* Statistics */
+    /// Configuration and statistics
+    lle_history_config_t *config; ///< Configuration
+    lle_history_stats_t stats;    ///< Statistics
 
-    /* Resource management */
-    lle_memory_pool_t *memory_pool;          /* Memory pool */
-    lle_performance_monitor_t *perf_monitor; /* Performance monitor */
+    /// Resource management
+    lle_memory_pool_t *memory_pool;          ///< Memory pool
+    lle_performance_monitor_t *perf_monitor; ///< Performance monitor
 
-    /* Thread safety */
-    pthread_rwlock_t lock; /* Read-write lock */
-    bool initialized;      /* Initialization flag */
+    /// Thread safety
+    pthread_rwlock_t lock; ///< Read-write lock
+    bool initialized;      ///< Initialization flag
 };
 
 /* ============================================================================
@@ -493,7 +493,7 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
  * ============================================================================
  */
 
-/* Forward declarations */
+/// Forward declarations
 typedef struct posix_history_manager posix_history_manager_t;
 
 /**
@@ -699,7 +699,7 @@ lle_result_t lle_history_bridge_print_diagnostics(void);
  * ============================================================================
  */
 
-/* Event handler function type (matches event_system.h) */
+/// Event handler function type (matches event_system.h)
 typedef lle_result_t (*lle_event_handler_fn)(struct lle_event *event,
                                              void *user_data);
 
@@ -907,23 +907,23 @@ lle_result_t lle_history_get_cwd(char *buffer, size_t size);
  * Search result types
  */
 typedef enum {
-    LLE_SEARCH_TYPE_EXACT,     /* Exact command match */
-    LLE_SEARCH_TYPE_PREFIX,    /* Command starts with query */
-    LLE_SEARCH_TYPE_SUBSTRING, /* Command contains query */
-    LLE_SEARCH_TYPE_FUZZY      /* Approximate match (Levenshtein) */
+    LLE_SEARCH_TYPE_EXACT,     ///< Exact command match
+    LLE_SEARCH_TYPE_PREFIX,    ///< Command starts with query
+    LLE_SEARCH_TYPE_SUBSTRING, ///< Command contains query
+    LLE_SEARCH_TYPE_FUZZY      /// Approximate match (Levenshtein)
 } lle_search_type_t;
 
 /**
  * Single search result
  */
 typedef struct {
-    uint64_t entry_id;            /* History entry ID */
-    size_t entry_index;           /* Index in history */
-    const char *command;          /* Command string (reference) */
-    uint64_t timestamp;           /* Command timestamp */
-    int score;                    /* Relevance score (higher = better) */
-    size_t match_position;        /* Position of match in command */
-    lle_search_type_t match_type; /* Type of match */
+    uint64_t entry_id;            ///< History entry ID
+    size_t entry_index;           ///< Index in history
+    const char *command;          ///< Command string (reference)
+    uint64_t timestamp;           ///< Command timestamp
+    int score;                    ///< Relevance score (higher = better)
+    size_t match_position;        ///< Position of match in command
+    lle_search_type_t match_type; ///< Type of match
 } lle_search_result_t;
 
 /**
@@ -1057,10 +1057,10 @@ lle_history_search_fuzzy(lle_history_core_t *history_core, const char *query,
  * Interactive search state
  */
 typedef enum {
-    LLE_SEARCH_STATE_INACTIVE,   /* No active search */
-    LLE_SEARCH_STATE_ACTIVE,     /* Search active, have results */
-    LLE_SEARCH_STATE_NO_RESULTS, /* Search active, no matches found */
-    LLE_SEARCH_STATE_FAILED      /* Search failed (error condition) */
+    LLE_SEARCH_STATE_INACTIVE,   ///< No active search
+    LLE_SEARCH_STATE_ACTIVE,     ///< Search active, have results
+    LLE_SEARCH_STATE_NO_RESULTS, ///< Search active, no matches found
+    LLE_SEARCH_STATE_FAILED      /// Search failed (error condition)
 } lle_interactive_search_state_t;
 
 /**
@@ -1293,13 +1293,13 @@ bool lle_history_expansion_get_verify(void);
  * Forensic context structure for capturing execution metadata
  */
 typedef struct lle_forensic_context {
-    pid_t process_id;        /* Current process ID */
-    pid_t session_id;        /* Current session ID */
-    uid_t user_id;           /* Current user ID */
-    gid_t group_id;          /* Current group ID */
-    char *terminal_name;     /* Terminal device name */
-    char *working_directory; /* Current working directory */
-    uint64_t timestamp_ns;   /* High-precision timestamp (nanoseconds) */
+    pid_t process_id;        ///< Current process ID
+    pid_t session_id;        ///< Current session ID
+    uid_t user_id;           ///< Current user ID
+    gid_t group_id;          ///< Current group ID
+    char *terminal_name;     ///< Terminal device name
+    char *working_directory; ///< Current working directory
+    uint64_t timestamp_ns;   ///< High-precision timestamp (nanoseconds)
 } lle_forensic_context_t;
 
 /**
@@ -1403,10 +1403,10 @@ void lle_forensic_free_context(lle_forensic_context_t *context);
  * Deduplication statistics
  */
 typedef struct lle_history_dedup_stats {
-    uint64_t duplicates_detected; /* Total duplicates found */
-    uint64_t duplicates_merged;   /* Total duplicates merged */
-    uint64_t duplicates_ignored;  /* Total duplicates rejected */
-    lle_history_dedup_strategy_t current_strategy; /* Active strategy */
+    uint64_t duplicates_detected; ///< Total duplicates found
+    uint64_t duplicates_merged;   ///< Total duplicates merged
+    uint64_t duplicates_ignored;  ///< Total duplicates rejected
+    lle_history_dedup_strategy_t current_strategy; ///< Active strategy
 } lle_history_dedup_stats_t;
 
 /**
@@ -1575,33 +1575,33 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
  * Multiline formatting options
  */
 typedef enum lle_history_multiline_format {
-    LLE_MULTILINE_FORMAT_ORIGINAL = 0, /* Preserve original formatting */
-    LLE_MULTILINE_FORMAT_FLATTENED,    /* Flatten to single line */
-    LLE_MULTILINE_FORMAT_COMPACT       /* Compact format (minimal whitespace) */
+    LLE_MULTILINE_FORMAT_ORIGINAL = 0, ///< Preserve original formatting
+    LLE_MULTILINE_FORMAT_FLATTENED,    ///< Flatten to single line
+    LLE_MULTILINE_FORMAT_COMPACT       /// Compact format (minimal whitespace)
 } lle_history_multiline_format_t;
 
 /**
  * Multiline command information structure
  */
 typedef struct lle_history_multiline_info {
-    bool is_multiline;          /* True if command is multiline */
-    size_t line_count;          /* Number of lines */
-    size_t total_length;        /* Total character count */
-    bool has_unclosed_quotes;   /* Has unclosed quotes (error state) */
-    bool has_unclosed_brackets; /* Has unclosed brackets (error state) */
-    bool is_function_def;       /* Is a function definition */
-    bool is_control_structure;  /* Contains control structures (if/while/for) */
-    bool is_here_doc;           /* Contains here document */
+    bool is_multiline;          ///< True if command is multiline
+    size_t line_count;          ///< Number of lines
+    size_t total_length;        ///< Total character count
+    bool has_unclosed_quotes;   ///< Has unclosed quotes (error state)
+    bool has_unclosed_brackets; ///< Has unclosed brackets (error state)
+    bool is_function_def;       ///< Is a function definition
+    bool is_control_structure;  ///< Contains control structures (if/while/for)
+    bool is_here_doc;           ///< Contains here document
 } lle_history_multiline_info_t;
 
 /**
  * Individual line information for multiline commands
  */
 typedef struct lle_history_multiline_line {
-    const char *line_text; /* Pointer to line start (not null-terminated) */
-    size_t line_length;    /* Length of this line */
-    size_t line_number;    /* Line number (1-based) */
-    size_t indentation;    /* Leading whitespace count */
+    const char *line_text; ///< Pointer to line start (not null-terminated)
+    size_t line_length;    ///< Length of this line
+    size_t line_number;    ///< Line number (1-based)
+    size_t indentation;    ///< Leading whitespace count
 } lle_history_multiline_line_t;
 
 /**
@@ -1784,4 +1784,4 @@ lle_history_get_original_multiline(const lle_history_entry_t *entry);
  */
 size_t lle_history_get_multiline_line_count(const lle_history_entry_t *entry);
 
-#endif /* LLE_HISTORY_H */
+#endif /// LLE_HISTORY_H

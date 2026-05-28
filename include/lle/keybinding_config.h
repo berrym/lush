@@ -58,13 +58,13 @@ extern "C" {
  * function pointers (e.g., lle_forward_char).
  */
 typedef struct lle_action_registry_entry {
-    const char *name;       /**< GNU Readline action name */
-    lle_action_type_t type; /**< Action type (SIMPLE or CONTEXT) */
+    const char *name;       ///< GNU Readline action name
+    lle_action_type_t type; ///< Action type (SIMPLE or CONTEXT)
     union {
-        lle_action_simple_t simple;   /**< Simple action function */
-        lle_action_context_t context; /**< Context-aware action function */
+        lle_action_simple_t simple;   ///< Simple action function
+        lle_action_context_t context; ///< Context-aware action function
     } func;
-    const char *description; /**< Human-readable description */
+    const char *description; ///< Human-readable description
 } lle_action_registry_entry_t;
 
 /* ============================================================================
@@ -76,14 +76,14 @@ typedef struct lle_action_registry_entry {
  * @brief Result of loading user keybindings
  */
 typedef struct lle_keybinding_load_result {
-    lle_result_t status;                           /**< Overall status */
-    char filepath[LLE_KEYBINDING_CONFIG_PATH_MAX]; /**< File that was loaded */
-    size_t bindings_applied;    /**< Number of bindings successfully applied */
-    size_t bindings_overridden; /**< Number of defaults overridden */
-    size_t errors_count; /**< Number of errors (invalid entries skipped) */
-    char error_msg[256]; /**< Error message if failed */
-    size_t error_line;   /**< Error line number */
-    size_t error_column; /**< Error column number */
+    lle_result_t status;                           ///< Overall status
+    char filepath[LLE_KEYBINDING_CONFIG_PATH_MAX]; ///< File that was loaded
+    size_t bindings_applied;    ///< Number of bindings successfully applied
+    size_t bindings_overridden; ///< Number of defaults overridden
+    size_t errors_count;        ///< Number of errors (invalid entries skipped)
+    char error_msg[256];        ///< Error message if failed
+    size_t error_line;          ///< Error line number
+    size_t error_column;        ///< Error column number
 } lle_keybinding_load_result_t;
 
 /* ============================================================================
@@ -217,4 +217,4 @@ lle_keybinding_reload_user_config(lle_keybinding_manager_t *manager,
 }
 #endif
 
-#endif /* LLE_KEYBINDING_CONFIG_H */
+#endif /// LLE_KEYBINDING_CONFIG_H

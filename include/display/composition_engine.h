@@ -49,174 +49,176 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define COMPOSITION_ENGINE_VERSION_MAJOR 1
 #define COMPOSITION_ENGINE_VERSION_MINOR 0
 #define COMPOSITION_ENGINE_VERSION_PATCH 0
 
-// Composition content limits
+/// Composition content limits
 #define COMPOSITION_ENGINE_MAX_OUTPUT_SIZE                                     \
-    65536 /* Increased for complex prompts */
+    65536 /// Increased for complex prompts
 #define COMPOSITION_ENGINE_MAX_LINES 64
 #define COMPOSITION_ENGINE_MAX_LINE_WIDTH 1024
 
-// Performance targets
+/// Performance targets
 #define COMPOSITION_ENGINE_TARGET_COMPOSE_TIME_MS 5
 #define COMPOSITION_ENGINE_CACHE_EXPIRY_MS 50
 
-// Cache configuration
+/// Cache configuration
 #define COMPOSITION_ENGINE_CACHE_SIZE 32
 #define COMPOSITION_ENGINE_METRICS_HISTORY_SIZE 32
 
-// Composition algorithm configuration
+/// Composition algorithm configuration
 #define COMPOSITION_ENGINE_MAX_PROMPT_LINES 32
 #define COMPOSITION_ENGINE_MAX_COMMAND_LINES 8
 #define COMPOSITION_ENGINE_ANALYSIS_BUFFER_SIZE 2048
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for composition engine operations
  */
 typedef enum {
-    COMPOSITION_ENGINE_SUCCESS = 0,         // Operation completed successfully
-    COMPOSITION_ENGINE_ERROR_INVALID_PARAM, // Invalid parameter provided
-    COMPOSITION_ENGINE_ERROR_NULL_POINTER,  // NULL pointer passed
-    COMPOSITION_ENGINE_ERROR_MEMORY_ALLOCATION, // Memory allocation failed
-    COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL,  // Output buffer insufficient
-    COMPOSITION_ENGINE_ERROR_CONTENT_TOO_LARGE, // Content exceeds limits
-    COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY, // Layer not ready for composition
-    COMPOSITION_ENGINE_ERROR_ANALYSIS_FAILED, // Prompt structure analysis
-                                              // failed
-    COMPOSITION_ENGINE_ERROR_COMPOSITION_FAILED, // Composition algorithm failed
-    COMPOSITION_ENGINE_ERROR_CACHE_INVALID,      // Cache state is invalid
-    COMPOSITION_ENGINE_ERROR_EVENT_FAILED,       // Event handling failed
-    COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED     // Engine not initialized
+    COMPOSITION_ENGINE_SUCCESS = 0,         /// Operation completed successfully
+    COMPOSITION_ENGINE_ERROR_INVALID_PARAM, /// Invalid parameter provided
+    COMPOSITION_ENGINE_ERROR_NULL_POINTER,  /// NULL pointer passed
+    COMPOSITION_ENGINE_ERROR_MEMORY_ALLOCATION,  /// Memory allocation failed
+    COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL,   /// Output buffer insufficient
+    COMPOSITION_ENGINE_ERROR_CONTENT_TOO_LARGE,  /// Content exceeds limits
+    COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY,    /// Layer not ready for
+                                                 /// composition
+    COMPOSITION_ENGINE_ERROR_ANALYSIS_FAILED,    /// Prompt structure analysis
+                                                 /// failed
+    COMPOSITION_ENGINE_ERROR_COMPOSITION_FAILED, /// Composition algorithm
+                                                 /// failed
+    COMPOSITION_ENGINE_ERROR_CACHE_INVALID,      /// Cache state is invalid
+    COMPOSITION_ENGINE_ERROR_EVENT_FAILED,       /// Event handling failed
+    COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED     /// Engine not initialized
 } composition_engine_error_t;
 
 /**
  * Composition strategy for different prompt types
  */
 typedef enum {
-    COMPOSITION_STRATEGY_SIMPLE = 0, // Simple single-line prompts
-    COMPOSITION_STRATEGY_MULTILINE,  // Multi-line prompts
-    COMPOSITION_STRATEGY_COMPLEX,    // Complex structured prompts
-    COMPOSITION_STRATEGY_ASCII_ART,  // ASCII art prompts
-    COMPOSITION_STRATEGY_ADAPTIVE,   // Adaptive strategy selection
-    COMPOSITION_STRATEGY_COUNT       // Number of strategies
+    COMPOSITION_STRATEGY_SIMPLE = 0, /// Simple single-line prompts
+    COMPOSITION_STRATEGY_MULTILINE,  /// Multi-line prompts
+    COMPOSITION_STRATEGY_COMPLEX,    /// Complex structured prompts
+    COMPOSITION_STRATEGY_ASCII_ART,  /// ASCII art prompts
+    COMPOSITION_STRATEGY_ADAPTIVE,   /// Adaptive strategy selection
+    COMPOSITION_STRATEGY_COUNT       /// Number of strategies
 } composition_strategy_t;
 
 /**
  * Prompt structure analysis results
  */
 typedef struct {
-    size_t line_count;       // Number of prompt lines
-    size_t max_line_width;   // Maximum line width
-    size_t last_line_length; // Length of last line
-    size_t cursor_column;    // Cursor column position
-    size_t cursor_line;      // Cursor line position
-    bool has_trailing_space; // Prompt ends with space
-    bool is_multiline;       // Multi-line prompt
-    bool has_ansi_sequences; // Contains ANSI codes
-    bool is_ascii_art;       // ASCII art style prompt
+    size_t line_count;       /// Number of prompt lines
+    size_t max_line_width;   /// Maximum line width
+    size_t last_line_length; /// Length of last line
+    size_t cursor_column;    /// Cursor column position
+    size_t cursor_line;      /// Cursor line position
+    bool has_trailing_space; /// Prompt ends with space
+    bool is_multiline;       /// Multi-line prompt
+    bool has_ansi_sequences; /// Contains ANSI codes
+    bool is_ascii_art;       /// ASCII art style prompt
     composition_strategy_t
-        recommended_strategy;    // Recommended composition strategy
-    char last_line_content[512]; // Content of last line
+        recommended_strategy;    /// Recommended composition strategy
+    char last_line_content[512]; /// Content of last line
 } composition_analysis_t;
 
 /**
  * Composition positioning information
  */
 typedef struct {
-    size_t prompt_start_line;      // Prompt starting line
-    size_t prompt_end_line;        // Prompt ending line
-    size_t command_start_line;     // Command starting line
-    size_t command_start_column;   // Command starting column
-    size_t total_lines;            // Total composition lines
-    size_t total_width;            // Total composition width
-    bool command_on_same_line;     // Command on same line as prompt
-    bool needs_cursor_positioning; // Requires cursor repositioning
+    size_t prompt_start_line;      /// Prompt starting line
+    size_t prompt_end_line;        /// Prompt ending line
+    size_t command_start_line;     /// Command starting line
+    size_t command_start_column;   /// Command starting column
+    size_t total_lines;            /// Total composition lines
+    size_t total_width;            /// Total composition width
+    bool command_on_same_line;     /// Command on same line as prompt
+    bool needs_cursor_positioning; /// Requires cursor repositioning
 } composition_positioning_t;
 
 /**
  * Composition performance metrics
  */
 typedef struct {
-    uint64_t composition_count;       // Number of compositions performed
-    uint64_t cache_hits;              // Cache hit count
-    uint64_t cache_misses;            // Cache miss count
-    uint64_t avg_composition_time_ns; // Average composition time
-    uint64_t max_composition_time_ns; // Maximum composition time
-    uint64_t min_composition_time_ns; // Minimum composition time
-    uint64_t analysis_time_ns;        // Time spent on analysis
-    uint64_t combination_time_ns;     // Time spent on combination
-    double cache_hit_rate;            // Cache hit rate percentage
+    uint64_t composition_count;       /// Number of compositions performed
+    uint64_t cache_hits;              /// Cache hit count
+    uint64_t cache_misses;            /// Cache miss count
+    uint64_t avg_composition_time_ns; /// Average composition time
+    uint64_t max_composition_time_ns; /// Maximum composition time
+    uint64_t min_composition_time_ns; /// Minimum composition time
+    uint64_t analysis_time_ns;        /// Time spent on analysis
+    uint64_t combination_time_ns;     /// Time spent on combination
+    double cache_hit_rate;            /// Cache hit rate percentage
 } composition_performance_t;
 
 /**
  * Composition cache entry
  */
 typedef struct {
-    char prompt_hash[32];                         // Prompt content hash
-    char command_hash[32];                        // Command content hash
-    char *cached_output;                          // Cached composition output
-    composition_analysis_t cached_analysis;       // Cached analysis
-    composition_positioning_t cached_positioning; // Cached positioning
-    struct timeval timestamp;                     // Cache entry timestamp
-    bool valid;                                   // Cache entry validity
+    char prompt_hash[32];                         /// Prompt content hash
+    char command_hash[32];                        /// Command content hash
+    char *cached_output;                          /// Cached composition output
+    composition_analysis_t cached_analysis;       /// Cached analysis
+    composition_positioning_t cached_positioning; /// Cached positioning
+    struct timeval timestamp;                     /// Cache entry timestamp
+    bool valid;                                   /// Cache entry validity
 } composition_cache_entry_t;
 
 /**
  * Composition engine main structure
  */
 typedef struct {
-    // Layer references
-    prompt_layer_t *prompt_layer;       // Prompt layer instance
-    command_layer_t *command_layer;     // Command layer instance
-    layer_event_system_t *event_system; // Event system instance
-    screen_buffer_t *screen_buffer;     // Screen buffer for rendering
+    /// Layer references
+    prompt_layer_t *prompt_layer;       /// Prompt layer instance
+    command_layer_t *command_layer;     /// Command layer instance
+    layer_event_system_t *event_system; /// Event system instance
+    screen_buffer_t *screen_buffer;     /// Screen buffer for rendering
 
-    // Continuation prompts handled via screen_buffer line prefixes
-    // in display_controller.c using screen_buffer_render_with_continuation()
-    bool continuation_prompts_enabled; // Enable continuation prompts
+    /// Continuation prompts handled via screen_buffer line prefixes
+    /// in display_controller.c using screen_buffer_render_with_continuation()
+    bool continuation_prompts_enabled; /// Enable continuation prompts
 
-    // Current composition state
-    char *composed_output;                         // Current composed output
-    size_t composed_output_size;                   // Size of composed output
-    composition_analysis_t current_analysis;       // Current prompt analysis
-    composition_positioning_t current_positioning; // Current positioning
-    composition_strategy_t current_strategy; // Current composition strategy
+    /// Current composition state
+    char *composed_output;                         /// Current composed output
+    size_t composed_output_size;                   /// Size of composed output
+    composition_analysis_t current_analysis;       /// Current prompt analysis
+    composition_positioning_t current_positioning; /// Current positioning
+    composition_strategy_t current_strategy; /// Current composition strategy
 
-    // Performance and caching
+    /// Performance and caching
     composition_cache_entry_t
-        cache[COMPOSITION_ENGINE_CACHE_SIZE]; // Composition cache
-    composition_performance_t performance;    // Performance metrics
-    bool composition_cache_valid;             // Cache validity flag
-    struct timeval last_composition_time;     // Last composition timestamp
+        cache[COMPOSITION_ENGINE_CACHE_SIZE]; /// Composition cache
+    composition_performance_t performance;    /// Performance metrics
+    bool composition_cache_valid;             /// Cache validity flag
+    struct timeval last_composition_time;     /// Last composition timestamp
 
-    // Configuration
-    bool intelligent_positioning; // Enable intelligent positioning
-    bool adaptive_strategy;       // Enable adaptive strategy selection
-    bool performance_monitoring;  // Enable performance monitoring
-    size_t max_cache_age_ms;      // Maximum cache age in milliseconds
+    /// Configuration
+    bool intelligent_positioning; /// Enable intelligent positioning
+    bool adaptive_strategy;       /// Enable adaptive strategy selection
+    bool performance_monitoring;  /// Enable performance monitoring
+    size_t max_cache_age_ms;      /// Maximum cache age in milliseconds
 
-    // Event handling
-    bool event_subscription_active; // Event subscription status
-    uint32_t event_subscriber_id;   // Event subscriber ID
+    /// Event handling
+    bool event_subscription_active; /// Event subscription status
+    uint32_t event_subscriber_id;   /// Event subscriber ID
 
-    // Internal state
-    bool initialized;        // Initialization status
-    char version_string[32]; // Version information
+    /// Internal state
+    bool initialized;        /// Initialization status
+    char version_string[32]; /// Version information
 } composition_engine_t;
 
-// ============================================================================
-// CORE API FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CORE API FUNCTIONS
+/// ============================================================================
 
 /**
  * Create a new composition engine instance.
@@ -338,9 +340,9 @@ composition_engine_cleanup(composition_engine_t *engine);
  */
 void composition_engine_destroy(composition_engine_t *engine);
 
-// ============================================================================
-// CONFIGURATION AND CONTROL FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND CONTROL FUNCTIONS
+/// ============================================================================
 
 /**
  * Set composition strategy.
@@ -410,9 +412,9 @@ composition_engine_set_cache_max_age(composition_engine_t *engine,
 composition_engine_error_t
 composition_engine_clear_cache(composition_engine_t *engine);
 
-// ============================================================================
-// CONTINUATION PROMPT SUPPORT (Phase 4)
-// ============================================================================
+/// ============================================================================
+/// CONTINUATION PROMPT SUPPORT (Phase 4)
+/// ============================================================================
 
 /**
  * Set screen buffer.
@@ -428,9 +430,9 @@ composition_engine_error_t
 composition_engine_set_screen_buffer(composition_engine_t *engine,
                                      screen_buffer_t *buffer);
 
-// ============================================================================
-// ANALYSIS AND DEBUGGING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// ANALYSIS AND DEBUGGING FUNCTIONS
+/// ============================================================================
 
 /**
  * Analyze prompt structure.
@@ -503,9 +505,9 @@ composition_engine_get_version(const composition_engine_t *engine,
  */
 bool composition_engine_is_initialized(const composition_engine_t *engine);
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * Convert error code to string.
@@ -543,9 +545,9 @@ composition_engine_error_t
 composition_engine_calculate_hash(const composition_engine_t *engine,
                                   char *hash_buffer, size_t buffer_size);
 
-// ============================================================================
-// EVENT HANDLING FUNCTIONS (Internal)
-// ============================================================================
+/// ============================================================================
+/// EVENT HANDLING FUNCTIONS (Internal)
+/// ============================================================================
 
 /**
  * Handle layer content changed event.
@@ -589,9 +591,9 @@ layer_events_error_t
 composition_engine_handle_terminal_resize(const layer_event_t *event,
                                           void *user_data);
 
-// ============================================================================
-// CURSOR TRACKING API (For LLE Terminal Control Wrapping)
-// ============================================================================
+/// ============================================================================
+/// CURSOR TRACKING API (For LLE Terminal Control Wrapping)
+/// ============================================================================
 
 /**
  * Composition result with cursor position tracking.
@@ -602,12 +604,12 @@ composition_engine_handle_terminal_resize(const layer_event_t *event,
  * positioning that handles line wrapping, UTF-8, ANSI codes, and tabs.
  */
 typedef struct {
-    char
-        composed_output[COMPOSITION_ENGINE_MAX_OUTPUT_SIZE]; // Composed content
-    size_t cursor_screen_row;    // Cursor row (0-based)
-    size_t cursor_screen_column; // Cursor column (0-based)
-    bool cursor_found;           // Cursor position was calculated
-    size_t terminal_width;       // Terminal width used for wrapping
+    char composed_output[COMPOSITION_ENGINE_MAX_OUTPUT_SIZE]; /// Composed
+                                                              /// content
+    size_t cursor_screen_row;    /// Cursor row (0-based)
+    size_t cursor_screen_column; /// Cursor column (0-based)
+    bool cursor_found;           /// Cursor position was calculated
+    size_t terminal_width;       /// Terminal width used for wrapping
 } composition_with_cursor_t;
 
 /**
@@ -654,4 +656,4 @@ composition_engine_error_t composition_engine_compose_with_cursor(
 }
 #endif
 
-#endif // COMPOSITION_ENGINE_H
+#endif /// COMPOSITION_ENGINE_H

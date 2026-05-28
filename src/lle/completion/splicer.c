@@ -68,13 +68,13 @@ static bool needs_escape_in_none(unsigned char b, size_t out_pos) {
 }
 
 static bool needs_escape_in_double(unsigned char b) {
-    /* Inside "..." only $ ` \ " keep their special meaning. */
+    /// Inside "..." only $ ` \ " keep their special meaning.
     return b == '$' || b == '`' || b == '\\' || b == '"';
 }
 
 static bool needs_escape_in_backtick(unsigned char b) {
-    /* Same as double-quote rules minus " (which has no special
-     * meaning inside `...`). */
+    /// Same as double-quote rules minus " (which has no special
+    /// meaning inside `...`).
     return b == '$' || b == '`' || b == '\\';
 }
 
@@ -92,8 +92,8 @@ typedef struct {
 static lle_result_t rb_grow(render_buf_t *rb, size_t need,
                             lle_memory_pool_t *pool) {
     (void)pool;
-    /* Required capacity = current length + bytes to add + 1 NUL.
-     * Detect overflow before computing the sum. */
+    /// Required capacity = current length + bytes to add + 1 NUL.
+    /// Detect overflow before computing the sum.
     if (need > SIZE_MAX - 1 - rb->len)
         return LLE_ERROR_OUT_OF_MEMORY;
     size_t required = rb->len + need + 1;
@@ -137,7 +137,7 @@ static lle_result_t rb_puts(render_buf_t *rb, const char *s, size_t n,
 
 static lle_result_t rb_finish(render_buf_t *rb, lle_memory_pool_t *pool,
                               char **out, size_t *out_len) {
-    /* NUL-terminate. rb_grow always reserves +1 for the terminator. */
+    /// NUL-terminate. rb_grow always reserves +1 for the terminator.
     lle_result_t r = rb_grow(rb, 1, pool);
     if (r != LLE_SUCCESS)
         return r;
@@ -210,9 +210,9 @@ static lle_result_t render_backtick(const char *text, size_t text_length,
 static lle_result_t render_single(const char *text, size_t text_length,
                                   lle_memory_pool_t *pool, char **out,
                                   size_t *out_length) {
-    /* Inside '...' nothing escapes. A single quote in the candidate
-     * is rendered by closing the open quote, emitting \', and
-     * re-opening: '...'\''...'. */
+    /// Inside '...' nothing escapes. A single quote in the candidate
+    /// is rendered by closing the open quote, emitting \', and
+    /// re-opening: '...'\''...'.
     render_buf_t rb = {0};
     for (size_t i = 0; i < text_length; i++) {
         char c = text[i];
@@ -244,10 +244,10 @@ lle_result_t lle_splicer_render_for_context(
     switch (quote_state) {
     case LLE_QUOTE_NONE:
     case LLE_QUOTE_ESCAPE_PENDING:
-        /* ESCAPE_PENDING currently shares NONE rendering. The
-         * user's pending backslash will absorb the first emitted
-         * byte, producing a literal-escape interaction the
-         * engine can treat as a documented edge case. */
+        /// ESCAPE_PENDING currently shares NONE rendering. The
+        /// user's pending backslash will absorb the first emitted
+        /// byte, producing a literal-escape interaction the
+        /// engine can treat as a documented edge case.
         return render_none(text, text_length, pool, out_rendered, out_length);
     case LLE_QUOTE_DOUBLE:
         return render_double(text, text_length, pool, out_rendered, out_length);
@@ -289,8 +289,8 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Render the candidate's literal text into the cursor's
-     * quote/escape context. */
+    /// Render the candidate's literal text into the cursor's
+    /// quote/escape context.
     char *rendered = NULL;
     size_t rendered_len = 0;
     lle_result_t r = lle_splicer_render_for_context(
@@ -299,7 +299,7 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
     if (r != LLE_SUCCESS)
         return r;
 
-    /* Build the final insert string: rendered + optional suffix. */
+    /// Build the final insert string: rendered + optional suffix.
     render_buf_t rb = {0};
     r = rb_puts(&rb, rendered, rendered_len, pool);
     if (r != LLE_SUCCESS)
@@ -329,8 +329,8 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
     if (r != LLE_SUCCESS)
         return r;
 
-    /* Splice replaces [filename_portion_start, word_end) with
-     * insert_text. The cursor sits at the end of the inserted bytes. */
+    /// Splice replaces [filename_portion_start, word_end) with
+    /// insert_text. The cursor sits at the end of the inserted bytes.
     out->delete_start = context->filename_portion_start;
     out->delete_length = context->word_end - context->filename_portion_start;
     out->insert_text = insert_text;
@@ -360,17 +360,17 @@ static lle_result_t apply_phase(lle_buffer_t *buffer,
     if (r != LLE_SUCCESS)
         return r;
 
-    /* Atomic delete + insert via the buffer's combined replace
-     * operation. */
+    /// Atomic delete + insert via the buffer's combined replace
+    /// operation.
     r = lle_buffer_replace_text(buffer, splice.delete_start,
                                 splice.delete_length, splice.insert_text,
                                 splice.insert_length);
     if (r != LLE_SUCCESS)
         return r;
 
-    /* Move the cursor manager and sync the buffer's cached cursor
-     * field, matching the invariant maintained by other buffer-
-     * mutation paths in the keybinding actions. */
+    /// Move the cursor manager and sync the buffer's cached cursor
+    /// field, matching the invariant maintained by other buffer-
+    /// mutation paths in the keybinding actions.
     r = lle_cursor_manager_move_to_byte_offset(cursor_mgr, splice.cursor_after);
     if (r != LLE_SUCCESS)
         return r;

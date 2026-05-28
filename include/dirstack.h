@@ -102,4 +102,4 @@ void dirstack_print(bool one_per_line, bool show_index);
  */
 void dirstack_sync_variable(void);
 
-#endif /* DIRSTACK_H */
+#endif /// DIRSTACK_H

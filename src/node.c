@@ -128,25 +128,25 @@ void free_node_tree(node_t *node) {
         return;
     }
 
-    // Free siblings of this node first (iteratively to avoid deep recursion)
+    /// Free siblings of this node first (iteratively to avoid deep recursion)
     node_t *sibling = node->next_sibling;
     while (sibling) {
         node_t *next_sib = sibling->next_sibling;
-        sibling->next_sibling = NULL; // Prevent double-free
+        sibling->next_sibling = NULL; /// Prevent double-free
         free_node_tree(sibling);
         sibling = next_sib;
     }
 
-    // Free all children
+    /// Free all children
     node_t *child = node->first_child;
     while (child) {
         node_t *next_child = child->next_sibling;
-        child->next_sibling = NULL; // Prevent double-free from sibling loop
+        child->next_sibling = NULL; /// Prevent double-free from sibling loop
         free_node_tree(child);
         child = next_child;
     }
 
-    // Free string value if present
+    /// Free string value if present
     if (node->val_type == VAL_STR && node->val.str) {
         free(node->val.str);
     }

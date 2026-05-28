@@ -22,14 +22,14 @@
 #include <string.h>
 
 /* ========================================================================== */
-/*                         MOCK OBJECTS                                       */
+/// MOCK OBJECTS
 /* ========================================================================== */
 
-/* Mock memory pool - uses liblle.a implementations via linking */
+/// Mock memory pool - uses liblle.a implementations via linking
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Helper to create a mock buffer */
+/// Helper to create a mock buffer
 static lle_buffer_t *create_mock_buffer(const char *content) {
     lle_buffer_t *buffer = (lle_buffer_t *)malloc(sizeof(lle_buffer_t));
     memset(buffer, 0, sizeof(lle_buffer_t));
@@ -53,7 +53,7 @@ static void destroy_mock_buffer(lle_buffer_t *buffer) {
 }
 
 /* ========================================================================== */
-/*                    PIPELINE INITIALIZATION TESTS                           */
+/// PIPELINE INITIALIZATION TESTS
 /* ========================================================================== */
 
 TEST(pipeline_init_success) {
@@ -86,7 +86,7 @@ TEST(pipeline_init_null_pool) {
 TEST(pipeline_reinit_after_cleanup) {
     lle_render_pipeline_t *pipeline = NULL;
 
-    /* Init, cleanup, then init again */
+    /// Init, cleanup, then init again
     lle_render_pipeline_init(&pipeline, mock_pool);
     lle_render_pipeline_cleanup(pipeline);
 
@@ -100,7 +100,7 @@ TEST(pipeline_reinit_after_cleanup) {
 }
 
 /* ========================================================================== */
-/*                    PIPELINE CLEANUP TESTS                                  */
+/// PIPELINE CLEANUP TESTS
 /* ========================================================================== */
 
 TEST(pipeline_cleanup_null) {
@@ -120,7 +120,7 @@ TEST(pipeline_cleanup_success) {
 }
 
 /* ========================================================================== */
-/*                    PIPELINE EXECUTION TESTS                                */
+/// PIPELINE EXECUTION TESTS
 /* ========================================================================== */
 
 TEST(pipeline_execute_null_pipeline) {
@@ -230,7 +230,7 @@ TEST(pipeline_execute_multiline_content) {
 }
 
 /* ========================================================================== */
-/*                    PIPELINE BEHAVIOR TESTS                                 */
+/// PIPELINE BEHAVIOR TESTS
 /* ========================================================================== */
 
 TEST(pipeline_multiple_executions) {
@@ -241,7 +241,7 @@ TEST(pipeline_multiple_executions) {
     lle_render_context_t context = {0};
     context.buffer = buffer;
 
-    /* Execute pipeline multiple times */
+    /// Execute pipeline multiple times
     for (int i = 0; i < 3; i++) {
         lle_render_output_t *output = NULL;
         lle_result_t result =
@@ -286,7 +286,7 @@ TEST(pipeline_different_content_sizes) {
 }
 
 /* ========================================================================== */
-/*                    PIPELINE STAGE VERIFICATION TESTS                       */
+/// PIPELINE STAGE VERIFICATION TESTS
 /* ========================================================================== */
 
 TEST(pipeline_handles_special_characters) {
@@ -328,7 +328,7 @@ TEST(pipeline_handles_unicode) {
 }
 
 /* ========================================================================== */
-/*                         TEST RUNNER                                        */
+/// TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {

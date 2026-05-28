@@ -40,7 +40,7 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-/* Test framework macros */
+/// Test framework macros
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -121,7 +121,7 @@ static int test_error_string_unknown(void) {
     const char *msg =
         terminal_control_error_string((terminal_control_error_t)9999);
     ASSERT_NOT_NULL(msg);
-    /* Should return some string for unknown errors */
+    /// Should return some string for unknown errors
     return 1;
 }
 
@@ -231,7 +231,7 @@ static int test_color_from_basic_bright_white(void) {
 }
 
 static int test_color_from_basic_max_value(void) {
-    /* Basic colors are 0-15 */
+    /// Basic colors are 0-15
     terminal_color_t color = terminal_control_color_from_basic(15);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, 15);
@@ -244,9 +244,9 @@ static int test_color_from_basic_max_value(void) {
 
 static int test_create_null_base_terminal(void) {
     terminal_control_t *tc = terminal_control_create(NULL);
-    /* Should handle NULL gracefully - either return NULL or create with NULL
-     * base */
-    /* Implementation may vary */
+    /// Should handle NULL gracefully - either return NULL or create with NULL
+    /// base
+    /// Implementation may vary
     if (tc) {
         terminal_control_destroy(tc);
     }
@@ -254,7 +254,7 @@ static int test_create_null_base_terminal(void) {
 }
 
 static int test_destroy_null_safe(void) {
-    /* Should not crash */
+    /// Should not crash
     terminal_control_destroy(NULL);
     return 1;
 }
@@ -292,7 +292,7 @@ static int test_detect_capabilities_null_control(void) {
 
 static int test_get_capabilities_null_control(void) {
     terminal_capabilities_t caps = terminal_control_get_capabilities(NULL);
-    /* Should return empty/zeroed capabilities */
+    /// Should return empty/zeroed capabilities
     ASSERT_EQ(caps.terminal_width, 0);
     ASSERT_EQ(caps.terminal_height, 0);
     return 1;
@@ -329,7 +329,7 @@ static int test_move_cursor_relative_null_control(void) {
 
 static int test_get_cursor_position_null_control(void) {
     terminal_position_t pos = terminal_control_get_cursor_position(NULL);
-    /* Should return invalid position (-1, -1) */
+    /// Should return invalid position (-1, -1)
     ASSERT_EQ(pos.row, -1);
     ASSERT_EQ(pos.column, -1);
     return 1;
@@ -437,8 +437,7 @@ static int test_generate_cursor_sequence_null_control(void) {
 }
 
 static int test_generate_cursor_sequence_null_buffer(void) {
-    /* Can't test without a valid control, but test that NULL buffer is handled
-     */
+    /// Can't test without a valid control, but test that NULL buffer is handled
     ssize_t result =
         terminal_control_generate_cursor_sequence(NULL, 1, 1, NULL, 64);
     ASSERT(result < 0);
@@ -477,8 +476,8 @@ static int test_validate_color_null_control(void) {
 
 static int test_color_from_rgb_null_control(void) {
     terminal_color_t color = terminal_control_color_from_rgb(NULL, 128, 0, 128);
-    /* Should still return a color, but may default to basic type */
-    /* The function should handle NULL gracefully */
+    /// Should still return a color, but may default to basic type
+    /// The function should handle NULL gracefully
     (void)color;
     return 1;
 }
@@ -535,7 +534,7 @@ static int test_get_version_not_null(void) {
 }
 
 static int test_get_version_null_params(void) {
-    /* Should not crash with NULL params */
+    /// Should not crash with NULL params
     terminal_control_get_version(NULL, NULL, NULL);
     return 1;
 }
@@ -561,7 +560,7 @@ static int test_get_version_partial_null_params(void) {
  * ============================================================ */
 
 static int test_capability_flags_distinct(void) {
-    /* Verify capability flags are distinct bit flags */
+    /// Verify capability flags are distinct bit flags
     ASSERT(TERMINAL_CAP_NONE == 0);
     ASSERT(TERMINAL_CAP_COLOR_8 != TERMINAL_CAP_COLOR_16);
     ASSERT(TERMINAL_CAP_COLOR_16 != TERMINAL_CAP_COLOR_256);
@@ -573,7 +572,7 @@ static int test_capability_flags_distinct(void) {
 }
 
 static int test_capability_flags_are_powers_of_two(void) {
-    /* Each capability should be a power of 2 for bitwise operations */
+    /// Each capability should be a power of 2 for bitwise operations
     terminal_capability_flags_t caps[] = {TERMINAL_CAP_COLOR_8,
                                           TERMINAL_CAP_COLOR_16,
                                           TERMINAL_CAP_COLOR_256,
@@ -592,7 +591,7 @@ static int test_capability_flags_are_powers_of_two(void) {
                                           TERMINAL_CAP_WINDOW_TITLE};
 
     for (size_t i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
-        /* A power of 2 has exactly one bit set */
+        /// A power of 2 has exactly one bit set
         terminal_capability_flags_t cap = caps[i];
         ASSERT((cap & (cap - 1)) == 0);
     }
@@ -613,7 +612,7 @@ static int test_style_flags_distinct(void) {
 }
 
 static int test_style_flags_combinable(void) {
-    /* Style flags should be combinable */
+    /// Style flags should be combinable
     terminal_style_flags_t combined =
         TERMINAL_STYLE_BOLD | TERMINAL_STYLE_UNDERLINE;
 
@@ -682,13 +681,13 @@ static int test_version_constants_positive(void) {
 static int test_max_sequence_length_reasonable(void) {
     ASSERT(TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH > 0);
     ASSERT(TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH >=
-           32); /* At least 32 for safety */
+           32); /// At least 32 for safety
     return 1;
 }
 
 static int test_max_terminal_name_length_reasonable(void) {
     ASSERT(TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH > 0);
-    ASSERT(TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH >= 16); /* At least 16 */
+    ASSERT(TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH >= 16); /// At least 16
     return 1;
 }
 
@@ -726,13 +725,13 @@ static int test_error_codes_distinct(void) {
  * ============================================================ */
 
 static int test_terminal_color_struct_size(void) {
-    /* Verify struct isn't unexpectedly large */
+    /// Verify struct isn't unexpectedly large
     ASSERT(sizeof(terminal_color_t) <= 16);
     return 1;
 }
 
 static int test_terminal_position_struct_size(void) {
-    /* Position struct should be compact */
+    /// Position struct should be compact
     ASSERT(sizeof(terminal_position_t) <= 16);
     return 1;
 }
@@ -740,7 +739,7 @@ static int test_terminal_position_struct_size(void) {
 static int test_terminal_capabilities_has_required_fields(void) {
     terminal_capabilities_t caps = {0};
 
-    /* Verify fields exist and are accessible */
+    /// Verify fields exist and are accessible
     caps.terminal_width = 80;
     caps.terminal_height = 24;
     caps.flags = TERMINAL_CAP_COLOR_8;

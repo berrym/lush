@@ -32,11 +32,10 @@
  * Custom source entry - wraps user source with internal state
  */
 typedef struct custom_source_entry {
-    lle_custom_completion_source_t
-        source;             /* Copy of user's source definition */
-    char *name_copy;        /* Owned copy of name string */
-    char *description_copy; /* Owned copy of description */
-    bool registered;        /* Currently registered in manager */
+    lle_custom_completion_source_t source; ///< Copy of user's source definition
+    char *name_copy;                       ///< Owned copy of name string
+    char *description_copy;                ///< Owned copy of description
+    bool registered;                       ///< Currently registered in manager
 } custom_source_entry_t;
 
 /**
@@ -45,9 +44,9 @@ typedef struct custom_source_entry {
 static struct {
     custom_source_entry_t entries[MAX_CUSTOM_SOURCES];
     size_t count;
-    lle_source_manager_t *source_manager; /* Active source manager */
-    lle_memory_pool_t *pool;              /* Memory pool for allocations */
-    pthread_mutex_t mutex;                /* Thread safety */
+    lle_source_manager_t *source_manager; ///< Active source manager
+    lle_memory_pool_t *pool;              ///< Memory pool for allocations
+    pthread_mutex_t mutex;                ///< Thread safety
     bool initialized;
 } g_custom_registry = {.count = 0,
                        .source_manager = NULL,
@@ -96,7 +95,7 @@ static lle_result_t custom_generate_wrapper(lle_memory_pool_t *pool,
                                             const lle_word_context_t *context,
                                             lle_completion_result_t *result) {
 
-    (void)pool; /* Pool is available in result->pool if needed */
+    (void)pool; /// Pool is available in result->pool if needed
 
     pthread_mutex_lock(&g_custom_registry.mutex);
 
@@ -133,7 +132,7 @@ static lle_result_t custom_generate_wrapper(lle_memory_pool_t *pool,
  */
 static bool custom_applicable_wrapper(const lle_word_context_t *context) {
     (void)context;
-    return true; /* Always query custom sources; they filter internally */
+    return true; /// Always query custom sources; they filter internally
 }
 
 /* ============================================================================
@@ -150,7 +149,7 @@ lle_result_t lle_custom_source_init(lle_source_manager_t *manager,
     pthread_mutex_lock(&g_custom_registry.mutex);
 
     if (g_custom_registry.initialized) {
-        /* Already initialized - update manager reference */
+        /// Already initialized - update manager reference
         g_custom_registry.source_manager = (lle_source_manager_t *)manager;
         g_custom_registry.pool = (lle_memory_pool_t *)pool;
         pthread_mutex_unlock(&g_custom_registry.mutex);
@@ -162,10 +161,8 @@ lle_result_t lle_custom_source_init(lle_source_manager_t *manager,
     g_custom_registry.count = 0;
     g_custom_registry.initialized = true;
 
-    /*
-     * Register a single "custom" meta-source in the manager.
-     * This source dispatches to all registered custom sources.
-     */
+    /// Register a single "custom" meta-source in the manager.
+    /// This source dispatches to all registered custom sources.
     lle_result_t res = lle_source_manager_register(
         manager, LLE_SOURCE_CUSTOM, "custom", custom_generate_wrapper,
         custom_applicable_wrapper);
@@ -177,7 +174,7 @@ lle_result_t lle_custom_source_init(lle_source_manager_t *manager,
 void lle_custom_source_shutdown(void) {
     pthread_mutex_lock(&g_custom_registry.mutex);
 
-    /* Call cleanup callbacks for all registered sources */
+    /// Call cleanup callbacks for all registered sources
     for (size_t i = 0; i < g_custom_registry.count; i++) {
         custom_source_entry_t *entry = &g_custom_registry.entries[i];
         if (entry->registered) {
@@ -217,23 +214,23 @@ lle_completion_register_source(const lle_custom_completion_source_t *source) {
         return LLE_ERROR_NOT_INITIALIZED;
     }
 
-    /* Check for duplicate name */
+    /// Check for duplicate name
     if (find_entry_by_name(source->name)) {
         pthread_mutex_unlock(&g_custom_registry.mutex);
         return LLE_ERROR_ALREADY_EXISTS;
     }
 
-    /* Check capacity */
+    /// Check capacity
     if (g_custom_registry.count >= MAX_CUSTOM_SOURCES) {
         pthread_mutex_unlock(&g_custom_registry.mutex);
         return LLE_ERROR_BUFFER_OVERFLOW;
     }
 
-    /* Create entry */
+    /// Create entry
     custom_source_entry_t *entry =
         &g_custom_registry.entries[g_custom_registry.count];
 
-    /* Copy strings */
+    /// Copy strings
     entry->name_copy = strdup(source->name);
     if (!entry->name_copy) {
         pthread_mutex_unlock(&g_custom_registry.mutex);
@@ -251,7 +248,7 @@ lle_completion_register_source(const lle_custom_completion_source_t *source) {
         entry->description_copy = NULL;
     }
 
-    /* Copy source definition */
+    /// Copy source definition
     entry->source = *source;
     entry->source.name = entry->name_copy;
     entry->source.description = entry->description_copy;
@@ -277,16 +274,16 @@ lle_result_t lle_completion_unregister_source(const char *name) {
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Call cleanup if provided */
+    /// Call cleanup if provided
     if (entry->source.cleanup) {
         entry->source.cleanup(entry->source.user_data);
     }
 
-    /* Free strings */
+    /// Free strings
     free(entry->name_copy);
     free(entry->description_copy);
 
-    /* Mark as unregistered */
+    /// Mark as unregistered
     entry->registered = false;
 
     pthread_mutex_unlock(&g_custom_registry.mutex);
@@ -445,14 +442,14 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check capacity */
+    /// Check capacity
     if (result->count >= result->capacity) {
         return LLE_ERROR_BUFFER_OVERFLOW;
     }
 
     lle_completion_item_t *item = &result->items[result->count];
 
-    /* Copy text - use pool if available */
+    /// Copy text - use pool if available
     if (result->memory_pool) {
         char *text_copy = lle_pool_alloc(strlen(text) + 1);
         if (!text_copy) {
@@ -460,7 +457,7 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
         }
         strcpy(text_copy, text);
         item->text = text_copy;
-        item->owns_text = false; /* Pool-allocated, not individually owned */
+        item->owns_text = false; /// Pool-allocated, not individually owned
 
         if (suffix) {
             char *suffix_copy = lle_pool_alloc(strlen(suffix) + 1);
@@ -468,7 +465,7 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
                 strcpy(suffix_copy, suffix);
                 item->suffix = suffix_copy;
             } else {
-                item->suffix = strdup(" "); /* Fallback */
+                item->suffix = strdup(" "); /// Fallback
                 item->owns_suffix = true;
             }
         } else {
@@ -490,7 +487,7 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
         }
         item->owns_description = false;
     } else {
-        /* No pool - duplicate strings (caller can free theirs) */
+        /// No pool - duplicate strings (caller can free theirs)
         item->text = strdup(text);
         item->owns_text = true;
         item->suffix = strdup(suffix ? suffix : " ");
@@ -501,7 +498,7 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
 
     item->type = LLE_COMPLETION_TYPE_CUSTOM;
     item->relevance_score = score > 0 ? score : 500;
-    item->type_indicator = NULL; /* Will be set by type system */
+    item->type_indicator = NULL; /// Will be set by type system
 
     result->count++;
     result->custom_count++;
@@ -518,14 +515,14 @@ lle_result_t lle_completion_add_typed_item(lle_completion_result_t *result,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check capacity */
+    /// Check capacity
     if (result->count >= result->capacity) {
         return LLE_ERROR_BUFFER_OVERFLOW;
     }
 
     lle_completion_item_t *item = &result->items[result->count];
 
-    /* Copy text - use pool if available */
+    /// Copy text - use pool if available
     if (result->memory_pool) {
         char *text_copy = lle_pool_alloc(strlen(text) + 1);
         if (!text_copy) {
@@ -563,7 +560,7 @@ lle_result_t lle_completion_add_typed_item(lle_completion_result_t *result,
         }
         item->owns_description = false;
     } else {
-        /* No pool - duplicate strings */
+        /// No pool - duplicate strings
         item->text = strdup(text);
         item->owns_text = true;
         item->suffix = strdup(suffix ? suffix : " ");
@@ -578,7 +575,7 @@ lle_result_t lle_completion_add_typed_item(lle_completion_result_t *result,
 
     result->count++;
 
-    /* Update type-specific count */
+    /// Update type-specific count
     if (type == LLE_COMPLETION_TYPE_CUSTOM) {
         result->custom_count++;
     }

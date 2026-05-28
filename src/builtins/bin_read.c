@@ -70,7 +70,7 @@ static char *read_line_from_fd(int fd) {
 }
 
 int bin_read(int argc, char **argv) {
-    // Option flags
+    /// Option flags
     char *prompt = NULL;
     bool raw_mode = false;
     int timeout_secs = -1;
@@ -79,12 +79,12 @@ int bin_read(int argc, char **argv) {
 
     int opt_index = 1;
 
-    // Parse options
+    /// Parse options
     while (opt_index < argc && argv[opt_index][0] == '-') {
         char *arg = argv[opt_index];
 
         if (strcmp(arg, "-p") == 0) {
-            // -p prompt: Display prompt before reading
+            /// -p prompt: Display prompt before reading
             if (opt_index + 1 >= argc) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_MISSING_ARGUMENT,
@@ -94,10 +94,10 @@ int bin_read(int argc, char **argv) {
             }
             prompt = argv[++opt_index];
         } else if (strcmp(arg, "-r") == 0) {
-            // -r: Raw mode (don't interpret backslashes)
+            /// -r: Raw mode (don't interpret backslashes)
             raw_mode = true;
         } else if (strcmp(arg, "-t") == 0) {
-            // -t timeout: Timeout after specified seconds
+            /// -t timeout: Timeout after specified seconds
             if (opt_index + 1 >= argc) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_MISSING_ARGUMENT,
@@ -113,7 +113,7 @@ int bin_read(int argc, char **argv) {
                 return 1;
             }
         } else if (strcmp(arg, "-n") == 0) {
-            // -n nchars: Read only specified number of characters
+            /// -n nchars: Read only specified number of characters
             if (opt_index + 1 >= argc) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_MISSING_ARGUMENT,
@@ -129,10 +129,10 @@ int bin_read(int argc, char **argv) {
                 return 1;
             }
         } else if (strcmp(arg, "-s") == 0) {
-            // -s: Silent mode (don't echo input)
+            /// -s: Silent mode (don't echo input)
             silent_mode = true;
         } else if (strcmp(arg, "--") == 0) {
-            // End of options
+            /// End of options
             opt_index++;
             break;
         } else {
@@ -144,7 +144,7 @@ int bin_read(int argc, char **argv) {
         opt_index++;
     }
 
-    // Must have at least one variable name
+    /// Must have at least one variable name
     if (opt_index >= argc) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
@@ -181,12 +181,12 @@ int bin_read(int argc, char **argv) {
         return 1;
     }
 
-    /* POSIX read accepts one or more variable names. With N names,
-     * the input line is split on IFS into the first N-1 fields
-     * (whitespace coalesced for default IFS) and the remainder
-     * (including any internal IFS chars) is assigned to the Nth
-     * variable. If fewer than N words are present, trailing
-     * variables get the empty string. Issue #101. */
+    /// POSIX read accepts one or more variable names. With N names,
+    /// the input line is split on IFS into the first N-1 fields
+    /// (whitespace coalesced for default IFS) and the remainder
+    /// (including any internal IFS chars) is assigned to the Nth
+    /// variable. If fewer than N words are present, trailing
+    /// variables get the empty string. Issue #101.
     int n_varnames = argc - opt_index;
     if (n_varnames <= 0) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -212,7 +212,7 @@ int bin_read(int argc, char **argv) {
         }
     }
 
-    // Display prompt if specified
+    /// Display prompt if specified
     if (prompt) {
         printf("%s", prompt);
         fflush(stdout);
@@ -223,7 +223,7 @@ int bin_read(int argc, char **argv) {
     int fd = fileno(stdin);
     bool is_tty = isatty(fd);
 
-    // Save original terminal settings if we need to modify them
+    /// Save original terminal settings if we need to modify them
     struct termios orig_termios, new_termios;
     bool termios_modified = false;
 
@@ -232,12 +232,12 @@ int bin_read(int argc, char **argv) {
             new_termios = orig_termios;
 
             if (silent_mode) {
-                // Disable echo
+                /// Disable echo
                 new_termios.c_lflag &= ~ECHO;
             }
 
             if (nchars > 0) {
-                // Non-canonical mode for character-by-character reading
+                /// Non-canonical mode for character-by-character reading
                 new_termios.c_lflag &= ~ICANON;
                 new_termios.c_cc[VMIN] = 1;
                 new_termios.c_cc[VTIME] = 0;
@@ -249,7 +249,7 @@ int bin_read(int argc, char **argv) {
         }
     }
 
-    // Handle timeout with select()
+    /// Handle timeout with select()
     if (timeout_secs >= 0) {
         fd_set readfds;
         struct timeval tv;
@@ -262,18 +262,18 @@ int bin_read(int argc, char **argv) {
         int select_result = select(fd + 1, &readfds, NULL, NULL, &tv);
 
         if (select_result <= 0) {
-            // Timeout (0) or error (-1)
+            /// Timeout (0) or error (-1)
             if (termios_modified) {
                 tcsetattr(fd, TCSANOW, &orig_termios);
             }
             symtable_set_global(varname, "");
-            return (select_result == 0) ? 142 : 1; // 142 = timeout exit code
+            return (select_result == 0) ? 142 : 1; /// 142 = timeout exit code
         }
     }
 
-    // Read input based on options
+    /// Read input based on options
     if (nchars > 0) {
-        // Read exactly nchars characters
+        /// Read exactly nchars characters
         line = malloc(nchars + 1);
         if (!line) {
             if (termios_modified) {
@@ -284,7 +284,7 @@ int bin_read(int argc, char **argv) {
 
         int chars_read = 0;
         while (chars_read < nchars) {
-            // Check timeout for each character if specified
+            /// Check timeout for each character if specified
             if (timeout_secs >= 0) {
                 fd_set readfds;
                 struct timeval tv;
@@ -304,7 +304,7 @@ int bin_read(int argc, char **argv) {
 
             ssize_t n = read(fd, &line[chars_read], 1);
             if (n <= 0) {
-                // EOF or error
+                /// EOF or error
                 if (chars_read == 0) {
                     free(line);
                     line = NULL;
@@ -315,7 +315,7 @@ int bin_read(int argc, char **argv) {
                 break;
             }
 
-            // Stop at newline even in nchars mode
+            /// Stop at newline even in nchars mode
             if (line[chars_read] == '\n') {
                 line[chars_read] = '\0';
                 break;
@@ -328,41 +328,41 @@ int bin_read(int argc, char **argv) {
             line[nchars] = '\0';
         }
 
-        // Print newline if silent mode (since echo was disabled)
+        /// Print newline if silent mode (since echo was disabled)
         if (silent_mode && is_tty) {
             printf("\n");
         }
     } else {
-        // Normal line reading via raw read() syscall — see
-        // read_line_from_fd above for why stdio is unsafe here.
+        /// Normal line reading via raw read() syscall — see
+        /// read_line_from_fd above for why stdio is unsafe here.
         line = read_line_from_fd(fd);
 
-        // Print newline if silent mode (since echo was disabled)
+        /// Print newline if silent mode (since echo was disabled)
         if (silent_mode && is_tty && line) {
             printf("\n");
         }
     }
 
-    // Restore terminal settings
+    /// Restore terminal settings
     if (termios_modified) {
         tcsetattr(fd, TCSANOW, &orig_termios);
     }
 
     if (!line) {
-        // EOF or input error
+        /// EOF or input error
         symtable_set_global(varname, "");
         return result ? result : 1;
     }
 
-    // Process backslashes unless in raw mode
+    /// Process backslashes unless in raw mode
     if (!raw_mode && line) {
         char *processed = malloc(strlen(line) + 1);
         if (processed) {
             int j = 0;
             for (int i = 0; line[i]; i++) {
                 if (line[i] == '\\' && line[i + 1]) {
-                    // Process escape sequences
-                    i++; // Skip the backslash
+                    /// Process escape sequences
+                    i++; /// Skip the backslash
                     switch (line[i]) {
                     case 'n':
                         processed[j++] = '\n';
@@ -391,27 +391,27 @@ int bin_read(int argc, char **argv) {
         }
     }
 
-    /* Assign the line to one or more variables. Single-name fast
-     * path matches POSIX read's default behavior (entire line ->
-     * the one variable). For N>1 names, split on IFS into N-1
-     * leading fields and assign the remainder (preserving internal
-     * IFS chars) to the last variable. */
+    /// Assign the line to one or more variables. Single-name fast
+    /// path matches POSIX read's default behavior (entire line ->
+    /// the one variable). For N>1 names, split on IFS into N-1
+    /// leading fields and assign the remainder (preserving internal
+    /// IFS chars) to the last variable.
     if (n_varnames == 1) {
         symtable_set_global(varname, line ? line : "");
     } else {
         const char *src = line ? line : "";
-        /* POSIX IFS default is space, tab, newline. Honor a user-set
-         * IFS if present in the symbol table. Read IFS as the SET
-         * of delimiter chars; consecutive whitespace IFS chars are
-         * collapsed by POSIX field-splitting semantics, but
-         * non-whitespace IFS chars produce empty fields. For the
-         * canonical read-line case (default IFS), the whitespace-
-         * coalescing behavior is what real scripts depend on. */
+        /// POSIX IFS default is space, tab, newline. Honor a user-set
+        /// IFS if present in the symbol table. Read IFS as the SET
+        /// of delimiter chars; consecutive whitespace IFS chars are
+        /// collapsed by POSIX field-splitting semantics, but
+        /// non-whitespace IFS chars produce empty fields. For the
+        /// canonical read-line case (default IFS), the whitespace-
+        /// coalescing behavior is what real scripts depend on.
         char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
         const char *ifs = ifs_val ? ifs_val : " \t\n";
 
         for (int i = 0; i < n_varnames - 1; i++) {
-            /* Skip leading IFS whitespace before each field. */
+            /// Skip leading IFS whitespace before each field.
             while (*src && strchr(ifs, *src)) {
                 src++;
             }
@@ -431,9 +431,9 @@ int bin_read(int argc, char **argv) {
             symtable_set_global(argv[opt_index + i], field);
             free(field);
         }
-        /* Last variable: skip one leading IFS-whitespace run then
-         * take everything else verbatim (including internal IFS
-         * chars). */
+        /// Last variable: skip one leading IFS-whitespace run then
+        /// take everything else verbatim (including internal IFS
+        /// chars).
         while (*src && strchr(ifs, *src)) {
             src++;
         }

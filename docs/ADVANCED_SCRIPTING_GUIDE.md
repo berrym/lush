@@ -1,21 +1,88 @@
 # Advanced Scripting Guide
 
-**Professional shell scripting with Lush v1.4.0**
+**Professional shell scripting with Lush v1.5.0**
+
+This guide is aimed at script authors who already know one of bash,
+zsh, or POSIX `sh`. It focuses on the parts of lush you cannot get
+from those shells: the typed value model (scalar / list / map as
+first-class kinds), the polyglot spelling layer
+(`${var^^}` and `${(U)var}` both work), the predictive static
+analyzer, and the integrated debugger.
+
+If something here surprises you, the authoritative references are
+[SEMANTICS.md](SEMANTICS.md) (engine rules), [CONFIGURATION.md](CONFIGURATION.md)
+(the four config surfaces), and [PHILOSOPHY.md](PHILOSOPHY.md) (the
+design contracts the language is held to).
 
 ---
 
 ## Table of Contents
 
-1. [Script Structure](#script-structure)
-2. [Error Handling](#error-handling)
-3. [Working with Arrays](#working-with-arrays)
-4. [Advanced Functions](#advanced-functions)
-5. [Process Management](#process-management)
-6. [Data Processing](#data-processing)
-7. [Using Hooks](#using-hooks)
-8. [Debugging Scripts](#debugging-scripts)
-9. [Performance](#performance)
-10. [Portability](#portability)
+1. [The Value Model You Must Know](#the-value-model-you-must-know)
+2. [Script Structure](#script-structure)
+3. [Error Handling](#error-handling)
+4. [Working with Arrays (Lists)](#working-with-arrays-lists)
+5. [Associative Arrays (Maps)](#associative-arrays-maps)
+6. [Parameter Expansion: Polyglot Spellings](#parameter-expansion-polyglot-spellings)
+7. [Advanced Functions](#advanced-functions)
+8. [Process Management](#process-management)
+9. [Data Processing](#data-processing)
+10. [Using Hooks](#using-hooks)
+11. [Debugging Scripts](#debugging-scripts)
+12. [Performance](#performance)
+13. [Portability](#portability)
+
+---
+
+## The Value Model You Must Know
+
+Lush's executor distinguishes three first-class value kinds (see
+SEMANTICS section 7):
+
+- **Scalar** -- a string (NFC-normalized; lengths are grapheme-aware)
+- **List** -- an indexed sequence; `${arr[@]}` / `${arr[*]}` are the
+  presentation operators
+- **Map** -- a key/value table; `${(k)m}` / `${(v)m}` /
+  `${!m[@]}` / `${m[@]}` present keys or values
+
+Two engine rules govern interactions and are non-negotiable:
+
+1. **No implicit list-to-string coercion** (section 3.4). Writing a
+   bare `${arr}` -- a List in a Scalar slot -- is a **type error**,
+   not "the first element," and not "the elements joined by space."
+   The shell raises `SHELL_ERR_TYPE_MISMATCH` and the offending
+   command exits non-zero with a structured-error diagnostic. There
+   is no silent flattening.
+
+2. **The presentation operator is mandatory** (section 3.9). To use a
+   List as a Scalar, you must say *how*:
+
+   ```bash
+   arr=(alpha beta gamma)
+
+   echo "${arr[@]}"   # OK -- "alpha" "beta" "gamma" as separate words
+   echo "${arr[*]}"   # OK -- "alpha beta gamma" as one IFS-joined string
+   echo "${arr[0]}"   # OK -- single element by index
+   echo "$arr"        # TYPE ERROR -- List in Scalar slot
+   echo "${arr}"      # TYPE ERROR (same)
+   ```
+
+   This rule extends to assignments and parameters:
+
+   ```bash
+   first="${arr[0]}"  # OK
+   joined="${arr[*]}" # OK
+   broken="${arr}"    # TYPE ERROR
+   ```
+
+This is the single largest difference between lush and bash/zsh, and
+the static analyzer flags violations *before* you run the script --
+see [Debugging Scripts](#debugging-scripts) below for `debug analyze`.
+
+If a section of code reads as "but bash lets me do this," check the
+analyzer output. The error message will name the kind and the slot.
+
+---
 
 ---
 
@@ -227,74 +294,70 @@ validate_directory() {
 
 ---
 
-## Working with Arrays
+## Working with Arrays (Lists)
 
-### Array Basics
+In lush a `name=(...)` literal binds `name` to a value of kind List,
+stored in the same per-scope symbol table as scalars (SEMANTICS
+section 7). The `[[ -v name ]]` predicate, `unset name`,
+function-local declarations, and the debugger all see Lists
+identically to Scalars -- there is no side-table.
+
+### List Basics
 
 ```bash
-# Indexed arrays
+# Empty list
 files=()
+
+# Append
 files+=("file1.txt")
 files+=("file2.txt")
 
-# From glob
+# From glob -- empty list, not the literal pattern, if no match
 scripts=(*.sh)
 
-# From command output
-readarray -t lines < file.txt
-# Or
+# From command output -- mapfile and readarray are equivalent
 mapfile -t lines < file.txt
+readarray -t lines < file.txt
 
-# Iterate
+# Iterate -- always use "${arr[@]}" with quotes
 for file in "${files[@]}"; do
     process "$file"
 done
 
-# Check if empty
-if [[ ${#files[@]} -eq 0 ]]; then
+# Length and empty check
+count=${#files[@]}
+if (( ${#files[@]} == 0 )); then
     echo "No files"
 fi
 ```
 
-### Associative Arrays
+### Function-local lists
 
 ```bash
-declare -A config
-
-# Load configuration
-config[host]="localhost"
-config[port]="8080"
-config[debug]="false"
-
-# Access
-echo "Connecting to ${config[host]}:${config[port]}"
-
-# Check key exists
-if [[ -v config[host] ]]; then
-    echo "Host configured"
-fi
-
-# Iterate
-for key in "${!config[@]}"; do
-    echo "$key = ${config[$key]}"
-done
+collect() {
+    local arr=(one two three)   # OK -- parser-level array literal
+    local -a others             # OK -- declare empty local list
+    others+=(more elements)
+    echo "${arr[@]} ${others[@]}"
+}
 ```
 
-### Array Operations
+Function-local Lists obey the scope-chain walk: they shadow any
+global `arr`, and `unset arr` inside the function clears only the
+local binding.
+
+### List Operations
 
 ```bash
-# Length
-count=${#array[@]}
+# Slice -- 3 elements starting at index 2
+subset=("${array[@]:2:3}")
 
-# Slice
-subset=("${array[@]:2:3}")  # 3 elements starting at index 2
-
-# Contains
+# Membership
 contains() {
-    local item="$1"
+    local needle="$1"
     shift
     for element in "$@"; do
-        [[ "$element" == "$item" ]] && return 0
+        [[ "$element" == "$needle" ]] && return 0
     done
     return 1
 }
@@ -303,7 +366,7 @@ if contains "target" "${array[@]}"; then
     echo "Found"
 fi
 
-# Join
+# Join with a delimiter
 join_array() {
     local delimiter="$1"
     shift
@@ -312,16 +375,16 @@ join_array() {
     for item in "$@"; do
         result+="${delimiter}${item}"
     done
-    echo "$result"
+    print -- "$result"
 }
 
 result=$(join_array "," "${array[@]}")
 ```
 
-### Passing Arrays to Functions
+### Passing Lists to Functions
 
 ```bash
-# Pass by expansion
+# Pass by expansion (positional parameters)
 process_files() {
     local files=("$@")
     for file in "${files[@]}"; do
@@ -330,7 +393,8 @@ process_files() {
 }
 process_files "${my_files[@]}"
 
-# Pass by nameref (Lush mode)
+# Pass by nameref -- works in every lush mode (bash, zsh, lush)
+# because nameref is canonical lush, not a mode-gated feature
 process_array() {
     local -n arr=$1
     for item in "${arr[@]}"; do
@@ -339,6 +403,74 @@ process_array() {
 }
 process_array my_array
 ```
+
+---
+
+## Associative Arrays (Maps)
+
+```bash
+declare -A config
+config[host]=localhost
+config[port]=8080
+config[debug]=false
+
+# Read
+echo "Connecting to ${config[host]}:${config[port]}"
+
+# Key existence (works on both Maps and Lists)
+if [[ -v config[host] ]]; then
+    echo "Host configured"
+fi
+
+# Iterate by key
+for key in "${!config[@]}"; do
+    echo "$key = ${config[$key]}"
+done
+
+# Zsh-style flags work too -- both spellings, one engine
+for key in "${(k)config}"; do
+    echo "$key"
+done
+for value in "${(v)config}"; do
+    echo "$value"
+done
+```
+
+The type-mismatch rule applies to Maps as well: `echo "$config"` is
+a TYPE ERROR (Map in Scalar slot). Always use a presentation
+operator (`${config[key]}`, `${!config[@]}`, `${config[@]}`,
+`${(k)config}`, `${(v)config}`, `${(kv)config}`).
+
+---
+
+## Parameter Expansion: Polyglot Spellings
+
+Lush accepts bash-style and zsh-style parameter expansion as
+spellings of the same canonical operations (PHILOSOPHY section 2).
+The pairs below all route to one implementation; choose by
+readability. Flags are recognized in all modes -- lush does not
+gate them behind `mode zsh`.
+
+| Operation | Bash spelling | Zsh spelling |
+|-----------|---------------|--------------|
+| Uppercase | `${var^^}` | `${(U)var}` |
+| Lowercase | `${var,,}` | `${(L)var}` |
+| Title-case (first char) | `${var^}` | `${(C)var}` |
+| Sort List | (none) | `${(o)arr}` |
+| Map keys | `${!m[@]}` | `${(k)m}` |
+| Quote-for-reuse | `${var@Q}` | (none) |
+
+Notes on composability:
+
+- Single-flag forms above are stable and tested.
+- Multi-flag composition (`${(Uo)arr}`) is recognized at the parser
+  level but a small set of combinations still interacts awkwardly
+  with `[@]` presentation; if you hit a `SHELL_ERR_TYPE_MISMATCH`
+  from a composed flag, file an issue with the exact expression --
+  it's a known maturation area, not by design.
+- The bash transformation operators (`@Q`, `@E`, `@P`, `@A`, `@K`,
+  `@a`) are supported; the zsh `(q)` flag family is a partial
+  overlap and is being rolled out incrementally.
 
 ---
 
@@ -632,23 +764,42 @@ chpwd() {
 
 ## Debugging Scripts
 
-### Using the Debugger
+### Predictive analysis -- catch errors before running
+
+Run the analyzer over a script to surface type-mismatch, unquoted
+expansion, and exit-status issues at edit time:
+
+```bash
+debug analyze ./myscript.sh
+# or, as a standalone builtin without entering debug mode
+analyze ./myscript.sh
+lint    ./myscript.sh
+```
+
+The analyzer's **type** category is unique to lush: it walks the AST
+and flags SEMANTICS section 3.9 type-mismatch sites (`echo "$arr"`
+where `arr` is a List, etc.) statically. The full reference is
+[DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md).
+
+### Interactive break-and-step
 
 ```bash
 #!/usr/bin/env lush
 set -euo pipefail
 
-# Enable debugging
-debug on 2
-
-# Your script
-for file in *.txt; do
-    debug print file
-    process "$file"
-done
-
-debug off
+debug break add script.sh 12       # halt at line 12
+source script.sh                    # run -- breakpoint fires
+# (lush-debug) prompt appears
+#   t arr        -> kind only (List / Scalar / Map / Func / Nameref)
+#   print arr    -> full contents with kind label
+#   next         -> depth-aware step over
+#   out          -> step out of current function frame
+#   continue     -> resume
 ```
+
+The break prompt is the LLE-driven `(lush-debug)` prompt -- history,
+Ctrl-R search, and tab completion all work, with a framed left-gutter
+UI distinguishing debugger output from script output.
 
 ### Profiling
 
@@ -772,53 +923,62 @@ xargs -I{} id {} < users.txt
 
 ## Portability
 
-### POSIX Mode
+### POSIX mode is a preset, not a restriction
 
-For maximum portability:
+`mode posix` (or its bash-bridge alias `set -o posix`) loads
+POSIX-conforming defaults, but **lush features remain available**
+(PHILOSOPHY section 4). Arrays, `[[ ]]`, process substitution, the
+debugger -- none of these are turned off by selecting POSIX mode.
+You are in lush, not `dash`.
+
+What POSIX mode does change is the *defaults*: word-splitting, glob
+handling, `echo` semantics, alias expansion, and so on, all
+configure to POSIX-conforming values. The polyglot translation layer
+also narrows -- `set -o pipefail` is still recognized because POSIX
+spells options the same way, but the bash-only `set -o privileged`
+or zsh-only `setopt extended_glob` will not be silently translated.
 
 ```bash
 #!/usr/bin/env lush
-set -o posix
-
-# POSIX-only constructs
-# No arrays, no [[ ]], no process substitution
+mode posix      # POSIX-conforming defaults; lush features still present
 ```
 
-### Feature Detection
+### Running scripts on other shells
+
+If a script must run on `bash`, `dash`, or `/bin/sh` (not just lush),
+write it within the intersection POSIX defines:
 
 ```bash
-# Check for feature before using
-if [[ -v BASH_VERSION ]] || [[ -v LUSH_VERSION ]]; then
-    # Use arrays
-    declare -a items
-else
-    # Fall back to string
-    items=""
-fi
-```
-
-### Portable Constructs
-
-```bash
-# Instead of [[ ]]
+# Use the test builtin (works in every shell, including POSIX sh)
 if [ "$a" = "$b" ]; then
     echo "Equal"
 fi
 
-# Instead of arrays
-# Use positional parameters
+# Use positional parameters in place of arrays
 set -- item1 item2 item3
 for item in "$@"; do
     echo "$item"
 done
 
-# Instead of process substitution
-# Use temporary files
+# Use temporary files in place of process substitution
 cmd1 > /tmp/out1
 cmd2 > /tmp/out2
 diff /tmp/out1 /tmp/out2
 rm /tmp/out1 /tmp/out2
 ```
+
+Detect lush vs another shell from the executable name when needed:
+
+```bash
+case "${0##*/}" in
+    lush|*lush*) is_lush=1 ;;
+    *)          is_lush=0 ;;
+esac
+```
+
+(There is no `LUSH_VERSION` environment variable -- the build-time
+constant lives only in the compiled binary. Use `lush --version`
+from a subshell if you need the version string.)
 
 ---
 

@@ -43,9 +43,9 @@ static void do_error(bool errnoflag, int err, const char *fmt, va_list args) {
     }
 
     strncat(buf, "\n", 2);
-    fflush(stdout); // in case stdout and stdin are the same
+    fflush(stdout); /// in case stdout and stdin are the same
     fputs(buf, stderr);
-    fflush(NULL); // flush all stdio output streams
+    fflush(NULL); /// flush all stdio output streams
 }
 
 void error_return(const char *fmt, ...) {
@@ -68,8 +68,8 @@ void error_abort(const char *fmt, ...) {
     va_start(args, fmt);
     do_error(false, 0, fmt, args);
     va_end(args);
-    abort();            // dump core and terminate
-    exit(EXIT_FAILURE); // should never happen
+    abort();            /// dump core and terminate
+    exit(EXIT_FAILURE); /// should never happen
 }
 
 void sigsegv_handler(int signo) {

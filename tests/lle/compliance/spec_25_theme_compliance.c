@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test assertion counter */
+/// Test assertion counter
 static int assertions_passed = 0;
 static int tests_run = 0;
 
@@ -58,7 +58,7 @@ static int tests_run = 0;
     } while (0)
 
 /* ========================================================================== */
-/* Test: Type Definitions                                                     */
+/// Test: Type Definitions
 /* ========================================================================== */
 
 static void test_type_definitions(void) {
@@ -166,7 +166,7 @@ static void test_type_definitions(void) {
 }
 
 /* ========================================================================== */
-/* Test: Theme Registry API                                                   */
+/// Test: Theme Registry API
 /* ========================================================================== */
 
 static void test_theme_registry_api(void) {
@@ -235,7 +235,7 @@ static void test_theme_registry_api(void) {
 }
 
 /* ========================================================================== */
-/* Test: Theme Lifecycle API                                                  */
+/// Test: Theme Lifecycle API
 /* ========================================================================== */
 
 static void test_theme_lifecycle_api(void) {
@@ -268,7 +268,7 @@ static void test_theme_lifecycle_api(void) {
 }
 
 /* ========================================================================== */
-/* Test: Color Helper API                                                     */
+/// Test: Color Helper API
 /* ========================================================================== */
 
 static void test_color_helper_api(void) {
@@ -311,7 +311,7 @@ static void test_color_helper_api(void) {
 }
 
 /* ========================================================================== */
-/* Test: Symbol Set API                                                       */
+/// Test: Symbol Set API
 /* ========================================================================== */
 
 static void test_symbol_set_api(void) {
@@ -333,7 +333,7 @@ static void test_symbol_set_api(void) {
                       "lle_symbol_set_init_ascii declared");
     lle_symbol_set_init_ascii(&symbols);
     COMPLIANCE_ASSERT(strlen(symbols.prompt) > 0, "prompt symbol set");
-    /* ASCII should use simple characters */
+    /// ASCII should use simple characters
     COMPLIANCE_ASSERT(strcmp(symbols.prompt, "$") == 0,
                       "prompt is $ for ASCII");
     TEST_PASS();
@@ -342,7 +342,7 @@ static void test_symbol_set_api(void) {
 }
 
 /* ========================================================================== */
-/* Test: Built-in Themes                                                      */
+/// Test: Built-in Themes
 /* ========================================================================== */
 
 static void test_builtin_themes(void) {
@@ -425,7 +425,7 @@ static void test_builtin_themes(void) {
     size_t count = lle_theme_register_builtins(&registry);
     COMPLIANCE_ASSERT(count == 11, "registers 11 themes");
     COMPLIANCE_ASSERT(registry.builtin_count == 11, "builtin_count is 11");
-    /* Verify all registered */
+    /// Verify all registered
     COMPLIANCE_ASSERT(lle_theme_registry_find(&registry, "minimal") != NULL,
                       "minimal registered");
     COMPLIANCE_ASSERT(lle_theme_registry_find(&registry, "default") != NULL,
@@ -447,7 +447,7 @@ static void test_builtin_themes(void) {
 }
 
 /* ========================================================================== */
-/* Main                                                                       */
+/// Main
 /* ========================================================================== */
 
 int main(void) {

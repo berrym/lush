@@ -74,7 +74,7 @@ static int call_hook_function(lle_hook_type_t hook_type, const char *arg) {
         return 0;
     }
 
-    // Get the global executor
+    /// Get the global executor
     executor_t *executor = get_global_executor();
     if (!executor) {
         return 0;
@@ -85,11 +85,11 @@ static int call_hook_function(lle_hook_type_t hook_type, const char *arg) {
         return 0;
     }
 
-    // Use executor's hook calling mechanism (handles recursion guard
-    // internally)
+    /// Use executor's hook calling mechanism (handles recursion guard
+    /// internally)
     int result = executor_call_hook(executor, hook_name, arg);
 
-    // Update statistics
+    /// Update statistics
     g_hook_call_counts[hook_type]++;
 
     return result;
@@ -163,14 +163,14 @@ static int call_hook_array(lle_hook_type_t hook_type, const char *arg) {
 
     int called = 0;
 
-    // First, check the standard array name (e.g., "precmd_functions")
+    /// First, check the standard array name (e.g., "precmd_functions")
     const char *array_name = g_hook_array_names[hook_type];
     if (array_name) {
         called += call_functions_in_array(executor, array_name, arg);
     }
 
-    // If FEATURE_SIMPLE_HOOK_ARRAYS is enabled, also check the simple
-    // hook name as an array (e.g., "precmd" array for precmd+=(fn) syntax)
+    /// If FEATURE_SIMPLE_HOOK_ARRAYS is enabled, also check the simple
+    /// hook name as an array (e.g., "precmd" array for precmd+=(fn) syntax)
     if (shell_mode_allows(FEATURE_SIMPLE_HOOK_ARRAYS)) {
         const char *simple_name = g_hook_names[hook_type];
         if (simple_name) {
@@ -189,13 +189,13 @@ static int call_hook_array(lle_hook_type_t hook_type, const char *arg) {
  * This is useful for tasks like checking mail or updating status.
  */
 static void check_periodic_hook(void) {
-    // Get the PERIOD variable
+    /// Get the PERIOD variable
     char *period_str = symtable_get_global("PERIOD");
     if (!period_str) {
         return;
     }
 
-    // Parse the period value
+    /// Parse the period value
     long period = strtol(period_str, NULL, 10);
     free(period_str);
 
@@ -203,16 +203,16 @@ static void check_periodic_hook(void) {
         return;
     }
 
-    // Check if enough time has elapsed
+    /// Check if enough time has elapsed
     time_t now = time(NULL);
     if (g_last_periodic_call == 0) {
-        // First call - initialize but don't trigger immediately
+        /// First call - initialize but don't trigger immediately
         g_last_periodic_call = now;
         return;
     }
 
     if ((now - g_last_periodic_call) >= period) {
-        // Time to call periodic hook
+        /// Time to call periodic hook
         g_last_periodic_call = now;
 
         g_current_hook = LLE_HOOK_PERIODIC;
@@ -233,7 +233,7 @@ static void check_periodic_hook(void) {
  * Only active when FEATURE_PROMPT_COMMAND is enabled.
  */
 static void execute_prompt_command(void) {
-    // Check feature flag
+    /// Check feature flag
     if (!shell_mode_allows(FEATURE_PROMPT_COMMAND)) {
         return;
     }
@@ -243,7 +243,7 @@ static void execute_prompt_command(void) {
         return;
     }
 
-    // First check if PROMPT_COMMAND exists as an array (Bash 5.1+ style)
+    /// First check if PROMPT_COMMAND exists as an array (Bash 5.1+ style)
     array_value_t *cmd_array = symtable_get_array("PROMPT_COMMAND");
     if (cmd_array) {
         size_t count = 0;
@@ -251,21 +251,21 @@ static void execute_prompt_command(void) {
         if (commands && count > 0) {
             for (size_t i = 0; i < count; i++) {
                 if (commands[i] && commands[i][0] != '\0') {
-                    /* PROMPT_COMMAND entries are independent logical
-                     * commands; line 1 of their own context. */
+                    /// PROMPT_COMMAND entries are independent logical
+                    /// commands; line 1 of their own context.
                     executor_execute_command_line(executor, commands[i], 1);
                 }
             }
-            // Free the commands array
+            /// Free the commands array
             for (size_t i = 0; i < count; i++) {
                 free(commands[i]);
             }
             free(commands);
         }
-        return; // Array takes precedence
+        return; /// Array takes precedence
     }
 
-    // Fall back to string form (traditional Bash style)
+    /// Fall back to string form (traditional Bash style)
     char *cmd_str = symtable_get_global("PROMPT_COMMAND");
     if (cmd_str && cmd_str[0] != '\0') {
         executor_execute_command_line(executor, cmd_str, 1);
@@ -291,23 +291,23 @@ static void hook_precmd_handler(void *event_data, void *user_data) {
     (void)event_data;
     (void)user_data;
 
-    // Prevent recursive calls
+    /// Prevent recursive calls
     if (executor_in_hook()) {
         return;
     }
 
-    // Execute PROMPT_COMMAND first (Bash compatibility)
-    // This runs regardless of FEATURE_HOOK_FUNCTIONS
+    /// Execute PROMPT_COMMAND first (Bash compatibility)
+    /// This runs regardless of FEATURE_HOOK_FUNCTIONS
     execute_prompt_command();
 
-    // Then execute Zsh-style hooks if enabled
+    /// Then execute Zsh-style hooks if enabled
     if (shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         g_current_hook = LLE_HOOK_PRECMD;
         call_hook_function(LLE_HOOK_PRECMD, NULL);
         call_hook_array(LLE_HOOK_PRECMD, NULL);
         g_current_hook = LLE_HOOK_COUNT;
 
-        // Check and call periodic hook if PERIOD has elapsed
+        /// Check and call periodic hook if PERIOD has elapsed
         check_periodic_hook();
     }
 }
@@ -320,12 +320,12 @@ static void hook_precmd_handler(void *event_data, void *user_data) {
 static void hook_preexec_handler(void *event_data, void *user_data) {
     (void)user_data;
 
-    // Check feature flag
+    /// Check feature flag
     if (!shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         return;
     }
 
-    // Prevent recursive calls
+    /// Prevent recursive calls
     if (executor_in_hook()) {
         return;
     }
@@ -349,12 +349,12 @@ static void hook_chpwd_handler(void *event_data, void *user_data) {
     (void)event_data;
     (void)user_data;
 
-    // Check feature flag
+    /// Check feature flag
     if (!shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         return;
     }
 
-    // Prevent recursive calls
+    /// Prevent recursive calls
     if (executor_in_hook()) {
         return;
     }
@@ -378,35 +378,35 @@ void lle_shell_hooks_init(void) {
         return;
     }
 
-    // Check if any hook feature is enabled
-    // PROMPT_COMMAND (Bash) or HOOK_FUNCTIONS (Zsh) both need POST_COMMAND
-    // events
+    /// Check if any hook feature is enabled
+    /// PROMPT_COMMAND (Bash) or HOOK_FUNCTIONS (Zsh) both need POST_COMMAND
+    /// events
     bool need_hooks = shell_mode_allows(FEATURE_HOOK_FUNCTIONS) ||
                       shell_mode_allows(FEATURE_PROMPT_COMMAND);
     if (!need_hooks) {
         return;
     }
 
-    // Get the shell event hub
+    /// Get the shell event hub
     if (!g_lle_integration || !g_lle_integration->event_hub) {
         return;
     }
 
     lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
-    // Register POST_COMMAND handler for precmd hooks and PROMPT_COMMAND
-    // This runs for both Zsh-style hooks and Bash-style PROMPT_COMMAND
+    /// Register POST_COMMAND handler for precmd hooks and PROMPT_COMMAND
+    /// This runs for both Zsh-style hooks and Bash-style PROMPT_COMMAND
     lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_POST_COMMAND,
                                  hook_precmd_handler, NULL, "precmd-hook");
 
-    // The following only make sense if FEATURE_HOOK_FUNCTIONS is enabled
+    /// The following only make sense if FEATURE_HOOK_FUNCTIONS is enabled
     if (shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
-        // preexec is triggered by PRE_COMMAND (before command runs)
+        /// preexec is triggered by PRE_COMMAND (before command runs)
         lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_PRE_COMMAND,
                                      hook_preexec_handler, NULL,
                                      "preexec-hook");
 
-        // chpwd is triggered by DIRECTORY_CHANGED
+        /// chpwd is triggered by DIRECTORY_CHANGED
         lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED,
                                      hook_chpwd_handler, NULL, "chpwd-hook");
     }
@@ -422,7 +422,7 @@ void lle_shell_hooks_cleanup(void) {
         return;
     }
 
-    // Unregister handlers if event hub is still available
+    /// Unregister handlers if event hub is still available
     if (g_lle_integration && g_lle_integration->event_hub) {
         lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
@@ -465,17 +465,17 @@ bool lle_shell_hook_defined(lle_hook_type_t hook_type) {
         return false;
     }
 
-    // Use executor_call_hook with a NULL check - if hook returns 0 and
-    // no function exists, that's the same as if it ran successfully.
-    // We need a way to check if the function exists without calling it.
-    // For now, we'll rely on the fact that executor_call_hook checks
-    // internally.
-    // TODO: Add executor_function_exists() for clean checking
+    /// Use executor_call_hook with a NULL check - if hook returns 0 and
+    /// no function exists, that's the same as if it ran successfully.
+    /// We need a way to check if the function exists without calling it.
+    /// For now, we'll rely on the fact that executor_call_hook checks
+    /// internally.
+    /// TODO: Add executor_function_exists() for clean checking
 
-    // Workaround: Check if the function name is in the executor's function
-    // table by attempting to call with special marker - but this isn't ideal.
-    // For now, just return true if the feature is enabled - the hook will
-    // silently do nothing if the function isn't defined.
+    /// Workaround: Check if the function name is in the executor's function
+    /// table by attempting to call with special marker - but this isn't ideal.
+    /// For now, just return true if the feature is enabled - the hook will
+    /// silently do nothing if the function isn't defined.
     return shell_mode_allows(FEATURE_HOOK_FUNCTIONS);
 }
 
@@ -505,12 +505,12 @@ int lle_shell_hook_call(lle_hook_type_t hook_type, int argc, char **argv) {
         return -1;
     }
 
-    // Check feature flag
+    /// Check feature flag
     if (!shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         return 0;
     }
 
-    // For preexec, extract command from argv[1] if present
+    /// For preexec, extract command from argv[1] if present
     const char *arg = NULL;
     if (hook_type == LLE_HOOK_PREEXEC && argc > 1 && argv && argv[1]) {
         arg = argv[1];
@@ -527,14 +527,14 @@ int lle_shell_hook_call_by_name(const char *hook_name, int argc, char **argv) {
         return -1;
     }
 
-    // Find the hook type
+    /// Find the hook type
     for (int i = 0; i < LLE_HOOK_COUNT; i++) {
         if (g_hook_names[i] && strcmp(g_hook_names[i], hook_name) == 0) {
             return lle_shell_hook_call((lle_hook_type_t)i, argc, argv);
         }
     }
 
-    return -1; // Unknown hook name
+    return -1; /// Unknown hook name
 }
 
 /* ============================================================================

@@ -52,14 +52,14 @@ lle_sequence_parser_init(lle_sequence_parser_t **parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate parser structure
+    /// Allocate parser structure
     lle_sequence_parser_t *new_parser =
         lle_pool_alloc(sizeof(lle_sequence_parser_t));
     if (!new_parser) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize all fields
+    /// Initialize all fields
     memset(new_parser, 0, sizeof(lle_sequence_parser_t));
 
     new_parser->type = LLE_SEQ_TYPE_UNKNOWN;
@@ -155,7 +155,7 @@ static lle_result_t parse_csi_parameters(lle_sequence_parser_t *parser,
                                          const char *params_start,
                                          size_t params_len) {
     if (!parser || !params_start || params_len == 0) {
-        return LLE_SUCCESS; // No parameters is valid
+        return LLE_SUCCESS; /// No parameters is valid
     }
 
     parser->parameter_count = 0;
@@ -171,18 +171,18 @@ static lle_result_t parse_csi_parameters(lle_sequence_parser_t *parser,
             current_param = current_param * 10 + (c - '0');
             has_current = true;
         } else if (c == ';') {
-            // Semicolon separates parameters
+            /// Semicolon separates parameters
             parser->parameters[parser->parameter_count++] =
                 has_current ? current_param : 0;
             current_param = 0;
             has_current = false;
         } else {
-            // Invalid character in parameters
+            /// Invalid character in parameters
             break;
         }
     }
 
-    // Add final parameter
+    /// Add final parameter
     if (has_current && parser->parameter_count < LLE_MAX_CSI_PARAMETERS) {
         parser->parameters[parser->parameter_count++] = current_param;
     }
@@ -209,15 +209,15 @@ static lle_result_t process_csi_sequence(lle_sequence_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // CSI sequence is complete - parse it
-    // Buffer contains: ESC [ [parameters] [intermediates] final
+    /// CSI sequence is complete - parse it
+    /// Buffer contains: ESC [ [parameters] [intermediates] final
 
-    // Find where parameters end and intermediates begin
-    size_t param_start = 2; // Skip ESC [
+    /// Find where parameters end and intermediates begin
+    size_t param_start = 2; /// Skip ESC [
     size_t param_end = param_start;
     size_t intermediate_start = param_start;
 
-    // Scan for parameters (digits and semicolons)
+    /// Scan for parameters (digits and semicolons)
     while (param_end < parser->buffer_pos) {
         char c = parser->buffer[param_end];
         if (IS_CSI_PARAMETER(c)) {
@@ -227,15 +227,15 @@ static lle_result_t process_csi_sequence(lle_sequence_parser_t *parser,
         }
     }
 
-    // Parse parameters
+    /// Parse parameters
     if (param_end > param_start) {
         parse_csi_parameters(parser, parser->buffer + param_start,
                              param_end - param_start);
     }
 
-    // Scan for intermediate bytes
+    /// Scan for intermediate bytes
     intermediate_start = param_end;
-    while (intermediate_start < parser->buffer_pos - 1) { // -1 for final byte
+    while (intermediate_start < parser->buffer_pos - 1) { /// -1 for final byte
         char c = parser->buffer[intermediate_start];
         if (IS_CSI_INTERMEDIATE(c)) {
             if (parser->intermediate_count <
@@ -248,10 +248,10 @@ static lle_result_t process_csi_sequence(lle_sequence_parser_t *parser,
         }
     }
 
-    // Final character
+    /// Final character
     parser->final_char = parser->buffer[parser->buffer_pos - 1];
 
-    // Create parsed input result
+    /// Create parsed input result
     lle_parsed_input_t *result = lle_pool_alloc(sizeof(lle_parsed_input_t));
     if (!result) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -279,12 +279,12 @@ static lle_result_t process_control_char(lle_sequence_parser_t *parser, char c,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Store control character
+    /// Store control character
     parser->buffer[0] = c;
     parser->buffer_pos = 1;
     parser->type = LLE_SEQ_TYPE_CONTROL_CHAR;
 
-    // Create parsed input result
+    /// Create parsed input result
     lle_parsed_input_t *result = lle_pool_alloc(sizeof(lle_parsed_input_t));
     if (!result) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -322,7 +322,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
     for (size_t i = 0; i < data_len; i++) {
         unsigned char c = data[i];
 
-        // Check for sequence timeout
+        /// Check for sequence timeout
         if (parser->state != LLE_PARSER_STATE_NORMAL &&
             has_sequence_timed_out(parser)) {
             parser->timeout_sequences++;
@@ -332,25 +332,25 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
         switch (parser->state) {
         case LLE_PARSER_STATE_NORMAL:
-            if (c == 0x1B) { // ESC
+            if (c == 0x1B) { /// ESC
                 parser->state = LLE_PARSER_STATE_ESCAPE;
                 parser->buffer[0] = c;
                 parser->buffer_pos = 1;
                 parser->sequence_start_time = get_current_time_us();
             } else if (IS_CONTROL_CHAR(c)) {
-                // Control character in normal state
+                /// Control character in normal state
                 return process_control_char(parser, c, parsed_input);
             } else {
-                // Regular character - not our responsibility (UTF-8 processor
-                // handles this)
+                /// Regular character - not our responsibility (UTF-8 processor
+                /// handles this)
                 continue;
             }
             break;
 
         case LLE_PARSER_STATE_ESCAPE:
-            // Store character
+            /// Store character
             if (parser->buffer_pos >= parser->buffer_capacity) {
-                // Buffer overflow - treat as malformed
+                /// Buffer overflow - treat as malformed
                 parser->malformed_sequences++;
                 parser->last_error_time = get_current_time_us();
                 lle_sequence_parser_reset_state(parser);
@@ -359,34 +359,34 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
             parser->buffer[parser->buffer_pos++] = c;
 
-            // Determine sequence type based on second character
+            /// Determine sequence type based on second character
             if (c == '[') {
-                // CSI sequence
+                /// CSI sequence
                 parser->state = LLE_PARSER_STATE_CSI;
                 parser->type = LLE_SEQ_TYPE_CSI;
             } else if (c == ']') {
-                // OSC sequence
+                /// OSC sequence
                 parser->state = LLE_PARSER_STATE_OSC;
                 parser->type = LLE_SEQ_TYPE_OSC;
             } else if (c == 'P') {
-                // DCS sequence
+                /// DCS sequence
                 parser->state = LLE_PARSER_STATE_DCS;
                 parser->type = LLE_SEQ_TYPE_DCS;
             } else if (c == 'O') {
-                // SS3 sequence (function keys)
+                /// SS3 sequence (function keys)
                 parser->type = LLE_SEQ_TYPE_SS3;
-                // SS3 sequences are typically followed by one more character
+                /// SS3 sequences are typically followed by one more character
                 parser->state = LLE_PARSER_STATE_KEY_SEQUENCE;
             } else if (c == 'N') {
-                // SS2 sequence
+                /// SS2 sequence
                 parser->type = LLE_SEQ_TYPE_SS2;
                 parser->state = LLE_PARSER_STATE_KEY_SEQUENCE;
             } else if ((c >= 0x20 && c < 0x7F) || c == 0x7F) {
-                // ESC + printable ASCII or DEL = Meta/Alt + character
-                // This is how macOS Terminal sends Alt+key when Option is Meta,
-                // or when user physically presses ESC then a letter (e.g., ESC
-                // f for M-f). 0x7F (DEL/Backspace) is included for
-                // Alt+Backspace.
+                /// ESC + printable ASCII or DEL = Meta/Alt + character
+                /// This is how macOS Terminal sends Alt+key when Option is
+                /// Meta, or when user physically presses ESC then a letter
+                /// (e.g., ESC f for M-f). 0x7F (DEL/Backspace) is included for
+                /// Alt+Backspace.
                 lle_parsed_input_t *result =
                     lle_pool_alloc(sizeof(lle_parsed_input_t));
                 if (!result) {
@@ -396,7 +396,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
                 memset(result, 0, sizeof(lle_parsed_input_t));
                 result->type = LLE_PARSED_INPUT_TYPE_KEY;
-                // 0x7F (DEL/Backspace) needs SPECIAL type to be recognized
+                /// 0x7F (DEL/Backspace) needs SPECIAL type to be recognized
                 result->data.key_info.type =
                     (c == 0x7F) ? LLE_KEY_TYPE_SPECIAL : LLE_KEY_TYPE_REGULAR;
                 result->data.key_info.keycode = c;
@@ -407,7 +407,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
                 lle_sequence_parser_reset_state(parser);
                 return LLE_SUCCESS;
             } else {
-                // Other two-character escape sequence
+                /// Other two-character escape sequence
                 lle_result_t result =
                     process_control_char(parser, c, parsed_input);
                 lle_sequence_parser_reset_state(parser);
@@ -416,7 +416,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             break;
 
         case LLE_PARSER_STATE_CSI:
-            // Store character
+            /// Store character
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
                 parser->last_error_time = get_current_time_us();
@@ -426,9 +426,9 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
             parser->buffer[parser->buffer_pos++] = c;
 
-            // Check if this is the final character
+            /// Check if this is the final character
             if (IS_CSI_FINAL(c)) {
-                // Sequence is complete
+                /// Sequence is complete
                 lle_result_t result =
                     process_csi_sequence(parser, parsed_input);
                 lle_sequence_parser_reset_state(parser);
@@ -438,7 +438,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
         case LLE_PARSER_STATE_OSC:
         case LLE_PARSER_STATE_DCS:
-            // OSC and DCS sequences are terminated by ST (ESC \) or BEL (0x07)
+            /// OSC and DCS sequences are terminated by ST (ESC \) or BEL (0x07)
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
                 parser->last_error_time = get_current_time_us();
@@ -448,9 +448,9 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
             parser->buffer[parser->buffer_pos++] = c;
 
-            // Check for terminator
-            if (c == 0x07) { // BEL
-                // Sequence complete
+            /// Check for terminator
+            if (c == 0x07) { /// BEL
+                /// Sequence complete
                 lle_parsed_input_t *result =
                     lle_pool_alloc(sizeof(lle_parsed_input_t));
                 if (result) {
@@ -462,7 +462,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
                 return result ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
             } else if (c == '\\' && parser->buffer_pos >= 2 &&
                        parser->buffer[parser->buffer_pos - 2] == 0x1B) {
-                // ESC \ (ST - String Terminator)
+                /// ESC \ (ST - String Terminator)
                 lle_parsed_input_t *result =
                     lle_pool_alloc(sizeof(lle_parsed_input_t));
                 if (result) {
@@ -476,7 +476,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             break;
 
         case LLE_PARSER_STATE_KEY_SEQUENCE:
-            // SS2/SS3 sequences followed by one character
+            /// SS2/SS3 sequences followed by one character
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
                 parser->last_error_time = get_current_time_us();
@@ -486,7 +486,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
 
             parser->buffer[parser->buffer_pos++] = c;
 
-            // Key sequence is complete
+            /// Key sequence is complete
             lle_parsed_input_t *result =
                 lle_pool_alloc(sizeof(lle_parsed_input_t));
             if (result) {
@@ -498,8 +498,8 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             return result ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
 
         case LLE_PARSER_STATE_ERROR_RECOVERY:
-            // In error recovery, skip characters until we see ESC or normal
-            // text
+            /// In error recovery, skip characters until we see ESC or normal
+            /// text
             if (c == 0x1B) {
                 parser->state = LLE_PARSER_STATE_ESCAPE;
                 parser->buffer[0] = c;
@@ -511,7 +511,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             break;
 
         default:
-            // Unknown state - reset
+            /// Unknown state - reset
             lle_sequence_parser_reset_state(parser);
             break;
         }
@@ -634,12 +634,12 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
 
     *parsed_input = NULL;
 
-    /* Only check timeout if parser is accumulating a sequence */
+    /// Only check timeout if parser is accumulating a sequence
     if (parser->state == LLE_PARSER_STATE_NORMAL) {
-        return LLE_ERROR_NOT_FOUND; /* Not accumulating, no timeout to check */
+        return LLE_ERROR_NOT_FOUND; /// Not accumulating, no timeout to check
     }
 
-    /* Check if we have a sequence start time */
+    /// Check if we have a sequence start time
     if (parser->sequence_start_time == 0) {
         return LLE_ERROR_NOT_FOUND;
     }
@@ -648,15 +648,15 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
     uint64_t elapsed = current_time - parser->sequence_start_time;
 
     if (elapsed < timeout_us) {
-        return LLE_ERROR_NOT_FOUND; /* Timeout not yet exceeded */
+        return LLE_ERROR_NOT_FOUND; /// Timeout not yet exceeded
     }
 
-    /* Timeout exceeded - if in ESCAPE state with just ESC buffered, return ESC
-     * key */
+    /// Timeout exceeded - if in ESCAPE state with just ESC buffered, return ESC
+    /// key
     if (parser->state == LLE_PARSER_STATE_ESCAPE && parser->buffer_pos == 1 &&
         parser->buffer[0] == 0x1B) {
 
-        /* Create ESC key event */
+        /// Create ESC key event
         lle_parsed_input_t *result = lle_pool_alloc(sizeof(lle_parsed_input_t));
         if (!result) {
             return LLE_ERROR_OUT_OF_MEMORY;
@@ -665,13 +665,13 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         memset(result, 0, sizeof(lle_parsed_input_t));
         result->type = LLE_PARSED_INPUT_TYPE_KEY;
         result->data.key_info.type = LLE_KEY_TYPE_SPECIAL;
-        result->data.key_info.keycode = 27; /* ESC */
+        result->data.key_info.keycode = 27; /// ESC
         result->data.key_info.modifiers = 0;
         result->data.key_info.timestamp = current_time;
         result->handled = false;
         result->parse_time_us = 0;
 
-        /* Reset parser state */
+        /// Reset parser state
         parser->timeout_sequences++;
         lle_sequence_parser_reset_state(parser);
 
@@ -679,7 +679,7 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         return LLE_SUCCESS;
     }
 
-    /* Timeout in other state - reset parser and discard partial sequence */
+    /// Timeout in other state - reset parser and discard partial sequence
     parser->timeout_sequences++;
     lle_sequence_parser_reset_state(parser);
 

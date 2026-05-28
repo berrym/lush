@@ -30,7 +30,7 @@
  * ============================================================================
  */
 
-/* Phase 2, 3, and 4 components are now real implementations */
+/// Phase 2, 3, and 4 components are now real implementations
 
 struct lle_callback_registry {
     lle_history_edit_callbacks_t callbacks;
@@ -69,7 +69,7 @@ static const lle_integration_config_t DEFAULT_CONFIG = {
  */
 static lle_result_t init_stub_component(void **component,
                                         lle_memory_pool_t *pool, size_t size) {
-    (void)pool; /* Unused - uses lle_pool_alloc global pool */
+    (void)pool; /// Unused - uses lle_pool_alloc global pool
 
     if (!component) {
         return LLE_ERROR_INVALID_PARAMETER;
@@ -98,14 +98,14 @@ lle_result_t lle_history_buffer_integration_create(
     lle_result_t result = LLE_SUCCESS;
     lle_history_buffer_integration_t *integ = NULL;
 
-    /* Validate parameters */
+    /// Validate parameters
     if (!integration || !history_core) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* memory_pool can be NULL - will use global pool via lle_pool_alloc */
+    /// memory_pool can be NULL - will use global pool via lle_pool_alloc
 
-    /* Allocate integration system */
+    /// Allocate integration system
     integ = lle_pool_alloc(sizeof(lle_history_buffer_integration_t));
     if (!integ) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -113,12 +113,12 @@ lle_result_t lle_history_buffer_integration_create(
 
     memset(integ, 0, sizeof(lle_history_buffer_integration_t));
 
-    /* Set core references */
+    /// Set core references
     integ->history_core = history_core;
     integ->memory_pool = memory_pool;
     integ->event_system = event_system;
 
-    /* Allocate configuration */
+    /// Allocate configuration
     integ->config = lle_pool_alloc(sizeof(lle_integration_config_t));
     if (!integ->config) {
         lle_pool_free(integ);
@@ -126,7 +126,7 @@ lle_result_t lle_history_buffer_integration_create(
     }
     memcpy(integ->config, &DEFAULT_CONFIG, sizeof(lle_integration_config_t));
 
-    /* Allocate state */
+    /// Allocate state
     integ->current_state = lle_pool_alloc(sizeof(lle_integration_state_t));
     if (!integ->current_state) {
         lle_pool_free(integ->config);
@@ -136,7 +136,7 @@ lle_result_t lle_history_buffer_integration_create(
     memset(integ->current_state, 0, sizeof(lle_integration_state_t));
     integ->current_state->state = LLE_INTEGRATION_UNINITIALIZED;
 
-    /* Initialize callback registry */
+    /// Initialize callback registry
     result =
         init_stub_component((void **)&integ->callback_registry, memory_pool,
                             sizeof(struct lle_callback_registry));
@@ -147,7 +147,7 @@ lle_result_t lle_history_buffer_integration_create(
         return result;
     }
 
-    /* Initialize Phase 2 components - Multiline Reconstruction Engine */
+    /// Initialize Phase 2 components - Multiline Reconstruction Engine
     result = lle_structure_analyzer_create(&integ->structure_analyzer,
                                            memory_pool, NULL);
     if (result != LLE_SUCCESS)
@@ -169,16 +169,16 @@ lle_result_t lle_history_buffer_integration_create(
     if (result != LLE_SUCCESS)
         goto cleanup;
 
-    /* Initialize Phase 3 components - Interactive Editing System */
+    /// Initialize Phase 3 components - Interactive Editing System
     result = lle_edit_session_manager_create(&integ->session_manager,
                                              memory_pool, history_core, NULL);
     if (result != LLE_SUCCESS)
         goto cleanup;
 
-    /* Initialize Phase 4 components - Performance Optimization */
+    /// Initialize Phase 4 components - Performance Optimization
     lle_edit_cache_config_t cache_config;
     cache_config.max_entries = integ->config->max_cache_entries;
-    cache_config.entry_ttl_ms = 300000; /* 5 minutes */
+    cache_config.entry_ttl_ms = 300000; /// 5 minutes
     cache_config.track_access = true;
 
     result =
@@ -186,20 +186,20 @@ lle_result_t lle_history_buffer_integration_create(
     if (result != LLE_SUCCESS)
         goto cleanup;
 
-    /* Initialize performance monitor if not provided */
+    /// Initialize performance monitor if not provided
     if (!integ->perf_monitor) {
-        /* Performance monitor should be created by caller, but we'll handle
-         * gracefully */
+        /// Performance monitor should be created by caller, but we'll handle
+        /// gracefully
         integ->perf_monitor = NULL;
     }
 
-    /* Initialize thread synchronization */
+    /// Initialize thread synchronization
     if (pthread_rwlock_init(&integ->integration_lock, NULL) != 0) {
         result = LLE_ERROR_INITIALIZATION_FAILED;
         goto cleanup;
     }
 
-    /* Set initial state */
+    /// Set initial state
     integ->system_active = true;
     integ->session_counter = 0;
     integ->current_state->state = LLE_INTEGRATION_READY;
@@ -238,16 +238,16 @@ lle_result_t lle_history_buffer_integration_destroy(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
-    /* Mark as shutting down */
+    /// Mark as shutting down
     integration->system_active = false;
     if (integration->current_state) {
         integration->current_state->state = LLE_INTEGRATION_SHUTDOWN;
     }
 
-    /* Check for active sessions - should wait or fail? */
+    /// Check for active sessions - should wait or fail?
     if (integration->current_state &&
         integration->current_state->active_sessions > 0) {
         pthread_rwlock_unlock(&integration->integration_lock);
@@ -255,7 +255,7 @@ lle_result_t lle_history_buffer_integration_destroy(
                                          */
     }
 
-    /* Free all components */
+    /// Free all components
     if (integration->edit_cache)
         lle_pool_free(integration->edit_cache);
     if (integration->formatter)
@@ -275,11 +275,11 @@ lle_result_t lle_history_buffer_integration_destroy(
     if (integration->config)
         lle_pool_free(integration->config);
 
-    /* Unlock and destroy lock */
+    /// Unlock and destroy lock
     pthread_rwlock_unlock(&integration->integration_lock);
     pthread_rwlock_destroy(&integration->integration_lock);
 
-    /* Free integration structure itself */
+    /// Free integration structure itself
     lle_pool_free(integration);
 
     return LLE_SUCCESS;
@@ -297,7 +297,7 @@ lle_result_t lle_history_buffer_integration_set_config(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -305,7 +305,7 @@ lle_result_t lle_history_buffer_integration_set_config(
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Validate configuration */
+    /// Validate configuration
     if (config->max_cache_entries == 0 || config->max_cache_entries > 10000) {
         pthread_rwlock_unlock(&integration->integration_lock);
         return LLE_ERROR_INVALID_PARAMETER;
@@ -323,11 +323,11 @@ lle_result_t lle_history_buffer_integration_set_config(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Apply configuration */
+    /// Apply configuration
     memcpy(integration->config, config, sizeof(lle_integration_config_t));
 
-    /* Note: Cache configuration is set at creation time */
-    /* To update cache settings, destroy and recreate the cache */
+    /// Note: Cache configuration is set at creation time
+    /// To update cache settings, destroy and recreate the cache
 
     pthread_rwlock_unlock(&integration->integration_lock);
 
@@ -341,7 +341,7 @@ lle_result_t lle_history_buffer_integration_get_config(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire read lock */
+    /// Acquire read lock
     pthread_rwlock_rdlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -349,7 +349,7 @@ lle_result_t lle_history_buffer_integration_get_config(
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Copy configuration */
+    /// Copy configuration
     memcpy(config, integration->config, sizeof(lle_integration_config_t));
 
     pthread_rwlock_unlock(&integration->integration_lock);
@@ -364,10 +364,10 @@ lle_result_t lle_history_buffer_integration_get_state(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire read lock */
+    /// Acquire read lock
     pthread_rwlock_rdlock(&integration->integration_lock);
 
-    /* Copy state */
+    /// Copy state
     memcpy(state, integration->current_state, sizeof(lle_integration_state_t));
 
     pthread_rwlock_unlock(&integration->integration_lock);
@@ -387,7 +387,7 @@ lle_result_t lle_history_buffer_integration_register_callbacks(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -401,12 +401,12 @@ lle_result_t lle_history_buffer_integration_register_callbacks(
     }
 
     if (callbacks) {
-        /* Register callbacks */
+        /// Register callbacks
         memcpy(&integration->callback_registry->callbacks, callbacks,
                sizeof(lle_history_edit_callbacks_t));
         integration->callback_registry->has_callbacks = true;
     } else {
-        /* Clear callbacks */
+        /// Clear callbacks
         memset(&integration->callback_registry->callbacks, 0,
                sizeof(lle_history_edit_callbacks_t));
         integration->callback_registry->has_callbacks = false;
@@ -434,7 +434,7 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -442,7 +442,7 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Start edit session */
+    /// Start edit session
     lle_edit_session_t *session = NULL;
     lle_result_t result = lle_edit_session_manager_start_session(
         integration->session_manager, entry_index, &session);
@@ -452,7 +452,7 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
         return result;
     }
 
-    /* Phase 4: Try cache lookup first if enabled */
+    /// Phase 4: Try cache lookup first if enabled
     lle_edit_cache_entry_t *cached_entry = NULL;
     bool cache_hit = false;
 
@@ -467,20 +467,19 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
         }
     }
 
-    /* Load history entry to buffer (from cache or fresh) */
+    /// Load history entry to buffer (from cache or fresh)
     if (cache_hit) {
-        /* Use cached reconstructed text - load directly into buffer */
-        /* Note: For now we still do full reconstruction even on cache hit.
-         * Future optimization: Implement buffer population from cached text.
-         * This would require buffer API changes or direct buffer manipulation.
-         */
-        integration->current_state->cache_hits--; /* Don't count as hit yet */
+        /// Use cached reconstructed text - load directly into buffer
+        /// Note: For now we still do full reconstruction even on cache hit.
+        /// Future optimization: Implement buffer population from cached text.
+        /// This would require buffer API changes or direct buffer manipulation.
+        integration->current_state->cache_hits--; /// Don't count as hit yet
         integration->current_state->cache_misses++;
-        cache_hit = false; /* Treat as miss for now */
+        cache_hit = false; /// Treat as miss for now
     }
 
     if (!cache_hit) {
-        /* Cache miss or caching disabled - do full reconstruction */
+        /// Cache miss or caching disabled - do full reconstruction
         lle_history_buffer_bridge_t *bridge = NULL;
         result = lle_history_buffer_bridge_create(
             &bridge, integration->memory_pool, integration->history_core,
@@ -489,30 +488,30 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
         if (result == LLE_SUCCESS) {
             lle_transfer_result_t transfer_result;
             result = lle_history_buffer_bridge_load_to_buffer(
-                bridge, entry_index, buffer, NULL, /* Use default options */
+                bridge, entry_index, buffer, NULL, /// Use default options
                 &transfer_result);
 
-            /* Phase 4: Cache insertion would happen here if we had the
-             * reconstructed text available. For now, cache is prepared but
-             * insertion requires getting the actual reconstructed text from
-             * the buffer or reconstruction engine, which isn't exposed in
-             * the current transfer_result structure. This is a known limitation
-             * that can be addressed in future iterations. */
+            /// Phase 4: Cache insertion would happen here if we had the
+            /// reconstructed text available. For now, cache is prepared but
+            /// insertion requires getting the actual reconstructed text from
+            /// the buffer or reconstruction engine, which isn't exposed in
+            /// the current transfer_result structure. This is a known
+            /// limitation that can be addressed in future iterations.
 
             lle_history_buffer_bridge_destroy(bridge);
         }
     }
 
-    /* Update integration state */
+    /// Update integration state
     if (result == LLE_SUCCESS) {
         integration->current_state->active_sessions++;
         integration->current_state->state = LLE_INTEGRATION_BUSY;
 
-        /* Invoke callback if registered */
+        /// Invoke callback if registered
         if (integration->callback_registry &&
             integration->callback_registry->has_callbacks &&
             integration->callback_registry->callbacks.on_edit_start) {
-            /* Get the entry for callback */
+            /// Get the entry for callback
             lle_history_entry_t *entry = NULL;
             lle_history_get_entry_by_index(integration->history_core,
                                            entry_index, &entry);
@@ -550,7 +549,7 @@ lle_result_t lle_history_buffer_integration_get_cache_stats(
     if (integration->edit_cache) {
         result = lle_edit_cache_get_stats(integration->edit_cache, stats);
     } else {
-        /* No cache available - return zeros */
+        /// No cache available - return zeros
         memset(stats, 0, sizeof(lle_edit_cache_stats_t));
     }
 
@@ -620,7 +619,7 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -628,7 +627,7 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Get current session */
+    /// Get current session
     lle_edit_session_t *session = NULL;
     lle_result_t result = lle_edit_session_manager_get_current_session(
         integration->session_manager, &session);
@@ -638,7 +637,7 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Save buffer contents back to history */
+    /// Save buffer contents back to history
     lle_history_buffer_bridge_t *bridge = NULL;
     result = lle_history_buffer_bridge_create(
         &bridge, integration->memory_pool, integration->history_core,
@@ -647,13 +646,13 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
     if (result == LLE_SUCCESS) {
         lle_transfer_result_t transfer_result;
         result = lle_history_buffer_bridge_save_from_buffer(
-            bridge, buffer, NULL, /* Use default options */
+            bridge, buffer, NULL, /// Use default options
             &transfer_result);
 
         lle_history_buffer_bridge_destroy(bridge);
     }
 
-    /* Complete the session */
+    /// Complete the session
     if (result == LLE_SUCCESS) {
         result = lle_edit_session_manager_complete_session(
             integration->session_manager, session);
@@ -662,7 +661,7 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
             integration->current_state->active_sessions--;
             integration->current_state->total_edits++;
 
-            /* Phase 4: Invalidate cache entry since it was modified */
+            /// Phase 4: Invalidate cache entry since it was modified
             if (integration->config->enable_edit_caching &&
                 integration->edit_cache) {
                 lle_edit_cache_invalidate(integration->edit_cache,
@@ -673,11 +672,11 @@ lle_history_session_complete(lle_history_buffer_integration_t *integration,
                 integration->current_state->state = LLE_INTEGRATION_READY;
             }
 
-            /* Invoke callback if registered */
+            /// Invoke callback if registered
             if (integration->callback_registry &&
                 integration->callback_registry->has_callbacks &&
                 integration->callback_registry->callbacks.on_edit_complete) {
-                /* Get the entry for callback */
+                /// Get the entry for callback
                 lle_history_entry_t *entry = NULL;
                 lle_history_get_entry_by_index(integration->history_core,
                                                session->entry_index, &entry);
@@ -698,7 +697,7 @@ lle_history_session_cancel(lle_history_buffer_integration_t *integration) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    /// Acquire write lock
     pthread_rwlock_wrlock(&integration->integration_lock);
 
     if (!integration->system_active) {
@@ -706,7 +705,7 @@ lle_history_session_cancel(lle_history_buffer_integration_t *integration) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Get current session */
+    /// Get current session
     lle_edit_session_t *session = NULL;
     lle_result_t result = lle_edit_session_manager_get_current_session(
         integration->session_manager, &session);
@@ -718,7 +717,7 @@ lle_history_session_cancel(lle_history_buffer_integration_t *integration) {
 
     size_t entry_index = session->entry_index;
 
-    /* Cancel the session (discards changes) */
+    /// Cancel the session (discards changes)
     result = lle_edit_session_manager_cancel_session(
         integration->session_manager, session);
 
@@ -729,11 +728,11 @@ lle_history_session_cancel(lle_history_buffer_integration_t *integration) {
             integration->current_state->state = LLE_INTEGRATION_READY;
         }
 
-        /* Invoke callback if registered */
+        /// Invoke callback if registered
         if (integration->callback_registry &&
             integration->callback_registry->has_callbacks &&
             integration->callback_registry->callbacks.on_edit_cancel) {
-            /* Get the entry for callback */
+            /// Get the entry for callback
             lle_history_entry_t *entry = NULL;
             lle_history_get_entry_by_index(integration->history_core,
                                            entry_index, &entry);

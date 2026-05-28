@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Test counter */
+/// Test counter
 static int test_count = 0;
 
 #define TEST(name)                                                             \
@@ -34,7 +34,7 @@ void test_history_entry_structure(void) {
 
     lle_history_entry_t entry;
 
-    /* Phase 1 required fields */
+    /// Phase 1 required fields
     entry.entry_id = 1;
     entry.command = NULL;
     entry.command_length = 0;
@@ -43,17 +43,17 @@ void test_history_entry_structure(void) {
     entry.working_directory = NULL;
     entry.state = LLE_HISTORY_STATE_ACTIVE;
 
-    /* Phase 4 fields (initialized but not used yet) */
+    /// Phase 4 fields (initialized but not used yet)
     entry.original_multiline = NULL;
     entry.is_multiline = false;
     entry.duration_ms = 0;
     entry.edit_count = 0;
 
-    /* List pointers */
+    /// List pointers
     entry.next = NULL;
     entry.prev = NULL;
 
-    /* Verify we can access all fields */
+    /// Verify we can access all fields
     assert(entry.entry_id == 1);
     assert(entry.timestamp == 12345);
     assert(entry.state == LLE_HISTORY_STATE_ACTIVE);
@@ -70,27 +70,27 @@ void test_history_config_structure(void) {
     lle_history_config_t config;
     memset(&config, 0, sizeof(config));
 
-    /* Capacity settings */
+    /// Capacity settings
     config.max_entries = 10000;
     config.max_command_length = 32768;
 
-    /* File settings */
+    /// File settings
     config.history_file_path = NULL;
     config.auto_save = false;
     config.load_on_init = false;
 
-    /* Behavior settings */
+    /// Behavior settings
     config.ignore_duplicates = false;
     config.ignore_space_prefix = true;
     config.save_timestamps = true;
     config.save_working_dir = true;
     config.save_exit_codes = true;
 
-    /* Performance settings */
+    /// Performance settings
     config.initial_capacity = 1000;
     config.use_indexing = true;
 
-    /* Verify we can access all fields */
+    /// Verify we can access all fields
     assert(config.max_entries == 10000);
     assert(config.ignore_space_prefix == true);
 
@@ -106,33 +106,33 @@ void test_history_stats_structure(void) {
     lle_history_stats_t stats;
     memset(&stats, 0, sizeof(stats));
 
-    /* Entry counts */
+    /// Entry counts
     stats.total_entries = 100;
     stats.active_entries = 90;
     stats.deleted_entries = 10;
 
-    /* Operation counts */
+    /// Operation counts
     stats.add_count = 100;
     stats.retrieve_count = 50;
     stats.search_count = 10;
     stats.save_count = 5;
     stats.load_count = 1;
 
-    /* Performance metrics */
+    /// Performance metrics
     stats.total_add_time_us = 5000;
     stats.total_retrieve_time_us = 1000;
     stats.total_search_time_us = 2000;
 
-    /* Memory usage */
+    /// Memory usage
     stats.memory_used_bytes = 102400;
     stats.peak_memory_bytes = 204800;
 
-    /* File statistics */
+    /// File statistics
     stats.file_size_bytes = 51200;
     stats.last_save_time = 0;
     stats.last_load_time = 0;
 
-    /* Verify we can access all fields */
+    /// Verify we can access all fields
     assert(stats.total_entries == 100);
     assert(stats.add_count == 100);
 
@@ -148,31 +148,31 @@ void test_history_core_structure(void) {
     lle_history_core_t core;
     memset(&core, 0, sizeof(core));
 
-    /* Entry storage */
+    /// Entry storage
     core.entries = NULL;
     core.entry_count = 0;
     core.entry_capacity = 1000;
     core.next_entry_id = 1;
 
-    /* Linked list pointers */
+    /// Linked list pointers
     core.first_entry = NULL;
     core.last_entry = NULL;
 
-    /* Indexing (Phase 2) */
+    /// Indexing (Phase 2)
     core.entry_lookup = NULL;
 
-    /* Configuration and statistics */
+    /// Configuration and statistics
     core.config = NULL;
     memset(&core.stats, 0, sizeof(lle_history_stats_t));
 
-    /* Resource management */
+    /// Resource management
     core.memory_pool = NULL;
     core.perf_monitor = NULL;
 
-    /* Thread safety */
+    /// Thread safety
     core.initialized = false;
 
-    /* Verify we can access all fields */
+    /// Verify we can access all fields
     assert(core.entry_capacity == 1000);
     assert(core.initialized == false);
 
@@ -215,17 +215,17 @@ void test_history_operation_enum(void) {
 void test_history_constants(void) {
     TEST("History system constants match specification");
 
-    /* Capacity constants */
+    /// Capacity constants
     assert(LLE_HISTORY_DEFAULT_CAPACITY == 10000);
     assert(LLE_HISTORY_INITIAL_CAPACITY == 1000);
     assert(LLE_HISTORY_MAX_CAPACITY == 100000);
     assert(LLE_HISTORY_MIN_CAPACITY == 100);
 
-    /* Size limits */
+    /// Size limits
     assert(LLE_HISTORY_MAX_COMMAND_LENGTH == 32768);
     assert(LLE_HISTORY_MAX_PATH_LENGTH == 4096);
 
-    /* Performance targets */
+    /// Performance targets
     assert(LLE_HISTORY_ADD_TARGET_US == 100);
     assert(LLE_HISTORY_RETRIEVE_TARGET_US == 50);
     assert(LLE_HISTORY_SEARCH_TARGET_MS == 10);
@@ -239,7 +239,7 @@ void test_history_constants(void) {
 void test_api_functions_declared(void) {
     TEST("Core API functions are declared");
 
-    /* Check function pointers are not NULL (they're declared) */
+    /// Check function pointers are not NULL (they're declared)
     void *funcs[] = {
         (void *)lle_history_core_create,
         (void *)lle_history_core_destroy,
@@ -287,19 +287,19 @@ void test_helper_functions_declared(void) {
 void test_structure_sizes(void) {
     TEST("Structure sizes are reasonable");
 
-    /* Entry structure should be reasonable (not huge) */
+    /// Entry structure should be reasonable (not huge)
     size_t entry_size = sizeof(lle_history_entry_t);
-    assert(entry_size < 512); /* Should be well under 512 bytes */
+    assert(entry_size < 512); /// Should be well under 512 bytes
 
-    /* Config structure */
+    /// Config structure
     size_t config_size = sizeof(lle_history_config_t);
     assert(config_size < 256);
 
-    /* Stats structure */
+    /// Stats structure
     size_t stats_size = sizeof(lle_history_stats_t);
     assert(stats_size < 512);
 
-    /* Core structure */
+    /// Core structure
     size_t core_size = sizeof(lle_history_core_t);
     assert(core_size < 1024);
 

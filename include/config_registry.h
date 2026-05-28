@@ -71,11 +71,11 @@ extern "C" {
  * @brief Configuration value types
  */
 typedef enum creg_value_type {
-    CREG_VALUE_NONE = 0, /**< No value / unset */
-    CREG_VALUE_STRING,   /**< String value */
-    CREG_VALUE_INTEGER,  /**< Integer value (int64_t) */
-    CREG_VALUE_BOOLEAN,  /**< Boolean value */
-    CREG_VALUE_FLOAT     /**< Floating point value (double) */
+    CREG_VALUE_NONE = 0, ///< No value / unset
+    CREG_VALUE_STRING,   ///< String value
+    CREG_VALUE_INTEGER,  ///< Integer value (int64_t)
+    CREG_VALUE_BOOLEAN,  ///< Boolean value
+    CREG_VALUE_FLOAT     ///< Floating point value (double)
 } creg_value_type_t;
 
 /**
@@ -103,11 +103,11 @@ typedef struct creg_value {
  * and optional help text.
  */
 typedef struct creg_option {
-    const char *name;         /**< Option name (e.g., "errexit") */
-    creg_value_type_t type;   /**< Expected value type */
-    creg_value_t default_val; /**< Default value */
-    const char *help;         /**< Help text for this option */
-    bool persisted;           /**< Whether to save to config file */
+    const char *name;         ///< Option name (e.g., "errexit")
+    creg_value_type_t type;   ///< Expected value type
+    creg_value_t default_val; ///< Default value
+    const char *help;         ///< Help text for this option
+    bool persisted;           ///< Whether to save to config file
 } creg_option_t;
 
 /* ============================================================================
@@ -122,16 +122,15 @@ typedef struct creg_option {
  * hooks for loading, saving, and syncing with runtime state.
  */
 typedef struct creg_section {
-    const char *name;             /**< Section name (e.g., "shell") */
-    const creg_option_t *options; /**< Array of options in this section */
-    size_t option_count;          /**< Number of options */
+    const char *name;             ///< Section name (e.g., "shell")
+    const creg_option_t *options; ///< Array of options in this section
+    size_t option_count;          ///< Number of options
 
-    /* Lifecycle hooks (all optional) */
-    void (*on_load)(void);       /**< Called after section is loaded */
-    void (*on_save)(FILE *file); /**< Called during save (for custom output) */
-    void (*sync_to_runtime)(void); /**< Apply config values to runtime state */
-    void (*sync_from_runtime)(
-        void); /**< Read runtime state into config values */
+    /// Lifecycle hooks (all optional)
+    void (*on_load)(void);           ///< Called after section is loaded
+    void (*on_save)(FILE *file);     ///< Called during save (for custom output)
+    void (*sync_to_runtime)(void);   ///< Apply config values to runtime state
+    void (*sync_from_runtime)(void); ///< Read runtime state into config values
 } creg_section_t;
 
 /* ============================================================================
@@ -164,16 +163,16 @@ typedef void (*creg_change_callback_t)(const char *key,
  * @brief Config registry result codes
  */
 typedef enum creg_result {
-    CREG_SUCCESS = 0,           /**< Operation succeeded */
-    CREG_ERROR_INVALID_PARAM,   /**< Invalid parameter */
-    CREG_ERROR_NOT_FOUND,       /**< Key or section not found */
-    CREG_ERROR_TYPE_MISMATCH,   /**< Value type doesn't match expected */
-    CREG_ERROR_OUT_OF_MEMORY,   /**< Memory allocation failed */
-    CREG_ERROR_SECTION_FULL,    /**< Too many sections registered */
-    CREG_ERROR_OPTION_FULL,     /**< Too many options in section */
-    CREG_ERROR_SUBSCRIBER_FULL, /**< Too many subscribers */
-    CREG_ERROR_PARSE_FAILED,    /**< Failed to parse config file */
-    CREG_ERROR_IO_FAILED        /**< File I/O error */
+    CREG_SUCCESS = 0,           ///< Operation succeeded
+    CREG_ERROR_INVALID_PARAM,   ///< Invalid parameter
+    CREG_ERROR_NOT_FOUND,       ///< Key or section not found
+    CREG_ERROR_TYPE_MISMATCH,   ///< Value type doesn't match expected
+    CREG_ERROR_OUT_OF_MEMORY,   ///< Memory allocation failed
+    CREG_ERROR_SECTION_FULL,    ///< Too many sections registered
+    CREG_ERROR_OPTION_FULL,     ///< Too many options in section
+    CREG_ERROR_SUBSCRIBER_FULL, ///< Too many subscribers
+    CREG_ERROR_PARSE_FAILED,    ///< Failed to parse config file
+    CREG_ERROR_IO_FAILED        ///< File I/O error
 } creg_result_t;
 
 /* ============================================================================
@@ -525,4 +524,4 @@ bool creg_value_equal(const creg_value_t *a, const creg_value_t *b);
 }
 #endif
 
-#endif /* CONFIG_REGISTRY_H */
+#endif /// CONFIG_REGISTRY_H

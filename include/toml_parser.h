@@ -67,12 +67,12 @@ extern "C" {
  * @brief TOML parser result codes
  */
 typedef enum toml_result {
-    TOML_SUCCESS = 0,             /**< Operation succeeded */
-    TOML_ERROR_INVALID_PARAMETER, /**< NULL or invalid parameter */
-    TOML_ERROR_INVALID_FORMAT,    /**< Parse error in input */
-    TOML_ERROR_OUT_OF_MEMORY,     /**< Memory allocation failed */
-    TOML_ERROR_NOT_FOUND,         /**< Key not found in table */
-    TOML_ERROR_CALLBACK_ABORT     /**< Callback requested abort */
+    TOML_SUCCESS = 0,             ///< Operation succeeded
+    TOML_ERROR_INVALID_PARAMETER, ///< NULL or invalid parameter
+    TOML_ERROR_INVALID_FORMAT,    ///< Parse error in input
+    TOML_ERROR_OUT_OF_MEMORY,     ///< Memory allocation failed
+    TOML_ERROR_NOT_FOUND,         ///< Key not found in table
+    TOML_ERROR_CALLBACK_ABORT     ///< Callback requested abort
 } toml_result_t;
 
 /* ============================================================================
@@ -84,11 +84,11 @@ typedef enum toml_result {
  * @brief Parsed value types
  */
 typedef enum toml_value_type {
-    TOML_VALUE_STRING,  /**< String value: "text" */
-    TOML_VALUE_INTEGER, /**< Integer value: 123 */
-    TOML_VALUE_BOOLEAN, /**< Boolean value: true/false */
-    TOML_VALUE_ARRAY,   /**< Array value: ["a", "b"] */
-    TOML_VALUE_TABLE    /**< Inline table: { key = "value" } */
+    TOML_VALUE_STRING,  ///< String value: "text"
+    TOML_VALUE_INTEGER, ///< Integer value: 123
+    TOML_VALUE_BOOLEAN, ///< Boolean value: true/false
+    TOML_VALUE_ARRAY,   ///< Array value: ["a", "b"]
+    TOML_VALUE_TABLE    ///< Inline table: { key = "value" }
 } toml_value_type_t;
 
 /**
@@ -133,11 +133,11 @@ typedef struct toml_value {
  * Tracks the current position in the input and error state.
  */
 typedef struct toml_parser {
-    const char *input; /**< Input string being parsed */
-    size_t input_len;  /**< Length of input string */
-    size_t pos;        /**< Current position in input */
-    size_t line;       /**< Current line number (1-based) */
-    size_t column;     /**< Current column number (1-based) */
+    const char *input; ///< Input string being parsed
+    size_t input_len;  ///< Length of input string
+    size_t pos;        ///< Current position in input
+    size_t line;       ///< Current line number (1-based)
+    size_t column;     ///< Current column number (1-based)
 
     /** Current section path (e.g., "shell" or "shell.features") */
     char current_section[TOML_PARSER_KEY_MAX * TOML_PARSER_SECTION_DEPTH_MAX];
@@ -392,4 +392,4 @@ static inline bool toml_value_get_boolean(const toml_value_t *value,
 }
 #endif
 
-#endif /* TOML_PARSER_H */
+#endif /// TOML_PARSER_H

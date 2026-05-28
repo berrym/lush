@@ -35,7 +35,7 @@ int bin_let(int argc, char **argv) {
             shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
                                loc, "missing arithmetic expression");
         if (error) {
-            /* Source-line snippet block from executor's batch text. */
+            /// Source-line snippet block from executor's batch text.
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
                     executor_get_source_line(current_executor, loc.line);
@@ -45,8 +45,8 @@ int bin_let(int argc, char **argv) {
                     free(src_line);
                 }
             }
-            /* Walk executor's context stack — already includes
-             * "in builtin 'let'" pushed by the dispatcher. */
+            /// Walk executor's context stack — already includes
+            /// "in builtin 'let'" pushed by the dispatcher.
             if (current_executor) {
                 for (size_t i = 0; i < current_executor->context_depth; i++) {
                     if (current_executor->context_stack[i]) {
@@ -69,7 +69,7 @@ int bin_let(int argc, char **argv) {
 
     ssize_t last_result = 0;
 
-    /* Evaluate each argument as an arithmetic expression */
+    /// Evaluate each argument as an arithmetic expression
     for (int i = 1; i < argc; i++) {
         arithm_clear_error();
         char *result = arithm_expand(argv[i]);
@@ -86,7 +86,7 @@ int bin_let(int argc, char **argv) {
                 shell_error_create(err_code, SHELL_SEVERITY_ERROR, loc,
                                    "invalid expression '%s'", argv[i]);
             if (error) {
-                /* Source-line snippet block from executor's batch text. */
+                /// Source-line snippet block from executor's batch text.
                 if (current_executor && SOURCE_LOC_VALID(loc)) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
@@ -96,8 +96,8 @@ int bin_let(int argc, char **argv) {
                         free(src_line);
                     }
                 }
-                /* Walk executor's context stack — already includes
-                 * "in builtin 'let'" pushed by the dispatcher. */
+                /// Walk executor's context stack — already includes
+                /// "in builtin 'let'" pushed by the dispatcher.
                 if (current_executor) {
                     for (size_t i = 0; i < current_executor->context_depth;
                          i++) {
@@ -116,8 +116,8 @@ int bin_let(int argc, char **argv) {
                 if (err_msg) {
                     shell_error_set_detail(error, err_msg);
                 }
-                /* Prefer the per-site help from arithmetic.c when present;
-                 * fall back to the generic let-builtin operator cheat sheet. */
+                /// Prefer the per-site help from arithmetic.c when present;
+                /// fall back to the generic let-builtin operator cheat sheet.
                 if (err_help) {
                     shell_error_set_suggestion(error, err_help);
                 } else {
@@ -141,6 +141,6 @@ int bin_let(int argc, char **argv) {
         free(result);
     }
 
-    /* Return 0 if last result is non-zero, 1 if zero (bash behavior) */
+    /// Return 0 if last result is non-zero, 1 if zero (bash behavior)
     return (last_result == 0) ? 1 : 0;
 }

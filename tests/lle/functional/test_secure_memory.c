@@ -17,7 +17,7 @@
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 
-/* Test result tracking */
+/// Test result tracking
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -38,7 +38,7 @@ static int tests_failed = 0;
 static int test_parameter_validation(void) {
     printf("Testing parameter validation...\n");
 
-    // NULL pointer tests
+    /// NULL pointer tests
     lle_result_t result = lle_memory_enable_secure_mode(NULL, 1024);
     if (result != LLE_ERROR_INVALID_PARAMETER) {
         printf("  ERROR: NULL pointer should fail with INVALID_PARAMETER\n");
@@ -46,7 +46,7 @@ static int test_parameter_validation(void) {
     }
     printf("  ✓ NULL pointer correctly rejected\n");
 
-    // Zero size tests
+    /// Zero size tests
     char buffer[100];
     result = lle_memory_enable_secure_mode(buffer, 0);
     if (result != LLE_ERROR_INVALID_PARAMETER) {
@@ -55,7 +55,7 @@ static int test_parameter_validation(void) {
     }
     printf("  ✓ Zero size correctly rejected\n");
 
-    // Same for secure_clear
+    /// Same for secure_clear
     result = lle_memory_secure_clear(NULL, 100);
     if (result != LLE_ERROR_INVALID_PARAMETER) {
         printf("  ERROR: NULL pointer to secure_clear should fail\n");
@@ -63,7 +63,7 @@ static int test_parameter_validation(void) {
     }
     printf("  ✓ secure_clear validates parameters\n");
 
-    // Same for disable
+    /// Same for disable
     result = lle_memory_disable_secure_mode(NULL, 100);
     if (result != LLE_ERROR_INVALID_PARAMETER) {
         printf("  ERROR: NULL pointer to disable should fail\n");
@@ -81,12 +81,12 @@ static int test_parameter_validation(void) {
 static int test_secure_clear_functionality(void) {
     printf("Testing secure clear functionality...\n");
 
-    // Create buffer with sensitive data
+    /// Create buffer with sensitive data
     char password[256];
     strcpy(password, "SuperSecretPassword123!");
     printf("  Initial password: '%s'\n", password);
 
-    // Secure clear
+    /// Secure clear
     lle_result_t result = lle_memory_secure_clear(password, sizeof(password));
     if (result != LLE_SUCCESS) {
         printf("  ERROR: Secure clear failed with code %d\n", result);
@@ -94,7 +94,7 @@ static int test_secure_clear_functionality(void) {
     }
     printf("  ✓ Secure clear succeeded\n");
 
-    // Verify all bytes are zero
+    /// Verify all bytes are zero
     int all_zero = 1;
     for (size_t i = 0; i < sizeof(password); i++) {
         if (password[i] != 0) {
@@ -120,17 +120,17 @@ static int test_secure_clear_functionality(void) {
 static int test_complete_lifecycle(void) {
     printf("Testing complete secure mode lifecycle...\n");
 
-    // Allocate buffer for sensitive data
+    /// Allocate buffer for sensitive data
     char api_token[512];
     strcpy(api_token,
            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0");
 
-    // Step 1: Enable secure mode (lock in RAM)
+    /// Step 1: Enable secure mode (lock in RAM)
     printf("  Step 1: Enabling secure mode...\n");
     lle_result_t result =
         lle_memory_enable_secure_mode(api_token, sizeof(api_token));
 
-    // Check result - should succeed or gracefully degrade
+    /// Check result - should succeed or gracefully degrade
     int secure_enabled = 0;
     switch (result) {
     case LLE_SUCCESS:
@@ -158,11 +158,11 @@ static int test_complete_lifecycle(void) {
         return 0;
     }
 
-    // Step 2: Use the sensitive data (simulated)
+    /// Step 2: Use the sensitive data (simulated)
     printf("  Step 2: Using sensitive data...\n");
     printf("  Token length: %zu bytes\n", strlen(api_token));
 
-    // Step 3: Secure clear when done
+    /// Step 3: Secure clear when done
     printf("  Step 3: Securely clearing data...\n");
     result = lle_memory_secure_clear(api_token, sizeof(api_token));
     if (result != LLE_SUCCESS) {
@@ -171,13 +171,13 @@ static int test_complete_lifecycle(void) {
     }
     printf("  ✓ Data securely cleared\n");
 
-    // Verify clearing
+    /// Verify clearing
     if (api_token[0] != '\0' || strlen(api_token) != 0) {
         printf("  ERROR: Data not properly cleared\n");
         return 0;
     }
 
-    // Step 4: Disable secure mode (unlock)
+    /// Step 4: Disable secure mode (unlock)
     if (secure_enabled) {
         printf("  Step 4: Disabling secure mode...\n");
         result = lle_memory_disable_secure_mode(api_token, sizeof(api_token));
@@ -198,14 +198,14 @@ static int test_complete_lifecycle(void) {
 static int test_multiple_regions(void) {
     printf("Testing multiple secure regions...\n");
 
-    // Allocate multiple sensitive buffers
+    /// Allocate multiple sensitive buffers
     char password[256] = "user_password_123";
     char api_key[512] = "sk_live_abc123xyz789";
     char session_token[1024] = "session_abc123def456ghi789";
 
     printf("  Securing 3 separate memory regions...\n");
 
-    // Enable secure mode for all
+    /// Enable secure mode for all
     lle_result_t r1 = lle_memory_enable_secure_mode(password, sizeof(password));
     lle_result_t r2 = lle_memory_enable_secure_mode(api_key, sizeof(api_key));
     lle_result_t r3 =
@@ -229,14 +229,14 @@ static int test_multiple_regions(void) {
         printf("  ⚠ No regions could be secured (platform limitation)\n");
     }
 
-    // Clear all regions
+    /// Clear all regions
     printf("  Clearing all regions...\n");
     lle_memory_secure_clear(password, sizeof(password));
     lle_memory_secure_clear(api_key, sizeof(api_key));
     lle_memory_secure_clear(session_token, sizeof(session_token));
     printf("  ✓ All regions cleared\n");
 
-    // Disable secure mode
+    /// Disable secure mode
     if (r1 == LLE_SUCCESS)
         lle_memory_disable_secure_mode(password, sizeof(password));
     if (r2 == LLE_SUCCESS)
@@ -256,16 +256,16 @@ static int test_multiple_regions(void) {
 static int test_graceful_degradation(void) {
     printf("Testing graceful degradation...\n");
 
-    // This test verifies that the system continues to function even when
-    // secure mode cannot be enabled (e.g., insufficient permissions)
+    /// This test verifies that the system continues to function even when
+    /// secure mode cannot be enabled (e.g., insufficient permissions)
 
     char data[128] = "test_data";
 
-    // Try to enable secure mode - may fail, that's OK
+    /// Try to enable secure mode - may fail, that's OK
     lle_result_t result = lle_memory_enable_secure_mode(data, sizeof(data));
     printf("  Enable result: %d\n", result);
 
-    // But secure_clear should ALWAYS work
+    /// But secure_clear should ALWAYS work
     result = lle_memory_secure_clear(data, sizeof(data));
     if (result != LLE_SUCCESS) {
         printf("  ERROR: secure_clear should always succeed\n");
@@ -273,13 +273,13 @@ static int test_graceful_degradation(void) {
     }
     printf("  ✓ Secure clear works even without mlock\n");
 
-    // Verify clearing worked
+    /// Verify clearing worked
     if (data[0] != 0) {
         printf("  ERROR: Data not cleared\n");
         return 0;
     }
 
-    // Disable should also be safe to call even if enable failed
+    /// Disable should also be safe to call even if enable failed
     result = lle_memory_disable_secure_mode(data, sizeof(data));
     printf("  ✓ Disable is safe to call\n");
 

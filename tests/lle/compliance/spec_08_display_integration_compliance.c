@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Test counter */
+/// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -107,7 +107,7 @@ void test_display_cache_structure(void) {
     lle_display_cache_t cache;
     memset(&cache, 0, sizeof(cache));
 
-    /* Verify cache_table field (LLE hashtable wrapper per Spec 05) */
+    /// Verify cache_table field (LLE hashtable wrapper per Spec 05)
     cache.cache_table = NULL;
     cache.policy = NULL;
     cache.metrics = NULL;
@@ -175,22 +175,22 @@ void test_render_output_structure(void) {
 void test_enum_definitions(void) {
     printf("[ TEST ] Enum type definitions\n");
 
-    /* Display sync state enum */
+    /// Display sync state enum
     lle_display_sync_state_t sync_state = LLE_DISPLAY_SYNC_IDLE;
     TEST_ASSERT(sync_state == LLE_DISPLAY_SYNC_IDLE,
                 "lle_display_sync_state_t enum defined");
 
-    /* Render stage type enum */
+    /// Render stage type enum
     lle_render_stage_type_t stage_type = LLE_RENDER_STAGE_PREPROCESSING;
     TEST_ASSERT(stage_type == LLE_RENDER_STAGE_PREPROCESSING,
                 "lle_render_stage_type_t enum defined");
 
-    /* Display event type enum */
+    /// Display event type enum
     lle_display_event_type_t event_type = LLE_DISPLAY_EVENT_BUFFER_CHANGE;
     TEST_ASSERT(event_type == LLE_DISPLAY_EVENT_BUFFER_CHANGE,
                 "lle_display_event_type_t enum defined");
 
-    /* Terminal type enum */
+    /// Terminal type enum
     lle_terminal_type_t term_type = LLE_TERMINAL_XTERM;
     TEST_ASSERT(term_type == LLE_TERMINAL_XTERM,
                 "lle_terminal_type_t enum defined");

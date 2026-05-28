@@ -1,3 +1,11 @@
+/**
+ * @file test_lush_stubs.c
+ * @brief Unit tests for lush stubs
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Stub implementations for lush dependencies
  *
@@ -9,17 +17,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ============================================================================
-// Global Variables Stubs
-// ============================================================================
+/// ============================================================================
+/// Global Variables Stubs
+/// ============================================================================
 
 int last_exit_status = 0;
 
-// ============================================================================
-// Hashtable Stubs (for symtable)
-// ============================================================================
+/// ============================================================================
+/// Hashtable Stubs (for symtable)
+/// ============================================================================
 
-// Minimal hashtable implementation for testing
+/// Minimal hashtable implementation for testing
 typedef struct ht_strstr {
     char **keys;
     char **values;

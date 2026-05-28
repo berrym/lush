@@ -1,4 +1,12 @@
 /**
+ * @file test_grapheme_nav.c
+ * @brief Manual grapheme nav manual test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Test grapheme navigation with complex emoji
  * Compile: gcc -o test_grapheme_nav test_grapheme_nav.c -I../../include
  * -L../../build/src/lle -llle -L../../build/src/pool -llush_pool
@@ -13,29 +21,29 @@ extern lush_memory_pool_t *global_memory_pool;
 int main(void) {
     printf("=== Grapheme Navigation Test ===\n\n");
 
-    /* Initialize global memory pool */
+    /// Initialize global memory pool
     if (lle_pool_init(1024 * 1024) != LLE_SUCCESS) {
         fprintf(stderr, "Failed to initialize memory pool\n");
         return 1;
     }
     global_memory_pool = lle_pool_get_global();
 
-    /* Test cases */
+    /// Test cases
     struct {
         const char *name;
         const char *text;
         size_t expected_graphemes;
     } tests[] = {
         {"Family emoji", "👨‍👩‍👧‍👦", 1},
-        {"Flag emoji", "🇺🇸", 1},
-        {"Skin tone", "👋🏽", 1},
+        {  "Flag emoji",                        "🇺🇸", 1},
+        {   "Skin tone",                      "👋🏽", 1},
     };
 
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
         printf("Test: %s\n", tests[i].name);
         printf("Text: %s\n", tests[i].text);
 
-        /* Create buffer */
+        /// Create buffer
         lle_buffer_t *buffer = NULL;
         lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
         if (result != LLE_SUCCESS) {
@@ -43,7 +51,7 @@ int main(void) {
             continue;
         }
 
-        /* Insert text at position 0 */
+        /// Insert text at position 0
         size_t text_len = strlen(tests[i].text);
         result = lle_buffer_insert_text(buffer, 0, tests[i].text, text_len);
         if (result != LLE_SUCCESS) {
@@ -61,7 +69,7 @@ int main(void) {
                buffer->cursor.codepoint_index);
         printf("  Cursor grapheme_index: %zu\n", buffer->cursor.grapheme_index);
 
-        /* Create cursor manager */
+        /// Create cursor manager
         lle_cursor_manager_t *cursor_mgr = NULL;
         result = lle_cursor_manager_init(&cursor_mgr, buffer);
         if (result != LLE_SUCCESS) {
@@ -70,7 +78,7 @@ int main(void) {
             continue;
         }
 
-        /* Try to sync cursor */
+        /// Try to sync cursor
         result = lle_cursor_manager_move_to_byte_offset(
             cursor_mgr, buffer->cursor.byte_offset);
         if (result != LLE_SUCCESS) {
@@ -84,7 +92,7 @@ int main(void) {
                    buffer->cursor.grapheme_index);
         }
 
-        /* Try moving back by 1 grapheme */
+        /// Try moving back by 1 grapheme
         printf("  Moving back by 1 grapheme...\n");
         result = lle_cursor_manager_move_by_graphemes(cursor_mgr, -1);
         if (result != LLE_SUCCESS) {

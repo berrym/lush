@@ -342,92 +342,100 @@ precmd() {
 
 ---
 
-## Plugin System
+## Extending the Shell (without a Plugin Loader)
 
-Lush includes a plugin system foundation for extending shell functionality.
+Lush does **not yet** ship a dedicated plugin loader / manager.
+That work is tracked under "User extensibility / plugins — Not yet
+implemented" in the README. What lush does ship today is enough to
+build the same patterns by composing existing mechanisms:
 
-### Plugin Architecture
+- **Hook functions** (this document) for lifecycle behavior.
+- **`display lle widget`** for custom editing actions bound to keys.
+- **`display lle hook`** for symmetric registration of widget-side
+  hooks.
+- **`display lle segment`** for custom prompt segments backed by
+  shell variables.
+- **`source`** of arbitrary shell scripts from
+  `~/.config/lush/lushrc` for any extra setup.
 
-The plugin system provides:
-- Standardized loading mechanism
-- Permission model
-- Hook integration
-- Configuration namespace
+See [LLE_GUIDE.md](LLE_GUIDE.md) "Customization" for the
+widget/hook/segment trio. The patterns below show how to organize
+an extension as a self-contained directory while we wait for the
+formal plugin system.
 
-### Plugin Location
+### Convention: Organizing Extensions
 
-Plugins are loaded from:
-- `~/.lush/plugins/`
-- `/usr/local/share/lush/plugins/`
+Even without a loader, the directory layout below is the convention
+extensions will eventually be packaged in:
 
-### Plugin Structure
-
-A plugin is a directory with:
 ```
-my_plugin/
-  init.sh      # Main entry point
-  config.sh    # Optional configuration
-  README.md    # Documentation
+~/.config/lush/extensions/my_ext/
+  init.lush      # Main entry point sourced from lushrc
+  README.md      # Documentation
 ```
 
-### Loading Plugins
+### Loading
 
 ```bash
-# In ~/.lushrc
-source ~/.lush/plugins/my_plugin/init.sh
-
-# Or use plugin manager (future)
-# plugin load my_plugin
-# plugin enable my_plugin
+# In ~/.config/lush/lushrc
+source ~/.config/lush/extensions/my_ext/init.lush
 ```
 
-### Creating a Plugin
-
-Example plugin structure:
+### Example Extension
 
 ```bash
-# ~/.lush/plugins/git_status/init.sh
+# ~/.config/lush/extensions/git_status/init.lush
 
-# Plugin: git_status
-# Description: Show git status in prompt
+# Extension: git_status
+# Description: Show git status as a custom LLE segment
 
-_git_status_precmd() {
+_git_status_compute() {
     if git rev-parse --git-dir >/dev/null 2>&1; then
-        local branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-        local status=$(git status --porcelain 2>/dev/null | wc -l)
-        
-        if [ "$status" -gt 0 ]; then
-            echo " ($branch *)"
-        else
-            echo " ($branch)"
+        local branch
+        branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+        local dirty=""
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            dirty="*"
         fi
+        GIT_STATUS_SEGMENT=" ($branch$dirty)"
+    else
+        GIT_STATUS_SEGMENT=""
     fi
 }
 
-# Register hook
-precmd_functions+=(_git_status_precmd)
+# A precmd hook keeps the segment variable current
+precmd_functions+=(_git_status_compute)
 
-# Provide unload function
+# Register a custom LLE segment backed by the variable
+display lle segment add git_status GIT_STATUS_SEGMENT
+
+# Provide an unload function
 git_status_unload() {
-    precmd_functions=(${precmd_functions[@]/_git_status_precmd})
+    precmd_functions=("${precmd_functions[@]/_git_status_compute}")
+    display lle segment remove git_status
+    unset GIT_STATUS_SEGMENT
 }
 ```
 
-### Plugin Best Practices
+### Extension Best Practices
 
-1. **Namespace your functions**: Prefix with plugin name
-2. **Provide unload function**: Allow clean removal
-3. **Don't pollute global scope**: Use local variables
-4. **Handle missing dependencies**: Check before using
-5. **Document your plugin**: Include README
+1. **Namespace your functions**: Prefix with the extension name.
+2. **Provide an unload function**: Allow clean removal even without a
+   manager.
+3. **Don't pollute global scope**: Use `local` inside helpers; the
+   exposed surface should be a small, named set of variables and
+   functions.
+4. **Handle missing dependencies**: Check `command -v` before using
+   external tools.
+5. **Document the extension**: Include a README beside `init.lush`.
 
-### Future Plugin Features
+### Toward a Formal Plugin System
 
-Planned for future releases:
-- Plugin manager with enable/disable
-- Dependency resolution
-- Permission system
-- Plugin repository
+The eventual plugin manager will add: enable/disable lifecycle,
+dependency resolution, a permission model, and a repository surface.
+Conventions in this document are designed to migrate forward — an
+extension organized as `~/.config/lush/extensions/<name>/init.lush`
+will be a one-line move to whatever the manager ends up requiring.
 
 ---
 

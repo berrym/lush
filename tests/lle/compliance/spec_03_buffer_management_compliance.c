@@ -25,15 +25,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Include only the buffer management header */
+/// Include only the buffer management header
 #include "lle/buffer_management.h"
 
-/* Test tracking */
+/// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Simple assertion macros */
+/// Simple assertion macros
 #define ASSERT_EQ(expected, actual, message)                                   \
     do {                                                                       \
         tests_run++;                                                           \
@@ -79,9 +79,7 @@ static int tests_failed = 0;
  * Buffer Constants Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify buffer size and capacity constants
- */
+/// @brief Test: Verify buffer size and capacity constants
 static bool test_buffer_size_constants(void) {
     printf("  Testing buffer size and capacity constants...\n");
 
@@ -102,9 +100,7 @@ static bool test_buffer_size_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify memory alignment constant
- */
+/// @brief Test: Verify memory alignment constant
 static bool test_memory_alignment_constant(void) {
     printf("  Testing memory alignment constant...\n");
 
@@ -114,9 +110,7 @@ static bool test_memory_alignment_constant(void) {
     return true;
 }
 
-/**
- * Test: Verify line structure limits
- */
+/// @brief Test: Verify line structure limits
 static bool test_line_structure_constants(void) {
     printf("  Testing line structure limit constants...\n");
 
@@ -129,9 +123,7 @@ static bool test_line_structure_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify UTF-8 index configuration
- */
+/// @brief Test: Verify UTF-8 index configuration
 static bool test_utf8_index_constants(void) {
     printf("  Testing UTF-8 index configuration constants...\n");
 
@@ -144,9 +136,7 @@ static bool test_utf8_index_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify change tracking limits
- */
+/// @brief Test: Verify change tracking limits
 static bool test_change_tracking_constants(void) {
     printf("  Testing change tracking limit constants...\n");
 
@@ -162,9 +152,7 @@ static bool test_change_tracking_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify cache configuration constants
- */
+/// @brief Test: Verify cache configuration constants
 static bool test_cache_configuration_constants(void) {
     printf("  Testing cache configuration constants...\n");
 
@@ -176,9 +164,7 @@ static bool test_cache_configuration_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify performance target constants
- */
+/// @brief Test: Verify performance target constants
 static bool test_performance_target_constants(void) {
     printf("  Testing performance target constants...\n");
 
@@ -194,9 +180,7 @@ static bool test_performance_target_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify buffer flag bit values
- */
+/// @brief Test: Verify buffer flag bit values
 static bool test_buffer_flags(void) {
     printf("  Testing buffer flag bit values...\n");
 
@@ -224,9 +208,7 @@ static bool test_buffer_flags(void) {
     return true;
 }
 
-/**
- * Test: Verify line flag bit values
- */
+/// @brief Test: Verify line flag bit values
 static bool test_line_flags(void) {
     printf("  Testing line flag bit values...\n");
 
@@ -241,9 +223,7 @@ static bool test_line_flags(void) {
     return true;
 }
 
-/**
- * Test: Verify cache flag bit values
- */
+/// @brief Test: Verify cache flag bit values
 static bool test_cache_flags(void) {
     printf("  Testing cache flag bit values...\n");
 
@@ -261,15 +241,13 @@ static bool test_cache_flags(void) {
  * Enumeration Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify change type enumeration
- */
+/// @brief Test: Verify change type enumeration
 static bool test_change_type_enum(void) {
     printf("  Testing change type enumeration...\n");
 
     ASSERT_EQ(1, LLE_CHANGE_TYPE_INSERT, "LLE_CHANGE_TYPE_INSERT must equal 1");
 
-    /* Verify all change types exist and are accessible */
+    /// Verify all change types exist and are accessible
     int change_types[] = {
         LLE_CHANGE_TYPE_INSERT,    LLE_CHANGE_TYPE_DELETE,
         LLE_CHANGE_TYPE_REPLACE,   LLE_CHANGE_TYPE_CURSOR_MOVE,
@@ -281,13 +259,11 @@ static bool test_change_type_enum(void) {
     return true;
 }
 
-/**
- * Test: Verify line type enumeration
- */
+/// @brief Test: Verify line type enumeration
 static bool test_line_type_enum(void) {
     printf("  Testing line type enumeration...\n");
 
-    /* Verify all line types exist and are accessible */
+    /// Verify all line types exist and are accessible
     int line_types[] = {LLE_LINE_TYPE_COMMAND, LLE_LINE_TYPE_CONTINUATION,
                         LLE_LINE_TYPE_HEREDOC, LLE_LINE_TYPE_QUOTED,
                         LLE_LINE_TYPE_COMMENT};
@@ -298,13 +274,11 @@ static bool test_line_type_enum(void) {
     return true;
 }
 
-/**
- * Test: Verify multiline state enumeration
- */
+/// @brief Test: Verify multiline state enumeration
 static bool test_multiline_state_enum(void) {
     printf("  Testing multiline state enumeration...\n");
 
-    /* Verify all multiline states exist and are accessible */
+    /// Verify all multiline states exist and are accessible
     int multiline_states[] = {
         LLE_MULTILINE_STATE_NONE,         LLE_MULTILINE_STATE_QUOTE_SINGLE,
         LLE_MULTILINE_STATE_QUOTE_DOUBLE, LLE_MULTILINE_STATE_QUOTE_BACKTICK,
@@ -322,22 +296,18 @@ static bool test_multiline_state_enum(void) {
  * Structure Definition Tests
  * ========================================================================== */
 
-/**
- * Test: Verify lle_buffer_t structure is defined
- */
+/// @brief Test: Verify lle_buffer_t structure is defined
 static bool test_buffer_structure_defined(void) {
     printf("  Testing lle_buffer_t structure is defined...\n");
 
-    /* This will fail to compile if structure is not defined */
+    /// This will fail to compile if structure is not defined
     ASSERT_TRUE(sizeof(lle_buffer_t) > 0,
                 "lle_buffer_t structure must be defined");
 
     return true;
 }
 
-/**
- * Test: Verify lle_line_info_t structure is defined
- */
+/// @brief Test: Verify lle_line_info_t structure is defined
 static bool test_line_info_structure_defined(void) {
     printf("  Testing lle_line_info_t structure is defined...\n");
 
@@ -347,9 +317,7 @@ static bool test_line_info_structure_defined(void) {
     return true;
 }
 
-/**
- * Test: Verify lle_cursor_position_t structure is defined
- */
+/// @brief Test: Verify lle_cursor_position_t structure is defined
 static bool test_cursor_position_structure_defined(void) {
     printf("  Testing lle_cursor_position_t structure is defined...\n");
 
@@ -359,9 +327,7 @@ static bool test_cursor_position_structure_defined(void) {
     return true;
 }
 
-/**
- * Test: Verify lle_selection_range_t structure is defined
- */
+/// @brief Test: Verify lle_selection_range_t structure is defined
 static bool test_selection_range_structure_defined(void) {
     printf("  Testing lle_selection_range_t structure is defined...\n");
 
@@ -384,7 +350,7 @@ int main(void) {
     printf(
         "==============================================================\n\n");
 
-    /* Run all compliance tests */
+    /// Run all compliance tests
     test_buffer_size_constants();
     test_memory_alignment_constant();
     test_line_structure_constants();
@@ -403,7 +369,7 @@ int main(void) {
     test_cursor_position_structure_defined();
     test_selection_range_structure_defined();
 
-    /* Print results */
+    /// Print results
     printf("\n");
     printf("==============================================================\n");
     printf("Tests run:    %d\n", tests_run);

@@ -21,6 +21,7 @@
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/memory_management.h"
+#include "lle/unicode_compare.h"
 #include "posix_history.h"
 
 #include <errno.h>
@@ -31,8 +32,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* GNU Readline headers - conditionally included */
-/* HAVE_READLINE is defined by meson build system (-DHAVE_READLINE=0/1) */
+/// GNU Readline headers - conditionally included
+/// HAVE_READLINE is defined by meson build system (-DHAVE_READLINE=0/1)
 #if HAVE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -47,32 +48,32 @@
  * Bridge state structure
  */
 typedef struct lle_history_bridge {
-    lle_history_core_t *lle_core;           /* LLE history core */
-    posix_history_manager_t *posix_manager; /* POSIX history manager */
-    lle_memory_pool_t *memory_pool;         /* Memory pool */
+    lle_history_core_t *lle_core;           ///< LLE history core
+    posix_history_manager_t *posix_manager; ///< POSIX history manager
+    lle_memory_pool_t *memory_pool;         ///< Memory pool
 
-    /* Synchronization state */
-    bool readline_sync_enabled;     /* Sync with GNU Readline */
-    bool posix_sync_enabled;        /* Sync with POSIX manager */
-    uint64_t last_readline_sync_id; /* Last synced readline entry */
-    uint64_t last_posix_sync_id;    /* Last synced POSIX entry */
+    /// Synchronization state
+    bool readline_sync_enabled;     ///< Sync with GNU Readline
+    bool posix_sync_enabled;        ///< Sync with POSIX manager
+    uint64_t last_readline_sync_id; ///< Last synced readline entry
+    uint64_t last_posix_sync_id;    ///< Last synced POSIX entry
 
-    /* Configuration */
-    bool auto_sync;          /* Automatic sync on add */
-    bool bidirectional_sync; /* Bidirectional sync */
-    bool import_on_init;     /* Import existing history */
+    /// Configuration
+    bool auto_sync;          ///< Automatic sync on add
+    bool bidirectional_sync; ///< Bidirectional sync
+    bool import_on_init;     ///< Import existing history
 
-    /* Statistics */
-    size_t readline_imports; /* Readline imports count */
-    size_t readline_exports; /* Readline exports count */
-    size_t posix_imports;    /* POSIX imports count */
-    size_t posix_exports;    /* POSIX exports count */
-    size_t sync_errors;      /* Synchronization errors */
+    /// Statistics
+    size_t readline_imports; ///< Readline imports count
+    size_t readline_exports; ///< Readline exports count
+    size_t posix_imports;    ///< POSIX imports count
+    size_t posix_exports;    ///< POSIX exports count
+    size_t sync_errors;      ///< Synchronization errors
 
-    bool initialized; /* Initialization flag */
+    bool initialized; ///< Initialization flag
 } lle_history_bridge_t;
 
-/* Global bridge instance */
+/// Global bridge instance
 static lle_history_bridge_t *g_bridge = NULL;
 
 /* ============================================================================
@@ -128,7 +129,7 @@ static bool should_ignore_command(const char *command) {
         return true;
     }
 
-    /* Check for whitespace-only */
+    /// Check for whitespace-only
     const char *p = command;
     while (*p) {
         if (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\r') {
@@ -166,34 +167,34 @@ lle_result_t lle_history_bridge_init(lle_history_core_t *lle_core,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if already initialized */
+    /// Check if already initialized
     if (g_bridge && g_bridge->initialized) {
         return LLE_ERROR_ALREADY_INITIALIZED;
     }
 
-    /* Allocate bridge */
+    /// Allocate bridge
     lle_result_t result = bridge_alloc(&g_bridge, memory_pool);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Initialize bridge state */
+    /// Initialize bridge state
     g_bridge->lle_core = lle_core;
     g_bridge->posix_manager = posix_manager;
     g_bridge->memory_pool = memory_pool;
 
-    /* Default configuration */
+    /// Default configuration
     g_bridge->readline_sync_enabled = true;
     g_bridge->posix_sync_enabled = (posix_manager != NULL);
     g_bridge->auto_sync = true;
     g_bridge->bidirectional_sync = true;
     g_bridge->import_on_init = true;
 
-    /* Initialize sync IDs */
+    /// Initialize sync IDs
     g_bridge->last_readline_sync_id = 0;
     g_bridge->last_posix_sync_id = 0;
 
-    /* Reset statistics */
+    /// Reset statistics
     g_bridge->readline_imports = 0;
     g_bridge->readline_exports = 0;
     g_bridge->posix_imports = 0;
@@ -202,14 +203,14 @@ lle_result_t lle_history_bridge_init(lle_history_core_t *lle_core,
 
     g_bridge->initialized = true;
 
-    /* Import existing history if configured */
+    /// Import existing history if configured
     if (g_bridge->import_on_init) {
-        /* Import from GNU Readline */
+        /// Import from GNU Readline
         if (g_bridge->readline_sync_enabled) {
             lle_history_bridge_import_from_readline();
         }
 
-        /* Import from POSIX */
+        /// Import from POSIX
         if (g_bridge->posix_sync_enabled && posix_manager) {
             lle_history_bridge_import_from_posix();
         }
@@ -230,7 +231,7 @@ lle_result_t lle_history_bridge_shutdown(void) {
         return LLE_SUCCESS;
     }
 
-    /* Final sync before shutdown */
+    /// Final sync before shutdown
     if (g_bridge->initialized) {
         if (g_bridge->readline_sync_enabled) {
             lle_history_bridge_export_to_readline();
@@ -241,7 +242,7 @@ lle_result_t lle_history_bridge_shutdown(void) {
         }
     }
 
-    /* Free bridge */
+    /// Free bridge
     bridge_free(g_bridge);
     g_bridge = NULL;
 
@@ -277,16 +278,16 @@ lle_result_t lle_history_bridge_import_from_readline(void) {
     }
 
     if (!g_bridge->readline_sync_enabled) {
-        return LLE_SUCCESS; /* Not an error, just disabled */
+        return LLE_SUCCESS; /// Not an error, just disabled
     }
 
-    /* Get readline history list */
+    /// Get readline history list
     HIST_ENTRY **hist_list = history_list();
     if (!hist_list) {
-        return LLE_SUCCESS; /* No history to import */
+        return LLE_SUCCESS; /// No history to import
     }
 
-    /* Import each entry */
+    /// Import each entry
     size_t imported = 0;
     for (int i = 0; hist_list[i] != NULL; i++) {
         const char *command = hist_list[i]->line;
@@ -295,10 +296,10 @@ lle_result_t lle_history_bridge_import_from_readline(void) {
             continue;
         }
 
-        /* Add to LLE core */
+        /// Add to LLE core
         uint64_t entry_id = 0;
         lle_result_t result = lle_history_add_entry(g_bridge->lle_core, command,
-                                                    -1, /* Unknown exit code */
+                                                    -1, /// Unknown exit code
                                                     &entry_id);
 
         if (result == LLE_SUCCESS) {
@@ -313,7 +314,7 @@ lle_result_t lle_history_bridge_import_from_readline(void) {
 
     return LLE_SUCCESS;
 #else
-    /* Readline not available */
+    /// Readline not available
     (void)g_bridge;
     return LLE_SUCCESS;
 #endif
@@ -337,7 +338,7 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
         return LLE_SUCCESS;
     }
 
-    /* Get entry count from LLE core */
+    /// Get entry count from LLE core
     size_t entry_count = 0;
     lle_result_t result =
         lle_history_get_entry_count(g_bridge->lle_core, &entry_count);
@@ -345,7 +346,7 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
         return result;
     }
 
-    /* Export each entry to readline */
+    /// Export each entry to readline
     size_t exported = 0;
     for (size_t i = 0; i < entry_count; i++) {
         lle_history_entry_t *entry = NULL;
@@ -355,13 +356,16 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
             continue;
         }
 
-        /* Check if already in readline (avoid duplicates) */
+        /// Check if already in readline (avoid duplicates). NFC-
+        /// equivalent so the same command stored under different
+        /// normalizations does not push twice on the readline side.
         HIST_ENTRY *last = history_get(history_length);
-        if (last && strcmp(last->line, entry->command) == 0) {
+        if (last &&
+            lle_unicode_strings_equal(last->line, entry->command, NULL)) {
             continue;
         }
 
-        /* Add to readline history */
+        /// Add to readline history
         add_history(entry->command);
         exported++;
     }
@@ -370,7 +374,7 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
 
     return LLE_SUCCESS;
 #else
-    /* Readline not available */
+    /// Readline not available
     return LLE_SUCCESS;
 #endif
 }
@@ -399,7 +403,7 @@ lle_history_bridge_sync_entry_to_readline(const lle_history_entry_t *entry) {
         return LLE_SUCCESS;
     }
 
-    /* Add to readline */
+    /// Add to readline
     add_history(entry->command);
     g_bridge->readline_exports++;
 
@@ -460,7 +464,7 @@ lle_result_t lle_history_bridge_import_from_posix(void) {
 
     posix_history_manager_t *mgr = g_bridge->posix_manager;
 
-    /* Import each entry from POSIX manager */
+    /// Import each entry from POSIX manager
     size_t imported = 0;
     for (size_t i = 0; i < mgr->count; i++) {
         const char *command = mgr->entries[i].command;
@@ -469,10 +473,10 @@ lle_result_t lle_history_bridge_import_from_posix(void) {
             continue;
         }
 
-        /* Add to LLE core */
+        /// Add to LLE core
         uint64_t entry_id = 0;
         lle_result_t result = lle_history_add_entry(g_bridge->lle_core, command,
-                                                    -1, /* Unknown exit code */
+                                                    -1, /// Unknown exit code
                                                     &entry_id);
 
         if (result == LLE_SUCCESS) {
@@ -505,7 +509,7 @@ lle_result_t lle_history_bridge_export_to_posix(void) {
         return LLE_SUCCESS;
     }
 
-    /* Get entry count from LLE core */
+    /// Get entry count from LLE core
     size_t entry_count = 0;
     lle_result_t result =
         lle_history_get_entry_count(g_bridge->lle_core, &entry_count);
@@ -513,7 +517,7 @@ lle_result_t lle_history_bridge_export_to_posix(void) {
         return result;
     }
 
-    /* Export each entry to POSIX manager */
+    /// Export each entry to POSIX manager
     size_t exported = 0;
     for (size_t i = 0; i < entry_count; i++) {
         lle_history_entry_t *entry = NULL;
@@ -523,7 +527,7 @@ lle_result_t lle_history_bridge_export_to_posix(void) {
             continue;
         }
 
-        /* Add to POSIX manager (posix_history_add handles duplicates) */
+        /// Add to POSIX manager (posix_history_add handles duplicates)
         int posix_number =
             posix_history_add(g_bridge->posix_manager, entry->command);
         if (posix_number > 0) {
@@ -559,7 +563,7 @@ lle_history_bridge_sync_entry_to_posix(const lle_history_entry_t *entry) {
         return LLE_SUCCESS;
     }
 
-    /* Add to POSIX manager */
+    /// Add to POSIX manager
     posix_history_add(g_bridge->posix_manager, entry->command);
     g_bridge->posix_exports++;
 
@@ -593,7 +597,7 @@ lle_result_t lle_history_bridge_add_entry(const char *command, int exit_code,
         return LLE_SUCCESS;
     }
 
-    /* Add to LLE core */
+    /// Add to LLE core
     uint64_t id = 0;
     lle_result_t result =
         lle_history_add_entry(g_bridge->lle_core, command, exit_code, &id);
@@ -606,19 +610,19 @@ lle_result_t lle_history_bridge_add_entry(const char *command, int exit_code,
         *entry_id = id;
     }
 
-    /* Auto-sync if enabled */
+    /// Auto-sync if enabled
     if (g_bridge->auto_sync) {
-        /* Get the entry we just added */
+        /// Get the entry we just added
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_id(g_bridge->lle_core, id, &entry);
 
         if (result == LLE_SUCCESS && entry) {
-            /* Sync to readline */
+            /// Sync to readline
             if (g_bridge->readline_sync_enabled) {
                 lle_history_bridge_sync_entry_to_readline(entry);
             }
 
-            /* Sync to POSIX */
+            /// Sync to POSIX
             if (g_bridge->posix_sync_enabled && g_bridge->posix_manager) {
                 lle_history_bridge_sync_entry_to_posix(entry);
             }
@@ -643,7 +647,7 @@ lle_result_t lle_history_bridge_sync_all(void) {
 
     lle_result_t result;
 
-    /* Export LLE to other systems */
+    /// Export LLE to other systems
     if (g_bridge->readline_sync_enabled) {
         result = lle_history_bridge_export_to_readline();
         if (result != LLE_SUCCESS) {
@@ -688,7 +692,7 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
     (void)argc;
     (void)argv;
 
-    /* Get entry count */
+    /// Get entry count
     size_t entry_count = 0;
     lle_result_t result =
         lle_history_get_entry_count(g_bridge->lle_core, &entry_count);
@@ -696,7 +700,7 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
         return result;
     }
 
-    /* Allocate output buffer (estimate 100 bytes per entry) */
+    /// Allocate output buffer (estimate 100 bytes per entry)
     size_t buffer_size = entry_count * 100 + 1024;
     char *buffer = (char *)lle_pool_alloc(buffer_size);
     if (!buffer) {
@@ -706,7 +710,7 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
     buffer[0] = '\0';
     size_t buffer_used = 0;
 
-    /* Format each entry: "  ID  command" */
+    /// Format each entry: "  ID  command"
     for (size_t i = 0; i < entry_count; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_index(g_bridge->lle_core, i, &entry);
@@ -715,12 +719,12 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
             continue;
         }
 
-        /* Skip deleted entries (removed by deduplication) */
+        /// Skip deleted entries (removed by deduplication)
         if (entry->state == LLE_HISTORY_STATE_DELETED) {
             continue;
         }
 
-        /* Format entry */
+        /// Format entry
         int written = snprintf(
             buffer + buffer_used, buffer_size - buffer_used, "%5llu  %s\n",
             (unsigned long long)entry->entry_id, entry->command);
@@ -728,7 +732,7 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
         if (written > 0 && (size_t)written < buffer_size - buffer_used) {
             buffer_used += written;
         } else {
-            /* Buffer full */
+            /// Buffer full
             break;
         }
     }
@@ -736,7 +740,7 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
     if (output) {
         *output = buffer;
     } else {
-        /* Print to stdout */
+        /// Print to stdout
         printf("%s", buffer);
         lle_pool_free(buffer);
     }
@@ -758,7 +762,7 @@ lle_result_t lle_history_bridge_get_by_number(uint64_t number,
         return LLE_ERROR_NOT_INITIALIZED;
     }
 
-    /* In LLE, entry_id is the number */
+    /// In LLE, entry_id is the number
     return lle_history_get_entry_by_id(g_bridge->lle_core, number, entry);
 }
 

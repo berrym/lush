@@ -55,7 +55,7 @@ int bin_break(int argc, char **argv) {
         return 1;
     }
 
-    // Parse optional level argument (break n)
+    /// Parse optional level argument (break n)
     int break_level = 1;
     if (argc > 1) {
         char *endptr;
@@ -133,7 +133,7 @@ int bin_break(int argc, char **argv) {
         }
     }
 
-    // Set loop control state to break
+    /// Set loop control state to break
     current_executor->loop_control = LOOP_BREAK;
 
     return 0;

@@ -37,9 +37,9 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define LAYER_EVENTS_VERSION_MAJOR 1
 #define LAYER_EVENTS_VERSION_MINOR 0
@@ -50,95 +50,95 @@ extern "C" {
 #define LAYER_EVENTS_MAX_EVENT_DATA_SIZE 1024
 #define LAYER_EVENTS_MAX_EVENT_TYPE_NAME 32
 
-// Event processing timeouts
+/// Event processing timeouts
 #define LAYER_EVENTS_DEFAULT_TIMEOUT_MS 50
 #define LAYER_EVENTS_CRITICAL_TIMEOUT_MS 10
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for layer events operations
  */
 typedef enum {
-    LAYER_EVENTS_SUCCESS = 0,                // Operation completed successfully
-    LAYER_EVENTS_ERROR_INVALID_PARAM,        // Invalid parameter provided
-    LAYER_EVENTS_ERROR_MEMORY_ALLOCATION,    // Memory allocation failed
-    LAYER_EVENTS_ERROR_QUEUE_FULL,           // Event queue is full
-    LAYER_EVENTS_ERROR_QUEUE_EMPTY,          // Event queue is empty
-    LAYER_EVENTS_ERROR_SUBSCRIBER_NOT_FOUND, // Subscriber not found
-    LAYER_EVENTS_ERROR_MAX_SUBSCRIBERS,      // Maximum subscribers reached
-    LAYER_EVENTS_ERROR_EVENT_TOO_LARGE,      // Event data too large
-    LAYER_EVENTS_ERROR_TIMEOUT,              // Event processing timeout
-    LAYER_EVENTS_ERROR_NOT_INITIALIZED       // Events system not initialized
+    LAYER_EVENTS_SUCCESS = 0,             /// Operation completed successfully
+    LAYER_EVENTS_ERROR_INVALID_PARAM,     /// Invalid parameter provided
+    LAYER_EVENTS_ERROR_MEMORY_ALLOCATION, /// Memory allocation failed
+    LAYER_EVENTS_ERROR_QUEUE_FULL,        /// Event queue is full
+    LAYER_EVENTS_ERROR_QUEUE_EMPTY,       /// Event queue is empty
+    LAYER_EVENTS_ERROR_SUBSCRIBER_NOT_FOUND, /// Subscriber not found
+    LAYER_EVENTS_ERROR_MAX_SUBSCRIBERS,      /// Maximum subscribers reached
+    LAYER_EVENTS_ERROR_EVENT_TOO_LARGE,      /// Event data too large
+    LAYER_EVENTS_ERROR_TIMEOUT,              /// Event processing timeout
+    LAYER_EVENTS_ERROR_NOT_INITIALIZED       /// Events system not initialized
 } layer_events_error_t;
 
 /**
  * Event types for layer communication
  */
 typedef enum {
-    LAYER_EVENT_NONE = 0, // No event / invalid
+    LAYER_EVENT_NONE = 0, /// No event / invalid
 
-    // Content change events
-    LAYER_EVENT_CONTENT_CHANGED, // Layer content has changed
-    LAYER_EVENT_TEXT_UPDATED,    // Text content updated
-    LAYER_EVENT_STYLE_UPDATED,   // Text styling updated
+    /// Content change events
+    LAYER_EVENT_CONTENT_CHANGED, /// Layer content has changed
+    LAYER_EVENT_TEXT_UPDATED,    /// Text content updated
+    LAYER_EVENT_STYLE_UPDATED,   /// Text styling updated
 
-    // Layout and positioning events
-    LAYER_EVENT_SIZE_CHANGED,     // Layer or terminal size changed
-    LAYER_EVENT_POSITION_CHANGED, // Layer position changed
-    LAYER_EVENT_CURSOR_MOVED,     // Cursor position changed
+    /// Layout and positioning events
+    LAYER_EVENT_SIZE_CHANGED,     /// Layer or terminal size changed
+    LAYER_EVENT_POSITION_CHANGED, /// Layer position changed
+    LAYER_EVENT_CURSOR_MOVED,     /// Cursor position changed
 
-    // Display and rendering events
-    LAYER_EVENT_REDRAW_NEEDED,      // Layer needs redraw
-    LAYER_EVENT_REFRESH_REQUESTED,  // Full refresh requested
-    LAYER_EVENT_VISIBILITY_CHANGED, // Layer visibility changed
+    /// Display and rendering events
+    LAYER_EVENT_REDRAW_NEEDED,      /// Layer needs redraw
+    LAYER_EVENT_REFRESH_REQUESTED,  /// Full refresh requested
+    LAYER_EVENT_VISIBILITY_CHANGED, /// Layer visibility changed
 
-    // Theme and appearance events
-    LAYER_EVENT_THEME_CHANGED,        // Color theme changed
-    LAYER_EVENT_COLOR_SCHEME_UPDATED, // Color scheme updated
-    LAYER_EVENT_FONT_CHANGED,         // Font or font size changed
+    /// Theme and appearance events
+    LAYER_EVENT_THEME_CHANGED,        /// Color theme changed
+    LAYER_EVENT_COLOR_SCHEME_UPDATED, /// Color scheme updated
+    LAYER_EVENT_FONT_CHANGED,         /// Font or font size changed
 
-    // User interaction events
-    LAYER_EVENT_INPUT_RECEIVED, // User input received
-    LAYER_EVENT_FOCUS_GAINED,   // Layer gained focus
-    LAYER_EVENT_FOCUS_LOST,     // Layer lost focus
+    /// User interaction events
+    LAYER_EVENT_INPUT_RECEIVED, /// User input received
+    LAYER_EVENT_FOCUS_GAINED,   /// Layer gained focus
+    LAYER_EVENT_FOCUS_LOST,     /// Layer lost focus
 
-    // System events
-    LAYER_EVENT_TERMINAL_RESIZE,         // Terminal was resized
-    LAYER_EVENT_INITIALIZATION_COMPLETE, // Layer initialization done
-    LAYER_EVENT_CLEANUP_REQUESTED,       // Layer cleanup requested
-    LAYER_EVENT_ERROR_OCCURRED,          // Error occurred in layer
+    /// System events
+    LAYER_EVENT_TERMINAL_RESIZE,         /// Terminal was resized
+    LAYER_EVENT_INITIALIZATION_COMPLETE, /// Layer initialization done
+    LAYER_EVENT_CLEANUP_REQUESTED,       /// Layer cleanup requested
+    LAYER_EVENT_ERROR_OCCURRED,          /// Error occurred in layer
 
-    // Performance and debugging events
-    LAYER_EVENT_PERFORMANCE_WARNING, // Performance issue detected
-    LAYER_EVENT_DEBUG_INFO,          // Debug information available
+    /// Performance and debugging events
+    LAYER_EVENT_PERFORMANCE_WARNING, /// Performance issue detected
+    LAYER_EVENT_DEBUG_INFO,          /// Debug information available
 
-    // Custom events (for future extensibility)
-    LAYER_EVENT_CUSTOM_START = 1000 // Start of custom event range
+    /// Custom events (for future extensibility)
+    LAYER_EVENT_CUSTOM_START = 1000 /// Start of custom event range
 } layer_event_type_t;
 
 /**
  * Event priority levels
  */
 typedef enum {
-    LAYER_EVENT_PRIORITY_LOW = 0,     // Low priority, can be delayed
-    LAYER_EVENT_PRIORITY_NORMAL = 1,  // Normal priority
-    LAYER_EVENT_PRIORITY_HIGH = 2,    // High priority, process quickly
-    LAYER_EVENT_PRIORITY_CRITICAL = 3 // Critical, process immediately
+    LAYER_EVENT_PRIORITY_LOW = 0,     /// Low priority, can be delayed
+    LAYER_EVENT_PRIORITY_NORMAL = 1,  /// Normal priority
+    LAYER_EVENT_PRIORITY_HIGH = 2,    /// High priority, process quickly
+    LAYER_EVENT_PRIORITY_CRITICAL = 3 /// Critical, process immediately
 } layer_event_priority_t;
 
 /**
  * Event processing flags
  */
 typedef enum {
-    LAYER_EVENT_FLAG_NONE = 0,              // No special flags
-    LAYER_EVENT_FLAG_ASYNC = (1 << 0),      // Process asynchronously
-    LAYER_EVENT_FLAG_BROADCAST = (1 << 1),  // Broadcast to all subscribers
-    LAYER_EVENT_FLAG_ONCE = (1 << 2),       // Process only once
-    LAYER_EVENT_FLAG_PERSISTENT = (1 << 3), // Keep event data after processing
-    LAYER_EVENT_FLAG_NO_QUEUE = (1 << 4)    // Process immediately, don't queue
+    LAYER_EVENT_FLAG_NONE = 0,              /// No special flags
+    LAYER_EVENT_FLAG_ASYNC = (1 << 0),      /// Process asynchronously
+    LAYER_EVENT_FLAG_BROADCAST = (1 << 1),  /// Broadcast to all subscribers
+    LAYER_EVENT_FLAG_ONCE = (1 << 2),       /// Process only once
+    LAYER_EVENT_FLAG_PERSISTENT = (1 << 3), /// Keep event data after processing
+    LAYER_EVENT_FLAG_NO_QUEUE = (1 << 4)    /// Process immediately, don't queue
 } layer_event_flags_t;
 
 /**
@@ -152,55 +152,55 @@ typedef enum {
     LAYER_ID_COMMAND_LAYER = 4,
     LAYER_ID_COMPOSITION_ENGINE = 5,
     LAYER_ID_DISPLAY_CONTROLLER = 6,
-    LAYER_ID_AUTOSUGGESTIONS = 7, // Fish-like autosuggestions layer
-    LAYER_ID_EXTERNAL = 100       // External components
+    LAYER_ID_AUTOSUGGESTIONS = 7, /// Fish-like autosuggestions layer
+    LAYER_ID_EXTERNAL = 100       /// External components
 } layer_id_t;
 
 /**
  * Event data structure for different event types
  */
 typedef union {
-    // Content change data
+    /// Content change data
     struct {
         const char *new_content;
         size_t content_length;
         bool needs_reflow;
     } content_changed;
 
-    // Size change data
+    /// Size change data
     struct {
         int old_width, old_height;
         int new_width, new_height;
     } size_changed;
 
-    // Position change data
+    /// Position change data
     struct {
         int old_row, old_column;
         int new_row, new_column;
     } position_changed;
 
-    // Theme change data
+    /// Theme change data
     struct {
         const char *theme_name;
         uint32_t color_count;
         void *color_palette;
     } theme_changed;
 
-    // Error data
+    /// Error data
     struct {
         int error_code;
         const char *error_message;
         const char *context;
     } error_occurred;
 
-    // Performance warning data
+    /// Performance warning data
     struct {
         const char *warning_type;
         uint64_t metric_value;
         uint64_t threshold_value;
     } performance_warning;
 
-    // Generic data for custom events
+    /// Generic data for custom events
     struct {
         void *data;
         size_t data_size;
@@ -212,22 +212,22 @@ typedef union {
  * Layer event structure
  */
 typedef struct {
-    layer_event_type_t type;         // Event type
-    layer_id_t source_layer;         // Layer that generated the event
-    layer_id_t target_layer;         // Target layer (0 for broadcast)
-    layer_event_priority_t priority; // Event priority
-    layer_event_flags_t flags;       // Processing flags
+    layer_event_type_t type;         /// Event type
+    layer_id_t source_layer;         /// Layer that generated the event
+    layer_id_t target_layer;         /// Target layer (0 for broadcast)
+    layer_event_priority_t priority; /// Event priority
+    layer_event_flags_t flags;       /// Processing flags
 
-    uint64_t timestamp;       // Event creation timestamp
-    uint32_t sequence_number; // Global sequence number
-    uint32_t event_id;        // Unique event identifier
+    uint64_t timestamp;       /// Event creation timestamp
+    uint32_t sequence_number; /// Global sequence number
+    uint32_t event_id;        /// Unique event identifier
 
-    layer_event_data_t data; // Event-specific data
+    layer_event_data_t data; /// Event-specific data
 
-    // Internal processing data
-    uint32_t processing_attempts;  // Number of processing attempts
-    uint64_t last_processing_time; // Last processing attempt time
-    bool processed;                // Whether event was processed
+    /// Internal processing data
+    uint32_t processing_attempts;  /// Number of processing attempts
+    uint64_t last_processing_time; /// Last processing attempt time
+    bool processed;                /// Whether event was processed
 } layer_event_t;
 
 /**
@@ -240,42 +240,42 @@ typedef layer_events_error_t (*layer_event_callback_t)(
  * Event subscriber information
  */
 typedef struct {
-    layer_event_type_t event_type;       // Type of events to receive
-    layer_id_t subscriber_id;            // ID of subscribing layer
-    layer_event_callback_t callback;     // Callback function
-    void *user_data;                     // User data for callback
-    layer_event_priority_t min_priority; // Minimum priority to process
-    bool active;                         // Whether subscription is active
-    uint64_t events_received;            // Number of events received
-    uint64_t events_processed;           // Number of events processed
-    uint64_t last_event_time;            // Timestamp of last event
+    layer_event_type_t event_type;       /// Type of events to receive
+    layer_id_t subscriber_id;            /// ID of subscribing layer
+    layer_event_callback_t callback;     /// Callback function
+    void *user_data;                     /// User data for callback
+    layer_event_priority_t min_priority; /// Minimum priority to process
+    bool active;                         /// Whether subscription is active
+    uint64_t events_received;            /// Number of events received
+    uint64_t events_processed;           /// Number of events processed
+    uint64_t last_event_time;            /// Timestamp of last event
 } layer_event_subscriber_t;
 
 /**
  * Event statistics structure
  */
 typedef struct {
-    uint64_t events_published;         // Total events published
-    uint64_t events_processed;         // Total events processed
-    uint64_t events_dropped;           // Events dropped due to queue full
-    uint64_t events_failed;            // Events that failed processing
-    uint64_t queue_overflows;          // Number of queue overflow events
-    uint64_t total_processing_time_ns; // Total time spent processing
-    uint32_t current_queue_size;       // Current number of queued events
-    uint32_t max_queue_size_reached;   // Maximum queue size reached
-    uint32_t active_subscribers;       // Number of active subscribers
+    uint64_t events_published;         /// Total events published
+    uint64_t events_processed;         /// Total events processed
+    uint64_t events_dropped;           /// Events dropped due to queue full
+    uint64_t events_failed;            /// Events that failed processing
+    uint64_t queue_overflows;          /// Number of queue overflow events
+    uint64_t total_processing_time_ns; /// Total time spent processing
+    uint32_t current_queue_size;       /// Current number of queued events
+    uint32_t max_queue_size_reached;   /// Maximum queue size reached
+    uint32_t active_subscribers;       /// Number of active subscribers
 } layer_event_stats_t;
 
 /**
  * Event system configuration
  */
 typedef struct {
-    uint32_t max_queue_size;            // Maximum events in queue
-    uint32_t max_subscribers;           // Maximum number of subscribers
-    uint32_t processing_timeout_ms;     // Processing timeout in milliseconds
-    bool enable_debugging;              // Enable debug logging
-    bool enable_performance_monitoring; // Enable performance monitoring
-    bool auto_cleanup_processed_events; // Auto-cleanup processed events
+    uint32_t max_queue_size;            /// Maximum events in queue
+    uint32_t max_subscribers;           /// Maximum number of subscribers
+    uint32_t processing_timeout_ms;     /// Processing timeout in milliseconds
+    bool enable_debugging;              /// Enable debug logging
+    bool enable_performance_monitoring; /// Enable performance monitoring
+    bool auto_cleanup_processed_events; /// Auto-cleanup processed events
 } layer_events_config_t;
 
 /**
@@ -283,9 +283,9 @@ typedef struct {
  */
 typedef struct layer_event_system layer_event_system_t;
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * Create a new layer events system
@@ -341,9 +341,9 @@ layer_events_error_t layer_events_cleanup(layer_event_system_t *events);
  */
 void layer_events_destroy(layer_event_system_t *events);
 
-// ============================================================================
-// EVENT PUBLISHING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT PUBLISHING FUNCTIONS
+/// ============================================================================
 
 /**
  * Publish an event to the system
@@ -413,9 +413,9 @@ layer_events_error_t layer_events_publish_size_changed(
     layer_event_system_t *events, layer_id_t source_layer, int old_width,
     int old_height, int new_width, int new_height);
 
-// ============================================================================
-// EVENT SUBSCRIPTION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT SUBSCRIPTION FUNCTIONS
+/// ============================================================================
 
 /**
  * Subscribe to events of a specific type
@@ -466,9 +466,9 @@ layer_events_error_t layer_events_unsubscribe(layer_event_system_t *events,
 layer_events_error_t layer_events_unsubscribe_all(layer_event_system_t *events,
                                                   layer_id_t subscriber_id);
 
-// ============================================================================
-// EVENT PROCESSING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT PROCESSING FUNCTIONS
+/// ============================================================================
 
 /**
  * Process pending events
@@ -521,9 +521,9 @@ bool layer_events_has_pending(layer_event_system_t *events);
  */
 uint32_t layer_events_get_pending_count(layer_event_system_t *events);
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * Get event type name
@@ -568,9 +568,9 @@ layer_events_config_t layer_events_create_default_config(void);
  */
 bool layer_events_validate_event(const layer_event_t *event);
 
-// ============================================================================
-// PERFORMANCE AND DIAGNOSTICS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND DIAGNOSTICS
+/// ============================================================================
 
 /**
  * Get event system statistics
@@ -620,9 +620,9 @@ layer_events_set_debug_enabled(layer_event_system_t *events, bool enabled);
 layer_events_error_t layer_events_dump_state(layer_event_system_t *events,
                                              bool include_queue_contents);
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
+/// ============================================================================
+/// ERROR HANDLING
+/// ============================================================================
 
 /**
  * Get error description string
@@ -637,9 +637,9 @@ layer_events_error_t layer_events_dump_state(layer_event_system_t *events,
  */
 const char *layer_events_error_string(layer_events_error_t error);
 
-// ============================================================================
-// VERSION INFORMATION
-// ============================================================================
+/// ============================================================================
+/// VERSION INFORMATION
+/// ============================================================================
 
 /**
  * Get layer events system version
@@ -667,11 +667,11 @@ static inline void layer_events_get_version(int *major, int *minor,
 }
 #endif
 
-#endif /* LAYER_EVENTS_H */
+#endif /// LAYER_EVENTS_H
 
-// ============================================================================
-// USAGE EXAMPLES
-// ============================================================================
+/// ============================================================================
+/// USAGE EXAMPLES
+/// ============================================================================
 
 /*
  * Basic usage example:
@@ -679,30 +679,30 @@ static inline void layer_events_get_version(int *major, int *minor,
  * ```c
  * #include "layer_events.h"
  *
- * // Event callback function
+ * /// Event callback function
  * layer_events_error_t handle_content_change(const layer_event_t *event, void
  * *user_data) { printf("Content changed: %s\n",
  * event->data.content_changed.new_content); return LAYER_EVENTS_SUCCESS;
  * }
  *
  * int main() {
- *     // Create event system
+ *     /// Create event system
  *     layer_event_system_t *events = layer_events_create(NULL);
  *     layer_events_init(events);
  *
- *     // Subscribe to content change events
+ *     /// Subscribe to content change events
  *     layer_events_subscribe(events, LAYER_EVENT_CONTENT_CHANGED,
  *                            LAYER_ID_COMMAND_LAYER, handle_content_change,
  *                            NULL, LAYER_EVENT_PRIORITY_NORMAL);
  *
- *     // Publish a content change event
+ *     /// Publish a content change event
  *     layer_events_publish_content_changed(events, LAYER_ID_PROMPT_LAYER,
  *                                          "New prompt text", 15, false);
  *
- *     // Process events
+ *     /// Process events
  *     layer_events_process_pending(events, 0, 100);
  *
- *     // Cleanup
+ *     /// Cleanup
  *     layer_events_destroy(events);
  *     return 0;
  * }
@@ -711,7 +711,7 @@ static inline void layer_events_get_version(int *major, int *minor,
  * Advanced event handling:
  *
  * ```c
- * // Create custom event
+ * /// Create custom event
  * layer_event_t custom_event = {
  *     .type = LAYER_EVENT_CUSTOM_START + 1,
  *     .source_layer = LAYER_ID_DISPLAY_CONTROLLER,
@@ -720,12 +720,12 @@ static inline void layer_events_get_version(int *major, int *minor,
  *     .flags = LAYER_EVENT_FLAG_ASYNC | LAYER_EVENT_FLAG_ONCE
  * };
  *
- * // Set custom data
+ * /// Set custom data
  * custom_event.data.custom_data.data = my_data;
  * custom_event.data.custom_data.data_size = sizeof(my_data);
  * custom_event.data.custom_data.cleanup_func = my_cleanup_function;
  *
- * // Publish custom event
+ * /// Publish custom event
  * layer_events_publish(events, &custom_event);
  * ```
  */

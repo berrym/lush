@@ -20,13 +20,13 @@
  * @return Special return code (200 + exit_code) for executor recognition
  */
 int bin_return(int argc, char **argv) {
-    // Default to last exit status (POSIX behavior)
+    /// Default to last exit status (POSIX behavior)
     int return_code = last_exit_status;
 
-    // Get executor context to check if we're in a valid return context
+    /// Get executor context to check if we're in a valid return context
     executor_t *executor = get_global_executor();
 
-    // Check if we're in a function or sourced script
+    /// Check if we're in a function or sourced script
     bool in_function = executor && executor->symtable &&
                        symtable_in_function_scope(executor->symtable);
     bool in_source = executor && executor->source_depth > 0;
@@ -69,12 +69,12 @@ int bin_return(int argc, char **argv) {
         return 1;
     }
 
-    // Parse optional return code argument
+    /// Parse optional return code argument
     if (argc > 1) {
         char *endptr;
         return_code = strtol(argv[1], &endptr, 10);
 
-        // Validate that the argument is a valid number
+        /// Validate that the argument is a valid number
         if (*endptr != '\0') {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(
@@ -112,12 +112,12 @@ int bin_return(int argc, char **argv) {
         }
     }
 
-    // Set the last exit status to the return code
+    /// Set the last exit status to the return code
     last_exit_status = return_code;
 
-    // Return a special exit code that the executor can recognize as "function
-    // return" We'll use a specific value that doesn't conflict with normal exit
-    // codes
+    /// Return a special exit code that the executor can recognize as "function
+    /// return" We'll use a specific value that doesn't conflict with normal
+    /// exit codes
     return 200 +
-           (return_code & 0xFF); // 200-455 range for function/source returns
+           (return_code & 0xFF); /// 200-455 range for function/source returns
 }

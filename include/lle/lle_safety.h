@@ -118,4 +118,4 @@ void lle_safety_get_event_stats(uint64_t *events_fired, uint64_t *dir_changes,
 }
 #endif
 
-#endif /* LLE_SAFETY_H */
+#endif /// LLE_SAFETY_H

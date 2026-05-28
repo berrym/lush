@@ -15,7 +15,7 @@
 #include "lle/prompt/composer.h"
 
 int display_lle_transient(int argc, char **argv) {
-    /* Control transient prompts (Spec 25 Section 12) */
+    // Control transient prompts (Spec 25 Section 12)
     if (argc < 2) {
         printf("Transient prompts: %s\n",
                config.display_transient_prompt ? "enabled" : "disabled");
@@ -32,7 +32,7 @@ int display_lle_transient(int argc, char **argv) {
         if (config_registry_is_initialized()) {
             config_registry_set_boolean("display.transient_prompt", true);
         }
-        /* Also update composer config if available */
+        // Also update composer config if available
         if (g_lle_integration && g_lle_integration->prompt_composer) {
             g_lle_integration->prompt_composer->config.enable_transient = true;
         }
@@ -43,7 +43,7 @@ int display_lle_transient(int argc, char **argv) {
         if (config_registry_is_initialized()) {
             config_registry_set_boolean("display.transient_prompt", false);
         }
-        /* Also update composer config if available */
+        // Also update composer config if available
         if (g_lle_integration && g_lle_integration->prompt_composer) {
             g_lle_integration->prompt_composer->config.enable_transient = false;
         }

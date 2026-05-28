@@ -18,27 +18,27 @@
  * @return Sequence length (1-4), or 0 if invalid start byte
  */
 int lle_utf8_sequence_length(unsigned char first_byte) {
-    // Single-byte character (ASCII): 0xxxxxxx
+    /// Single-byte character (ASCII): 0xxxxxxx
     if ((first_byte & 0x80) == 0x00) {
         return 1;
     }
 
-    // Two-byte sequence: 110xxxxx
+    /// Two-byte sequence: 110xxxxx
     if ((first_byte & 0xE0) == 0xC0) {
         return 2;
     }
 
-    // Three-byte sequence: 1110xxxx
+    /// Three-byte sequence: 1110xxxx
     if ((first_byte & 0xF0) == 0xE0) {
         return 3;
     }
 
-    // Four-byte sequence: 11110xxx
+    /// Four-byte sequence: 11110xxx
     if ((first_byte & 0xF8) == 0xF0) {
         return 4;
     }
 
-    // Invalid UTF-8 start byte
+    /// Invalid UTF-8 start byte
     return 0;
 }
 
@@ -57,51 +57,51 @@ bool lle_utf8_is_valid_sequence(const char *ptr, int length) {
 
     unsigned char first = (unsigned char)ptr[0];
 
-    // Validate sequence length matches first byte
+    /// Validate sequence length matches first byte
     int expected_len = lle_utf8_sequence_length(first);
     if (expected_len != length) {
         return false;
     }
 
-    // Single-byte ASCII
+    /// Single-byte ASCII
     if (length == 1) {
         return true;
     }
 
-    // Multi-byte sequences - validate continuation bytes
+    /// Multi-byte sequences - validate continuation bytes
     for (int i = 1; i < length; i++) {
         unsigned char byte = (unsigned char)ptr[i];
-        // Continuation bytes must be 10xxxxxx
+        /// Continuation bytes must be 10xxxxxx
         if ((byte & 0xC0) != 0x80) {
             return false;
         }
     }
 
-    // Additional validation for overlong encodings and invalid ranges
+    /// Additional validation for overlong encodings and invalid ranges
     uint32_t codepoint = 0;
 
     if (length == 2) {
-        // Two-byte: 110xxxxx 10xxxxxx
+        /// Two-byte: 110xxxxx 10xxxxxx
         codepoint = ((first & 0x1F) << 6) | (ptr[1] & 0x3F);
-        // Must be >= 0x80 (not overlong)
+        /// Must be >= 0x80 (not overlong)
         if (codepoint < 0x80) {
             return false;
         }
     } else if (length == 3) {
-        // Three-byte: 1110xxxx 10xxxxxx 10xxxxxx
+        /// Three-byte: 1110xxxx 10xxxxxx 10xxxxxx
         codepoint =
             ((first & 0x0F) << 12) | ((ptr[1] & 0x3F) << 6) | (ptr[2] & 0x3F);
-        // Must be >= 0x800 (not overlong)
-        // Must not be in surrogate range (0xD800-0xDFFF)
+        /// Must be >= 0x800 (not overlong)
+        /// Must not be in surrogate range (0xD800-0xDFFF)
         if (codepoint < 0x800 || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
             return false;
         }
     } else if (length == 4) {
-        // Four-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+        /// Four-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
         codepoint = ((first & 0x07) << 18) | ((ptr[1] & 0x3F) << 12) |
                     ((ptr[2] & 0x3F) << 6) | (ptr[3] & 0x3F);
-        // Must be >= 0x10000 (not overlong)
-        // Must be <= 0x10FFFF (maximum Unicode codepoint)
+        /// Must be >= 0x10000 (not overlong)
+        /// Must be <= 0x10FFFF (maximum Unicode codepoint)
         if (codepoint < 0x10000 || codepoint > 0x10FFFF) {
             return false;
         }
@@ -160,24 +160,24 @@ int lle_utf8_decode_codepoint(const char *ptr, size_t max_len,
         return -1;
     }
 
-    // Validate the sequence
+    /// Validate the sequence
     if (!lle_utf8_is_valid_sequence(ptr, seq_len)) {
         return -1;
     }
 
-    // Decode based on length
+    /// Decode based on length
     if (seq_len == 1) {
-        // ASCII
+        /// ASCII
         *codepoint = first;
     } else if (seq_len == 2) {
-        // Two-byte sequence
+        /// Two-byte sequence
         *codepoint = ((first & 0x1F) << 6) | (ptr[1] & 0x3F);
     } else if (seq_len == 3) {
-        // Three-byte sequence
+        /// Three-byte sequence
         *codepoint =
             ((first & 0x0F) << 12) | ((ptr[1] & 0x3F) << 6) | (ptr[2] & 0x3F);
     } else if (seq_len == 4) {
-        // Four-byte sequence
+        /// Four-byte sequence
         *codepoint = ((first & 0x07) << 18) | ((ptr[1] & 0x3F) << 12) |
                      ((ptr[2] & 0x3F) << 6) | (ptr[3] & 0x3F);
     }
@@ -196,28 +196,28 @@ int lle_utf8_encode_codepoint(uint32_t codepoint, char *buffer) {
         return 0;
     }
 
-    // Validate codepoint range
+    /// Validate codepoint range
     if (codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
-        return 0; // Invalid codepoint
+        return 0; /// Invalid codepoint
     }
 
     if (codepoint <= 0x7F) {
-        // Single-byte (ASCII)
+        /// Single-byte (ASCII)
         buffer[0] = (char)codepoint;
         return 1;
     } else if (codepoint <= 0x7FF) {
-        // Two-byte sequence
+        /// Two-byte sequence
         buffer[0] = (char)(0xC0 | (codepoint >> 6));
         buffer[1] = (char)(0x80 | (codepoint & 0x3F));
         return 2;
     } else if (codepoint <= 0xFFFF) {
-        // Three-byte sequence
+        /// Three-byte sequence
         buffer[0] = (char)(0xE0 | (codepoint >> 12));
         buffer[1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
         buffer[2] = (char)(0x80 | (codepoint & 0x3F));
         return 3;
     } else {
-        // Four-byte sequence
+        /// Four-byte sequence
         buffer[0] = (char)(0xF0 | (codepoint >> 18));
         buffer[1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
         buffer[2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
@@ -244,7 +244,7 @@ size_t lle_utf8_count_codepoints(const char *text, size_t length) {
     while (ptr < end) {
         int seq_len = lle_utf8_sequence_length((unsigned char)*ptr);
         if (seq_len == 0 || ptr + seq_len > end) {
-            break; // Invalid UTF-8 or end of string
+            break; /// Invalid UTF-8 or end of string
         }
 
         count++;
@@ -274,7 +274,7 @@ int lle_utf8_byte_to_codepoint_index(const char *text, size_t byte_offset,
     while (current_byte < byte_offset) {
         int seq_len = lle_utf8_sequence_length((unsigned char)*ptr);
         if (seq_len == 0) {
-            return -1; // Invalid UTF-8
+            return -1; /// Invalid UTF-8
         }
 
         current_byte += seq_len;
@@ -308,7 +308,7 @@ int lle_utf8_codepoint_to_byte_offset(const char *text, size_t cp_index,
     while (index < cp_index) {
         int seq_len = lle_utf8_sequence_length((unsigned char)*ptr);
         if (seq_len == 0) {
-            return -1; // Invalid UTF-8 or past end
+            return -1; /// Invalid UTF-8 or past end
         }
 
         offset += seq_len;
@@ -338,14 +338,14 @@ int lle_utf8_codepoint_to_grapheme_index(const char *text, size_t cp_index,
     size_t cp_count = 0;
     size_t grapheme_count = 0;
 
-    // Count grapheme clusters up to the specified codepoint
+    /// Count grapheme clusters up to the specified codepoint
     while (cp_count <= cp_index) {
         int seq_len = lle_utf8_sequence_length((unsigned char)*ptr);
         if (seq_len == 0) {
-            return -1; // Invalid UTF-8
+            return -1; /// Invalid UTF-8
         }
 
-        // Check if this is a grapheme boundary
+        /// Check if this is a grapheme boundary
         if (lle_is_grapheme_boundary(ptr, start, ptr + seq_len)) {
             if (cp_count < cp_index) {
                 grapheme_count++;
@@ -373,74 +373,74 @@ int lle_utf8_codepoint_to_grapheme_index(const char *text, size_t cp_index,
  * Based on Unicode character width properties including CJK and emoji.
  */
 int lle_utf8_codepoint_width(uint32_t codepoint) {
-    // Zero-width characters
-    if (codepoint == 0x0000 ||                          // NULL
-        codepoint == 0x200B ||                          // Zero-width space
-        codepoint == 0x200C ||                          // Zero-width non-joiner
-        codepoint == 0x200D ||                          // Zero-width joiner
-        (codepoint >= 0x200E && codepoint <= 0x200F) || // LRM, RLM
-        codepoint == 0xFEFF || // Zero-width no-break space
+    /// Zero-width characters
+    if (codepoint == 0x0000 || /// NULL
+        codepoint == 0x200B || /// Zero-width space
+        codepoint == 0x200C || /// Zero-width non-joiner
+        codepoint == 0x200D || /// Zero-width joiner
+        (codepoint >= 0x200E && codepoint <= 0x200F) || /// LRM, RLM
+        codepoint == 0xFEFF || /// Zero-width no-break space
         (codepoint >= 0x0300 &&
-         codepoint <= 0x036F) || // Combining diacriticals
+         codepoint <= 0x036F) || /// Combining diacriticals
         (codepoint >= 0x1DC0 &&
-         codepoint <= 0x1DFF) || // Combining diacriticals supplement
+         codepoint <= 0x1DFF) || /// Combining diacriticals supplement
         (codepoint >= 0x20D0 &&
-         codepoint <= 0x20FF) || // Combining marks for symbols
-        (codepoint >= 0xFE00 && codepoint <= 0xFE0F) || // Variation selectors
-        (codepoint >= 0xFE20 && codepoint <= 0xFE2F)) { // Combining half marks
+         codepoint <= 0x20FF) || /// Combining marks for symbols
+        (codepoint >= 0xFE00 && codepoint <= 0xFE0F) || /// Variation selectors
+        (codepoint >= 0xFE20 && codepoint <= 0xFE2F)) { /// Combining half marks
         return 0;
     }
 
-    // Control characters
+    /// Control characters
     if (codepoint < 0x20 || (codepoint >= 0x7F && codepoint < 0xA0)) {
         return 0;
     }
 
-    // Wide characters (CJK and emoji)
-    // CJK Unified Ideographs
-    if ((codepoint >= 0x1100 && codepoint <= 0x115F) || // Hangul Jamo
-        (codepoint >= 0x2329 && codepoint <= 0x232A) || // Angle brackets
+    /// Wide characters (CJK and emoji)
+    /// CJK Unified Ideographs
+    if ((codepoint >= 0x1100 && codepoint <= 0x115F) || /// Hangul Jamo
+        (codepoint >= 0x2329 && codepoint <= 0x232A) || /// Angle brackets
         (codepoint >= 0x2E80 &&
-         codepoint <= 0x2E99) || // CJK radicals supplement
+         codepoint <= 0x2E99) || /// CJK radicals supplement
         (codepoint >= 0x2E9B && codepoint <= 0x2EF3) ||
-        (codepoint >= 0x2F00 && codepoint <= 0x2FD5) || // Kangxi radicals
+        (codepoint >= 0x2F00 && codepoint <= 0x2FD5) || /// Kangxi radicals
         (codepoint >= 0x2FF0 &&
-         codepoint <= 0x2FFB) || // Ideographic description
+         codepoint <= 0x2FFB) || /// Ideographic description
         (codepoint >= 0x3000 &&
-         codepoint <= 0x303E) || // CJK symbols and punctuation
-        (codepoint >= 0x3041 && codepoint <= 0x3096) || // Hiragana
-        (codepoint >= 0x3099 && codepoint <= 0x30FF) || // Katakana
-        (codepoint >= 0x3105 && codepoint <= 0x312F) || // Bopomofo
+         codepoint <= 0x303E) || /// CJK symbols and punctuation
+        (codepoint >= 0x3041 && codepoint <= 0x3096) || /// Hiragana
+        (codepoint >= 0x3099 && codepoint <= 0x30FF) || /// Katakana
+        (codepoint >= 0x3105 && codepoint <= 0x312F) || /// Bopomofo
         (codepoint >= 0x3131 &&
-         codepoint <= 0x318E) || // Hangul compatibility jamo
-        (codepoint >= 0x3190 && codepoint <= 0x31E3) || // CJK strokes and misc
+         codepoint <= 0x318E) || /// Hangul compatibility jamo
+        (codepoint >= 0x3190 && codepoint <= 0x31E3) || /// CJK strokes and misc
         (codepoint >= 0x31F0 &&
-         codepoint <= 0x321E) || // Katakana phonetic extensions
-        (codepoint >= 0x3220 && codepoint <= 0x3247) || // Enclosed CJK letters
+         codepoint <= 0x321E) || /// Katakana phonetic extensions
+        (codepoint >= 0x3220 && codepoint <= 0x3247) || /// Enclosed CJK letters
         (codepoint >= 0x3250 &&
-         codepoint <= 0x4DBF) || // CJK unified ideographs extension A
+         codepoint <= 0x4DBF) || /// CJK unified ideographs extension A
         (codepoint >= 0x4E00 &&
-         codepoint <= 0xA48C) || // CJK unified ideographs
-        (codepoint >= 0xA490 && codepoint <= 0xA4C6) || // Yi radicals
-        (codepoint >= 0xAC00 && codepoint <= 0xD7A3) || // Hangul syllables
+         codepoint <= 0xA48C) || /// CJK unified ideographs
+        (codepoint >= 0xA490 && codepoint <= 0xA4C6) || /// Yi radicals
+        (codepoint >= 0xAC00 && codepoint <= 0xD7A3) || /// Hangul syllables
         (codepoint >= 0xF900 &&
-         codepoint <= 0xFAFF) || // CJK compatibility ideographs
-        (codepoint >= 0xFE10 && codepoint <= 0xFE19) || // Vertical forms
+         codepoint <= 0xFAFF) || /// CJK compatibility ideographs
+        (codepoint >= 0xFE10 && codepoint <= 0xFE19) || /// Vertical forms
         (codepoint >= 0xFE30 &&
-         codepoint <= 0xFE6B) || // CJK compatibility forms
-        (codepoint >= 0xFF01 && codepoint <= 0xFF60) || // Fullwidth forms
+         codepoint <= 0xFE6B) || /// CJK compatibility forms
+        (codepoint >= 0xFF01 && codepoint <= 0xFF60) || /// Fullwidth forms
         (codepoint >= 0xFFE0 &&
-         codepoint <= 0xFFE6) || // Fullwidth currency signs
+         codepoint <= 0xFFE6) || /// Fullwidth currency signs
         (codepoint >= 0x1F000 &&
-         codepoint <= 0x1F9FF) || // Emoji and pictographs
+         codepoint <= 0x1F9FF) || /// Emoji and pictographs
         (codepoint >= 0x20000 &&
-         codepoint <= 0x2FFFD) || // CJK unified ideographs extension B-F
+         codepoint <= 0x2FFFD) || /// CJK unified ideographs extension B-F
         (codepoint >= 0x30000 &&
-         codepoint <= 0x3FFFD)) { // CJK unified ideographs extension G
-        return 2;                 // Wide character
+         codepoint <= 0x3FFFD)) { /// CJK unified ideographs extension G
+        return 2;                 /// Wide character
     }
 
-    // Default: normal width
+    /// Default: normal width
     return 1;
 }
 
@@ -463,7 +463,7 @@ size_t lle_utf8_string_width(const char *text, size_t length) {
         uint32_t codepoint = 0;
         int seq_len = lle_utf8_decode_codepoint(ptr, end - ptr, &codepoint);
         if (seq_len <= 0) {
-            break; // Invalid UTF-8
+            break; /// Invalid UTF-8
         }
 
         total_width += lle_utf8_codepoint_width(codepoint);

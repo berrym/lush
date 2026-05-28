@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase3_day8.c
+ * @brief Functional tests for history phase3 day8
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_history_phase3_day8.c - Search Engine Tests (Spec 09 Phase 3 Day 8)
  *
  * Comprehensive test suite for the LLE History Search Engine:
@@ -21,14 +29,14 @@
 #include <string.h>
 #include <time.h>
 
-/* Test memory mock provided by test_memory_mock.c */
+/// Test memory mock provided by test_memory_mock.c
 
-/* Test result tracking */
+/// Test result tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Helper macros */
+/// Helper macros
 #define TEST_START(name)                                                       \
     do {                                                                       \
         tests_run++;                                                           \
@@ -93,16 +101,16 @@ static int tests_failed = 0;
 void test_search_results_create_destroy(void) {
     TEST_START("Search Results Create/Destroy");
 
-    /* Create results container */
+    /// Create results container
     lle_history_search_results_t *results =
         lle_history_search_results_create(100);
     ASSERT_NOT_NULL(results, "Results creation should succeed");
 
-    /* Verify initial state */
+    /// Verify initial state
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 0, "Initial count should be 0");
 
-    /* Destroy */
+    /// Destroy
     lle_history_search_results_destroy(results);
 
     TEST_PASS();
@@ -111,13 +119,13 @@ void test_search_results_create_destroy(void) {
 void test_search_results_create_default(void) {
     TEST_START("Search Results Create with Default Size");
 
-    /* Create with default size (0 = use default) */
+    /// Create with default size (0 = use default)
     lle_history_search_results_t *results =
         lle_history_search_results_create(0);
     ASSERT_NOT_NULL(results,
                     "Results creation with default size should succeed");
 
-    /* Should be able to use it */
+    /// Should be able to use it
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 0, "Initial count should be 0");
 
@@ -134,36 +142,70 @@ void test_search_results_create_default(void) {
 void test_exact_match_search(void) {
     TEST_START("Exact Match Search");
 
-    /* Create history core */
+    /// Create history core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Add some test entries */
+    /// Add some test entries
     uint64_t id1, id2, id3;
     lle_history_add_entry(core, "ls -la", 0, &id1);
     lle_history_add_entry(core, "cd /tmp", 0, &id2);
-    lle_history_add_entry(core, "ls -la", 0, &id3); /* Duplicate */
+    lle_history_add_entry(core, "ls -la", 0, &id3); /// Duplicate
 
-    /* Search for exact match */
+    /// Search for exact match
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "ls -la", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
 
-    /* Should find both matches */
+    /// Should find both matches
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 2, "Should find 2 exact matches");
 
-    /* Verify results contain the correct command */
+    /// Verify results contain the correct command
     const lle_search_result_t *r = lle_history_search_results_get(results, 0);
     ASSERT_NOT_NULL(r, "Should get first result");
     ASSERT_TRUE(strcmp(r->command, "ls -la") == 0, "Result should match query");
 
-    /* Check search time was recorded */
+    /// Check search time was recorded
     uint64_t search_time = lle_history_search_results_get_time_us(results);
     ASSERT_TRUE(search_time > 0, "Search time should be recorded");
 
     lle_history_search_results_destroy(results);
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
+void test_exact_match_nfc_nfd_equivalence(void) {
+    TEST_START("Exact Match Search - NFC/NFD Equivalence");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    /// Entry stored in NFC form: "café" = caf + e-acute (U+00E9, bytes C3 A9)
+    lle_history_add_entry(core, "caf\xC3\xA9", 0, NULL);
+    /// Unrelated entry for noise.
+    lle_history_add_entry(core, "echo hello", 0, NULL);
+
+    /// Query in NFD form: "café" = caf + e + combining acute (U+0301, CC 81)
+    /// Must match the NFC-stored entry under NFC equivalence.
+    lle_history_search_results_t *results =
+        lle_history_search_exact(core, "cafe\xCC\x81", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "NFD query must find NFC-stored entry");
+
+    lle_history_search_results_destroy(results);
+
+    /// And the reverse direction: NFD-stored entry, NFC query.
+    lle_history_add_entry(core, "cafe\xCC\x81 deuxieme", 0, NULL);
+    results = lle_history_search_exact(core, "caf\xC3\xA9 deuxieme", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "NFC query must find NFD-stored entry");
+    lle_history_search_results_destroy(results);
+
     lle_history_core_destroy(core);
 
     TEST_PASS();
@@ -178,7 +220,7 @@ void test_exact_match_no_results(void) {
     lle_history_add_entry(core, "ls -la", 0, NULL);
     lle_history_add_entry(core, "cd /tmp", 0, NULL);
 
-    /* Search for non-existent command */
+    /// Search for non-existent command
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "nonexistent", 10);
     ASSERT_NOT_NULL(results, "Search should return results container");
@@ -201,7 +243,7 @@ void test_exact_match_case_sensitive(void) {
     lle_history_add_entry(core, "ls -la", 0, NULL);
     lle_history_add_entry(core, "LS -LA", 0, NULL);
 
-    /* Exact match is case-sensitive */
+    /// Exact match is case-sensitive
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "ls -la", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -226,13 +268,13 @@ void test_prefix_search(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add entries with common prefixes */
+    /// Add entries with common prefixes
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "git commit", 0, NULL);
     lle_history_add_entry(core, "git push", 0, NULL);
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /* Search for "git" prefix */
+    /// Search for "git" prefix
     lle_history_search_results_t *results =
         lle_history_search_prefix(core, "git", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -240,7 +282,7 @@ void test_prefix_search(void) {
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 3, "Should find 3 commands starting with 'git'");
 
-    /* Verify all results start with prefix */
+    /// Verify all results start with prefix
     for (size_t i = 0; i < count; i++) {
         const lle_search_result_t *r =
             lle_history_search_results_get(results, i);
@@ -266,7 +308,7 @@ void test_prefix_search_case_insensitive(void) {
     lle_history_add_entry(core, "GIT commit", 0, NULL);
     lle_history_add_entry(core, "git push", 0, NULL);
 
-    /* Search with lowercase prefix should match all cases */
+    /// Search with lowercase prefix should match all cases
     lle_history_search_results_t *results =
         lle_history_search_prefix(core, "git", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -313,13 +355,13 @@ void test_substring_search(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add entries with keyword in different positions */
+    /// Add entries with keyword in different positions
     lle_history_add_entry(core, "docker ps -a", 0, NULL);
     lle_history_add_entry(core, "docker-compose up", 0, NULL);
     lle_history_add_entry(core, "ls -la /var/lib/docker", 0, NULL);
     lle_history_add_entry(core, "git status", 0, NULL);
 
-    /* Search for "docker" substring */
+    /// Search for "docker" substring
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "docker", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -343,13 +385,75 @@ void test_substring_search_case_insensitive(void) {
     lle_history_add_entry(core, "Docker-compose", 0, NULL);
     lle_history_add_entry(core, "docker logs", 0, NULL);
 
-    /* Lowercase search should match all cases */
+    /// Lowercase search should match all cases
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "docker", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
 
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 3, "Should find all case variations");
+
+    lle_history_search_results_destroy(results);
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
+void test_substring_search_case_insensitive_unicode(void) {
+    TEST_START("Substring Search - Case Insensitive Unicode");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    /// Mixed-case entries with non-ASCII letters that the previous
+    /// strncasecmp-based search could not fold (only A-Z -> a-z).
+    lle_history_add_entry(core, "echo Café", 0, NULL);
+    lle_history_add_entry(core, "echo NAÏVE", 0, NULL);
+    lle_history_add_entry(core, "echo Ångström", 0, NULL);
+    lle_history_add_entry(core, "echo straße", 0, NULL);
+
+    /// Lowercase needle must match the uppercase Unicode entries.
+    lle_history_search_results_t *results =
+        lle_history_search_substring(core, "café", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo Café' via 'café'");
+    lle_history_search_results_destroy(results);
+
+    results = lle_history_search_substring(core, "naïve", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo NAÏVE' via 'naïve'");
+    lle_history_search_results_destroy(results);
+
+    results = lle_history_search_substring(core, "ångström", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo Ångström' via 'ångström'");
+    lle_history_search_results_destroy(results);
+
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
+void test_prefix_search_case_insensitive_unicode(void) {
+    TEST_START("Prefix Search - Case Insensitive Unicode");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    lle_history_add_entry(core, "Über alle Berge", 0, NULL);
+    lle_history_add_entry(core, "ÜBER LASTIG", 0, NULL);
+    lle_history_add_entry(core, "über die Brücke", 0, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL);
+
+    /// Lowercase 'ü' prefix must match all three Unicode entries.
+    lle_history_search_results_t *results =
+        lle_history_search_prefix(core, "über", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 3,
+              "Should find all 3 'Über' / 'ÜBER' / 'über' prefix variants");
 
     lle_history_search_results_destroy(results);
     lle_history_core_destroy(core);
@@ -366,7 +470,7 @@ void test_substring_search_partial_match(void) {
     lle_history_add_entry(core, "systemctl status", 0, NULL);
     lle_history_add_entry(core, "system info", 0, NULL);
 
-    /* Search for partial word */
+    /// Search for partial word
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "stem", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -394,7 +498,7 @@ void test_fuzzy_search_exact(void) {
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "git commit", 0, NULL);
 
-    /* Exact match should have highest score */
+    /// Exact match should have highest score
     lle_history_search_results_t *results =
         lle_history_search_fuzzy(core, "git status", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -402,7 +506,7 @@ void test_fuzzy_search_exact(void) {
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_TRUE(count >= 1, "Should find at least exact match");
 
-    /* First result should be exact match */
+    /// First result should be exact match
     const lle_search_result_t *r = lle_history_search_results_get(results, 0);
     ASSERT_NOT_NULL(r, "Should get first result");
     ASSERT_TRUE(strcmp(r->command, "git status") == 0,
@@ -423,7 +527,7 @@ void test_fuzzy_search_typo(void) {
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /* Search with typo (statuz instead of status) */
+    /// Search with typo (statuz instead of status)
     lle_history_search_results_t *results =
         lle_history_search_fuzzy(core, "git statuz", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -431,7 +535,7 @@ void test_fuzzy_search_typo(void) {
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_TRUE(count >= 1, "Should find fuzzy match");
 
-    /* Should find "git status" */
+    /// Should find "git status"
     const lle_search_result_t *r = lle_history_search_results_get(results, 0);
     ASSERT_NOT_NULL(r, "Should get result");
     ASSERT_TRUE(strcmp(r->command, "git status") == 0,
@@ -451,7 +555,7 @@ void test_fuzzy_search_distance_limit(void) {
 
     lle_history_add_entry(core, "git", 0, NULL);
 
-    /* 4 character difference should not match (distance > 3) */
+    /// 4 character difference should not match (distance > 3)
     lle_history_search_results_t *results =
         lle_history_search_fuzzy(core, "gitxxxx", 10);
     ASSERT_NOT_NULL(results, "Search should return results container");
@@ -476,12 +580,12 @@ void test_result_ranking_by_recency(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add same command multiple times */
-    lle_history_add_entry(core, "ls -la", 0, NULL); /* Older */
+    /// Add same command multiple times
+    lle_history_add_entry(core, "ls -la", 0, NULL); /// Older
     lle_history_add_entry(core, "cd /tmp", 0, NULL);
-    lle_history_add_entry(core, "ls -la", 0, NULL); /* More recent */
+    lle_history_add_entry(core, "ls -la", 0, NULL); /// More recent
 
-    /* Search should find both, with more recent first */
+    /// Search should find both, with more recent first
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "ls -la", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -489,13 +593,13 @@ void test_result_ranking_by_recency(void) {
     size_t count = lle_history_search_results_get_count(results);
     ASSERT_EQ(count, 2, "Should find 2 matches");
 
-    /* More recent should have higher score */
+    /// More recent should have higher score
     const lle_search_result_t *r0 = lle_history_search_results_get(results, 0);
     const lle_search_result_t *r1 = lle_history_search_results_get(results, 1);
     ASSERT_NOT_NULL(r0, "Should get first result");
     ASSERT_NOT_NULL(r1, "Should get second result");
 
-    /* First result should be more recent (higher index) */
+    /// First result should be more recent (higher index)
     ASSERT_TRUE(r0->entry_index > r1->entry_index,
                 "First result should be more recent");
     ASSERT_TRUE(r0->score >= r1->score,
@@ -513,12 +617,12 @@ void test_result_max_limit(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add many matching entries */
+    /// Add many matching entries
     for (int i = 0; i < 20; i++) {
         lle_history_add_entry(core, "ls -la", 0, NULL);
     }
 
-    /* Limit to 5 results */
+    /// Limit to 5 results
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "ls -la", 5);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -543,7 +647,7 @@ void test_search_empty_history(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Search empty history */
+    /// Search empty history
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "test", 10);
     ASSERT_NOT_NULL(results, "Search should return results container");
@@ -563,12 +667,12 @@ void test_search_null_parameters(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* NULL core should return NULL */
+    /// NULL core should return NULL
     lle_history_search_results_t *results1 =
         lle_history_search_exact(NULL, "test", 10);
     ASSERT_NULL(results1, "Search with NULL core should return NULL");
 
-    /* NULL query should return NULL */
+    /// NULL query should return NULL
     lle_history_search_results_t *results2 =
         lle_history_search_exact(core, NULL, 10);
     ASSERT_NULL(results2, "Search with NULL query should return NULL");
@@ -586,11 +690,11 @@ void test_search_empty_query(void) {
 
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /* Empty query */
+    /// Empty query
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "", 10);
 
-    /* Should either match all or none, but not crash */
+    /// Should either match all or none, but not crash
     if (results) {
         lle_history_search_results_destroy(results);
     }
@@ -611,17 +715,17 @@ void test_search_performance_large_history(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /* Add 1000 entries */
+    /// Add 1000 entries
     char cmd[64];
     for (int i = 0; i < 1000; i++) {
         snprintf(cmd, sizeof(cmd), "command_%d", i);
         lle_history_add_entry(core, cmd, 0, NULL);
     }
 
-    /* Add target command */
+    /// Add target command
     lle_history_add_entry(core, "target_command", 0, NULL);
 
-    /* Search should complete reasonably fast */
+    /// Search should complete reasonably fast
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "target", 10);
     ASSERT_NOT_NULL(results, "Search should succeed");
@@ -629,7 +733,7 @@ void test_search_performance_large_history(void) {
     uint64_t time_us = lle_history_search_results_get_time_us(results);
     printf("  Search time: %" PRIu64 " μs\n", time_us);
 
-    /* Should complete in reasonable time (< 50ms for 1000 entries) */
+    /// Should complete in reasonable time (< 50ms for 1000 entries)
     ASSERT_TRUE(time_us < 50000, "Search should complete in < 50ms");
 
     size_t count = lle_history_search_results_get_count(results);
@@ -657,17 +761,20 @@ int main(void) {
 
     printf("\n--- EXACT MATCH SEARCH ---\n");
     test_exact_match_search();
+    test_exact_match_nfc_nfd_equivalence();
     test_exact_match_no_results();
     test_exact_match_case_sensitive();
 
     printf("\n--- PREFIX SEARCH ---\n");
     test_prefix_search();
     test_prefix_search_case_insensitive();
+    test_prefix_search_case_insensitive_unicode();
     test_prefix_search_empty_results();
 
     printf("\n--- SUBSTRING SEARCH ---\n");
     test_substring_search();
     test_substring_search_case_insensitive();
+    test_substring_search_case_insensitive_unicode();
     test_substring_search_partial_match();
 
     printf("\n--- FUZZY SEARCH ---\n");

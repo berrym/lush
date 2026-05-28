@@ -214,4 +214,4 @@ lle_result_t lle_splicer_apply_preview(lle_buffer_t *buffer,
 }
 #endif
 
-#endif /* LLE_SPLICER_H */
+#endif // LLE_SPLICER_H

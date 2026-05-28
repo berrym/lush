@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+/// Forward declarations
 typedef struct lle_edit_cache lle_edit_cache_t;
 typedef struct lle_edit_cache_entry lle_edit_cache_entry_t;
 
@@ -31,41 +31,41 @@ typedef struct lle_edit_cache_entry lle_edit_cache_entry_t;
  * @brief Cache entry data structure
  */
 typedef struct lle_edit_cache_entry {
-    size_t history_index;          /**< Entry identification - history index */
-    uint64_t entry_id;             /**< Entry identification - unique ID */
-    char *original_text;           /**< Original command text */
-    size_t original_length;        /**< Length of original text */
-    char *reconstructed_text;      /**< Reconstructed text */
-    size_t reconstructed_length;   /**< Length of reconstructed text */
-    struct timespec cached_at;     /**< When entry was cached */
-    struct timespec last_accessed; /**< Last access time */
-    uint64_t access_count;         /**< Number of accesses */
-    struct lle_edit_cache_entry *prev; /**< Previous entry in LRU chain */
-    struct lle_edit_cache_entry *next; /**< Next entry in LRU chain */
-    void *reserved[2];                 /**< Reserved for future use */
+    size_t history_index;              ///< Entry identification - history index
+    uint64_t entry_id;                 ///< Entry identification - unique ID
+    char *original_text;               ///< Original command text
+    size_t original_length;            ///< Length of original text
+    char *reconstructed_text;          ///< Reconstructed text
+    size_t reconstructed_length;       ///< Length of reconstructed text
+    struct timespec cached_at;         ///< When entry was cached
+    struct timespec last_accessed;     ///< Last access time
+    uint64_t access_count;             ///< Number of accesses
+    struct lle_edit_cache_entry *prev; ///< Previous entry in LRU chain
+    struct lle_edit_cache_entry *next; ///< Next entry in LRU chain
+    void *reserved[2];                 ///< Reserved for future use
 } lle_edit_cache_entry_t;
 
 /**
  * @brief Cache configuration structure
  */
 typedef struct lle_edit_cache_config {
-    size_t max_entries;    /**< Maximum cache entries */
-    uint32_t entry_ttl_ms; /**< Cache entry TTL (milliseconds, 0 = no expiry) */
-    bool track_access;     /**< Enable access tracking */
-    void *reserved[4];     /**< Reserved for future use */
+    size_t max_entries;    ///< Maximum cache entries
+    uint32_t entry_ttl_ms; ///< Cache entry TTL (milliseconds, 0 = no expiry)
+    bool track_access;     ///< Enable access tracking
+    void *reserved[4];     ///< Reserved for future use
 } lle_edit_cache_config_t;
 
 /**
  * @brief Cache statistics structure
  */
 typedef struct lle_edit_cache_stats {
-    uint64_t hits;          /**< Cache hits */
-    uint64_t misses;        /**< Cache misses */
-    size_t current_entries; /**< Current number of entries */
-    size_t max_entries;     /**< Maximum allowed entries */
-    uint64_t evictions;     /**< Number of evictions */
-    uint64_t expirations;   /**< Number of expirations */
-    void *reserved[2];      /**< Reserved for future use */
+    uint64_t hits;          ///< Cache hits
+    uint64_t misses;        ///< Cache misses
+    size_t current_entries; ///< Current number of entries
+    size_t max_entries;     ///< Maximum allowed entries
+    uint64_t evictions;     ///< Number of evictions
+    uint64_t expirations;   ///< Number of expirations
+    void *reserved[2];      ///< Reserved for future use
 } lle_edit_cache_stats_t;
 
 /**
@@ -160,4 +160,4 @@ lle_result_t lle_edit_cache_get_default_config(lle_edit_cache_config_t *config);
 }
 #endif
 
-#endif /* LLE_EDIT_CACHE_H */
+#endif /// LLE_EDIT_CACHE_H

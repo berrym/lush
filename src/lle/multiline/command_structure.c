@@ -37,7 +37,7 @@ lle_result_t lle_command_structure_create(lle_command_structure_t **structure,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* memory_pool can be NULL - will use global pool */
+    // memory_pool can be NULL - will use global pool
 
     lle_command_structure_t *cmd_struct =
         lle_pool_alloc(sizeof(lle_command_structure_t));
@@ -46,7 +46,7 @@ lle_result_t lle_command_structure_create(lle_command_structure_t **structure,
     }
 
     memset(cmd_struct, 0, sizeof(lle_command_structure_t));
-    cmd_struct->pool = memory_pool; /* Can be NULL */
+    cmd_struct->pool = memory_pool; // Can be NULL
     cmd_struct->primary_type = LLE_CONSTRUCT_SIMPLE;
     cmd_struct->is_complete = false;
     cmd_struct->has_syntax_error = false;
@@ -66,7 +66,7 @@ lle_result_t lle_command_structure_destroy(lle_command_structure_t *structure) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Free keyword list */
+    // Free keyword list
     lle_keyword_position_t *keyword = structure->first_keyword;
     while (keyword) {
         lle_keyword_position_t *next = keyword->next;
@@ -74,7 +74,7 @@ lle_result_t lle_command_structure_destroy(lle_command_structure_t *structure) {
         keyword = next;
     }
 
-    /* Free indentation info */
+    // Free indentation info
     if (structure->indentation) {
         if (structure->indentation->level_per_line) {
             lle_pool_free(structure->indentation->level_per_line);
@@ -82,7 +82,7 @@ lle_result_t lle_command_structure_destroy(lle_command_structure_t *structure) {
         lle_pool_free(structure->indentation);
     }
 
-    /* Free line mapping */
+    // Free line mapping
     if (structure->line_mapping) {
         if (structure->line_mapping->line_offsets) {
             lle_pool_free(structure->line_mapping->line_offsets);
@@ -93,12 +93,12 @@ lle_result_t lle_command_structure_destroy(lle_command_structure_t *structure) {
         lle_pool_free(structure->line_mapping);
     }
 
-    /* Free nested construct tree (recursive) */
+    // Free nested construct tree (recursive)
     if (structure->root_construct) {
         lle_free_nested_construct_tree(structure->root_construct);
     }
 
-    /* Free structure itself */
+    // Free structure itself
     lle_pool_free(structure);
 
     return LLE_SUCCESS;
@@ -126,7 +126,7 @@ lle_command_structure_add_keyword(lle_command_structure_t *structure,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate new keyword position */
+    // Allocate new keyword position
     lle_keyword_position_t *keyword =
         lle_pool_alloc(sizeof(lle_keyword_position_t));
     if (!keyword) {
@@ -139,7 +139,7 @@ lle_command_structure_add_keyword(lle_command_structure_t *structure,
     keyword->indent_level = indent_level;
     keyword->next = NULL;
 
-    /* Add to end of list */
+    // Add to end of list
     if (!structure->first_keyword) {
         structure->first_keyword = keyword;
     } else {
@@ -200,7 +200,7 @@ lle_command_structure_find_matching_keyword(lle_command_structure_t *structure,
 
     *match = NULL;
 
-    /* Define matching pairs */
+    // Define matching pairs
     lle_keyword_type_t search_type = LLE_KEYWORD_NONE;
 
     switch (keyword->type) {
@@ -226,7 +226,7 @@ lle_command_structure_find_matching_keyword(lle_command_structure_t *structure,
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Search forward for matching keyword at same or lower indent */
+    // Search forward for matching keyword at same or lower indent
     lle_keyword_position_t *current = keyword->next;
     int depth = 0;
 
@@ -262,7 +262,7 @@ static void lle_free_nested_construct_tree(lle_nested_construct_t *construct) {
         return;
     }
 
-    /* Free children first */
+    // Free children first
     lle_nested_construct_t *child = construct->first_child;
     while (child) {
         lle_nested_construct_t *next_sibling = child->next_sibling;
@@ -270,6 +270,6 @@ static void lle_free_nested_construct_tree(lle_nested_construct_t *construct) {
         child = next_sibling;
     }
 
-    /* Free this construct */
+    // Free this construct
     lle_pool_free(construct);
 }

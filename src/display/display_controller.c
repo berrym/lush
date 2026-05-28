@@ -33,6 +33,7 @@
 #include "display/display_controller.h"
 #include "display/base_terminal.h"
 #include "display/command_layer.h"
+#include "display/pager_layer.h"
 #include "display/prompt_layer.h"
 #include "display/screen_buffer.h"
 #include "display_integration.h"
@@ -40,14 +41,14 @@
 #include "lle/utf8_support.h"
 #include "lush_memory_pool.h"
 
-// LLE Completion menu support (Spec 12 - Proper Architecture)
+/// LLE Completion menu support (Spec 12 - Proper Architecture)
 #include "lle/completion/completion_menu_renderer.h"
 #include "lle/completion/completion_menu_state.h"
 
-// LLE Notification support (transient hints)
+/// LLE Notification support (transient hints)
 #include "lle/notification.h"
 
-// LLE Shell integration (RPROMPT)
+/// LLE Shell integration (RPROMPT)
 #include "lle/lle_shell_integration.h"
 
 #include <ctype.h>
@@ -62,9 +63,9 @@
 #include <time.h>
 #include <unistd.h>
 
-// ============================================================================
-// EINTR-SAFE WRITE HELPER
-// ============================================================================
+/// ============================================================================
+/// EINTR-SAFE WRITE HELPER
+/// ============================================================================
 
 /**
  * @brief Write all bytes to a file descriptor, retrying on EINTR
@@ -92,9 +93,9 @@ static bool dc_write_all(int fd, const void *buf, size_t len) {
     return true;
 }
 
-// ============================================================================
-// INTERNAL CONSTANTS AND MACROS
-// ============================================================================
+/// ============================================================================
+/// INTERNAL CONSTANTS AND MACROS
+/// ============================================================================
 
 #define DC_HASH_SEED 0x811c9dc5
 #define DC_HASH_PRIME 0x01000193
@@ -103,8 +104,8 @@ static bool dc_write_all(int fd, const void *buf, size_t len) {
 #define DC_PERFORMANCE_UPDATE_INTERVAL_MS 100
 #define DC_ADAPTIVE_OPTIMIZATION_THRESHOLD 5
 
-// Debugging and logging macros
-#if 1 // DC_DEBUG enabled temporarily for debugging
+/// Debugging and logging macros
+#if 1 /// DC_DEBUG enabled temporarily for debugging
 #define DC_DEBUG(fmt, ...)                                                     \
     do {                                                                       \
         FILE *_dbg = fopen("/tmp/lush_dc_debug.log", "a");                     \
@@ -124,9 +125,9 @@ static bool dc_write_all(int fd, const void *buf, size_t len) {
     fprintf(stderr, "[DC_ERROR] %s:%d: " fmt "\n", __func__, __LINE__,         \
             ##__VA_ARGS__)
 
-// ============================================================================
-// INTERNAL UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INTERNAL UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Get current timestamp in microseconds
@@ -157,9 +158,9 @@ static int count_newlines(const char *text) {
     return count;
 }
 
-// ============================================================================
-// EVENT HANDLERS
-// ============================================================================
+/// ============================================================================
+/// EVENT HANDLERS
+/// ============================================================================
 
 /**
  * @brief Handle LAYER_EVENT_REDRAW_NEEDED from command_layer
@@ -185,7 +186,7 @@ static screen_buffer_t desired_screen;
 static bool screen_buffer_initialized = false;
 static bool prompt_rendered = false;
 static int last_terminal_end_row =
-    0; /* Actual terminal row after ghost text/menu */
+    0; /// Actual terminal row after ghost text/menu
 /* Note: Notification is now tracked in screen_buffer like menu, so no separate
  * tracking variable needed */
 
@@ -202,10 +203,10 @@ void dc_reset_prompt_display_state(void) {
         screen_buffer_clear(&desired_screen);
     }
 
-    /* Reset command_layer's update_sequence_number so next render is treated
-     * as "first render" and publishes REDRAW_NEEDED even if buffer is empty.
-     * Without this, empty-to-empty transitions (like Ctrl+G on empty buffer)
-     * would skip the event and prompt wouldn't be drawn. */
+    /// Reset command_layer's update_sequence_number so next render is treated
+    /// as "first render" and publishes REDRAW_NEEDED even if buffer is empty.
+    /// Without this, empty-to-empty transitions (like Ctrl+G on empty buffer)
+    /// would skip the event and prompt wouldn't be drawn.
     display_controller_t *dc = display_integration_get_controller();
     if (dc && dc->compositor && dc->compositor->command_layer) {
         dc->compositor->command_layer->update_sequence_number = 0;
@@ -219,16 +220,16 @@ void dc_reset_prompt_display_state(void) {
  * resets display state for the next prompt.
  */
 void dc_finalize_input(void) {
-    /* Block SIGWINCH during terminal output */
+    /// Block SIGWINCH during terminal output
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
     sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
-    /* Write newline to move cursor to next line for command output */
+    /// Write newline to move cursor to next line for command output
     dc_write_all(STDOUT_FILENO, "\n", 1);
 
-    /* Reset display state for next prompt */
+    /// Reset display state for next prompt
     dc_reset_prompt_display_state();
 
     sigprocmask(SIG_SETMASK, &old_set, NULL);
@@ -246,36 +247,33 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         return false;
     }
 
-    /* Block SIGWINCH during terminal output to prevent mid-sequence corruption
-     */
+    /// Block SIGWINCH during terminal output to prevent mid-sequence corruption
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
     sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
-    /*
-     * Transient Prompt Replacement (Spec 25 Section 12)
-     *
-     * Replace the current (fancy) prompt with a minimal transient prompt
-     * while preserving the command text. This simplifies scrollback history.
-     *
-     * Current state (from current_screen):
-     * - command_start_row: row where command starts (0 = same line as prompt)
-     * - cursor_row: current cursor row (last row of display)
-     * - We need to go back and redraw everything from row 0
-     *
-     * Algorithm:
-     * 1. Move cursor up to row 0, column 1
-     * 2. Clear from there to end of screen
-     * 3. Write transient prompt + command text
-     * 4. Update screen buffer to reflect new state
-     */
+    /// Transient Prompt Replacement (Spec 25 Section 12)
+    ///
+    /// Replace the current (fancy) prompt with a minimal transient prompt
+    /// while preserving the command text. This simplifies scrollback history.
+    ///
+    /// Current state (from current_screen):
+    /// - command_start_row: row where command starts (0 = same line as prompt)
+    /// - cursor_row: current cursor row (last row of display)
+    /// - We need to go back and redraw everything from row 0
+    ///
+    /// Algorithm:
+    /// 1. Move cursor up to row 0, column 1
+    /// 2. Clear from there to end of screen
+    /// 3. Write transient prompt + command text
+    /// 4. Update screen buffer to reflect new state
 
     int total_rows = current_screen.cursor_row + 1;
     char seq_buf[32];
     int seq_len;
 
-    /* Step 1: Move cursor up to the first row (where prompt started) */
+    /// Step 1: Move cursor up to the first row (where prompt started)
     if (current_screen.cursor_row > 0) {
         seq_len = snprintf(seq_buf, sizeof(seq_buf), "\033[%dA",
                            current_screen.cursor_row);
@@ -284,27 +282,27 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         }
     }
 
-    /* Step 2: Move to column 1 */
+    /// Step 2: Move to column 1
     dc_write_all(STDOUT_FILENO, "\033[1G", 4);
 
-    /* Step 3: Clear from cursor to end of screen */
+    /// Step 3: Clear from cursor to end of screen
     dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-    /* Step 4: Write transient prompt */
+    /// Step 4: Write transient prompt
     if (transient_prompt[0] != '\0') {
         dc_write_all(STDOUT_FILENO, transient_prompt, strlen(transient_prompt));
     }
 
-    /* Step 5: Write command text (with syntax highlighting if available) */
+    /// Step 5: Write command text (with syntax highlighting if available)
     if (command_text && command_text[0] != '\0') {
         bool wrote_highlighted = false;
 
-        /* Try to get syntax-highlighted version from display controller */
+        /// Try to get syntax-highlighted version from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc && dc->compositor && dc->compositor->command_layer) {
             command_layer_t *cmd_layer = dc->compositor->command_layer;
 
-            /* Temporarily set the command text for highlighting */
+            /// Temporarily set the command text for highlighting
             command_layer_error_t set_result = command_layer_set_command(
                 cmd_layer, command_text, strlen(command_text));
 
@@ -324,22 +322,22 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
             }
         }
 
-        /* Fallback to plain text if highlighting failed */
+        /// Fallback to plain text if highlighting failed
         if (!wrote_highlighted) {
             dc_write_all(STDOUT_FILENO, command_text, strlen(command_text));
         }
     }
 
-    /* Step 6: Update screen buffer to reflect new state
-     * Re-render with transient prompt so current_screen is accurate */
+    /// Step 6: Update screen buffer to reflect new state
+    /// Re-render with transient prompt so current_screen is accurate
     size_t cursor_offset = command_text ? strlen(command_text) : 0;
     screen_buffer_render(&current_screen, transient_prompt,
                          command_text ? command_text : "", cursor_offset);
 
-    /* Mark that we handled this - prompt_rendered stays true since we
-     * wrote a prompt, but next dc_reset_prompt_display_state will clear it */
+    /// Mark that we handled this - prompt_rendered stays true since we
+    /// wrote a prompt, but next dc_reset_prompt_display_state will clear it
 
-    (void)total_rows; /* Used for documentation, may use later */
+    (void)total_rows; /// Used for documentation, may use later
 
     sigprocmask(SIG_SETMASK, &old_set, NULL);
     return true;
@@ -363,31 +361,29 @@ void dc_get_prompt_metrics(int *prompt_lines, int *total_lines,
         return;
     }
 
-    /*
-     * current_screen contains the last rendered state:
-     * - command_start_row: row where command text starts (0-based)
-     * - command_start_col: column where command text starts
-     * - cursor_row: current cursor row (0-based)
-     *
-     * For a single-line prompt "$ cmd":
-     *   command_start_row = 0, command_start_col > 0
-     *   prompt occupies part of row 0
-     *
-     * For a two-line prompt:
-     *   Line 0: "[user@host] ~/path"
-     *   Line 1: "$ cmd"
-     *   command_start_row = 1, prompt occupies rows 0-1
-     *
-     * prompt_lines = command_start_row + 1 (since it's 0-indexed)
-     * But if command_start_row == 0, prompt shares line with command,
-     * so prompt_lines = 1.
-     */
+    /// current_screen contains the last rendered state:
+    /// - command_start_row: row where command text starts (0-based)
+    /// - command_start_col: column where command text starts
+    /// - cursor_row: current cursor row (0-based)
+    ///
+    /// For a single-line prompt "$ cmd":
+    ///   command_start_row = 0, command_start_col > 0
+    ///   prompt occupies part of row 0
+    ///
+    /// For a two-line prompt:
+    ///   Line 0: "[user@host] ~/path"
+    ///   Line 1: "$ cmd"
+    ///   command_start_row = 1, prompt occupies rows 0-1
+    ///
+    /// prompt_lines = command_start_row + 1 (since it's 0-indexed)
+    /// But if command_start_row == 0, prompt shares line with command,
+    /// so prompt_lines = 1.
     if (prompt_lines) {
         *prompt_lines = current_screen.command_start_row + 1;
     }
 
     if (total_lines) {
-        /* Total lines = cursor row + 1 (cursor is on the last used row) */
+        /// Total lines = cursor row + 1 (cursor is on the last used row)
         *total_lines = current_screen.cursor_row + 1;
     }
 
@@ -415,13 +411,13 @@ static const char *dc_continuation_prompt_callback(const char *line_text,
                                                    void *user_data) {
     continuation_state_t *cont_state = (continuation_state_t *)user_data;
     if (!cont_state) {
-        return "> "; /* Fallback */
+        return "> "; /// Fallback
     }
 
-    /* Analyze this line to update continuation state */
+    /// Analyze this line to update continuation state
     continuation_analyze_line(line_text, cont_state);
 
-    /* Get the continuation prompt based on updated state */
+    /// Get the continuation prompt based on updated state
     const char *prompt = continuation_get_prompt(cont_state);
 
     DC_DEBUG("Continuation callback: line=%d, text='%.40s%s', prompt='%s'",
@@ -447,9 +443,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
     }
 
-    /* Block SIGWINCH during rendering to prevent a resize signal from
-     * interrupting mid-escape-sequence, which corrupts terminal state.
-     * The signal will be delivered after we restore the mask. */
+    /// Block SIGWINCH during rendering to prevent a resize signal from
+    /// interrupting mid-escape-sequence, which corrupts terminal state.
+    /// The signal will be delivered after we restore the mask.
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
@@ -490,8 +486,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
     }
 
-    /* Render completion menu if active (Proper Architecture - Spec 12)
-     * Menu is now composed at display time, not baked into command text */
+    /// Render completion menu if active (Proper Architecture - Spec 12)
+    /// Menu is now composed at display time, not baked into command text
     char menu_buffer[8192] = {0};
     char *menu_text = NULL;
 
@@ -499,7 +495,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         controller->active_completion_menu) {
         lle_menu_render_options_t options =
             lle_menu_renderer_default_options(term_width);
-        options.max_rows = 20; /* Limit menu to 20 rows */
+        options.max_rows = 20; /// Limit menu to 20 rows
 
         lle_menu_render_stats_t stats;
         lle_result_t result = lle_completion_menu_render(
@@ -511,24 +507,23 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* CONTINUATION PROMPT SUPPORT:
-     *
-     * Use screen_buffer_render_with_continuation() which calls back on each
-     * newline to get the context-aware continuation prompt. This is the
-     * architecturally correct approach: prompts are set at the exact visual row
-     * where each newline lands during character-by-character rendering, not
-     * pre-calculated.
-     *
-     * The callback receives the plain text of each line (ANSI stripped) and
-     * updates the continuation state to determine the appropriate prompt.
-     */
+    /// CONTINUATION PROMPT SUPPORT:
+    ///
+    /// Use screen_buffer_render_with_continuation() which calls back on each
+    /// newline to get the context-aware continuation prompt. This is the
+    /// architecturally correct approach: prompts are set at the exact visual
+    /// row where each newline lands during character-by-character rendering,
+    /// not pre-calculated.
+    ///
+    /// The callback receives the plain text of each line (ANSI stripped) and
+    /// updates the continuation state to determine the appropriate prompt.
     int newline_count = count_newlines(command_buffer);
     bool is_multiline = (newline_count > 0);
 
     size_t cursor_byte_offset = cmd_layer->cursor_position;
 
     if (is_multiline) {
-        /* Use callback-based rendering for proper visual row tracking */
+        /// Use callback-based rendering for proper visual row tracking
         continuation_state_t cont_state;
         continuation_state_init(&cont_state);
 
@@ -538,18 +533,18 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
 
         continuation_state_cleanup(&cont_state);
     } else {
-        /* No newlines - use simple render */
+        /// No newlines - use simple render
         screen_buffer_render(&desired_screen, prompt_buffer, command_buffer,
                              cursor_byte_offset);
     }
 
-    /* DEBUG: Log what screen_buffer_render produced */
+    /// DEBUG: Log what screen_buffer_render produced
     DC_DEBUG("After render: num_rows=%d, command_start_row=%d, cursor=(%d,%d), "
              "term_width=%d",
              desired_screen.num_rows, desired_screen.command_start_row,
              desired_screen.cursor_row, desired_screen.cursor_col, term_width);
 
-    /* DEBUG: Log prefixes set on each row */
+    /// DEBUG: Log prefixes set on each row
     for (int r = 0; r < desired_screen.num_rows && r < 10; r++) {
         const char *prefix = screen_buffer_get_line_prefix(&desired_screen, r);
         if (prefix) {
@@ -557,30 +552,30 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Pass RPROMPT to screen_buffer for fit calculation.
-     * Must be done after screen_buffer_render() so command_start_col is valid.
-     * The RPROMPT text comes from the shell integration layer which expands
-     * RPROMPT/RPS1 through the Spec 28 two-pass engine. */
+    /// Pass RPROMPT to screen_buffer for fit calculation.
+    /// Must be done after screen_buffer_render() so command_start_col is valid.
+    /// The RPROMPT text comes from the shell integration layer which expands
+    /// RPROMPT/RPS1 through the Spec 28 two-pass engine.
     const char *rprompt = lle_shell_get_rendered_rprompt();
     if (rprompt && rprompt[0]) {
         screen_buffer_set_rprompt(&desired_screen, rprompt);
     }
 
-    /* Add menu rows to screen_buffer per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md
-     *
-     * This is the key fix: by adding menu rows to screen_buffer AFTER rendering
-     * command text, the buffer knows the total display height. This allows
-     * screen_buffer_get_rows_below_cursor() to return the correct value for
-     * cursor positioning, fixing the "upward row consumption" bug.
-     *
-     * Cursor position (cursor_row, cursor_col) stays in the command area -
-     * menu rows are added AFTER and don't affect cursor tracking.
-     */
+    /// Add menu rows to screen_buffer per
+    /// SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md
+    ///
+    /// This is the key fix: by adding menu rows to screen_buffer AFTER
+    /// rendering command text, the buffer knows the total display height. This
+    /// allows screen_buffer_get_rows_below_cursor() to return the correct value
+    /// for cursor positioning, fixing the "upward row consumption" bug.
+    ///
+    /// Cursor position (cursor_row, cursor_col) stays in the command area -
+    /// menu rows are added AFTER and don't affect cursor tracking.
     int menu_rows_added = 0;
     if (menu_text && *menu_text) {
-        /* Add menu starting at row after command ends.
-         * Note: We add a newline before menu, so start at num_rows (which is
-         * one past the last command row). */
+        /// Add menu starting at row after command ends.
+        /// Note: We add a newline before menu, so start at num_rows (which is
+        /// one past the last command row).
         int menu_start_row = desired_screen.num_rows;
         menu_rows_added = screen_buffer_add_text_rows(
             &desired_screen, menu_start_row, menu_text);
@@ -590,9 +585,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                  menu_start_row, menu_rows_added, desired_screen.num_rows);
     }
 
-    /* Get notification text if visible and add to screen_buffer for proper
-     * tracking Following the same pattern as menu to ensure correct cursor
-     * positioning */
+    /// Get notification text if visible and add to screen_buffer for proper
+    /// tracking Following the same pattern as menu to ensure correct cursor
+    /// positioning
     char notification_buffer[LLE_NOTIFICATION_MAX_STYLED];
     const char *notification_text = NULL;
     int notification_rows_added = 0;
@@ -603,7 +598,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             &controller->notification_copy, notification_buffer,
             sizeof(notification_buffer));
 
-        /* Add notification to screen_buffer like we do for menu */
+        /// Add notification to screen_buffer like we do for menu
         if (notification_text && *notification_text) {
             int notif_start_row = desired_screen.num_rows;
             notification_rows_added = screen_buffer_add_text_rows(
@@ -617,18 +612,17 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* PROMPT-ONCE ARCHITECTURE per MODERN_EDITOR_WRAPPING_RESEARCH.md
-     *
-     * This implements the proven approach used by Replxx, Fish, and ZLE:
-     * 1. Prompt is drawn ONCE on first render and NEVER redrawn
-     * 2. Only the command text area is cleared and redrawn on updates
-     * 3. Absolute column positioning (\033[{n}G) is used instead of \r
-     *
-     * Key principle: Never move cursor to column 0 after first render,
-     * as this would allow \033[J to clear the prompt.
-     */
+    /// PROMPT-ONCE ARCHITECTURE per MODERN_EDITOR_WRAPPING_RESEARCH.md
+    ///
+    /// This implements the proven approach used by Replxx, Fish, and ZLE:
+    /// 1. Prompt is drawn ONCE on first render and NEVER redrawn
+    /// 2. Only the command text area is cleared and redrawn on updates
+    /// 3. Absolute column positioning (\033[{n}G) is used instead of \r
+    ///
+    /// Key principle: Never move cursor to column 0 after first render,
+    /// as this would allow \033[J to clear the prompt.
 
-    /* First render only: Draw prompt once */
+    /// First render only: Draw prompt once
     if (!prompt_rendered) {
         if (prompt_buffer[0]) {
             dc_write_all(STDOUT_FILENO, prompt_buffer, strlen(prompt_buffer));
@@ -636,12 +630,12 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         prompt_rendered = true;
     }
 
-    /* Every render (including first): Position to command start and redraw
-     * command */
+    /// Every render (including first): Position to command start and redraw
+    /// command
 
-    /* Step 1: Move to absolute column where command starts (after prompt)
-     * For multi-line prompts, use command_start_col from screen buffer
-     * Use \033[{n}G for absolute positioning (1-based indexing) */
+    /// Step 1: Move to absolute column where command starts (after prompt)
+    /// For multi-line prompts, use command_start_col from screen buffer
+    /// Use \033[{n}G for absolute positioning (1-based indexing)
     int command_start_col = desired_screen.command_start_col;
     char move_to_col[32];
     int col_len = snprintf(move_to_col, sizeof(move_to_col), "\033[%dG",
@@ -650,20 +644,20 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         dc_write_all(STDOUT_FILENO, move_to_col, col_len);
     }
 
-    /* Step 2: Handle ghost text/menu cleanup from previous render
-     *
-     * Problem: Ghost text (autosuggestions) may have wrapped to extra rows.
-     * After Step 5 of previous render, cursor was moved back to command cursor
-     * position. But the ghost text remains on screen below that.
-     *
-     * Solution: If previous render had extra rows (ghost text/menu), move DOWN
-     * to that row first, then clear, then move back up. This ensures we clear
-     * all the ghost text artifacts. */
+    /// Step 2: Handle ghost text/menu cleanup from previous render
+    ///
+    /// Problem: Ghost text (autosuggestions) may have wrapped to extra rows.
+    /// After Step 5 of previous render, cursor was moved back to command cursor
+    /// position. But the ghost text remains on screen below that.
+    ///
+    /// Solution: If previous render had extra rows (ghost text/menu), move DOWN
+    /// to that row first, then clear, then move back up. This ensures we clear
+    /// all the ghost text artifacts.
     int command_row = desired_screen.command_start_row;
 
     if (last_terminal_end_row > current_screen.cursor_row) {
-        /* Previous render had ghost text/menu extending below cursor position.
-         * Move DOWN to that row to clear from there. */
+        /// Previous render had ghost text/menu extending below cursor position.
+        /// Move DOWN to that row to clear from there.
         int rows_down = last_terminal_end_row - current_screen.cursor_row;
         DC_DEBUG("Step2: Moving DOWN %d rows to clear ghost text", rows_down);
         char move_down[32];
@@ -673,10 +667,10 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             dc_write_all(STDOUT_FILENO, move_down, down_len);
         }
 
-        /* Clear from here to end of screen (clears ghost text) */
+        /// Clear from here to end of screen (clears ghost text)
         dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-        /* Move back up to command start row */
+        /// Move back up to command start row
         int rows_up = last_terminal_end_row - command_row;
         if (rows_up > 0) {
             DC_DEBUG("Step2: Moving UP %d rows to command start", rows_up);
@@ -688,8 +682,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             }
         }
     } else if (current_screen.cursor_row > command_row) {
-        /* No ghost text overflow, but cursor is below command start - move up
-         */
+        /// No ghost text overflow, but cursor is below command start - move up
         int rows_up = current_screen.cursor_row - command_row;
         DC_DEBUG("Step2: Moving up %d rows", rows_up);
         char move_up[32];
@@ -699,20 +692,19 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Step 3: Clear from current position to end of screen
-     * This clears only the command area, never touches the prompt */
+    /// Step 3: Clear from current position to end of screen
+    /// This clears only the command area, never touches the prompt
     dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-    /* Step 3.5: Write RPROMPT (right-aligned on prompt row)
-     *
-     * RPROMPT occupies the right side of the prompt row. It's written after
-     * \033[J clears the command area (which also erases any previous RPROMPT),
-     * so we must redraw it every cycle.
-     *
-     * Sequence: move to rprompt_col, write RPROMPT, move back to command_start.
-     * Only on single-line prompts where command hasn't grown into RPROMPT
-     * space.
-     */
+    /// Step 3.5: Write RPROMPT (right-aligned on prompt row)
+    ///
+    /// RPROMPT occupies the right side of the prompt row. It's written after
+    /// \033[J clears the command area (which also erases any previous RPROMPT),
+    /// so we must redraw it every cycle.
+    ///
+    /// Sequence: move to rprompt_col, write RPROMPT, move back to
+    /// command_start. Only on single-line prompts where command hasn't grown
+    /// into RPROMPT space.
     if (desired_screen.rprompt_fits && desired_screen.rprompt_text[0]) {
         char rprompt_col_seq[16];
         int rprompt_col_len =
@@ -724,9 +716,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
         dc_write_all(STDOUT_FILENO, desired_screen.rprompt_text,
                      strlen(desired_screen.rprompt_text));
-        /* Reset attributes after RPROMPT (it may contain colors) */
+        /// Reset attributes after RPROMPT (it may contain colors)
         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
-        /* Move back to command start column */
+        /// Move back to command start column
         char back_col_seq[16];
         int back_col_len = snprintf(back_col_seq, sizeof(back_col_seq),
                                     "\033[%dG", command_start_col + 1);
@@ -735,21 +727,20 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Step 4: Write command text with continuation prompts
-     *
-     * For multiline input, we need to insert continuation prompts after each
-     * newline. The screen_buffer has prefixes set at visual rows (accounting
-     * for wrapping), so we must track visual rows during output to find the
-     * correct prefix.
-     *
-     * This uses character-by-character tracking to match how
-     * screen_buffer_render calculated visual rows, ensuring prefixes appear on
-     * the correct lines.
-     */
+    /// Step 4: Write command text with continuation prompts
+    ///
+    /// For multiline input, we need to insert continuation prompts after each
+    /// newline. The screen_buffer has prefixes set at visual rows (accounting
+    /// for wrapping), so we must track visual rows during output to find the
+    /// correct prefix.
+    ///
+    /// This uses character-by-character tracking to match how
+    /// screen_buffer_render calculated visual rows, ensuring prefixes appear on
+    /// the correct lines.
     if (command_buffer[0]) {
         if (is_multiline) {
-            /* Write command text character by character, tracking visual rows
-             * to output continuation prompts at the correct positions */
+            /// Write command text character by character, tracking visual rows
+            /// to output continuation prompts at the correct positions
             size_t i = 0;
             size_t text_len = strlen(command_buffer);
             int visual_row = desired_screen.command_start_row;
@@ -758,8 +749,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             while (i < text_len) {
                 unsigned char ch = (unsigned char)command_buffer[i];
 
-                /* Handle ANSI escape sequences - pass through without affecting
-                 * position */
+                /// Handle ANSI escape sequences - pass through without
+                /// affecting position
                 if (ch == '\033' || ch == '\x1b') {
                     size_t seq_start = i;
                     i++;
@@ -775,24 +766,23 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                             }
                         }
                     }
-                    /* Write the ANSI sequence */
+                    /// Write the ANSI sequence
                     dc_write_all(STDOUT_FILENO, command_buffer + seq_start,
                                  i - seq_start);
                     continue;
                 }
 
-                /* Handle newlines - move to next visual row and output
-                 * continuation prompt */
+                /// Handle newlines - move to next visual row and output
+                /// continuation prompt
                 if (ch == '\n') {
                     dc_write_all(STDOUT_FILENO, "\n", 1);
                     visual_row++;
 
-                    /* Get continuation prompt for this visual row */
+                    /// Get continuation prompt for this visual row
                     const char *cont_prompt = screen_buffer_get_line_prefix(
                         &desired_screen, visual_row);
                     if (cont_prompt) {
-                        /* Reset ANSI state before writing continuation prompt
-                         */
+                        /// Reset ANSI state before writing continuation prompt
                         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
                         dc_write_all(STDOUT_FILENO, cont_prompt,
                                      strlen(cont_prompt));
@@ -807,8 +797,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     continue;
                 }
 
-                /* Handle regular characters - track visual column for wrapping
-                 */
+                /// Handle regular characters - track visual column for wrapping
                 uint32_t codepoint;
                 int char_bytes = lle_utf8_decode_codepoint(
                     command_buffer + i, text_len - i, &codepoint);
@@ -816,23 +805,23 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                 if (char_bytes > 0) {
                     int char_width = lle_utf8_codepoint_width(codepoint);
 
-                    /* Write the character */
+                    /// Write the character
                     dc_write_all(STDOUT_FILENO, command_buffer + i, char_bytes);
 
-                    /* Update visual position */
+                    /// Update visual position
                     visual_col += char_width;
 
-                    /* Check for line wrap */
+                    /// Check for line wrap
                     if (visual_col >= term_width) {
                         visual_row++;
                         visual_col = 0;
-                        /* Note: wrapped lines don't get continuation prompts,
-                         * only lines after explicit newlines do */
+                        /// Note: wrapped lines don't get continuation prompts,
+                        /// only lines after explicit newlines do
                     }
 
                     i += char_bytes;
                 } else {
-                    /* Invalid UTF-8, write single byte */
+                    /// Invalid UTF-8, write single byte
                     dc_write_all(STDOUT_FILENO, command_buffer + i, 1);
                     visual_col++;
                     if (visual_col >= term_width) {
@@ -843,22 +832,21 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                 }
             }
         } else {
-            /* Single-line input - write directly */
+            /// Single-line input - write directly
             dc_write_all(STDOUT_FILENO, command_buffer, strlen(command_buffer));
         }
     }
 
-    /* Step 4a: Write autosuggestion ghost text (Fish-style)
-     *
-     * Conditions for showing ghost text:
-     * 1. Autosuggestions enabled and layer available
-     * 2. No completion menu visible (menu takes precedence)
-     * 3. Not multiline input (simplifies initial implementation)
-     * 4. Cursor is at end of command (checked by autosuggestions_layer)
-     *
-     * The ghost text appears in BRIGHT_BLACK (gray/dimmed) after the command.
-     * Cursor positioning (Step 5) will move cursor back to correct position.
-     */
+    /// Step 4a: Write autosuggestion ghost text (Fish-style)
+    ///
+    /// Conditions for showing ghost text:
+    /// 1. Autosuggestions enabled and layer available
+    /// 2. No completion menu visible (menu takes precedence)
+    /// 3. Not multiline input (simplifies initial implementation)
+    /// 4. Cursor is at end of command (checked by autosuggestions_layer)
+    ///
+    /// The ghost text appears in BRIGHT_BLACK (gray/dimmed) after the command.
+    /// Cursor positioning (Step 5) will move cursor back to correct position.
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
         !controller->completion_menu_visible && !is_multiline) {
@@ -867,52 +855,51 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             controller->autosuggestions_layer);
 
         if (suggestion && *suggestion) {
-            /* Write ghost text in BRIGHT_BLACK (dimmed gray) */
+            /// Write ghost text in BRIGHT_BLACK (dimmed gray)
             dc_write_all(STDOUT_FILENO, "\033[90m",
-                         5); /* Set bright black foreground */
+                         5); /// Set bright black foreground
             dc_write_all(STDOUT_FILENO, suggestion, strlen(suggestion));
             dc_write_all(STDOUT_FILENO, "\033[0m",
-                         4); /* Reset all attributes */
+                         4); /// Reset all attributes
         }
     }
 
-    /* Step 4b: Write completion menu WITHOUT continuation prompts */
+    /// Step 4b: Write completion menu WITHOUT continuation prompts
     if (menu_text && *menu_text) {
         dc_write_all(STDOUT_FILENO, "\n", 1);
         dc_write_all(STDOUT_FILENO, menu_text, strlen(menu_text));
     }
 
-    /* Step 4c: Write notification below menu (if any)
-     * Notification is now tracked in screen_buffer like menu */
+    /// Step 4c: Write notification below menu (if any)
+    /// Notification is now tracked in screen_buffer like menu
     if (notification_text && *notification_text) {
         dc_write_all(STDOUT_FILENO, "\n", 1);
         dc_write_all(STDOUT_FILENO, notification_text,
                      strlen(notification_text));
     }
 
-    /* Step 5: Position cursor at the correct location
-     *
-     * After drawing command text, ghost text, and menu, terminal cursor is at
-     * the end. We need to position it where the user's cursor actually is (in
-     * the command).
-     *
-     * With the new architecture (per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md):
-     * - Menu rows were added to desired_screen via
-     * screen_buffer_add_text_rows()
-     * - desired_screen.num_rows now includes menu rows
-     * - desired_screen.cursor_row is still in the command area (unaffected by
-     * menu)
-     * - screen_buffer_get_rows_below_cursor() gives us the exact count
-     *
-     * Ghost text is not yet tracked in screen_buffer, so we still calculate it
-     * separately.
-     */
+    /// Step 5: Position cursor at the correct location
+    ///
+    /// After drawing command text, ghost text, and menu, terminal cursor is at
+    /// the end. We need to position it where the user's cursor actually is (in
+    /// the command).
+    ///
+    /// With the new architecture (per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md):
+    /// - Menu rows were added to desired_screen via
+    /// screen_buffer_add_text_rows()
+    /// - desired_screen.num_rows now includes menu rows
+    /// - desired_screen.cursor_row is still in the command area (unaffected by
+    /// menu)
+    /// - screen_buffer_get_rows_below_cursor() gives us the exact count
+    ///
+    /// Ghost text is not yet tracked in screen_buffer, so we still calculate it
+    /// separately.
     int cursor_row = desired_screen.cursor_row;
     int cursor_col = desired_screen.cursor_col;
 
-    /* Calculate extra rows added by ghost text (autosuggestion)
-     * Ghost text may wrap to additional lines beyond the command text.
-     * TODO: Add ghost text to screen_buffer for unified tracking. */
+    /// Calculate extra rows added by ghost text (autosuggestion)
+    /// Ghost text may wrap to additional lines beyond the command text.
+    /// TODO: Add ghost text to screen_buffer for unified tracking.
     int ghost_text_extra_rows = 0;
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
@@ -933,13 +920,12 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Calculate rows to move up using screen_buffer's tracked state.
-     *
-     * screen_buffer_get_rows_below_cursor() returns: (num_rows - 1) -
-     * cursor_row This accounts for menu rows AND notification rows that were
-     * added via screen_buffer_add_text_rows(). We still need to add
-     * ghost_text_extra_rows since those aren't in screen_buffer yet.
-     */
+    /// Calculate rows to move up using screen_buffer's tracked state.
+    ///
+    /// screen_buffer_get_rows_below_cursor() returns: (num_rows - 1) -
+    /// cursor_row This accounts for menu rows AND notification rows that were
+    /// added via screen_buffer_add_text_rows(). We still need to add
+    /// ghost_text_extra_rows since those aren't in screen_buffer yet.
     int rows_to_move_up = screen_buffer_get_rows_below_cursor(&desired_screen) +
                           ghost_text_extra_rows;
 
@@ -958,8 +944,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Move to absolute column (never use \r - it goes to column 0!)
-     * Use \033[{n}G for absolute column positioning (1-based indexing) */
+    /// Move to absolute column (never use \r - it goes to column 0!)
+    /// Use \033[{n}G for absolute column positioning (1-based indexing)
     char col_seq[16];
     int col_seq_len =
         snprintf(col_seq, sizeof(col_seq), "\033[%dG", cursor_col + 1);
@@ -973,24 +959,24 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     screen_buffer_copy(&current_screen, &desired_screen);
     prompt_rendered = true;
 
-    /* Track where the terminal display actually ends (including ghost
-     * text/menu/notification) This is needed by Step 2 on the next render to
-     * move up the correct amount.
-     *
-     * With menu AND notification rows now tracked in screen_buffer:
-     * - (num_rows - 1) gives the last row index in the buffer (includes menu
-     *   and notification)
-     * - ghost_text_extra_rows adds any additional wrapping from autosuggestions
-     */
+    /// Track where the terminal display actually ends (including ghost
+    /// text/menu/notification) This is needed by Step 2 on the next render to
+    /// move up the correct amount.
+    ///
+    /// With menu AND notification rows now tracked in screen_buffer:
+    /// - (num_rows - 1) gives the last row index in the buffer (includes menu
+    ///   and notification)
+    /// - ghost_text_extra_rows adds any additional wrapping from
+    /// autosuggestions
     last_terminal_end_row =
         (desired_screen.num_rows - 1) + ghost_text_extra_rows;
 
-    /* NOTE: fsync() was causing input timeouts after cursor positioning -
-     * removed stdout is line-buffered by default and terminal I/O doesn't need
-     * fsync */
+    /// NOTE: fsync() was causing input timeouts after cursor positioning -
+    /// removed stdout is line-buffered by default and terminal I/O doesn't need
+    /// fsync
 
-    /* Restore original signal mask - any pending SIGWINCH will be delivered now
-     */
+    /// Restore original signal mask - any pending SIGWINCH will be delivered
+    /// now
     sigprocmask(SIG_SETMASK, &old_set, NULL);
 
     return LAYER_EVENTS_SUCCESS;
@@ -1047,8 +1033,8 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
     if (!prompt || *prompt == '\0')
         return DC_HASH_SEED;
 
-    // For maximum cache hit rates, normalize prompt by removing time-sensitive
-    // elements
+    /// For maximum cache hit rates, normalize prompt by removing time-sensitive
+    /// elements
     char normalized[512] = {0};
     const char *p = prompt;
     size_t pos = 0;
@@ -1058,7 +1044,7 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
     while (*p && pos < sizeof(normalized) - 1) {
         if (*p == '\033' || *p == '\x1b') {
             in_color_seq = true;
-            normalized[pos++] = 'C'; // Color marker only
+            normalized[pos++] = 'C'; /// Color marker only
             p++;
             continue;
         }
@@ -1071,12 +1057,12 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
             continue;
         }
 
-        // Detect and skip timestamp patterns (common formats)
-        // Skip sequences like "Mon Jan 27 15:30:42 2025" or "15:30:42" or "Jan
-        // 27"
+        /// Detect and skip timestamp patterns (common formats)
+        /// Skip sequences like "Mon Jan 27 15:30:42 2025" or "15:30:42" or "Jan
+        /// 27"
         if ((*p >= '0' && *p <= '9') &&
             (*(p + 1) == ':' || (isdigit(*(p + 1)) && *(p + 2) == ':'))) {
-            // Skip time patterns like "15:30:42" or "3:45"
+            /// Skip time patterns like "15:30:42" or "3:45"
             skip_timestamp = true;
         } else if (skip_timestamp && (*p == ' ' || *p == '\t' || *p == '\n')) {
             skip_timestamp = false;
@@ -1087,7 +1073,7 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
             continue;
         }
 
-        // Skip common date patterns
+        /// Skip common date patterns
         if ((strncmp(p, "Mon ", 4) == 0) || (strncmp(p, "Tue ", 4) == 0) ||
             (strncmp(p, "Wed ", 4) == 0) || (strncmp(p, "Thu ", 4) == 0) ||
             (strncmp(p, "Fri ", 4) == 0) || (strncmp(p, "Sat ", 4) == 0) ||
@@ -1098,28 +1084,28 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
             (strncmp(p, "Aug ", 4) == 0) || (strncmp(p, "Sep ", 4) == 0) ||
             (strncmp(p, "Oct ", 4) == 0) || (strncmp(p, "Nov ", 4) == 0) ||
             (strncmp(p, "Dec ", 4) == 0)) {
-            // Skip to end of timestamp section
+            /// Skip to end of timestamp section
             while (*p && *p != '\n' && *p != '$' && *p != '#' && *p != '>') {
                 p++;
             }
             continue;
         }
 
-        // Normalize structural elements
+        /// Normalize structural elements
         if (*p == '$' || *p == '#' || *p == '>') {
-            normalized[pos++] = 'P'; // Prompt end marker
+            normalized[pos++] = 'P'; /// Prompt end marker
         } else if (*p == '[' || *p == '(' || *p == '{') {
-            normalized[pos++] = 'B'; // Begin bracket
+            normalized[pos++] = 'B'; /// Begin bracket
         } else if (*p == ']' || *p == ')' || *p == '}') {
-            normalized[pos++] = 'E'; // End bracket
+            normalized[pos++] = 'E'; /// End bracket
         } else if (*p == '/' || *p == '~') {
-            normalized[pos++] = 'D'; // Directory marker
+            normalized[pos++] = 'D'; /// Directory marker
         } else if (*p == '@') {
-            normalized[pos++] = 'A'; // User@host separator
+            normalized[pos++] = 'A'; /// User@host separator
         } else if (isalpha(*p)) {
-            normalized[pos++] = tolower(*p); // Normalize case
+            normalized[pos++] = tolower(*p); /// Normalize case
         } else if (*p != ' ' && *p != '\t' && *p != '\n') {
-            normalized[pos++] = *p; // Keep other significant chars
+            normalized[pos++] = *p; /// Keep other significant chars
         }
 
         p++;
@@ -1127,7 +1113,7 @@ static uint32_t dc_hash_prompt_semantic(const char *prompt) {
 
     normalized[pos] = '\0';
 
-    // Hash the normalized prompt structure
+    /// Hash the normalized prompt structure
     uint32_t hash = DC_HASH_SEED;
     const unsigned char *data = (const unsigned char *)normalized;
     while (*data) {
@@ -1150,31 +1136,31 @@ static uint32_t dc_hash_command_semantic(const char *command) {
     if (!command || *command == '\0')
         return DC_HASH_SEED;
 
-    // Simplified but more predictable command classification
+    /// Simplified but more predictable command classification
     uint32_t cmd_hash = DC_HASH_SEED;
     const char *p = command;
 
-    // Skip leading whitespace
+    /// Skip leading whitespace
     while (*p && isspace(*p))
         p++;
 
     if (!*p)
         return DC_HASH_SEED;
 
-    // Extract base command for classification
+    /// Extract base command for classification
     char base_cmd[32] = {0};
     size_t i = 0;
     while (*p && !isspace(*p) && i < sizeof(base_cmd) - 1) {
         base_cmd[i++] = (char)tolower(*p++);
     }
 
-    // Hash the base command
+    /// Hash the base command
     for (i = 0; base_cmd[i]; i++) {
         cmd_hash ^= (unsigned char)base_cmd[i];
         cmd_hash *= DC_HASH_PRIME;
     }
 
-    // Simple argument classification (not exact matching)
+    /// Simple argument classification (not exact matching)
     while (*p && isspace(*p))
         p++;
     int has_flags = 0, has_args = 0;
@@ -1193,7 +1179,7 @@ static uint32_t dc_hash_command_semantic(const char *command) {
         }
     }
 
-    // Include argument pattern in hash for differentiation
+    /// Include argument pattern in hash for differentiation
     cmd_hash ^= (has_flags << 8) | (has_args << 4);
 
     return cmd_hash;
@@ -1218,29 +1204,29 @@ static void dc_generate_state_hash(const char *prompt, const char *command,
     if (!hash_buffer || buffer_size < DC_MAX_STATE_HASH_LENGTH)
         return;
 
-    // Get semantic hashes for grouping similar states
+    /// Get semantic hashes for grouping similar states
     uint32_t prompt_semantic = dc_hash_prompt_semantic(prompt);
     uint32_t command_semantic = dc_hash_command_semantic(command);
 
-    // Add theme context to hash calculation
+    /// Add theme context to hash calculation
     uint32_t theme_hash = dc_hash_string(theme_name ? theme_name : "default");
     uint32_t symbol_hash = (uint32_t)symbol_mode;
 
-    // Create primary hash from semantic components including theme context
+    /// Create primary hash from semantic components including theme context
     uint32_t primary_hash = prompt_semantic ^ (command_semantic << 1) ^
                             (theme_hash << 2) ^ (symbol_hash << 3);
 
-    // For identical repeated commands, ensure exact cache hits
+    /// For identical repeated commands, ensure exact cache hits
     uint32_t exact_prompt = dc_hash_string(prompt ? prompt : "");
     uint32_t exact_command = dc_hash_string(command ? command : "");
 
-    // Balance semantic grouping with exact matching
-    // Use semantic hash as primary, exact hash for differentiation
+    /// Balance semantic grouping with exact matching
+    /// Use semantic hash as primary, exact hash for differentiation
     uint32_t secondary_hash =
         (exact_prompt & 0xFFFF) ^ ((exact_command & 0xFFFF) << 16);
 
-    // Final combined hash: semantic-driven but with exact differentiation and
-    // theme context
+    /// Final combined hash: semantic-driven but with exact differentiation and
+    /// theme context
     uint32_t combined_hash = primary_hash ^ secondary_hash;
 
     snprintf(hash_buffer, buffer_size, "s%08x_e%08x_c%08x_t%08x_m%x",
@@ -1258,28 +1244,28 @@ static void dc_init_default_config(display_controller_config_t *config) {
 
     memset(config, 0, sizeof(display_controller_config_t));
 
-    // Performance configuration
+    /// Performance configuration
     config->optimization_level = DISPLAY_OPTIMIZATION_STANDARD;
     config->cache_ttl_ms = DISPLAY_CONTROLLER_DEFAULT_CACHE_TTL_MS;
     config->performance_monitor_interval_ms =
         DISPLAY_CONTROLLER_DEFAULT_MONITORING_INTERVAL_MS;
     config->max_cache_entries = 256;
 
-    // Feature toggles
+    /// Feature toggles
     config->enable_caching = true;
     config->enable_diff_algorithms = true;
     config->enable_performance_monitoring = true;
     config->enable_adaptive_optimization = true;
     config->enable_integration_mode = false;
 
-    // Threshold configuration
+    /// Threshold configuration
     config->performance_threshold_ms =
         DISPLAY_CONTROLLER_PERFORMANCE_THRESHOLD_MS;
     config->cache_hit_rate_threshold =
         DISPLAY_CONTROLLER_CACHE_HIT_RATE_THRESHOLD;
     config->memory_threshold_mb = DISPLAY_CONTROLLER_MEMORY_THRESHOLD_MB;
 
-    // Debug and diagnostics
+    /// Debug and diagnostics
     config->enable_debug_logging = false;
     config->enable_performance_profiling = false;
     config->log_file_path = NULL;
@@ -1341,7 +1327,7 @@ static void dc_cleanup_expired_cache_entries(display_controller_t *controller) {
         display_cache_entry_t *entry = &controller->cache_entries[i];
 
         if (!entry->is_valid) {
-            // Remove invalid entry
+            /// Remove invalid entry
             if (entry->display_content) {
                 lush_pool_free(entry->display_content);
                 entry->display_content = NULL;
@@ -1351,7 +1337,7 @@ static void dc_cleanup_expired_cache_entries(display_controller_t *controller) {
                 entry->state_hash = NULL;
             }
 
-            // Move last entry to this position
+            /// Move last entry to this position
             if (i < controller->cache_count - 1) {
                 *entry = controller->cache_entries[controller->cache_count - 1];
             }
@@ -1359,7 +1345,7 @@ static void dc_cleanup_expired_cache_entries(display_controller_t *controller) {
             continue;
         }
 
-        // Calculate age
+        /// Calculate age
         uint64_t age_ms = ((uint64_t)current_time.tv_sec -
                            (uint64_t)entry->timestamp.tv_sec) *
                               1000 +
@@ -1367,22 +1353,22 @@ static void dc_cleanup_expired_cache_entries(display_controller_t *controller) {
                            (uint64_t)entry->timestamp.tv_usec) /
                               1000;
 
-        // Adaptive TTL based on access frequency
+        /// Adaptive TTL based on access frequency
         uint32_t adaptive_ttl_ms = controller->config.cache_ttl_ms;
 
         if (entry->access_count > 5) {
-            // High-frequency entries get 4x longer TTL
+            /// High-frequency entries get 4x longer TTL
             adaptive_ttl_ms *= 4;
         } else if (entry->access_count > 2) {
-            // Medium-frequency entries get 2x longer TTL
+            /// Medium-frequency entries get 2x longer TTL
             adaptive_ttl_ms *= 2;
         } else if (entry->access_count == 1) {
-            // Single-use entries get much shorter TTL
+            /// Single-use entries get much shorter TTL
             adaptive_ttl_ms = adaptive_ttl_ms / 3;
         }
 
         if (age_ms > adaptive_ttl_ms) {
-            // Entry has expired
+            /// Entry has expired
             if (entry->display_content) {
                 lush_pool_free(entry->display_content);
                 entry->display_content = NULL;
@@ -1393,7 +1379,7 @@ static void dc_cleanup_expired_cache_entries(display_controller_t *controller) {
             }
             entry->is_valid = false;
 
-            // Move last entry to this position
+            /// Move last entry to this position
             if (i < controller->cache_count - 1) {
                 *entry = controller->cache_entries[controller->cache_count - 1];
             }
@@ -1443,22 +1429,22 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
         return DISPLAY_CONTROLLER_ERROR_INVALID_PARAM;
     }
 
-    // Check if cache is full
+    /// Check if cache is full
     if (controller->cache_count >= controller->cache_capacity) {
-        // Find least recently used entry with improved protection for frequent
-        // entries
+        /// Find least recently used entry with improved protection for frequent
+        /// entries
         size_t lru_index = 0;
         uint32_t min_score = UINT32_MAX;
 
         for (size_t i = 0; i < controller->cache_count; i++) {
             display_cache_entry_t *entry = &controller->cache_entries[i];
 
-            // Calculate eviction score: lower score = more likely to evict
-            // Protect frequently accessed entries by heavily weighting access
-            // count
+            /// Calculate eviction score: lower score = more likely to evict
+            /// Protect frequently accessed entries by heavily weighting access
+            /// count
             uint32_t score = entry->access_count * 1000;
 
-            // Also consider recency (entries accessed recently get protection)
+            /// Also consider recency (entries accessed recently get protection)
             struct timeval current_time;
             gettimeofday(&current_time, NULL);
             uint64_t age_ms = ((uint64_t)current_time.tv_sec -
@@ -1468,10 +1454,10 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
                                (uint64_t)entry->timestamp.tv_usec) /
                                   1000;
 
-            // Reduce score based on age (older entries have lower scores)
+            /// Reduce score based on age (older entries have lower scores)
             if (age_ms > 5000) {
                 score =
-                    score / 2; // Halve score for entries older than 5 seconds
+                    score / 2; /// Halve score for entries older than 5 seconds
             }
 
             if (score < min_score) {
@@ -1480,7 +1466,7 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
             }
         }
 
-        // Remove LRU entry
+        /// Remove LRU entry
         display_cache_entry_t *lru_entry =
             &controller->cache_entries[lru_index];
         if (lru_entry->display_content)
@@ -1488,7 +1474,7 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
         if (lru_entry->state_hash)
             lush_pool_free(lru_entry->state_hash);
 
-        // Use this slot for new entry
+        /// Use this slot for new entry
         display_cache_entry_t *new_entry = lru_entry;
         memset(new_entry, 0, sizeof(display_cache_entry_t));
 
@@ -1511,7 +1497,7 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
         new_entry->is_valid = true;
         gettimeofday(&new_entry->timestamp, NULL);
     } else {
-        // Add new entry
+        /// Add new entry
         display_cache_entry_t *new_entry =
             &controller->cache_entries[controller->cache_count];
         memset(new_entry, 0, sizeof(display_cache_entry_t));
@@ -1541,9 +1527,9 @@ dc_add_cache_entry(display_controller_t *controller, const char *state_hash,
     return DISPLAY_CONTROLLER_SUCCESS;
 }
 
-// ============================================================================
-// CORE API IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// CORE API IMPLEMENTATION
+/// ============================================================================
 
 display_controller_t *display_controller_create(void) {
     display_controller_t *controller = malloc(sizeof(display_controller_t));
@@ -1554,7 +1540,7 @@ display_controller_t *display_controller_create(void) {
 
     memset(controller, 0, sizeof(display_controller_t));
 
-    // Initialize configuration with defaults
+    /// Initialize configuration with defaults
     dc_init_default_config(&controller->config);
 
     DC_DEBUG("Display controller created successfully");
@@ -1572,24 +1558,24 @@ display_controller_init(display_controller_t *controller,
 
     DC_DEBUG("Initializing display controller");
 
-    // Apply configuration
+    /// Apply configuration
     if (init_config) {
         controller->config = *init_config;
     } else {
         dc_init_default_config(&controller->config);
     }
 
-    // Initialize event system
+    /// Initialize event system
     controller->event_system = event_system;
 
-    // Create composition engine
+    /// Create composition engine
     controller->compositor = composition_engine_create();
     if (!controller->compositor) {
         DC_ERROR("Failed to create composition engine");
         return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Create base terminal first (required for terminal control)
+    /// Create base terminal first (required for terminal control)
     base_terminal_t *base_terminal = base_terminal_create();
     if (!base_terminal) {
         DC_ERROR("Failed to create base terminal");
@@ -1598,14 +1584,14 @@ display_controller_init(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
     }
 
-    // CRITICAL: Initialize base_terminal BEFORE creating terminal_control
-    // This sets up FDs and detects terminal capabilities
-    // Only initialize if stdout is a TTY (won't work with pipes/redirects)
+    /// CRITICAL: Initialize base_terminal BEFORE creating terminal_control
+    /// This sets up FDs and detects terminal capabilities
+    /// Only initialize if stdout is a TTY (won't work with pipes/redirects)
     if (isatty(STDOUT_FILENO)) {
         base_terminal_error_t bt_result = base_terminal_init(base_terminal);
         if (bt_result != BASE_TERMINAL_SUCCESS) {
-            /* Non-fatal - will use default 80x24. Only log at debug level
-             * since this is expected when stdin is a pipe with -i flag. */
+            /// Non-fatal - will use default 80x24. Only log at debug level
+            /// since this is expected when stdin is a pipe with -i flag.
             DC_DEBUG("Base terminal init returned %d - using defaults",
                      bt_result);
         } else {
@@ -1613,10 +1599,10 @@ display_controller_init(display_controller_t *controller,
         }
     } else {
         DC_DEBUG("stdout is not a TTY, skipping base_terminal initialization");
-        // Will use default 80x24 when output is redirected
+        /// Will use default 80x24 when output is redirected
     }
 
-    // Create terminal control context
+    /// Create terminal control context
     controller->terminal_ctrl = terminal_control_create(base_terminal);
     if (!controller->terminal_ctrl) {
         DC_ERROR("Failed to create terminal control context");
@@ -1626,27 +1612,27 @@ display_controller_init(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Initialize terminal control to detect actual terminal capabilities
+    /// Initialize terminal control to detect actual terminal capabilities
     terminal_control_error_t tc_result =
         terminal_control_init(controller->terminal_ctrl);
     if (tc_result != TERMINAL_CONTROL_SUCCESS) {
         DC_ERROR(
             "Failed to initialize terminal control (error %d) - using defaults",
             tc_result);
-        // Non-fatal - will use default 80x24
+        /// Non-fatal - will use default 80x24
     }
 
-    // ========================================================================
-    // EAGER COMPOSITOR INITIALIZATION
-    // Initialize composition engine layers NOW so they're ready when LLE needs
-    // them. This fixes the startup issue where lle_display_integration_init
-    // fails because compositor->command_layer is NULL (was previously lazily
-    // initialized).
-    // ========================================================================
+    /// ========================================================================
+    /// EAGER COMPOSITOR INITIALIZATION
+    /// Initialize composition engine layers NOW so they're ready when LLE needs
+    /// them. This fixes the startup issue where lle_display_integration_init
+    /// fails because compositor->command_layer is NULL (was previously lazily
+    /// initialized).
+    /// ========================================================================
     {
         DC_DEBUG("Eagerly initializing compositor layers");
 
-        // Create prompt and command layers
+        /// Create prompt and command layers
         prompt_layer_t *prompt_layer = prompt_layer_create();
         command_layer_t *command_layer = command_layer_create();
 
@@ -1656,9 +1642,9 @@ display_controller_init(display_controller_t *controller,
                 prompt_layer_destroy(prompt_layer);
             if (command_layer)
                 command_layer_destroy(command_layer);
-            // Non-fatal - fall back to lazy initialization
+            /// Non-fatal - fall back to lazy initialization
         } else {
-            // Initialize prompt layer
+            /// Initialize prompt layer
             prompt_layer_error_t prompt_result =
                 prompt_layer_init(prompt_layer, controller->event_system);
             if (prompt_result != PROMPT_LAYER_SUCCESS) {
@@ -1666,9 +1652,9 @@ display_controller_init(display_controller_t *controller,
                          prompt_result);
                 prompt_layer_destroy(prompt_layer);
                 command_layer_destroy(command_layer);
-                // Non-fatal - fall back to lazy initialization
+                /// Non-fatal - fall back to lazy initialization
             } else {
-                // Initialize command layer
+                /// Initialize command layer
                 command_layer_error_t command_result =
                     command_layer_init(command_layer, controller->event_system);
                 if (command_result != COMMAND_LAYER_SUCCESS) {
@@ -1677,9 +1663,9 @@ display_controller_init(display_controller_t *controller,
                     prompt_layer_cleanup(prompt_layer);
                     prompt_layer_destroy(prompt_layer);
                     command_layer_destroy(command_layer);
-                    // Non-fatal - fall back to lazy initialization
+                    /// Non-fatal - fall back to lazy initialization
                 } else {
-                    // Initialize composition engine with the layers
+                    /// Initialize composition engine with the layers
                     composition_engine_error_t comp_result =
                         composition_engine_init(controller->compositor,
                                                 prompt_layer, command_layer,
@@ -1693,7 +1679,7 @@ display_controller_init(display_controller_t *controller,
                         prompt_layer_destroy(prompt_layer);
                         command_layer_cleanup(command_layer);
                         command_layer_destroy(command_layer);
-                        // Non-fatal - fall back to lazy initialization
+                        /// Non-fatal - fall back to lazy initialization
                     } else {
                         DC_DEBUG("Compositor layers initialized successfully "
                                  "(eager init)");
@@ -1703,7 +1689,7 @@ display_controller_init(display_controller_t *controller,
         }
     }
 
-    // Initialize caching system
+    /// Initialize caching system
     if (controller->config.enable_caching) {
         controller->cache_capacity = controller->config.max_cache_entries;
         controller->cache_entries =
@@ -1719,14 +1705,14 @@ display_controller_init(display_controller_t *controller,
         controller->cache_count = 0;
     }
 
-    // Initialize performance monitoring
+    /// Initialize performance monitoring
     memset(&controller->performance, 0,
            sizeof(display_controller_performance_t));
     memset(controller->performance_history, 0,
            sizeof(controller->performance_history));
     controller->performance_history_index = 0;
 
-    // Initialize state tracking
+    /// Initialize state tracking
     controller->last_display_state = NULL;
     controller->last_display_length = 0;
     controller->current_state_hash = malloc(DC_MAX_STATE_HASH_LENGTH);
@@ -1741,60 +1727,60 @@ display_controller_init(display_controller_t *controller,
 
     controller->display_cache_valid = false;
 
-    // Cache preheating: Pre-populate with comprehensive common patterns
+    /// Cache preheating: Pre-populate with comprehensive common patterns
     if (controller->config.enable_caching) {
-        // Comprehensive command patterns that benefit from caching
+        /// Comprehensive command patterns that benefit from caching
         const char *common_commands[] = {
-            // Basic file operations
+            /// Basic file operations
             "ls", "ls -l", "ls -la", "ls -lh", "ls .", "ls ..", "pwd", "cd",
             "cd ..", "cd .", "cd ~",
 
-            // Text operations
+            /// Text operations
             "echo", "echo test", "echo hello", "cat", "head", "tail",
 
-            // Git operations (common in development)
+            /// Git operations (common in development)
             "git status", "git branch", "git log", "git log --oneline",
             "git diff", "git add", "git commit",
 
-            // System operations
+            /// System operations
             "history", "clear", "exit", "which", "whereis", "ps", "top", "df",
             "du", "free"};
 
-        // Get current prompt for preheating (if available)
+        /// Get current prompt for preheating (if available)
         extern char *lush_generate_prompt(void);
         char *current_prompt = lush_generate_prompt();
 
         if (current_prompt) {
-            // Pre-generate cache entries for common commands with current
-            // prompt
+            /// Pre-generate cache entries for common commands with current
+            /// prompt
             for (size_t i = 0;
                  i < sizeof(common_commands) / sizeof(common_commands[0]) &&
                  i < 16;
-                 i++) { // Expanded preheating for better coverage
+                 i++) { /// Expanded preheating for better coverage
 
                 char state_hash[DC_MAX_STATE_HASH_LENGTH];
                 dc_generate_state_hash(current_prompt, common_commands[i],
                                        "default", SYMBOL_MODE_AUTO, state_hash,
                                        sizeof(state_hash));
 
-                // Create optimized cache entry for common patterns
+                /// Create optimized cache entry for common patterns
                 char placeholder_output[128];
                 snprintf(placeholder_output, sizeof(placeholder_output),
                          "%s%s\n", current_prompt, common_commands[i]);
 
-                // Add to cache with higher access count to keep them longer
+                /// Add to cache with higher access count to keep them longer
                 dc_add_cache_entry(controller, state_hash, placeholder_output,
                                    strlen(placeholder_output));
 
-                // Mark as frequently used for adaptive TTL
+                /// Mark as frequently used for adaptive TTL
                 if (controller->cache_count > 0) {
                     controller->cache_entries[controller->cache_count - 1]
                         .access_count = 3;
                 }
             }
 
-            // Pre-populate with repeated command patterns (simulate high
-            // frequency)
+            /// Pre-populate with repeated command patterns (simulate high
+            /// frequency)
             const char *repeated_commands[] = {"ls", "pwd", "echo",
                                                "git status"};
             for (size_t i = 0;
@@ -1805,26 +1791,26 @@ display_controller_init(display_controller_t *controller,
                                        "default", SYMBOL_MODE_AUTO, state_hash,
                                        sizeof(state_hash));
 
-                // Find existing entry and boost its access count
+                /// Find existing entry and boost its access count
                 display_cache_entry_t *existing =
                     dc_find_cache_entry(controller, state_hash);
                 if (existing) {
-                    existing->access_count = 6; // High frequency simulation
+                    existing->access_count = 6; /// High frequency simulation
                 }
             }
 
-            // Note: Do not free current_prompt here - it's managed by readline
-            // integration system Freeing it here causes double free corruption
-            // when lush_readline_cleanup() runs
+            /// Note: Do not free current_prompt here - it's managed by readline
+            /// integration system Freeing it here causes double free corruption
+            /// when lush_readline_cleanup() runs
         }
     }
 
-    // Initialize completion menu state (LLE Spec 12 - Proper Architecture)
+    /// Initialize completion menu state (LLE Spec 12 - Proper Architecture)
     controller->active_completion_menu = NULL;
     controller->completion_menu_visible = false;
     controller->menu_state_changed = false;
 
-    // Initialize autosuggestions layer (Fish-style ghost text)
+    /// Initialize autosuggestions layer (Fish-style ghost text)
     controller->autosuggestions_layer = NULL;
     controller->autosuggestions_enabled = false;
 
@@ -1836,7 +1822,7 @@ display_controller_init(display_controller_t *controller,
             autosuggestions_layer_error_t as_result =
                 autosuggestions_layer_init(
                     controller->autosuggestions_layer,
-                    NULL // Use default config (BRIGHT_BLACK color)
+                    NULL /// Use default config (BRIGHT_BLACK color)
                 );
 
             if (as_result == AUTOSUGGESTIONS_LAYER_SUCCESS) {
@@ -1845,7 +1831,7 @@ display_controller_init(display_controller_t *controller,
             } else {
                 DC_DEBUG("Autosuggestions layer init failed: %s",
                          autosuggestions_layer_error_string(as_result));
-                // Non-fatal - continue without autosuggestions
+                /// Non-fatal - continue without autosuggestions
                 autosuggestions_layer_destroy(
                     &controller->autosuggestions_layer);
                 controller->autosuggestions_layer = NULL;
@@ -1860,26 +1846,26 @@ display_controller_init(display_controller_t *controller,
         controller->config.enable_integration_mode;
     controller->operation_sequence_number = 0;
 
-    // Subscribe to command layer REDRAW_NEEDED events
-    // This is critical for LLE display integration - connects command_layer
-    // updates to terminal
+    /// Subscribe to command layer REDRAW_NEEDED events
+    /// This is critical for LLE display integration - connects command_layer
+    /// updates to terminal
     if (controller->event_system) {
         layer_events_error_t subscribe_result = layer_events_subscribe(
             controller->event_system, LAYER_EVENT_REDRAW_NEEDED,
-            LAYER_ID_DISPLAY_CONTROLLER,         /* subscriber_id */
-            dc_handle_redraw_needed, controller, /* user_data */
+            LAYER_ID_DISPLAY_CONTROLLER,         /// subscriber_id
+            dc_handle_redraw_needed, controller, /// user_data
             LAYER_EVENT_PRIORITY_HIGH);
 
         if (subscribe_result != LAYER_EVENTS_SUCCESS) {
             DC_ERROR("Failed to subscribe to REDRAW_NEEDED events: %s",
                      layer_events_error_string(subscribe_result));
-            /* Non-fatal - display may still work without events */
+            /// Non-fatal - display may still work without events
         } else {
             DC_DEBUG("Successfully subscribed to LAYER_EVENT_REDRAW_NEEDED");
         }
     }
 
-    // Initialize theme context
+    /// Initialize theme context
     memset(controller->current_theme_name, 0,
            sizeof(controller->current_theme_name));
     controller->current_symbol_mode = SYMBOL_MODE_AUTO;
@@ -1922,19 +1908,19 @@ display_controller_display(display_controller_t *controller,
     DC_DEBUG("Starting display operation (seq: %u)",
              controller->operation_sequence_number++);
 
-    // Generate state hash for caching including theme context
+    /// Generate state hash for caching including theme context
     char state_hash[DC_MAX_STATE_HASH_LENGTH];
     dc_generate_state_hash(
         prompt_text, command_text, controller->current_theme_name,
         controller->current_symbol_mode, state_hash, sizeof(state_hash));
 
-    // Check cache if enabled
+    /// Check cache if enabled
     if (controller->config.enable_caching) {
         display_cache_entry_t *cached_entry =
             dc_find_cache_entry(controller, state_hash);
 
         if (cached_entry && cached_entry->content_length < output_size) {
-            // Cache hit - return cached content immediately
+            /// Cache hit - return cached content immediately
             memcpy(output, cached_entry->display_content,
                    cached_entry->content_length);
             output[cached_entry->content_length] = '\0';
@@ -1946,7 +1932,7 @@ display_controller_display(display_controller_t *controller,
             uint64_t operation_time = dc_time_diff_ns(&start_time, &end_time);
             dc_update_performance_history(controller, operation_time);
 
-            // Performance Monitoring: Record cache hit and timing
+            /// Performance Monitoring: Record cache hit and timing
             display_integration_record_layer_cache_operation(
                 "display_controller", true);
             display_integration_record_display_timing(operation_time);
@@ -1957,14 +1943,14 @@ display_controller_display(display_controller_t *controller,
         } else {
             controller->performance.cache_misses++;
 
-            // Performance Monitoring: Record cache miss
+            /// Performance Monitoring: Record cache miss
             display_integration_record_layer_cache_operation(
                 "display_controller", false);
             DC_DEBUG("Cache miss for state hash: %s", state_hash);
         }
     }
 
-    // Initialize layers if needed
+    /// Initialize layers if needed
     bool compositor_initialized =
         composition_engine_is_initialized(controller->compositor);
     DC_DEBUG("Composition engine initialized check: %s",
@@ -1972,7 +1958,7 @@ display_controller_display(display_controller_t *controller,
     DC_DEBUG("Compositor pointer: %p", (void *)controller->compositor);
 
     if (!compositor_initialized) {
-        // Create and initialize prompt and command layers
+        /// Create and initialize prompt and command layers
         prompt_layer_t *prompt_layer = prompt_layer_create();
         command_layer_t *command_layer = command_layer_create();
 
@@ -1985,7 +1971,7 @@ display_controller_display(display_controller_t *controller,
             return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
         }
 
-        // Initialize individual layers with event system
+        /// Initialize individual layers with event system
         DC_DEBUG("About to initialize prompt layer");
         DC_DEBUG("Prompt layer pointer: %p", (void *)prompt_layer);
         DC_DEBUG("Event system pointer: %p", (void *)controller->event_system);
@@ -1999,7 +1985,7 @@ display_controller_display(display_controller_t *controller,
             DC_ERROR("Failed to initialize prompt layer: error %d",
                      prompt_init_result);
 
-            // Detailed error analysis for prompt layer
+            /// Detailed error analysis for prompt layer
             switch (prompt_init_result) {
             case PROMPT_LAYER_ERROR_INVALID_PARAM:
                 DC_ERROR("Prompt error cause: Invalid parameter");
@@ -2044,14 +2030,14 @@ display_controller_display(display_controller_t *controller,
 
         DC_DEBUG("Command layer initialized successfully");
 
-        // ============================================================================
-        // CRITICAL FIX: Populate layers with provided content before
-        // composition engine init
-        // ============================================================================
+        /// ============================================================================
+        /// CRITICAL FIX: Populate layers with provided content before
+        /// composition engine init
+        /// ============================================================================
 
         DC_DEBUG("Layer content populated successfully");
 
-        // Initialize composition engine with populated layers
+        /// Initialize composition engine with populated layers
         composition_engine_error_t comp_result =
             composition_engine_init(controller->compositor, prompt_layer,
                                     command_layer, controller->event_system);
@@ -2067,11 +2053,11 @@ display_controller_display(display_controller_t *controller,
         }
     }
 
-    // ============================================================================
-    // CRITICAL BUG FIX: Always update layer content with new input
-    // ============================================================================
+    /// ============================================================================
+    /// CRITICAL BUG FIX: Always update layer content with new input
+    /// ============================================================================
 
-    // Get layers from compositor (they are public fields)
+    /// Get layers from compositor (they are public fields)
     prompt_layer_t *prompt_layer = controller->compositor->prompt_layer;
     command_layer_t *command_layer = controller->compositor->command_layer;
 
@@ -2080,7 +2066,7 @@ display_controller_display(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_COMPOSITION_FAILED;
     }
 
-    // Always update layer content with new input (this was the missing piece!)
+    /// Always update layer content with new input (this was the missing piece!)
 
     if (prompt_text && *prompt_text && prompt_layer) {
 
@@ -2092,7 +2078,7 @@ display_controller_display(display_controller_t *controller,
         }
     }
 
-    // Always update command content with new input
+    /// Always update command content with new input
     if (command_text && *command_text && command_layer) {
 
         command_layer_error_t command_content_result =
@@ -2103,7 +2089,7 @@ display_controller_display(display_controller_t *controller,
         }
     }
 
-    // Perform composition
+    /// Perform composition
     composition_engine_error_t comp_result =
         composition_engine_compose(controller->compositor);
     if (comp_result != COMPOSITION_ENGINE_SUCCESS) {
@@ -2112,7 +2098,7 @@ display_controller_display(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_COMPOSITION_FAILED;
     }
 
-    // Get composed output
+    /// Get composed output
     comp_result = composition_engine_get_output(controller->compositor, output,
                                                 output_size);
     if (comp_result != COMPOSITION_ENGINE_SUCCESS) {
@@ -2121,24 +2107,24 @@ display_controller_display(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_COMPOSITION_FAILED;
     }
 
-    // Fix cursor positioning: strip trailing newlines from composed output
+    /// Fix cursor positioning: strip trailing newlines from composed output
     size_t output_length = strlen(output);
     while (output_length > 0 && output[output_length - 1] == '\n') {
         output[output_length - 1] = '\0';
         output_length--;
     }
 
-    // Update cache if enabled
+    /// Update cache if enabled
     if (controller->config.enable_caching) {
         display_controller_error_t cache_result =
             dc_add_cache_entry(controller, state_hash, output, output_length);
         if (cache_result != DISPLAY_CONTROLLER_SUCCESS) {
             DC_DEBUG("Failed to add cache entry: %d", cache_result);
-            // Non-fatal error, continue
+            /// Non-fatal error, continue
         }
     }
 
-    // Update last display state
+    /// Update last display state
     if (controller->last_display_state) {
         free(controller->last_display_state);
     }
@@ -2150,12 +2136,12 @@ display_controller_display(display_controller_t *controller,
         controller->display_cache_valid = true;
     }
 
-    // Update performance metrics
+    /// Update performance metrics
     gettimeofday(&end_time, NULL);
     uint64_t operation_time = dc_time_diff_ns(&start_time, &end_time);
 
-    // Performance Monitoring: Record display timing for new
-    // compositions
+    /// Performance Monitoring: Record display timing for new
+    /// compositions
     display_integration_record_display_timing(operation_time);
 
     controller->performance.total_display_operations++;
@@ -2176,14 +2162,14 @@ display_controller_display(display_controller_t *controller,
 
     dc_update_performance_history(controller, operation_time);
 
-    // Update cache hit rate
+    /// Update cache hit rate
     if (controller->performance.total_display_operations > 0) {
         controller->performance.cache_hit_rate =
             (double)controller->performance.cache_hits /
             (double)controller->performance.total_display_operations;
     }
 
-    // Check if cache cleanup is needed
+    /// Check if cache cleanup is needed
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
     uint64_t cleanup_interval_ms =
@@ -2220,21 +2206,44 @@ display_controller_error_t display_controller_display_with_cursor(
         return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
     }
 
-    // If terminal control is NOT requested, just use normal display
+    /// Pager mode: when a pager layer is attached, the render cycle
+    /// composes from the pager's content + view state and suppresses
+    /// prompt + command. Terminal-control wrapping (clear-screen
+    /// before, cursor-position after) is added on top when requested
+    /// so the pager view replaces the live editing surface.
+    if (controller->active_pager) {
+        if (!apply_terminal_control) {
+            return display_controller_render_pager(controller, output,
+                                                   output_size);
+        }
+        char body[16384];
+        display_controller_error_t rc =
+            display_controller_render_pager(controller, body, sizeof(body));
+        if (rc != DISPLAY_CONTROLLER_SUCCESS) {
+            return rc;
+        }
+        int written = snprintf(output, output_size, "\r\033[J%s", body);
+        if (written < 0 || (size_t)written >= output_size) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        return DISPLAY_CONTROLLER_SUCCESS;
+    }
+
+    /// If terminal control is NOT requested, just use normal display
     if (!apply_terminal_control) {
         return display_controller_display(controller, prompt_text, command_text,
                                           output, output_size);
     }
 
-    // Terminal control wrapping requested - use composition engine with cursor
-    // tracking
+    /// Terminal control wrapping requested - use composition engine with cursor
+    /// tracking
     DC_DEBUG(
         "display_controller_display_with_cursor: apply_terminal_control=true");
     DC_DEBUG("prompt_text: %s", prompt_text ? prompt_text : "(null)");
     DC_DEBUG("command_text: %s", command_text ? command_text : "(null)");
     DC_DEBUG("cursor_byte_offset: %zu", cursor_byte_offset);
 
-    // Check if compositor is initialized, if not we need to initialize it
+    /// Check if compositor is initialized, if not we need to initialize it
     bool compositor_initialized =
         composition_engine_is_initialized(controller->compositor);
     DC_DEBUG("compositor_initialized: %s",
@@ -2243,7 +2252,7 @@ display_controller_error_t display_controller_display_with_cursor(
     if (!compositor_initialized) {
         DC_DEBUG("Initializing compositor...");
 
-        // Initialize compositor with empty layers first
+        /// Initialize compositor with empty layers first
         prompt_layer_t *new_prompt_layer = prompt_layer_create();
         command_layer_t *new_command_layer = command_layer_create();
 
@@ -2256,7 +2265,7 @@ display_controller_error_t display_controller_display_with_cursor(
             return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
         }
 
-        // Initialize layers
+        /// Initialize layers
         prompt_layer_error_t prompt_init =
             prompt_layer_init(new_prompt_layer, controller->event_system);
         if (prompt_init != PROMPT_LAYER_SUCCESS) {
@@ -2276,7 +2285,7 @@ display_controller_error_t display_controller_display_with_cursor(
             return DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED;
         }
 
-        // Initialize composition engine
+        /// Initialize composition engine
         composition_engine_error_t comp_init = composition_engine_init(
             controller->compositor, new_prompt_layer, new_command_layer,
             controller->event_system);
@@ -2291,7 +2300,7 @@ display_controller_error_t display_controller_display_with_cursor(
         }
     }
 
-    // Get the layers (now guaranteed to be initialized)
+    /// Get the layers (now guaranteed to be initialized)
     prompt_layer_t *prompt_layer = controller->compositor->prompt_layer;
     command_layer_t *command_layer = controller->compositor->command_layer;
 
@@ -2303,7 +2312,7 @@ display_controller_error_t display_controller_display_with_cursor(
         return DISPLAY_CONTROLLER_ERROR_COMPOSITION_FAILED;
     }
 
-    // Set prompt content if provided
+    /// Set prompt content if provided
     if (prompt_text && *prompt_text) {
         DC_DEBUG("Setting prompt content...");
         prompt_layer_error_t prompt_result =
@@ -2317,7 +2326,7 @@ display_controller_error_t display_controller_display_with_cursor(
         DC_DEBUG("No prompt text provided");
     }
 
-    // Set command content if provided
+    /// Set command content if provided
     if (command_text && *command_text) {
         DC_DEBUG("Setting command content...");
         command_layer_error_t cmd_result = command_layer_set_command(
@@ -2331,8 +2340,8 @@ display_controller_error_t display_controller_display_with_cursor(
         DC_DEBUG("No command text provided");
     }
 
-    // Get terminal width from terminal control layer
-    int terminal_width = 80; // Default
+    /// Get terminal width from terminal control layer
+    int terminal_width = 80; /// Default
     if (controller->terminal_ctrl) {
         terminal_width = controller->terminal_ctrl->capabilities.terminal_width;
         if (terminal_width <= 0) {
@@ -2340,7 +2349,7 @@ display_controller_error_t display_controller_display_with_cursor(
         }
     }
 
-    // Use composition engine with cursor tracking
+    /// Use composition engine with cursor tracking
     composition_with_cursor_t comp_result;
     memset(&comp_result, 0, sizeof(comp_result));
 
@@ -2369,10 +2378,10 @@ display_controller_error_t display_controller_display_with_cursor(
     DC_DEBUG("Cursor position: row=%zu, col=%zu", comp_result.cursor_screen_row,
              comp_result.cursor_screen_column);
 
-    // Now wrap the composed output with terminal control sequences
+    /// Now wrap the composed output with terminal control sequences
 
     if (!controller->terminal_ctrl) {
-        // No terminal control available - just return composed content
+        /// No terminal control available - just return composed content
         size_t len = strlen(comp_result.composed_output);
         if (len >= output_size) {
             return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
@@ -2383,7 +2392,7 @@ display_controller_error_t display_controller_display_with_cursor(
 
     terminal_control_t *tc = controller->terminal_ctrl;
 
-    // Step 1: Clear line sequence (\r\033[J)
+    /// Step 1: Clear line sequence (\r\033[J)
     char clear_seq[64];
     ssize_t clear_len = snprintf(clear_seq, sizeof(clear_seq), "\r\033[J");
 
@@ -2391,19 +2400,19 @@ display_controller_error_t display_controller_display_with_cursor(
         return DISPLAY_CONTROLLER_ERROR_COMPOSITION_FAILED;
     }
 
-    // Step 2: Build output: clear + content with line wrapping
+    /// Step 2: Build output: clear + content with line wrapping
     size_t offset = 0;
 
-    // Add clear sequence
+    /// Add clear sequence
     if (offset + clear_len >= output_size) {
         return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
     }
     memcpy(output + offset, clear_seq, clear_len);
     offset += clear_len;
 
-    // Add composed content WITH line wrapping:
-    // Walk through composed output character-by-character and insert newlines
-    // when wrapping
+    /// Add composed content WITH line wrapping:
+    /// Walk through composed output character-by-character and insert newlines
+    /// when wrapping
     const char *composed = comp_result.composed_output;
     size_t composed_len = strlen(composed);
     int visual_col = 0;
@@ -2412,16 +2421,16 @@ display_controller_error_t display_controller_display_with_cursor(
     for (size_t i = 0; i < composed_len; i++) {
         char ch = composed[i];
 
-        // Track ANSI escape sequences (they don't consume visual space)
+        /// Track ANSI escape sequences (they don't consume visual space)
         if (ch == '\033' || ch == '\x1b') {
             in_escape = true;
         }
 
-        // Check if we need to wrap BEFORE writing this character
-        // (Only if not in escape sequence and not already a newline)
+        /// Check if we need to wrap BEFORE writing this character
+        /// (Only if not in escape sequence and not already a newline)
         if (!in_escape && ch != '\n' && ch != '\r' &&
             visual_col >= terminal_width) {
-            // Insert newline to wrap to next line at column 0
+            /// Insert newline to wrap to next line at column 0
             if (offset + 1 >= output_size) {
                 return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
             }
@@ -2429,38 +2438,38 @@ display_controller_error_t display_controller_display_with_cursor(
             visual_col = 0;
         }
 
-        // Write the character
+        /// Write the character
         if (offset + 1 >= output_size) {
             return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
         }
         output[offset++] = ch;
 
-        // Update visual column position
+        /// Update visual column position
         if (in_escape) {
-            // Check for end of escape sequence
+            /// Check for end of escape sequence
             if (ch == 'm' || ch == 'K' || ch == 'J' || ch == 'H' || ch == 'A' ||
                 ch == 'B' || ch == 'C' || ch == 'D' || ch == 'G') {
                 in_escape = false;
             }
-            // Escape sequences don't advance visual column
+            /// Escape sequences don't advance visual column
         } else if (ch == '\n' || ch == '\r') {
             visual_col = 0;
         } else if (ch == '\t') {
-            // Tab advances to next multiple of 8
+            /// Tab advances to next multiple of 8
             visual_col += 8 - (visual_col % 8);
         } else if ((unsigned char)ch >= 32) {
-            // Printable character advances by 1
-            // TODO: Handle wide characters (CJK) which advance by 2
+            /// Printable character advances by 1
+            /// TODO: Handle wide characters (CJK) which advance by 2
             visual_col++;
         }
     }
 
-    // Step 3: Add cursor positioning
-    // Convert from 0-based (composition) to 1-based (ANSI)
+    /// Step 3: Add cursor positioning
+    /// Convert from 0-based (composition) to 1-based (ANSI)
     int target_row = comp_result.cursor_screen_row + 1;
     int target_column = comp_result.cursor_screen_column + 1;
 
-    // Generate cursor positioning sequence using Layer 2 (terminal_control)
+    /// Generate cursor positioning sequence using Layer 2 (terminal_control)
     char cursor_seq[64];
     ssize_t cursor_len = terminal_control_generate_cursor_sequence(
         tc, target_row, target_column, cursor_seq, sizeof(cursor_seq));
@@ -2476,7 +2485,7 @@ display_controller_error_t display_controller_display_with_cursor(
     memcpy(output + offset, cursor_seq, cursor_len);
     offset += cursor_len;
 
-    // Null-terminate
+    /// Null-terminate
     output[offset] = '\0';
 
     DC_DEBUG("Display with cursor completed: row=%d, col=%d, total output "
@@ -2499,13 +2508,13 @@ display_controller_error_t display_controller_update(
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // For now, implement update as a full display operation
-    // In a more advanced implementation, this would include diff algorithms
+    /// For now, implement update as a full display operation
+    /// In a more advanced implementation, this would include diff algorithms
     display_controller_error_t result =
         display_controller_display(controller, new_prompt_text,
                                    new_command_text, diff_output, output_size);
 
-    // Set change info if requested
+    /// Set change info if requested
     if (change_info) {
         change_info->change_type = DISPLAY_STATE_FULL_REFRESH_NEEDED;
         change_info->change_start_pos = 0;
@@ -2525,14 +2534,14 @@ display_controller_refresh(display_controller_t *controller, char *output,
         return DISPLAY_CONTROLLER_ERROR_NULL_POINTER;
     }
 
-    // Clear cache and force refresh
+    /// Clear cache and force refresh
     if (controller->config.enable_caching) {
         display_controller_clear_cache(controller);
     }
 
     controller->display_cache_valid = false;
 
-    // Perform fresh display operation
+    /// Perform fresh display operation
     return display_controller_display(controller, NULL, NULL, output,
                                       output_size);
 }
@@ -2549,7 +2558,7 @@ display_controller_clear_screen(display_controller_t *controller) {
 
     DC_DEBUG("Clearing screen");
 
-    /* Clear the screen through terminal_control */
+    /// Clear the screen through terminal_control
     terminal_control_error_t result =
         terminal_control_clear_screen(controller->terminal_ctrl);
 
@@ -2569,24 +2578,24 @@ display_controller_cleanup(display_controller_t *controller) {
 
     DC_DEBUG("Cleaning up display controller");
 
-    // Clean up composition engine
+    /// Clean up composition engine
     if (controller->compositor) {
         composition_engine_cleanup(controller->compositor);
         composition_engine_destroy(controller->compositor);
         controller->compositor = NULL;
     }
 
-    // Clean up terminal control
+    /// Clean up terminal control
     if (controller->terminal_ctrl) {
         terminal_control_cleanup(controller->terminal_ctrl);
         terminal_control_destroy(controller->terminal_ctrl);
         controller->terminal_ctrl = NULL;
     }
 
-    // Clean up cache
+    /// Clean up cache
     if (controller->cache_entries) {
-        // Only iterate over valid entries to prevent accessing uninitialized
-        // memory
+        /// Only iterate over valid entries to prevent accessing uninitialized
+        /// memory
         for (size_t i = 0; i < controller->cache_count; i++) {
             if (controller->cache_entries[i].display_content) {
                 lush_pool_free(controller->cache_entries[i].display_content);
@@ -2604,7 +2613,7 @@ display_controller_cleanup(display_controller_t *controller) {
         controller->cache_capacity = 0;
     }
 
-    // Clean up state tracking
+    /// Clean up state tracking
     if (controller->last_display_state) {
         free(controller->last_display_state);
         controller->last_display_state = NULL;
@@ -2615,18 +2624,19 @@ display_controller_cleanup(display_controller_t *controller) {
         controller->current_state_hash = NULL;
     }
 
-    // Clear completion menu reference (we don't own it, just clear the pointer)
+    /// Clear completion menu reference (we don't own it, just clear the
+    /// pointer)
     controller->active_completion_menu = NULL;
     controller->completion_menu_visible = false;
 
-    // Clean up autosuggestions layer
+    /// Clean up autosuggestions layer
     if (controller->autosuggestions_layer) {
         autosuggestions_layer_destroy(&controller->autosuggestions_layer);
         controller->autosuggestions_layer = NULL;
     }
     controller->autosuggestions_enabled = false;
 
-    // Clean up event system (we own it - passed to us during init)
+    /// Clean up event system (we own it - passed to us during init)
     if (controller->event_system) {
         layer_events_destroy(controller->event_system);
         controller->event_system = NULL;
@@ -2648,9 +2658,9 @@ void display_controller_destroy(display_controller_t *controller) {
     free(controller);
 }
 
-// ============================================================================
-// COMPLETION MENU INTEGRATION (LLE Spec 12 - Proper Architecture)
-// ============================================================================
+/// ============================================================================
+/// COMPLETION MENU INTEGRATION (LLE Spec 12 - Proper Architecture)
+/// ============================================================================
 
 display_controller_error_t display_controller_set_completion_menu(
     display_controller_t *controller, lle_completion_menu_state_t *menu_state) {
@@ -2663,7 +2673,7 @@ display_controller_error_t display_controller_set_completion_menu(
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // Clear existing menu if NULL is passed
+    /// Clear existing menu if NULL is passed
     if (!menu_state) {
         controller->active_completion_menu = NULL;
         controller->completion_menu_visible = false;
@@ -2671,11 +2681,11 @@ display_controller_error_t display_controller_set_completion_menu(
         return DISPLAY_CONTROLLER_SUCCESS;
     }
 
-    // Set new menu state (we don't own it - caller manages lifecycle)
+    /// Set new menu state (we don't own it - caller manages lifecycle)
     controller->active_completion_menu = menu_state;
     controller->completion_menu_visible = true;
 
-    // Update menu layout based on current terminal width
+    /// Update menu layout based on current terminal width
     int term_width = 80;
     if (controller->terminal_ctrl &&
         controller->terminal_ctrl->capabilities.terminal_width > 0) {
@@ -2686,10 +2696,9 @@ display_controller_error_t display_controller_set_completion_menu(
     DC_DEBUG("Completion menu set (visible: %d, columns: %zu)",
              controller->completion_menu_visible, menu_state->num_columns);
 
-    /* Menu state changed - mark that we need redraw even if command text
-     * unchanged This flag will be checked by command_layer to bypass its early
-     * return optimization
-     */
+    /// Menu state changed - mark that we need redraw even if command text
+    /// unchanged This flag will be checked by command_layer to bypass its early
+    /// return optimization
     controller->menu_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2711,8 +2720,8 @@ display_controller_clear_completion_menu(display_controller_t *controller) {
 
     DC_DEBUG("Completion menu cleared");
 
-    /* Menu state changed - mark that we need redraw even if command text
-     * unchanged */
+    /// Menu state changed - mark that we need redraw even if command text
+    /// unchanged
     controller->menu_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2747,34 +2756,33 @@ bool display_controller_check_and_clear_menu_changed(
     }
 
     bool changed = controller->menu_state_changed;
-    controller->menu_state_changed = false; // Clear the flag after checking
+    controller->menu_state_changed = false; /// Clear the flag after checking
     return changed;
 }
 
-// ============================================================================
-// AUTOSUGGESTIONS INTEGRATION (Fish-style Ghost Text)
-// ============================================================================
+/// ============================================================================
+/// AUTOSUGGESTIONS INTEGRATION (Fish-style Ghost Text)
+/// ============================================================================
 
 void display_controller_update_autosuggestion(display_controller_t *controller,
                                               const char *buffer_content,
                                               size_t cursor_position,
                                               size_t buffer_length) {
 
-    /* DEPRECATED: This function uses the legacy autosuggestions system which
-     * relies on GNU readline history. Use
-     * display_controller_set_autosuggestion() with LLE history instead.
-     *
-     * This function is kept for backwards compatibility but is now a no-op
-     * when LLE is active. The actual suggestion generation happens in
-     * lle_readline.c using LLE history, then passed via set_autosuggestion().
-     */
+    /// DEPRECATED: This function uses the legacy autosuggestions system which
+    /// relies on GNU readline history. Use
+    /// display_controller_set_autosuggestion() with LLE history instead.
+    ///
+    /// This function is kept for backwards compatibility but is now a no-op
+    /// when LLE is active. The actual suggestion generation happens in
+    /// lle_readline.c using LLE history, then passed via set_autosuggestion().
     (void)controller;
     (void)buffer_content;
     (void)cursor_position;
     (void)buffer_length;
 
-    /* No-op: lle_readline now handles suggestion generation and calls
-     * display_controller_set_autosuggestion() directly */
+    /// No-op: lle_readline now handles suggestion generation and calls
+    /// display_controller_set_autosuggestion() directly
 }
 
 void display_controller_set_autosuggestion(display_controller_t *controller,
@@ -2784,13 +2792,13 @@ void display_controller_set_autosuggestion(display_controller_t *controller,
         return;
     }
 
-    /* Don't set suggestion if completion menu is visible */
+    /// Don't set suggestion if completion menu is visible
     if (controller->completion_menu_visible) {
         autosuggestions_layer_clear(controller->autosuggestions_layer);
         return;
     }
 
-    /* Set the suggestion directly (or clear if NULL/empty) */
+    /// Set the suggestion directly (or clear if NULL/empty)
     autosuggestions_layer_set_suggestion(controller->autosuggestions_layer,
                                          suggestion);
 }
@@ -2867,15 +2875,15 @@ void display_controller_set_autosuggestions_enabled(
                                           enabled);
     }
 
-    // Clear any existing suggestion when disabling
+    /// Clear any existing suggestion when disabling
     if (!enabled && controller->autosuggestions_layer) {
         autosuggestions_layer_clear(controller->autosuggestions_layer);
     }
 }
 
-// ============================================================================
-// NOTIFICATION INTEGRATION (Transient Hints)
-// ============================================================================
+/// ============================================================================
+/// NOTIFICATION INTEGRATION (Transient Hints)
+/// ============================================================================
 
 display_controller_error_t display_controller_set_notification(
     display_controller_t *controller,
@@ -2889,7 +2897,7 @@ display_controller_error_t display_controller_set_notification(
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // Clear existing notification if NULL is passed
+    /// Clear existing notification if NULL is passed
     if (!notification) {
         lle_notification_dismiss(&controller->notification_copy);
         controller->notification_visible = false;
@@ -2897,14 +2905,14 @@ display_controller_error_t display_controller_set_notification(
         return DISPLAY_CONTROLLER_SUCCESS;
     }
 
-    // COPY the notification data (source may be on stack and get overwritten)
+    /// COPY the notification data (source may be on stack and get overwritten)
     memcpy(&controller->notification_copy, notification, sizeof(*notification));
     controller->notification_visible = true;
 
     DC_DEBUG("Notification set (visible: %d)",
              controller->notification_visible);
 
-    // Notification state changed - mark that we need redraw
+    /// Notification state changed - mark that we need redraw
     controller->notification_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2926,7 +2934,7 @@ display_controller_clear_notification(display_controller_t *controller) {
 
     DC_DEBUG("Notification cleared");
 
-    // Notification state changed - mark that we need redraw
+    /// Notification state changed - mark that we need redraw
     controller->notification_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2952,13 +2960,13 @@ bool display_controller_check_and_clear_notification_changed(
 
     bool changed = controller->notification_state_changed;
     controller->notification_state_changed =
-        false; // Clear the flag after checking
+        false; /// Clear the flag after checking
     return changed;
 }
 
-// ============================================================================
-// PERFORMANCE AND MONITORING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND MONITORING FUNCTIONS
+/// ============================================================================
 
 display_controller_error_t display_controller_get_performance(
     const display_controller_t *controller,
@@ -2974,7 +2982,7 @@ display_controller_error_t display_controller_get_performance(
 
     *performance = controller->performance;
 
-    // Update cache memory usage
+    /// Update cache memory usage
     performance->cache_memory_usage_bytes = 0;
     if (controller->cache_entries) {
         for (size_t i = 0; i < controller->cache_count; i++) {
@@ -2987,7 +2995,7 @@ display_controller_error_t display_controller_get_performance(
         }
     }
 
-    // Update health indicators
+    /// Update health indicators
     performance->performance_within_threshold =
         (performance->avg_display_time_ns / 1000000) <=
         controller->config.performance_threshold_ms;
@@ -3023,9 +3031,9 @@ display_controller_reset_performance_metrics(display_controller_t *controller) {
     return DISPLAY_CONTROLLER_SUCCESS;
 }
 
-// ============================================================================
-// CACHING AND OPTIMIZATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CACHING AND OPTIMIZATION FUNCTIONS
+/// ============================================================================
 
 display_controller_error_t
 display_controller_set_optimization_level(display_controller_t *controller,
@@ -3116,7 +3124,7 @@ display_controller_error_t display_controller_validate_cache(
                 continue;
             }
 
-            // Check if entry has expired
+            /// Check if entry has expired
             uint64_t age_ms = ((uint64_t)current_time.tv_sec -
                                (uint64_t)entry->timestamp.tv_sec) *
                                   1000 +
@@ -3130,7 +3138,7 @@ display_controller_error_t display_controller_validate_cache(
                 valid_count++;
             }
 
-            // Check for corruption
+            /// Check for corruption
             if (!entry->display_content || !entry->state_hash) {
                 corruption_found = true;
             }
@@ -3158,11 +3166,11 @@ display_controller_optimize_cache(display_controller_t *controller) {
         return DISPLAY_CONTROLLER_SUCCESS;
     }
 
-    // Clean up expired entries
+    /// Clean up expired entries
     dc_cleanup_expired_cache_entries(controller);
 
-    // Sort by access count for better cache performance
-    // Simple bubble sort for small cache sizes
+    /// Sort by access count for better cache performance
+    /// Simple bubble sort for small cache sizes
     for (size_t i = 0; i < controller->cache_count; i++) {
         for (size_t j = i + 1; j < controller->cache_count; j++) {
             if (controller->cache_entries[i].access_count <
@@ -3177,9 +3185,9 @@ display_controller_optimize_cache(display_controller_t *controller) {
     return DISPLAY_CONTROLLER_SUCCESS;
 }
 
-// ============================================================================
-// CONFIGURATION AND STATE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND STATE FUNCTIONS
+/// ============================================================================
 
 display_controller_error_t
 display_controller_get_config(const display_controller_t *controller,
@@ -3209,27 +3217,27 @@ display_controller_set_config(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // Validate configuration
+    /// Validate configuration
     if (config->optimization_level > DISPLAY_OPTIMIZATION_MAXIMUM) {
         return DISPLAY_CONTROLLER_ERROR_CONFIGURATION_INVALID;
     }
 
-    if (config->max_cache_entries > 1000) { // Reasonable limit
+    if (config->max_cache_entries > 1000) { /// Reasonable limit
         return DISPLAY_CONTROLLER_ERROR_CONFIGURATION_INVALID;
     }
 
-    // Apply new configuration
+    /// Apply new configuration
     controller->config = *config;
     controller->current_optimization = config->optimization_level;
     controller->adaptive_optimization_enabled =
         config->enable_adaptive_optimization;
     controller->integration_mode_active = config->enable_integration_mode;
 
-    // Resize cache if needed
+    /// Resize cache if needed
     if (config->enable_caching &&
         config->max_cache_entries != controller->cache_capacity) {
         if (controller->cache_entries) {
-            // Clean up existing cache
+            /// Clean up existing cache
             for (size_t i = 0; i < controller->cache_count; i++) {
                 if (controller->cache_entries[i].display_content) {
                     free(controller->cache_entries[i].display_content);
@@ -3241,7 +3249,7 @@ display_controller_set_config(display_controller_t *controller,
             free(controller->cache_entries);
         }
 
-        // Allocate new cache
+        /// Allocate new cache
         controller->cache_capacity = config->max_cache_entries;
         controller->cache_entries =
             malloc(controller->cache_capacity * sizeof(display_cache_entry_t));
@@ -3297,14 +3305,14 @@ display_controller_get_version(const display_controller_t *controller,
     return DISPLAY_CONTROLLER_SUCCESS;
 }
 
-// ============================================================================
-// INTEGRATION PREPARATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INTEGRATION PREPARATION FUNCTIONS
+/// ============================================================================
 
 display_controller_error_t
 display_controller_prepare_shell_integration(display_controller_t *controller,
                                              const void *shell_config) {
-    (void)shell_config; /* Reserved for future use */
+    (void)shell_config; /// Reserved for future use
 
     if (!controller) {
         return DISPLAY_CONTROLLER_ERROR_NULL_POINTER;
@@ -3314,19 +3322,20 @@ display_controller_prepare_shell_integration(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // Enable integration mode
+    /// Enable integration mode
     controller->integration_mode_active = true;
     controller->config.enable_integration_mode = true;
 
-    // Optimize for shell integration
+    /// Optimize for shell integration
     controller->config.optimization_level = DISPLAY_OPTIMIZATION_STANDARD;
     controller->config.enable_caching = true;
     controller->config.enable_performance_monitoring = true;
 
-    // Configure reasonable defaults for shell operation
-    controller->config.cache_ttl_ms = 10000; // 10 seconds for shell integration
+    /// Configure reasonable defaults for shell operation
+    controller->config.cache_ttl_ms =
+        10000; /// 10 seconds for shell integration
     controller->config.performance_threshold_ms =
-        50; // 50ms for shell responsiveness
+        50; /// 50ms for shell responsiveness
 
     return DISPLAY_CONTROLLER_SUCCESS;
 }
@@ -3343,16 +3352,16 @@ display_controller_error_t display_controller_get_integration_interface(
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // For now, this is a placeholder for future integration interface
-    // In Week 8, this would provide function pointers for shell integration
+    /// For now, this is a placeholder for future integration interface
+    /// In Week 8, this would provide function pointers for shell integration
     memset(interface_buffer, 0, buffer_size);
 
     return DISPLAY_CONTROLLER_SUCCESS;
 }
 
-// ============================================================================
-// UTILITY AND DIAGNOSTIC FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY AND DIAGNOSTIC FUNCTIONS
+/// ============================================================================
 
 const char *display_controller_error_string(display_controller_error_t error) {
     switch (error) {
@@ -3482,9 +3491,9 @@ display_controller_get_event_system(const display_controller_t *controller) {
     return controller->event_system;
 }
 
-// ============================================================================
-// THEME CONTEXT MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// THEME CONTEXT MANAGEMENT
+/// ============================================================================
 
 /**
  * Set theme context for the display controller.
@@ -3506,7 +3515,7 @@ display_controller_set_theme_context(display_controller_t *controller,
         return DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED;
     }
 
-    // Check for theme change to invalidate relevant cache entries
+    /// Check for theme change to invalidate relevant cache entries
     bool theme_changed = false;
     bool symbol_mode_changed = false;
 
@@ -3516,7 +3525,7 @@ display_controller_set_theme_context(display_controller_t *controller,
         symbol_mode_changed = (controller->current_symbol_mode != symbol_mode);
     }
 
-    // Update theme context
+    /// Update theme context
     if (theme_name) {
         strncpy(controller->current_theme_name, theme_name, THEME_NAME_MAX - 1);
         controller->current_theme_name[THEME_NAME_MAX - 1] = '\0';
@@ -3527,10 +3536,10 @@ display_controller_set_theme_context(display_controller_t *controller,
     controller->current_symbol_mode = symbol_mode;
     controller->theme_context_initialized = true;
 
-    // Invalidate cache entries if theme changed
+    /// Invalidate cache entries if theme changed
     if ((theme_changed || symbol_mode_changed) &&
         controller->config.enable_caching) {
-        // Clear all cache entries since theme affects all prompts
+        /// Clear all cache entries since theme affects all prompts
         for (size_t i = 0; i < controller->cache_count; i++) {
             if (controller->cache_entries[i].is_valid) {
                 if (controller->cache_entries[i].display_content) {
@@ -3548,7 +3557,7 @@ display_controller_set_theme_context(display_controller_t *controller,
         controller->cache_count = 0;
         controller->display_cache_valid = false;
 
-        // Update performance metrics
+        /// Update performance metrics
         controller->performance.cache_invalidations++;
 
         DC_DEBUG("Theme context changed - cache invalidated (theme: %s, "
@@ -3559,5 +3568,146 @@ display_controller_set_theme_context(display_controller_t *controller,
     DC_DEBUG("Theme context updated: theme=%s, symbol_mode=%d",
              controller->current_theme_name, symbol_mode);
 
+    return DISPLAY_CONTROLLER_SUCCESS;
+}
+
+/// ============================================================================
+/// PAGER LAYER INTEGRATION
+/// ============================================================================
+
+void display_controller_attach_pager(display_controller_t *controller,
+                                     struct pager_layer *pager) {
+    if (!controller) {
+        return;
+    }
+    controller->active_pager = pager;
+    /// Pager attachment invalidates the display cache so the next
+    /// render unconditionally redraws from the new surface rather
+    /// than serving a stale prompt + command from before the pager
+    /// was active.
+    controller->display_cache_valid = false;
+}
+
+void display_controller_detach_pager(display_controller_t *controller) {
+    display_controller_attach_pager(controller, NULL);
+}
+
+/**
+ * @brief Emit `"\n"` into `out` at `pos`, growing pos
+ *
+ * Defensive on overflow: if the buffer would be exceeded, the
+ * function returns false without writing. Otherwise writes the byte
+ * and the trailing NUL terminator, advancing pos.
+ */
+static bool pager_emit_newline(char *out, size_t cap, size_t *pos) {
+    if (*pos + 2 > cap) { /// need room for '\n' + '\0'
+        return false;
+    }
+    out[(*pos)++] = '\n';
+    out[*pos] = '\0';
+    return true;
+}
+
+/**
+ * @brief Copy `len` bytes from `src` into `out`, growing pos
+ *
+ * Returns false on buffer overflow without partial write.
+ */
+static bool pager_emit_bytes(char *out, size_t cap, size_t *pos,
+                             const char *src, size_t len) {
+    if (*pos + len + 1 > cap) { /// +1 for NUL terminator
+        return false;
+    }
+    memcpy(out + *pos, src, len);
+    *pos += len;
+    out[*pos] = '\0';
+    return true;
+}
+
+display_controller_error_t
+display_controller_render_pager(display_controller_t *controller, char *output,
+                                size_t output_size) {
+    if (!controller || !output) {
+        return DISPLAY_CONTROLLER_ERROR_INVALID_PARAM;
+    }
+    pager_layer_t *pager = controller->active_pager;
+    if (!pager) {
+        return DISPLAY_CONTROLLER_ERROR_INVALID_PARAM;
+    }
+    if (output_size == 0) {
+        return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+    }
+
+    size_t pos = 0;
+    output[0] = '\0';
+
+    size_t visible = pager_layer_visible_line_count(pager);
+    size_t rows_emitted = 0;
+
+    /// Emit each visible logical line. Each line is content slice
+    /// followed by '\n'. Lines are written verbatim including any
+    /// ANSI styling already in the content; screen_buffer's render
+    /// path is what aligns them to terminal width when the controller
+    /// composes the full frame, so here we just emit bytes.
+    for (size_t i = 0; i < visible; i++) {
+        const screen_line_index_entry_t *e =
+            &pager->line_index.entries[pager->top_line + i];
+        if (!pager_emit_bytes(output, output_size, &pos,
+                              pager->content + e->byte_offset,
+                              e->byte_length)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        if (!pager_emit_newline(output, output_size, &pos)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        rows_emitted += e->visual_height;
+    }
+
+    /// Pad to view_rows with empty lines so the status sits at the
+    /// bottom of the allotted area even when the content underfills
+    /// the view (e.g. when pager_layer_visible_line_count returns 0
+    /// because content is empty).
+    while (rows_emitted < pager->view_rows) {
+        if (!pager_emit_newline(output, output_size, &pos)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        rows_emitted++;
+    }
+
+    /// Status line. SEARCH mode shows the in-progress pattern with
+    /// a / or ? prefix matching the chosen direction. VIEW / HELP
+    /// modes show position info. Empty content always shows
+    /// "(empty)". Format: "Lines X-Y of Z (NN%)" -- 1-based line
+    /// numbering, percentage rounded to nearest integer.
+    char status[256];
+    int status_len = 0;
+    if (pager->mode == PAGER_MODE_SEARCH) {
+        const char *prompt =
+            (pager->search_direction == PAGER_SEARCH_BACKWARD) ? "?" : "/";
+        const char *pattern =
+            pager->search_pattern ? pager->search_pattern : "";
+        status_len = snprintf(status, sizeof(status), "%s%s", prompt, pattern);
+    } else if (pager->line_index.count == 0) {
+        status_len = snprintf(status, sizeof(status), "(empty)");
+    } else {
+        size_t first_line = pager->top_line + 1; /// 1-based
+        size_t last_line = pager->top_line + (visible > 0 ? visible : 1);
+        size_t total = pager->line_index.count;
+        unsigned pct =
+            total > 0 ? (unsigned)((last_line * 100 + total / 2) / total) : 0;
+        if (pct > 100) {
+            pct = 100;
+        }
+        status_len =
+            snprintf(status, sizeof(status), "Lines %zu-%zu of %zu (%u%%)",
+                     first_line, last_line, total, pct);
+    }
+    if (status_len < 0 || (size_t)status_len >= sizeof(status)) {
+        status_len = (int)strlen(status); /// safe fallback
+    }
+    if (!pager_emit_bytes(output, output_size, &pos, status,
+                          (size_t)status_len)) {
+        return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+    }
     return DISPLAY_CONTROLLER_SUCCESS;
 }

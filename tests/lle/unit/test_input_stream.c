@@ -1,4 +1,12 @@
 /**
+ * @file test_input_stream.c
+ * @brief Unit tests for input stream
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Unit Tests for LLE Input Stream Management
  *
  * Tests the input stream buffering and flow control implementation.
@@ -18,8 +26,8 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Mock terminal system and memory pool (opaque pointers for testing) */
-/* We use dummy non-NULL pointers since the functions check for NULL */
+/// Mock terminal system and memory pool (opaque pointers for testing)
+/// We use dummy non-NULL pointers since the functions check for NULL
 static int mock_terminal_dummy = 42;
 static int mock_pool_dummy = 43;
 static lle_terminal_system_t *mock_terminal =
@@ -37,7 +45,7 @@ void test_init_destroy(void) {
     lle_input_stream_t *stream = NULL;
     lle_result_t result;
 
-    /* Test successful initialization */
+    /// Test successful initialization
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
     ASSERT(stream != NULL, "Stream should not be NULL");
@@ -48,7 +56,7 @@ void test_init_destroy(void) {
     ASSERT(stream->buffer_pos == 0, "Buffer position should be 0");
     ASSERT(stream->blocking_mode == false, "Should default to non-blocking");
 
-    /* Test destruction */
+    /// Test destruction
     result = lle_input_stream_destroy(stream);
     ASSERT(result == LLE_SUCCESS, "Destroy should succeed");
 
@@ -61,16 +69,16 @@ void test_init_invalid_params(void) {
     lle_input_stream_t *stream = NULL;
     lle_result_t result;
 
-    /* NULL stream pointer */
+    /// NULL stream pointer
     result = lle_input_stream_init(NULL, mock_terminal, mock_pool);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER, "Should reject NULL stream");
 
-    /* NULL terminal */
+    /// NULL terminal
     result = lle_input_stream_init(&stream, NULL, mock_pool);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
            "Should reject NULL terminal");
 
-    /* NULL memory pool */
+    /// NULL memory pool
     result = lle_input_stream_init(&stream, mock_terminal, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER, "Should reject NULL pool");
 
@@ -90,11 +98,11 @@ void test_buffer_data(void) {
     const char *test_data = "Hello, World!";
     size_t test_len = strlen(test_data);
 
-    /* Initialize stream */
+    /// Initialize stream
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer some data */
+    /// Buffer some data
     result = lle_input_stream_buffer_data(stream, test_data, test_len);
     ASSERT(result == LLE_SUCCESS, "Buffer data should succeed");
     ASSERT(stream->buffer_used == test_len,
@@ -102,7 +110,7 @@ void test_buffer_data(void) {
     ASSERT(memcmp(stream->buffer, test_data, test_len) == 0,
            "Data should match");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -120,7 +128,7 @@ void test_buffer_data_multiple(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer multiple chunks */
+    /// Buffer multiple chunks
     result = lle_input_stream_buffer_data(stream, data1, strlen(data1));
     ASSERT(result == LLE_SUCCESS, "First buffer should succeed");
 
@@ -130,12 +138,12 @@ void test_buffer_data_multiple(void) {
     result = lle_input_stream_buffer_data(stream, data3, strlen(data3));
     ASSERT(result == LLE_SUCCESS, "Third buffer should succeed");
 
-    /* Verify total data */
+    /// Verify total data
     size_t expected_len = strlen(data1) + strlen(data2) + strlen(data3);
     ASSERT(stream->buffer_used == expected_len,
            "Total buffer used should match");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -158,11 +166,11 @@ void test_get_buffered(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer some data */
+    /// Buffer some data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Get buffered data */
+    /// Get buffered data
     result =
         lle_input_stream_get_buffered(stream, &buffered_data, &buffered_len);
     ASSERT(result == LLE_SUCCESS, "Get buffered should succeed");
@@ -171,7 +179,7 @@ void test_get_buffered(void) {
     ASSERT(memcmp(buffered_data, test_data, buffered_len) == 0,
            "Data should match");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -188,7 +196,7 @@ void test_get_buffered_empty(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Get buffered data when empty */
+    /// Get buffered data when empty
     result =
         lle_input_stream_get_buffered(stream, &buffered_data, &buffered_len);
     ASSERT(result == LLE_SUCCESS,
@@ -196,7 +204,7 @@ void test_get_buffered_empty(void) {
     ASSERT(buffered_data == NULL, "Buffered data should be NULL when empty");
     ASSERT(buffered_len == 0, "Buffered length should be 0 when empty");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -219,16 +227,16 @@ void test_consume(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer data */
+    /// Buffer data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Consume 5 bytes */
+    /// Consume 5 bytes
     result = lle_input_stream_consume(stream, 5);
     ASSERT(result == LLE_SUCCESS, "Consume should succeed");
     ASSERT(stream->buffer_pos == 5, "Buffer position should be 5");
 
-    /* Get remaining data */
+    /// Get remaining data
     result =
         lle_input_stream_get_buffered(stream, &buffered_data, &buffered_len);
     ASSERT(result == LLE_SUCCESS, "Get buffered should succeed");
@@ -236,7 +244,7 @@ void test_consume(void) {
     ASSERT(memcmp(buffered_data, "56789", 5) == 0,
            "Remaining data should match");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -252,16 +260,16 @@ void test_consume_invalid(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer some data */
+    /// Buffer some data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Try to consume more than available */
+    /// Try to consume more than available
     result = lle_input_stream_consume(stream, 100);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
            "Should reject consuming too much");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -283,11 +291,11 @@ void test_peek(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer data */
+    /// Buffer data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Peek at different offsets */
+    /// Peek at different offsets
     result = lle_input_stream_peek(stream, 0, &byte);
     ASSERT(result == LLE_SUCCESS, "Peek should succeed");
     ASSERT(byte == 'A', "First byte should be 'A'");
@@ -300,11 +308,11 @@ void test_peek(void) {
     ASSERT(result == LLE_SUCCESS, "Peek should succeed");
     ASSERT(byte == 'F', "Sixth byte should be 'F'");
 
-    /* Verify buffer position unchanged */
+    /// Verify buffer position unchanged
     ASSERT(stream->buffer_pos == 0,
            "Buffer position should not change after peek");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -321,16 +329,16 @@ void test_peek_out_of_bounds(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer data */
+    /// Buffer data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Try to peek beyond available data */
+    /// Try to peek beyond available data
     result = lle_input_stream_peek(stream, 10, &byte);
     ASSERT(result == LLE_ERROR_BUFFER_UNDERFLOW,
            "Should fail for out of bounds peek");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -355,11 +363,11 @@ void test_statistics(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer data twice */
+    /// Buffer data twice
     lle_input_stream_buffer_data(stream, data1, strlen(data1));
     lle_input_stream_buffer_data(stream, data2, strlen(data2));
 
-    /* Get statistics */
+    /// Get statistics
     result = lle_input_stream_get_statistics(
         stream, &bytes_read, &read_operations, &buffer_overflows);
     ASSERT(result == LLE_SUCCESS, "Get statistics should succeed");
@@ -367,7 +375,7 @@ void test_statistics(void) {
            "Bytes read should match");
     ASSERT(buffer_overflows == 0, "Should have no overflows");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -390,26 +398,26 @@ void test_reset(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Buffer data */
+    /// Buffer data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Reset */
+    /// Reset
     result = lle_input_stream_reset(stream);
     ASSERT(result == LLE_SUCCESS, "Reset should succeed");
 
-    /* Verify everything is cleared */
+    /// Verify everything is cleared
     ASSERT(stream->buffer_used == 0, "Buffer should be empty");
     ASSERT(stream->buffer_pos == 0, "Buffer position should be 0");
     ASSERT(stream->bytes_read == 0, "Bytes read should be 0");
 
-    /* Verify no data available */
+    /// Verify no data available
     result =
         lle_input_stream_get_buffered(stream, &buffered_data, &buffered_len);
     ASSERT(result == LLE_SUCCESS, "Get buffered should succeed");
     ASSERT(buffered_len == 0, "Should have no data after reset");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -431,31 +439,31 @@ void test_get_available(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Initially empty */
+    /// Initially empty
     result = lle_input_stream_get_available(stream, &available);
     ASSERT(result == LLE_SUCCESS, "Get available should succeed");
     ASSERT(available == 0, "Should have 0 bytes initially");
 
-    /* Buffer data */
+    /// Buffer data
     result = lle_input_stream_buffer_data(stream, test_data, strlen(test_data));
     ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
 
-    /* Check available */
+    /// Check available
     result = lle_input_stream_get_available(stream, &available);
     ASSERT(result == LLE_SUCCESS, "Get available should succeed");
     ASSERT(available == strlen(test_data), "Should have all bytes available");
 
-    /* Consume some */
+    /// Consume some
     result = lle_input_stream_consume(stream, 3);
     ASSERT(result == LLE_SUCCESS, "Consume should succeed");
 
-    /* Check available again */
+    /// Check available again
     result = lle_input_stream_get_available(stream, &available);
     ASSERT(result == LLE_SUCCESS, "Get available should succeed");
     ASSERT(available == strlen(test_data) - 3,
            "Should have reduced available bytes");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -477,18 +485,18 @@ void test_buffer_overflow(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Try to buffer more than buffer size */
+    /// Try to buffer more than buffer size
     result =
         lle_input_stream_buffer_data(stream, large_data, sizeof(large_data));
     ASSERT(result == LLE_ERROR_BUFFER_OVERFLOW,
            "Should detect buffer overflow");
 
-    /* Verify overflow was counted */
+    /// Verify overflow was counted
     uint64_t overflows = 0;
     lle_input_stream_get_statistics(stream, NULL, NULL, &overflows);
     ASSERT(overflows > 0, "Overflow count should be incremented");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -510,27 +518,27 @@ void test_buffer_compaction(void) {
     result = lle_input_stream_init(&stream, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    /* Fill buffer with enough data */
+    /// Fill buffer with enough data
     size_t half_size = LLE_INPUT_BUFFER_SIZE / 2;
     size_t initial_data = half_size + 200;
 
-    /* Buffer data in chunks to fill more than half */
+    /// Buffer data in chunks to fill more than half
     for (size_t i = 0; i < initial_data / sizeof(data); i++) {
         result = lle_input_stream_buffer_data(stream, data, sizeof(data));
         ASSERT(result == LLE_SUCCESS, "Buffer should succeed");
     }
 
-    /* Consume more than half (triggers compaction) */
+    /// Consume more than half (triggers compaction)
     size_t consume_amount = half_size + 100;
     result = lle_input_stream_consume(stream, consume_amount);
     ASSERT(result == LLE_SUCCESS, "Consume should succeed");
 
-    /* Verify compaction occurred */
+    /// Verify compaction occurred
     ASSERT(stream->buffer_pos == 0,
            "Buffer position should be 0 after compaction");
     ASSERT(stream->buffer_used < consume_amount, "Buffer should be compacted");
 
-    /* Cleanup */
+    /// Cleanup
     lle_input_stream_destroy(stream);
 
     TEST_END;
@@ -550,13 +558,13 @@ int main(void) {
            "==========\n");
     printf("\n");
 
-    /* Lifecycle tests */
+    /// Lifecycle tests
     printf("Lifecycle Tests:\n");
     RUN_TEST(init_destroy);
     RUN_TEST(init_invalid_params);
     printf("\n");
 
-    /* Buffer management tests */
+    /// Buffer management tests
     printf("Buffer Management Tests:\n");
     RUN_TEST(buffer_data);
     RUN_TEST(buffer_data_multiple);
@@ -564,26 +572,26 @@ int main(void) {
     RUN_TEST(get_buffered_empty);
     printf("\n");
 
-    /* Consume tests */
+    /// Consume tests
     printf("Consume Tests:\n");
     RUN_TEST(consume);
     RUN_TEST(consume_invalid);
     printf("\n");
 
-    /* Peek tests */
+    /// Peek tests
     printf("Peek Tests:\n");
     RUN_TEST(peek);
     RUN_TEST(peek_out_of_bounds);
     printf("\n");
 
-    /* Utility tests */
+    /// Utility tests
     printf("Utility Tests:\n");
     RUN_TEST(statistics);
     RUN_TEST(reset);
     RUN_TEST(get_available);
     printf("\n");
 
-    /* Edge case tests */
+    /// Edge case tests
     printf("Edge Case Tests:\n");
     RUN_TEST(buffer_overflow);
     RUN_TEST(buffer_compaction);

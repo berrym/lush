@@ -50,11 +50,11 @@
  * at specific points in the shell's execution lifecycle.
  */
 typedef enum {
-    LLE_HOOK_PRECMD,   /**< Called before prompt display (after command) */
-    LLE_HOOK_PREEXEC,  /**< Called before command execution */
-    LLE_HOOK_CHPWD,    /**< Called after directory change */
-    LLE_HOOK_PERIODIC, /**< Called periodically based on PERIOD variable */
-    LLE_HOOK_COUNT     /**< Number of hook types */
+    LLE_HOOK_PRECMD,   ///< Called before prompt display (after command)
+    LLE_HOOK_PREEXEC,  ///< Called before command execution
+    LLE_HOOK_CHPWD,    ///< Called after directory change
+    LLE_HOOK_PERIODIC, ///< Called periodically based on PERIOD variable
+    LLE_HOOK_COUNT     ///< Number of hook types
 } lle_hook_type_t;
 
 /* ============================================================================
@@ -195,4 +195,4 @@ bool lle_shell_hook_in_progress(void);
  */
 lle_hook_type_t lle_shell_hook_current(void);
 
-#endif /* LLE_SHELL_HOOKS_H */
+#endif /// LLE_SHELL_HOOKS_H
