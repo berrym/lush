@@ -389,6 +389,26 @@ void executor_clear_context(executor_t *executor);
 void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
+/**
+ * @brief Reject a mixed-script identifier when the hardening flag is set
+ *
+ * Author-time guard for the UAX #39 homograph vector: an identifier
+ * drawing letters from more than one script (Latin `p` + Cyrillic `а`
+ * in `pаsswd`). When FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off (the
+ * default in every mode) this is a no-op returning false. When on, a
+ * mixed-script @p name reports a structured error at @p loc and returns
+ * true so the caller aborts the definition. Call only at author
+ * boundaries (assignment, declare/typeset, function, alias); never on
+ * the environment-import path.
+ *
+ * @param executor Executor for error reporting and context stack
+ * @param name Candidate identifier name
+ * @param loc Source location for the diagnostic
+ * @return true if rejected (error already reported); false to proceed
+ */
+bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,
+                                        source_location_t loc);
+
 /* ============================================================================
  * Variable Expansion
  * ============================================================================

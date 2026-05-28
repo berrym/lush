@@ -814,6 +814,30 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
     shell_error_free(error);
 }
 
+bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,
+                                        source_location_t loc) {
+    /// Opt-in only: the canonical modes stay permissive and surface
+    /// mixed-script identifiers as a `debug analyze` advisory. This hard
+    /// rejection fires solely under FEATURE_REJECT_MIXED_SCRIPT_IDENTS,
+    /// at author-time definition boundaries (assignment, declare,
+    /// function, alias) -- never on the environment-import path, where
+    /// inherited names are external bytes rather than lush identifiers.
+    if (!shell_mode_allows(FEATURE_REJECT_MIXED_SCRIPT_IDENTS)) {
+        return false;
+    }
+    const char *script_a = NULL;
+    const char *script_b = NULL;
+    if (!lush_ident_mixes_scripts(name, &script_a, &script_b)) {
+        return false;
+    }
+    executor_error_report(
+        executor, SHELL_ERR_INVALID_ARGUMENT, loc,
+        "identifier `%s' mixes %s and %s scripts -- homograph risk; "
+        "rename to a single script or `unsetopt reject_mixed_script_idents'",
+        name, script_a, script_b);
+    return true;
+}
+
 /**
  * @brief Add a structured error and display it
  *
@@ -9005,6 +9029,13 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         free(var_name);
         return 1;
     }
+    /// Optional homograph guard (off unless
+    /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS).
+    if (executor_reject_mixed_script_ident(executor, var_name,
+                                           executor_current_loc(executor))) {
+        free(var_name);
+        return 1;
+    }
 
     /// Expand the value using modern expansion
     /// Save exit status set by command substitution (POSIX: assignment-only
@@ -9416,6 +9447,16 @@ static int execute_function_definition(executor_t *executor, node_t *node) {
                 *end_brace = '}'; /// Restore original string
             }
         }
+    }
+
+    /// Optional homograph guard (off unless
+    /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS).
+    if (executor_reject_mixed_script_ident(executor, actual_function_name,
+                                           node->loc)) {
+        if (actual_function_name != function_name) {
+            free(actual_function_name);
+        }
+        return 1;
     }
 
     /// Store function in function table

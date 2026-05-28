@@ -2680,6 +2680,34 @@ TEST(rt_unicode_ident_single_script_not_flagged) {
            "NFD café -- combining mark is inherited, not mixed");
 }
 
+TEST(rt_unicode_ident_mixed_script_allowed_by_default) {
+    /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off in every mode, lush
+    /// included, so a mixed-script name is accepted and runs.
+    run_result_t r = run_shell("declare p\xD0\xB0sswd=hi\n"
+                               "echo \"$p\xD0\xB0sswd\"\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_unicode_ident_mixed_script_rejected_when_opted_in) {
+    /// With the hardening flag on, declaring a Latin+Cyrillic name is a
+    /// definition-time error. unsetopt at the end so the global feature
+    /// override does not leak into later tests.
+    run_result_t r = run_shell("setopt reject_mixed_script_idents\n"
+                               "declare p\xD0\xB0sswd=hi\n");
+    ASSERT_STDERR_CONTAINS(r, "mixes latin and cyrillic");
+    (void)run_shell("unsetopt reject_mixed_script_idents\n");
+}
+
+TEST(rt_unicode_ident_mixed_script_single_script_ok_when_opted_in) {
+    /// The flag rejects only cross-script names; an all-Latin unicode
+    /// identifier is still accepted.
+    run_result_t r = run_shell("setopt reject_mixed_script_idents\n"
+                               "declare caf\xC3\xA9=hi\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+    (void)run_shell("unsetopt reject_mixed_script_idents\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3976,6 +4004,9 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_highlight_spans_full_name);
     RUN_TEST(rt_unicode_ident_mixed_script_detected);
     RUN_TEST(rt_unicode_ident_single_script_not_flagged);
+    RUN_TEST(rt_unicode_ident_mixed_script_allowed_by_default);
+    RUN_TEST(rt_unicode_ident_mixed_script_rejected_when_opted_in);
+    RUN_TEST(rt_unicode_ident_mixed_script_single_script_ok_when_opted_in);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);

@@ -352,6 +352,13 @@ int bin_declare(int argc, char **argv) {
             free(name);
             return 1;
         }
+        /// Optional homograph guard (off unless
+        /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS).
+        if (executor_reject_mixed_script_ident(current_executor, name,
+                                               builtin_get_source_location())) {
+            free(name);
+            return 1;
+        }
 
         /// Handle -p for specific variable
         if (opt_print) {

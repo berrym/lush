@@ -158,6 +158,23 @@ typedef enum {
                                  ///< normalized on ingest. Default true in
                                  ///< lush mode, false elsewhere.
 
+    FEATURE_REJECT_MIXED_SCRIPT_IDENTS, ///< When on, an identifier that mixes
+                                        ///< Unicode scripts (e.g. Latin p +
+                                        ///< Cyrillic а in pаsswd, the homograph
+                                        ///< vector) is a hard error at
+                                        ///< definition time. Default false in
+                                        ///< every mode, lush included: the
+                                        ///< canonical mode stays permissive
+                                        ///< (presets are not restrictions) and
+                                        ///< surfaces mixed-script as an
+                                        ///< advisory via `debug analyze`
+                                        ///< instead. Opt in for a hardening
+                                        ///< posture (CI, a strict preset).
+                                        ///< Never consulted on the
+                                        ///< environment-import path --
+                                        ///< inherited names are external bytes,
+                                        ///< not lush-authored identifiers.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;

@@ -822,6 +822,15 @@ int bin_alias(int argc, char **argv) {
                 exit_status = 1;
                 continue;
             }
+            /// Optional homograph guard (off unless
+            /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS).
+            if (executor_reject_mixed_script_ident(
+                    current_executor, name, builtin_get_source_location())) {
+                free(name);
+                free(value);
+                exit_status = 1;
+                continue;
+            }
 
             /// Can't alias builtin commands or keywords
             if (is_builtin(name)) {

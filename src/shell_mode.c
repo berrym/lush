@@ -123,6 +123,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PLUGIN_SYSTEM] = false,
                             [FEATURE_KIND_SIGILS] = false,
                             [FEATURE_UNICODE_IDENTIFIERS] = false,
+                            [FEATURE_REJECT_MIXED_SCRIPT_IDENTS] = false,
                             },
 
     /// SHELL_MODE_BASH - Bash 5.x compatibility
@@ -211,6 +212,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PLUGIN_SYSTEM] = false,     /// Not a Bash feature
             [FEATURE_KIND_SIGILS] = false, /// @/% remain word chars in bash
             [FEATURE_UNICODE_IDENTIFIERS] = false, /// Bash ASCII-only ident
+            [FEATURE_REJECT_MIXED_SCRIPT_IDENTS] = false, /// opt-in only
         },
 
     /// SHELL_MODE_ZSH - Zsh compatibility
@@ -298,6 +300,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PLUGIN_SYSTEM] = false,     /// Not a Zsh feature
             [FEATURE_KIND_SIGILS] = false, /// @/% remain word chars in zsh
             [FEATURE_UNICODE_IDENTIFIERS] = false, /// Zsh ASCII-only ident
+            [FEATURE_REJECT_MIXED_SCRIPT_IDENTS] = false, /// opt-in only
         },
 
     /// SHELL_MODE_LUSH - Curated best of both (DEFAULT)
@@ -397,7 +400,12 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PLUGIN_SYSTEM] = true,     /// Lush extension
             [FEATURE_KIND_SIGILS] = true,       /// Curated: @/% sigils
             [FEATURE_UNICODE_IDENTIFIERS] = true, /// Curated: lush default
-        },
+            /// Curated OFF, lush included: the canonical mode stays
+            /// permissive (presets are not restrictions) and surfaces
+            /// mixed-script identifiers as a `debug analyze` advisory
+            /// rather than a hard error. Opt in for a hardening posture.
+            [FEATURE_REJECT_MIXED_SCRIPT_IDENTS] = false,
+                            },
 };
 
 /* ============================================================================
@@ -495,6 +503,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
     [FEATURE_KIND_SIGILS] = "kind_sigils",
     [FEATURE_UNICODE_IDENTIFIERS] = "unicode_identifiers",
+    [FEATURE_REJECT_MIXED_SCRIPT_IDENTS] = "reject_mixed_script_idents",
 };
 
 /* Feature short names and cross-shell aliases.
