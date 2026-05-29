@@ -95,27 +95,6 @@ static lle_expansion_context_t g_expansion_ctx = {
  */
 
 /**
- * @brief Duplicate string using memory pool
- *
- * Allocates memory from the LLE memory pool and copies the input string.
- *
- * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation
- * fails
- */
-static char *pool_strdup(const char *str) {
-    if (!str)
-        return NULL;
-
-    size_t len = strlen(str) + 1;
-    char *dup = lle_pool_alloc(len);
-    if (dup) {
-        memcpy(dup, str, len);
-    }
-    return dup;
-}
-
-/**
  * @brief Find the next history expansion marker in a string
  *
  * Searches for unescaped '!' characters or '^' at position 0.
@@ -362,7 +341,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
             return LLE_ERROR_NOT_FOUND;
         }
 
-        result->expanded_command = pool_strdup(entry->command);
+        result->expanded_command = lle_pool_strdup(entry->command);
         if (!result->expanded_command) {
             return LLE_ERROR_OUT_OF_MEMORY;
         }
@@ -410,7 +389,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
             return LLE_ERROR_NOT_FOUND;
         }
 
-        result->expanded_command = pool_strdup(entry->command);
+        result->expanded_command = lle_pool_strdup(entry->command);
         if (!result->expanded_command) {
             return LLE_ERROR_OUT_OF_MEMORY;
         }
@@ -451,7 +430,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
         const lle_search_result_t *first_result =
             lle_history_search_results_get(search_results, 0);
-        result->expanded_command = pool_strdup(first_result->command);
+        result->expanded_command = lle_pool_strdup(first_result->command);
 
         lle_history_search_results_destroy(search_results);
 
@@ -493,7 +472,7 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
     const lle_search_result_t *first_result =
         lle_history_search_results_get(search_results, 0);
-    result->expanded_command = pool_strdup(first_result->command);
+    result->expanded_command = lle_pool_strdup(first_result->command);
 
     lle_history_search_results_destroy(search_results);
 
@@ -609,7 +588,7 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
 
     /// Check if expansion is needed
     if (!lle_history_expansion_needed(command)) {
-        *expanded = pool_strdup(command);
+        *expanded = lle_pool_strdup(command);
         return *expanded ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
     }
 
@@ -657,7 +636,7 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
-        *expanded = pool_strdup(result);
+        *expanded = lle_pool_strdup(result);
         return *expanded ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
     }
 
@@ -721,7 +700,7 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
     result[result_pos] = '\0';
     g_expansion_ctx.recursion_depth--;
 
-    *expanded = pool_strdup(result);
+    *expanded = lle_pool_strdup(result);
     return *expanded ? LLE_SUCCESS : LLE_ERROR_OUT_OF_MEMORY;
 }
 
