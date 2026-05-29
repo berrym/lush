@@ -14,9 +14,10 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <strings.h>
 
-/// Forward declaration for portability (see ht_fnv1a.c)
+/// Forward declaration for portability — never `#include <strings.h>`
+/// in this project; the forward-declare pattern avoids shadowing
+/// include/strings.h (see ht_fnv1a.c and the project-wide rule).
 int strcasecmp(const char *s1, const char *s2);
 
 /* ============================================================================
