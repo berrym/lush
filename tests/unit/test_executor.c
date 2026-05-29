@@ -3268,6 +3268,18 @@ TEST(rt_pe_catalog_per_element_at_q_via_slice) {
     ASSERT_STDOUT_EQ(r, "['hello' 'world']\n");
 }
 
+TEST(rt_pe_vectorized_case_transform) {
+    /// ${arr[@]@U}/@u/@L apply the case transform per element (issue
+    /// #124); previously only @Q was handled and these passed through.
+    run_result_t r = run_shell("arr=(foo Bar baz)\n"
+                               "echo \"[${arr[@]@U}]\"\n"
+                               "echo \"[${arr[@]@u}]\"\n"
+                               "echo \"[${arr[@]@L}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[FOO BAR BAZ]\n"
+                        "[Foo Bar Baz]\n"
+                        "[foo bar baz]\n");
+}
+
 TEST(rt_pipeline_three_stages) {
     /// Three-stage plumbing: producer | middle | terminator. The
     /// original form used `wc -c` to count bytes, but `wc -c`
@@ -4336,6 +4348,7 @@ int main(void) {
     RUN_TEST(rt_pe_catalog_per_element_replace_first_via_slice);
     RUN_TEST(rt_pe_catalog_per_element_replace_all_via_slice);
     RUN_TEST(rt_pe_catalog_per_element_at_q_via_slice);
+    RUN_TEST(rt_pe_vectorized_case_transform);
     RUN_TEST(rt_pipeline_three_stages);
     RUN_TEST(rt_pipeline_four_stages);
     RUN_TEST(rt_pipeline_pipestatus_three_stages);
