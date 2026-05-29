@@ -27,6 +27,7 @@
 #include "fuzzy_match.h"
 #include "lle/error_handling.h"
 #include "lle/history.h"
+#include "lle/memory_management.h"
 #include "lle/performance.h"
 #include "lle/unicode_case.h"
 #include "lle/unicode_compare.h"
@@ -83,26 +84,6 @@ struct lle_history_search_results {
  * PRIVATE HELPER FUNCTIONS
  * ============================================================================
  */
-
-/**
- * @brief Duplicate a string using pool allocation
- *
- * Allocates memory from the LLE memory pool and copies the input string.
- *
- * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation
- * fails
- */
-static char *pool_strdup(const char *str) {
-    if (!str)
-        return NULL;
-    size_t len = strlen(str);
-    char *dup = lle_pool_alloc(len + 1);
-    if (dup) {
-        memcpy(dup, str, len + 1);
-    }
-    return dup;
-}
 
 /// Note: Levenshtein distance now provided by libfuzzy (fuzzy_match.h)
 
@@ -472,7 +453,7 @@ lle_history_search_exact(lle_history_core_t *history_core, const char *query,
     }
 
     /// Store query
-    results->query = pool_strdup(query);
+    results->query = lle_pool_strdup(query);
     results->search_type = LLE_SEARCH_TYPE_EXACT;
 
     /// Get total entry count
@@ -556,7 +537,7 @@ lle_history_search_prefix(lle_history_core_t *history_core, const char *prefix,
     }
 
     /// Store query
-    results->query = pool_strdup(prefix);
+    results->query = lle_pool_strdup(prefix);
     results->search_type = LLE_SEARCH_TYPE_PREFIX;
 
     /// Get total entry count
@@ -637,7 +618,7 @@ lle_history_search_substring(lle_history_core_t *history_core,
     }
 
     /// Store query
-    results->query = pool_strdup(substring);
+    results->query = lle_pool_strdup(substring);
     results->search_type = LLE_SEARCH_TYPE_SUBSTRING;
 
     /// Get total entry count
@@ -722,7 +703,7 @@ lle_history_search_fuzzy(lle_history_core_t *history_core, const char *query,
     }
 
     /// Store query
-    results->query = pool_strdup(query);
+    results->query = lle_pool_strdup(query);
     results->search_type = LLE_SEARCH_TYPE_FUZZY;
 
     /// Get total entry count

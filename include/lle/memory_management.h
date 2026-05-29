@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 
 /// Include LLE error handling
@@ -403,6 +404,32 @@ void *lle_pool_alloc(size_t size);
  * @param ptr Pointer returned by lle_pool_alloc (may be NULL)
  */
 void lle_pool_free(void *ptr);
+/**
+ * @brief Duplicate a NUL-terminated string into pool-allocated memory
+ *
+ * Pool-allocator analogue of `strdup`: returns a freshly allocated copy
+ * of `str` (including the trailing NUL) owned by the global pool. NULL
+ * input maps to NULL output; allocation failure also returns NULL. The
+ * result must be freed with `lle_pool_free`.
+ *
+ * Defined inline so unit tests that link a mock `lle_pool_alloc` still
+ * get a consistent strdup wrapper without pulling in the real pool
+ * allocator definition.
+ *
+ * @param str Source string (may be NULL)
+ * @return Pool-allocated copy on success, NULL on NULL input or OOM.
+ */
+static inline char *lle_pool_strdup(const char *str) {
+    if (!str) {
+        return NULL;
+    }
+    size_t bytes = strlen(str) + 1;
+    char *dup = (char *)lle_pool_alloc(bytes);
+    if (dup) {
+        memcpy(dup, str, bytes);
+    }
+    return dup;
+}
 /**
  * @brief Allocate memory from a specific base memory pool
  *

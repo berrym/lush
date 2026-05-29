@@ -119,28 +119,6 @@ static lle_result_t flatten_command(const char *original, char *flattened,
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Duplicate a string using memory pool
- *
- * Allocates memory from the LLE memory pool and copies the input string.
- *
- * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation
- * fails
- */
-static char *pool_strdup(const char *str) {
-    if (!str) {
-        return NULL;
-    }
-
-    size_t len = strlen(str) + 1;
-    char *dup = lle_pool_alloc(len);
-    if (dup) {
-        memcpy(dup, str, len);
-    }
-    return dup;
-}
-
 /* ============================================================================
  * PUBLIC API
  * ============================================================================
@@ -266,7 +244,7 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
     }
 
     /// Store original multiline format
-    entry->original_multiline = pool_strdup(original_multiline);
+    entry->original_multiline = lle_pool_strdup(original_multiline);
     if (!entry->original_multiline) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -286,7 +264,7 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
         lle_pool_free(entry->command);
     }
 
-    entry->command = pool_strdup(flattened);
+    entry->command = lle_pool_strdup(flattened);
     if (!entry->command) {
         lle_pool_free(entry->original_multiline);
         entry->original_multiline = NULL;

@@ -45,6 +45,7 @@
  */
 
 #include "lle/completion/word_context.h"
+#include "lle/memory_management.h"
 
 #include "executor.h"
 #include "identifier.h"
@@ -1264,17 +1265,6 @@ static char *pool_substring(const char *buffer, size_t start, size_t end) {
 }
 
 /// Allocate a pool-owned copy of a NUL-terminated string.
-static char *pool_strdup(const char *s) {
-    if (!s)
-        return NULL;
-    size_t len = strlen(s);
-    char *out = lle_pool_alloc(len + 1);
-    if (!out)
-        return NULL;
-    memcpy(out, s, len + 1);
-    return out;
-}
-
 /* True if the path-prefix bytes contain a comma-separated brace list
  * suitable for expand_brace_pattern. We accept either a list (`{a,b}`)
  * or a range (`{1..5}`); both are handled by the existing expander. */
@@ -1456,7 +1446,7 @@ static char *resolve_single_path_prefix(const char *path_prefix,
     if (current_executor) {
         char *expanded = expand_if_needed(current_executor, path_prefix);
         if (expanded && expanded[0]) {
-            char *result = pool_strdup(expanded);
+            char *result = lle_pool_strdup(expanded);
             free(expanded);
             return result;
         }
@@ -1468,7 +1458,7 @@ static char *resolve_single_path_prefix(const char *path_prefix,
     /// uniformly.
     if (path_prefix[0] != '$' && path_prefix[0] != '`' &&
         path_prefix[0] != '~') {
-        return pool_strdup(path_prefix);
+        return lle_pool_strdup(path_prefix);
     }
 
     /// Path begins with an expansion marker we couldn't resolve (e.g.,

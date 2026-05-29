@@ -79,27 +79,6 @@ static bool get_terminal_name(char *buffer, size_t size) {
     return false;
 }
 
-/**
- * @brief Duplicate string using memory pool
- *
- * Allocates memory from the LLE memory pool and copies the input string.
- *
- * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation
- * fails
- */
-static char *pool_strdup(const char *str) {
-    if (!str)
-        return NULL;
-
-    size_t len = strlen(str) + 1;
-    char *dup = lle_pool_alloc(len);
-    if (dup) {
-        memcpy(dup, str, len);
-    }
-    return dup;
-}
-
 /* ============================================================================
  * PUBLIC API - FORENSIC CONTEXT
  * ============================================================================
@@ -152,7 +131,7 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
     /// Capture terminal name
     char tty_buffer[256];
     if (get_terminal_name(tty_buffer, sizeof(tty_buffer))) {
-        context->terminal_name = pool_strdup(tty_buffer);
+        context->terminal_name = lle_pool_strdup(tty_buffer);
     } else {
         context->terminal_name = NULL;
     }
@@ -160,7 +139,7 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
     /// Capture working directory
     char cwd_buffer[4096];
     if (getcwd(cwd_buffer, sizeof(cwd_buffer)) != NULL) {
-        context->working_directory = pool_strdup(cwd_buffer);
+        context->working_directory = lle_pool_strdup(cwd_buffer);
     } else {
         context->working_directory = NULL;
     }
@@ -198,12 +177,12 @@ lle_forensic_apply_to_entry(lle_history_entry_t *entry,
 
     /// Apply terminal name
     if (context->terminal_name) {
-        entry->terminal_name = pool_strdup(context->terminal_name);
+        entry->terminal_name = lle_pool_strdup(context->terminal_name);
     }
 
     /// Apply working directory (if not already set)
     if (!entry->working_directory && context->working_directory) {
-        entry->working_directory = pool_strdup(context->working_directory);
+        entry->working_directory = lle_pool_strdup(context->working_directory);
     }
 
     /// Initialize timing fields

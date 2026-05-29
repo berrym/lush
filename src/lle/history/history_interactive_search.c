@@ -24,6 +24,7 @@
 
 #include "lle/error_handling.h"
 #include "lle/history.h"
+#include "lle/memory_management.h"
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -42,26 +43,6 @@
  * HELPER FUNCTIONS
  * ============================================================================
  */
-
-/**
- * @brief Duplicate a string using pool allocation
- *
- * Allocates memory from the LLE memory pool and copies the input string.
- *
- * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation
- * fails
- */
-static char *pool_strdup(const char *str) {
-    if (!str)
-        return NULL;
-    size_t len = strlen(str);
-    char *dup = lle_pool_alloc(len + 1);
-    if (dup) {
-        memcpy(dup, str, len + 1);
-    }
-    return dup;
-}
 
 /* ============================================================================
  * TYPE DEFINITIONS
@@ -288,7 +269,8 @@ lle_history_interactive_search_init(lle_history_core_t *history_core,
     if (session->original_line) {
         lle_pool_free(session->original_line);
     }
-    session->original_line = current_line ? pool_strdup(current_line) : NULL;
+    session->original_line =
+        current_line ? lle_pool_strdup(current_line) : NULL;
     session->original_cursor_pos = cursor_pos;
 
     /// Update prompt
