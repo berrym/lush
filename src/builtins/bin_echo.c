@@ -7,13 +7,11 @@
  */
 
 #include "builtins.h"
+#include "escape.h"
 #include "shell_mode.h"
 
 #include <errno.h>
-
-/* Defined in src/builtins/bin_printf.c. Bin_echo and bin_printf both
- * need to interpret escape sequences (\n, \t, etc.) the same way. */
-char *process_escape_sequences(const char *str);
+#include <string.h>
 
 /**
  * @brief Echo arguments to stdout
@@ -65,7 +63,8 @@ int bin_echo(int argc, char **argv) {
         }
 
         if (interpret_escapes) {
-            char *processed = process_escape_sequences(argv[i]);
+            char *processed =
+                lush_expand_escapes(argv[i], strlen(argv[i]), LUSH_ESC_SIMPLE);
             if (processed) {
                 printf("%s", processed);
                 free(processed);

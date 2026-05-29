@@ -183,6 +183,7 @@ src = ['src/arithmetic.c',
        'src/opts.c',
        'src/parser.c',
        'src/pattern_match.c',
+       'src/escape.c',
        'src/identifier.c',
        'src/posix_history.c',
        'src/posix_opts.c',
@@ -2390,6 +2391,17 @@ if fs.exists('tests/unit/test_pattern_match.c')
                                   include_directories: [inc, include_directories('tests')],
                                   dependencies: [lle_dep])
   test('Pattern Match', test_pattern_match,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Escape Engine Tests - canonical backslash-escape expansion (both dialects)
+if fs.exists('tests/unit/test_escape.c')
+  test_escape = executable('test_escape',
+                           'tests/unit/test_escape.c',
+                           'src/escape.c',
+                           include_directories: [inc, include_directories('tests')])
+  test('Escape Engine', test_escape,
        suite: 'unit',
        timeout: 30)
 endif

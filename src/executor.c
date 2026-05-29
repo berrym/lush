@@ -19,6 +19,7 @@
 #include "builtins.h"
 #include "config.h"
 #include "debug.h"
+#include "escape.h"
 #include "ht.h"
 #include "identifier.h"
 #include "init.h"
@@ -214,7 +215,6 @@ static char *expand_array_unsubscripted(executor_t *executor,
 static void executor_request_posix_exit(executor_t *executor, int status);
 static char *slice_string_graphemes(const char *str, size_t str_len,
                                     int start_grapheme, int count);
-static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment,
                               source_location_t loc);
@@ -5194,7 +5194,8 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
             shell_mode_allows(FEATURE_ANSI_QUOTING)) {
             size_t len = strlen(node->val.str);
             if (len >= 3 && node->val.str[len - 1] == '\'') {
-                return expand_ansi_c_string(node->val.str + 2, len - 3);
+                return lush_expand_escapes(node->val.str + 2, len - 3,
+                                           LUSH_ESC_ANSI_C);
             }
         }
         return strdup(node->val.str);
@@ -5974,8 +5975,8 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 /// Extract and expand the ANSI-C string content
                 size_t content_len = i - content_start;
                 if (shell_mode_allows(FEATURE_ANSI_QUOTING)) {
-                    char *expanded =
-                        expand_ansi_c_string(&text[content_start], content_len);
+                    char *expanded = lush_expand_escapes(
+                        &text[content_start], content_len, LUSH_ESC_ANSI_C);
                     if (expanded) {
                         size_t exp_len = strlen(expanded);
                         while (result_pos + exp_len >= result_capacity) {
@@ -6215,7 +6216,8 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     /// Feature disabled, return literal
                     return strdup(text);
                 }
-                char *expanded = expand_ansi_c_string(text + 2, quote_end - 2);
+                char *expanded = lush_expand_escapes(text + 2, quote_end - 2,
+                                                     LUSH_ESC_ANSI_C);
                 /// If there's text after the closing quote, append it
                 if (text[quote_end + 1] != '\0') {
                     char *rest =
@@ -10659,96 +10661,6 @@ char *transform_quote(const char *str) {
 }
 
 /**
- * @brief Expand escape sequences in a string
- *
- * Used for ${var@E} transformation.
- *
- * @param str String with escape sequences
- * @return Expanded string (caller must free)
- */
-static char *transform_escape(const char *str) {
-    if (!str) {
-        return strdup("");
-    }
-
-    size_t len = strlen(str);
-    char *result = malloc(len + 1);
-    if (!result) {
-        return strdup("");
-    }
-
-    size_t j = 0;
-    for (size_t i = 0; i < len; i++) {
-        if (str[i] == '\\' && i + 1 < len) {
-            switch (str[i + 1]) {
-            case 'n':
-                result[j++] = '\n';
-                i++;
-                break;
-            case 't':
-                result[j++] = '\t';
-                i++;
-                break;
-            case 'r':
-                result[j++] = '\r';
-                i++;
-                break;
-            case '\\':
-                result[j++] = '\\';
-                i++;
-                break;
-            case '\'':
-                result[j++] = '\'';
-                i++;
-                break;
-            case '"':
-                result[j++] = '"';
-                i++;
-                break;
-            case 'a':
-                result[j++] = '\a';
-                i++;
-                break;
-            case 'b':
-                result[j++] = '\b';
-                i++;
-                break;
-            case 'e':
-                result[j++] = '\033';
-                i++;
-                break;
-            case 'f':
-                result[j++] = '\f';
-                i++;
-                break;
-            case 'v':
-                result[j++] = '\v';
-                i++;
-                break;
-            case 'x': /// Hex escape \xHH
-                if (i + 3 < len && isxdigit(str[i + 2]) &&
-                    isxdigit(str[i + 3])) {
-                    char hex[3] = {str[i + 2], str[i + 3], '\0'};
-                    result[j++] = (char)strtol(hex, NULL, 16);
-                    i += 3;
-                } else {
-                    result[j++] = str[i];
-                }
-                break;
-            default:
-                result[j++] = str[i];
-                break;
-            }
-        } else {
-            result[j++] = str[i];
-        }
-    }
-
-    result[j] = '\0';
-    return result;
-}
-
-/**
  * @brief Create assignment statement form
  *
  * Used for ${var@A} transformation.
@@ -14387,8 +14299,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                 case 'Q': /// Quote value for reuse as input
                     result = transform_quote(var_value);
                     break;
-                case 'E': /// Expand escape sequences
-                    result = transform_escape(var_value);
+                case 'E': /// Expand escape sequences (ANSI-C, like $'...')
+                    result = lush_expand_escapes(var_value, strlen(var_value),
+                                                 LUSH_ESC_ANSI_C);
                     break;
                 case 'P': /// Expand as prompt string
                     result = transform_prompt(var_value);
@@ -15514,261 +15427,6 @@ static node_t *copy_node_simple(node_t *original) {
     }
 
     return copy;
-}
-
-/**
- * @brief Expand ANSI-C escape sequences in $'...' strings
- *
- * Handles escape sequences like \n, \t, \xNN, \uNNNN, \UNNNNNNNN, etc.
- * This is the Bash/Zsh $'...' quoting mechanism.
- *
- * @param str Content between the quotes (without $' and ')
- * @param len Length of the content
- * @return Expanded string (caller must free)
- */
-static char *expand_ansi_c_string(const char *str, size_t len) {
-    if (!str || len == 0) {
-        return strdup("");
-    }
-
-    /// Allocate buffer (escape sequences usually shrink the string)
-    size_t buffer_size = len * 4 + 1; /// Extra space for Unicode expansion
-    char *result = malloc(buffer_size);
-    if (!result) {
-        return strdup("");
-    }
-
-    size_t result_pos = 0;
-    size_t i = 0;
-
-    while (i < len) {
-        if (str[i] == '\\' && i + 1 < len) {
-            char next = str[i + 1];
-            switch (next) {
-            case 'a': /// Alert (bell)
-                result[result_pos++] = '\a';
-                i += 2;
-                break;
-            case 'b': /// Backspace
-                result[result_pos++] = '\b';
-                i += 2;
-                break;
-            case 'e': /// Escape character
-            case 'E':
-                result[result_pos++] = '\033';
-                i += 2;
-                break;
-            case 'f': /// Form feed
-                result[result_pos++] = '\f';
-                i += 2;
-                break;
-            case 'n': /// Newline
-                result[result_pos++] = '\n';
-                i += 2;
-                break;
-            case 'r': /// Carriage return
-                result[result_pos++] = '\r';
-                i += 2;
-                break;
-            case 't': /// Horizontal tab
-                result[result_pos++] = '\t';
-                i += 2;
-                break;
-            case 'v': /// Vertical tab
-                result[result_pos++] = '\v';
-                i += 2;
-                break;
-            case '\\': /// Backslash
-                result[result_pos++] = '\\';
-                i += 2;
-                break;
-            case '\'': /// Single quote
-                result[result_pos++] = '\'';
-                i += 2;
-                break;
-            case '"': /// Double quote
-                result[result_pos++] = '"';
-                i += 2;
-                break;
-            case '?': /// Question mark
-                result[result_pos++] = '?';
-                i += 2;
-                break;
-            case 'x': /// Hex escape \xNN
-                if (i + 3 < len && isxdigit((unsigned char)str[i + 2])) {
-                    char hex[3] = {0};
-                    int hex_len = 0;
-                    /// Read up to 2 hex digits
-                    for (int j = 0; j < 2 && i + 2 + j < len; j++) {
-                        if (isxdigit((unsigned char)str[i + 2 + j])) {
-                            hex[hex_len++] = str[i + 2 + j];
-                        } else {
-                            break;
-                        }
-                    }
-                    if (hex_len > 0) {
-                        unsigned int val = (unsigned int)strtoul(hex, NULL, 16);
-                        result[result_pos++] = (char)val;
-                        i += 2 + hex_len;
-                    } else {
-                        result[result_pos++] = str[i++];
-                    }
-                } else {
-                    result[result_pos++] = str[i++];
-                }
-                break;
-            case 'u': /// Unicode escape \uNNNN (4 hex digits)
-                if (i + 5 < len) {
-                    char hex[5] = {0};
-                    int hex_len = 0;
-                    for (int j = 0; j < 4 && i + 2 + j < len; j++) {
-                        if (isxdigit((unsigned char)str[i + 2 + j])) {
-                            hex[hex_len++] = str[i + 2 + j];
-                        } else {
-                            break;
-                        }
-                    }
-                    if (hex_len == 4) {
-                        uint32_t codepoint = (uint32_t)strtoul(hex, NULL, 16);
-                        /// Encode as UTF-8
-                        if (codepoint < 0x80) {
-                            result[result_pos++] = (char)codepoint;
-                        } else if (codepoint < 0x800) {
-                            result[result_pos++] =
-                                (char)(0xC0 | (codepoint >> 6));
-                            result[result_pos++] =
-                                (char)(0x80 | (codepoint & 0x3F));
-                        } else {
-                            result[result_pos++] =
-                                (char)(0xE0 | (codepoint >> 12));
-                            result[result_pos++] =
-                                (char)(0x80 | ((codepoint >> 6) & 0x3F));
-                            result[result_pos++] =
-                                (char)(0x80 | (codepoint & 0x3F));
-                        }
-                        i += 2 + hex_len;
-                    } else {
-                        result[result_pos++] = str[i++];
-                    }
-                } else {
-                    result[result_pos++] = str[i++];
-                }
-                break;
-            case 'U': /// Unicode escape \UNNNNNNNN (8 hex digits)
-                if (i + 9 < len) {
-                    char hex[9] = {0};
-                    int hex_len = 0;
-                    for (int j = 0; j < 8 && i + 2 + j < len; j++) {
-                        if (isxdigit((unsigned char)str[i + 2 + j])) {
-                            hex[hex_len++] = str[i + 2 + j];
-                        } else {
-                            break;
-                        }
-                    }
-                    if (hex_len == 8) {
-                        uint32_t codepoint = (uint32_t)strtoul(hex, NULL, 16);
-                        /// Encode as UTF-8
-                        if (codepoint < 0x80) {
-                            result[result_pos++] = (char)codepoint;
-                        } else if (codepoint < 0x800) {
-                            result[result_pos++] =
-                                (char)(0xC0 | (codepoint >> 6));
-                            result[result_pos++] =
-                                (char)(0x80 | (codepoint & 0x3F));
-                        } else if (codepoint < 0x10000) {
-                            result[result_pos++] =
-                                (char)(0xE0 | (codepoint >> 12));
-                            result[result_pos++] =
-                                (char)(0x80 | ((codepoint >> 6) & 0x3F));
-                            result[result_pos++] =
-                                (char)(0x80 | (codepoint & 0x3F));
-                        } else if (codepoint <= 0x10FFFF) {
-                            result[result_pos++] =
-                                (char)(0xF0 | (codepoint >> 18));
-                            result[result_pos++] =
-                                (char)(0x80 | ((codepoint >> 12) & 0x3F));
-                            result[result_pos++] =
-                                (char)(0x80 | ((codepoint >> 6) & 0x3F));
-                            result[result_pos++] =
-                                (char)(0x80 | (codepoint & 0x3F));
-                        }
-                        i += 2 + hex_len;
-                    } else {
-                        result[result_pos++] = str[i++];
-                    }
-                } else {
-                    result[result_pos++] = str[i++];
-                }
-                break;
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7': /// Octal escape \NNN
-            {
-                char octal[4] = {0};
-                int octal_len = 0;
-                for (int j = 0; j < 3 && i + 1 + j < len; j++) {
-                    char c = str[i + 1 + j];
-                    if (c >= '0' && c <= '7') {
-                        octal[octal_len++] = c;
-                    } else {
-                        break;
-                    }
-                }
-                if (octal_len > 0) {
-                    unsigned int val = (unsigned int)strtoul(octal, NULL, 8);
-                    result[result_pos++] = (char)(val & 0xFF);
-                    i += 1 + octal_len;
-                } else {
-                    result[result_pos++] = str[i++];
-                }
-                break;
-            }
-            case 'c': /// Control character \cX
-                if (i + 2 < len) {
-                    char ctrl = str[i + 2];
-                    if (ctrl >= '@' && ctrl <= '_') {
-                        result[result_pos++] = (char)(ctrl - '@');
-                    } else if (ctrl >= 'a' && ctrl <= 'z') {
-                        result[result_pos++] = (char)(ctrl - 'a' + 1);
-                    } else if (ctrl == '?') {
-                        result[result_pos++] = 127; /// DEL
-                    } else {
-                        result[result_pos++] = str[i++];
-                        break;
-                    }
-                    i += 3;
-                } else {
-                    result[result_pos++] = str[i++];
-                }
-                break;
-            default:
-                /// Unknown escape - keep the backslash and character
-                result[result_pos++] = str[i++];
-                break;
-            }
-        } else {
-            result[result_pos++] = str[i++];
-        }
-
-        /// Ensure buffer has space
-        if (result_pos >= buffer_size - 4) {
-            buffer_size *= 2;
-            char *new_result = realloc(result, buffer_size);
-            if (!new_result) {
-                free(result);
-                return strdup("");
-            }
-            result = new_result;
-        }
-    }
-
-    result[result_pos] = '\0';
-    return result;
 }
 
 /**

@@ -7,6 +7,7 @@
  */
 
 #include "builtins.h"
+#include "escape.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -16,83 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-/**
- * @brief Process escape sequences in a string
- *
- * Converts escape sequences like \n, \t, \r, etc. to their
- * corresponding characters.
- *
- * @param str The string to process
- * @return Newly allocated string with escapes processed (caller must free),
- *         or NULL on error
- */
-/* Non-static -- also called from src/builtins/bin_echo.c. The helper
- * is a per-file colocator rather than a public API; bin_echo.c
- * forward-declares it locally rather than promoting it through
- * include/builtins.h. */
-char *process_escape_sequences(const char *str) {
-    if (!str) {
-        return NULL;
-    }
-
-    size_t len = strlen(str);
-    char *result = malloc(len + 1);
-    if (!result) {
-        return NULL;
-    }
-
-    const char *src = str;
-    char *dst = result;
-
-    while (*src) {
-        if (*src == '\\' && *(src + 1)) {
-            src++; /// Skip the backslash
-            switch (*src) {
-            case 'n':
-                *dst++ = '\n';
-                break;
-            case 't':
-                *dst++ = '\t';
-                break;
-            case 'r':
-                *dst++ = '\r';
-                break;
-            case 'b':
-                *dst++ = '\b';
-                break;
-            case 'a':
-                *dst++ = '\a';
-                break;
-            case 'v':
-                *dst++ = '\v';
-                break;
-            case 'f':
-                *dst++ = '\f';
-                break;
-            case '\\':
-                *dst++ = '\\';
-                break;
-            case '"':
-                *dst++ = '"';
-                break;
-            case '\'':
-                *dst++ = '\'';
-                break;
-            default:
-                *dst++ = '\\';
-                *dst++ = *src;
-                break;
-            }
-        } else {
-            *dst++ = *src;
-        }
-        src++;
-    }
-
-    *dst = '\0';
-    return result;
-}
 
 /**
  * @brief Formatted output to stdout
@@ -389,44 +313,15 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
             } else if (format[i] == '\\' && format[i + 1] != '\0') {
-                /// Handle escaped characters
+                /// Handle escaped characters via the canonical decoder.
                 i++;
-                switch (format[i]) {
-                case 'n':
-                    putchar('\n');
-                    break;
-                case 't':
-                    putchar('\t');
-                    break;
-                case 'r':
-                    putchar('\r');
-                    break;
-                case 'b':
-                    putchar('\b');
-                    break;
-                case 'f':
-                    putchar('\f');
-                    break;
-                case 'a':
-                    putchar('\a');
-                    break;
-                case 'v':
-                    putchar('\v');
-                    break;
-                case '\\':
-                    putchar('\\');
-                    break;
-                case '"':
-                    putchar('"');
-                    break;
-                case '\'':
-                    putchar('\'');
-                    break;
-                default:
+                int decoded = lush_escape_basic_char(format[i]);
+                if (decoded >= 0) {
+                    putchar(decoded);
+                } else {
                     /// Unknown escape - print as literal
                     putchar('\\');
                     putchar(format[i]);
-                    break;
                 }
             } else {
                 /// Regular character

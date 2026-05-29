@@ -220,16 +220,6 @@ char *quote_val(char *val, bool add_quotes);
 char *substitute_str(char *s1, char *s2, size_t start, size_t end);
 
 /**
- * @brief Process escape sequences in a token
- *
- * Converts escape sequences like \n, \t, \\ to their actual characters.
- *
- * @param str String containing escape sequences
- * @return Processed string (caller must free), or NULL on error
- */
-char *process_token_escapes(const char *str);
-
-/**
  * @brief Check and grow buffer if needed
  *
  * Ensures buffer has sufficient capacity, reallocating if necessary.
