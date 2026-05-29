@@ -14225,6 +14225,15 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             break;
                         }
+                        case 'U': /// uppercase all
+                            converted = convert_case_all_upper(elems[i]);
+                            break;
+                        case 'u': /// uppercase first character
+                            converted = convert_case_first_upper(elems[i]);
+                            break;
+                        case 'L': /// lowercase all
+                            converted = convert_case_all_lower(elems[i]);
+                            break;
                         case 'E': /// backslash-escape processing
                             /// Passthrough for now; per-element parity
                             /// with the scalar @E path.
