@@ -186,6 +186,17 @@ typedef enum {
                                 ///< across modes. Toggleable per-script via
                                 ///< setopt/unsetopt.
 
+    FEATURE_ZSH_PARAM_MODIFIERS, ///< zsh `${var:h}` history-style modifier
+                                 ///< family (:h head, :t tail, :r root,
+                                 ///< :e ext, :l/:u case, :q quote,
+                                 ///< :s/old/new/ and :gs/old/new/), with
+                                 ///< chaining (${var:t:r}). On in zsh and
+                                 ///< lush modes; OFF in bash and posix,
+                                 ///< where ${var:x} is substring-offset
+                                 ///< expansion and a leading letter would
+                                 ///< otherwise change meaning. setopt name
+                                 ///< `zsh_param_modifiers`.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;

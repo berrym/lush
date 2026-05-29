@@ -100,6 +100,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 false, /// POSIX permits failing loop bodies; do not deviate
             [FEATURE_ASSIGN_ERROR_EXITS] =
                 true, /// POSIX 2.8.1: assignment error exits non-interactive sh
+            [FEATURE_ZSH_PARAM_MODIFIERS] =
+                false,                 /// ${var:x} is substring-offset in POSIX
             [FEATURE_XPG_ECHO] = true, /// POSIX XSI mandates escape interp
 
             /// History Behavior
@@ -189,6 +191,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ASSIGN_ERROR_EXITS] =
                 false, /// bash continues after a readonly assignment error,
                        /// aborting only the current AND-OR list
+            [FEATURE_ZSH_PARAM_MODIFIERS] =
+                false,                  /// ${var:x} is substring-offset in bash
             [FEATURE_XPG_ECHO] = false, /// shopt xpg_echo, off by default
 
             /// History Behavior
@@ -281,6 +285,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ASSIGN_ERROR_EXITS] =
                 true, /// zsh exits a non-interactive shell on a readonly
                       /// assignment error, like dash; match it in zsh mode
+            [FEATURE_ZSH_PARAM_MODIFIERS] = true, /// native zsh modifiers
             [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
                             by default in zsh's echo builtin */
 
@@ -384,6 +389,11 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             stops the dangerous `||` fallthrough. Opt into the
                             strict posix/zsh behavior with
                             `setopt assign_error_exits`. */
+            [FEATURE_ZSH_PARAM_MODIFIERS] =
+                true, /* Curated: the zsh ${var:h/t/r/e/...} modifiers are a
+                            genuinely useful, terse path/string toolkit, and a
+                            leading modifier letter never collides with a valid
+                            substring offset (which is numeric). On in lush. */
             [FEATURE_XPG_ECHO] =
                 true, /* Curated zsh-style: echo interprets escapes by
                             default. More predictable and modern than bash's
@@ -496,6 +506,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_CDABLE_VARS] = "cdable_vars",
     [FEATURE_ERREXIT_IN_LOOPS] = "errexit_in_loops",
     [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
+    [FEATURE_ZSH_PARAM_MODIFIERS] = "zsh_param_modifiers",
     [FEATURE_XPG_ECHO] = "xpg_echo",
 
     /// History Behavior
