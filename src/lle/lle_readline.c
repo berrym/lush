@@ -3419,6 +3419,15 @@ char *lle_readline(const char *prompt) {
             } else if (event->data.special_key.key == LLE_KEY_DOWN) {
                 execute_keybinding_action(&ctx, "DOWN", handle_arrow_down);
             }
+            /// PageUp/PageDown move through history like UP/DOWN in the line
+            /// editor (the natural "previous/next screenful" analogue when
+            /// there is no scrollable viewport here; pager and completion
+            /// menus do their own screenful pagination).
+            else if (event->data.special_key.key == LLE_KEY_PAGE_UP) {
+                execute_keybinding_action(&ctx, "PAGEUP", handle_arrow_up);
+            } else if (event->data.special_key.key == LLE_KEY_PAGE_DOWN) {
+                execute_keybinding_action(&ctx, "PAGEDOWN", handle_arrow_down);
+            }
             /// GROUP 1 MIGRATION: Home/End keys routed through keybinding
             ///                manager
             else if (event->data.special_key.key == LLE_KEY_HOME) {

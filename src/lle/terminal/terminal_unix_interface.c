@@ -1233,53 +1233,126 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             ssize_t read2 = read(interface->terminal_fd, &second_byte, 1);
 
             if (read2 == 1 && second_byte == '[') {
-                /// CSI sequence - read the final byte
-                unsigned char final_byte;
-                ssize_t read3 = read(interface->terminal_fd, &final_byte, 1);
-
-                if (read3 == 1) {
-                    /// Detect common arrow key sequences: ESC [ A/B/C/D
-                    event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
-                    event->timestamp = lle_get_current_time_microseconds();
-                    event->data.special_key.modifiers = 0;
-
-                    switch (final_byte) {
-                    case 'A':
-                        event->data.special_key.key = LLE_KEY_UP;
-                        return LLE_SUCCESS;
-                    case 'B':
-                        event->data.special_key.key = LLE_KEY_DOWN;
-                        return LLE_SUCCESS;
-                    case 'C':
-                        event->data.special_key.key = LLE_KEY_RIGHT;
-                        return LLE_SUCCESS;
-                    case 'D':
-                        event->data.special_key.key = LLE_KEY_LEFT;
-                        return LLE_SUCCESS;
-                    case 'H':
-                        event->data.special_key.key = LLE_KEY_HOME;
-                        return LLE_SUCCESS;
-                    case 'F':
-                        event->data.special_key.key = LLE_KEY_END;
-                        return LLE_SUCCESS;
-                    case '3':
-                        /// Delete key: ESC [ 3 ~ - need to read the ~
-                        {
-                            unsigned char tilde;
-                            ssize_t read4 =
-                                read(interface->terminal_fd, &tilde, 1);
-                            if (read4 == 1 && tilde == '~') {
-                                event->data.special_key.key = LLE_KEY_DELETE;
-                                return LLE_SUCCESS;
-                            }
-                        }
-                        break;
-                    default:
-                        /// Unknown CSI sequence - fall through to return as
-                        /// character
+                /// CSI sequence: ESC [ <params> <final>. Read parameter and
+                /// intermediate bytes until the final byte (0x40-0x7E), so the
+                /// ENTIRE sequence is consumed. The previous reader read only
+                /// one byte after `[` and handled A/B/C/D/H/F plus a special
+                /// 3~ for Delete; every other form (PageUp ESC[5~, PageDown
+                /// ESC[6~, Insert ESC[2~, numeric Home/End ESC[1~/ESC[4~, and
+                /// all modified forms like Shift+PageUp ESC[5;2~) hit the
+                /// default case, leaving the trailing `~` / `;2~` unread to
+                /// leak into the line as literal text.
+                char csi_params[16];
+                size_t csi_len = 0;
+                unsigned char final_byte = 0;
+                bool have_final = false;
+                while (csi_len < sizeof(csi_params) - 1) {
+                    unsigned char b;
+                    if (read(interface->terminal_fd, &b, 1) != 1) {
+                        break; /// incomplete sequence; nothing leaks
+                    }
+                    if (b >= 0x40 && b <= 0x7E) {
+                        final_byte = b;
+                        have_final = true;
                         break;
                     }
+                    csi_params[csi_len++] = (char)b;
                 }
+                csi_params[csi_len] = '\0';
+
+                event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
+                event->timestamp = lle_get_current_time_microseconds();
+                event->data.special_key.key = LLE_KEY_UNKNOWN;
+                event->data.special_key.modifiers = 0;
+
+                if (have_final) {
+                    /// Parse a leading numeric parameter and an optional
+                    /// ;modifier. xterm encodes the modifier as 1 + a bitmask
+                    /// (Shift=1, Alt=2, Ctrl=4): 2=Shift, 3=Alt, 5=Ctrl, ...
+                    int num = 0;
+                    int mod_param = 0;
+                    const char *p = csi_params;
+                    while (*p >= '0' && *p <= '9') {
+                        num = num * 10 + (*p - '0');
+                        p++;
+                    }
+                    if (*p == ';') {
+                        p++;
+                        while (*p >= '0' && *p <= '9') {
+                            mod_param = mod_param * 10 + (*p - '0');
+                            p++;
+                        }
+                    }
+                    if (mod_param > 1) {
+                        int bits = mod_param - 1;
+                        if (bits & 1) {
+                            event->data.special_key.modifiers |= LLE_MOD_SHIFT;
+                        }
+                        if (bits & 2) {
+                            event->data.special_key.modifiers |= LLE_MOD_ALT;
+                        }
+                        if (bits & 4) {
+                            event->data.special_key.modifiers |= LLE_MOD_CTRL;
+                        }
+                    }
+
+                    if (final_byte == '~') {
+                        /// Tilde-form keys are keyed by the numeric parameter.
+                        switch (num) {
+                        case 1:
+                        case 7:
+                            event->data.special_key.key = LLE_KEY_HOME;
+                            break;
+                        case 2:
+                            event->data.special_key.key = LLE_KEY_INSERT;
+                            break;
+                        case 3:
+                            event->data.special_key.key = LLE_KEY_DELETE;
+                            break;
+                        case 4:
+                        case 8:
+                            event->data.special_key.key = LLE_KEY_END;
+                            break;
+                        case 5:
+                            event->data.special_key.key = LLE_KEY_PAGE_UP;
+                            break;
+                        case 6:
+                            event->data.special_key.key = LLE_KEY_PAGE_DOWN;
+                            break;
+                        default:
+                            break;
+                        }
+                    } else {
+                        /// Letter-final keys (optionally ESC[1;<mod> prefixed).
+                        switch (final_byte) {
+                        case 'A':
+                            event->data.special_key.key = LLE_KEY_UP;
+                            break;
+                        case 'B':
+                            event->data.special_key.key = LLE_KEY_DOWN;
+                            break;
+                        case 'C':
+                            event->data.special_key.key = LLE_KEY_RIGHT;
+                            break;
+                        case 'D':
+                            event->data.special_key.key = LLE_KEY_LEFT;
+                            break;
+                        case 'H':
+                            event->data.special_key.key = LLE_KEY_HOME;
+                            break;
+                        case 'F':
+                            event->data.special_key.key = LLE_KEY_END;
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                }
+
+                /// Recognized or not, the whole CSI sequence has been drained.
+                /// A mapped key dispatches; an unmapped one is a no-op special
+                /// key (never inserted as text), so nothing leaks.
+                return LLE_SUCCESS;
             } else if (read2 == 1 && second_byte == 'O') {
                 /// SS3 sequence - alternate function keys
                 unsigned char final_byte;
