@@ -734,19 +734,11 @@ static void shell_sync_to_runtime(void) {
 
     if (config_registry_get_string("shell.mode", sval, sizeof(sval)) ==
         CREG_SUCCESS) {
-        /// Map mode string to enum - use Unicode comparison
-        if (lle_unicode_strings_equal(sval, "posix",
-                                      &LLE_UNICODE_COMPARE_DEFAULT)) {
-            config.shell_mode = SHELL_MODE_POSIX;
-        } else if (lle_unicode_strings_equal(sval, "bash",
-                                             &LLE_UNICODE_COMPARE_DEFAULT)) {
-            config.shell_mode = SHELL_MODE_BASH;
-        } else if (lle_unicode_strings_equal(sval, "zsh",
-                                             &LLE_UNICODE_COMPARE_DEFAULT)) {
-            config.shell_mode = SHELL_MODE_ZSH;
-        } else {
-            config.shell_mode = SHELL_MODE_LUSH;
-        }
+        /// Map mode string to enum via the canonical parser. Unknown
+        /// names fall back to lush, preserving the prior behavior.
+        shell_mode_t parsed;
+        config.shell_mode =
+            shell_mode_parse(sval, &parsed) ? parsed : SHELL_MODE_LUSH;
     }
 
     /// POSIX options - sync to shell_opts via config_set_shell_option
@@ -766,23 +758,9 @@ static void shell_sync_to_runtime(void) {
 
 /// @brief Sync shell options from runtime to registry
 static void shell_sync_from_runtime(void) {
-    /// Map mode enum to string
-    const char *mode_str = "lush";
-    switch (config.shell_mode) {
-    case SHELL_MODE_POSIX:
-        mode_str = "posix";
-        break;
-    case SHELL_MODE_BASH:
-        mode_str = "bash";
-        break;
-    case SHELL_MODE_ZSH:
-        mode_str = "zsh";
-        break;
-    case SHELL_MODE_LUSH:
-        mode_str = "lush";
-        break;
-    }
-    config_registry_set_string("shell.mode", mode_str);
+    /// Map mode enum to its canonical string via shell_mode_name.
+    const char *mode_str = shell_mode_name(config.shell_mode);
+    config_registry_set_string("shell.mode", mode_str ? mode_str : "lush");
 
     /// POSIX options - read from shell_opts via config_get_shell_option
     config_registry_set_boolean("shell.errexit",
@@ -3401,9 +3379,11 @@ bool config_validate_lle_dedup_strategy(const char *value) {
  * @return True if value is a valid shell mode
  */
 bool config_validate_shell_mode(const char *value) {
-    return (strcmp(value, "posix") == 0 || strcmp(value, "bash") == 0 ||
-            strcmp(value, "zsh") == 0 || strcmp(value, "lush") == 0 ||
-            strcmp(value, "sh") == 0); /// sh is alias for posix
+    /// Delegate to the canonical parser: it knows every mode name and
+    /// the "sh"-as-POSIX alias, so this stays correct as new modes are
+    /// added without touching the registry validator.
+    shell_mode_t scratch;
+    return shell_mode_parse(value, &scratch);
 }
 
 /* config_error(), config_warning(), and config_get_last_error() removed
@@ -3869,16 +3849,10 @@ void config_set_value(const char *key, const char *value) {
             /// Handle shell.mode specially - it's an enum that also updates
             /// shell_mode system
             if (strcmp(key, "shell.mode") == 0) {
+                /// Parse via the canonical helper (handles every mode
+                /// name and the "sh"-as-POSIX alias in one place).
                 shell_mode_t new_mode;
-                if (strcmp(value, "posix") == 0 || strcmp(value, "sh") == 0) {
-                    new_mode = SHELL_MODE_POSIX;
-                } else if (strcmp(value, "bash") == 0) {
-                    new_mode = SHELL_MODE_BASH;
-                } else if (strcmp(value, "zsh") == 0) {
-                    new_mode = SHELL_MODE_ZSH;
-                } else if (strcmp(value, "lush") == 0) {
-                    new_mode = SHELL_MODE_LUSH;
-                } else {
+                if (!shell_mode_parse(value, &new_mode)) {
                     printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n",
                            value);
                     return;
