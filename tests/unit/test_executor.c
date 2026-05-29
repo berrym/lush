@@ -1745,6 +1745,53 @@ TEST(loop_continue) {
     executor_free(exec);
 }
 
+TEST(loop_break_outside_loop_errors) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(exec, "break");
+    ASSERT_EXIT_STATUS(r, 1);
+    executor_free(exec);
+}
+
+TEST(loop_continue_outside_loop_errors) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(exec, "continue");
+    ASSERT_EXIT_STATUS(r, 1);
+    executor_free(exec);
+}
+
+TEST(loop_break_non_numeric_level_errors) {
+    /// `break abc` inside a loop is a numeric-argument error.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "RC=0; for i in 1; do break abc || RC=$?; done; echo done; exit $RC");
+    ASSERT_EXIT_STATUS(r, 1);
+    executor_free(exec);
+}
+
+TEST(loop_break_level_exceeds_depth_errors) {
+    /// `break 5` with only 1 loop nested is an over-deep-level error.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "RC=0; for i in 1; do break 5 || RC=$?; done; echo done; exit $RC");
+    ASSERT_EXIT_STATUS(r, 1);
+    executor_free(exec);
+}
+
+TEST(loop_continue_non_numeric_level_errors) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "RC=0; for i in 1; do continue abc || RC=$?; done; exit $RC");
+    ASSERT_EXIT_STATUS(r, 1);
+    executor_free(exec);
+}
+
 /* ============================================================================
  * PIPELINE TESTS
  * ============================================================================
@@ -4375,6 +4422,11 @@ int main(void) {
     printf("\nBreak/continue tests:\n");
     RUN_TEST(loop_break);
     RUN_TEST(loop_continue);
+    RUN_TEST(loop_break_outside_loop_errors);
+    RUN_TEST(loop_continue_outside_loop_errors);
+    RUN_TEST(loop_break_non_numeric_level_errors);
+    RUN_TEST(loop_break_level_exceeds_depth_errors);
+    RUN_TEST(loop_continue_non_numeric_level_errors);
 
     printf("\nPipeline tests:\n");
     RUN_TEST(pipeline_simple);

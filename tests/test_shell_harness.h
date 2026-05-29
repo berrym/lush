@@ -42,6 +42,7 @@
 #define LUSH_TEST_SHELL_HARNESS_H
 
 #include "executor.h"
+#include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
 #include "parser.h"
@@ -93,6 +94,15 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
                                                    const char *src) {
     run_result_t r = {0};
 
+    /// Save+restore the REPL-level globals around the test so a script
+    /// that calls `exit` (which sets exit_flag=true) does NOT cause
+    /// every subsequent test in the same binary to short-circuit at the
+    /// executor's `if (exit_flag)` checks. last_exit_status is also
+    /// global ($? state) and is restored for the same reason. See
+    /// gh issue #171 for the discovery trace.
+    bool saved_exit_flag = exit_flag;
+    int saved_last_exit_status = last_exit_status;
+
     FILE *out_tmp = tmpfile();
     FILE *err_tmp = tmpfile();
     if (!out_tmp || !err_tmp) {
@@ -134,6 +144,11 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
 
     fclose(out_tmp);
     fclose(err_tmp);
+
+    /// Restore the REPL-level globals so a test's `exit` does not bleed
+    /// into the next test (see save above + gh #171).
+    exit_flag = saved_exit_flag;
+    last_exit_status = saved_last_exit_status;
 
     return r;
 }
