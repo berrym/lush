@@ -545,6 +545,134 @@ TEST(mixed_event_types) {
 }
 
 /* ============================================================================
+ * CSI navigation-key tests (PageUp/PageDown/Insert/Home/End + modifiers)
+ *
+ * Regression coverage for the CSI reader: the previous one-byte-after-ESC[
+ * reader handled only A/B/C/D/H/F and a special 3~ for Delete, leaving the
+ * trailing bytes of every other sequence (PageUp ESC[5~, Shift+PageUp
+ * ESC[5;2~, ...) unread to leak into the line as literal text.
+ * ============================================================================
+ */
+
+/// Feed `data` through the unix interface via a pipe and read up to
+/// `n_events` events. Returns the count of SUCCESS events read.
+static int feed_and_read_events(const void *data, size_t len,
+                                lle_input_event_t *events, int n_events) {
+    int pipe_fd = create_pipe_with_data(data, len, NULL);
+    if (pipe_fd < 0) {
+        return -1;
+    }
+    lle_unix_interface_t *interface = NULL;
+    if (lle_unix_interface_init(&interface) != LLE_SUCCESS) {
+        close(pipe_fd);
+        return -1;
+    }
+    int saved_stdin = dup(STDIN_FILENO);
+    dup2(pipe_fd, STDIN_FILENO);
+    interface->terminal_fd = STDIN_FILENO;
+
+    int got = 0;
+    for (int i = 0; i < n_events; i++) {
+        if (lle_unix_interface_read_event(interface, &events[i], 1000) !=
+            LLE_SUCCESS) {
+            break;
+        }
+        got++;
+    }
+
+    dup2(saved_stdin, STDIN_FILENO);
+    close(saved_stdin);
+    close(pipe_fd);
+    lle_unix_interface_destroy(interface);
+    return got;
+}
+
+TEST(csi_pageup) {
+    unsigned char d[] = {0x1B, '[', '5', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.type == LLE_INPUT_TYPE_SPECIAL_KEY);
+    ASSERT(ev.data.special_key.key == LLE_KEY_PAGE_UP);
+    ASSERT(ev.data.special_key.modifiers == 0);
+}
+
+TEST(csi_pagedown) {
+    unsigned char d[] = {0x1B, '[', '6', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_PAGE_DOWN);
+}
+
+TEST(csi_insert) {
+    unsigned char d[] = {0x1B, '[', '2', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_INSERT);
+}
+
+TEST(csi_home_numeric) {
+    unsigned char d[] = {0x1B, '[', '1', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_HOME);
+}
+
+TEST(csi_end_numeric) {
+    unsigned char d[] = {0x1B, '[', '4', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_END);
+}
+
+TEST(csi_shift_pageup_modifier) {
+    unsigned char d[] = {0x1B, '[', '5', ';', '2', '~'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_PAGE_UP);
+    ASSERT((ev.data.special_key.modifiers & LLE_MOD_SHIFT) != 0);
+}
+
+TEST(csi_shift_home_letter_modifier) {
+    unsigned char d[] = {0x1B, '[', '1', ';', '2', 'H'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_HOME);
+    ASSERT((ev.data.special_key.modifiers & LLE_MOD_SHIFT) != 0);
+}
+
+TEST(csi_ctrl_right_modifier) {
+    unsigned char d[] = {0x1B, '[', '1', ';', '5', 'C'};
+    lle_input_event_t ev;
+    ASSERT(feed_and_read_events(d, sizeof(d), &ev, 1) == 1);
+    ASSERT(ev.data.special_key.key == LLE_KEY_RIGHT);
+    ASSERT((ev.data.special_key.modifiers & LLE_MOD_CTRL) != 0);
+}
+
+TEST(csi_pageup_no_trailing_leak) {
+    /// The whole ESC[5~ must be consumed: the byte after it ('X') is the
+    /// next event, not a leaked '~'. This is the core regression guard.
+    unsigned char d[] = {0x1B, '[', '5', '~', 'X'};
+    lle_input_event_t ev[2];
+    ASSERT(feed_and_read_events(d, sizeof(d), ev, 2) == 2);
+    ASSERT(ev[0].type == LLE_INPUT_TYPE_SPECIAL_KEY);
+    ASSERT(ev[0].data.special_key.key == LLE_KEY_PAGE_UP);
+    ASSERT(ev[1].type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(ev[1].data.character.codepoint == 'X');
+}
+
+TEST(csi_shift_pageup_no_trailing_leak) {
+    /// Shift+PageUp ESC[5;2~ then 'Y': the ';2~' tail must be fully
+    /// consumed, so 'Y' is the next event rather than leaked ';2~' text.
+    unsigned char d[] = {0x1B, '[', '5', ';', '2', '~', 'Y'};
+    lle_input_event_t ev[2];
+    ASSERT(feed_and_read_events(d, sizeof(d), ev, 2) == 2);
+    ASSERT(ev[0].data.special_key.key == LLE_KEY_PAGE_UP);
+    ASSERT((ev[0].data.special_key.modifiers & LLE_MOD_SHIFT) != 0);
+    ASSERT(ev[1].type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(ev[1].data.character.codepoint == 'Y');
+}
+
+/* ============================================================================
  * TEST RUNNER
  * ============================================================================
  */
@@ -580,6 +708,18 @@ int main(void) {
     printf("\nIntegration Tests:\n");
     RUN_TEST(multiple_events_sequence);
     RUN_TEST(mixed_event_types);
+
+    printf("\nCSI Navigation Key Tests:\n");
+    RUN_TEST(csi_pageup);
+    RUN_TEST(csi_pagedown);
+    RUN_TEST(csi_insert);
+    RUN_TEST(csi_home_numeric);
+    RUN_TEST(csi_end_numeric);
+    RUN_TEST(csi_shift_pageup_modifier);
+    RUN_TEST(csi_shift_home_letter_modifier);
+    RUN_TEST(csi_ctrl_right_modifier);
+    RUN_TEST(csi_pageup_no_trailing_leak);
+    RUN_TEST(csi_shift_pageup_no_trailing_leak);
 
     return TEST_RESULT();
 }
