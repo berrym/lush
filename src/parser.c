@@ -1701,20 +1701,10 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
             break;
         }
 
-        /// Check for redirection tokens
-        if (arg_token->type == TOK_REDIRECT_OUT ||
-            arg_token->type == TOK_REDIRECT_IN ||
-            arg_token->type == TOK_APPEND || arg_token->type == TOK_HEREDOC ||
-            arg_token->type == TOK_HEREDOC_STRIP ||
-            arg_token->type == TOK_HERESTRING ||
-            arg_token->type == TOK_REDIRECT_ERR ||
-            arg_token->type == TOK_REDIRECT_IN_FD ||
-            arg_token->type == TOK_REDIRECT_BOTH ||
-            arg_token->type == TOK_APPEND_ERR ||
-            arg_token->type == TOK_REDIRECT_FD ||
-            arg_token->type == TOK_REDIRECT_FD_ALLOC ||
-            arg_token->type == TOK_REDIRECT_CLOBBER ||
-            arg_token->type == TOK_APPEND_BOTH) {
+        /// Check for redirection tokens via the canonical predicate so a
+        /// new redirection token type added to is_redirection_token is
+        /// picked up here automatically.
+        if (is_redirection_token(arg_token->type)) {
 
             node_t *redir_node = parse_redirection(parser);
             if (!redir_node) {
@@ -2168,13 +2158,9 @@ static node_t *finish_assignment_or_prefix(parser_t *parser,
         }
 
         /// Redirection in the prefix (e.g. `x=1 2>/dev/null cmd`).
-        if (t->type == TOK_REDIRECT_OUT || t->type == TOK_REDIRECT_IN ||
-            t->type == TOK_APPEND || t->type == TOK_HEREDOC ||
-            t->type == TOK_HEREDOC_STRIP || t->type == TOK_HERESTRING ||
-            t->type == TOK_REDIRECT_ERR || t->type == TOK_REDIRECT_IN_FD ||
-            t->type == TOK_REDIRECT_BOTH || t->type == TOK_APPEND_ERR ||
-            t->type == TOK_REDIRECT_FD || t->type == TOK_REDIRECT_FD_ALLOC ||
-            t->type == TOK_REDIRECT_CLOBBER || t->type == TOK_APPEND_BOTH) {
+        /// Use the canonical predicate so a new redirection token type
+        /// is recognized here automatically.
+        if (is_redirection_token(t->type)) {
             node_t *redir = parse_redirection(parser);
             if (!redir) {
                 free_node_tree(cmd);
