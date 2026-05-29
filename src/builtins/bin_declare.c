@@ -519,8 +519,28 @@ int bin_declare(int argc, char **argv) {
             /// Without this, `declare -i n=5; n=n+10` would only
             /// apply arithmetic to the initial 5; the n=n+10 line
             /// would store the literal string "n+10".
-            symvar_flags_t flags = symtable_get_flags(manager, name);
-            symtable_set_flags(manager, name, flags | SYMVAR_INTEGER_ATTR);
+            ///
+            /// Also carry the other attribute flags requested alongside
+            /// -i: this dedicated integer branch otherwise skipped them,
+            /// so `declare -ix n` set integer but left SYMVAR_EXPORTED
+            /// unset and ${n@a} reported "i" instead of "ix" (the actual
+            /// export still happened via the unconditional setenv below).
+            /// Issue #123.
+            symvar_flags_t flags =
+                symtable_get_flags(manager, name) | SYMVAR_INTEGER_ATTR;
+            if (opt_export) {
+                flags |= SYMVAR_EXPORTED;
+            }
+            if (opt_readonly) {
+                flags |= SYMVAR_READONLY;
+            }
+            if (opt_lowercase) {
+                flags |= SYMVAR_LOWERCASE;
+            }
+            if (opt_uppercase) {
+                flags |= SYMVAR_UPPERCASE;
+            }
+            symtable_set_flags(manager, name, flags);
         }
         /// Handle nameref declaration (-n)
         else if (opt_nameref) {
