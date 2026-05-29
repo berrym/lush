@@ -327,6 +327,136 @@ int is_valid_identifier(const char *name) {
 }
 
 /* ============================================================================
+ * Shared loop-control implementation
+ *
+ * `break` and `continue` are 95% identical -- same out-of-loop guard,
+ * same numeric-argument parse, same nesting-depth check, same structured-
+ * error machinery, differing only in the verb in the error messages /
+ * suggestions and the loop_control value they set. bin_break and
+ * bin_continue both reduce to one call into this helper.
+ * ============================================================================
+ */
+
+int builtin_loop_control(int argc, char **argv, const char *verb,
+                         loop_control_t ctl) {
+    if (!current_executor || current_executor->loop_depth <= 0) {
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR,
+                               loc, "not currently in a loop");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            char suggestion[96];
+            snprintf(suggestion, sizeof(suggestion),
+                     "%s is only valid inside while/until/for loops", verb);
+            shell_error_set_suggestion(err, suggestion);
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: %s: not currently in a loop\n", verb);
+        }
+        return 1;
+    }
+
+    int level = 1;
+    if (argc > 1) {
+        char *endptr;
+        level = (int)strtol(argv[1], &endptr, 10);
+
+        if (*endptr != '\0' || level <= 0) {
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%s: numeric argument required", argv[1]);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line, loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(err,
+                                           "level must be a positive integer");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr, "lush: %s: %s: numeric argument required\n",
+                        verb, argv[1]);
+            }
+            return 1;
+        }
+
+        if (level > current_executor->loop_depth) {
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%d: cannot %s %d levels (only %d nested)", level, verb, level,
+                current_executor->loop_depth);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line, loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "level cannot exceed the current loop nesting depth");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: %s: %d: cannot %s %d levels (only %d nested)\n",
+                        verb, level, verb, level, current_executor->loop_depth);
+            }
+            return 1;
+        }
+    }
+
+    current_executor->loop_control = ctl;
+    return 0;
+}
+
+/* ============================================================================
  * Command Hash Table
  *
  * Owned here so it survives across all bin_<name>.c translation units.
