@@ -3197,6 +3197,18 @@ TEST(rt_pe_at_attr_query_scalar_unaffected) {
     ASSERT_STDOUT_EQ(r, "[i][r]\n");
 }
 
+TEST(rt_declare_combined_flags_attributes) {
+    /// declare with combined attribute flags including -i must record
+    /// every attribute, not just integer: ${var@a} reflects all of them
+    /// (issue #123). The integer branch previously dropped export and the
+    /// other attributes.
+    run_result_t r = run_shell("declare -ix ex=3\n"
+                               "declare -xi xe=4\n"
+                               "declare -ir ir=5\n"
+                               "echo \"[${ex@a}][${xe@a}][${ir@a}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[ix][ix][ir]\n");
+}
+
 TEST(rt_pe_at_value_transform_on_map_still_errors) {
     /// Only @a bypasses the guard; a value-shaped @ transform on a bare
     /// collection remains a type error (needs [@] to vectorize).
@@ -4314,6 +4326,7 @@ int main(void) {
     RUN_TEST(rt_pe_at_attr_query_on_map);
     RUN_TEST(rt_pe_at_attr_query_on_list);
     RUN_TEST(rt_pe_at_attr_query_scalar_unaffected);
+    RUN_TEST(rt_declare_combined_flags_attributes);
     RUN_TEST(rt_pe_at_value_transform_on_map_still_errors);
     RUN_TEST(rt_pe_catalog_conditional_on_map);
     RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
