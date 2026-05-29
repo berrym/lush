@@ -555,6 +555,34 @@ TEST(case_posix_character_class) {
     executor_free(exec);
 }
 
+TEST(rt_case_extglob_alternation) {
+    /// Extended-glob @(a|b) in a case pattern: the inner `|` is part of
+    /// the extglob group, not a case-alternative separator, and the
+    /// canonical matcher (lush_pattern_match) matches it. The duplicate
+    /// hand-rolled matcher that lacked extglob was retired here (#148).
+    /// zsh mode has extglob on at parse time; the bash-mode parse-time
+    /// `shopt -s extglob` enablement is a separate, deeper issue.
+    run_result_t r = run_shell("mode zsh\n"
+                               "for w in cat dog bird; do\n"
+                               "  case \"$w\" in\n"
+                               "    @(cat|dog)) echo \"pet:$w\" ;;\n"
+                               "    +([a-z])) echo \"word:$w\" ;;\n"
+                               "  esac\n"
+                               "done\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "pet:cat\npet:dog\nword:bird\n");
+}
+
+TEST(rt_case_plain_alternation_unregressed) {
+    /// The paren/bracket-aware separator must still split ordinary
+    /// top-level `|` alternation, including an empty alternative.
+    run_result_t r =
+        run_shell("case b in a|b|c) echo abc;; *) echo no;; esac\n"
+                  "x=''\n"
+                  "case \"$x\" in ''|z) echo empty-or-z;; *) echo no;; esac\n");
+    ASSERT_STDOUT_EQ(r, "abc\nempty-or-z\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4246,6 +4274,8 @@ int main(void) {
     RUN_TEST(case_statement);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
+    RUN_TEST(rt_case_extglob_alternation);
+    RUN_TEST(rt_case_plain_alternation_unregressed);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);

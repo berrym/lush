@@ -17,6 +17,8 @@
 
 #include "pattern_match.h"
 
+#include "lle/unicode_case.h"
+#include "lle/unicode_class.h"
 #include "lle/utf8_support.h"
 
 #include <ctype.h>
@@ -205,6 +207,48 @@ static int match_char_class(const char *s, const char *p, const char **end,
     bool first = true;
     while (*p && (first || *p != ']')) {
         first = false;
+
+        /// POSIX / Unicode character class [:CLASS:] inside the bracket.
+        /// Matched against the same decoded input codepoint, via the
+        /// project's Unicode general-category predicates.
+        if (p[0] == '[' && p[1] == ':') {
+            const char *class_start = p + 2;
+            const char *class_end = strstr(class_start, ":]");
+            if (class_end) {
+                size_t cl = (size_t)(class_end - class_start);
+                bool cls = false;
+                if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
+                    cls = lle_unicode_is_space(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "alpha", 5) == 0) {
+                    cls = lle_unicode_is_alpha(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "digit", 5) == 0) {
+                    cls = lle_unicode_is_digit(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "alnum", 5) == 0) {
+                    cls = lle_unicode_is_alnum(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "upper", 5) == 0) {
+                    cls = lle_unicode_is_upper(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "lower", 5) == 0) {
+                    cls = lle_unicode_is_lower(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "punct", 5) == 0) {
+                    cls = lle_unicode_is_punct(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "print", 5) == 0) {
+                    cls = lle_unicode_is_print(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "graph", 5) == 0) {
+                    cls = lle_unicode_is_graph(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "blank", 5) == 0) {
+                    cls = lle_unicode_is_blank(input_cp);
+                } else if (cl == 5 && memcmp(class_start, "cntrl", 5) == 0) {
+                    cls = lle_unicode_is_cntrl(input_cp);
+                } else if (cl == 6 && memcmp(class_start, "xdigit", 6) == 0) {
+                    cls = lle_unicode_is_xdigit(input_cp);
+                }
+                if (cls) {
+                    matched = true;
+                }
+                p = class_end + 2; /// past `:]`
+                continue;
+            }
+        }
 
         /// Decode the low codepoint (may be `\`-escaped).
         uint32_t lo;
