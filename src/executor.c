@@ -12520,6 +12520,19 @@ static char *parse_parameter_expansion(executor_t *executor,
                 char *new_result = NULL;
 
                 switch (*p) {
+                case 'P':
+                    /// Indirect: treat the current value as the NAME of a
+                    /// parameter and expand that parameter. ${(P)ref} yields
+                    /// the value of the variable named by $ref, comparable to
+                    /// bash ${!ref}.
+                    new_result = symtable_get_var(executor->symtable, result);
+                    if (result != inner_result) {
+                        free(result);
+                    }
+                    result = new_result ? new_result : strdup("");
+                    p++;
+                    break;
+
                 case 'U':
                     /// Uppercase all
                     new_result = convert_case_all_upper(result);

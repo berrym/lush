@@ -1964,6 +1964,17 @@ TEST(rt_zsh_modifier_numeric_arg_still_substring) {
     ASSERT_STDOUT_EQ(r, "cdef|bcd\n");
 }
 
+TEST(rt_zsh_param_indirect_P) {
+    /// ${(P)ref} expands the variable NAMED by $ref (indirect), and
+    /// composes with other flags, e.g. ${(PU)ref}. Issue #142.
+    run_result_t r = run_shell("mode zsh\n"
+                               "target=hello\n"
+                               "ref=target\n"
+                               "echo \"${(P)ref}|${(PU)ref}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "hello|HELLO\n");
+}
+
 TEST(param_pattern_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4332,6 +4343,7 @@ int main(void) {
     RUN_TEST(rt_zsh_modifier_chain_and_nest);
     RUN_TEST(rt_zsh_modifier_off_in_bash_is_substring);
     RUN_TEST(rt_zsh_modifier_numeric_arg_still_substring);
+    RUN_TEST(rt_zsh_param_indirect_P);
     RUN_TEST(param_pattern_substitution);
     RUN_TEST(param_global_substitution);
 
