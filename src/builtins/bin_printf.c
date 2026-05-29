@@ -7,10 +7,15 @@
  */
 
 #include "builtins.h"
+#include "symtable.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /**
  * @brief Process escape sequences in a string
@@ -101,7 +106,21 @@ char *process_escape_sequences(const char *str) {
  * @return 0 on success, 1 on usage error
  */
 int bin_printf(int argc, char **argv) {
-    if (argc < 2) {
+    /// `printf -v VAR FMT ARGS` assigns the formatted output to VAR
+    /// instead of writing it to stdout.
+    const char *assign_var = NULL;
+    int base = 1;
+    if (argc >= 2 && strcmp(argv[1], "-v") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "lush: printf: -v: option requires a variable "
+                            "name\n");
+            return 1;
+        }
+        assign_var = argv[2];
+        base = 3;
+    }
+
+    if (argc < base + 1) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
             shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
@@ -137,8 +156,30 @@ int bin_printf(int argc, char **argv) {
         return 1;
     }
 
-    const char *format = argv[1];
-    int arg_index = 2;
+    const char *format = argv[base];
+    int arg_index = base + 1;
+
+    /// For `-v`, redirect stdout to a temp file for the duration so the
+    /// existing per-conversion output code is unchanged; the captured
+    /// bytes are read back and assigned after the format loop.
+    int printf_saved_fd = -1;
+    FILE *printf_capture = NULL;
+    if (assign_var) {
+        fflush(stdout);
+        printf_capture = tmpfile();
+        if (printf_capture) {
+            printf_saved_fd = dup(STDOUT_FILENO);
+            if (printf_saved_fd < 0 ||
+                dup2(fileno(printf_capture), STDOUT_FILENO) < 0) {
+                if (printf_saved_fd >= 0) {
+                    close(printf_saved_fd);
+                }
+                fclose(printf_capture);
+                printf_capture = NULL;
+                printf_saved_fd = -1;
+            }
+        }
+    }
 
     /// POSIX: The format string is reused as often as necessary to satisfy
     /// the remaining arguments. If the format string contains no conversion
@@ -400,6 +441,33 @@ int bin_printf(int argc, char **argv) {
         }
 
     } while (arg_index < argc);
+
+    if (assign_var) {
+        fflush(stdout);
+        if (printf_capture) {
+            if (printf_saved_fd >= 0) {
+                dup2(printf_saved_fd, STDOUT_FILENO);
+                close(printf_saved_fd);
+            }
+            long n = ftell(printf_capture);
+            if (n < 0) {
+                n = 0;
+            }
+            rewind(printf_capture);
+            char *buf = malloc((size_t)n + 1);
+            if (buf) {
+                size_t got = fread(buf, 1, (size_t)n, printf_capture);
+                buf[got] = '\0';
+                symtable_set_global(assign_var, buf);
+                free(buf);
+            }
+            fclose(printf_capture);
+        } else {
+            /// Capture setup failed; clear the target rather than leave a
+            /// stale value.
+            symtable_set_global(assign_var, "");
+        }
+    }
 
     return 0;
 }

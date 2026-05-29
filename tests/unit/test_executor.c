@@ -1579,6 +1579,20 @@ TEST(rt_read_non_whitespace_ifs_not_trimmed) {
     ASSERT_STDOUT_EQ(r, "[:a:b:]\n");
 }
 
+TEST(rt_printf_v_assigns_variable) {
+    /// printf -v VAR assigns the formatted output to VAR and prints
+    /// nothing to stdout; the value is visible to a later command (#141).
+    run_result_t r = run_shell("printf -v out '%05d-%s' 42 hello\n"
+                               "echo \"[$out]\"\n");
+    ASSERT_STDOUT_EQ(r, "[00042-hello]\n");
+}
+
+TEST(rt_printf_without_v_still_prints) {
+    /// Regression guard: plain printf (no -v) still writes to stdout.
+    run_result_t r = run_shell("printf '%s-%d\\n' hi 7\n");
+    ASSERT_STDOUT_EQ(r, "hi-7\n");
+}
+
 TEST(builtin_eval) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4295,6 +4309,8 @@ int main(void) {
     RUN_TEST(rt_read_strips_leading_trailing_ifs_whitespace);
     RUN_TEST(rt_read_multi_var_trims_trailing_ws);
     RUN_TEST(rt_read_non_whitespace_ifs_not_trimmed);
+    RUN_TEST(rt_printf_v_assigns_variable);
+    RUN_TEST(rt_printf_without_v_still_prints);
     RUN_TEST(builtin_eval);
     RUN_TEST(builtin_shift);
     RUN_TEST(builtin_set_positional);
