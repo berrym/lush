@@ -145,23 +145,16 @@ int bin_local(int argc, char **argv) {
             strncpy(name, arg, name_len);
             name[name_len] = '\0';
 
-            /// Validate variable name
-            if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
-                executor_error_report(
-                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                    builtin_get_source_location(), "invalid variable name");
+            /// Validate variable name via the canonical, Unicode-aware
+            /// is_valid_identifier (matches the bin_declare/export/readonly
+            /// pattern; honors FEATURE_UNICODE_IDENTIFIERS).
+            if (!is_valid_identifier(name)) {
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid variable name: %s", name);
                 free(name);
                 return 1;
-            }
-
-            for (size_t j = 1; j < name_len; j++) {
-                if (!isalnum(name[j]) && name[j] != '_') {
-                    executor_error_report(
-                        current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                        builtin_get_source_location(), "invalid variable name");
-                    free(name);
-                    return 1;
-                }
             }
 
             char *value = eq + 1;
@@ -258,21 +251,15 @@ int bin_local(int argc, char **argv) {
             free(name);
         } else {
             /// Declaration only: local var
-            /// Validate variable name
-            if (!arg[0] || (!isalpha(arg[0]) && arg[0] != '_')) {
-                executor_error_report(
-                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                    builtin_get_source_location(), "invalid variable name");
+            /// Validate variable name via the canonical, Unicode-aware
+            /// is_valid_identifier (matches the bin_declare/export/readonly
+            /// pattern; honors FEATURE_UNICODE_IDENTIFIERS).
+            if (!is_valid_identifier(arg)) {
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid variable name: %s", arg);
                 return 1;
-            }
-
-            for (size_t j = 1; arg[j]; j++) {
-                if (!isalnum(arg[j]) && arg[j] != '_') {
-                    executor_error_report(
-                        current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                        builtin_get_source_location(), "invalid variable name");
-                    return 1;
-                }
             }
 
             if (opt_nameref) {
