@@ -6823,144 +6823,6 @@ static bool has_zsh_extglob_pattern(const char *pattern) {
 }
 
 /**
- * @brief Convert zsh extglob pattern to POSIX extended regex
- *
- * Converts zsh extended glob syntax to regex:
- *   X#   -> X* (zero or more)
- *   X##  -> X+ (one or more)
- *   (a|b) -> (a|b) (alternation)
- *   [...]# -> [...]* (char class zero or more)
- *   *    -> .* (any chars)
- *   ?    -> . (any single char)
- *   .    -> \. (literal dot)
- *
- * @param pattern Zsh extglob pattern (without leading ^ if negation)
- * @return Regex pattern (caller must free), or NULL on error
- */
-static char *zsh_extglob_to_regex(const char *pattern) {
-    if (!pattern)
-        return NULL;
-
-    /// Allocate generous buffer
-    size_t max_len = strlen(pattern) * 4 + 10;
-    char *regex = malloc(max_len);
-    if (!regex)
-        return NULL;
-
-    char *out = regex;
-    *out++ = '^'; /// Anchor at start
-
-    const char *p = pattern;
-    while (*p) {
-        if (*p == '[') {
-            /// Character class - copy until ]
-            *out++ = *p++;
-            /// Handle negation [^ or [!
-            if (*p == '^' || *p == '!') {
-                *out++ = '^';
-                p++;
-            }
-            /// Handle ] as first char (literal)
-            if (*p == ']') {
-                *out++ = *p++;
-            }
-            while (*p && *p != ']') {
-                *out++ = *p++;
-            }
-            if (*p == ']') {
-                *out++ = *p++;
-            }
-            /// Check for # or ## after char class
-            if (*p == '#') {
-                if (*(p + 1) == '#') {
-                    *out++ = '+'; /// ## = one or more
-                    p += 2;
-                } else {
-                    *out++ = '*'; /// # = zero or more
-                    p++;
-                }
-            }
-        } else if (*p == '(') {
-            /// Alternation group - copy as-is, handling nested parens
-            *out++ = *p++;
-            int depth = 1;
-            while (*p && depth > 0) {
-                if (*p == '(') {
-                    depth++;
-                    *out++ = *p++;
-                } else if (*p == ')') {
-                    depth--;
-                    *out++ = *p++;
-                } else if (*p == '*') {
-                    /// Glob * inside alternation
-                    *out++ = '.';
-                    *out++ = '*';
-                    p++;
-                } else if (*p == '?') {
-                    *out++ = '.';
-                    p++;
-                } else if (*p == '.') {
-                    *out++ = '\\';
-                    *out++ = '.';
-                    p++;
-                } else {
-                    *out++ = *p++;
-                }
-            }
-        } else if (*p == '*') {
-            /// Glob * -> regex .*
-            *out++ = '.';
-            *out++ = '*';
-            p++;
-        } else if (*p == '?') {
-            /// Glob ? -> regex .
-            *out++ = '.';
-            p++;
-        } else if (*p == '.') {
-            /// Escape literal dot
-            *out++ = '\\';
-            *out++ = '.';
-            p++;
-        } else if (*p == '#') {
-            /// Standalone # - should not happen if preceded by nothing
-            /// Skip it (treat as literal)
-            *out++ = '#';
-            p++;
-        } else {
-            /// Regular character
-            char c = *p++;
-            /// Check for # or ## quantifier after this char
-            if (*p == '#') {
-                /// Need to wrap single char in group for regex
-                /// But first, escape regex metacharacters
-                if (strchr("^$+{}\\|()", c)) {
-                    *out++ = '\\';
-                }
-                *out++ = c;
-                if (*(p + 1) == '#') {
-                    *out++ = '+'; /// ## = one or more
-                    p += 2;
-                } else {
-                    *out++ = '*'; /// # = zero or more
-                    p++;
-                }
-            } else {
-                /// No quantifier - regular char, might need escaping
-                if (strchr("^$+{}\\|", c)) {
-                    *out++ = '\\';
-                }
-                *out++ = c;
-            }
-        }
-    }
-
-    *out++ = '$'; /// Anchor at end
-    *out = '\0';
-
-    return regex;
-}
-
-/**
  * @brief Reject regex patterns that exceed behavior.regex_pattern_max length.
  *
  * Platform regcomp implementations (TRE on macOS, glibc regex on Linux)
@@ -6986,38 +6848,6 @@ static bool regex_pattern_is_safe(const char *pattern) {
         return true; /// explicitly unbounded
     }
     return strlen(pattern) <= (size_t)config.regex_pattern_max;
-}
-
-/// @brief Match filename against zsh extglob pattern
-static bool match_zsh_extglob(const char *filename, const char *pattern,
-                              bool is_negated) {
-    if (!regex_pattern_is_safe(pattern)) {
-        return false;
-    }
-    char *regex_pattern = zsh_extglob_to_regex(pattern);
-    if (!regex_pattern) {
-        return false;
-    }
-
-    regex_t regex;
-    int ret = regcomp(&regex, regex_pattern, REG_EXTENDED | REG_NOSUB);
-    free(regex_pattern);
-
-    if (ret != 0) {
-        return false;
-    }
-
-    ret = regexec(&regex, filename, 0, NULL, 0);
-    regfree(&regex);
-
-    bool matches = (ret == 0);
-
-    /// For ^pattern, invert the result
-    if (is_negated) {
-        matches = !matches;
-    }
-
-    return matches;
 }
 
 /// @brief Expand zsh extglob pattern by reading directory and matching
@@ -7075,7 +6905,12 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
             continue;
         }
 
-        if (match_zsh_extglob(entry->d_name, file_pattern, is_negated)) {
+        bool zsh_match = lush_pattern_match_ex(entry->d_name, file_pattern,
+                                               LUSH_PATTERN_ZSH_EXTENDED);
+        if (is_negated) {
+            zsh_match = !zsh_match;
+        }
+        if (zsh_match) {
             /// Grow array if needed
             if (result_count >= result_capacity) {
                 size_t new_capacity =
