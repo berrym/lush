@@ -3862,30 +3862,34 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                         menu_items[item_count] = expanded;
                         item_count++;
                     } else {
-                        /// Unquoted: Split by IFS
+                        /// Unquoted: split via the canonical ifs_field_split
+                        /// (respects live IFS and preserves non-whitespace
+                        /// empty-field semantics strtok cannot express).
                         const char *ifs =
                             symtable_get(executor->symtable, "IFS");
                         if (!ifs) {
                             ifs = " \t\n";
                         }
-
-                        char *expanded_copy = strdup(expanded);
-                        char *token = strtok(expanded_copy, ifs);
-
-                        while (token) {
-                            menu_items = realloc(
+                        int field_count = 0;
+                        char **fields =
+                            ifs_field_split(expanded, ifs, &field_count);
+                        for (int fi = 0; fi < field_count; fi++) {
+                            char **grown = realloc(
                                 menu_items, (item_count + 1) * sizeof(char *));
-                            if (!menu_items) {
+                            if (!grown) {
+                                for (int k = fi; k < field_count; k++) {
+                                    free(fields[k]);
+                                }
+                                free(fields);
                                 free(expanded);
-                                free(expanded_copy);
                                 return 1;
                             }
-                            menu_items[item_count] = strdup(token);
-                            item_count++;
-                            token = strtok(NULL, ifs);
+                            menu_items = grown;
+                            /// Ownership transfers from fields[fi] into
+                            /// menu_items.
+                            menu_items[item_count++] = fields[fi];
                         }
-
-                        free(expanded_copy);
+                        free(fields);
                         free(expanded);
                     }
                 }
@@ -17653,27 +17657,39 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                             }
                         }
 
-                        /// Word split the expanded value if it contains spaces
-                        /// This handles ${(s:,:)var} and ${(f)var} producing
-                        /// multiple words but NOT quoted strings like "echo
-                        /// hello"
-                        if (!is_quoted && strchr(final_value, ' ') != NULL) {
-                            /// Split on spaces and add each word as separate
-                            /// element
-                            char *copy = strdup(final_value);
-                            if (copy) {
-                                char *saveptr;
-                                char *word = strtok_r(copy, " ", &saveptr);
-                                while (word) {
-                                    /// Skip empty words
-                                    if (*word) {
+                        /// Word-split the expanded value via the canonical
+                        /// ifs_field_split: respects live IFS (the old
+                        /// hardcoded space-only split missed `\t`/`\n`) and
+                        /// honors non-whitespace-IFS empty-field semantics
+                        /// strtok cannot express. Quoted elements are not
+                        /// split.
+                        if (!is_quoted) {
+                            const char *ifs =
+                                symtable_get(executor->symtable, "IFS");
+                            if (!ifs) {
+                                ifs = " \t\n";
+                            }
+                            int field_count = 0;
+                            char **fields =
+                                ifs_field_split(final_value, ifs, &field_count);
+                            if (fields && field_count > 0) {
+                                for (int fi = 0; fi < field_count; fi++) {
+                                    if (fields[fi] && *fields[fi]) {
                                         symtable_array_set_index(array, index,
-                                                                 word);
+                                                                 fields[fi]);
                                         index++;
                                     }
-                                    word = strtok_r(NULL, " ", &saveptr);
+                                    free(fields[fi]);
                                 }
-                                free(copy);
+                                free(fields);
+                            } else {
+                                /// Empty / NULL field set: store as-is so we
+                                /// don't silently drop the value on OOM or
+                                /// degenerate input.
+                                free(fields);
+                                symtable_array_set_index(array, index,
+                                                         final_value);
+                                index++;
                             }
                         } else {
                             symtable_array_set_index(array, index, final_value);
