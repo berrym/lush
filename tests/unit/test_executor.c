@@ -13,6 +13,9 @@
 #include "executor.h"
 #include "identifier.h"
 #include "lle/buffer_management.h"
+#include "lle/completion/builtin_completions.h"
+#include "lle/completion/completion_types.h"
+#include "lle/completion/word_context.h"
 #include "lle/lle_editor.h"
 #include "lle/syntax_highlighting.h"
 #include "symtable.h"
@@ -3234,6 +3237,35 @@ TEST(rt_lle_feature_bridge_enumerates_matrix) {
     ASSERT_TRUE(found_xpg, "xpg_echo must be enumerable via the bridge");
 }
 
+TEST(rt_setopt_completion_lists_matrix_features) {
+    /// End-to-end: setopt completion routes through the bridge and offers
+    /// names from the live feature matrix, including ones the old static
+    /// completion list omitted (issue #126). Drives the public builtin
+    /// completion entry with a minimal "setopt err" context.
+    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; /// LLE pool sentinel
+    lle_completion_result_t *result = NULL;
+    lle_result_t r = lle_completion_result_create(pool, 8, &result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "completion result create");
+
+    lle_word_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.command_name = "setopt";
+    ctx.dequoted_filename_prefix = (char *)"err";
+
+    r = lle_builtin_completions_generate(pool, &ctx, result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "builtin completions generate");
+
+    bool found = false;
+    for (size_t i = 0; i < result->count; i++) {
+        if (result->items[i].text &&
+            strcmp(result->items[i].text, "errexit_in_loops") == 0) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found, "setopt completion must offer errexit_in_loops");
+}
+
 TEST(rt_pe_at_value_transform_on_map_still_errors) {
     /// Only @a bypasses the guard; a value-shaped @ transform on a bare
     /// collection remains a type error (needs [@] to vectorize).
@@ -4365,6 +4397,7 @@ int main(void) {
     RUN_TEST(rt_pe_at_attr_query_scalar_unaffected);
     RUN_TEST(rt_declare_combined_flags_attributes);
     RUN_TEST(rt_lle_feature_bridge_enumerates_matrix);
+    RUN_TEST(rt_setopt_completion_lists_matrix_features);
     RUN_TEST(rt_pe_at_value_transform_on_map_still_errors);
     RUN_TEST(rt_pe_catalog_conditional_on_map);
     RUN_TEST(rt_pe_catalog_scalar_slice_still_works);

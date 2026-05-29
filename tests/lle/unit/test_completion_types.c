@@ -210,6 +210,17 @@ TEST(error_handling) {
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 }
 
+TEST(feature_bridge_weak_fallback) {
+    /// In a standalone liblle build (no shell_mode.c) the setopt feature
+    /// bridge resolves to its weak fallbacks: zero features, NULL names.
+    /// This is the path that keeps completion linking without the shell.
+    extern int lle_shell_feature_count(void);
+    extern const char *lle_shell_feature_name(int index);
+    ASSERT(lle_shell_feature_count() == 0);
+    ASSERT(lle_shell_feature_name(0) == NULL);
+    ASSERT(lle_shell_feature_name(-1) == NULL);
+}
+
 int main(void) {
     printf("=== LLE Completion Types Unit Tests ===\n");
     RUN_TEST(type_info_queries);
@@ -219,5 +230,6 @@ int main(void) {
     RUN_TEST(completion_result_sorting);
     RUN_TEST(classification);
     RUN_TEST(error_handling);
+    RUN_TEST(feature_bridge_weak_fallback);
     return TEST_RESULT();
 }
