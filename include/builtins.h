@@ -69,6 +69,25 @@ source_location_t builtin_swap_source_location(source_location_t loc);
  */
 source_location_t builtin_get_source_location(void);
 
+/**
+ * @brief Shared implementation for `break` and `continue`
+ *
+ * Both builtins parse an optional positive-integer level, validate that
+ * we are inside a loop, that the level does not exceed the current
+ * nesting depth, and then set the executor's loop_control to the
+ * requested value. The only differences between them are the verb used
+ * in error messages and the loop_control value -- bin_break and
+ * bin_continue are thin wrappers around this.
+ *
+ * @param argc argc as received by the builtin
+ * @param argv argv as received by the builtin (argv[1] is the optional level)
+ * @param verb "break" or "continue", used in error / suggestion text
+ * @param ctl  LOOP_BREAK or LOOP_CONTINUE, the value to set on success
+ * @return 0 on success, 1 on any error (already reported via shell_error_*)
+ */
+int builtin_loop_control(int argc, char **argv, const char *verb,
+                         loop_control_t ctl);
+
 /** Builtin command entry */
 typedef struct builtin_s {
     const char *name;                   ///< Command name
