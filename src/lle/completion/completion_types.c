@@ -27,6 +27,8 @@
 /// These will be properly integrated via completion_sources module
 extern bool lle_shell_is_builtin(const char *text);
 extern bool lle_shell_is_alias(const char *text);
+extern int lle_shell_feature_count(void);
+extern const char *lle_shell_feature_name(int index);
 
 /// ============================================================================
 /// TYPE INFORMATION DATABASE
@@ -775,6 +777,17 @@ __attribute__((weak)) bool lle_shell_is_builtin(const char *text) {
 __attribute__((weak)) bool lle_shell_is_alias(const char *text) {
     (void)text;
     return false;
+}
+
+/// Weak fallbacks for the setopt/unsetopt feature-name bridge. The
+/// strong versions in completion_sources.c enumerate the shell's feature
+/// matrix (shell_mode.c); a standalone liblle.a has no shell_mode, so
+/// completion simply offers no feature names.
+__attribute__((weak)) int lle_shell_feature_count(void) { return 0; }
+
+__attribute__((weak)) const char *lle_shell_feature_name(int index) {
+    (void)index;
+    return NULL;
 }
 
 /// Weak ASCII-only fallback for the shell identifier predicate used by

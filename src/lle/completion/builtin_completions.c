@@ -718,50 +718,19 @@ generate_alias_completions(lle_memory_pool_t *pool,
     return lle_completion_source_aliases(pool, context, result);
 }
 
-/**
- * @brief Shell feature names for completion
- *
- * Static list of shell feature names matching shell_mode.h.
- * This avoids linking dependency on shell_mode for test binaries.
- */
-/// setopt/unsetopt feature names offered by completion. Hand-maintained
-/// here rather than read from shell_mode.c's feature matrix because this
-/// module lives in liblle, which links standalone and must not depend on
-/// the main shell's symbols (see the lle_shell_* weak-symbol bridge). The
-/// list has drifted from the matrix over time; converting it to a
-/// weak-symbol bridge is tracked separately.
-static const char *shell_feature_names[] = {
-    /// Arrays
-    "indexed_arrays", "associative_arrays", "array_zero_indexed",
-    "array_append",
-    /// Arithmetic
-    "arith_command", "let_builtin",
-    /// Tests
-    "extended_test", "regex_match", "pattern_match",
-    /// Redirection
-    "process_substitution", "pipe_stderr", "append_both", "coproc",
-    /// Parameter expansion
-    "case_modification", "substring_expansion", "pattern_substitution",
-    "indirect_expansion", "param_transformation",
-    /// Globbing
-    "extended_glob", "null_glob", "dot_glob",
-    /// Brace expansion
-    "brace_expansion",
-    /// Control flow
-    "case_fallthrough", "select_loop", "time_keyword",
-    /// Behavior
-    "word_split_default", "auto_cd", "auto_pushd", "cdable_vars",
-    "assign_error_exits",
-    /// Advanced
-    "nameref", "anonymous_functions", "return_anywhere",
-    /// Zsh-specific
-    "glob_qualifiers", "hook_functions", "zsh_param_flags", "plugin_system",
-    NULL};
+/// Shell feature-name bridge: liblle cannot call shell_mode.c directly,
+/// so it reads the matrix through the lle_shell_feature_* weak/strong
+/// symbols (strong versions in completion_sources.c enumerate the real
+/// matrix; the weak fallbacks in completion_types.c yield nothing in a
+/// standalone liblle build).
+extern int lle_shell_feature_count(void);
+extern const char *lle_shell_feature_name(int index);
 
 /**
  * @brief Generate shell feature completions for setopt/unsetopt
  *
- * Provides completion for shell feature names.
+ * Enumerates the shell's feature matrix through the bridge so the offered
+ * names are always the single source of truth and never drift.
  */
 static lle_result_t
 generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
@@ -769,11 +738,15 @@ generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
     (void)pool; /// Completions allocated via result's pool
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
-    /// Iterate through all shell feature names
-    for (const char **name = shell_feature_names; *name != NULL; name++) {
-        if (prefix_len == 0 || strncmp(*name, prefix, prefix_len) == 0) {
+    int count = lle_shell_feature_count();
+    for (int i = 0; i < count; i++) {
+        const char *name = lle_shell_feature_name(i);
+        if (!name) {
+            continue;
+        }
+        if (prefix_len == 0 || strncmp(name, prefix, prefix_len) == 0) {
             lle_result_t res = lle_completion_result_add(
-                result, *name, " ", LLE_COMPLETION_TYPE_CUSTOM, 600);
+                result, name, " ", LLE_COMPLETION_TYPE_CUSTOM, 600);
             if (res != LLE_SUCCESS) {
                 return res;
             }
