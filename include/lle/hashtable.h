@@ -157,8 +157,9 @@ struct lle_strstr_hashtable {
     pthread_rwlock_t *lock;                       ///< Thread safety lock
     bool is_concurrent;                           ///< Thread-safe flag
     const char *name;                             ///< Hashtable name
-    size_t entry_count; /**< Entry count (workaround for libhashtable
-                           enumeration bug) */
+    size_t entry_count; ///< Cached entry count: libhashtable exposes no
+                        ///< O(1) size query, so the wrapper tracks it on
+                        ///< insert/delete for lle_strstr_hashtable_size().
 };
 
 /**
@@ -172,8 +173,9 @@ struct lle_generic_hashtable {
     pthread_rwlock_t *lock;                       ///< Thread safety lock
     bool is_concurrent;                           ///< Thread-safe flag
     const char *name;                             ///< Hashtable name
-    size_t entry_count; /**< Entry count (workaround for libhashtable
-                           enumeration bug) */
+    size_t entry_count; ///< Cached entry count: libhashtable exposes no
+                        ///< O(1) size query, so the wrapper tracks it on
+                        ///< insert/delete.
 };
 
 /**
@@ -311,6 +313,27 @@ size_t lle_strstr_hashtable_size(lle_strstr_hashtable_t *ht);
  * @brief Clear all entries
  */
 void lle_strstr_hashtable_clear(lle_strstr_hashtable_t *ht);
+
+/**
+ * @brief Visitor callback for lle_strstr_hashtable_foreach()
+ */
+typedef void (*lle_strstr_hashtable_visit_fn)(const char *key,
+                                              const char *value,
+                                              void *user_data);
+
+/**
+ * @brief Invoke @p cb for every key/value pair in the table.
+ *
+ * Walks the table via libhashtable's ht_strstr_enum API under the read
+ * lock (when thread-safe). The callback must not mutate the table.
+ *
+ * @param ht Hashtable (NULL is a no-op)
+ * @param cb Visitor invoked as cb(key, value, user_data)
+ * @param user_data Opaque pointer forwarded to the visitor
+ */
+void lle_strstr_hashtable_foreach(lle_strstr_hashtable_t *ht,
+                                  lle_strstr_hashtable_visit_fn cb,
+                                  void *user_data);
 
 /**
  * @brief Destroy hashtable

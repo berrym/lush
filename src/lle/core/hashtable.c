@@ -906,6 +906,35 @@ void lle_strstr_hashtable_clear(lle_strstr_hashtable_t *ht) {
     }
 }
 
+void lle_strstr_hashtable_foreach(lle_strstr_hashtable_t *ht,
+                                  lle_strstr_hashtable_visit_fn cb,
+                                  void *user_data) {
+    if (!ht || !cb) {
+        return;
+    }
+
+    /// Read lock for the duration of the walk (Phase 2 thread-safety).
+    if (ht->is_concurrent && ht->lock) {
+        pthread_rwlock_rdlock(ht->lock);
+    }
+
+    /// libhashtable's ht_strstr_enum walks every live entry; the same
+    /// API backs lle_strstr_hashtable_clear() above and the associative-
+    /// array iteration in the executor, so it is exercised continuously.
+    ht_enum_t *enumerator = ht_strstr_enum_create(ht->ht);
+    if (enumerator) {
+        const char *key, *value;
+        while (ht_strstr_enum_next(enumerator, &key, &value)) {
+            cb(key, value, user_data);
+        }
+        ht_strstr_enum_destroy(enumerator);
+    }
+
+    if (ht->is_concurrent && ht->lock) {
+        pthread_rwlock_unlock(ht->lock);
+    }
+}
+
 /**
  * @brief Destroy a string-to-string hashtable and free all resources
  * @param ht Hashtable to destroy (may be NULL)
