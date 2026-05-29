@@ -4554,6 +4554,7 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  *   $@                       positional params
  *   $*                       positional params
  *   ${@}, ${*}               braced positional params
+ *   ${@:N}, ${@:N:M}         positional-param slice
  *   ${NAME[@]}, ${NAME[*]}   array all-elements
  *   ${!NAME[@]}              array keys (assoc) / indices (indexed)
  *   ${NAME[@]:N},  ${NAME[@]:N:M}, ${NAME[*]:N:M}  array slice
@@ -4566,6 +4567,47 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  * @return true if the node was a vector form and out_vec/out_count were
  *         populated; false otherwise.
  */
+
+/// Parse an optional `:N` / `:N:M` slice suffix shared by the array and
+/// positional vector forms. @p p points just past the subscript (the `]`
+/// of NAME[@], or the `@`/`*` of a positional ref); @p end is just past
+/// the closing `}`. On a `:` slice sets *has_slice and the offset/length;
+/// with no suffix leaves them untouched. Returns false on malformed junk
+/// (anything other than end-of-content or a `:`-led numeric slice).
+static bool parse_vector_slice_suffix(const char *p, const char *end,
+                                      bool *has_slice, int *slice_offset,
+                                      int *slice_length) {
+    if (p == end) {
+        return true; /// no slice suffix
+    }
+    if (*p != ':') {
+        return false; /// junk between subscript/ref and `}`
+    }
+    p++;
+    if (p >= end) {
+        return false;
+    }
+    size_t spec_len = (size_t)(end - p);
+    char spec[64];
+    if (spec_len >= sizeof(spec)) {
+        return false;
+    }
+    memcpy(spec, p, spec_len);
+    spec[spec_len] = '\0';
+    char *endp = NULL;
+    *slice_offset = (int)strtol(spec, &endp, 10);
+    if (!endp) {
+        return false;
+    }
+    if (*endp == ':') {
+        *slice_length = (int)strtol(endp + 1, NULL, 10);
+    } else if (*endp != '\0') {
+        return false;
+    }
+    *has_slice = true;
+    return true;
+}
+
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                                   char ***out_vec, int *out_count) {
     if (!node || !node->val.str) {
@@ -4824,10 +4866,15 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        /// Special-cased ${@} / ${*}: positional, no subscript.
-        if (!keys_form && (end - p) == 1 && (*p == '@' || *p == '*')) {
+        /// ${@} / ${*}, optionally sliced: ${@:N} / ${@:N:M}.
+        if (!keys_form && (*p == '@' || *p == '*')) {
             is_positional = true;
             subscript = *p;
+            p++;
+            if (!parse_vector_slice_suffix(p, end, &has_slice, &slice_offset,
+                                           &slice_length)) {
+                return false;
+            }
         } else {
             /// Must be NAME[@] / NAME[*] optionally followed by :N or :N:M
             name_start = p;
@@ -4883,34 +4930,9 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 return false;
             }
             p++;
-            /// Optional slicing :N or :N:M.
-            if (p < end && *p == ':') {
-                has_slice = true;
-                p++;
-                if (p >= end) {
-                    return false;
-                }
-                char *endp = NULL;
-                /// end is past the trailing `}`; we need a NUL-terminated
-                /// span. Copy the slice spec into a scratch buffer.
-                size_t spec_len = (size_t)(end - p);
-                char spec[64];
-                if (spec_len >= sizeof(spec)) {
-                    return false;
-                }
-                memcpy(spec, p, spec_len);
-                spec[spec_len] = '\0';
-                slice_offset = (int)strtol(spec, &endp, 10);
-                if (!endp) {
-                    return false;
-                }
-                if (*endp == ':') {
-                    slice_length = (int)strtol(endp + 1, NULL, 10);
-                } else if (*endp != '\0') {
-                    return false;
-                }
-            } else if (p != end) {
-                /// Junk between `]` and `}`. Not a recognized vector form.
+            /// Optional slicing :N or :N:M (shared parser).
+            if (!parse_vector_slice_suffix(p, end, &has_slice, &slice_offset,
+                                           &slice_length)) {
                 return false;
             }
         }
@@ -4958,6 +4980,59 @@ braced_bare_array_ready:;
                     return false;
                 }
             }
+        }
+
+        /// Apply ${@:offset:length} slicing. bash slices the conceptual
+        /// sequence [$0, $1, ..., $N], so $0 sits at index 0; vec holds
+        /// $1..$N. A negative offset counts from the end; an omitted
+        /// length runs to the end.
+        if (has_slice) {
+            char *zero = symtable_get_var(executor->symtable, "0");
+            if (!zero) {
+                zero = strdup((shell_argv && shell_argc > 0 && shell_argv[0])
+                                  ? shell_argv[0]
+                                  : "");
+            }
+            int nelem = vcount + 1; /// includes $0
+            int start = slice_offset;
+            if (start < 0) {
+                start = nelem + start;
+            }
+            if (start < 0) {
+                start = 0;
+            }
+            int end_idx =
+                (slice_length >= 0) ? start + slice_length - 1 : nelem - 1;
+            if (end_idx >= nelem) {
+                end_idx = nelem - 1;
+            }
+            char **sliced = NULL;
+            int scount = 0, scap = 0;
+            bool oom = false;
+            for (int idx = start; idx <= end_idx && idx >= 0; idx++) {
+                const char *src = (idx == 0) ? zero : vec[idx - 1];
+                char *val = strdup(src ? src : "");
+                if (!add_to_argv_list(&sliced, &scount, &scap, val)) {
+                    free(val);
+                    oom = true;
+                    break;
+                }
+            }
+            free(zero);
+            for (int k = 0; k < vcount; k++) {
+                free(vec[k]);
+            }
+            free(vec);
+            if (oom) {
+                for (int k = 0; k < scount; k++) {
+                    free(sliced[k]);
+                }
+                free(sliced);
+                return false;
+            }
+            vec = sliced;
+            vcount = scount;
+            vcap = scap;
         }
     } else {
         /// Array name lookup. Need a NUL-terminated name.
