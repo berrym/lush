@@ -394,54 +394,8 @@ TEST(quote_val_with_special_chars) {
 }
 
 /// Note: substitute_str tests removed - function declared but not implemented
-
-/* ============================================================================
- * ESCAPE PROCESSING TESTS
- * ============================================================================
- */
-
-TEST(process_token_escapes_newline) {
-    const char *input = "hello\\nworld";
-    char *result = process_token_escapes(input);
-    ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello\nworld", "Newline escape should be processed");
-    free(result);
-}
-
-TEST(process_token_escapes_tab) {
-    const char *input = "hello\\tworld";
-    char *result = process_token_escapes(input);
-    ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello\tworld", "Tab escape should be processed");
-    free(result);
-}
-
-TEST(process_token_escapes_backslash) {
-    const char *input = "hello\\\\world";
-    char *result = process_token_escapes(input);
-    ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello\\world",
-                  "Backslash escape should be processed");
-    free(result);
-}
-
-TEST(process_token_escapes_multiple) {
-    const char *input = "\\thello\\nworld\\t";
-    char *result = process_token_escapes(input);
-    ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "\thello\nworld\t",
-                  "Multiple escapes should be processed");
-    free(result);
-}
-
-TEST(process_token_escapes_no_escapes) {
-    const char *input = "hello world";
-    char *result = process_token_escapes(input);
-    ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello world",
-                  "String without escapes should be unchanged");
-    free(result);
-}
+/// Note: escape-processing tests moved to tests/unit/test_escape.c when the
+/// canonical escape engine (src/escape.c) replaced process_token_escapes.
 
 /* ============================================================================
  * BUFFER BOUNDS TESTS
@@ -572,13 +526,7 @@ int main(void) {
 
     printf("\nString Substitution Tests:\n");
     /// substitute_str tests removed - function not implemented
-
-    printf("\nEscape Processing Tests:\n");
-    RUN_TEST(process_token_escapes_newline);
-    RUN_TEST(process_token_escapes_tab);
-    RUN_TEST(process_token_escapes_backslash);
-    RUN_TEST(process_token_escapes_multiple);
-    RUN_TEST(process_token_escapes_no_escapes);
+    /// Escape-processing tests moved to test_escape.c (src/escape.c).
 
     printf("\nBuffer Bounds Tests:\n");
     RUN_TEST(check_buffer_bounds_needs_growth);

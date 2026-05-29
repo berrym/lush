@@ -19,6 +19,7 @@
  */
 
 #include "builtins.h"
+#include "escape.h"
 #include "lle/prompt/prompt_expansion.h"
 #include "lush.h"
 #include "shell_mode.h"
@@ -28,10 +29,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-/* From src/builtins/bin_printf.c -- shared escape-sequence interpreter.
- * Same forward-decl pattern as bin_echo.c. */
-char *process_escape_sequences(const char *str);
 
 /* From src/builtins/bin_printf.c -- printf-style format processor.
  * Used for `print -f FMT [args...]`. */
@@ -306,7 +303,8 @@ int bin_print(int argc, char **argv) {
         } else if (!raw) {
             /// Default: process \n, \t, \xNN, etc. like bin_echo's
             /// XPG-mode path.
-            processed = process_escape_sequences(argv[k]);
+            processed =
+                lush_expand_escapes(argv[k], strlen(argv[k]), LUSH_ESC_SIMPLE);
             if (processed) {
                 src = processed;
             }
