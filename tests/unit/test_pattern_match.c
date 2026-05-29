@@ -230,6 +230,54 @@ TEST(bracket_negation_unicode) {
 }
 
 /* ============================================================================
+ * Zsh extended-glob (LUSH_PATTERN_ZSH_EXTENDED): `#`/`##` + leading `^`
+ * ============================================================================
+ */
+
+TEST(zsh_ext_hash_zero_or_more) {
+    /// `x#` matches zero or more of x (like `*(x)`).
+    unsigned f = LUSH_PATTERN_ZSH_EXTENDED;
+    ASSERT(lush_pattern_match_ex("", "a#", f), "zero a's");
+    ASSERT(lush_pattern_match_ex("aaaa", "a#", f), "many a's");
+    ASSERT(!lush_pattern_match_ex("aaab", "a#", f), "trailing b fails");
+    /// Without the flag, `#` is a literal character.
+    ASSERT(lush_pattern_match_ex("a#", "a#", 0), "# literal without flag");
+    ASSERT(!lush_pattern_match_ex("aaaa", "a#", 0),
+           "no quantifier without flag");
+}
+
+TEST(zsh_ext_hashhash_one_or_more) {
+    /// `x##` matches one or more of x (like `+(x)`).
+    unsigned f = LUSH_PATTERN_ZSH_EXTENDED;
+    ASSERT(!lush_pattern_match_ex("", "a##", f), "zero a's fails one-or-more");
+    ASSERT(lush_pattern_match_ex("a", "a##", f), "one a");
+    ASSERT(lush_pattern_match_ex("aaaa", "a##", f), "many a's");
+}
+
+TEST(zsh_ext_hash_charclass_and_suffix) {
+    /// Quantifier applies to a `[...]` atom, with a literal suffix after.
+    unsigned f = LUSH_PATTERN_ZSH_EXTENDED;
+    ASSERT(lush_pattern_match_ex("123.txt", "[0-9]#.txt", f),
+           "digits then .txt");
+    ASSERT(lush_pattern_match_ex(".txt", "[0-9]#.txt", f),
+           "zero digits then .txt");
+    ASSERT(lush_pattern_match_ex("7.txt", "[0-9]##.txt", f),
+           "one-or-more digits");
+    ASSERT(!lush_pattern_match_ex(".txt", "[0-9]##.txt", f),
+           "zero digits fails one-or-more");
+}
+
+TEST(zsh_ext_leading_caret_negates) {
+    /// A leading `^` negates the whole pattern.
+    unsigned f = LUSH_PATTERN_ZSH_EXTENDED;
+    ASSERT(lush_pattern_match_ex("world", "^h*", f), "world is not h*");
+    ASSERT(!lush_pattern_match_ex("hello", "^h*", f),
+           "hello matches h*, negated");
+    /// Without the flag, leading `^` is a literal.
+    ASSERT(lush_pattern_match_ex("^h", "^h", 0), "^ literal without flag");
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -260,6 +308,12 @@ int main(void) {
     printf("\nZsh bare alternation:\n");
     RUN_TEST(zsh_bare_alt_equiv_to_at);
     RUN_TEST(zsh_bare_alt_with_empty);
+
+    printf("\nZsh extended glob (#/##/^):\n");
+    RUN_TEST(zsh_ext_hash_zero_or_more);
+    RUN_TEST(zsh_ext_hashhash_one_or_more);
+    RUN_TEST(zsh_ext_hash_charclass_and_suffix);
+    RUN_TEST(zsh_ext_leading_caret_negates);
 
     printf("\nEdge cases:\n");
     RUN_TEST(null_inputs);

@@ -285,8 +285,50 @@ static int match_char_class(const char *s, const char *p, const char **end,
 }
 
 /* Forward declaration: the matcher is mutually recursive with the
- * alternative-branch composer. */
-static bool match(const char *s, const char *p);
+ * alternative-branch composer. `flags` carries LUSH_PATTERN_* options
+ * (currently only the zsh-extended `#`/`##` postfix quantifiers). */
+static bool match(const char *s, const char *p, unsigned flags);
+
+/**
+ * @brief End of a quantifiable atom for zsh `#`/`##`, or NULL
+ *
+ * A "quantifiable atom" is the smallest pattern unit that a trailing
+ * zsh `#` (zero-or-more) or `##` (one-or-more) repeats: a `[...]`
+ * character class, a `\`-escaped character, or a single literal
+ * codepoint. The glob-control characters `*?()|` do not begin a
+ * quantifiable atom (they are handled by their own matcher branches),
+ * so this returns NULL for them and for an unterminated `[`.
+ */
+static const char *find_quantifiable_atom_end(const char *p) {
+    if (*p == '[') {
+        const char *q = p + 1;
+        if (*q == '!' || *q == '^') {
+            q++;
+        }
+        if (*q == ']') {
+            q++;
+        }
+        while (*q && *q != ']') {
+            if (*q == '\\' && q[1]) {
+                q += 2;
+            } else {
+                q++;
+            }
+        }
+        return (*q == ']') ? q + 1 : NULL;
+    }
+    if (*p == '\\' && p[1]) {
+        size_t b;
+        (void)decode_one(p + 1, &b);
+        return p + 1 + b;
+    }
+    if (*p && !strchr("*?()|", *p)) {
+        size_t b;
+        (void)decode_one(p, &b);
+        return p + b;
+    }
+    return NULL;
+}
 
 /**
  * @brief Match `s` against (alt-text + rest_pattern) by composition
@@ -297,7 +339,8 @@ static bool match(const char *s, const char *p);
  * as failure (the caller continues with other alternatives).
  */
 static bool match_alt_plus_rest(const char *s, const char *alt_start,
-                                const char *alt_end, const char *rest) {
+                                const char *alt_end, const char *rest,
+                                unsigned flags) {
     size_t alt_len = (size_t)(alt_end - alt_start);
     size_t rest_len = strlen(rest);
     char *composite = malloc(alt_len + rest_len + 1);
@@ -307,7 +350,7 @@ static bool match_alt_plus_rest(const char *s, const char *alt_start,
     memcpy(composite, alt_start, alt_len);
     memcpy(composite + alt_len, rest, rest_len);
     composite[alt_len + rest_len] = '\0';
-    bool r = match(s, composite);
+    bool r = match(s, composite, flags);
     free(composite);
     return r;
 }
@@ -321,8 +364,8 @@ static bool match_alt_plus_rest(const char *s, const char *alt_start,
  * pattern or OOM yields false.
  */
 static bool alt_matches_exact_prefix(const char *s, size_t s_len,
-                                     const char *alt_start,
-                                     const char *alt_end) {
+                                     const char *alt_start, const char *alt_end,
+                                     unsigned flags) {
     size_t alt_len = (size_t)(alt_end - alt_start);
     char *alt_buf = malloc(alt_len + 1);
     char *s_buf = malloc(s_len + 1);
@@ -335,7 +378,7 @@ static bool alt_matches_exact_prefix(const char *s, size_t s_len,
     alt_buf[alt_len] = '\0';
     memcpy(s_buf, s, s_len);
     s_buf[s_len] = '\0';
-    bool r = match(s_buf, alt_buf);
+    bool r = match(s_buf, alt_buf, flags);
     free(alt_buf);
     free(s_buf);
     return r;
@@ -353,8 +396,35 @@ static bool alt_matches_exact_prefix(const char *s, size_t s_len,
  * to per-operator handling; otherwise consumes one glob token from `p`
  * (`*`, `?`, `[...]`, `\X`, or literal) and recurses on the remainder.
  */
-static bool match(const char *s, const char *p) {
+static bool match(const char *s, const char *p, unsigned flags) {
     while (*p) {
+        /// zsh-extended `#` (zero-or-more) / `##` (one-or-more) postfix
+        /// quantifiers. An atom immediately followed by `#`/`##` is
+        /// equivalent to the extglob group `*(atom)` / `+(atom)`, so
+        /// synthesize that form and reuse the tested extglob machinery.
+        if (flags & LUSH_PATTERN_ZSH_EXTENDED) {
+            const char *atom_end = find_quantifiable_atom_end(p);
+            if (atom_end && *atom_end == '#') {
+                bool one_or_more = (atom_end[1] == '#');
+                const char *rest = one_or_more ? atom_end + 2 : atom_end + 1;
+                size_t atom_len = (size_t)(atom_end - p);
+                size_t rest_len = strlen(rest);
+                char *synth = malloc(2 + atom_len + 1 + rest_len + 1);
+                if (!synth) {
+                    return false;
+                }
+                synth[0] = one_or_more ? '+' : '*';
+                synth[1] = '(';
+                memcpy(synth + 2, p, atom_len);
+                synth[2 + atom_len] = ')';
+                memcpy(synth + 3 + atom_len, rest, rest_len);
+                synth[3 + atom_len + rest_len] = '\0';
+                bool r = match(s, synth, flags);
+                free(synth);
+                return r;
+            }
+        }
+
         char op = 0;
         const char *paren_inside = NULL;
         if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
@@ -378,7 +448,7 @@ static bool match(const char *s, const char *p) {
                 const char *alt_start = paren_inside;
                 while (alt_start <= close) {
                     const char *sep = find_next_alt_separator(alt_start, close);
-                    if (match_alt_plus_rest(s, alt_start, sep, rest)) {
+                    if (match_alt_plus_rest(s, alt_start, sep, rest, flags)) {
                         return true;
                     }
                     if (sep == close) {
@@ -391,14 +461,14 @@ static bool match(const char *s, const char *p) {
 
             if (op == '?') {
                 /// Zero occurrences: rest matches whole s.
-                if (match(s, rest)) {
+                if (match(s, rest, flags)) {
                     return true;
                 }
                 /// One occurrence: identical to @.
                 const char *alt_start = paren_inside;
                 while (alt_start <= close) {
                     const char *sep = find_next_alt_separator(alt_start, close);
-                    if (match_alt_plus_rest(s, alt_start, sep, rest)) {
+                    if (match_alt_plus_rest(s, alt_start, sep, rest, flags)) {
                         return true;
                     }
                     if (sep == close) {
@@ -411,7 +481,7 @@ static bool match(const char *s, const char *p) {
 
             if (op == '*' || op == '+') {
                 /// Zero (only valid for `*`): rest matches whole s.
-                if (op == '*' && match(s, rest)) {
+                if (op == '*' && match(s, rest, flags)) {
                     return true;
                 }
                 /// One-or-more: pick an alternative, match it against a
@@ -445,9 +515,9 @@ static bool match(const char *s, const char *p) {
                     while (alt_start <= close && !found) {
                         const char *sep =
                             find_next_alt_separator(alt_start, close);
-                        if (alt_matches_exact_prefix(s, split, alt_start,
-                                                     sep)) {
-                            if (match(s + split, kleene)) {
+                        if (alt_matches_exact_prefix(s, split, alt_start, sep,
+                                                     flags)) {
+                            if (match(s + split, kleene, flags)) {
                                 found = true;
                             }
                         }
@@ -473,8 +543,8 @@ static bool match(const char *s, const char *p) {
                     while (alt_start <= close) {
                         const char *sep =
                             find_next_alt_separator(alt_start, close);
-                        if (alt_matches_exact_prefix(s, split, alt_start,
-                                                     sep)) {
+                        if (alt_matches_exact_prefix(s, split, alt_start, sep,
+                                                     flags)) {
                             any_alt_matches = true;
                             break;
                         }
@@ -483,7 +553,7 @@ static bool match(const char *s, const char *p) {
                         }
                         alt_start = sep + 1;
                     }
-                    if (!any_alt_matches && match(s + split, rest)) {
+                    if (!any_alt_matches && match(s + split, rest, flags)) {
                         return true;
                     }
                 }
@@ -503,7 +573,7 @@ static bool match(const char *s, const char *p) {
             /// stepping is both faster and more principled than the
             /// prior byte-stepping `s++`.
             while (*s) {
-                if (match(s, p)) {
+                if (match(s, p, flags)) {
                     return true;
                 }
                 size_t step;
@@ -513,7 +583,7 @@ static bool match(const char *s, const char *p) {
                 }
                 s += step;
             }
-            return match(s, p); /// try with empty tail
+            return match(s, p, flags); /// try with empty tail
         }
         if (*p == '?') {
             if (*s == '\0') {
@@ -563,8 +633,19 @@ static bool match(const char *s, const char *p) {
 }
 
 bool lush_pattern_match(const char *str, const char *pattern) {
+    return lush_pattern_match_ex(str, pattern, 0);
+}
+
+bool lush_pattern_match_ex(const char *str, const char *pattern,
+                           unsigned flags) {
     if (!str || !pattern) {
         return false;
     }
-    return match(str, pattern);
+    /// zsh-extended leading `^` negates the whole pattern (the rest is
+    /// matched and the result inverted). Only honored at pattern start,
+    /// matching the historical zsh extended-glob filename behavior.
+    if ((flags & LUSH_PATTERN_ZSH_EXTENDED) && pattern[0] == '^') {
+        return !match(str, pattern + 1, flags);
+    }
+    return match(str, pattern, flags);
 }
