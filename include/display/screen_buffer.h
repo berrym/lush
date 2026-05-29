@@ -396,28 +396,6 @@ bool screen_buffer_render_multiline_with_prefixes(const screen_buffer_t *buffer,
 size_t screen_buffer_calculate_visual_width(const char *text, size_t start_col);
 
 /**
- * Render completion menu through screen buffer virtual layout
- *
- * Properly handles ANSI codes and calculates actual line count.
- * Separate from main render function to avoid breaking existing code.
- *
- * @param buffer Screen buffer to use for layout calculation
- * @param menu_text The rendered menu text with ANSI codes
- * @param terminal_width Current terminal width
- * @return Number of lines the menu occupies
- */
-int screen_buffer_render_menu(screen_buffer_t *buffer, const char *menu_text,
-                              int terminal_width);
-
-/**
- * Calculate visual width of menu without rendering
- *
- * @param menu_text The menu text to measure
- * @return Maximum line width in the menu
- */
-int screen_buffer_calculate_menu_width(const char *menu_text);
-
-/**
  * Add plain text rows to screen buffer (for menu, hints, etc.)
  *
  * Parses text line-by-line and adds each line as a new row starting
