@@ -2968,29 +2968,14 @@ lle_result_t lle_self_insert(lle_editor_t *editor, uint32_t codepoint) {
         clear_completion_menu(editor);
     }
 
-    /// Convert codepoint to UTF-8 bytes
+    /// Convert codepoint to UTF-8 bytes via the canonical encoder.
     char utf8_bytes[4];
-    size_t byte_count = 0;
-
-    if (codepoint < 0x80) {
-        utf8_bytes[0] = (char)codepoint;
-        byte_count = 1;
-    } else if (codepoint < 0x800) {
-        utf8_bytes[0] = (char)(0xC0 | (codepoint >> 6));
-        utf8_bytes[1] = (char)(0x80 | (codepoint & 0x3F));
-        byte_count = 2;
-    } else if (codepoint < 0x10000) {
-        utf8_bytes[0] = (char)(0xE0 | (codepoint >> 12));
-        utf8_bytes[1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
-        utf8_bytes[2] = (char)(0x80 | (codepoint & 0x3F));
-        byte_count = 3;
-    } else {
-        utf8_bytes[0] = (char)(0xF0 | (codepoint >> 18));
-        utf8_bytes[1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
-        utf8_bytes[2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
-        utf8_bytes[3] = (char)(0x80 | (codepoint & 0x3F));
-        byte_count = 4;
+    int encoded = lle_utf8_encode_codepoint(codepoint, utf8_bytes);
+    if (encoded <= 0) {
+        /// Invalid codepoint (surrogate or out of range): nothing to insert.
+        return LLE_ERROR_INVALID_PARAMETER;
     }
+    size_t byte_count = (size_t)encoded;
 
     /// Insert at cursor
     return lle_buffer_insert_text(editor->buffer,
