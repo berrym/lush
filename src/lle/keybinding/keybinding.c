@@ -1119,6 +1119,34 @@ lle_result_t lle_keybinding_manager_load_vi_insert_preset(
  * @param count_out Pointer to store the count of bindings
  * @return LLE_SUCCESS on success, error code on failure
  */
+/// Fill context for lle_keybinding_manager_list_bindings()'s enumeration.
+typedef struct {
+    lle_keybinding_info_t *bindings; ///< Caller-allocated output array
+    size_t capacity;                 ///< Number of slots in @c bindings
+    size_t index;                    ///< Next slot to write
+} list_bindings_fill_t;
+
+/// Visitor: each hashtable value is a "%p" pointer to the entry; copy its
+/// key sequence and action metadata into the next output slot.
+static void list_bindings_visit(const char *key, const char *value,
+                                void *user_data) {
+    list_bindings_fill_t *fill = (list_bindings_fill_t *)user_data;
+    if (fill->index >= fill->capacity) {
+        return;
+    }
+    lle_keybinding_entry_t *entry = NULL;
+    if (sscanf(value, "%p", (void **)&entry) != 1 || entry == NULL) {
+        return;
+    }
+    lle_keybinding_info_t *info = &fill->bindings[fill->index];
+    memset(info, 0, sizeof(*info));
+    snprintf(info->key_sequence, sizeof(info->key_sequence), "%s", key);
+    info->action = entry->action;
+    info->function_name = entry->function_name;
+    info->mode = entry->mode;
+    fill->index++;
+}
+
 lle_result_t
 lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
                                      lle_keybinding_info_t **bindings_out,
@@ -1149,11 +1177,16 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /// Note: We would need to enumerate the hashtable here, but libhashtable's
-    /// enumeration is buggy according to the LLE wrapper. For now, return
-    /// empty.
+    /// Enumerate the bindings table and copy each entry into the output
+    /// array. ht_strstr_enum (via lle_strstr_hashtable_foreach) walks the
+    /// table reliably -- the same API backs the wrapper's clear() and the
+    /// executor's associative-array iteration.
+    list_bindings_fill_t fill = {
+        .bindings = bindings, .capacity = count, .index = 0};
+    lle_strstr_hashtable_foreach(manager->bindings, list_bindings_visit, &fill);
+
     *bindings_out = bindings;
-    *count_out = 0;
+    *count_out = fill.index;
 
     return LLE_SUCCESS;
 }

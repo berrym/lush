@@ -264,6 +264,43 @@ TEST(bind_multiple_keys) {
     lle_keybinding_manager_destroy(manager);
 }
 
+TEST(list_bindings_enumerates) {
+    /// list_bindings must enumerate the bindings hashtable, not return an
+    /// empty set: ht_strstr_enum walks the table reliably.
+    lle_keybinding_manager_t *manager = NULL;
+    lle_result_t result = lle_keybinding_manager_create(&manager, NULL);
+    ASSERT(result == LLE_SUCCESS, "Create failed");
+
+    lle_keybinding_manager_bind(manager, "C-a", test_action,
+                                "beginning-of-line");
+    lle_keybinding_manager_bind(manager, "C-e", test_action, "end-of-line");
+    lle_keybinding_manager_bind(manager, "M-f", test_action, "forward-word");
+
+    lle_keybinding_info_t *bindings = NULL;
+    size_t count = 0;
+    result = lle_keybinding_manager_list_bindings(manager, &bindings, &count);
+    ASSERT(result == LLE_SUCCESS, "list_bindings failed");
+    ASSERT_EQ(count, 3, "list_bindings should return all three bindings");
+    ASSERT(bindings != NULL, "bindings array should be non-NULL");
+
+    bool seen_ca = false, seen_ce = false, seen_mf = false;
+    for (size_t i = 0; i < count; i++) {
+        if (strcmp(bindings[i].key_sequence, "C-a") == 0) {
+            seen_ca = true;
+        } else if (strcmp(bindings[i].key_sequence, "C-e") == 0) {
+            seen_ce = true;
+        } else if (strcmp(bindings[i].key_sequence, "M-f") == 0) {
+            seen_mf = true;
+        }
+    }
+    ASSERT(seen_ca && seen_ce && seen_mf,
+           "every bound sequence must appear in the list");
+
+    /// NULL pool -> list_bindings used malloc.
+    free(bindings);
+    lle_keybinding_manager_destroy(manager);
+}
+
 TEST(unbind_key) {
     lle_keybinding_manager_t *manager = NULL;
     lle_result_t result;
@@ -461,6 +498,7 @@ int main(void) {
     printf("\nKeybinding Operations Tests:\n");
     RUN_TEST(bind_and_lookup);
     RUN_TEST(bind_multiple_keys);
+    RUN_TEST(list_bindings_enumerates);
     RUN_TEST(unbind_key);
     RUN_TEST(lookup_nonexistent_key);
 
