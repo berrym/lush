@@ -26,7 +26,6 @@
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
-#include "lle/unicode_class.h"
 #include "lle/unicode_compare.h"
 #include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
@@ -220,7 +219,6 @@ static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment,
                               source_location_t loc);
-static bool match_pattern(const char *str, const char *pattern);
 
 /**
  * @brief Check if command is allowed in privileged mode
@@ -9344,6 +9342,39 @@ static int execute_assignment(executor_t *executor, const char *assignment,
  * @param node Case statement node
  * @return Exit status of executed commands, or 0 if no match
  */
+
+/// Find the next case-alternative `|` separator at the top level: a `|`
+/// that is not inside an extglob group `(...)` or a `[...]` bracket, and
+/// not backslash-escaped. Without this an extglob pattern like
+/// `@(cat|dog)` would be wrongly split at its inner `|`. Returns NULL
+/// when the remaining patterns hold no further top-level separator.
+static const char *find_case_alt_separator(const char *p) {
+    int paren = 0;
+    int bracket = 0;
+    for (; *p; p++) {
+        if (*p == '\\' && p[1]) {
+            p++; /// skip the escaped char
+            continue;
+        }
+        if (*p == '[') {
+            bracket++;
+        } else if (*p == ']') {
+            if (bracket > 0) {
+                bracket--;
+            }
+        } else if (*p == '(') {
+            paren++;
+        } else if (*p == ')') {
+            if (paren > 0) {
+                paren--;
+            }
+        } else if (*p == '|' && paren == 0 && bracket == 0) {
+            return p;
+        }
+    }
+    return NULL;
+}
+
 static int execute_case(executor_t *executor, node_t *node) {
     if (!executor || !node || node->type != NODE_CASE) {
         return 1;
@@ -9412,7 +9443,7 @@ static int execute_case(executor_t *executor, node_t *node) {
             /// Use strchr-based splitting that emits empty tokens.
             const char *p = patterns;
             while (p && !matched) {
-                const char *bar = strchr(p, '|');
+                const char *bar = find_case_alt_separator(p);
                 size_t plen = bar ? (size_t)(bar - p) : strlen(p);
                 char *pattern = malloc(plen + 1);
                 if (!pattern) {
@@ -9424,7 +9455,7 @@ static int execute_case(executor_t *executor, node_t *node) {
 
                 char *expanded_pattern = expand_if_needed(executor, pattern);
                 if (expanded_pattern) {
-                    if (match_pattern(test_word, expanded_pattern)) {
+                    if (lush_pattern_match(test_word, expanded_pattern)) {
                         matched = true;
                     }
                     free(expanded_pattern);
@@ -10204,222 +10235,6 @@ static char *extract_substring(const char *str, int offset, int length,
 }
 
 /**
- * @brief Match string against glob pattern
- *
- * Supports *, ?, and [...] character classes including ranges
- * and negation [!...] or [^...]. Used for case patterns and
- * parameter expansion pattern matching.
- *
- * @param str String to match
- * @param pattern Glob pattern
- * @return true if string matches pattern
- */
-static bool match_pattern(const char *str, const char *pattern) {
-    if (!str || !pattern) {
-        return false;
-    }
-
-    const char *s = str;
-    const char *p = pattern;
-
-    while (*p) {
-        if (*p == '*') {
-            /// Handle wildcard
-            p++; /// Skip the *
-
-            /// If * is at the end, it matches everything remaining
-            if (*p == '\0') {
-                return true;
-            }
-
-            /// Try to match the rest of the pattern at each position in the
-            /// string
-            while (*s) {
-                if (match_pattern(s, p)) {
-                    return true;
-                }
-                s++;
-            }
-
-            /// Try matching the pattern with empty string (for cases like
-            /// "*suffix")
-            return match_pattern(s, p);
-        } else if (*p == '?') {
-            /// Wildcard matches any single character
-            if (*s == '\0') {
-                return false; /// ? can't match empty
-            }
-            s++;
-            p++;
-        } else if (*p == '[') {
-            /// Character class pattern [abc] or [a-z]
-            if (*s == '\0') {
-                return false; /// Character class can't match empty
-            }
-
-            p++; /// Skip opening [
-            bool matched = false;
-            bool negated = false;
-
-            /// Decode the input codepoint once for the whole bracket.
-            /// All match-arms (class / range / literal) test against
-            /// this single codepoint, and the post-bracket `s` advance
-            /// uses its UTF-8 byte length so multi-byte input never
-            /// gets left mid-codepoint. Malformed UTF-8 degrades to a
-            /// byte-as-codepoint so ASCII patterns continue to work.
-            uint32_t input_cp = (uint32_t)(unsigned char)*s;
-            size_t s_consumed = 1;
-            if (*s) {
-                uint32_t decoded = 0;
-                int consumed =
-                    lle_utf8_decode_codepoint(s, strlen(s), &decoded);
-                if (consumed > 0) {
-                    input_cp = decoded;
-                    s_consumed = (size_t)consumed;
-                }
-            }
-
-            /// Check for negation [!abc] or [^abc]
-            if (*p == '!' || *p == '^') {
-                negated = true;
-                p++;
-            }
-
-            while (*p && *p != ']') {
-                /// POSIX character class [:CLASS:] (e.g. [:space:],
-                /// [:alpha:], [:digit:]). Used heavily by real-world
-                /// trim/parse idioms - `${s%%[![:space:]]*}` was
-                /// silently treating [:space:] as the literal
-                /// character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
-                /// because the class form was never parsed
-                /// (real_world/bash/201 trim function). Scan for `:]`
-                /// to delimit the class name, then dispatch through
-                /// the Unicode general-category predicates.
-                if (p[0] == '[' && p[1] == ':') {
-                    const char *class_start = p + 2;
-                    const char *class_end = strstr(class_start, ":]");
-                    if (class_end) {
-                        size_t cl = (size_t)(class_end - class_start);
-                        bool cls_match = false;
-                        if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
-                            cls_match = lle_unicode_is_space(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "alpha", 5) == 0) {
-                            cls_match = lle_unicode_is_alpha(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "digit", 5) == 0) {
-                            cls_match = lle_unicode_is_digit(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "alnum", 5) == 0) {
-                            cls_match = lle_unicode_is_alnum(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "upper", 5) == 0) {
-                            cls_match = lle_unicode_is_upper(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "lower", 5) == 0) {
-                            cls_match = lle_unicode_is_lower(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "punct", 5) == 0) {
-                            cls_match = lle_unicode_is_punct(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "print", 5) == 0) {
-                            cls_match = lle_unicode_is_print(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "graph", 5) == 0) {
-                            cls_match = lle_unicode_is_graph(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "blank", 5) == 0) {
-                            cls_match = lle_unicode_is_blank(input_cp);
-                        } else if (cl == 5 &&
-                                   memcmp(class_start, "cntrl", 5) == 0) {
-                            cls_match = lle_unicode_is_cntrl(input_cp);
-                        } else if (cl == 6 &&
-                                   memcmp(class_start, "xdigit", 6) == 0) {
-                            cls_match = lle_unicode_is_xdigit(input_cp);
-                        }
-                        if (cls_match) {
-                            matched = true;
-                        }
-                        p = class_end + 2; /// past `:]`
-                        continue;
-                    }
-                }
-
-                /// Decode the pattern codepoint at p. UTF-8 multi-byte
-                /// characters in patterns are now first-class: `[α-ω]`
-                /// is one codepoint, one `-`, one codepoint, not five
-                /// independent bytes. Malformed UTF-8 falls back to a
-                /// single byte so ASCII patterns are untouched.
-                uint32_t pat_first = (uint32_t)(unsigned char)*p;
-                size_t pat_first_bytes = 1;
-                {
-                    uint32_t decoded = 0;
-                    int consumed =
-                        lle_utf8_decode_codepoint(p, strlen(p), &decoded);
-                    if (consumed > 0) {
-                        pat_first = decoded;
-                        pat_first_bytes = (size_t)consumed;
-                    }
-                }
-                const char *after_first = p + pat_first_bytes;
-                if (*after_first == '-' && after_first[1] != ']' &&
-                    after_first[1] != '\0') {
-                    /// Range pattern X-Y. Decode the end codepoint.
-                    const char *range_end = after_first + 1;
-                    uint32_t pat_end = (uint32_t)(unsigned char)*range_end;
-                    size_t pat_end_bytes = 1;
-                    {
-                        uint32_t decoded = 0;
-                        int consumed = lle_utf8_decode_codepoint(
-                            range_end, strlen(range_end), &decoded);
-                        if (consumed > 0) {
-                            pat_end = decoded;
-                            pat_end_bytes = (size_t)consumed;
-                        }
-                    }
-                    if (input_cp >= pat_first && input_cp <= pat_end) {
-                        matched = true;
-                    }
-                    p = range_end + pat_end_bytes;
-                } else {
-                    /// Single codepoint
-                    if (input_cp == pat_first) {
-                        matched = true;
-                    }
-                    p += pat_first_bytes;
-                }
-            }
-
-            if (*p == ']') {
-                p++; /// Skip closing ]
-            }
-
-            /// Apply negation if needed
-            if (negated) {
-                matched = !matched;
-            }
-
-            if (!matched) {
-                return false;
-            }
-
-            s += s_consumed;
-        } else {
-            /// Literal character match (including special chars like : @ /
-            /// etc.)
-            if (*s != *p) {
-                return false;
-            }
-            s++;
-            p++;
-        }
-    }
-
-    /// Pattern is exhausted, string should be too for a complete match
-    return *s == '\0';
-}
-
-/**
  * @brief Find prefix match length for # and ## operators
  *
  * Finds how many characters from the beginning of str match pattern.
@@ -10448,7 +10263,7 @@ static int find_prefix_match(const char *str, const char *pattern,
         strncpy(substr, str, i);
         substr[i] = '\0';
 
-        if (match_pattern(substr, pattern)) {
+        if (lush_pattern_match(substr, pattern)) {
             match_len = i;
             if (!longest) {
                 free(substr);
@@ -10483,7 +10298,7 @@ static int find_suffix_match(const char *str, const char *pattern,
 
     for (int i = 0; i <= str_len; i++) {
         const char *suffix = str + str_len - i;
-        if (match_pattern(suffix, pattern)) {
+        if (lush_pattern_match(suffix, pattern)) {
             match_len = i;
             if (!longest) {
                 break; /// Return first (shortest) match
