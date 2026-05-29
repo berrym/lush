@@ -18,7 +18,7 @@
 #include <string.h>
 
 /// Convenience: expand a NUL-terminated literal.
-static char *exp(const char *s, lush_escape_dialect_t d) {
+static char *esc_expand(const char *s, lush_escape_dialect_t d) {
     return lush_expand_escapes(s, strlen(s), d);
 }
 
@@ -28,28 +28,28 @@ static char *exp(const char *s, lush_escape_dialect_t d) {
  */
 
 TEST(simple_basic_escapes) {
-    char *r = exp("a\\nb\\tc\\\\d", LUSH_ESC_SIMPLE);
+    char *r = esc_expand("a\\nb\\tc\\\\d", LUSH_ESC_SIMPLE);
     ASSERT_STR_EQ(r, "a\nb\tc\\d", "n/t/backslash decoded");
     free(r);
 }
 
 TEST(simple_quotes) {
-    char *r = exp("\\\"q\\'s", LUSH_ESC_SIMPLE);
+    char *r = esc_expand("\\\"q\\'s", LUSH_ESC_SIMPLE);
     ASSERT_STR_EQ(r, "\"q's", "escaped quotes decoded");
     free(r);
 }
 
 TEST(simple_unknown_kept_literal) {
-    char *r = exp("a\\zb", LUSH_ESC_SIMPLE);
+    char *r = esc_expand("a\\zb", LUSH_ESC_SIMPLE);
     ASSERT_STR_EQ(r, "a\\zb", "unknown escape preserved as backslash+char");
     free(r);
 }
 
 TEST(simple_does_not_interpret_hex_or_octal) {
-    char *r = exp("\\x41", LUSH_ESC_SIMPLE);
+    char *r = esc_expand("\\x41", LUSH_ESC_SIMPLE);
     ASSERT_STR_EQ(r, "\\x41", "\\x is literal in simple dialect");
     free(r);
-    char *o = exp("\\101", LUSH_ESC_SIMPLE);
+    char *o = esc_expand("\\101", LUSH_ESC_SIMPLE);
     ASSERT_STR_EQ(o, "\\101", "octal is literal in simple dialect");
     free(o);
 }
@@ -60,26 +60,26 @@ TEST(simple_does_not_interpret_hex_or_octal) {
  */
 
 TEST(ansi_basic_escapes) {
-    char *r = exp("a\\nb\\tc", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("a\\nb\\tc", LUSH_ESC_ANSI_C);
     ASSERT_STR_EQ(r, "a\nb\tc", "basic escapes shared with simple");
     free(r);
 }
 
 TEST(ansi_hex) {
-    char *r = exp("\\x41\\x42", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("\\x41\\x42", LUSH_ESC_ANSI_C);
     ASSERT_STR_EQ(r, "AB", "\\xHH decoded");
     free(r);
 }
 
 TEST(ansi_octal) {
-    char *r = exp("\\101\\102", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("\\101\\102", LUSH_ESC_ANSI_C);
     ASSERT_STR_EQ(r, "AB", "\\NNN octal decoded");
     free(r);
 }
 
 TEST(ansi_unicode_bmp) {
     /// é is U+00E9 (e-acute) = UTF-8 0xC3 0xA9.
-    char *r = exp("\\u00e9", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("\\u00e9", LUSH_ESC_ANSI_C);
     ASSERT_TRUE((unsigned char)r[0] == 0xC3 && (unsigned char)r[1] == 0xA9 &&
                     r[2] == '\0',
                 "\\uNNNN encodes UTF-8");
@@ -88,7 +88,7 @@ TEST(ansi_unicode_bmp) {
 
 TEST(ansi_unicode_astral) {
     /// \U0001F600 is U+1F600 = UTF-8 F0 9F 98 80 (4 bytes, no truncation).
-    char *r = exp("\\U0001F600", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("\\U0001F600", LUSH_ESC_ANSI_C);
     ASSERT_TRUE((unsigned char)r[0] == 0xF0 && (unsigned char)r[1] == 0x9F &&
                     (unsigned char)r[2] == 0x98 &&
                     (unsigned char)r[3] == 0x80 && r[4] == '\0',
@@ -97,19 +97,19 @@ TEST(ansi_unicode_astral) {
 }
 
 TEST(ansi_control_and_escape) {
-    char *r = exp("\\cA", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("\\cA", LUSH_ESC_ANSI_C);
     ASSERT_TRUE(r[0] == 0x01 && r[1] == '\0', "\\cA is control-A (0x01)");
     free(r);
-    char *e = exp("\\e", LUSH_ESC_ANSI_C);
+    char *e = esc_expand("\\e", LUSH_ESC_ANSI_C);
     ASSERT_TRUE(e[0] == 0x1b && e[1] == '\0', "\\e is ESC (0x1b)");
     free(e);
-    char *q = exp("\\?", LUSH_ESC_ANSI_C);
+    char *q = esc_expand("\\?", LUSH_ESC_ANSI_C);
     ASSERT_STR_EQ(q, "?", "\\? is literal question mark");
     free(q);
 }
 
 TEST(empty_and_null) {
-    char *r = exp("", LUSH_ESC_ANSI_C);
+    char *r = esc_expand("", LUSH_ESC_ANSI_C);
     ASSERT_STR_EQ(r, "", "empty input yields empty string");
     free(r);
     char *n = lush_expand_escapes(NULL, 0, LUSH_ESC_SIMPLE);
