@@ -1908,6 +1908,62 @@ TEST(param_substring_offset_length) {
                         "[]\n");
 }
 
+TEST(rt_zsh_modifier_path_parts) {
+    /// zsh :h/:t/:r/:e path modifiers (issue #132).
+    run_result_t r = run_shell("mode zsh\n"
+                               "p=/usr/local/bin/script.tar.gz\n"
+                               "echo \"${p:h}|${p:t}|${p:r}|${p:e}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(
+        r, "/usr/local/bin|script.tar.gz|/usr/local/bin/script.tar|gz\n");
+}
+
+TEST(rt_zsh_modifier_case_and_quote) {
+    /// :l/:u case modifiers and :q (backslash quoting, zsh style).
+    run_result_t r = run_shell("mode zsh\n"
+                               "s=\"Hello World\"\n"
+                               "echo \"${s:l}|${s:u}|${s:q}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "hello world|HELLO WORLD|Hello\\ World\n");
+}
+
+TEST(rt_zsh_modifier_substitute) {
+    /// :s/old/new/ (first) and :gs/old/new/ (global).
+    run_result_t r = run_shell("mode zsh\n"
+                               "p=/usr/local/bin\n"
+                               "echo \"${p:s/local/LOCAL/}|${p:gs/o/0/}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "/usr/LOCAL/bin|/usr/l0cal/bin\n");
+}
+
+TEST(rt_zsh_modifier_chain_and_nest) {
+    /// Chained (:t:r) and nested (${${p:t}:r}) modifiers compose.
+    run_result_t r = run_shell("mode zsh\n"
+                               "p=/usr/local/bin/script.tar.gz\n"
+                               "echo \"${p:t:r}|${${p:t}:r}|${${p:h}:t}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "script.tar|script.tar|bin\n");
+}
+
+TEST(rt_zsh_modifier_off_in_bash_is_substring) {
+    /// In bash mode ${var:h} is substring-offset (h parses as 0), not a
+    /// modifier, so the whole value is returned -- matching bash.
+    run_result_t r = run_shell("mode bash\n"
+                               "p=/usr/local/bin\n"
+                               "echo \"${p:h}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "/usr/local/bin\n");
+}
+
+TEST(rt_zsh_modifier_numeric_arg_still_substring) {
+    /// Even in zsh mode a numeric argument is substring, not a modifier.
+    run_result_t r = run_shell("mode zsh\n"
+                               "s=abcdef\n"
+                               "echo \"${s:2}|${s:1:3}\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "cdef|bcd\n");
+}
+
 TEST(param_pattern_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4270,6 +4326,12 @@ int main(void) {
     RUN_TEST(param_substring_removal_prefix);
     RUN_TEST(param_substring_removal_suffix);
     RUN_TEST(param_substring_offset_length);
+    RUN_TEST(rt_zsh_modifier_path_parts);
+    RUN_TEST(rt_zsh_modifier_case_and_quote);
+    RUN_TEST(rt_zsh_modifier_substitute);
+    RUN_TEST(rt_zsh_modifier_chain_and_nest);
+    RUN_TEST(rt_zsh_modifier_off_in_bash_is_substring);
+    RUN_TEST(rt_zsh_modifier_numeric_arg_still_substring);
     RUN_TEST(param_pattern_substitution);
     RUN_TEST(param_global_substitution);
 

@@ -11931,12 +11931,228 @@ static const char *find_op_outside_brackets(const char *haystack,
             }
             continue;
         }
+        if (p[0] == '$' && p[1] == '{') {
+            /// Skip a nested ${...} so an operator inside it is not
+            /// mistaken for this expansion's operator -- the inner ':'
+            /// of ${${p:t}:r} must not hide the outer ':r'.
+            int depth = 1;
+            p += 2;
+            while (*p && depth > 0) {
+                if (*p == '{') {
+                    depth++;
+                } else if (*p == '}') {
+                    depth--;
+                }
+                p++;
+            }
+            continue;
+        }
         if (strncmp(p, needle, needle_len) == 0) {
             return p;
         }
         p++;
     }
     return NULL;
+}
+
+/// zsh `:h` (head / dirname): everything up to the last '/'. No slash
+/// yields "." (a relative name has no directory part).
+static char *zsh_mod_head(const char *v) {
+    const char *slash = strrchr(v, '/');
+    if (!slash) {
+        return strdup(".");
+    }
+    if (slash == v) {
+        return strdup("/"); /// "/foo" -> "/"
+    }
+    size_t n = (size_t)(slash - v);
+    char *r = malloc(n + 1);
+    if (r) {
+        memcpy(r, v, n);
+        r[n] = '\0';
+    }
+    return r;
+}
+
+/// zsh `:t` (tail / basename): everything after the last '/'.
+static char *zsh_mod_tail(const char *v) {
+    const char *slash = strrchr(v, '/');
+    return strdup(slash ? slash + 1 : v);
+}
+
+/// Locate the extension dot in the tail component: the last '.' that is
+/// after the last '/' and not the leading character of the tail (so a
+/// dotfile like ".bashrc" has no extension). Returns NULL when none.
+static const char *zsh_ext_dot(const char *v) {
+    const char *slash = strrchr(v, '/');
+    const char *base = slash ? slash + 1 : v;
+    const char *dot = strrchr(base, '.');
+    if (!dot || dot == base) {
+        return NULL;
+    }
+    return dot;
+}
+
+/// zsh `:r` (root): strip the last extension (".gz" off "x.tar.gz").
+static char *zsh_mod_root(const char *v) {
+    const char *dot = zsh_ext_dot(v);
+    if (!dot) {
+        return strdup(v);
+    }
+    size_t n = (size_t)(dot - v);
+    char *r = malloc(n + 1);
+    if (r) {
+        memcpy(r, v, n);
+        r[n] = '\0';
+    }
+    return r;
+}
+
+/// zsh `:e` (extension): the text after the last extension dot, or "".
+static char *zsh_mod_ext(const char *v) {
+    const char *dot = zsh_ext_dot(v);
+    return strdup(dot ? dot + 1 : "");
+}
+
+/// zsh `:q` (quote): backslash-escape characters that are not safe bare,
+/// so the result re-evaluates to the original (zsh emits "Hello\ World",
+/// not the single-quoted form bash's @Q uses). UTF-8 continuation bytes
+/// (>= 0x80) are left intact so multibyte characters are not mangled.
+static char *zsh_mod_quote(const char *v) {
+    size_t len = strlen(v);
+    char *r = malloc(len * 2 + 1);
+    if (!r) {
+        return NULL;
+    }
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)v[i];
+        bool safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                    (c >= '0' && c <= '9') || c == '/' || c == '.' ||
+                    c == '_' || c == '-' || c == '+' || c == ',' || c >= 0x80;
+        if (!safe) {
+            r[j++] = '\\';
+        }
+        r[j++] = (char)c;
+    }
+    r[j] = '\0';
+    return r;
+}
+
+/// Apply a zsh modifier chain (the argument after the first ':' in
+/// ${var:...}) to @p value. Supports h/t/r/e (path), l/u (case),
+/// q (quote), and s/old/new/ plus gs/old/new/ (substitute, optional g
+/// for global), separated or run together (e.g. "t:r" or "h:h").
+/// Returns a newly malloc'd string; the caller frees. Unknown modifier
+/// letters are skipped (zsh would error; we degrade gracefully).
+static char *apply_zsh_modifiers(executor_t *executor, const char *value,
+                                 const char *chain) {
+    (void)executor;
+    char *cur = strdup(value ? value : "");
+    if (!cur) {
+        return NULL;
+    }
+    const char *p = chain;
+    while (p && *p) {
+        if (*p == ':') {
+            p++;
+            continue;
+        }
+        char m = *p;
+        char *next = NULL;
+        if (m == 'h') {
+            next = zsh_mod_head(cur);
+            p++;
+        } else if (m == 't') {
+            next = zsh_mod_tail(cur);
+            p++;
+        } else if (m == 'r') {
+            next = zsh_mod_root(cur);
+            p++;
+        } else if (m == 'e') {
+            next = zsh_mod_ext(cur);
+            p++;
+        } else if (m == 'l') {
+            next = convert_case_all_lower(cur);
+            p++;
+        } else if (m == 'u') {
+            next = convert_case_all_upper(cur);
+            p++;
+        } else if (m == 'q') {
+            next = zsh_mod_quote(cur);
+            p++;
+        } else if (m == 's' || (m == 'g' && p[1] == 's')) {
+            bool global = (m == 'g');
+            if (global) {
+                p++; /// past 'g'
+            }
+            p++; /// past 's'
+            if (!*p) {
+                break; /// malformed: no delimiter
+            }
+            char delim = *p++;
+            const char *old_start = p;
+            while (*p && *p != delim) {
+                p++;
+            }
+            if (*p != delim) {
+                break; /// malformed: unterminated old
+            }
+            size_t old_len = (size_t)(p - old_start);
+            p++; /// past middle delim
+            const char *new_start = p;
+            while (*p && *p != delim) {
+                p++;
+            }
+            size_t new_len = (size_t)(p - new_start);
+            if (*p == delim) {
+                p++; /// optional trailing delim
+            }
+            char *oldp = malloc(old_len + 1);
+            char *newp = malloc(new_len + 1);
+            if (oldp && newp) {
+                memcpy(oldp, old_start, old_len);
+                oldp[old_len] = '\0';
+                memcpy(newp, new_start, new_len);
+                newp[new_len] = '\0';
+                next = pattern_substitute(cur, oldp, newp, global);
+            }
+            free(oldp);
+            free(newp);
+        } else {
+            /// Unknown modifier letter: skip it.
+            p++;
+            continue;
+        }
+        if (next) {
+            free(cur);
+            cur = next;
+        }
+    }
+    return cur;
+}
+
+/// True if the argument after ':' in ${var:...} is a zsh modifier chain
+/// (leads with a modifier letter) rather than a substring offset (which
+/// begins with a digit, sign, space, or arithmetic paren).
+static bool looks_like_zsh_modifier(const char *arg) {
+    if (!arg) {
+        return false;
+    }
+    switch (arg[0]) {
+    case 'h':
+    case 't':
+    case 'r':
+    case 'e':
+    case 'l':
+    case 'u':
+    case 'q':
+    case 's':
+    case 'g':
+        return true;
+    default:
+        return false;
+    }
 }
 
 static char *parse_parameter_expansion(executor_t *executor,
@@ -14003,8 +14219,15 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
         }
 
-        /// Get variable value
-        char *var_value = symtable_get_var(executor->symtable, var_name);
+        /// Get variable value. A nested expansion in the name position
+        /// (${${inner}:op}) is expanded first so the outer operator or
+        /// modifier applies to the inner result, e.g. ${${p:t}:r}.
+        char *var_value;
+        if (var_name[0] == '$' && var_name[1] == '{') {
+            var_value = expand_variable(executor, var_name);
+        } else {
+            var_value = symtable_get_var(executor->symtable, var_name);
+        }
         const char *default_value = op_pos + strlen(operators[op_type]);
 
         /// Expand variables in default value
@@ -14469,8 +14692,15 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 14: /// ${var:offset:length} - substring expansion
-            if (var_value) {
+        case 14: /// ${var:offset:length} substring, or ${var:h...} modifiers
+            if (var_value && shell_mode_allows(FEATURE_ZSH_PARAM_MODIFIERS) &&
+                looks_like_zsh_modifier(expanded_default)) {
+                /// zsh modifier chain (:h, :t, :r, :e, :l, :u, :q, :s///,
+                /// :gs///). The leading char is a modifier letter, which is
+                /// never a valid substring offset (those are numeric).
+                result =
+                    apply_zsh_modifiers(executor, var_value, expanded_default);
+            } else if (var_value) {
                 /// Parse offset and optional length (with variable expansion)
                 char *expanded_offset_str =
                     expand_variables_in_string(executor, expanded_default);
