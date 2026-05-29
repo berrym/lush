@@ -2400,7 +2400,8 @@ if fs.exists('tests/unit/test_escape.c')
   test_escape = executable('test_escape',
                            'tests/unit/test_escape.c',
                            'src/escape.c',
-                           include_directories: [inc, include_directories('tests')])
+                           include_directories: [inc, include_directories('tests')],
+                           dependencies: [lle_dep])
   test('Escape Engine', test_escape,
        suite: 'unit',
        timeout: 30)

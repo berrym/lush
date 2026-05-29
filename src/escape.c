@@ -8,6 +8,8 @@
 
 #include "escape.h"
 
+#include "lle/utf8_support.h"
+
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -38,33 +40,6 @@ int lush_escape_basic_char(char c) {
     default:
         return -1;
     }
-}
-
-/// Encode `cp` as UTF-8 into `out` (must hold >= 4 bytes); return byte count.
-static size_t encode_utf8(uint32_t cp, char *out) {
-    if (cp < 0x80) {
-        out[0] = (char)cp;
-        return 1;
-    }
-    if (cp < 0x800) {
-        out[0] = (char)(0xC0 | (cp >> 6));
-        out[1] = (char)(0x80 | (cp & 0x3F));
-        return 2;
-    }
-    if (cp < 0x10000) {
-        out[0] = (char)(0xE0 | (cp >> 12));
-        out[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-        out[2] = (char)(0x80 | (cp & 0x3F));
-        return 3;
-    }
-    if (cp <= 0x10FFFF) {
-        out[0] = (char)(0xF0 | (cp >> 18));
-        out[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
-        out[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
-        out[3] = (char)(0x80 | (cp & 0x3F));
-        return 4;
-    }
-    return 0;
 }
 
 char *lush_expand_escapes(const char *str, size_t len,
@@ -139,7 +114,10 @@ char *lush_expand_escapes(const char *str, size_t len,
                     }
                     if (n == want) {
                         uint32_t cp = (uint32_t)strtoul(hex, NULL, 16);
-                        pos += encode_utf8(cp, out + pos);
+                        int enc = lle_utf8_encode_codepoint(cp, out + pos);
+                        if (enc > 0) {
+                            pos += (size_t)enc;
+                        }
                         i += 2 + (size_t)n;
                     } else {
                         out[pos++] = str[i++];
