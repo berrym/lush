@@ -11617,6 +11617,118 @@ static bool looks_like_zsh_modifier(const char *arg) {
     }
 }
 
+/* ============================================================================
+ * Param-expansion helpers: space-separated word lists
+ * --------------------------------------------------------------------------
+ * The zsh `(o)` / `(O)` / `(u)` parameter-expansion flags all reduce to the
+ * same shape -- count words, allocate an array, strdup-split on space,
+ * transform the array (sort / dedup), rejoin with single spaces. These
+ * helpers centralize that pattern so the three call sites don't drift apart.
+ * ========================================================================== */
+
+/**
+ * @brief Split `text` on single-space runs into a heap array of strdup'd
+ *        word strings. *out_count receives the number of words. Caller
+ *        frees each entry plus the array (use words_free).
+ *
+ * Returns NULL on NULL input, empty input, or allocation failure.
+ */
+static char **words_split_on_space(const char *text, size_t *out_count) {
+    *out_count = 0;
+    if (!text || !*text) {
+        return NULL;
+    }
+    size_t word_count = 0;
+    bool in_word = false;
+    for (const char *c = text; *c; c++) {
+        if (*c == ' ') {
+            in_word = false;
+        } else if (!in_word) {
+            word_count++;
+            in_word = true;
+        }
+    }
+    if (word_count == 0) {
+        return NULL;
+    }
+    char **words = malloc(word_count * sizeof(char *));
+    if (!words) {
+        return NULL;
+    }
+    char *copy = strdup(text);
+    if (!copy) {
+        free(words);
+        return NULL;
+    }
+    size_t idx = 0;
+    char *tok = strtok(copy, " ");
+    while (tok && idx < word_count) {
+        words[idx] = strdup(tok);
+        if (!words[idx]) {
+            for (size_t i = 0; i < idx; i++) {
+                free(words[i]);
+            }
+            free(words);
+            free(copy);
+            return NULL;
+        }
+        idx++;
+        tok = strtok(NULL, " ");
+    }
+    free(copy);
+    *out_count = idx;
+    return words;
+}
+
+/**
+ * @brief Rejoin `words[0..count)` with single-space separators into a
+ *        fresh malloc'd NUL-terminated string. NULL on OOM or count==0.
+ */
+static char *words_join_on_space(char **words, size_t count) {
+    if (!words || count == 0) {
+        return NULL;
+    }
+    size_t total_len = 0;
+    for (size_t i = 0; i < count; i++) {
+        total_len += strlen(words[i]) + 1;
+    }
+    char *out = malloc(total_len + 1);
+    if (!out) {
+        return NULL;
+    }
+    out[0] = '\0';
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) {
+            strcat(out, " ");
+        }
+        strcat(out, words[i]);
+    }
+    return out;
+}
+
+/**
+ * @brief Free the array returned by words_split_on_space (NULL-safe).
+ */
+static void words_free(char **words, size_t count) {
+    if (!words) {
+        return;
+    }
+    for (size_t i = 0; i < count; i++) {
+        free(words[i]);
+    }
+    free(words);
+}
+
+/// qsort comparator: strcmp ascending.
+static int cmp_str_asc(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+/// qsort comparator: strcmp descending.
+static int cmp_str_desc(const void *a, const void *b) {
+    return strcmp(*(const char *const *)b, *(const char *const *)a);
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -12145,154 +12257,43 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
                 }
 
-                case 'o':
-                    /// Sort ascending - split on spaces, sort, rejoin
-                    {
-                        /// Count words
-                        size_t word_count = 0;
-                        bool in_word = false;
-                        for (const char *c = result; *c; c++) {
-                            if (*c == ' ') {
-                                in_word = false;
-                            } else if (!in_word) {
-                                word_count++;
-                                in_word = true;
+                case 'o': {
+                    /// Sort ascending via the shared word-list helpers.
+                    size_t count = 0;
+                    char **words = words_split_on_space(result, &count);
+                    if (words && count > 1) {
+                        qsort(words, count, sizeof(char *), cmp_str_asc);
+                        new_result = words_join_on_space(words, count);
+                        if (new_result) {
+                            if (result != inner_result) {
+                                free(result);
                             }
-                        }
-
-                        if (word_count > 1) {
-                            char **words = malloc(word_count * sizeof(char *));
-                            if (words) {
-                                /// Split into words
-                                char *copy = strdup(result);
-                                if (copy) {
-                                    size_t idx = 0;
-                                    char *tok = strtok(copy, " ");
-                                    while (tok && idx < word_count) {
-                                        words[idx++] = strdup(tok);
-                                        tok = strtok(NULL, " ");
-                                    }
-                                    word_count = idx;
-
-                                    /// Sort ascending
-                                    for (size_t i = 0; i < word_count - 1;
-                                         i++) {
-                                        for (size_t j = i + 1; j < word_count;
-                                             j++) {
-                                            if (strcmp(words[i], words[j]) >
-                                                0) {
-                                                char *tmp = words[i];
-                                                words[i] = words[j];
-                                                words[j] = tmp;
-                                            }
-                                        }
-                                    }
-
-                                    /// Rejoin
-                                    size_t total_len = 0;
-                                    for (size_t i = 0; i < word_count; i++) {
-                                        total_len += strlen(words[i]) + 1;
-                                    }
-                                    new_result = malloc(total_len + 1);
-                                    if (new_result) {
-                                        new_result[0] = '\0';
-                                        for (size_t i = 0; i < word_count;
-                                             i++) {
-                                            if (i > 0)
-                                                strcat(new_result, " ");
-                                            strcat(new_result, words[i]);
-                                        }
-                                    }
-
-                                    for (size_t i = 0; i < word_count; i++) {
-                                        free(words[i]);
-                                    }
-                                    free(copy);
-                                }
-                                free(words);
-                            }
-                            if (new_result) {
-                                if (result != inner_result)
-                                    free(result);
-                                result = new_result;
-                            }
+                            result = new_result;
                         }
                     }
+                    words_free(words, count);
                     p++;
                     break;
+                }
 
-                case 'O':
-                    /// Sort descending - same as 'o' but reverse comparison
-                    {
-                        size_t word_count = 0;
-                        bool in_word = false;
-                        for (const char *c = result; *c; c++) {
-                            if (*c == ' ') {
-                                in_word = false;
-                            } else if (!in_word) {
-                                word_count++;
-                                in_word = true;
+                case 'O': {
+                    /// Sort descending via the shared word-list helpers.
+                    size_t count = 0;
+                    char **words = words_split_on_space(result, &count);
+                    if (words && count > 1) {
+                        qsort(words, count, sizeof(char *), cmp_str_desc);
+                        new_result = words_join_on_space(words, count);
+                        if (new_result) {
+                            if (result != inner_result) {
+                                free(result);
                             }
-                        }
-
-                        if (word_count > 1) {
-                            char **words = malloc(word_count * sizeof(char *));
-                            if (words) {
-                                char *copy = strdup(result);
-                                if (copy) {
-                                    size_t idx = 0;
-                                    char *tok = strtok(copy, " ");
-                                    while (tok && idx < word_count) {
-                                        words[idx++] = strdup(tok);
-                                        tok = strtok(NULL, " ");
-                                    }
-                                    word_count = idx;
-
-                                    /// Sort descending
-                                    for (size_t i = 0; i < word_count - 1;
-                                         i++) {
-                                        for (size_t j = i + 1; j < word_count;
-                                             j++) {
-                                            if (strcmp(words[i], words[j]) <
-                                                0) {
-                                                char *tmp = words[i];
-                                                words[i] = words[j];
-                                                words[j] = tmp;
-                                            }
-                                        }
-                                    }
-
-                                    size_t total_len = 0;
-                                    for (size_t i = 0; i < word_count; i++) {
-                                        total_len += strlen(words[i]) + 1;
-                                    }
-                                    new_result = malloc(total_len + 1);
-                                    if (new_result) {
-                                        new_result[0] = '\0';
-                                        for (size_t i = 0; i < word_count;
-                                             i++) {
-                                            if (i > 0)
-                                                strcat(new_result, " ");
-                                            strcat(new_result, words[i]);
-                                        }
-                                    }
-
-                                    for (size_t i = 0; i < word_count; i++) {
-                                        free(words[i]);
-                                    }
-                                    free(copy);
-                                }
-                                free(words);
-                            }
-                            if (new_result) {
-                                if (result != inner_result)
-                                    free(result);
-                                result = new_result;
-                            }
+                            result = new_result;
                         }
                     }
+                    words_free(words, count);
                     p++;
                     break;
+                }
 
                 case 'k':
                     /// Keys flag - already handled before inner expansion
@@ -12305,73 +12306,50 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'u': {
-                    /// Unique: dedupe consecutive (and non-consecutive)
-                    /// elements after splitting on spaces. zsh's (u)
-                    /// removes ALL duplicates, not just adjacent ones.
-                    /// Combine with (o) or (O) for sort+unique. Issue
-                    /// #103.
-                    size_t word_count = 0;
-                    bool in_word = false;
-                    for (const char *c = result; *c; c++) {
-                        if (*c == ' ') {
-                            in_word = false;
-                        } else if (!in_word) {
-                            word_count++;
-                            in_word = true;
-                        }
-                    }
-                    if (word_count > 1) {
-                        char **words = malloc(word_count * sizeof(char *));
-                        if (words) {
-                            char *copy = strdup(result);
-                            if (copy) {
-                                size_t idx = 0;
-                                char *tok = strtok(copy, " ");
-                                while (tok && idx < word_count) {
-                                    /// Skip if already seen. O(N^2)
-                                    /// is fine for typical zsh array
-                                    /// sizes; switching to a hash set
-                                    /// would be premature.
-                                    bool seen = false;
-                                    for (size_t k = 0; k < idx; k++) {
-                                        if (strcmp(words[k], tok) == 0) {
-                                            seen = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!seen) {
-                                        words[idx++] = strdup(tok);
-                                    }
-                                    tok = strtok(NULL, " ");
+                    /// Unique: drop ALL duplicates (not just adjacent).
+                    /// zsh (u) preserves first-seen order. Combine with
+                    /// (o) or (O) for sort+unique. Issue #103. The
+                    /// O(N^2) dedup is fine for typical zsh array sizes;
+                    /// a hash set would be premature.
+                    size_t count = 0;
+                    char **words = words_split_on_space(result, &count);
+                    if (words && count > 1) {
+                        size_t unique_count = 0;
+                        for (size_t i = 0; i < count; i++) {
+                            bool seen = false;
+                            for (size_t k = 0; k < unique_count; k++) {
+                                if (strcmp(words[k], words[i]) == 0) {
+                                    seen = true;
+                                    break;
                                 }
-                                size_t unique_count = idx;
-                                size_t total_len = 0;
-                                for (size_t k = 0; k < unique_count; k++) {
-                                    total_len += strlen(words[k]) + 1;
-                                }
-                                new_result = malloc(total_len + 1);
-                                if (new_result) {
-                                    new_result[0] = '\0';
-                                    for (size_t k = 0; k < unique_count; k++) {
-                                        if (k > 0) {
-                                            strcat(new_result, " ");
-                                        }
-                                        strcat(new_result, words[k]);
-                                    }
-                                }
-                                for (size_t k = 0; k < unique_count; k++) {
-                                    free(words[k]);
-                                }
-                                free(copy);
                             }
-                            free(words);
+                            if (seen) {
+                                free(words[i]);
+                                words[i] = NULL;
+                            } else if (unique_count != i) {
+                                words[unique_count++] = words[i];
+                                words[i] = NULL;
+                            } else {
+                                unique_count++;
+                            }
                         }
+                        new_result = words_join_on_space(words, unique_count);
                         if (new_result) {
                             if (result != inner_result) {
                                 free(result);
                             }
                             result = new_result;
                         }
+                        /// Free any remaining entries (in case unique_count
+                        /// < count and we left holes -- but the loop above
+                        /// already freed dropped entries).
+                        for (size_t i = unique_count; i < count; i++) {
+                            free(words[i]);
+                            words[i] = NULL;
+                        }
+                        free(words);
+                    } else {
+                        words_free(words, count);
                     }
                     p++;
                     break;
