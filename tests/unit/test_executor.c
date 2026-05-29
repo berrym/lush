@@ -1922,6 +1922,19 @@ TEST(param_substring_offset_length) {
                         "[]\n");
 }
 
+TEST(rt_positional_param_slice) {
+    /// ${@:offset:length} slices the positional parameters, counting $0
+    /// at index 0 like bash; a negative offset counts from the end (#147).
+    run_result_t r =
+        run_shell("set -- a b c d e\n"
+                  "for w in \"${@:2}\"; do echo \"f:$w\"; done\n"
+                  "for w in \"${@:2:2}\"; do echo \"s:$w\"; done\n"
+                  "for w in \"${@: -2}\"; do echo \"n:$w\"; done\n");
+    ASSERT_STDOUT_EQ(r, "f:b\nf:c\nf:d\nf:e\n"
+                        "s:b\ns:c\n"
+                        "n:d\nn:e\n");
+}
+
 TEST(rt_zsh_modifier_path_parts) {
     /// zsh :h/:t/:r/:e path modifiers (issue #132).
     run_result_t r = run_shell("mode zsh\n"
@@ -4353,6 +4366,7 @@ int main(void) {
     RUN_TEST(param_substring_removal_prefix);
     RUN_TEST(param_substring_removal_suffix);
     RUN_TEST(param_substring_offset_length);
+    RUN_TEST(rt_positional_param_slice);
     RUN_TEST(rt_zsh_modifier_path_parts);
     RUN_TEST(rt_zsh_modifier_case_and_quote);
     RUN_TEST(rt_zsh_modifier_substitute);
