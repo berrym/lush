@@ -36,9 +36,9 @@
  */
 
 #include "builtins.h"
+#include "pattern_match.h"
 #include "symtable.h"
 
-#include <fnmatch.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,8 +79,9 @@ static zstyle_entry_t *find_exact(const char *pattern, const char *style) {
 }
 
 /// Find the recorded entry whose pattern matches the query pattern via
-/// fnmatch (i.e., the query pattern is the "context" being looked up).
-/// Returns the first match; future enhancement: specificity ranking.
+/// lush_pattern_match (i.e., the query pattern is the "context" being
+/// looked up). Returns the first match; future enhancement: specificity
+/// ranking.
 static zstyle_entry_t *find_matching(const char *query_pattern,
                                      const char *style) {
     if (!query_pattern || !style) {
@@ -91,7 +92,7 @@ static zstyle_entry_t *find_matching(const char *query_pattern,
     if (exact) {
         return exact;
     }
-    /// Then fnmatch: recorded pattern's wildcards expand against the
+    /// Then glob-match: recorded pattern's wildcards expand against the
     /// query pattern. (Reverse of the conventional zsh lookup, where the
     /// query is a specific context string and recorded patterns match
     /// against it. For corpus purposes both directions cover the same
@@ -100,8 +101,8 @@ static zstyle_entry_t *find_matching(const char *query_pattern,
         if (strcmp(e->style, style) != 0) {
             continue;
         }
-        if (fnmatch(e->pattern, query_pattern, 0) == 0 ||
-            fnmatch(query_pattern, e->pattern, 0) == 0) {
+        if (lush_pattern_match(query_pattern, e->pattern) ||
+            lush_pattern_match(e->pattern, query_pattern)) {
             return e;
         }
     }

@@ -44,7 +44,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fnmatch.h>
 #include <glob.h>
 #include <math.h>
 #include <pwd.h>
@@ -7158,182 +7157,6 @@ static bool has_extglob_pattern(const char *pattern) {
 }
 
 /**
- * @brief Convert extglob pattern to regex pattern
- *
- * Converts bash extglob syntax to POSIX extended regex:
- *   ?(pat)  -> (pat)?
- *   *(pat)  -> (pat)*
- *   +(pat)  -> (pat)+
- *   @(pat)  -> (pat)
- *   !(pat)  -> handled specially (negative match)
- *   *       -> .*
- *   ?       -> .
- *   .       -> \.
- *
- * @param pattern Extglob pattern
- * @param is_negated Output: true if pattern uses !(...)
- * @return Regex pattern (caller must free), or NULL on error
- */
-static char *extglob_to_regex(const char *pattern, bool *is_negated) {
-    if (!pattern)
-        return NULL;
-
-    *is_negated = false;
-
-    /// Allocate generous buffer (pattern can expand significantly)
-    size_t max_len = strlen(pattern) * 4 + 10;
-    char *regex = malloc(max_len);
-    if (!regex)
-        return NULL;
-
-    char *out = regex;
-    *out++ = '^'; /// Anchor at start
-
-    const char *p = pattern;
-    while (*p) {
-        /// Check for extglob operators
-        if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
-            *(p + 1) == '(') {
-            char op = *p;
-            p += 2; /// Skip operator and (
-
-            /// Find matching closing paren
-            int depth = 1;
-            const char *start = p;
-            while (*p && depth > 0) {
-                if (*p == '(')
-                    depth++;
-                else if (*p == ')')
-                    depth--;
-                if (depth > 0)
-                    p++;
-            }
-
-            if (depth != 0) {
-                /// Unmatched paren - treat literally
-                free(regex);
-                return NULL;
-            }
-
-            /// Copy the inner pattern
-            *out++ = '(';
-            size_t inner_len = p - start;
-
-            /// Convert inner pattern (replace | with |, escape regex chars)
-            for (size_t i = 0; i < inner_len; i++) {
-                char c = start[i];
-                if (c == '*') {
-                    *out++ = '.';
-                    *out++ = '*';
-                } else if (c == '?') {
-                    *out++ = '.';
-                } else if (c == '.') {
-                    *out++ = '\\';
-                    *out++ = '.';
-                } else if (c == '|') {
-                    *out++ = '|';
-                } else {
-                    *out++ = c;
-                }
-            }
-            *out++ = ')';
-
-            /// Add quantifier based on operator
-            switch (op) {
-            case '?':
-                *out++ = '?';
-                break;
-            case '*':
-                *out++ = '*';
-                break;
-            case '+':
-                *out++ = '+';
-                break;
-            case '@': /// exactly one, no quantifier
-                break;
-            case '!':
-                *is_negated = true;
-                break;
-            }
-
-            p++; /// Skip closing paren
-        } else if (*p == '*') {
-            /// Glob * -> regex .*
-            *out++ = '.';
-            *out++ = '*';
-            p++;
-        } else if (*p == '?') {
-            /// Glob ? -> regex .
-            *out++ = '.';
-            p++;
-        } else if (*p == '.') {
-            /// Escape literal dot
-            *out++ = '\\';
-            *out++ = '.';
-            p++;
-        } else if (*p == '[') {
-            /// Character class - copy as-is until ]
-            *out++ = *p++;
-            while (*p && *p != ']') {
-                *out++ = *p++;
-            }
-            if (*p == ']') {
-                *out++ = *p++;
-            }
-        } else {
-            /// Regular character - might need escaping
-            if (strchr("^$+{}\\", *p)) {
-                *out++ = '\\';
-            }
-            *out++ = *p++;
-        }
-    }
-
-    *out++ = '$'; /// Anchor at end
-    *out = '\0';
-
-    return regex;
-}
-
-/**
- * @brief Match filename against extglob pattern
- *
- * @param filename Filename to match
- * @param pattern Extglob pattern
- * @return true if matches
- */
-static bool match_extglob(const char *filename, const char *pattern) {
-    if (!regex_pattern_is_safe(pattern)) {
-        return false;
-    }
-    bool is_negated = false;
-    char *regex_pattern = extglob_to_regex(pattern, &is_negated);
-    if (!regex_pattern) {
-        return false;
-    }
-
-    regex_t regex;
-    int ret = regcomp(&regex, regex_pattern, REG_EXTENDED | REG_NOSUB);
-    free(regex_pattern);
-
-    if (ret != 0) {
-        return false;
-    }
-
-    ret = regexec(&regex, filename, 0, NULL, 0);
-    regfree(&regex);
-
-    bool matches = (ret == 0);
-
-    /// For !(pattern), invert the result
-    if (is_negated) {
-        matches = !matches;
-    }
-
-    return matches;
-}
-
-/**
  * @brief Expand extglob pattern by reading directory and matching
  *
  * @param pattern Pattern with extglob syntax
@@ -7386,7 +7209,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
             }
         }
 
-        if (match_extglob(entry->d_name, file_pattern)) {
+        if (lush_pattern_match(entry->d_name, file_pattern)) {
             /// Resize array if needed
             if (count >= capacity) {
                 capacity = capacity ? capacity * 2 : 16;
@@ -7678,7 +7501,8 @@ static char **expand_globstar_pattern(const char *pattern,
  * flag to change that (GLOB_PERIOD is a glibc/_GNU_SOURCE extension,
  * absent on macOS). The zsh `(D)` glob qualifier explicitly requests
  * dotfile inclusion, so for D-qualified patterns scan the directory
- * directly with readdir + fnmatch. `.` and `..` are always excluded.
+ * directly with readdir + lush_pattern_match. `.` and `..` are always
+ * excluded.
  *
  * Only single-component patterns and `dir/filepat` forms are handled
  * (the qualifier-glob syntax in practice never nests deeper). Results
@@ -7725,9 +7549,9 @@ static char **expand_glob_dotglob(const char *base_pattern,
             strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        /// fnmatch without FNM_PERIOD: `*` matches leading-dot names,
-        /// which is exactly the D-qualifier semantics.
-        if (fnmatch(filepat, entry->d_name, 0) != 0) {
+        /// lush_pattern_match has no FNM_PERIOD analogue: `*` matches
+        /// leading-dot names, which is exactly the D-qualifier semantics.
+        if (!lush_pattern_match(entry->d_name, filepat)) {
             continue;
         }
         /// Build the path as the caller would see it.
@@ -10392,20 +10216,17 @@ static char *convert_case_first_lower(const char *str) {
  *
  * `${var^^[pat]}` / `${var,,[pat]}` / `${var^[pat]}` / `${var,[pat]}`
  * apply case conversion only to characters that match `pattern`.
- * `pattern` is fnmatch-style and matched against each codepoint's
- * UTF-8 byte sequence. If `first_only` is true, only the first matching
- * codepoint is converted (the `^` / `,` operators); otherwise all
- * matches convert (`^^` / `,,`).
+ * `pattern` is a glob pattern matched against each codepoint's UTF-8
+ * byte sequence via lush_pattern_match. If `first_only` is true, only
+ * the first matching codepoint is converted (the `^` / `,` operators);
+ * otherwise all matches convert (`^^` / `,,`).
  *
  * Iteration is by codepoint via lle_utf8_decode_codepoint; case
  * mapping goes through lle_unicode_toupper_codepoint /
  * lle_unicode_tolower_codepoint so non-ASCII letters convert correctly.
- * Pattern matching is fnmatch against the codepoint's UTF-8 bytes:
- * ASCII patterns like `[aeiou]` and Unicode patterns like `[äöü]`
- * both work; full Unicode general-category char-classes
- * (`[[:alpha:]]`) are still byte-class-bound in the matcher — that
- * is a separate audit item (see UNICODE_AUDIT_WORKLIST.md C-verdict
- * #2).
+ * lush_pattern_match is codepoint-aware, so ASCII patterns like
+ * `[aeiou]`, Unicode literals/ranges like `[äöü]`, and Unicode
+ * general-category char-classes like `[[:alpha:]]` all work.
  *
  * @param str Input string
  * @param pattern Glob pattern (may be NULL/empty -- treated as "any char")
@@ -10463,7 +10284,7 @@ static char *convert_case_pattern(const char *str, const char *pattern,
                 should_convert = false;
             } else {
                 utf8_buf[enc] = '\0';
-                should_convert = (fnmatch(pattern, utf8_buf, 0) == 0);
+                should_convert = lush_pattern_match(utf8_buf, pattern);
             }
         }
 
@@ -10690,10 +10511,10 @@ static char *pattern_substitute(const char *str, const char *pattern,
     size_t pattern_len = strlen(pattern);
     size_t replacement_len = strlen(replacement);
 
-    /// Detect glob metacharacters that route through fnmatch. The
-    /// original check missed `[` (character class) and treated `[bd]`
-    /// patterns as exact-substring matches, which never matched
-    /// because the literal string never contained `[bd]`. fnmatch
+    /// Detect glob metacharacters that route through lush_pattern_match.
+    /// The original check missed `[` (character class) and treated `[bd]`
+    /// patterns as exact-substring matches, which never matched because
+    /// the literal string never contained `[bd]`. lush_pattern_match
     /// supports character classes natively.
     bool is_glob =
         (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '['));
@@ -10713,7 +10534,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 }
                 memcpy(substr, str, try_len);
                 substr[try_len] = '\0';
-                if (fnmatch(pattern, substr, 0) == 0) {
+                if (lush_pattern_match(substr, pattern)) {
                     matched = true;
                     match_len = try_len;
                     /// For glob with *, prefer longest match.
@@ -10726,7 +10547,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                             }
                             memcpy(l, str, longer);
                             l[longer] = '\0';
-                            if (fnmatch(pattern, l, 0) == 0) {
+                            if (lush_pattern_match(l, pattern)) {
                                 match_len = longer;
                             }
                             free(l);
@@ -10773,7 +10594,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 }
                 memcpy(substr, str + start, try_len);
                 substr[try_len] = '\0';
-                if (fnmatch(pattern, substr, 0) == 0) {
+                if (lush_pattern_match(substr, pattern)) {
                     matched = true;
                     match_len = try_len;
                     free(substr);
@@ -10821,14 +10642,14 @@ static char *pattern_substitute(const char *str, const char *pattern,
 
         /// Simple pattern matching - check for exact match or glob
         if (is_glob) {
-            /// Use fnmatch for glob patterns
+            /// Use lush_pattern_match for glob patterns
             /// Try increasing lengths to find the match
             for (size_t try_len = 1; try_len <= str_len - i; try_len++) {
                 char *substr = malloc(try_len + 1);
                 if (substr) {
                     strncpy(substr, str + i, try_len);
                     substr[try_len] = '\0';
-                    if (fnmatch(pattern, substr, 0) == 0) {
+                    if (lush_pattern_match(substr, pattern)) {
                         matched = true;
                         match_len = try_len;
                         /// For greedy matching with *, keep trying longer
@@ -10839,8 +10660,8 @@ static char *pattern_substitute(const char *str, const char *pattern,
                                 if (longer_substr) {
                                     strncpy(longer_substr, str + i, longer);
                                     longer_substr[longer] = '\0';
-                                    if (fnmatch(pattern, longer_substr, 0) ==
-                                        0) {
+                                    if (lush_pattern_match(longer_substr,
+                                                           pattern)) {
                                         match_len = longer;
                                     }
                                     free(longer_substr);
@@ -13545,7 +13366,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         /// zsh subscript flags ${arr[(r)pat]} / ${arr[(R)pat]}:
                         /// return the VALUE of the first / last element
                         /// matching pat, or empty string on no match.
-                        /// pat is fnmatch-style. Issue #104.
+                        /// pat is a glob pattern (lush_pattern_match). Issue
+                        /// #104.
                         bool last_match = (subscript[1] == 'R');
                         const char *pat = subscript + 3;
                         size_t total = symtable_array_length(array);
@@ -13560,7 +13382,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             bool match;
                             if (is_glob) {
-                                match = (fnmatch(pat, elem, 0) == 0);
+                                match = lush_pattern_match(elem, pat);
                             } else {
                                 match = (strcmp(elem, pat) == 0);
                             }
@@ -13578,7 +13400,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         /// zsh subscript flags ${arr[(i)pat]} / ${arr[(I)pat]}:
                         /// return the 1-based index of the first / last
                         /// element matching pat, or N+1 / 0 if no match.
-                        /// pat is fnmatch-style. Issue #99.
+                        /// pat is a glob pattern (lush_pattern_match). Issue
+                        /// #99.
                         bool last_index = (subscript[1] == 'I');
                         const char *pat = subscript + 3;
                         size_t total = symtable_array_length(array);
@@ -13594,7 +13417,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             bool match;
                             if (is_glob) {
-                                match = (fnmatch(pat, elem, 0) == 0);
+                                match = lush_pattern_match(elem, pat);
                             } else {
                                 match = (strcmp(elem, pat) == 0);
                             }
@@ -14635,7 +14458,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             /// as `/.` -- silently producing the original string back.
             /// Walk the spec and break at the first unescaped `/`.
             /// Backslash-escapes other than `\/` pass through to
-            /// fnmatch which handles them per glob spec. Issue #96.
+            /// lush_pattern_match which handles them per glob spec.
+            /// Issue #96.
             if (var_value) {
                 char *sep = NULL;
                 for (char *p = expanded_default; *p; p++) {
