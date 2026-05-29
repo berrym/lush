@@ -17,19 +17,9 @@
 
 #include "lle/error_handling.h"
 #include "lle/input_parsing.h"
+#include "lle/time_util.h"
 #include <string.h>
 #include <time.h>
-
-/**
- * @brief Get current time in microseconds
- *
- * @return Current monotonic time in microseconds
- */
-static uint64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Initialize mouse parser
@@ -166,7 +156,7 @@ static lle_result_t parse_x10_sequence(lle_mouse_parser_t *parser,
         parser->pressed_buttons = event->button;
     }
 
-    event->timestamp = get_current_time_us();
+    event->timestamp = lle_get_current_time_microseconds();
 
     /// Update last position
     parser->last_x = event->x;
@@ -289,7 +279,7 @@ static lle_result_t parse_sgr_sequence(lle_mouse_parser_t *parser,
         parser->pressed_buttons = event->button;
     }
 
-    event->timestamp = get_current_time_us();
+    event->timestamp = lle_get_current_time_microseconds();
 
     /// Update last position
     parser->last_x = event->x;

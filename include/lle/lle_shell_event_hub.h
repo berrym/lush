@@ -285,14 +285,8 @@ void lle_fire_post_command(const char *command, int exit_code,
  * ============================================================================
  */
 
-/**
- * @brief Get current timestamp in microseconds
- *
- * Uses CLOCK_MONOTONIC for reliable duration calculation.
- *
- * @return Current timestamp in microseconds
- */
-uint64_t lle_shell_event_get_timestamp_us(void);
+/// Monotonic-microsecond clock is declared in `lle/time_util.h`; the
+/// previous local alias has been retired.
 
 /**
  * @brief Get event type name for debugging

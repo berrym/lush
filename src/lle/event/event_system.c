@@ -11,6 +11,7 @@
  */
 
 #include "lle/event_system.h"
+#include "lle/time_util.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -19,16 +20,6 @@
 #define LLE_EVENT_QUEUE_DEFAULT_CAPACITY 1024
 /** @brief Initial handler array capacity */
 #define LLE_EVENT_HANDLER_INITIAL_CAPACITY 32
-
-/**
- * @brief Get current timestamp in microseconds
- * @return Current monotonic time in microseconds
- */
-uint64_t lle_event_get_timestamp_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Get human-readable name for an event type
@@ -269,7 +260,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
     /// Phase 2C: Initialize system state tracking
     sys->current_state = LLE_STATE_INITIALIZING;
     sys->previous_state = LLE_STATE_INITIALIZING;
-    sys->state_changed_time = lle_event_get_timestamp_us();
+    sys->state_changed_time = lle_get_current_time_microseconds();
 
     /// Phase 2D: Timer system starts NULL (created on demand)
     sys->timer_system = NULL;
@@ -279,7 +270,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
 
     /// Phase 2C: Transition to IDLE state after successful initialization
     sys->current_state = LLE_STATE_IDLE;
-    sys->state_changed_time = lle_event_get_timestamp_us();
+    sys->state_changed_time = lle_get_current_time_microseconds();
 
     *system = sys;
     return LLE_SUCCESS;
@@ -492,7 +483,7 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
     evt->type = type;
     evt->sequence_number =
         __atomic_fetch_add(&system->sequence_counter, 1, __ATOMIC_SEQ_CST);
-    evt->timestamp = lle_event_get_timestamp_us();
+    evt->timestamp = lle_get_current_time_microseconds();
     evt->next = NULL;
 
     /// Set Phase 2 event fields

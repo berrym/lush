@@ -33,6 +33,7 @@
 #include "lle/event_system.h"
 #include "lle/input_parsing.h"
 #include "lle/memory_management.h"
+#include "lle/time_util.h"
 #include <string.h>
 
 /* ========================================================================== */
@@ -74,7 +75,8 @@ insert_replacement_character(lle_input_parser_system_t *parser_sys) {
            replacement_len);
     replacement_input.data.text_info.is_grapheme_start = true;
     replacement_input.data.text_info.display_width = 1;
-    replacement_input.data.text_info.timestamp = lle_event_get_timestamp_us();
+    replacement_input.data.text_info.timestamp =
+        lle_get_current_time_microseconds();
 
     /// Generate event for replacement character
     lle_result_t result =
@@ -112,7 +114,8 @@ static lle_result_t process_as_text(lle_input_parser_system_t *parser_sys,
         text_input.data.text_info.utf8_bytes[0] = data[i];
         text_input.data.text_info.is_grapheme_start = true;
         text_input.data.text_info.display_width = 1;
-        text_input.data.text_info.timestamp = lle_event_get_timestamp_us();
+        text_input.data.text_info.timestamp =
+            lle_get_current_time_microseconds();
 
         /// Generate event for this character
         lle_result_t result =
@@ -180,7 +183,7 @@ force_key_resolution(lle_input_parser_system_t *parser_sys) {
                detector->sequence_pos);
         key_input.data.key_info.sequence_length = detector->sequence_pos;
         key_input.data.key_info.is_repeat = false;
-        key_input.data.key_info.timestamp = lle_event_get_timestamp_us();
+        key_input.data.key_info.timestamp = lle_get_current_time_microseconds();
 
         /// Generate event
         lle_result_t result =
@@ -260,7 +263,7 @@ lle_result_t lle_input_parser_recover_from_error(
     }
 
     /// Record recovery attempt start time
-    uint64_t start_time = lle_event_get_timestamp_us();
+    uint64_t start_time = lle_get_current_time_microseconds();
 
     lle_result_t result = LLE_SUCCESS;
 

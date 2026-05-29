@@ -26,6 +26,7 @@
 #include "lle/history.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
+#include "lle/time_util.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -106,16 +107,6 @@ static lle_history_event_state_t *g_event_state = NULL;
  * INTERNAL HELPERS
  * ============================================================================
  */
-
-/**
- * @brief Get current timestamp in microseconds
- * @return Timestamp in microseconds since epoch
- */
-static uint64_t get_timestamp_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-}
 
 /* ============================================================================
  * INITIALIZATION AND LIFECYCLE
@@ -221,7 +212,7 @@ lle_result_t lle_history_emit_entry_added(uint64_t entry_id,
     event_data->command = command; /// Read-only reference
     event_data->command_length = strlen(command);
     event_data->exit_code = exit_code;
-    event_data->timestamp = get_timestamp_us();
+    event_data->timestamp = lle_get_current_time_microseconds();
 
     /// Create and emit event
     lle_event_t *event = NULL;
@@ -282,7 +273,7 @@ lle_result_t lle_history_emit_entry_accessed(uint64_t entry_id,
     event_data->command = command;
     event_data->command_length = strlen(command);
     event_data->exit_code = -1; /// Not applicable for access
-    event_data->timestamp = get_timestamp_us();
+    event_data->timestamp = lle_get_current_time_microseconds();
 
     /// Create and emit event
     lle_event_t *event = NULL;

@@ -816,11 +816,11 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
                                                 size_t *width, size_t *height);
 
 /// Utility Functions
-/**
- * @brief Get the current monotonic time in microseconds
- * @return Microsecond timestamp from a monotonic clock source
- */
-uint64_t lle_get_current_time_microseconds(void);
+/// `lle_get_current_time_microseconds` was previously declared here;
+/// it now lives in the focused `lle/time_util.h` header so callers
+/// that need a monotonic clock do not have to pull in the entire
+/// terminal-abstraction interface.
+
 /**
  * @brief Convert a Lush result code to an LLE result code
  * @param lush_error Lush-side result/error code

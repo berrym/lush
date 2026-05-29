@@ -13,23 +13,13 @@
 #include "lle/buffer_management.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
+#include "lle/time_util.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 /// External UTF-8 validation functions from utf8_support.c
 extern bool lle_utf8_is_valid(const char *text, size_t length);
-
-/**
- * @brief Get current time in microseconds
- *
- * @return Current time in microseconds
- */
-static uint64_t lle_get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-}
 
 /**
  * @brief Initialize buffer validator
@@ -304,14 +294,14 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
 
     /// Update validation statistics
     validator->validation_count++;
-    uint64_t start_time = lle_get_current_time_us();
+    uint64_t start_time = lle_get_current_time_microseconds();
 
     /// Step 1: Validate buffer bounds first (most critical)
     result = lle_buffer_validate_bounds(buffer, validator);
     if (result != LLE_SUCCESS) {
         validator->last_validation_result = result;
         validator->last_validation_time =
-            lle_get_current_time_us() - start_time;
+            lle_get_current_time_microseconds() - start_time;
         return result;
     }
 
@@ -320,7 +310,7 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
     if (result != LLE_SUCCESS) {
         validator->last_validation_result = result;
         validator->last_validation_time =
-            lle_get_current_time_us() - start_time;
+            lle_get_current_time_microseconds() - start_time;
         return result;
     }
 
@@ -330,7 +320,7 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
         validator->corruption_detections++;
         validator->last_validation_result = LLE_ERROR_MEMORY_CORRUPTION;
         validator->last_validation_time =
-            lle_get_current_time_us() - start_time;
+            lle_get_current_time_microseconds() - start_time;
         return LLE_ERROR_MEMORY_CORRUPTION;
     }
 
@@ -339,7 +329,7 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
     if (result != LLE_SUCCESS) {
         validator->last_validation_result = result;
         validator->last_validation_time =
-            lle_get_current_time_us() - start_time;
+            lle_get_current_time_microseconds() - start_time;
         return result;
     }
 
@@ -348,13 +338,14 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
     if (result != LLE_SUCCESS) {
         validator->last_validation_result = result;
         validator->last_validation_time =
-            lle_get_current_time_us() - start_time;
+            lle_get_current_time_microseconds() - start_time;
         return result;
     }
 
     /// All validations passed
     validator->last_validation_result = LLE_SUCCESS;
-    validator->last_validation_time = lle_get_current_time_us() - start_time;
+    validator->last_validation_time =
+        lle_get_current_time_microseconds() - start_time;
 
     return LLE_SUCCESS;
 }

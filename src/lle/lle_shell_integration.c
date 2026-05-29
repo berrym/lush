@@ -30,6 +30,7 @@
 #include "lle/prompt/segment.h"
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
+#include "lle/time_util.h"
 #include "lle/utf8_support.h"
 #include "lle/widget_hooks_bridge.h"
 #include "lush.h"
@@ -114,15 +115,6 @@ static void destroy_prompt_composer(lle_shell_integration_t *integ);
  * UTILITY FUNCTIONS
  * ============================================================================
  */
-
-/// @brief Get current timestamp in microseconds
-static uint64_t get_timestamp_us(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-        return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000;
-    }
-    return 0;
-}
 
 /// @brief Populate history config from Lush config system
 static void populate_history_config(lle_history_config_t *hist_config) {
@@ -249,7 +241,7 @@ lle_result_t lle_shell_integration_init(void) {
     }
 
     integ->session_arena = session_arena;
-    integ->init_time_us = get_timestamp_us();
+    integ->init_time_us = lle_get_current_time_microseconds();
     integ->init_state.memory_pool_verified = true;
 
     /// Step 3: Verify terminal detection is complete
@@ -721,7 +713,7 @@ void lle_hard_reset(void) {
 
     /// Update statistics
     integ->hard_reset_count++;
-    integ->last_reset_time_us = get_timestamp_us();
+    integ->last_reset_time_us = lle_get_current_time_microseconds();
 }
 
 /**
@@ -1055,7 +1047,7 @@ void lle_record_ctrl_g(void) {
         return;
     }
 
-    uint64_t now = get_timestamp_us();
+    uint64_t now = lle_get_current_time_microseconds();
 
     /// Check if this Ctrl+G is within the panic window
     if (now - g_lle_integration->last_ctrl_g_time_us <

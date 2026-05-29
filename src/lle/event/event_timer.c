@@ -23,6 +23,7 @@
  */
 
 #include "lle/event_system.h"
+#include "lle/time_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -269,7 +270,7 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
     pthread_mutex_lock(&ts->timer_mutex);
 
     timer->timer_id = ts->next_timer_id++;
-    timer->trigger_time_us = lle_event_get_timestamp_us() + delay_us;
+    timer->trigger_time_us = lle_get_current_time_microseconds() + delay_us;
     timer->interval_us = 0;
     timer->repeating = false;
     timer->enabled = true;
@@ -365,7 +366,8 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
     pthread_mutex_lock(&ts->timer_mutex);
 
     timer->timer_id = ts->next_timer_id++;
-    timer->trigger_time_us = lle_event_get_timestamp_us() + initial_delay_us;
+    timer->trigger_time_us =
+        lle_get_current_time_microseconds() + initial_delay_us;
     timer->interval_us = interval_us;
     timer->repeating = true;
     timer->enabled = true;
@@ -548,7 +550,7 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
     }
 
     lle_timer_system_t *ts = system->timer_system;
-    uint64_t current_time = lle_event_get_timestamp_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
 
     pthread_mutex_lock(&ts->timer_mutex);
 

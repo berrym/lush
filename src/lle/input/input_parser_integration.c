@@ -26,6 +26,7 @@
 #include "lle/event_system.h"
 #include "lle/input_parsing.h"
 #include "lle/memory_management.h"
+#include "lle/time_util.h"
 #include <stdatomic.h>
 #include <string.h>
 #include <time.h>
@@ -40,17 +41,6 @@ static _Atomic uint64_t g_event_sequence = 0;
 /* ========================================================================== */
 /// HELPER FUNCTIONS
 /* ========================================================================== */
-
-/**
- * @brief Get current time in microseconds
- *
- * @return Current monotonic time in microseconds
- */
-static uint64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Get next event sequence number
@@ -183,7 +173,7 @@ lle_input_parser_generate_key_events(lle_input_parser_system_t *parser_sys,
     uint64_t sequence = get_next_event_sequence();
 
     /// Add timestamp
-    uint64_t timestamp = get_current_time_us();
+    uint64_t timestamp = lle_get_current_time_microseconds();
 
     /// For now, we just validate and return success
     /// Once Spec 04 is implemented, create and dispatch event
@@ -222,7 +212,7 @@ lle_input_parser_generate_mouse_events(lle_input_parser_system_t *parser_sys,
 
     /// Event generation would happen here
     uint64_t sequence = get_next_event_sequence();
-    uint64_t timestamp = get_current_time_us();
+    uint64_t timestamp = lle_get_current_time_microseconds();
 
     /// Unused for now
     (void)priority;
@@ -258,7 +248,7 @@ lle_input_parser_generate_sequence_events(lle_input_parser_system_t *parser_sys,
 
     /// Event generation
     uint64_t sequence = get_next_event_sequence();
-    uint64_t timestamp = get_current_time_us();
+    uint64_t timestamp = lle_get_current_time_microseconds();
 
     /// Unused for now
     (void)priority;

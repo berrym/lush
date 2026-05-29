@@ -31,6 +31,7 @@
 #include "lle/event_system.h"
 #include "lle/input_parsing.h"
 #include "lle/memory_management.h"
+#include "lle/time_util.h"
 #include <string.h>
 #include <time.h>
 
@@ -145,7 +146,7 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
     lle_keybinding_integration_t *kb = parser->keybinding_integration;
 
     /// Record start time for performance tracking
-    uint64_t start_time = lle_event_get_timestamp_us();
+    uint64_t start_time = lle_get_current_time_microseconds();
 
     /// Update lookup counter
     __atomic_fetch_add(&kb->lookups_performed, 1, __ATOMIC_SEQ_CST);
@@ -172,7 +173,7 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
     }
 
     /// Track lookup time
-    uint64_t lookup_time = lle_event_get_timestamp_us() - start_time;
+    uint64_t lookup_time = lle_get_current_time_microseconds() - start_time;
     __atomic_fetch_add(&kb->total_lookup_time_us, lookup_time,
                        __ATOMIC_SEQ_CST);
 
@@ -222,7 +223,7 @@ lle_keybinding_add_to_sequence(lle_keybinding_integration_t *integration,
     /// Mark sequence as in progress
     if (!integration->sequence_in_progress) {
         integration->sequence_in_progress = true;
-        integration->sequence_start_time = lle_event_get_timestamp_us();
+        integration->sequence_start_time = lle_get_current_time_microseconds();
     }
 
     return LLE_SUCCESS;

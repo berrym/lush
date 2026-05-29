@@ -29,6 +29,7 @@
 
 #include "lle/buffer_management.h"
 #include "lle/secure_memory.h"
+#include "lle/time_util.h"
 #include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include <string.h>
@@ -51,17 +52,6 @@ static uint32_t generate_buffer_id(void) {
     static uint32_t counter = 0;
     uint32_t timestamp = (uint32_t)time(NULL);
     return (timestamp & 0xFFFF0000) | (++counter & 0x0000FFFF);
-}
-
-/**
- * @brief Get current timestamp in microseconds
- *
- * @return Current timestamp
- */
-static uint64_t get_timestamp_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
 
 /* ============================================================================
@@ -129,7 +119,7 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
     /// Initialize buffer metadata
     buf->buffer_id = generate_buffer_id();
     snprintf(buf->name, LLE_BUFFER_NAME_MAX, "buffer_%u", buf->buffer_id);
-    buf->creation_time = get_timestamp_us();
+    buf->creation_time = lle_get_current_time_microseconds();
     buf->last_modified_time = buf->creation_time;
     buf->modification_count = 0;
 
@@ -287,7 +277,7 @@ lle_result_t lle_buffer_clear(lle_buffer_t *buffer) {
     /// Reset content metadata
     buffer->length = 0;
     buffer->used = 0;
-    buffer->last_modified_time = get_timestamp_us();
+    buffer->last_modified_time = lle_get_current_time_microseconds();
     buffer->modification_count++;
 
     /// Reset UTF-8 and Unicode metadata
@@ -386,7 +376,7 @@ lle_result_t lle_buffer_secure_clear(lle_buffer_t *buffer) {
     /// Reset all buffer metadata (same as lle_buffer_clear)
     buffer->length = 0;
     buffer->used = 0;
-    buffer->last_modified_time = get_timestamp_us();
+    buffer->last_modified_time = lle_get_current_time_microseconds();
     buffer->modification_count++;
 
     /// Reset UTF-8 and Unicode metadata
@@ -608,7 +598,7 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
 
     /// Step 6: Update buffer metadata
     buffer->modification_count++;
-    buffer->last_modified_time = get_timestamp_us();
+    buffer->last_modified_time = lle_get_current_time_microseconds();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
     /// Step 7: Update UTF-8 counts and invalidate position index
@@ -710,7 +700,7 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
 
     /// Step 4: Update buffer metadata
     buffer->modification_count++;
-    buffer->last_modified_time = get_timestamp_us();
+    buffer->last_modified_time = lle_get_current_time_microseconds();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
     /// Step 5: Update UTF-8 counts and invalidate position index
@@ -863,7 +853,7 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
 
     /// Step 5: Update buffer metadata
     buffer->modification_count++;
-    buffer->last_modified_time = get_timestamp_us();
+    buffer->last_modified_time = lle_get_current_time_microseconds();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
     /// Step 6: Update UTF-8 counts and invalidate position index
