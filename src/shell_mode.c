@@ -803,6 +803,26 @@ const char *shell_feature_name(shell_feature_t feature) {
     return feature_names[feature];
 }
 
+/// Bridge for liblle's completion module. liblle links standalone and so
+/// cannot include shell_mode.h or call shell_feature_name() directly; it
+/// reaches the feature matrix through these int-typed wrappers (declared
+/// weak in src/lle/completion/completion_types.c). This strong definition
+/// is linked only into the full shell, so setopt/unsetopt completion
+/// enumerates the matrix itself -- the offered option list can never
+/// drift from shell_mode.c. A standalone liblle build gets the weak
+/// fallbacks (count 0 / name NULL) and simply offers no feature names.
+int lle_shell_feature_count(void);
+const char *lle_shell_feature_name(int index);
+
+int lle_shell_feature_count(void) { return (int)FEATURE_COUNT; }
+
+const char *lle_shell_feature_name(int index) {
+    if (index < 0 || index >= (int)FEATURE_COUNT) {
+        return NULL;
+    }
+    return shell_feature_name((shell_feature_t)index);
+}
+
 bool shell_mode_feature_default(shell_mode_t mode, shell_feature_t feature) {
     if (mode >= SHELL_MODE_COUNT || feature >= FEATURE_COUNT) {
         return false;

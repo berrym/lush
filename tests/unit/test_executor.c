@@ -13,6 +13,9 @@
 #include "executor.h"
 #include "identifier.h"
 #include "lle/buffer_management.h"
+#include "lle/completion/builtin_completions.h"
+#include "lle/completion/completion_types.h"
+#include "lle/completion/word_context.h"
 #include "lle/lle_editor.h"
 #include "lle/syntax_highlighting.h"
 #include "symtable.h"
@@ -3209,6 +3212,60 @@ TEST(rt_declare_combined_flags_attributes) {
     ASSERT_STDOUT_EQ(r, "[ix][ix][ir]\n");
 }
 
+TEST(rt_lle_feature_bridge_enumerates_matrix) {
+    /// setopt/unsetopt completion enumerates the feature matrix through
+    /// this bridge instead of a hand-maintained list, so it can never
+    /// drift (issue #126). Names the old static completion list omitted
+    /// must be reachable through the bridge.
+    extern int lle_shell_feature_count(void);
+    extern const char *lle_shell_feature_name(int index);
+    int n = lle_shell_feature_count();
+    ASSERT_TRUE(n > 30, "feature matrix should expose many features");
+    bool found_errexit = false;
+    bool found_xpg = false;
+    for (int i = 0; i < n; i++) {
+        const char *nm = lle_shell_feature_name(i);
+        if (nm && strcmp(nm, "errexit_in_loops") == 0) {
+            found_errexit = true;
+        }
+        if (nm && strcmp(nm, "xpg_echo") == 0) {
+            found_xpg = true;
+        }
+    }
+    ASSERT_TRUE(found_errexit,
+                "errexit_in_loops must be enumerable via the bridge");
+    ASSERT_TRUE(found_xpg, "xpg_echo must be enumerable via the bridge");
+}
+
+TEST(rt_setopt_completion_lists_matrix_features) {
+    /// End-to-end: setopt completion routes through the bridge and offers
+    /// names from the live feature matrix, including ones the old static
+    /// completion list omitted (issue #126). Drives the public builtin
+    /// completion entry with a minimal "setopt err" context.
+    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; /// LLE pool sentinel
+    lle_completion_result_t *result = NULL;
+    lle_result_t r = lle_completion_result_create(pool, 8, &result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "completion result create");
+
+    lle_word_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.command_name = "setopt";
+    ctx.dequoted_filename_prefix = (char *)"err";
+
+    r = lle_builtin_completions_generate(pool, &ctx, result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "builtin completions generate");
+
+    bool found = false;
+    for (size_t i = 0; i < result->count; i++) {
+        if (result->items[i].text &&
+            strcmp(result->items[i].text, "errexit_in_loops") == 0) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found, "setopt completion must offer errexit_in_loops");
+}
+
 TEST(rt_pe_at_value_transform_on_map_still_errors) {
     /// Only @a bypasses the guard; a value-shaped @ transform on a bare
     /// collection remains a type error (needs [@] to vectorize).
@@ -4339,6 +4396,8 @@ int main(void) {
     RUN_TEST(rt_pe_at_attr_query_on_list);
     RUN_TEST(rt_pe_at_attr_query_scalar_unaffected);
     RUN_TEST(rt_declare_combined_flags_attributes);
+    RUN_TEST(rt_lle_feature_bridge_enumerates_matrix);
+    RUN_TEST(rt_setopt_completion_lists_matrix_features);
     RUN_TEST(rt_pe_at_value_transform_on_map_still_errors);
     RUN_TEST(rt_pe_catalog_conditional_on_map);
     RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
