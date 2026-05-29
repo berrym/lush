@@ -17,6 +17,7 @@
  */
 
 #include "lle/terminal_abstraction.h"
+#include "lle/time_util.h"
 #include "lle/utf8_support.h"
 #include <errno.h>
 #include <stdlib.h>

@@ -18,6 +18,7 @@
  */
 
 #include "lle/buffer_management.h"
+#include "lle/time_util.h"
 #include "lle/utf8_support.h"
 #include <stdlib.h>
 #include <string.h>
@@ -27,13 +28,6 @@
  * HELPER FUNCTIONS
  * ============================================================================
  */
-
-/// @brief Get current timestamp in microseconds
-static uint64_t get_timestamp_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-}
 
 /// @brief Find last undoable sequence
 static lle_change_sequence_t *
@@ -223,7 +217,7 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
     memset(seq, 0, sizeof(lle_change_sequence_t));
 
     seq->sequence_id = tracker->next_sequence_id++;
-    seq->start_time = get_timestamp_us();
+    seq->start_time = lle_get_current_time_microseconds();
     seq->can_undo = true;
     seq->can_redo = false;
     seq->sequence_complete = false;
@@ -296,7 +290,7 @@ lle_change_tracker_complete_sequence(lle_change_tracker_t *tracker) {
     }
 
     /// Finalize sequence
-    tracker->active_sequence->end_time = get_timestamp_us();
+    tracker->active_sequence->end_time = lle_get_current_time_microseconds();
     tracker->active_sequence->sequence_complete = true;
 
     /// Clear tracking state
@@ -327,7 +321,7 @@ lle_result_t lle_change_tracker_begin_operation(
     op->start_position = start_position;
     op->end_position = start_position + length;
     op->affected_length = length;
-    op->timestamp = get_timestamp_us();
+    op->timestamp = lle_get_current_time_microseconds();
 
     /// Add to sequence
     if (!sequence->first_op) {

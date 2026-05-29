@@ -15,6 +15,7 @@
 
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/error_handling.h"
+#include "lle/time_util.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,16 +37,6 @@ static uint64_t cache_timestamp_us = 0;
  * INTERNAL UTILITY FUNCTIONS
  * ============================================================================
  */
-
-/**
- * @brief Get current time in microseconds
- * @return Current monotonic time in microseconds
- */
-static uint64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Simple wildcard pattern matching
@@ -438,7 +429,7 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    uint64_t start_time = get_current_time_us();
+    uint64_t start_time = lle_get_current_time_microseconds();
 
     // Step 1: Basic TTY status detection
     detection->stdin_is_tty = isatty(STDIN_FILENO);
@@ -488,7 +479,8 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
     // Step 6: Final mode validation and adjustment
     detection->recommended_mode = validate_and_adjust_mode(detection);
 
-    detection->detection_time_us = get_current_time_us() - start_time;
+    detection->detection_time_us =
+        lle_get_current_time_microseconds() - start_time;
 
     // Update statistics
     detection_stats.total_detections++;
@@ -520,7 +512,7 @@ lle_result_t lle_detect_terminal_capabilities_optimized(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    uint64_t current_time = get_current_time_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
 
     // Check cache validity
     if (cached_result && (current_time - cache_timestamp_us) < CACHE_TTL_US) {

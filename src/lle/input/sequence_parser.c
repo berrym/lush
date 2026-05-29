@@ -13,6 +13,7 @@
 
 #include "lle/error_handling.h"
 #include "lle/input_parsing.h"
+#include "lle/time_util.h"
 #include <string.h>
 #include <time.h>
 
@@ -24,17 +25,6 @@
 #define IS_CSI_INTERMEDIATE(c) ((c) >= 0x20 && (c) <= 0x2F)
 /** Check if character is a CSI final byte */
 #define IS_CSI_FINAL(c) ((c) >= 0x40 && (c) <= 0x7E)
-
-/**
- * @brief Get current time in microseconds
- *
- * @return Current monotonic time in microseconds
- */
-static uint64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Initialize a sequence parser
@@ -134,7 +124,7 @@ static bool has_sequence_timed_out(lle_sequence_parser_t *parser) {
         return false;
     }
 
-    uint64_t current_time = get_current_time_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
     uint64_t elapsed = current_time - parser->sequence_start_time;
 
     return elapsed > LLE_MAX_SEQUENCE_TIMEOUT_US;
@@ -326,7 +316,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
         if (parser->state != LLE_PARSER_STATE_NORMAL &&
             has_sequence_timed_out(parser)) {
             parser->timeout_sequences++;
-            parser->last_error_time = get_current_time_us();
+            parser->last_error_time = lle_get_current_time_microseconds();
             lle_sequence_parser_reset_state(parser);
         }
 
@@ -336,7 +326,8 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
                 parser->state = LLE_PARSER_STATE_ESCAPE;
                 parser->buffer[0] = c;
                 parser->buffer_pos = 1;
-                parser->sequence_start_time = get_current_time_us();
+                parser->sequence_start_time =
+                    lle_get_current_time_microseconds();
             } else if (IS_CONTROL_CHAR(c)) {
                 /// Control character in normal state
                 return process_control_char(parser, c, parsed_input);
@@ -352,7 +343,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 /// Buffer overflow - treat as malformed
                 parser->malformed_sequences++;
-                parser->last_error_time = get_current_time_us();
+                parser->last_error_time = lle_get_current_time_microseconds();
                 lle_sequence_parser_reset_state(parser);
                 break;
             }
@@ -419,7 +410,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             /// Store character
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
-                parser->last_error_time = get_current_time_us();
+                parser->last_error_time = lle_get_current_time_microseconds();
                 lle_sequence_parser_reset_state(parser);
                 break;
             }
@@ -441,7 +432,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             /// OSC and DCS sequences are terminated by ST (ESC \) or BEL (0x07)
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
-                parser->last_error_time = get_current_time_us();
+                parser->last_error_time = lle_get_current_time_microseconds();
                 lle_sequence_parser_reset_state(parser);
                 break;
             }
@@ -479,7 +470,7 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
             /// SS2/SS3 sequences followed by one character
             if (parser->buffer_pos >= parser->buffer_capacity) {
                 parser->malformed_sequences++;
-                parser->last_error_time = get_current_time_us();
+                parser->last_error_time = lle_get_current_time_microseconds();
                 lle_sequence_parser_reset_state(parser);
                 break;
             }
@@ -504,7 +495,8 @@ lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
                 parser->state = LLE_PARSER_STATE_ESCAPE;
                 parser->buffer[0] = c;
                 parser->buffer_pos = 1;
-                parser->sequence_start_time = get_current_time_us();
+                parser->sequence_start_time =
+                    lle_get_current_time_microseconds();
             } else if (!IS_CONTROL_CHAR(c)) {
                 lle_sequence_parser_reset_state(parser);
             }
@@ -644,7 +636,7 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         return LLE_ERROR_NOT_FOUND;
     }
 
-    uint64_t current_time = get_current_time_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
     uint64_t elapsed = current_time - parser->sequence_start_time;
 
     if (elapsed < timeout_us) {

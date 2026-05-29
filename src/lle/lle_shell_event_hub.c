@@ -12,6 +12,7 @@
  */
 
 #include "lle/lle_shell_event_hub.h"
+#include "lle/time_util.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -50,21 +51,6 @@ __attribute__((weak)) lle_shell_integration_t *g_lle_integration = NULL;
  * UTILITY FUNCTIONS
  * ============================================================================
  */
-
-/**
- * @brief Get current timestamp in microseconds
- *
- * Uses CLOCK_MONOTONIC for consistent timing measurements.
- *
- * @return Current timestamp in microseconds, or 0 on error
- */
-uint64_t lle_shell_event_get_timestamp_us(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-        return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000;
-    }
-    return 0;
-}
 
 /**
  * @brief Get human-readable name for an event type
@@ -390,7 +376,7 @@ void lle_fire_pre_command(const char *command, bool is_background) {
     lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
     /// Record command start time
-    hub->command_start_time_us = lle_shell_event_get_timestamp_us();
+    hub->command_start_time_us = lle_get_current_time_microseconds();
 
     /// Store command for post-command event
     if (command) {
@@ -445,7 +431,7 @@ void lle_fire_post_command(const char *command, int exit_code,
     /// Calculate duration if not provided
     uint64_t actual_duration = duration_us;
     if (actual_duration == 0 && hub->command_start_time_us > 0) {
-        uint64_t end_time = lle_shell_event_get_timestamp_us();
+        uint64_t end_time = lle_get_current_time_microseconds();
         actual_duration = end_time - hub->command_start_time_us;
     }
 

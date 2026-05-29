@@ -24,6 +24,7 @@
 
 #include "lle/input_parsing.h"
 #include "lle/terminal_abstraction.h"
+#include "lle/time_util.h"
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>

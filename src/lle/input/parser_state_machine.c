@@ -27,19 +27,9 @@
 
 #include "lle/error_handling.h"
 #include "lle/input_parsing.h"
+#include "lle/time_util.h"
 #include <string.h>
 #include <time.h>
-
-/**
- * @brief Get current time in microseconds
- *
- * @return Current monotonic time in microseconds
- */
-static uint64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
-}
 
 /**
  * @brief Initialize parser state machine
@@ -68,7 +58,7 @@ lle_parser_state_machine_init(lle_parser_state_machine_t **state_machine,
     sm->current_state = LLE_PARSER_STATE_NORMAL;
     sm->previous_state = LLE_PARSER_STATE_NORMAL;
     sm->state_transitions = 0;
-    sm->state_change_time = get_current_time_us();
+    sm->state_change_time = lle_get_current_time_microseconds();
     sm->error_ctx = error_ctx;
     sm->error_recoveries = 0;
     sm->memory_pool = memory_pool;
@@ -111,7 +101,7 @@ lle_parser_state_machine_transition(lle_parser_state_machine_t *state_machine,
         state_machine->previous_state = state_machine->current_state;
         state_machine->current_state = new_state;
         state_machine->state_transitions++;
-        state_machine->state_change_time = get_current_time_us();
+        state_machine->state_change_time = lle_get_current_time_microseconds();
     }
 
     return LLE_SUCCESS;
@@ -290,7 +280,8 @@ uint64_t lle_parser_state_machine_time_in_state(
     if (!state_machine) {
         return 0;
     }
-    return get_current_time_us() - state_machine->state_change_time;
+    return lle_get_current_time_microseconds() -
+           state_machine->state_change_time;
 }
 
 /**
@@ -322,7 +313,7 @@ lle_parser_state_machine_reset(lle_parser_state_machine_t *state_machine) {
     state_machine->current_state = LLE_PARSER_STATE_NORMAL;
     state_machine->previous_state = LLE_PARSER_STATE_NORMAL;
     state_machine->state_transitions = 0;
-    state_machine->state_change_time = get_current_time_us();
+    state_machine->state_change_time = lle_get_current_time_microseconds();
     state_machine->error_recoveries = 0;
 
     return LLE_SUCCESS;

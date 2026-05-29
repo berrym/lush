@@ -14,7 +14,7 @@
  */
 
 #include "lle/hashtable.h"
-#include "lle/terminal_abstraction.h"
+#include "lle/time_util.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

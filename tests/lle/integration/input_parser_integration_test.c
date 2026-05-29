@@ -12,6 +12,7 @@
  * TEST COVERAGE: Phase 7, 8, 9 - Error Recovery Focus
  */
 
+#include "lle/time_util.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -177,7 +178,7 @@ static int test_sequence_timeout_none(void) {
     parser_sys.sequence_parser = &seq_parser;
     parser_sys.key_detector = &key_detector;
 
-    uint64_t current_time = lle_event_get_timestamp_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
 
     /// No partial data - no timeout
     seq_parser.buffer_pos = 0;
@@ -198,7 +199,7 @@ static int test_sequence_timeout_within_window(void) {
     parser_sys.sequence_parser = &seq_parser;
     parser_sys.key_detector = &key_detector;
 
-    uint64_t current_time = lle_event_get_timestamp_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
 
     /// Partial sequence within timeout
     seq_parser.buffer_pos = 5;
@@ -219,7 +220,7 @@ static int test_sequence_timeout_exceeded(void) {
     parser_sys.sequence_parser = &seq_parser;
     parser_sys.key_detector = &key_detector;
 
-    uint64_t current_time = lle_event_get_timestamp_us();
+    uint64_t current_time = lle_get_current_time_microseconds();
 
     /// Partial sequence exceeded timeout (must be > LLE_MAX_SEQUENCE_TIMEOUT_US
     /// = 400ms)

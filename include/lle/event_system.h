@@ -846,14 +846,8 @@ lle_result_t lle_event_process_all(lle_event_system_t *system);
  * ============================================================================
  */
 
-/*
- * Get current timestamp in microseconds
- */
-/**
- * @brief Get current timestamp in microseconds
- * @return Monotonic timestamp in microseconds
- */
-uint64_t lle_event_get_timestamp_us(void);
+/// Monotonic-microsecond clock is declared in `lle/time_util.h`; the
+/// previous local alias has been retired.
 
 /*
  * Get event type name (for debugging)

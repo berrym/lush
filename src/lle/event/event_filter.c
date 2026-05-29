@@ -11,6 +11,7 @@
  */
 
 #include "lle/event_system.h"
+#include "lle/time_util.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -495,7 +496,7 @@ lle_result_t lle_event_system_set_state(lle_event_system_t *system,
 
     system->previous_state = system->current_state;
     system->current_state = state;
-    system->state_changed_time = lle_event_get_timestamp_us();
+    system->state_changed_time = lle_get_current_time_microseconds();
 
     pthread_mutex_unlock(&system->system_mutex);
 

@@ -31,6 +31,7 @@
 #include "lle/input_parsing.h"
 #include "lle/lle_editor.h"
 #include "lle/memory_management.h"
+#include "lle/time_util.h"
 #include "lle/widget_hooks.h"
 #include <string.h>
 
@@ -174,7 +175,7 @@ lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
     }
 
     /// Record start time for performance tracking
-    uint64_t start_time = lle_event_get_timestamp_us();
+    uint64_t start_time = lle_get_current_time_microseconds();
 
     /// Determine which hook to trigger based on input type
     bool should_trigger = false;
@@ -211,7 +212,7 @@ lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
     }
 
     /// Track execution time
-    uint64_t execution_time = lle_event_get_timestamp_us() - start_time;
+    uint64_t execution_time = lle_get_current_time_microseconds() - start_time;
     __atomic_fetch_add(&wh->total_execution_time_us, execution_time,
                        __ATOMIC_SEQ_CST);
 
