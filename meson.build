@@ -411,9 +411,15 @@ if lle_sources.length() > 0
                               include_directories: inc,
                               dependencies: [lle_dep])
 
+  # The benchmark suite measures wall-clock against per-operation spec
+  # budgets; running it concurrently with other test binaries shares
+  # the runner's CPU and produces flaky failures (#170). is_parallel:
+  # false reserves the runner so the timings reflect the unloaded
+  # performance the spec describes.
   test('LLE Performance Benchmarks', benchmark_perf,
        suite: 'lle-benchmarks',
-       timeout: 120)
+       timeout: 120,
+       is_parallel: false)
 
   # Display integration performance benchmarks
   # Validates display operations meet Spec 08 performance requirements
