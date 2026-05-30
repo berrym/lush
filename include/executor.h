@@ -82,6 +82,13 @@ typedef struct executor {
     int next_job_id;              ///< Next job ID to assign
     pid_t shell_pgid;             ///< Shell process group ID
     loop_control_t loop_control;  ///< Loop control state
+    int loop_control_level;       ///< Levels remaining to unwind for `break N`
+                                  ///< / `continue N`: 1 = innermost (default),
+                                  ///< higher values are decremented at each
+                                  ///< loop frame until they reach 1, at which
+                                  ///< point the current frame consumes the
+                                  ///< signal. Zero when no break/continue is
+                                  ///< pending.
     int loop_depth;               ///< Current loop nesting depth
 
     /// Script execution context for breakpoint matching

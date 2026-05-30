@@ -351,6 +351,7 @@ executor_t *executor_new(void) {
     executor->command_abort = false;
     executor->pending_readonly_var = NULL;
     executor->loop_control = LOOP_NORMAL;
+    executor->loop_control_level = 0;
     executor->loop_depth = 0;
     executor->source_depth = 0;
     executor->source_return = false;
@@ -420,6 +421,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->command_abort = false;
     executor->pending_readonly_var = NULL;
     executor->loop_control = LOOP_NORMAL;
+    executor->loop_control_level = 0;
     executor->loop_depth = 0;
     executor->source_depth = 0;
     executor->source_return = false;
@@ -2654,6 +2656,30 @@ static bool loop_errexit_tripped(int body_status) {
     return body_status != 0 && shell_mode_allows(FEATURE_ERREXIT_IN_LOOPS);
 }
 
+/* Consume one loop frame for a pending break/continue control signal.
+ *
+ * `break N` and `continue N` each cross N loop frames. This helper is
+ * called at the unwind site of every loop body. If the level is > 1,
+ * one frame is consumed (level--) and the helper returns true so the
+ * caller propagates the signal outward; the loop_control state stays
+ * armed for the enclosing frame. If the level is <= 1, the signal is
+ * consumed here -- loop_control reverts to LOOP_NORMAL and the helper
+ * returns false; the caller decides whether to break or continue this
+ * frame based on the signal kind it just consumed.
+ *
+ * Returns true when this frame should also exit (signal still
+ * propagating outward), false when this frame has fully consumed the
+ * signal (loop_control is now LOOP_NORMAL). */
+static bool consume_loop_control(executor_t *executor) {
+    if (executor->loop_control_level > 1) {
+        executor->loop_control_level--;
+        return true;
+    }
+    executor->loop_control = LOOP_NORMAL;
+    executor->loop_control_level = 0;
+    return false;
+}
+
 /* Returns true when the streak satisfies both N and T thresholds.
  * Caller should report SHELL_ERR_LOOP_LIMIT and break out. */
 static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
@@ -2765,13 +2791,18 @@ static int execute_while(executor_t *executor, node_t *while_node) {
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        /// Check for break/continue
+        /// Check for break/continue. `break N` / `continue N` cross N
+        /// loop frames: consume_loop_control decrements N and leaves
+        /// loop_control armed when N > 1 so the enclosing loop sees
+        /// the signal too. See its docstring for full semantics.
         if (executor->loop_control == LOOP_BREAK) {
-            executor->loop_control = LOOP_NORMAL;
+            (void)consume_loop_control(executor);
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
-            executor->loop_control = LOOP_NORMAL;
-            /// Continue to next iteration (just reset and loop again)
+            if (consume_loop_control(executor)) {
+                break; /// propagate `continue N>1` outward
+            }
+            /// Signal consumed; fall through to next iteration.
         }
 
         /// `return` inside the body: stop iterating, propagate the
@@ -2896,13 +2927,15 @@ static int execute_until(executor_t *executor, node_t *until_node) {
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        /// Check for break/continue
+        /// Check for break/continue. See consume_loop_control() for
+        /// `break N` / `continue N` propagation semantics.
         if (executor->loop_control == LOOP_BREAK) {
-            executor->loop_control = LOOP_NORMAL;
+            (void)consume_loop_control(executor);
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
-            executor->loop_control = LOOP_NORMAL;
-            /// Continue to next iteration
+            if (consume_loop_control(executor)) {
+                break;
+            }
         }
 
         /// `return` inside the body: stop iterating, propagate the
@@ -3020,10 +3053,12 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
         last_result = execute_command_chain(executor, body);
 
         if (executor->loop_control == LOOP_BREAK) {
-            executor->loop_control = LOOP_NORMAL;
+            (void)consume_loop_control(executor);
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
-            executor->loop_control = LOOP_NORMAL;
+            if (consume_loop_control(executor)) {
+                break;
+            }
             continue;
         }
         /// `return` inside the body: stop iterating, propagate the
@@ -3486,13 +3521,15 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             last_result = execute_command_chain(executor, body);
             iteration++;
 
-            /// Check for break/continue
+            /// Check for break/continue. See consume_loop_control() for
+            /// `break N` / `continue N` propagation semantics.
             if (executor->loop_control == LOOP_BREAK) {
-                executor->loop_control = LOOP_NORMAL;
+                (void)consume_loop_control(executor);
                 break;
             } else if (executor->loop_control == LOOP_CONTINUE) {
-                executor->loop_control = LOOP_NORMAL;
-                /// Continue to next iteration
+                if (consume_loop_control(executor)) {
+                    break;
+                }
             }
 
             /// `return` inside the body: stop iterating, propagate the
@@ -3695,13 +3732,17 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        /// Check for break/continue
+        /// Check for break/continue. `continue N>1` propagates via
+        /// break so the enclosing loop sees it; otherwise we fall
+        /// through to the for-loop's update expression below.
         if (executor->loop_control == LOOP_BREAK) {
-            executor->loop_control = LOOP_NORMAL;
+            (void)consume_loop_control(executor);
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
-            executor->loop_control = LOOP_NORMAL;
-            /// Fall through to update expression
+            if (consume_loop_control(executor)) {
+                break;
+            }
+            /// Fall through to update expression.
         }
 
         /// `return` inside the body: stop iterating, propagate the
@@ -3986,12 +4027,15 @@ static int execute_select(executor_t *executor, node_t *select_node) {
             cmd = cmd->next_sibling;
         }
 
-        /// Handle break from body
+        /// Handle break/continue from body. See consume_loop_control()
+        /// for `break N` / `continue N` propagation semantics.
         if (executor->loop_control == LOOP_BREAK) {
-            executor->loop_control = LOOP_NORMAL;
+            (void)consume_loop_control(executor);
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
-            executor->loop_control = LOOP_NORMAL;
+            if (consume_loop_control(executor)) {
+                break;
+            }
             continue;
         }
 
