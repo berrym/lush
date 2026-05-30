@@ -15,8 +15,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/** @brief Legacy user configuration file name (in home directory) */
-#define USER_CONFIG_FILE ".lushrc"
+/**
+ * @brief Home-directory TOML config fallback (legacy / adoption path).
+ *
+ * XDG (`~/.config/lush/lushrc.toml`) is the canonical default. This
+ * home-dir fallback exists for users not on XDG layouts. Note the
+ * `.toml` suffix: bare `~/.lushrc` is the SHELL-SCRIPT location (see
+ * RC_SCRIPT_FILE in config.c), not a TOML file. The two MUST stay
+ * separate -- previously this macro was `.lushrc` (no suffix) which
+ * collided with the script loader and emitted a spurious E1204 parse
+ * error whenever a user had a normal shell-script `~/.lushrc`.
+ */
+#define USER_CONFIG_FILE ".lushrc.toml"
 
 /** @brief System-wide configuration file path */
 #define SYSTEM_CONFIG_FILE "/etc/lush/lushrc"

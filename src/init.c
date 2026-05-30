@@ -410,6 +410,28 @@ int init(int argc, char **argv, FILE **in) {
         env_ptr++;
     }
 
+    /// Increment SHLVL so nested shells reflect their depth (matches
+    /// bash and zsh). A missing or unparseable parent value reads as
+    /// 0, so a fresh top-level shell ends up at SHLVL=1. Bash treats
+    /// values >= 1000 as garbage and resets to 1; mirror that.
+    {
+        const char *cur = getenv("SHLVL");
+        long n = 0;
+        if (cur && *cur) {
+            char *end = NULL;
+            long v = strtol(cur, &end, 10);
+            if (end && *end == '\0' && v >= 0 && v < 1000) {
+                n = v;
+            }
+        }
+        n++;
+        char buf[24];
+        snprintf(buf, sizeof(buf), "%ld", n);
+        setenv("SHLVL", buf, 1);
+        symtable_set_global("SHLVL", buf);
+        symtable_export_global("SHLVL");
+    }
+
     init_shell_opts();
 
     /// Initialize POSIX shell options with defaults

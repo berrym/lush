@@ -1292,69 +1292,87 @@ char *config_get_profile_script_path(void) {
 }
 
 /**
- * @brief Get the path to the login script file
+ * @brief Resolve a lush-specific script path, XDG default with ~/ fallback.
  *
- * Returns the full path to ~/.lush_login.
+ * Lush's per-user script lookup order is:
+ *   1. `${XDG_CONFIG_HOME:-~/.config}/lush/<xdg_basename>`  -- canonical
+ *   2. `~/<home_basename>`                                  -- fallback
  *
- * @return Allocated path string, or NULL on failure (caller must free)
+ * XDG is the default lush configuration location; `~/` is a fallback
+ * for users not on XDG layouts (cross-shell adoption ergonomics). See
+ * memory note [[config-file-conventions]].
+ *
+ * If the XDG path exists as a regular file, its path is returned.
+ * Otherwise the home-dir fallback path is returned regardless of
+ * whether the file exists (callers gate the actual source step on
+ * config_script_exists), so the migration UX ("file not found"
+ * messages) shows the legacy path the user is likely looking at.
+ *
+ * @param xdg_basename  basename under `<XDG>/lush/` (no leading slash)
+ * @param home_basename basename under `~/` (typically `.<name>`)
+ * @return malloc'd path string, or NULL on allocation / env failure
  */
-char *config_get_login_script_path(void) {
+static char *config_get_xdg_or_home_script(const char *xdg_basename,
+                                           const char *home_basename) {
+    char xdg_dir[CONFIG_PATH_MAX];
+    if (config_get_xdg_dir(xdg_dir, sizeof(xdg_dir)) == 0) {
+        char xdg_path[CONFIG_PATH_MAX];
+        if ((size_t)snprintf(xdg_path, sizeof(xdg_path), "%s/%s", xdg_dir,
+                             xdg_basename) < sizeof(xdg_path)) {
+            struct stat st;
+            if (stat(xdg_path, &st) == 0 && S_ISREG(st.st_mode)) {
+                return strdup(xdg_path);
+            }
+        }
+    }
+
     const char *home = getenv("HOME");
     if (!home) {
         return NULL;
     }
-
-    char *path = malloc(strlen(home) + strlen(LOGIN_SCRIPT_FILE) + 2);
+    char *path = malloc(strlen(home) + strlen(home_basename) + 2);
     if (!path) {
         return NULL;
     }
-
-    sprintf(path, "%s/%s", home, LOGIN_SCRIPT_FILE);
+    sprintf(path, "%s/%s", home, home_basename);
     return path;
+}
+
+/**
+ * @brief Get the path to the login script file
+ *
+ * Returns `${XDG_CONFIG_HOME:-~/.config}/lush/lush_login` if it
+ * exists, else `~/.lush_login`.
+ *
+ * @return Allocated path string, or NULL on failure (caller must free)
+ */
+char *config_get_login_script_path(void) {
+    return config_get_xdg_or_home_script("lush_login", LOGIN_SCRIPT_FILE);
 }
 
 /**
  * @brief Get the path to the RC script file
  *
- * Returns the full path to ~/.lushrc.
+ * Returns `${XDG_CONFIG_HOME:-~/.config}/lush/lushrc` if it exists,
+ * else `~/.lushrc`. XDG is canonical; `~/` is the adoption fallback.
  *
  * @return Allocated path string, or NULL on failure (caller must free)
  */
 char *config_get_rc_script_path(void) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        return NULL;
-    }
-
-    char *path = malloc(strlen(home) + strlen(RC_SCRIPT_FILE) + 2);
-    if (!path) {
-        return NULL;
-    }
-
-    sprintf(path, "%s/%s", home, RC_SCRIPT_FILE);
-    return path;
+    return config_get_xdg_or_home_script("lushrc", RC_SCRIPT_FILE);
 }
 
 /**
  * @brief Get the path to the logout script file
  *
- * Returns the full path to ~/.lush_logout.
+ * Returns `${XDG_CONFIG_HOME:-~/.config}/lush/lush_logout` if it
+ * exists, else `~/.lush_logout`. XDG is canonical; `~/` is the
+ * adoption fallback. See config_get_xdg_or_home_script.
  *
  * @return Allocated path string, or NULL on failure (caller must free)
  */
 char *config_get_logout_script_path(void) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        return NULL;
-    }
-
-    char *path = malloc(strlen(home) + strlen(LOGOUT_SCRIPT_FILE) + 2);
-    if (!path) {
-        return NULL;
-    }
-
-    sprintf(path, "%s/%s", home, LOGOUT_SCRIPT_FILE);
-    return path;
+    return config_get_xdg_or_home_script("lush_logout", LOGOUT_SCRIPT_FILE);
 }
 
 /**
