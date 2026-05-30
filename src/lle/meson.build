@@ -132,12 +132,8 @@ lle_sources += files(
 lle_sources += files(
   'input/input_stream.c',
   'input/input_utf8_processor.c',
-  'input/sequence_parser.c',
-  'input/key_detector.c',
   'input/mouse_parser.c',
   'input/parser_state_machine.c',
-  'input/input_parser_integration.c',
-  'input/input_parser_error_recovery.c',
   'input/input_keybinding_integration.c',
   'input/input_widget_hooks.c',
 )

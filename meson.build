@@ -390,18 +390,6 @@ if lle_sources.length() > 0
   #      suite: 'lle-integration',
   #      timeout: 60)
 
-  # Input Parser Integration (Phase 7-9)
-  # Tests event generation, keybinding integration, and error recovery
-  if fs.exists('tests/lle/integration/input_parser_integration_test.c')
-    test_input_parser_integration = executable('test_input_parser_integration',
-                                              'tests/lle/integration/input_parser_integration_test.c',
-                                              include_directories: inc,
-                                              dependencies: [lle_dep])
-
-    test('LLE Input Parser Integration', test_input_parser_integration,
-         suite: 'lle-integration',
-         timeout: 60)
-  endif
 
   # End-to-end realistic scenario tests
   # Tests complete editing workflows that simulate real-world usage
@@ -533,26 +521,6 @@ if lle_sources.length() > 0
   test('LLE Terminal Event Reading', test_terminal_event_reading,
        suite: 'lle-unit',
        timeout: 30)
-
-  # F-Key Detection Integration Test (Spec 02 + Spec 06)
-  # Tests F-key detection with full terminal_abstraction initialization
-  # Validates production code path with parser + key_detector
-  test_fkey_detection = executable('test_fkey_detection',
-                                   'tests/lle/integration/test_fkey_detection.c',
-                                   include_directories: inc,
-                                   dependencies: [lle_dep])
-
-  test('LLE F-Key Detection Integration', test_fkey_detection,
-       suite: 'lle-integration',
-       timeout: 30)
-
-  # F-Key Manual Test Program (Spec 02 + Spec 06)
-  # Interactive manual test for F-key detection in real terminals
-  # Not registered as automated test - for manual verification only
-  test_fkey_manual = executable('test_fkey_manual',
-                                'tests/lle/manual/test_fkey_manual.c',
-                                include_directories: inc,
-                                dependencies: [lle_dep])
 
   # Render Controller Unit Tests (Spec 08)
   # Unit tests for render controller initialization, cleanup, and sub-component setup
@@ -722,31 +690,6 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Sequence Parser Unit Tests (Spec 06 Phase 3)
-  # Unit tests for terminal escape sequence parsing (CSI, OSC, DCS, control chars)
-  # Tests: state machine, CSI parameters, string sequences, incomplete sequences, error recovery
-  test_sequence_parser = executable('test_sequence_parser',
-                                    ['tests/lle/unit/test_sequence_parser.c',
-                                     'tests/lle/functional/test_memory_mock.c'],
-                                    include_directories: [inc, include_directories('tests')],
-                                    dependencies: [lle_dep])
-
-  test('LLE Sequence Parser', test_sequence_parser,
-       suite: 'lle-unit',
-       timeout: 30)
-
-  # Key Detector Unit Tests (Spec 06 Phase 4)
-  # Unit tests for key sequence detection and mapping
-  # Tests: function keys, cursor keys, modifiers, control chars, partial sequences
-  test_key_detector = executable('test_key_detector',
-                                 ['tests/lle/unit/test_key_detector.c',
-                                  'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: [inc, include_directories('tests')],
-                                 dependencies: [lle_dep])
-
-  test('LLE Key Detector', test_key_detector,
-       suite: 'lle-unit',
-       timeout: 30)
 endif
 
 # Test: Mouse Parser

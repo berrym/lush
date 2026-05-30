@@ -66,10 +66,6 @@ typedef int lush_result_t;
 /// Lush result codes
 #define LUSH_SUCCESS 0
 
-/// Forward declarations for input parsing components (from input_parsing.h)
-typedef struct lle_sequence_parser lle_sequence_parser_t;
-typedef struct lle_key_detector lle_key_detector_t;
-
 /* ============================================================================
  * ENUMERATIONS
  * ============================================================================
@@ -474,13 +470,6 @@ typedef struct lle_unix_interface {
     /// Signal handling integration
     bool sigwinch_received; ///< Set by SIGWINCH handler, polled by loop
 
-    /// Escape sequence parsing (Spec 06 integration)
-    lle_sequence_parser_t *sequence_parser; ///< Comprehensive sequence parser
-    lle_key_detector_t *key_detector;       ///< Key sequence detector
-    lle_terminal_capabilities_t
-        *capabilities;              ///< Terminal capabilities for parser
-    lle_memory_pool_t *memory_pool; ///< Memory pool for parser
-
     /// Error state
     lle_result_t last_error;
 } lle_unix_interface_t;
@@ -768,16 +757,6 @@ lle_input_processor_read_next_event(lle_input_processor_t *processor,
  * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface);
-/**
- * @brief Initialize the escape-sequence parser attached to the Unix interface
- * @param interface Unix interface to augment
- * @param capabilities Detected terminal capabilities used by the parser
- * @param memory_pool Memory pool that backs parser allocations
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t lle_unix_interface_init_sequence_parser(
-    lle_unix_interface_t *interface, lle_terminal_capabilities_t *capabilities,
-    lle_memory_pool_t *memory_pool);
 /**
  * @brief Destroy the Unix terminal interface and restore terminal settings
  * @param interface Interface to destroy (may be NULL)

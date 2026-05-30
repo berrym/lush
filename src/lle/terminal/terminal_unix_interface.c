@@ -22,7 +22,6 @@
  * Spec 02: Terminal Abstraction - Subsystem 6
  */
 
-#include "lle/input_parsing.h"
 #include "lle/terminal_abstraction.h"
 #include "lle/time_util.h"
 #include <errno.h>
@@ -330,60 +329,7 @@ lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface) {
     /// Register atexit cleanup
     register_cleanup();
 
-    /// Initialize parser-related fields to NULL (will be set up later)
-    iface->sequence_parser = NULL;
-    iface->key_detector = NULL;
-    iface->capabilities = NULL;
-    iface->memory_pool = NULL;
-
     *interface = iface;
-    return LLE_SUCCESS;
-}
-
-/**
- * @brief Initialize sequence parser for escape sequence processing
- *
- * This must be called after lle_unix_interface_init() and after
- * terminal capabilities have been detected.
- *
- * @param interface Unix interface instance
- * @param capabilities Terminal capabilities reference
- * @param memory_pool Memory pool for allocations
- * @return LLE_SUCCESS on success, error code on failure
- */
-lle_result_t lle_unix_interface_init_sequence_parser(
-    lle_unix_interface_t *interface, lle_terminal_capabilities_t *capabilities,
-    lle_memory_pool_t *memory_pool) {
-    if (!interface || !capabilities || !memory_pool) {
-        return LLE_ERROR_INVALID_PARAMETER;
-    }
-
-    /// Store references for later use
-    interface->capabilities = capabilities;
-    interface->memory_pool = memory_pool;
-
-    /// Initialize sequence parser
-    lle_result_t result = lle_sequence_parser_init(&interface->sequence_parser,
-                                                   capabilities, memory_pool);
-
-    if (result != LLE_SUCCESS) {
-        interface->capabilities = NULL;
-        interface->memory_pool = NULL;
-        return result;
-    }
-
-    /// Initialize key detector
-    result = lle_key_detector_init(&interface->key_detector, capabilities,
-                                   memory_pool);
-
-    if (result != LLE_SUCCESS) {
-        lle_sequence_parser_destroy(interface->sequence_parser);
-        interface->sequence_parser = NULL;
-        interface->capabilities = NULL;
-        interface->memory_pool = NULL;
-        return result;
-    }
-
     return LLE_SUCCESS;
 }
 
@@ -401,22 +347,6 @@ void lle_unix_interface_destroy(lle_unix_interface_t *interface) {
     if (interface->raw_mode_active) {
         lle_unix_interface_exit_raw_mode(interface);
     }
-
-    /// Clean up sequence parser if initialized
-    if (interface->sequence_parser) {
-        lle_sequence_parser_destroy(interface->sequence_parser);
-        interface->sequence_parser = NULL;
-    }
-
-    /// Clean up key detector if initialized
-    if (interface->key_detector) {
-        lle_key_detector_destroy(interface->key_detector);
-        interface->key_detector = NULL;
-    }
-
-    /// Clear references (we don't own capabilities or memory_pool)
-    interface->capabilities = NULL;
-    interface->memory_pool = NULL;
 
     /// Restore original signal handlers
     restore_signal_handlers(interface);
@@ -552,260 +482,6 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
     /// Update cached size
     interface->current_width = *width;
     interface->current_height = *height;
-
-    return LLE_SUCCESS;
-}
-
-/* ============================================================================
- * CONVERSION HELPERS - PARSED INPUT TO INPUT EVENT
- * ============================================================================
- */
-
-/**
- * @brief Convert lle_key_info_t keycode to lle_special_key_t
- *
- * Maps key codes from the parser's format to the terminal abstraction's
- * special key enum. Handles cursor keys, function keys, editing keys,
- * control characters, and special keys like Tab, Enter, and Escape.
- *
- * @param keycode Key code value from parser
- * @param key_type Key type classification from parser
- * @return Corresponding special key enum value, or LLE_KEY_UNKNOWN if not
- * mapped
- */
-static lle_special_key_t convert_key_code(uint32_t keycode,
-                                          lle_key_type_t key_type) {
-    /// For cursor keys and editing keys, keycode typically maps directly
-    switch (key_type) {
-    case LLE_KEY_TYPE_CURSOR:
-        /// Cursor keys: handle both numeric (1-4) and ASCII ('A'-'D') formats
-        if (keycode >= 1 && keycode <= 4) {
-            return (lle_special_key_t)(LLE_KEY_UP + keycode - 1);
-        }
-        /// CSI cursor keys use ASCII: A=Up, B=Down, C=Right, D=Left
-        switch (keycode) {
-        case 'A':
-            return LLE_KEY_UP;
-        case 'B':
-            return LLE_KEY_DOWN;
-        case 'C':
-            return LLE_KEY_RIGHT;
-        case 'D':
-            return LLE_KEY_LEFT;
-        /// Home/End also sometimes reported as cursor type
-        case 'H':
-            return LLE_KEY_HOME;
-        case 'F':
-            return LLE_KEY_END;
-        /// PageUp/PageDown with ASCII digit keycodes
-        case '5':
-            return LLE_KEY_PAGE_UP;
-        case '6':
-            return LLE_KEY_PAGE_DOWN;
-        default:
-            break;
-        }
-        break;
-    case LLE_KEY_TYPE_FUNCTION:
-        /// Function keys: F1-F12
-        if (keycode >= 1 && keycode <= 12) {
-            return (lle_special_key_t)(LLE_KEY_F1 + keycode - 1);
-        }
-        break;
-    case LLE_KEY_TYPE_EDITING:
-        /// Editing keys: map common codes (both numeric and ASCII)
-        switch (keycode) {
-        case 1:
-            return LLE_KEY_HOME;
-        case 2:
-        case '2':
-            return LLE_KEY_INSERT;
-        case 3:
-        case '3':
-            return LLE_KEY_DELETE;
-        case 4:
-            return LLE_KEY_END;
-        case 5:
-        case '5':
-            return LLE_KEY_PAGE_UP;
-        case 6:
-        case '6':
-            return LLE_KEY_PAGE_DOWN;
-        default:
-            break;
-        }
-        break;
-    case LLE_KEY_TYPE_CONTROL:
-        /// Control characters - treat as regular characters for now
-        /// Ctrl+C (0x03) should be handled by the application layer
-        /// We'll return UNKNOWN here and let the character handler deal with it
-        break;
-    case LLE_KEY_TYPE_SPECIAL:
-        /// Special keys
-        switch (keycode) {
-        case 9:
-            return LLE_KEY_TAB;
-        case 13:
-        case 10:
-            return LLE_KEY_ENTER;
-        case 27:
-            return LLE_KEY_ESCAPE;
-        case 127:
-            return LLE_KEY_BACKSPACE;
-        default:
-            break;
-        }
-        break;
-    default:
-        break;
-    }
-    return LLE_KEY_UNKNOWN;
-}
-
-/**
- * @brief Convert lle_key_modifiers_t to lle_key_modifier_t
- *
- * Translates modifier flags from the input parser's format to the
- * terminal abstraction's modifier flag format.
- *
- * @param parser_mods Parser modifier flags (LLE_KEY_MOD_*)
- * @return Terminal abstraction modifier flags (LLE_MOD_*)
- */
-static lle_key_modifier_t convert_modifiers(lle_key_modifiers_t parser_mods) {
-    lle_key_modifier_t result = LLE_MOD_NONE;
-
-    if (parser_mods & LLE_KEY_MOD_SHIFT)
-        result |= LLE_MOD_SHIFT;
-    if (parser_mods & LLE_KEY_MOD_ALT)
-        result |= LLE_MOD_ALT;
-    if (parser_mods & LLE_KEY_MOD_CTRL)
-        result |= LLE_MOD_CTRL;
-    if (parser_mods & LLE_KEY_MOD_META)
-        result |= LLE_MOD_META;
-
-    return result;
-}
-
-/**
- * @brief Convert lle_parsed_input_t to lle_input_event_t
- *
- * This function bridges the comprehensive sequence parser output with the
- * terminal abstraction input event format. Handles text, key, mouse,
- * sequence, paste, and focus event types.
- *
- * @param parsed Parsed input from sequence parser
- * @param event Output input event structure to populate
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if inputs are
- * NULL
- */
-static lle_result_t
-convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
-                              lle_input_event_t *event) {
-    if (!parsed || !event) {
-        return LLE_ERROR_INVALID_PARAMETER;
-    }
-
-    memset(event, 0, sizeof(lle_input_event_t));
-    event->timestamp = parsed->data.text_info.timestamp;
-    event->sequence_number = 0; /// Will be set by caller if needed
-
-    switch (parsed->type) {
-    case LLE_PARSED_INPUT_TYPE_TEXT:
-        /// Regular text input
-        event->type = LLE_INPUT_TYPE_CHARACTER;
-        event->data.character.codepoint = parsed->data.text_info.codepoint;
-        memcpy(event->data.character.utf8_bytes,
-               parsed->data.text_info.utf8_bytes,
-               parsed->data.text_info.utf8_length);
-        event->data.character.byte_count =
-            (uint8_t)parsed->data.text_info.utf8_length;
-        break;
-
-    case LLE_PARSED_INPUT_TYPE_KEY: {
-        /// Key press or combination
-        /// First try to convert to special key
-        lle_special_key_t special_key = convert_key_code(
-            parsed->data.key_info.keycode, parsed->data.key_info.type);
-
-        /// If it's a control character that didn't map to a special key,
-        /// treat it as a regular character event (e.g., Ctrl+C)
-        if (special_key == LLE_KEY_UNKNOWN &&
-            parsed->data.key_info.type == LLE_KEY_TYPE_CONTROL) {
-            /// Control character - return as CHARACTER event
-            /// For control chars, keycode might be ASCII letter, so use raw
-            /// value
-            uint32_t ctrl_code = parsed->data.key_info.keycode;
-            /// If keycode is uppercase letter, convert to control code (Ctrl+C
-            /// = 'C'-64 = 3)
-            if (ctrl_code >= 'A' && ctrl_code <= 'Z') {
-                ctrl_code = ctrl_code - 64;
-            } else if (ctrl_code >= 'a' && ctrl_code <= 'z') {
-                ctrl_code = ctrl_code - 96;
-            }
-            event->type = LLE_INPUT_TYPE_CHARACTER;
-            event->data.character.codepoint = ctrl_code;
-            event->data.character.utf8_bytes[0] = (char)ctrl_code;
-            event->data.character.byte_count = 1;
-        } else {
-            /// Regular special key
-            event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
-            event->data.special_key.key = special_key;
-            event->data.special_key.keycode = parsed->data.key_info.keycode;
-            event->data.special_key.modifiers =
-                convert_modifiers(parsed->data.key_info.modifiers);
-        }
-        event->timestamp = parsed->data.key_info.timestamp;
-        break;
-    }
-
-    case LLE_PARSED_INPUT_TYPE_MOUSE:
-        /// Mouse events are not directly supported by lle_input_event_t
-        /// We'll need to handle these through a different mechanism later
-        /// For now, treat as unknown/error
-        event->type = LLE_INPUT_TYPE_ERROR;
-        event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
-        snprintf(event->data.error.error_message,
-                 sizeof(event->data.error.error_message),
-                 "Mouse events not yet supported");
-        break;
-
-    case LLE_PARSED_INPUT_TYPE_SEQUENCE:
-        /// Terminal sequence - treat as error for now
-        event->type = LLE_INPUT_TYPE_ERROR;
-        event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
-        snprintf(event->data.error.error_message,
-                 sizeof(event->data.error.error_message),
-                 "Terminal sequence events not yet supported");
-        break;
-
-    case LLE_PARSED_INPUT_TYPE_PASTE:
-        /// Bracketed paste - treat as error for now
-        event->type = LLE_INPUT_TYPE_ERROR;
-        event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
-        snprintf(event->data.error.error_message,
-                 sizeof(event->data.error.error_message),
-                 "Paste events not yet supported");
-        break;
-
-    case LLE_PARSED_INPUT_TYPE_FOCUS:
-        /// Focus events - treat as error for now
-        event->type = LLE_INPUT_TYPE_ERROR;
-        event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
-        snprintf(event->data.error.error_message,
-                 sizeof(event->data.error.error_message),
-                 "Focus events not yet supported");
-        break;
-
-    case LLE_PARSED_INPUT_TYPE_UNKNOWN:
-    default:
-        /// Unknown input type
-        event->type = LLE_INPUT_TYPE_ERROR;
-        event->data.error.error_code = LLE_ERROR_INPUT_PARSING;
-        snprintf(event->data.error.error_message,
-                 sizeof(event->data.error.error_message),
-                 "Unknown input type from parser");
-        break;
-    }
 
     return LLE_SUCCESS;
 }
@@ -992,21 +668,10 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     /// Determine effective timeout
     uint32_t effective_timeout_ms = timeout_ms;
 
-    /// If parser is accumulating an escape sequence, use a shorter timeout
-    /// to detect standalone ESC key (50ms is typical escape sequence timeout)
-    if (interface->sequence_parser) {
-        lle_parser_state_t parser_state =
-            lle_sequence_parser_get_state(interface->sequence_parser);
-        if (parser_state != LLE_PARSER_STATE_NORMAL) {
-            /// Parser is waiting for more sequence bytes - use 60ms timeout
-            /// (slightly longer than the 50ms sequence timeout to ensure we
-            /// detect it)
-            if (effective_timeout_ms == UINT32_MAX ||
-                effective_timeout_ms > 60) {
-                effective_timeout_ms = 60;
-            }
-        }
-    }
+    /// The inline CSI reader below drains a complete ESC sequence in
+    /// a single read_event call (its own short reads consume params +
+    /// final byte), so there is no cross-call "accumulating sequence"
+    /// state to shorten the outer select() timeout for.
 
     if (effective_timeout_ms == UINT32_MAX) {
         /// Infinite timeout - pass NULL to select()
@@ -1044,24 +709,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     }
 
     if (ready == 0) {
-        /// Timeout - no data available
-        /// Check if parser is accumulating a sequence that has timed out
-        if (interface->sequence_parser) {
-            lle_parsed_input_t *timeout_input = NULL;
-            lle_result_t timeout_result = lle_sequence_parser_check_timeout(
-                interface->sequence_parser,
-                300000, /// 300ms timeout for ESC+key (Meta) sequences
-                &timeout_input);
-
-            if (timeout_result == LLE_SUCCESS && timeout_input) {
-                /// Timeout occurred - return the ESC key event
-                lle_result_t convert_result =
-                    convert_parsed_input_to_event(timeout_input, event);
-                lle_pool_free(timeout_input);
-                return convert_result;
-            }
-        }
-
+        /// Timeout - no data available.
         event->type = LLE_INPUT_TYPE_TIMEOUT;
         event->timestamp = lle_get_current_time_microseconds();
         return LLE_SUCCESS;
@@ -1095,126 +743,13 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         return LLE_SUCCESS;
     }
 
-    /// Use comprehensive sequence parser if available
-    if (interface->sequence_parser) {
-        /// Check if parser is accumulating a sequence or if this is ESC/control
-        /// char IMPORTANT: Don't send standalone control chars (Ctrl-A through
-        /// Ctrl-Z, Enter, etc.) to parser unless we're already accumulating an
-        /// escape sequence. Only ESC (0x1B) should initiate parsing.
-        lle_parser_state_t parser_state =
-            lle_sequence_parser_get_state(interface->sequence_parser);
-        bool parser_accumulating = (parser_state != LLE_PARSER_STATE_NORMAL);
-        bool should_parse = parser_accumulating || (first_byte == 0x1B);
-
-        if (should_parse) {
-            /// Feed byte to comprehensive parser
-            lle_parsed_input_t *parsed_input = NULL;
-            char byte_buffer[1] = {(char)first_byte};
-
-            /// Save parser buffer BEFORE process_data (in case it needs to be
-            /// retrieved)
-            const char *pre_buffer = NULL;
-            size_t pre_buffer_len = 0;
-            lle_sequence_parser_get_buffer(interface->sequence_parser,
-                                           &pre_buffer, &pre_buffer_len);
-
-            /// Make a copy since parser will reset after returning a result
-            char saved_buffer[256];
-            size_t saved_len = (pre_buffer_len < sizeof(saved_buffer))
-                                   ? pre_buffer_len
-                                   : sizeof(saved_buffer);
-            if (pre_buffer && saved_len > 0) {
-                memcpy(saved_buffer, pre_buffer, saved_len);
-            }
-
-            lle_result_t parse_result = lle_sequence_parser_process_data(
-                interface->sequence_parser, byte_buffer, 1, &parsed_input);
-
-            if (parse_result != LLE_SUCCESS) {
-                event->type = LLE_INPUT_TYPE_ERROR;
-                event->timestamp = lle_get_current_time_microseconds();
-                event->data.error.error_code = parse_result;
-                snprintf(event->data.error.error_message,
-                         sizeof(event->data.error.error_message),
-                         "Parser failed to process input");
-                return parse_result;
-            }
-
-            if (parsed_input) {
-                /// Parser returned a complete sequence
-                /// Note: Parser has already reset its buffer, but we saved it
-                /// beforehand
-
-                /// Add the last byte we just processed to the saved buffer
-                if (saved_len < sizeof(saved_buffer)) {
-                    saved_buffer[saved_len++] = first_byte;
-                }
-
-                /// Try key_detector if:
-                /// 1. It's a generic SEQUENCE type, OR
-                /// 2. It's a KEY type but with unknown/zero keycode (parser
-                /// didn't identify it)
-                bool should_try_detector = false;
-                if (parsed_input->type == LLE_PARSED_INPUT_TYPE_SEQUENCE) {
-                    should_try_detector = true;
-                } else if (parsed_input->type == LLE_PARSED_INPUT_TYPE_KEY &&
-                           parsed_input->data.key_info.keycode == 0) {
-                    should_try_detector = true;
-                }
-
-                if (should_try_detector && interface->key_detector &&
-                    saved_len > 0) {
-
-                    /// Try to identify the key
-                    lle_key_info_t *key_info = NULL;
-                    lle_result_t detect_result =
-                        lle_key_detector_process_sequence(
-                            interface->key_detector, saved_buffer, saved_len,
-                            &key_info);
-
-                    if (detect_result == LLE_SUCCESS && key_info) {
-                        /// Successfully identified the key - update
-                        /// parsed_input
-                        parsed_input->type = LLE_PARSED_INPUT_TYPE_KEY;
-                        parsed_input->data.key_info = *key_info;
-                        lle_pool_free(key_info);
-                    }
-                }
-
-                /// Convert to event
-                lle_result_t convert_result =
-                    convert_parsed_input_to_event(parsed_input, event);
-                lle_pool_free(parsed_input);
-                return convert_result;
-            }
-
-            /// Parser is accumulating a sequence - check for timeout first
-            /// If ESC key was pressed and enough time has passed, return ESC as
-            /// standalone key
-            lle_parsed_input_t *timeout_input = NULL;
-            lle_result_t timeout_result = lle_sequence_parser_check_timeout(
-                interface->sequence_parser,
-                300000, /// 300ms timeout for ESC+key (Meta) sequences
-                &timeout_input);
-
-            if (timeout_result == LLE_SUCCESS && timeout_input) {
-                /// Timeout occurred - return the ESC key event
-                lle_result_t convert_result =
-                    convert_parsed_input_to_event(timeout_input, event);
-                lle_pool_free(timeout_input);
-                return convert_result;
-            }
-
-            /// No timeout yet - return timeout so caller will call again
-            event->type = LLE_INPUT_TYPE_TIMEOUT;
-            event->timestamp = lle_get_current_time_microseconds();
-            return LLE_SUCCESS;
-        }
-        /// else: regular character, parser not accumulating - fall through to
-        /// UTF-8 handling
-    }
-
-    /// Check for escape sequences (ESC = 0x1B = 27)
+    /// Check for escape sequences (ESC = 0x1B = 27).
+    /// All CSI / SS3 / Meta+key decoding is done by the inline reader
+    /// below; it is the canonical live-path decoder. The earlier
+    /// sequence_parser + key_detector fallback chain was retired in
+    /// the #155 fix because it could not classify modifier-bearing
+    /// nav keys (`ESC[5;2~` etc.) and silently mapped them to
+    /// LLE_INPUT_TYPE_ERROR, terminating the shell.
     if (first_byte == 0x1B) {
         /// Read next byte with short timeout to detect escape sequences
         unsigned char second_byte;
@@ -1299,6 +834,9 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
 
                     if (final_byte == '~') {
                         /// Tilde-form keys are keyed by the numeric parameter.
+                        /// xterm function-key numbering: F5=15, F6=17, F7=18,
+                        /// F8=19, F9=20, F10=21, F11=23, F12=24 (16 and 22
+                        /// are intentionally skipped in the xterm table).
                         switch (num) {
                         case 1:
                         case 7:
@@ -1319,6 +857,30 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                             break;
                         case 6:
                             event->data.special_key.key = LLE_KEY_PAGE_DOWN;
+                            break;
+                        case 15:
+                            event->data.special_key.key = LLE_KEY_F5;
+                            break;
+                        case 17:
+                            event->data.special_key.key = LLE_KEY_F6;
+                            break;
+                        case 18:
+                            event->data.special_key.key = LLE_KEY_F7;
+                            break;
+                        case 19:
+                            event->data.special_key.key = LLE_KEY_F8;
+                            break;
+                        case 20:
+                            event->data.special_key.key = LLE_KEY_F9;
+                            break;
+                        case 21:
+                            event->data.special_key.key = LLE_KEY_F10;
+                            break;
+                        case 23:
+                            event->data.special_key.key = LLE_KEY_F11;
+                            break;
+                        case 24:
+                            event->data.special_key.key = LLE_KEY_F12;
                             break;
                         default:
                             break;
@@ -1370,6 +932,18 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                         return LLE_SUCCESS;
                     case 'F':
                         event->data.special_key.key = LLE_KEY_END;
+                        return LLE_SUCCESS;
+                    case 'P':
+                        event->data.special_key.key = LLE_KEY_F1;
+                        return LLE_SUCCESS;
+                    case 'Q':
+                        event->data.special_key.key = LLE_KEY_F2;
+                        return LLE_SUCCESS;
+                    case 'R':
+                        event->data.special_key.key = LLE_KEY_F3;
+                        return LLE_SUCCESS;
+                    case 'S':
+                        event->data.special_key.key = LLE_KEY_F4;
                         return LLE_SUCCESS;
                     default:
                         /// Unknown SS3 sequence
