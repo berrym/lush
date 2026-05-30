@@ -436,17 +436,6 @@ void free_all_words(word_t *first);
 bool is_name(const char *str);
 
 /**
- * @brief Substitute a portion of a string
- *
- * @param s1 Original string
- * @param s2 Replacement string
- * @param start Start index
- * @param end End index
- * @return New string with substitution (caller must free)
- */
-char *substitute_str(char *s1, char *s2, size_t start, size_t end);
-
-/**
  * @brief Convert a word list to a single string
  *
  * @param word First word in list

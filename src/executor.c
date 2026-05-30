@@ -16,6 +16,7 @@
 #include "arithmetic.h"
 #include "autocorrect.h"
 #include "autoload.h"
+#include "brace_match.h"
 #include "builtins.h"
 #include "config.h"
 #include "debug.h"
@@ -38,7 +39,6 @@
 #include "redirection.h"
 #include "shell_mode.h"
 #include "signals.h"
-#include "strings.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -11018,12 +11018,12 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
             /// Check for command substitution $(...)
             else if (i + 1 < len && str[i + 1] == '(') {
             try_cmd_sub_path:;
-                /// Find matching closing parenthesis using find_closing_brace
-                char *temp_str =
-                    (char *)&str[i + 1]; /// Start from the opening parenthesis
-                size_t brace_offset = find_closing_brace(temp_str);
-
-                if (brace_offset > 0) {
+                /// Find matching closing parenthesis via the canonical
+                /// brace matcher (quote-/escape-aware, codepoint-aware).
+                const char *temp_str =
+                    &str[i + 1]; /// Start from the opening parenthesis
+                size_t brace_offset = 0;
+                if (lush_find_matching_brace(temp_str, 0, &brace_offset)) {
                     /// Extract command from $(...)
                     size_t cmd_len =
                         brace_offset - 1; /// Exclude the closing paren
@@ -11079,11 +11079,11 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
 
             /// Handle ${var} format
             if (var_start < len && str[var_start] == '{') {
-                /// Use proper brace matching for nested expressions
-                char *brace_str = (char *)&str[var_start];
-                size_t brace_len = find_closing_brace(brace_str);
-
-                if (brace_len > 0) {
+                /// Use proper brace matching for nested expressions via
+                /// the canonical brace matcher.
+                const char *brace_str = &str[var_start];
+                size_t brace_len = 0;
+                if (lush_find_matching_brace(brace_str, 0, &brace_len)) {
                     /// brace_len is the index of the closing brace
                     var_end = var_start + brace_len +
                               1; /// Point to after closing brace
@@ -14584,11 +14584,12 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
         /// parameter expansion ${(flag)${INNER}} has an inner `}` that
         /// the outer brace match must skip past. strchr would stop at
         /// the inner brace and leave the outer expansion truncated.
-        /// find_closing_brace counts depth and returns the matched
+        /// lush_find_matching_brace counts depth and returns the matched
         /// close. Issue #98.
-        size_t close_offset = find_closing_brace((char *)var_name);
-        char *close = close_offset > 0 ? (char *)(var_name + close_offset)
-                                       : strchr(var_name, '}');
+        size_t close_offset = 0;
+        char *close = lush_find_matching_brace(var_name, 0, &close_offset)
+                          ? (char *)(var_name + close_offset)
+                          : strchr(var_name, '}');
         if (close) {
             size_t len = close - var_name - 1;
             char *expansion = malloc(len + 1);
@@ -15567,17 +15568,14 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
             /// Check for command substitution $(...)
             else if (str[i + 1] == '(') {
             qs_try_cmd_sub:;
-                /// Use the robust find_closing_brace function to handle nested
-                /// quotes
+                /// Use the canonical brace matcher to handle nested quotes
+                /// and escapes.
                 size_t cmd_start = i;
 
-                /// Create a temporary string starting from the '(' to use with
-                /// find_closing_brace
-                char *temp_str =
-                    (char *)&str[i + 1]; /// Start from the opening parenthesis
-                size_t brace_offset = find_closing_brace(temp_str);
-
-                if (brace_offset > 0) {
+                /// Start from the opening parenthesis.
+                const char *temp_str = &str[i + 1];
+                size_t brace_offset = 0;
+                if (lush_find_matching_brace(temp_str, 0, &brace_offset)) {
                     /// Found matching closing parenthesis
                     size_t cmd_end =
                         i + 1 + brace_offset; /// Points to the closing paren
