@@ -461,6 +461,31 @@ bool token_is_word_like(token_type_t type) {
            type == TOK_VARIABLE;
 }
 
+bool token_is_argument_word_token(token_type_t type) {
+    return type == TOK_STRING || type == TOK_EXPANDABLE_STRING ||
+           type == TOK_ARITH_EXP || type == TOK_COMMAND_SUB ||
+           type == TOK_BACKQUOTE || token_is_word_like(type) ||
+           token_is_keyword(type) || type == TOK_VARIABLE ||
+           type == TOK_LBRACKET || type == TOK_RBRACKET || type == TOK_ASSIGN ||
+           type == TOK_COMMA || type == TOK_GLOB || type == TOK_QUESTION ||
+           type == TOK_NOT_EQUAL;
+}
+
+bool token_is_assignment_value_token(token_type_t type) {
+    return token_is_word_like(type) || type == TOK_VARIABLE ||
+           type == TOK_ARITH_EXP || type == TOK_COMMAND_SUB ||
+           type == TOK_BACKQUOTE || type == TOK_ASSIGN ||
+           type == TOK_PLUS_ASSIGN || type == TOK_COMMA ||
+           type == TOK_LBRACKET || type == TOK_RBRACKET;
+}
+
+bool token_is_word_list_token(token_type_t type) {
+    return token_is_word_like(type) || type == TOK_VARIABLE ||
+           type == TOK_COMMAND_SUB || type == TOK_ARITH_EXP ||
+           type == TOK_BACKQUOTE || type == TOK_LBRACKET ||
+           type == TOK_RBRACKET;
+}
+
 /**
  * @brief Enable or disable keyword recognition
  *

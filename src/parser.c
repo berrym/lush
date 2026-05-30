@@ -1110,20 +1110,10 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         return false;
     }
 
-    /// Acceptance test — same set parse_simple_command has used since the
-    /// unified-concatenation logic was introduced.
-    bool accepted =
-        (arg_token->type == TOK_STRING ||
-         arg_token->type == TOK_EXPANDABLE_STRING ||
-         arg_token->type == TOK_ARITH_EXP ||
-         arg_token->type == TOK_COMMAND_SUB ||
-         arg_token->type == TOK_BACKQUOTE ||
-         token_is_word_like(arg_token->type) ||
-         token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
-         arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-         arg_token->type == TOK_COMMA || arg_token->type == TOK_GLOB ||
-         arg_token->type == TOK_QUESTION || arg_token->type == TOK_NOT_EQUAL);
-    if (!accepted) {
+    /// Acceptance test routed through the canonical predicate so a
+    /// leading-`[` glob like `[5].txt` is collected as a word here
+    /// instead of being mis-parsed as the `[` test builtin (#154).
+    if (!token_is_argument_word_token(arg_token->type)) {
         return false;
     }
 
@@ -1143,18 +1133,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
     /// word concatenation depends on this being correct.
     size_t last_end_pos = arg_token->end_position;
 
-    while (
-        arg_token &&
-        (arg_token->type == TOK_STRING ||
-         arg_token->type == TOK_EXPANDABLE_STRING ||
-         arg_token->type == TOK_ARITH_EXP ||
-         arg_token->type == TOK_COMMAND_SUB ||
-         arg_token->type == TOK_BACKQUOTE ||
-         token_is_word_like(arg_token->type) ||
-         token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
-         arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-         arg_token->type == TOK_COMMA || arg_token->type == TOK_GLOB ||
-         arg_token->type == TOK_QUESTION || arg_token->type == TOK_NOT_EQUAL)) {
+    while (arg_token && token_is_argument_word_token(arg_token->type)) {
 
         token_info_t *new_tokens =
             realloc(collected_tokens, (token_count + 1) * sizeof(token_info_t));
@@ -1284,7 +1263,26 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             for (int i = 0; i < token_count; i++) {
                 strcat(concatenated, dequoted[i]);
             }
-            node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
+            /// Choose the node type so the executor's glob / word-split
+            /// gate fires correctly. NODE_STRING_EXPANDABLE means
+            /// "this came from a double-quoted string -- no glob, no
+            /// split". If every collected token was an unquoted bare
+            /// word (no TOK_STRING / TOK_EXPANDABLE_STRING in the run)
+            /// the concatenation is a regular shell word and must
+            /// glob-expand: a leading `[5].txt` after the parser fix
+            /// for #154 reaches here, and emitting it as
+            /// NODE_STRING_EXPANDABLE would suppress the bracket-class
+            /// glob.
+            bool any_quoted = false;
+            for (int i = 0; i < token_count; i++) {
+                if (collected_tokens[i].type == TOK_STRING ||
+                    collected_tokens[i].type == TOK_EXPANDABLE_STRING) {
+                    any_quoted = true;
+                    break;
+                }
+            }
+            node_t *arg_node =
+                new_node(any_quoted ? NODE_STRING_EXPANDABLE : NODE_VAR);
             if (arg_node) {
                 arg_node->val.str = concatenated;
                 arg_node->val_type = VAL_STR;
@@ -1923,11 +1921,7 @@ static char *parse_scalar_assignment_string(parser_t *parser,
     /// and TOK_PLUS_ASSIGN are valid first tokens because POSIX
     /// ASSIGNMENT_WORD only delimits at the FIRST '='; `X===` has value
     /// `==`.
-    if (value_adjacent &&
-        (token_is_word_like(value->type) || value->type == TOK_VARIABLE ||
-         value->type == TOK_ARITH_EXP || value->type == TOK_COMMAND_SUB ||
-         value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
-         value->type == TOK_PLUS_ASSIGN || value->type == TOK_COMMA)) {
+    if (value_adjacent && token_is_assignment_value_token(value->type)) {
 
         /// Build complete value by concatenating adjacent tokens
         size_t value_capacity = 256;
@@ -1947,12 +1941,7 @@ static char *parse_scalar_assignment_string(parser_t *parser,
         /// (a whitespace gap breaks the loop). A peek-ahead "this word
         /// starts a new assignment" check would mis-handle X=a=b by
         /// treating the inner '=' as a new operator.
-        while (value &&
-               (token_is_word_like(value->type) ||
-                value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
-                value->type == TOK_COMMAND_SUB ||
-                value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
-                value->type == TOK_PLUS_ASSIGN || value->type == TOK_COMMA)) {
+        while (value && token_is_assignment_value_token(value->type)) {
 
             size_t token_len = strlen(value->text);
             /// Quote re-wrapping policy for assignment-value
@@ -3838,11 +3827,7 @@ static node_t *parse_for_statement(parser_t *parser) {
         while (!tokenizer_match(parser->tokenizer, TOK_RPAREN) &&
                !tokenizer_match(parser->tokenizer, TOK_EOF)) {
             token_t *word_token = tokenizer_current(parser->tokenizer);
-            if (token_is_word_like(word_token->type) ||
-                word_token->type == TOK_VARIABLE ||
-                word_token->type == TOK_COMMAND_SUB ||
-                word_token->type == TOK_ARITH_EXP ||
-                word_token->type == TOK_BACKQUOTE) {
+            if (token_is_word_list_token(word_token->type)) {
                 node_t *word_node = new_node(NODE_VAR);
                 if (!word_node) {
                     free_node_tree(for_node);
@@ -3944,11 +3929,7 @@ static node_t *parse_for_statement(parser_t *parser) {
             continue;
         }
 
-        if (token_is_word_like(word_token->type) ||
-            word_token->type == TOK_VARIABLE ||
-            word_token->type == TOK_COMMAND_SUB ||
-            word_token->type == TOK_ARITH_EXP ||
-            word_token->type == TOK_BACKQUOTE) {
+        if (token_is_word_list_token(word_token->type)) {
 
             node_t *word_node = NULL;
 
@@ -4000,15 +3981,12 @@ static node_t *parse_for_statement(parser_t *parser) {
                 if (!next_tok || next_tok->position != current_end_pos) {
                     break;
                 }
-                bool is_continuation = token_is_word_like(next_tok->type) ||
-                                       next_tok->type == TOK_VARIABLE ||
-                                       next_tok->type == TOK_NUMBER ||
-                                       next_tok->type == TOK_COMMAND_SUB ||
-                                       next_tok->type == TOK_ARITH_EXP ||
-                                       next_tok->type == TOK_BACKQUOTE ||
-                                       next_tok->type == TOK_ASSIGN ||
-                                       next_tok->type == TOK_PLUS_ASSIGN ||
-                                       next_tok->type == TOK_COMMA;
+                bool is_continuation =
+                    token_is_word_list_token(next_tok->type) ||
+                    next_tok->type == TOK_NUMBER ||
+                    next_tok->type == TOK_ASSIGN ||
+                    next_tok->type == TOK_PLUS_ASSIGN ||
+                    next_tok->type == TOK_COMMA;
                 if (!is_continuation) {
                     break;
                 }
@@ -4166,11 +4144,7 @@ static node_t *parse_select_statement(parser_t *parser) {
 
             token_t *word_token = tokenizer_current(parser->tokenizer);
 
-            if (token_is_word_like(word_token->type) ||
-                word_token->type == TOK_VARIABLE ||
-                word_token->type == TOK_COMMAND_SUB ||
-                word_token->type == TOK_ARITH_EXP ||
-                word_token->type == TOK_BACKQUOTE) {
+            if (token_is_word_list_token(word_token->type)) {
 
                 node_t *word_node = NULL;
 
