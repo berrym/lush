@@ -115,6 +115,15 @@ extern const size_t builtins_count;
 int bin_exit(int argc, char **argv);
 
 /**
+ * @brief Terminate a login shell
+ *
+ * @param argc Argument count
+ * @param argv Argument vector
+ * @return Exit status, or 1 if invoked outside a login shell
+ */
+int bin_logout(int argc, char **argv);
+
+/**
  * @brief Display help information
  * @param argc Argument count
  * @param argv Argument vector
