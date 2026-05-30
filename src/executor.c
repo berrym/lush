@@ -6588,6 +6588,14 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
             command = command->next_sibling;
         }
 
+        /// Fire any EXIT trap registered in this subshell before
+        /// terminating the child process. bash, zsh, and dash all
+        /// fire the trap (inherited from the parent and / or
+        /// installed locally inside the `( ... )`) when the subshell
+        /// exits; lush was the outlier, calling bare exit() and
+        /// silently dropping the trap. POSIX 2.11 also requires this.
+        execute_exit_traps();
+
         /// Exit with the last command's result
         exit(last_result);
     } else {
