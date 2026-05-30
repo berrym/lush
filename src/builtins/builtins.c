@@ -453,6 +453,7 @@ int builtin_loop_control(int argc, char **argv, const char *verb,
     }
 
     current_executor->loop_control = ctl;
+    current_executor->loop_control_level = level;
     return 0;
 }
 

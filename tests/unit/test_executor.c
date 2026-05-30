@@ -1753,6 +1753,82 @@ TEST(loop_break_outside_loop_errors) {
     executor_free(exec);
 }
 
+TEST(loop_break_2_unwinds_two_frames) {
+    /// `break 2` in a doubly-nested loop fires exactly once at the
+    /// inner break point and the outer loop must NOT keep iterating
+    /// (regression test for #169 -- the level argument was parsed but
+    /// discarded, so the outer loop ran every iteration).
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "N=0; for i in 1 2; do for j in a b; do N=$((N+1)); "
+              "if [ $j = a ]; then break 2; fi; done; done");
+    ASSERT_EXIT_STATUS(r, 0);
+
+    char *n = symtable_get_var(exec->symtable, "N");
+    ASSERT_NOT_NULL(n, "N should be set");
+    ASSERT_STR_EQ(n, "1", "break 2 must exit both loops on first hit");
+    free(n);
+    executor_free(exec);
+}
+
+TEST(loop_continue_2_skips_to_outer_next) {
+    /// `continue 2` from the inner loop must skip the rest of BOTH
+    /// loops on this iteration and advance the outer loop to its
+    /// next iteration. With three outer iterations and a guaranteed
+    /// `continue 2` on the first inner step, exactly three
+    /// "outer-tail" markers should fire and zero inner-tail markers.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "OUTER=0; INNER=0; "
+              "for i in 1 2 3; do "
+              "  for j in a b c; do continue 2; INNER=$((INNER+1)); done; "
+              "  OUTER=$((OUTER+1)); "
+              "done");
+    ASSERT_EXIT_STATUS(r, 0);
+
+    char *inner = symtable_get_var(exec->symtable, "INNER");
+    ASSERT_NOT_NULL(inner, "INNER should be set");
+    ASSERT_STR_EQ(inner, "0", "continue 2 must skip the inner-tail entirely");
+    free(inner);
+    char *outer = symtable_get_var(exec->symtable, "OUTER");
+    ASSERT_NOT_NULL(outer, "OUTER should be set");
+    ASSERT_STR_EQ(outer, "0", "continue 2 must also skip the outer-tail");
+    free(outer);
+    executor_free(exec);
+}
+
+TEST(loop_break_3_unwinds_three_frames) {
+    /// Triple-nested loop with `break 3` must unwind all three frames.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "N=0; for i in 1 2; do for j in 1 2; do for k in 1 2; do "
+              "N=$((N+1)); break 3; done; done; done");
+    ASSERT_EXIT_STATUS(r, 0);
+
+    char *n = symtable_get_var(exec->symtable, "N");
+    ASSERT_NOT_NULL(n, "N should be set");
+    ASSERT_STR_EQ(n, "1", "break 3 must exit all three loops on first hit");
+    free(n);
+    executor_free(exec);
+}
+
+TEST(loop_break_1_is_same_as_plain_break) {
+    /// `break 1` is the POSIX-explicit form of plain `break`.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "N=0; for i in 1 2 3; do N=$((N+1)); break 1; done");
+    ASSERT_EXIT_STATUS(r, 0);
+
+    char *n = symtable_get_var(exec->symtable, "N");
+    ASSERT_STR_EQ(n, "1", "break 1 behaves like plain break");
+    free(n);
+    executor_free(exec);
+}
+
 TEST(loop_continue_outside_loop_errors) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4427,6 +4503,10 @@ int main(void) {
     RUN_TEST(loop_break_non_numeric_level_errors);
     RUN_TEST(loop_break_level_exceeds_depth_errors);
     RUN_TEST(loop_continue_non_numeric_level_errors);
+    RUN_TEST(loop_break_2_unwinds_two_frames);
+    RUN_TEST(loop_continue_2_skips_to_outer_next);
+    RUN_TEST(loop_break_3_unwinds_three_frames);
+    RUN_TEST(loop_break_1_is_same_as_plain_break);
 
     printf("\nPipeline tests:\n");
     RUN_TEST(pipeline_simple);
