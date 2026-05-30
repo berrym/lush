@@ -12769,11 +12769,14 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         /// Nested form ${#${INNER}}: count the length of the inner
         /// expansion's result. expand_variable handles the full ${...}
-        /// form. Issue #98.
+        /// form. Issue #98. Bash/zsh return codepoint count, not byte
+        /// count, for multi-byte strings; use the canonical UTF-8
+        /// counter to match the consensus.
         if (var_name[0] == '$' && var_name[1] == '{') {
             char *inner = expand_variable(executor, var_name);
             if (inner) {
-                size_t inner_len = strlen(inner);
+                size_t inner_len =
+                    lle_utf8_count_codepoints(inner, strlen(inner));
                 free(inner);
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%zu", inner_len);
@@ -12837,15 +12840,22 @@ static char *parse_parameter_expansion(executor_t *executor,
                                         const char *elem =
                                             symtable_array_get_index(array,
                                                                      idx);
+                                        size_t elem_len =
+                                            elem ? lle_utf8_count_codepoints(
+                                                       elem, strlen(elem))
+                                                 : 0;
                                         snprintf(result_buf, sizeof(result_buf),
-                                                 "%zu",
-                                                 elem ? strlen(elem) : 0);
+                                                 "%zu", elem_len);
                                     }
                                 } else {
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
+                                    size_t elem_len =
+                                        elem ? lle_utf8_count_codepoints(
+                                                   elem, strlen(elem))
+                                             : 0;
                                     snprintf(result_buf, sizeof(result_buf),
-                                             "%zu", elem ? strlen(elem) : 0);
+                                             "%zu", elem_len);
                                 }
                             } else {
                                 if (idx_result)
@@ -12873,15 +12883,18 @@ static char *parse_parameter_expansion(executor_t *executor,
         ///   lush: number of elements (curated zsh idiom)
         ///   posix: arrays don't exist, but if one was carried over
         ///          from a prior mode, match bash's first-element rule.
-        /// Unified lookup branches on kind in a single call.
+        /// Unified lookup branches on kind in a single call. Length is
+        /// counted in codepoints (bash/zsh consensus) via the canonical
+        /// UTF-8 counter, not in bytes.
         lush_value_view_t view = {0};
         symtable_lookup(var_name, &view);
         if (view.kind == LUSH_VALUE_SCALAR) {
-            int len = (int)strlen(view.scalar_value);
+            const char *s = view.scalar_value;
+            size_t len = lle_utf8_count_codepoints(s, strlen(s));
             lush_value_view_clear(&view);
-            char *result = malloc(16);
+            char *result = malloc(24);
             if (result) {
-                snprintf(result, 16, "%d", len);
+                snprintf(result, 24, "%zu", len);
             }
             return result ? result : strdup("0");
         }
@@ -12896,7 +12909,9 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
                 const char *first = symtable_array_get_index(array, 0);
-                snprintf(result, 24, "%zu", first ? strlen(first) : 0);
+                size_t first_len =
+                    first ? lle_utf8_count_codepoints(first, strlen(first)) : 0;
+                snprintf(result, 24, "%zu", first_len);
             } else {
                 snprintf(result, 24, "%zu", symtable_array_length(array));
             }

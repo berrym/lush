@@ -2022,6 +2022,44 @@ TEST(param_string_length) {
     executor_free(exec);
 }
 
+TEST(param_string_length_counts_codepoints_not_bytes) {
+    /// ${#var} returns CODEPOINT count (bash/zsh consensus), not byte
+    /// count. Multi-byte strings used to byte-count, which broke
+    /// real-world parity (#157 verification surfaced this).
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// 4 codepoints, 5 bytes.
+    run_result_t r = run_shell_with_executor(exec, "V=café; LEN=${#V}");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *len = symtable_get_var(exec->symtable, "LEN");
+    ASSERT_STR_EQ(len, "4", "Length of 'café' should be 4 (codepoints)");
+    free(len);
+
+    /// CJK: 2 codepoints, 6 bytes.
+    r = run_shell_with_executor(exec, "V=中文; LEN=${#V}");
+    ASSERT_EXIT_STATUS(r, 0);
+    len = symtable_get_var(exec->symtable, "LEN");
+    ASSERT_STR_EQ(len, "2", "Length of '中文' should be 2 (codepoints)");
+    free(len);
+
+    /// Emoji: ab🌍c = 4 codepoints (a, b, 🌍, c), 7 bytes.
+    r = run_shell_with_executor(exec, "V=ab🌍c; LEN=${#V}");
+    ASSERT_EXIT_STATUS(r, 0);
+    len = symtable_get_var(exec->symtable, "LEN");
+    ASSERT_STR_EQ(len, "4", "Length of 'ab🌍c' should be 4 (codepoints)");
+    free(len);
+
+    /// Empty string still returns 0.
+    r = run_shell_with_executor(exec, "V=; LEN=${#V}");
+    ASSERT_EXIT_STATUS(r, 0);
+    len = symtable_get_var(exec->symtable, "LEN");
+    ASSERT_STR_EQ(len, "0", "Length of '' should be 0");
+    free(len);
+
+    executor_free(exec);
+}
+
 TEST(param_substring_removal_prefix) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4524,6 +4562,7 @@ int main(void) {
     printf("\nParameter expansion tests:\n");
     RUN_TEST(param_default_value);
     RUN_TEST(param_alternate_value);
+    RUN_TEST(param_string_length_counts_codepoints_not_bytes);
     RUN_TEST(param_string_length);
     RUN_TEST(param_substring_removal_prefix);
     RUN_TEST(param_substring_removal_suffix);
