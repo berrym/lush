@@ -5,9 +5,9 @@
  * These helpers predate the structured shell-error system in shell_error.h
  * and remain in use only for paths that fall outside its model:
  *   - error_return: nonfatal OOM/infrastructure failures with no executor
- *     context (alloc_str, set_node_val_str)
+ *     context (set_node_val_str)
  *   - error_syscall: fatal syscall failures during early init or low-level
- *     allocation (init.c, strings.c, input.c, node.c)
+ *     allocation (init.c, input.c, node.c)
  *   - error_abort: fatal assertion-style failures during init
  *   - sigsegv_handler: SIGSEGV signal handler
  *

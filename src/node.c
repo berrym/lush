@@ -14,7 +14,6 @@
 
 #include "errors.h"
 #include "shell_error.h"
-#include "strings.h"
 
 #include <stdbool.h>
 #include <stdio.h>

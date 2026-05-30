@@ -184,6 +184,7 @@ src = ['src/arithmetic.c',
        'src/parser.c',
        'src/pattern_match.c',
        'src/escape.c',
+       'src/brace_match.c',
        'src/identifier.c',
        'src/posix_history.c',
        'src/posix_opts.c',
@@ -191,7 +192,6 @@ src = ['src/arithmetic.c',
        'src/shell_error.c',
        'src/shell_mode.c',
        'src/signals.c',
-       'src/strings.c',
        'src/symtable.c',
        'src/tokenizer.c',
       ]
@@ -291,7 +291,6 @@ display_sources = [
   'src/display/pager_input.c',
   'src/display_integration.c',
   'src/globals.c',
-  'src/strings.c',
   'src/errors.c',
   # display_integration.c reports subsystem-init failures through the
   # structured error system (#71), so the unit-test display_lib needs
@@ -1367,7 +1366,6 @@ if fs.exists('tests/unit/test_parser.c')
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
-                           'src/strings.c',
                            'src/symtable.c',
                            'src/libhashtable/ht.c',
                            'src/libhashtable/ht_fnv1a.c',
@@ -1390,7 +1388,6 @@ if fs.exists('tests/unit/test_parser_fuzzer.c')
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
-                           'src/strings.c',
                            'src/symtable.c',
                            'src/libhashtable/ht.c',
                            'src/libhashtable/ht_fnv1a.c',
@@ -1413,7 +1410,6 @@ if fs.exists('tests/unit/test_parser_negative.c')
                            'src/node.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
-                           'src/strings.c',
                            'src/symtable.c',
                            'src/libhashtable/ht.c',
                            'src/libhashtable/ht_fnv1a.c',
@@ -1437,7 +1433,6 @@ if fs.exists('tests/unit/test_ast_roundtrip.c')
                            'src/node_to_source.c',
                            'src/shell_mode.c',
                            'src/shell_error.c',
-                           'src/strings.c',
                            'src/symtable.c',
                            'src/libhashtable/ht.c',
                            'src/libhashtable/ht_fnv1a.c',
@@ -2050,7 +2045,6 @@ if fuzzing_enabled
     'src/node.c',
     'src/shell_mode.c',
     'src/shell_error.c',
-    'src/strings.c',
     'src/globals.c',
     'src/symtable.c',
     'src/libhashtable/ht.c',
@@ -2250,25 +2244,6 @@ endif
 # ADDITIONAL UNIT TESTS FOR COVERAGE IMPROVEMENT
 # ============================================================================
 
-# String Utilities Tests
-if fs.exists('tests/unit/test_strings.c')
-  test_strings_sources = []
-  foreach s : src
-    if not s.endswith('lush.c')
-      test_strings_sources += s
-    endif
-  endforeach
-  test_strings = executable('test_strings',
-                            'tests/unit/test_strings.c',
-                            'tests/unit/test_executor_stubs.c',
-                            test_strings_sources + lle_shell_sources,
-                            include_directories: [inc, include_directories('tests')],
-                            dependencies: [lle_dep, libm])
-  test('String Utilities', test_strings,
-       suite: 'unit',
-       timeout: 30)
-endif
-
 # Shell Error System Tests
 if fs.exists('tests/unit/test_shell_error.c')
   test_shell_error_sources = []
@@ -2407,6 +2382,18 @@ if fs.exists('tests/unit/test_escape.c')
        timeout: 30)
 endif
 
+# Brace-Match Tests - canonical brace/paren matcher with shell quote dialects
+if fs.exists('tests/unit/test_brace_match.c')
+  test_brace_match = executable('test_brace_match',
+                                'tests/unit/test_brace_match.c',
+                                'src/brace_match.c',
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep])
+  test('Brace Match', test_brace_match,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Compatibility Database Tests
 if fs.exists('tests/unit/test_compat.c')
   test_compat_sources = []
@@ -2474,7 +2461,6 @@ if fs.exists('tests/unit/test_node_to_source.c')
                                    'src/node.c',
                                    'src/shell_mode.c',
                                    'src/shell_error.c',
-                                   'src/strings.c',
                                    'src/symtable.c',
                                    'src/libhashtable/ht.c',
                                    'src/libhashtable/ht_fnv1a.c',
