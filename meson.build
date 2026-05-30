@@ -1079,6 +1079,27 @@ endif
          env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
   endif
 
+  # #154 regression tests: leading-`[` bracket-glob parsing
+  if fs.exists('tests/unit/test_bracket_glob_parsing.c')
+    test_bracket_glob_sources = []
+    foreach s : src
+      if not s.endswith('lush.c')
+        test_bracket_glob_sources += s
+      endif
+    endforeach
+    test_bracket_glob_parsing = executable('test_bracket_glob_parsing',
+                                           'tests/unit/test_bracket_glob_parsing.c',
+                                           'tests/unit/test_executor_stubs.c',
+                                           test_bracket_glob_sources + lle_shell_sources,
+                                           include_directories: [inc, include_directories('tests')],
+                                           dependencies: [lle_dep, libm])
+    test('Bracket Glob Parsing (#154)', test_bracket_glob_parsing,
+         suite: 'unit',
+         timeout: 30,
+         depends: [lush_exe],
+         env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
+  endif
+
   # Word-Context Analyzer Tests
   # Exercises lle_word_context_analyze across quote/escape state, word
   # boundaries respecting quote state, filename_portion_start computation,

@@ -295,6 +295,40 @@ bool token_is_operator(token_type_t type);
  */
 bool token_is_word_like(token_type_t type);
 
+/**
+ * @brief Check if a token type is acceptable inside a command-argument word.
+ *
+ * Returns true for every token type the parser may pull into a
+ * concatenated argument word via `collect_word_argument` adjacency.
+ * In particular, this includes TOK_LBRACKET and TOK_RBRACKET so a
+ * bracket-glob like `[5].txt` at the start of an argument word does
+ * not get mis-parsed as an invocation of the `[` test builtin (#154).
+ */
+bool token_is_argument_word_token(token_type_t type);
+
+/**
+ * @brief Check if a token type is acceptable as part of an assignment value.
+ *
+ * Used by `parse_scalar_assignment_string` to decide what counts as a
+ * continuation of `x=...` adjacency. Differs from
+ * `token_is_argument_word_token` because TOK_PLUS_ASSIGN is accepted
+ * here (POSIX ASSIGNMENT_WORD only delimits at the FIRST `=`, so a
+ * subsequent `+=` inside the value is literal text), and TOK_STRING /
+ * keywords / TOK_GLOB / TOK_QUESTION / TOK_NOT_EQUAL are not.
+ */
+bool token_is_assignment_value_token(token_type_t type);
+
+/**
+ * @brief Check if a token type is acceptable as a for/select word-list item.
+ *
+ * Used by `for NAME in WORDS;` and `select NAME in WORDS;` parsers
+ * (and the zsh `for NAME (WORDS)` form). Includes TOK_LBRACKET /
+ * TOK_RBRACKET so a bracket-glob like `for f in [5].txt; ...` is
+ * collected as a word instead of mis-routing to the `[` test builtin
+ * (#154).
+ */
+bool token_is_word_list_token(token_type_t type);
+
 /* ============================================================================
  * Tokenizer Control
  * ============================================================================
