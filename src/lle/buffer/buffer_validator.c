@@ -50,9 +50,6 @@ lle_result_t lle_buffer_validator_init(lle_buffer_validator_t **validator) {
     val->corruption_detections = 0;
     val->bounds_violations = 0;
 
-    /// No UTF-8 processor reference by default
-    val->utf8_processor = NULL;
-
     /// Initialize last validation results
     val->last_validation_result = LLE_SUCCESS;
     val->last_validation_time = 0;

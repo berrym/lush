@@ -664,32 +664,6 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Input Stream Unit Tests (Spec 06 Phase 1)
-  # Unit tests for input stream buffering, flow control, and data management
-  # Tests: init/destroy, buffer data, consume, peek, statistics, overflow handling
-  test_input_stream = executable('test_input_stream',
-                                 ['tests/lle/unit/test_input_stream.c',
-                                  'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: [inc, include_directories('tests')],
-                                 dependencies: [lle_dep])
-
-  test('LLE Input Stream', test_input_stream,
-       suite: 'lle-unit',
-       timeout: 30)
-
-  # Input UTF-8 Processor Unit Tests (Spec 06 Phase 2)
-  # Unit tests for streaming UTF-8 decoding and grapheme boundary detection
-  # Tests: byte-by-byte processing, buffer processing, partial sequences, error recovery
-  test_input_utf8_processor = executable('test_input_utf8_processor',
-                                         ['tests/lle/unit/test_input_utf8_processor.c',
-                                          'tests/lle/functional/test_memory_mock.c'],
-                                         include_directories: [inc, include_directories('tests')],
-                                         dependencies: [lle_dep])
-
-  test('LLE Input UTF-8 Processor', test_input_utf8_processor,
-       suite: 'lle-unit',
-       timeout: 30)
-
 endif
 
 # Test: CSI / SS3 decoder (live-path key decoder for the inline CSI reader)
@@ -703,29 +677,6 @@ if fs.exists('tests/lle/unit/test_csi_decoder.c')
        timeout: 30)
 endif
 
-# Test: Mouse Parser
-if fs.exists('tests/lle/unit/test_mouse_parser.c')
-  test_mouse_parser = executable('test_mouse_parser',
-                                 ['tests/lle/unit/test_mouse_parser.c',
-                                  'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: [inc, include_directories('tests')],
-                                 dependencies: [lle_dep])
-  test('LLE Mouse Parser', test_mouse_parser,
-       suite: 'lle-unit',
-       timeout: 30)
-endif
-
-# Test: Parser State Machine
-if fs.exists('tests/lle/unit/test_parser_state_machine.c')
-  test_parser_state_machine = executable('test_parser_state_machine',
-                                         ['tests/lle/unit/test_parser_state_machine.c',
-                                          'tests/lle/functional/test_memory_mock.c'],
-                                         include_directories: [inc, include_directories('tests')],
-                                         dependencies: [lle_dep])
-  test('LLE Parser State Machine', test_parser_state_machine,
-       suite: 'lle-unit',
-       timeout: 30)
-endif
 
 # ============================================================================
 # LLE History System Tests (Spec 09)
