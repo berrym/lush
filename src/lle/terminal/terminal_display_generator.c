@@ -16,6 +16,7 @@
  * Spec 02: Terminal Abstraction - Subsystem 3
  */
 
+#include "lle/char_width.h"
 #include "lle/terminal_abstraction.h"
 #include "lle/time_util.h"
 #include "lle/utf8_support.h"
@@ -282,7 +283,7 @@ static size_t calculate_display_lines(const char *buffer, size_t buffer_length,
                 &buffer[i], buffer_length - i, &codepoint);
 
             if (bytes_in_char > 0) {
-                int char_width = lle_utf8_codepoint_width(codepoint);
+                int char_width = lle_codepoint_width(codepoint);
                 current_column += char_width;
                 i += bytes_in_char;
             } else {
@@ -398,7 +399,7 @@ lle_display_generator_generate_content(lle_display_generator_t *generator,
                 }
 
                 /// Update column with actual display width
-                int char_width = lle_utf8_codepoint_width(codepoint);
+                int char_width = lle_codepoint_width(codepoint);
                 current_column += char_width;
                 buffer_pos += bytes_in_char;
             } else {

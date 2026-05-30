@@ -95,21 +95,12 @@ int lle_utf8_codepoint_to_grapheme_index(const char *text, size_t cp_index,
                                          size_t *grapheme_index);
 
 /**
- * @brief Get the display width of a Unicode codepoint
- *
- * This function returns the visual width for terminal display,
- * accounting for:
- * - Zero-width characters (combining marks, format characters)
- * - Wide characters (CJK, emoji)
- * - Normal characters
- *
- * @param codepoint Unicode codepoint
- * @return Display width (0, 1, or 2)
- */
-int lle_utf8_codepoint_width(uint32_t codepoint);
-
-/**
  * @brief Get the display width of a UTF-8 string
+ *
+ * Per-codepoint widths come from lle_codepoint_width (canonical
+ * table in char_width.c), which honours the configured East Asian
+ * Ambiguous policy.
+ *
  * @param text UTF-8 text
  * @param length Length in bytes
  * @return Total display width

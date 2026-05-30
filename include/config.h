@@ -251,6 +251,8 @@ typedef struct {
     bool display_newline_before_prompt;  ///< Print newline before prompt
     bool display_performance_monitoring; ///< Enable performance monitoring
     int display_optimization_level;      ///< Optimization level (0-4)
+    char *display_ambiguous_width;       ///< East Asian Ambiguous width
+                                         ///< policy: "narrow" or "wide"
     bool enhanced_display_mode; ///< Legacy display setting (deprecated)
 
     /// LLE pager (lle_pager_present)
@@ -479,6 +481,14 @@ bool config_validate_optimization_level(const char *value);
  * @return true if valid color scheme, false otherwise
  */
 bool config_validate_color_scheme(const char *value);
+
+/**
+ * @brief Validate an East Asian Ambiguous-width policy value
+ *
+ * @param value Width policy string ("narrow" or "wide")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_ambiguous_width(const char *value);
 
 /**
  * @brief Validate an LLE arrow mode value
