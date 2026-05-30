@@ -2533,3 +2533,15 @@ if fs.exists('tools/real_world_scorecard.sh')
        is_parallel: false,
        timeout: 120)
 endif
+
+# Fixture-driven integration test for POSIX $ENV sourcing (#L12).
+# Spawns the lush binary with various env configurations and observes
+# the visible side effect; can't be a unit test because $ENV is
+# consulted during shell init.
+if fs.exists('tests/integration/test_env_sourcing.sh')
+  test('POSIX $ENV sourcing',
+       find_program('tests/integration/test_env_sourcing.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
