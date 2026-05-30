@@ -315,7 +315,8 @@ display_dep = declare_dependency(link_with: display_lib,
 lush_exe = executable('lush',
                         src + lle_shell_sources,
                         include_directories: inc,
-                        dependencies: [lle_dep, libm])
+                        dependencies: [lle_dep, libm],
+                        install: true)
 
 # ============================================================================
 # TEST INFRASTRUCTURE
