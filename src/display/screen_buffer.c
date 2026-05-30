@@ -20,6 +20,7 @@
 
 #include "display/screen_buffer.h"
 #include "config.h"
+#include "lle/char_width.h"
 #include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include <stdio.h>
@@ -388,7 +389,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                                                   &codepoint);
 
             if (bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_utf8_codepoint_width(codepoint);
+                int visual_width = lle_codepoint_width(codepoint);
                 if (visual_width > 0) {
                     /// Store full UTF-8 sequence
                     write_char_to_buffer(buffer, prompt_text + i, bytes,
@@ -500,7 +501,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 command_text + i, text_len - i, &codepoint);
 
             if (char_bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_utf8_codepoint_width(codepoint);
+                int visual_width = lle_codepoint_width(codepoint);
 
                 if (visual_width > 0) {
                     /// Store full UTF-8 sequence
@@ -648,7 +649,7 @@ void screen_buffer_render_with_continuation(
                                                   &codepoint);
 
             if (bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_utf8_codepoint_width(codepoint);
+                int visual_width = lle_codepoint_width(codepoint);
                 if (visual_width > 0) {
                     write_char_to_buffer(buffer, prompt_text + i, bytes,
                                          visual_width, true, &row, &col);
@@ -793,7 +794,7 @@ void screen_buffer_render_with_continuation(
                 command_text + i, text_len - i, &codepoint);
 
             if (char_bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_utf8_codepoint_width(codepoint);
+                int visual_width = lle_codepoint_width(codepoint);
 
                 if (visual_width > 0) {
                     write_char_to_buffer(buffer, command_text + i, char_bytes,
@@ -1165,7 +1166,7 @@ size_t screen_buffer_calculate_visual_width(const char *text,
         int char_width = 1; /// Default to 1 column
         if (decode_result > 0 && base_codepoint >= 32) {
             /// Use LLE's wcwidth implementation for proper width
-            char_width = lle_utf8_codepoint_width(base_codepoint);
+            char_width = lle_codepoint_width(base_codepoint);
             if (char_width < 0) {
                 char_width = 1; /// Control characters default to 1
             }
@@ -1194,7 +1195,7 @@ static size_t line_index_visual_width(const char *text, size_t byte_length) {
     /// Compute visual columns occupied by a logical line. Matches the
     /// width semantics of screen_buffer_render: ANSI escape sequences
     /// take 0 columns, UTF-8 codepoints are decoded and weighed via
-    /// lle_utf8_codepoint_width (CJK / emoji count as 2 columns each).
+    /// lle_codepoint_width (CJK / emoji count as 2 columns each).
     /// Readline markers \001 and \002 take 0 columns (consistent with
     /// screen_buffer_visual_width).
     if (!text || byte_length == 0) {
@@ -1231,7 +1232,7 @@ static size_t line_index_visual_width(const char *text, size_t byte_length) {
             i += 1;
             continue;
         }
-        int w = lle_utf8_codepoint_width(cp);
+        int w = lle_codepoint_width(cp);
         if (w < 0) {
             w = 0; /// Control characters take no visible columns
         }

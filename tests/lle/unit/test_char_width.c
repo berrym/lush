@@ -183,8 +183,9 @@ TEST(hangul_syllables_wide) {
  */
 
 TEST(hiragana_wide) {
-    /// U+3040..U+309F
-    ASSERT_EQ(lle_codepoint_width(0x3040), 2, "first hiragana block");
+    /// Per TR11, the Hiragana 'W' range is U+3041..U+3096 plus
+    /// U+3099..U+309F. U+3040 itself is reserved/Neutral.
+    ASSERT_EQ(lle_codepoint_width(0x3041), 2, "HIRAGANA LETTER SMALL A");
     ASSERT_EQ(lle_codepoint_width(0x3042), 2, "あ");
     ASSERT_EQ(lle_codepoint_width(0x309F), 2, "last hiragana block");
 }
@@ -208,8 +209,9 @@ TEST(katakana_phonetic_extensions_wide) {
  */
 
 TEST(fullwidth_forms_wide) {
-    /// U+FF00..U+FF60
-    ASSERT_EQ(lle_codepoint_width(0xFF00), 2, "first fullwidth");
+    /// Per TR11 the Fullwidth 'F' range is U+FF01..U+FF60 -- U+FF00
+    /// itself is Neutral.
+    ASSERT_EQ(lle_codepoint_width(0xFF01), 2, "FULLWIDTH EXCLAMATION");
     ASSERT_EQ(lle_codepoint_width(0xFF21), 2, "FULLWIDTH A");
     ASSERT_EQ(lle_codepoint_width(0xFF60), 2, "last in first fullwidth range");
 }
@@ -238,17 +240,22 @@ TEST(emoji_symbols_pictographs_extended_a_wide) {
     ASSERT_EQ(lle_codepoint_width(0x1FAFF), 2, "last SP-A");
 }
 
-TEST(misc_symbols_wide) {
-    /// U+2600..U+27BF
-    ASSERT_EQ(lle_codepoint_width(0x2600), 2, "BLACK SUN WITH RAYS");
-    ASSERT_EQ(lle_codepoint_width(0x2705), 2, "WHITE HEAVY CHECK MARK");
-    ASSERT_EQ(lle_codepoint_width(0x27BF), 2, "last in block");
+TEST(misc_symbols_ambiguous_narrow_by_default) {
+    /// Per TR11 the Miscellaneous Symbols block (U+2600..U+27BF) is
+    /// mixed; lush treats the whole block as Ambiguous so a single
+    /// policy knob covers it. Default policy is narrow.
+    ASSERT_EQ(lle_codepoint_width(0x2600), 1, "BLACK SUN WITH RAYS (narrow)");
+    ASSERT_EQ(lle_codepoint_width(0x2705), 1, "WHITE HEAVY CHECK MARK");
+    ASSERT_EQ(lle_codepoint_width(0x27BF), 1, "last in block");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x2600), "block is 'A'");
 }
 
-TEST(misc_technical_wide) {
-    /// U+2300..U+23FF
-    ASSERT_EQ(lle_codepoint_width(0x2300), 2, "first technical");
-    ASSERT_EQ(lle_codepoint_width(0x23FF), 2, "last technical");
+TEST(misc_technical_ambiguous_narrow_by_default) {
+    /// Per TR11 the Miscellaneous Technical block (U+2300..U+23FF)
+    /// is mixed; treated as Ambiguous as a whole. Default narrow.
+    ASSERT_EQ(lle_codepoint_width(0x2300), 1, "first technical (narrow)");
+    ASSERT_EQ(lle_codepoint_width(0x23FF), 1, "last technical");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x2300), "block is 'A'");
 }
 
 TEST(stars_wide) {
@@ -328,6 +335,149 @@ TEST(geometric_shapes_width_one) {
 }
 
 /* ============================================================================
+ * East Asian Ambiguous policy (#157)
+ * ============================================================================
+ */
+
+TEST(ambiguous_policy_default_is_narrow) {
+    /// Fresh test process; the global policy default must be 1 (narrow).
+    /// U+2300 first Misc Technical, U+2600 first Misc Symbols both 'A'.
+    ASSERT_EQ(lle_codepoint_width(0x2300), 1, "ambiguous default narrow");
+    ASSERT_EQ(lle_codepoint_width(0x2600), 1, "ambiguous default narrow");
+}
+
+TEST(ambiguous_policy_wide_returns_two) {
+    /// Switch policy; ambiguous codepoints return 2.
+    lle_codepoint_width_set_ambiguous_policy(2);
+    ASSERT_EQ(lle_codepoint_width(0x2300), 2, "ambiguous wide");
+    ASSERT_EQ(lle_codepoint_width(0x2600), 2, "ambiguous wide");
+    ASSERT_EQ(lle_codepoint_width(0x00A1), 2, "Latin-1 'A' wide");
+    /// Restore default for subsequent tests.
+    lle_codepoint_width_set_ambiguous_policy(1);
+}
+
+TEST(ambiguous_policy_coerces_invalid_to_narrow) {
+    lle_codepoint_width_set_ambiguous_policy(99);
+    ASSERT_EQ(lle_codepoint_width(0x2300), 1, "invalid -> narrow");
+    lle_codepoint_width_set_ambiguous_policy(2);
+    lle_codepoint_width_set_ambiguous_policy(0);
+    ASSERT_EQ(lle_codepoint_width(0x2300), 1, "zero -> narrow");
+    lle_codepoint_width_set_ambiguous_policy(1);
+}
+
+TEST(ambiguous_policy_does_not_affect_wide_chars) {
+    /// CJK ideographs are 'W', not 'A'; policy must not move them.
+    lle_codepoint_width_set_ambiguous_policy(2);
+    ASSERT_EQ(lle_codepoint_width(0x4E00), 2, "CJK stays wide");
+    lle_codepoint_width_set_ambiguous_policy(1);
+    ASSERT_EQ(lle_codepoint_width(0x4E00), 2, "CJK stays wide");
+}
+
+TEST(ambiguous_predicate_covers_named_ranges) {
+    /// Spot-check the ranges named in the issue.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x2300),
+                "Misc Technical first");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x23FF),
+                "Misc Technical last");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x2600),
+                "Misc Symbols first");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x27BF),
+                "Misc Symbols last");
+    /// Greek and Cyrillic core.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x03B1), "Greek alpha");
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x0410), "Cyrillic A");
+    /// Latin-1 ambiguous subset.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x00A1),
+                "INVERTED EXCLAMATION");
+    /// Euro sign.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0x20AC), "Euro");
+    /// Private Use Area.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0xE000), "PUA");
+    /// Replacement character.
+    ASSERT_TRUE(lle_codepoint_is_east_asian_ambiguous(0xFFFD), "U+FFFD");
+}
+
+TEST(ambiguous_predicate_excludes_unambiguous) {
+    /// ASCII / unambiguous Wide / Narrow chars must not be classified
+    /// as Ambiguous.
+    ASSERT_FALSE(lle_codepoint_is_east_asian_ambiguous('A'), "ASCII A");
+    ASSERT_FALSE(lle_codepoint_is_east_asian_ambiguous(0x4E00),
+                 "CJK is 'W' not 'A'");
+    ASSERT_FALSE(lle_codepoint_is_east_asian_ambiguous(0x3000),
+                 "Ideographic Space is 'F' not 'A'");
+    ASSERT_FALSE(lle_codepoint_is_east_asian_ambiguous(0x1F600),
+                 "emoji is 'W' not 'A'");
+}
+
+/* ============================================================================
+ * Newly-covered unambiguous ranges (#157 unification gaps)
+ * ============================================================================
+ */
+
+TEST(ideographic_space_is_wide) {
+    /// U+3000 is TR11 'F' (Fullwidth); the divergent utf8_support.c
+    /// table had this but the old canonical char_width.c didn't.
+    ASSERT_EQ(lle_codepoint_width(0x3000), 2, "IDEOGRAPHIC SPACE");
+}
+
+TEST(cjk_symbols_punctuation_wide) {
+    /// U+3001-U+303E. Newly added to canonical.
+    ASSERT_EQ(lle_codepoint_width(0x3001), 2, "IDEOGRAPHIC COMMA");
+    ASSERT_EQ(lle_codepoint_width(0x303E), 2, "last CJK symbols block");
+}
+
+TEST(angle_brackets_wide) {
+    /// U+2329, U+232A -- TR11 'W'.
+    ASSERT_EQ(lle_codepoint_width(0x2329), 2, "LEFT-POINTING ANGLE BRACKET");
+    ASSERT_EQ(lle_codepoint_width(0x232A), 2, "RIGHT-POINTING ANGLE BRACKET");
+}
+
+TEST(kangxi_radicals_wide) {
+    /// U+2F00-U+2FD5.
+    ASSERT_EQ(lle_codepoint_width(0x2F00), 2, "KANGXI RADICAL ONE");
+    ASSERT_EQ(lle_codepoint_width(0x2FD5), 2, "last Kangxi radical");
+}
+
+TEST(cjk_radicals_supplement_wide) {
+    /// U+2E80-U+2E99, U+2E9B-U+2EF3.
+    ASSERT_EQ(lle_codepoint_width(0x2E80), 2, "first CJK radical supp");
+    ASSERT_EQ(lle_codepoint_width(0x2E99), 2, "U+2E99");
+    ASSERT_EQ(lle_codepoint_width(0x2EF3), 2, "last CJK radical supp");
+}
+
+TEST(bopomofo_wide) {
+    /// U+3105-U+312F.
+    ASSERT_EQ(lle_codepoint_width(0x3105), 2, "BOPOMOFO LETTER B");
+    ASSERT_EQ(lle_codepoint_width(0x312F), 2, "last Bopomofo");
+}
+
+TEST(yi_syllables_wide) {
+    /// U+A000-U+A4CF.
+    ASSERT_EQ(lle_codepoint_width(0xA000), 2, "first Yi syllable");
+    ASSERT_EQ(lle_codepoint_width(0xA4CF), 2, "last Yi syllable");
+}
+
+TEST(cjk_compatibility_ideographs_wide) {
+    /// U+F900-U+FAFF.
+    ASSERT_EQ(lle_codepoint_width(0xF900), 2, "first CJK compat");
+    ASSERT_EQ(lle_codepoint_width(0xFAFF), 2, "last CJK compat");
+}
+
+TEST(vertical_forms_and_cjk_compat_forms_wide) {
+    /// U+FE10-U+FE19 (vertical forms), U+FE30-U+FE6F (CJK compat forms).
+    ASSERT_EQ(lle_codepoint_width(0xFE10), 2, "first vertical form");
+    ASSERT_EQ(lle_codepoint_width(0xFE19), 2, "last vertical form");
+    ASSERT_EQ(lle_codepoint_width(0xFE30), 2, "first CJK compat form");
+    ASSERT_EQ(lle_codepoint_width(0xFE6F), 2, "last CJK compat form");
+}
+
+TEST(hangul_compatibility_jamo_wide) {
+    /// U+3131-U+318E.
+    ASSERT_EQ(lle_codepoint_width(0x3131), 2, "HANGUL LETTER KIYEOK");
+    ASSERT_EQ(lle_codepoint_width(0x318E), 2, "last Hangul compat jamo");
+}
+
+/* ============================================================================
  * Default width-1 fallback for unmapped codepoints
  * ============================================================================
  */
@@ -356,10 +506,12 @@ TEST(boundary_just_before_cjk_unified) {
 }
 
 TEST(boundary_just_after_cjk_unified) {
-    /// 0xA000 is just after CJK (0x9FFF). Yi Syllables block; falls
-    /// through to default.
+    /// U+A000 is the first Yi Syllable, classified 'W' by TR11.
+    /// (Earlier canonical char_width.c did not cover this range, but
+    /// the divergent table in utf8_support.c did; the unification
+    /// fixed the gap.)
     ASSERT_EQ(lle_codepoint_width(0x9FFF), 2, "last CJK");
-    ASSERT_EQ(lle_codepoint_width(0xA000), 1, "just after CJK (default)");
+    ASSERT_EQ(lle_codepoint_width(0xA000), 2, "first Yi syllable");
 }
 
 TEST(boundary_just_before_hangul_jamo_choseong) {
@@ -452,8 +604,8 @@ int main(void) {
     printf("\n--- Emoji and symbols ---\n");
     RUN_TEST(emoji_main_block_wide);
     RUN_TEST(emoji_symbols_pictographs_extended_a_wide);
-    RUN_TEST(misc_symbols_wide);
-    RUN_TEST(misc_technical_wide);
+    RUN_TEST(misc_symbols_ambiguous_narrow_by_default);
+    RUN_TEST(misc_technical_ambiguous_narrow_by_default);
     RUN_TEST(stars_wide);
 
     printf("\n--- Variation selectors and modifiers ---\n");
@@ -467,6 +619,26 @@ int main(void) {
     RUN_TEST(box_drawing_width_one);
     RUN_TEST(block_elements_width_one);
     RUN_TEST(geometric_shapes_width_one);
+
+    printf("\n--- East Asian Ambiguous policy (#157) ---\n");
+    RUN_TEST(ambiguous_policy_default_is_narrow);
+    RUN_TEST(ambiguous_policy_wide_returns_two);
+    RUN_TEST(ambiguous_policy_coerces_invalid_to_narrow);
+    RUN_TEST(ambiguous_policy_does_not_affect_wide_chars);
+    RUN_TEST(ambiguous_predicate_covers_named_ranges);
+    RUN_TEST(ambiguous_predicate_excludes_unambiguous);
+
+    printf("\n--- Newly-covered unambiguous ranges ---\n");
+    RUN_TEST(ideographic_space_is_wide);
+    RUN_TEST(cjk_symbols_punctuation_wide);
+    RUN_TEST(angle_brackets_wide);
+    RUN_TEST(kangxi_radicals_wide);
+    RUN_TEST(cjk_radicals_supplement_wide);
+    RUN_TEST(bopomofo_wide);
+    RUN_TEST(yi_syllables_wide);
+    RUN_TEST(cjk_compatibility_ideographs_wide);
+    RUN_TEST(vertical_forms_and_cjk_compat_forms_wide);
+    RUN_TEST(hangul_compatibility_jamo_wide);
 
     printf("\n--- Default width-1 fallback ---\n");
     RUN_TEST(unmapped_codepoints_default_to_one);

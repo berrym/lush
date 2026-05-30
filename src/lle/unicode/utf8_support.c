@@ -9,6 +9,8 @@
  */
 
 #include "lle/utf8_support.h"
+
+#include "lle/char_width.h"
 #include "lle/unicode_grapheme.h"
 #include <string.h>
 
@@ -365,90 +367,14 @@ int lle_utf8_codepoint_to_grapheme_index(const char *text, size_t cp_index,
 }
 
 /**
- * @brief Get the display width of a Unicode codepoint
- * @param codepoint The Unicode codepoint to measure
- * @return Display width (0 for combining, 1 for normal, 2 for wide/CJK)
- *
- * Implements a subset of wcwidth() functionality for common cases.
- * Based on Unicode character width properties including CJK and emoji.
- */
-int lle_utf8_codepoint_width(uint32_t codepoint) {
-    /// Zero-width characters
-    if (codepoint == 0x0000 || /// NULL
-        codepoint == 0x200B || /// Zero-width space
-        codepoint == 0x200C || /// Zero-width non-joiner
-        codepoint == 0x200D || /// Zero-width joiner
-        (codepoint >= 0x200E && codepoint <= 0x200F) || /// LRM, RLM
-        codepoint == 0xFEFF || /// Zero-width no-break space
-        (codepoint >= 0x0300 &&
-         codepoint <= 0x036F) || /// Combining diacriticals
-        (codepoint >= 0x1DC0 &&
-         codepoint <= 0x1DFF) || /// Combining diacriticals supplement
-        (codepoint >= 0x20D0 &&
-         codepoint <= 0x20FF) || /// Combining marks for symbols
-        (codepoint >= 0xFE00 && codepoint <= 0xFE0F) || /// Variation selectors
-        (codepoint >= 0xFE20 && codepoint <= 0xFE2F)) { /// Combining half marks
-        return 0;
-    }
-
-    /// Control characters
-    if (codepoint < 0x20 || (codepoint >= 0x7F && codepoint < 0xA0)) {
-        return 0;
-    }
-
-    /// Wide characters (CJK and emoji)
-    /// CJK Unified Ideographs
-    if ((codepoint >= 0x1100 && codepoint <= 0x115F) || /// Hangul Jamo
-        (codepoint >= 0x2329 && codepoint <= 0x232A) || /// Angle brackets
-        (codepoint >= 0x2E80 &&
-         codepoint <= 0x2E99) || /// CJK radicals supplement
-        (codepoint >= 0x2E9B && codepoint <= 0x2EF3) ||
-        (codepoint >= 0x2F00 && codepoint <= 0x2FD5) || /// Kangxi radicals
-        (codepoint >= 0x2FF0 &&
-         codepoint <= 0x2FFB) || /// Ideographic description
-        (codepoint >= 0x3000 &&
-         codepoint <= 0x303E) || /// CJK symbols and punctuation
-        (codepoint >= 0x3041 && codepoint <= 0x3096) || /// Hiragana
-        (codepoint >= 0x3099 && codepoint <= 0x30FF) || /// Katakana
-        (codepoint >= 0x3105 && codepoint <= 0x312F) || /// Bopomofo
-        (codepoint >= 0x3131 &&
-         codepoint <= 0x318E) || /// Hangul compatibility jamo
-        (codepoint >= 0x3190 && codepoint <= 0x31E3) || /// CJK strokes and misc
-        (codepoint >= 0x31F0 &&
-         codepoint <= 0x321E) || /// Katakana phonetic extensions
-        (codepoint >= 0x3220 && codepoint <= 0x3247) || /// Enclosed CJK letters
-        (codepoint >= 0x3250 &&
-         codepoint <= 0x4DBF) || /// CJK unified ideographs extension A
-        (codepoint >= 0x4E00 &&
-         codepoint <= 0xA48C) || /// CJK unified ideographs
-        (codepoint >= 0xA490 && codepoint <= 0xA4C6) || /// Yi radicals
-        (codepoint >= 0xAC00 && codepoint <= 0xD7A3) || /// Hangul syllables
-        (codepoint >= 0xF900 &&
-         codepoint <= 0xFAFF) || /// CJK compatibility ideographs
-        (codepoint >= 0xFE10 && codepoint <= 0xFE19) || /// Vertical forms
-        (codepoint >= 0xFE30 &&
-         codepoint <= 0xFE6B) || /// CJK compatibility forms
-        (codepoint >= 0xFF01 && codepoint <= 0xFF60) || /// Fullwidth forms
-        (codepoint >= 0xFFE0 &&
-         codepoint <= 0xFFE6) || /// Fullwidth currency signs
-        (codepoint >= 0x1F000 &&
-         codepoint <= 0x1F9FF) || /// Emoji and pictographs
-        (codepoint >= 0x20000 &&
-         codepoint <= 0x2FFFD) || /// CJK unified ideographs extension B-F
-        (codepoint >= 0x30000 &&
-         codepoint <= 0x3FFFD)) { /// CJK unified ideographs extension G
-        return 2;                 /// Wide character
-    }
-
-    /// Default: normal width
-    return 1;
-}
-
-/**
  * @brief Get the display width of a UTF-8 string
  * @param text The UTF-8 text to measure
  * @param length Length of text in bytes
  * @return Total display width in terminal columns
+ *
+ * Sums per-codepoint widths via lle_codepoint_width (the canonical
+ * codepoint-width table in char_width.c), which honours the
+ * configured TR11 'Ambiguous' policy.
  */
 size_t lle_utf8_string_width(const char *text, size_t length) {
     if (!text || length == 0) {
@@ -466,7 +392,10 @@ size_t lle_utf8_string_width(const char *text, size_t length) {
             break; /// Invalid UTF-8
         }
 
-        total_width += lle_utf8_codepoint_width(codepoint);
+        int w = lle_codepoint_width(codepoint);
+        if (w > 0) {
+            total_width += (size_t)w;
+        }
         ptr += seq_len;
     }
 

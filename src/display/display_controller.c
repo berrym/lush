@@ -38,6 +38,7 @@
 #include "display/screen_buffer.h"
 #include "display_integration.h"
 #include "input_continuation.h"
+#include "lle/char_width.h"
 #include "lle/utf8_support.h"
 #include "lush_memory_pool.h"
 
@@ -803,7 +804,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     command_buffer + i, text_len - i, &codepoint);
 
                 if (char_bytes > 0) {
-                    int char_width = lle_utf8_codepoint_width(codepoint);
+                    int char_width = lle_codepoint_width(codepoint);
 
                     /// Write the character
                     dc_write_all(STDOUT_FILENO, command_buffer + i, char_bytes);
