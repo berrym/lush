@@ -1544,6 +1544,35 @@ TEST(builtin_export) {
     executor_free(exec);
 }
 
+TEST(builtin_logout_outside_login_errors) {
+    /// `logout` from a non-login shell must error out with a clear
+    /// diagnostic instead of terminating the shell (matches bash and
+    /// zsh; protects users from accidental logout in a script).
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "logout");
+    ASSERT_TRUE(r.exit_status != 0,
+                "logout outside login shell must return non-zero");
+    ASSERT_STDERR_CONTAINS(r, "not login shell");
+
+    executor_free(exec);
+}
+
+TEST(builtin_logout_known_to_type_builtin) {
+    /// `type logout` should report it as a shell builtin even outside
+    /// a login shell -- the builtin must be registered so users can
+    /// discover it.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec, "type logout");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "builtin");
+
+    executor_free(exec);
+}
+
 TEST(builtin_unset) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4519,6 +4548,8 @@ int main(void) {
 
     printf("\nBuiltin tests:\n");
     RUN_TEST(builtin_export);
+    RUN_TEST(builtin_logout_outside_login_errors);
+    RUN_TEST(builtin_logout_known_to_type_builtin);
     RUN_TEST(builtin_unset);
     RUN_TEST(builtin_readonly);
     RUN_TEST(rt_read_strips_leading_trailing_ifs_whitespace);

@@ -154,6 +154,7 @@ void path_negative_cache_clear(void) {
 
 builtin builtins[] = {
     {        "exit",                                               "exit shell",bin_exit                                                                                },
+    {      "logout",                                       "exit a login shell",       bin_logout},
     {        "help",                                             "builtin help",         bin_help},
     {          "cd",                                         "change directory",           bin_cd},
     {         "pwd",                                  "print working directory",          bin_pwd},

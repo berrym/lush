@@ -959,6 +959,10 @@ static int parse_opts(int argc, char **argv) {
                 printf("Copyright (C) 2021-2026 Michael Berry. Licensed under "
                        "MIT.\n");
                 exit(EXIT_SUCCESS);
+            } else if (strcmp(arg, "--login") == 0) {
+                /// Long-flag spelling of `-l`. Bash accepts both forms;
+                /// lush matches for ergonomic parity.
+                shell_opts.login_shell = true;
             } else if (strcmp(arg, "--strict") == 0) {
                 /// Enable strict compatibility mode - warnings become errors
                 compat_set_strict(true);

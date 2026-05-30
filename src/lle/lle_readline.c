@@ -86,7 +86,8 @@
 #include "lle/terminal_abstraction.h"
 #include "lle/unicode_compare.h" /// TR#29 compliant Unicode prefix matching
 #include "lle/widget_hooks.h"    /// Widget hooks for lifecycle events
-#include "signals.h"             /// For SIGINT flag coordination with LLE
+#include "lush.h"    /// shell_opts (for ignoreeof gate in handle_eof)
+#include "signals.h" /// For SIGINT flag coordination with LLE
 
 /// Forward declarations for history action functions
 lle_result_t lle_history_previous(lle_editor_t *editor);
@@ -1388,6 +1389,22 @@ static lle_result_t handle_eof(lle_event_t *event, void *user_data) {
     readline_context_t *ctx = (readline_context_t *)user_data;
 
     if (ctx->buffer->length == 0) {
+        /// EOF on empty line. Honor `set -o ignoreeof` (POSIX shell
+        /// option): when enabled, don't exit -- print a reminder and
+        /// abandon the current input line so the prompt redraws.
+        /// This mirrors bash's behavior for the simplest case
+        /// (lush's option is a bool; bash uses an IGNOREEOF counter
+        /// that defaults to 10 -- the simple-bool form is what
+        /// POSIX `set -o ignoreeof` actually requires).
+        if (shell_opts.ignoreeof) {
+            const char *msg = "\nUse \"exit\" to leave the shell.\n";
+            (void)!write(STDOUT_FILENO, msg, strlen(msg));
+            /// Return an empty line so the read-loop redraws the
+            /// prompt without exiting.
+            *ctx->done = true;
+            *ctx->final_line = strdup("");
+            return LLE_SUCCESS;
+        }
         /// EOF on empty line - exit shell
         *ctx->done = true;
         *ctx->final_line = NULL;
