@@ -692,6 +692,17 @@ if lle_sources.length() > 0
 
 endif
 
+# Test: CSI / SS3 decoder (live-path key decoder for the inline CSI reader)
+if fs.exists('tests/lle/unit/test_csi_decoder.c')
+  test_csi_decoder = executable('test_csi_decoder',
+                                'tests/lle/unit/test_csi_decoder.c',
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep])
+  test('LLE CSI Decoder', test_csi_decoder,
+       suite: 'lle-unit',
+       timeout: 30)
+endif
+
 # Test: Mouse Parser
 if fs.exists('tests/lle/unit/test_mouse_parser.c')
   test_mouse_parser = executable('test_mouse_parser',

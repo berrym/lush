@@ -103,6 +103,7 @@ lle_sources += files(
   'terminal/terminal_abstraction.c',
   'terminal/terminal_capabilities.c',
   'terminal/terminal_unix_interface.c',
+  'terminal/csi_decoder.c',
   'terminal/terminal_internal_state.c',
   'terminal/terminal_display_generator.c',
   'terminal/terminal_input_processor.c',

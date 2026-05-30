@@ -22,6 +22,7 @@
  * Spec 02: Terminal Abstraction - Subsystem 6
  */
 
+#include "lle/csi_decoder.h"
 #include "lle/terminal_abstraction.h"
 #include "lle/time_util.h"
 #include <errno.h>
@@ -769,15 +770,13 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             ssize_t read2 = read(interface->terminal_fd, &second_byte, 1);
 
             if (read2 == 1 && second_byte == '[') {
-                /// CSI sequence: ESC [ <params> <final>. Read parameter and
-                /// intermediate bytes until the final byte (0x40-0x7E), so the
-                /// ENTIRE sequence is consumed. The previous reader read only
-                /// one byte after `[` and handled A/B/C/D/H/F plus a special
-                /// 3~ for Delete; every other form (PageUp ESC[5~, PageDown
-                /// ESC[6~, Insert ESC[2~, numeric Home/End ESC[1~/ESC[4~, and
-                /// all modified forms like Shift+PageUp ESC[5;2~) hit the
-                /// default case, leaving the trailing `~` / `;2~` unread to
-                /// leak into the line as literal text.
+                /// CSI sequence: ESC [ <params> <final>. Read parameter
+                /// and intermediate bytes until the final byte (0x40-0x7E)
+                /// so the ENTIRE sequence is consumed (otherwise the
+                /// trailing `~` / `;2~` leaks into the line as literal
+                /// text). The decoding from (params, final) to a
+                /// SPECIAL_KEY is delegated to lle_csi_decode -- pure,
+                /// unit-tested in tests/lle/unit/test_csi_decoder.c.
                 char csi_params[16];
                 size_t csi_len = 0;
                 unsigned char final_byte = 0;
@@ -794,127 +793,21 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                     }
                     csi_params[csi_len++] = (char)b;
                 }
-                csi_params[csi_len] = '\0';
 
                 event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
                 event->timestamp = lle_get_current_time_microseconds();
                 event->data.special_key.key = LLE_KEY_UNKNOWN;
+                event->data.special_key.keycode = 0;
                 event->data.special_key.modifiers = 0;
 
                 if (have_final) {
-                    /// Parse a leading numeric parameter and an optional
-                    /// ;modifier. xterm encodes the modifier as 1 + a bitmask
-                    /// (Shift=1, Alt=2, Ctrl=4): 2=Shift, 3=Alt, 5=Ctrl, ...
-                    int num = 0;
-                    int mod_param = 0;
-                    const char *p = csi_params;
-                    while (*p >= '0' && *p <= '9') {
-                        num = num * 10 + (*p - '0');
-                        p++;
-                    }
-                    if (*p == ';') {
-                        p++;
-                        while (*p >= '0' && *p <= '9') {
-                            mod_param = mod_param * 10 + (*p - '0');
-                            p++;
-                        }
-                    }
-                    if (mod_param > 1) {
-                        int bits = mod_param - 1;
-                        if (bits & 1) {
-                            event->data.special_key.modifiers |= LLE_MOD_SHIFT;
-                        }
-                        if (bits & 2) {
-                            event->data.special_key.modifiers |= LLE_MOD_ALT;
-                        }
-                        if (bits & 4) {
-                            event->data.special_key.modifiers |= LLE_MOD_CTRL;
-                        }
-                    }
-
-                    if (final_byte == '~') {
-                        /// Tilde-form keys are keyed by the numeric parameter.
-                        /// xterm function-key numbering: F5=15, F6=17, F7=18,
-                        /// F8=19, F9=20, F10=21, F11=23, F12=24 (16 and 22
-                        /// are intentionally skipped in the xterm table).
-                        switch (num) {
-                        case 1:
-                        case 7:
-                            event->data.special_key.key = LLE_KEY_HOME;
-                            break;
-                        case 2:
-                            event->data.special_key.key = LLE_KEY_INSERT;
-                            break;
-                        case 3:
-                            event->data.special_key.key = LLE_KEY_DELETE;
-                            break;
-                        case 4:
-                        case 8:
-                            event->data.special_key.key = LLE_KEY_END;
-                            break;
-                        case 5:
-                            event->data.special_key.key = LLE_KEY_PAGE_UP;
-                            break;
-                        case 6:
-                            event->data.special_key.key = LLE_KEY_PAGE_DOWN;
-                            break;
-                        case 15:
-                            event->data.special_key.key = LLE_KEY_F5;
-                            break;
-                        case 17:
-                            event->data.special_key.key = LLE_KEY_F6;
-                            break;
-                        case 18:
-                            event->data.special_key.key = LLE_KEY_F7;
-                            break;
-                        case 19:
-                            event->data.special_key.key = LLE_KEY_F8;
-                            break;
-                        case 20:
-                            event->data.special_key.key = LLE_KEY_F9;
-                            break;
-                        case 21:
-                            event->data.special_key.key = LLE_KEY_F10;
-                            break;
-                        case 23:
-                            event->data.special_key.key = LLE_KEY_F11;
-                            break;
-                        case 24:
-                            event->data.special_key.key = LLE_KEY_F12;
-                            break;
-                        default:
-                            break;
-                        }
-                    } else {
-                        /// Letter-final keys (optionally ESC[1;<mod> prefixed).
-                        switch (final_byte) {
-                        case 'A':
-                            event->data.special_key.key = LLE_KEY_UP;
-                            break;
-                        case 'B':
-                            event->data.special_key.key = LLE_KEY_DOWN;
-                            break;
-                        case 'C':
-                            event->data.special_key.key = LLE_KEY_RIGHT;
-                            break;
-                        case 'D':
-                            event->data.special_key.key = LLE_KEY_LEFT;
-                            break;
-                        case 'H':
-                            event->data.special_key.key = LLE_KEY_HOME;
-                            break;
-                        case 'F':
-                            event->data.special_key.key = LLE_KEY_END;
-                            break;
-                        default:
-                            break;
-                        }
-                    }
+                    (void)lle_csi_decode(csi_params, csi_len, (char)final_byte,
+                                         event);
                 }
 
-                /// Recognized or not, the whole CSI sequence has been drained.
-                /// A mapped key dispatches; an unmapped one is a no-op special
-                /// key (never inserted as text), so nothing leaks.
+                /// Recognized or not, the whole CSI sequence has been
+                /// drained. A mapped key dispatches; an unmapped one is
+                /// a no-op special key (never inserted as text).
                 return LLE_SUCCESS;
             } else if (read2 == 1 && second_byte == 'O') {
                 /// SS3 sequence - alternate function keys
@@ -924,31 +817,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                 if (read3 == 1) {
                     event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
                     event->timestamp = lle_get_current_time_microseconds();
-                    event->data.special_key.modifiers = 0;
-
-                    switch (final_byte) {
-                    case 'H':
-                        event->data.special_key.key = LLE_KEY_HOME;
-                        return LLE_SUCCESS;
-                    case 'F':
-                        event->data.special_key.key = LLE_KEY_END;
-                        return LLE_SUCCESS;
-                    case 'P':
-                        event->data.special_key.key = LLE_KEY_F1;
-                        return LLE_SUCCESS;
-                    case 'Q':
-                        event->data.special_key.key = LLE_KEY_F2;
-                        return LLE_SUCCESS;
-                    case 'R':
-                        event->data.special_key.key = LLE_KEY_F3;
-                        return LLE_SUCCESS;
-                    case 'S':
-                        event->data.special_key.key = LLE_KEY_F4;
-                        return LLE_SUCCESS;
-                    default:
-                        /// Unknown SS3 sequence
-                        break;
-                    }
+                    (void)lle_ss3_decode((char)final_byte, event);
+                    return LLE_SUCCESS;
                 }
             } else if (read2 == 1 && second_byte >= 0x20 &&
                        second_byte < 0x7F) {
