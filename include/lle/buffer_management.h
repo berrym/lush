@@ -150,7 +150,6 @@ typedef struct lle_buffer_t lle_buffer_t;
 typedef struct lle_buffer_system_t lle_buffer_system_t;
 typedef struct lle_buffer_pool_t lle_buffer_pool_t;
 typedef struct lle_line_info_t lle_line_info_t;
-typedef struct lle_utf8_processor lle_utf8_processor_t;
 typedef struct lle_utf8_index_t lle_utf8_index_t;
 typedef struct lle_multiline_context_t lle_multiline_context_t;
 typedef struct lle_multiline_manager_t lle_multiline_manager_t;
@@ -270,9 +269,6 @@ struct lle_buffer_validator_t {
     uint32_t corruption_detections; ///< Buffer corruption detections
     uint32_t bounds_violations;     ///< Bounds check violations
 
-    /// UTF-8 processor reference
-    lle_utf8_processor_t *utf8_processor; ///< UTF-8 processor (optional)
-
     /// Last validation results
     lle_result_t last_validation_result; ///< Result of last validation
     uint64_t last_validation_time;       ///< Timestamp of last validation
@@ -292,9 +288,6 @@ struct lle_cursor_manager_t {
     /// Movement preferences
     size_t preferred_visual_column; ///< Preferred visual column
     bool sticky_column;             ///< Sticky column mode
-
-    /// UTF-8 processor reference
-    lle_utf8_processor_t *utf8_processor; ///< UTF-8 processor (optional)
 
     /// Buffer reference
     lle_buffer_t *buffer; ///< Associated buffer
