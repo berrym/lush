@@ -491,6 +491,41 @@ int init(int argc, char **argv, FILE **in) {
         config_execute_startup_scripts();
     }
 
+    /// POSIX: an interactive non-login shell must source the file
+    /// named by $ENV at startup, after the script-execution path has
+    /// already been resolved. Login shells skip this -- $ENV is
+    /// specifically for the interactive non-login case. We expand
+    /// the env value through the shell so a user can write
+    /// `ENV=~/.config/lush/env` and have ~ expand.
+    if (preliminary_interactive && !IS_LOGIN_SHELL &&
+        !shell_opts.command_mode) {
+        const char *env_raw = getenv("ENV");
+        if (env_raw && env_raw[0] != '\0') {
+            /// Expand the path: $ENV may contain `~` or `$VAR`. The
+            /// config script helper expects an absolute path so we
+            /// route through a tiny expand_env_path step here.
+            char *env_path = NULL;
+            if (env_raw[0] == '~' &&
+                (env_raw[1] == '/' || env_raw[1] == '\0')) {
+                const char *home = getenv("HOME");
+                if (home) {
+                    size_t need =
+                        strlen(home) + strlen(env_raw); /// over-budget
+                    env_path = malloc(need + 1);
+                    if (env_path) {
+                        snprintf(env_path, need + 1, "%s%s", home, env_raw + 1);
+                    }
+                }
+            } else {
+                env_path = strdup(env_raw);
+            }
+            if (env_path && config_script_exists(env_path)) {
+                config_execute_script_file(env_path);
+            }
+            free(env_path);
+        }
+    }
+
     /// Initialize auto-correction system
     autocorrect_init();
 
@@ -1177,8 +1212,9 @@ static int parse_opts(int argc, char **argv) {
  * @param err Exit code (EXIT_SUCCESS or EXIT_FAILURE)
  */
 static void usage(int err) {
-    printf("Usage: %s [OPTIONS] [SCRIPT]\n", LUSH_NAME);
-    printf("A POSIX-compliant shell with modern features\n\n");
+    printf("Usage: %s [OPTIONS] [SCRIPT [SCRIPT_ARGS...]]\n", LUSH_NAME);
+    printf("A polyglot superset of POSIX, bash, and zsh with an integrated\n");
+    printf("debugger and native line editor.\n\n");
     printf("Options:\n");
     printf("      --help              Show this help message and exit\n");
     printf("  -V, --version           Show version information and exit\n");
@@ -1197,10 +1233,14 @@ static void usage(int err) {
         "      --strict            Treat compatibility warnings as errors\n");
     printf("      --target=<shell>    Check compatibility against shell "
            "(posix, bash, zsh)\n");
+    printf("      --posix             Start in POSIX mode\n");
+    printf("      --bash              Start in bash mode\n");
+    printf("      --zsh               Start in zsh mode\n");
+    printf("      --lush              Start in lush native mode (default)\n");
     printf("  -c command       Execute command string and exit\n");
     printf("  -s               Read commands from standard input\n");
     printf("  -i               Force interactive mode\n");
-    printf("  -l               Act as login shell\n");
+    printf("  -l, --login      Act as a login shell\n");
     printf("  -e               Exit immediately on command failure (set -e)\n");
     printf("  -x               Trace command execution (set -x)\n");
     printf("  -n               Syntax check mode - read but don't execute (set "
@@ -1219,11 +1259,22 @@ static void usage(int err) {
            "-o noclobber)\n");
     printf("\nArguments:\n");
     printf("  SCRIPT           Execute commands from script file\n");
+    printf("  SCRIPT_ARGS      Positional parameters $1..$N for SCRIPT\n");
+    printf("\nStartup files (XDG-canonical with home-dir fallbacks):\n");
+    printf("  System:  /etc/lushrc, /etc/profile, /etc/profile.d/*.sh\n");
+    printf("  Login:   ~/.config/lush/lush_login  (or ~/.lush_login)\n");
+    printf("           ~/.profile                 (sourced in bash mode)\n");
+    printf("  All:     ~/.config/lush/lushrc.toml (CREG: behavior options)\n");
+    printf("           ~/.config/lush/lushrc      (or ~/.lushrc; shell "
+           "script)\n");
+    printf("  Logout:  ~/.config/lush/lush_logout (or ~/.lush_logout)\n");
+    printf("  Interactive non-login: $ENV (POSIX, expanded path)\n");
     printf("\nShell Options:\n");
     printf(
         "  Use 'set -o option' or 'set +o option' to control shell behavior\n");
     printf("  Available options: errexit, xtrace, noexec, nounset, verbose,\n");
-    printf("                     noglob, hashall, monitor, notify, onecmd\n");
+    printf("                     noglob, hashall, monitor, notify, onecmd,\n");
+    printf("                     ignoreeof, pipefail, allexport, noclobber\n");
     printf("\nFor more information, see the manual or documentation.\n");
     exit(err);
 }
