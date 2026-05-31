@@ -29,6 +29,12 @@
 ht_strstr_t *aliases = NULL; /// alias hash table
 ht_enum_t *aliases_e = NULL; /// alias enumeration object
 
+/// zsh-style global aliases (`alias -g NAME=value`). Stored in a
+/// separate table so the lookup discipline can distinguish
+/// command-position (regular alias) from non-command positions
+/// (global alias) without per-entry tagging. Issue #204.
+static ht_strstr_t *global_aliases = NULL;
+
 /**
  * @brief Initialize the aliases hash table
  *
@@ -38,6 +44,9 @@ ht_enum_t *aliases_e = NULL; /// alias enumeration object
 void init_aliases(void) {
     if (aliases == NULL) {
         aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+    }
+    if (global_aliases == NULL) {
+        global_aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
     }
 
     /// set some example aliases
@@ -60,6 +69,37 @@ void free_aliases(void) {
         ht_strstr_destroy(aliases);
         aliases = NULL;
     }
+    if (global_aliases) {
+        ht_strstr_destroy(global_aliases);
+        global_aliases = NULL;
+    }
+}
+
+char *lookup_global_alias(const char *key) {
+    if (!global_aliases || !key) {
+        return NULL;
+    }
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return NULL;
+    }
+    const char *val = ht_strstr_get(global_aliases, canon);
+    free(canon);
+    return (char *)val;
+}
+
+bool set_global_alias(const char *key, const char *val) {
+    if (!global_aliases || !key || !val) {
+        return false;
+    }
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return false;
+    }
+    ht_strstr_insert(global_aliases, canon, val);
+    char *probe = lookup_global_alias(canon);
+    free(canon);
+    return (probe != NULL);
 }
 
 /**
@@ -788,20 +828,50 @@ int bin_alias(int argc, char **argv) {
     }
 
     int exit_status = 0;
+    bool global_mode = false; /// `-g` flag: zsh global alias
 
     /// `--` ends option parsing; subsequent tokens are alias names or
     /// assignments even if they begin with `-`. Both bash and zsh accept
-    /// this. Lush has no `-` flags for `alias` today, but the convention
-    /// is still required so scripts like `alias -- -='cd -'` parse — the
-    /// bare `-` would otherwise be flagged as a not-found lookup target.
+    /// this. Recognized flags: `-g` (zsh global alias). The bare `-`
+    /// (e.g. `alias - cd-` style) still needs `--` to disambiguate, since
+    /// no `-x` flag stands alone today.
     int start = 1;
-    if (argc >= 2 && strcmp(argv[1], "--") == 0) {
-        start = 2;
-        if (argc == 2) {
-            /// `alias --` alone is equivalent to `alias` with no args.
-            print_aliases();
-            return 0;
+    while (start < argc && argv[start][0] == '-' && argv[start][1] != '\0') {
+        if (strcmp(argv[start], "--") == 0) {
+            start++;
+            break;
+        } else if (strcmp(argv[start], "-g") == 0) {
+            /// zsh global alias: stored in the parallel global_aliases
+            /// table and substituted at non-command argv positions
+            /// during executor expansion. Issue #204.
+            global_mode = true;
+            start++;
+        } else {
+            /// Unknown flag.
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "alias: invalid option: %s", argv[start]);
+            return 1;
         }
+    }
+    if (start >= argc) {
+        /// All args were flags / `--`; print aliases (global or regular
+        /// depending on which set the flags selected).
+        if (global_mode) {
+            ht_enum_t *e = ht_strstr_enum_create(global_aliases);
+            if (e) {
+                const char *k, *v;
+                while (ht_strstr_enum_next(e, &k, &v)) {
+                    if (k && v) {
+                        printf("alias -g %s='%s'\n", k, v);
+                    }
+                }
+                ht_strstr_enum_destroy(e);
+            }
+        } else {
+            print_aliases();
+        }
+        return 0;
     }
 
     /// Process each argument
@@ -844,8 +914,11 @@ int bin_alias(int argc, char **argv) {
                 continue;
             }
 
-            /// Set the alias
-            if (!set_alias(name, value)) {
+            /// Set the alias -- routes to global table when -g was
+            /// passed, otherwise the regular command-position table.
+            bool ok = global_mode ? set_global_alias(name, value)
+                                  : set_alias(name, value);
+            if (!ok) {
                 executor_error_report(current_executor, SHELL_ERR_ALIAS_ERROR,
                                       builtin_get_source_location(),
                                       "failed to create alias: %s", name);
@@ -856,9 +929,11 @@ int bin_alias(int argc, char **argv) {
             free(value);
         } else {
             /// Not an assignment, treat as name lookup
-            char *alias_value = lookup_alias(argv[i]);
+            char *alias_value = global_mode ? lookup_global_alias(argv[i])
+                                            : lookup_alias(argv[i]);
             if (alias_value) {
-                printf("alias %s='%s'\n", argv[i], alias_value);
+                printf("alias %s%s='%s'\n", global_mode ? "-g " : "", argv[i],
+                       alias_value);
             } else {
                 executor_error_report(
                     current_executor, SHELL_ERR_INVALID_ARGUMENT,

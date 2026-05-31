@@ -47,6 +47,40 @@ void free_aliases(void);
 char *lookup_alias(const char *name);
 
 /**
+ * @brief Look up a zsh global alias by name
+ *
+ * Global aliases (defined via `alias -g NAME=value`) expand anywhere
+ * on the command line, not just at command position. The expansion
+ * happens at executor argv-build time -- each non-command argv slot
+ * is checked against the global table and substituted in place. Per
+ * the polyglot stance: lush's substitution is text-only (the
+ * substituted value occupies one argv slot), matching the common
+ * directory-shortcut use case (`alias -g ...='../..'`); zsh's
+ * structural-operator case (`alias -g G='| grep'` introducing a
+ * real pipeline) is not supported because lush would need to
+ * re-tokenize the line after substitution. Documented in
+ * docs/CONFIGURATION.md.
+ *
+ * @param name Alias name to look up
+ * @return Alias value string, or NULL if not a global alias
+ */
+char *lookup_global_alias(const char *name);
+
+/**
+ * @brief Define or update a global alias (zsh -g semantics).
+ *
+ * Stored in a separate table from regular (command-position) aliases.
+ * If a regular alias of the same name exists, it remains; lookup at
+ * command position consults regular aliases first, at non-command
+ * positions consults global aliases.
+ *
+ * @param name Alias name
+ * @param value Alias expansion value
+ * @return true on success
+ */
+bool set_global_alias(const char *name, const char *value);
+
+/**
  * @brief Print all defined aliases
  *
  * Displays all aliases in "name='value'" format to stdout.
