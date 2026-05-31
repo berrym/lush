@@ -592,39 +592,81 @@ static const struct {
     const char *name;
     const char *rationale;
 } feature_noop_aliases[] = {
-    {     "prompt_subst","lush prompt always supports parameter / arith / "
-"command expansion; no opt-in needed"                                             },
-    {      "promptsubst",                                  "alias for prompt_subst"},
-    {    "menu_complete",        "lush completion is always menu-shaped; no toggle"},
-    {     "menucomplete",                                 "alias for menu_complete"},
-    {    "always_to_end",         "completion always lands at end of inserted word"},
-    {      "alwaystoend",                                 "alias for always_to_end"},
-    {        "auto_menu",            "lush completion auto-menus on TAB; no toggle"},
-    {         "automenu",                                     "alias for auto_menu"},
-    { "complete_in_word",
-     "lush completion always treats cursor mid-word as completable"                },
-    {   "completeinword",                              "alias for complete_in_word"},
-    {      "flowcontrol",                   "terminal flow-control toggle; lush LLE manages its own "
+    {          "prompt_subst","lush prompt always supports parameter / arith / "
+"command expansion; no opt-in needed"                                                  },
+    {           "promptsubst",                                  "alias for prompt_subst"},
+    {         "menu_complete",        "lush completion is always menu-shaped; no toggle"},
+    {          "menucomplete",                                 "alias for menu_complete"},
+    {         "always_to_end",         "completion always lands at end of inserted word"},
+    {           "alwaystoend",                                 "alias for always_to_end"},
+    {             "auto_menu",            "lush completion auto-menus on TAB; no toggle"},
+    {              "automenu",                                     "alias for auto_menu"},
+    {      "complete_in_word",
+     "lush completion always treats cursor mid-word as completable"                     },
+    {        "completeinword",                              "alias for complete_in_word"},
+    {           "flowcontrol",                   "terminal flow-control toggle; lush LLE manages its own "
                    "tty raw-mode state"                   },
-    {      "correct_all",        "lush has no spelling-correction prompt to toggle"},
-    {       "correctall",                                   "alias for correct_all"},
-    {"pushd_ignore_dups",
-     "lush dirstack dedup behavior is benign and introspection-invisible"          },
-    {  "pushdignoredups",                             "alias for pushd_ignore_dups"},
-    {     "pushd_silent",       "lush pushd/popd never prints the stack; always-on"},
-    {      "pushdsilent",                                  "alias for pushd_silent"},
-    {    "pushd_to_home",                        "zsh-specific pushd-with-no-arg-goes-home; lush requires "
+    {           "correct_all",        "lush has no spelling-correction prompt to toggle"},
+    {            "correctall",                                   "alias for correct_all"},
+    {     "pushd_ignore_dups",
+     "lush dirstack dedup behavior is benign and introspection-invisible"               },
+    {       "pushdignoredups",                             "alias for pushd_ignore_dups"},
+    {          "pushd_silent",       "lush pushd/popd never prints the stack; always-on"},
+    {           "pushdsilent",                                  "alias for pushd_silent"},
+    {         "pushd_to_home",                        "zsh-specific pushd-with-no-arg-goes-home; lush requires "
                         "an argument"                     },
-    {      "pushdtohome",                                 "alias for pushd_to_home"},
-    {          "multios",                       "zsh multiple-redirection-target option; lush has its own "
+    {           "pushdtohome",                                 "alias for pushd_to_home"},
+    {               "multios",                       "zsh multiple-redirection-target option; lush has its own "
                        "redirection engine"               },
-    {          "clobber",
+    {               "clobber",
      "zsh positive CLOBBER (inverse of POSIX noclobber); accepted "
      "as alias since unsetopt CLOBBER and set -o noclobber express the same "
-     "intent. Full inversion wiring is a future refinement"                        },
-    {             "beep",     "zsh line-editor terminal-bell-on-error; LLE has its own bell "
+     "intent. Full inversion wiring is a future refinement"                             },
+    {                  "beep",     "zsh line-editor terminal-bell-on-error; LLE has its own bell "
      "behavior and never gates on this option"            },
-    {               NULL,                                                      NULL}
+
+    /* Zsh setopt names accepted for parity with oh-my-zsh / prezto
+     * etc. (issue #203). Each is either always-on behavior in lush,
+     * a knob that doesn't apply to lush's implementation, or a
+     * future refinement not yet wired. Adding the name here lets
+     * `setopt X` / `unsetopt X` succeed without changing behavior;
+     * promote any entry to a real FEATURE_* flag if the underlying
+     * behavior ever needs to be toggleable. */
+    {            "pushdminus",
+     "zsh's pushd numeric-argument direction inversion; lush dirstack uses "
+     "zsh's default semantics, so this option is a no-op for parity"                    },
+    {      "extended_history",
+     "zsh records timestamps + duration in HISTFILE; lush's history format "
+     "differs but the option is accepted so init scripts don't error"                   },
+    {       "extendedhistory",                              "alias for extended_history"},
+    {"hist_expire_dups_first",
+     "zsh: when trimming HISTFILE, expire duplicate entries before unique "
+     "ones; lush's history trimming differs but accepts the name for parity"            },
+    {   "histexpiredupsfirst",                        "alias for hist_expire_dups_first"},
+    {      "hist_ignore_dups",
+     "zsh: skip the previous command if identical to the current; lush has "
+     "its own dedup policy and accepts this name for parity"                            },
+    {        "histignoredups",                              "alias for hist_ignore_dups"},
+    {     "hist_ignore_space",
+     "zsh: don't record commands starting with whitespace; lush accepts "
+     "this name for parity and treats it as a no-op pending implementation"             },
+    {       "histignorespace",                             "alias for hist_ignore_space"},
+    {        "long_list_jobs",
+     "zsh: verbose `jobs` listing; lush's jobs format is fixed, name "
+     "accepted for parity"                                                              },
+    {          "longlistjobs",                                "alias for long_list_jobs"},
+    {   "interactivecomments",
+     "zsh-style spelling of POSIX `interactive-comments` (already in "
+     "option_map). Accepted as a no-op so zsh scripts that call "
+     "`setopt interactivecomments` in their init paths run cleanly"                     },
+    {  "interactive_comments",                           "alias for interactivecomments"},
+    {     "magic_equal_subst",
+     "zsh: tilde and parameter expansion in assignment-style words "
+     "(`foo=~/path`); lush already performs tilde-expansion on assignment "
+     "RHS so this is no-op-for-parity"                                                  },
+    {       "magicequalsubst",                             "alias for magic_equal_subst"},
+
+    {                    NULL,                                                      NULL}
 };
 
 bool shell_feature_is_noop_alias(const char *name) {
