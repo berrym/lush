@@ -368,8 +368,19 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
         return 1; /// No target specified
     }
 
-    /// Expand variables in the target
-    char *target = expand_redirection_target(executor, target_node->val.str);
+    /// Expand the target. Single-quoted content (NODE_STRING_LITERAL)
+    /// gets NO expansion per POSIX -- no $VAR, no backticks, no
+    /// backslash escapes. The parser already stripped the surrounding
+    /// quotes, so val.str is the literal byte content that must reach
+    /// the target verbatim. Skipping expand_if_needed for this case
+    /// is what lets `read -r line <<< 'literal \n stays \\ here'`
+    /// preserve its backslashes the way bash and zsh do.
+    char *target = NULL;
+    if (target_node->type == NODE_STRING_LITERAL) {
+        target = strdup(target_node->val.str);
+    } else {
+        target = expand_redirection_target(executor, target_node->val.str);
+    }
     if (!target) {
         return 1;
     }
@@ -1284,33 +1295,31 @@ static int setup_here_string(executor_t *executor, const char *content) {
         return 1;
     }
 
-    /// Expand variables in the content first
-    char *expanded_content = expand_redirection_target(executor, content);
-    if (!expanded_content) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        return 1;
-    }
+    /// IMPORTANT: do NOT re-expand here. handle_redirection_node has
+    /// already run expand_redirection_target on the value that the
+    /// parser produced; calling it again applied escape processing
+    /// twice, which (combined with expand_if_needed's lossy
+    /// behavior on single-quoted content) shredded backslashes in
+    /// here-string input. The bytes we received are the bytes that
+    /// belong on the pipe.
 
-    /// Write the expanded string + trailing newline to the pipe.
+    /// Write the content + trailing newline to the pipe.
     /// redir_write_all loops on EINTR / short writes so a partial
     /// delivery cannot truncate the here-string the child reads.
-    if (!redir_write_all(pipefd[1], expanded_content,
-                         strlen(expanded_content)) ||
+    if (!redir_write_all(pipefd[1], content, strlen(content)) ||
         !redir_write_all(pipefd[1], "\n", 1)) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
             "write: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
-        free(expanded_content);
         close(pipefd[0]);
         close(pipefd[1]);
         return 1;
     }
 
     close(pipefd[1]);
-    free(expanded_content);
+    (void)executor; /// no longer needed -- content arrives pre-expanded
 
     /// Redirect stdin to read from the pipe
     if (dup2(pipefd[0], STDIN_FILENO) == -1) {

@@ -84,6 +84,7 @@ int bin_read(int argc, char **argv) {
     int timeout_secs = -1;
     int nchars = -1;
     bool silent_mode = false;
+    char *array_name = NULL; /// `-a NAME`: read into array NAME
 
     int opt_index = 1;
 
@@ -139,6 +140,28 @@ int bin_read(int argc, char **argv) {
         } else if (strcmp(arg, "-s") == 0) {
             /// -s: Silent mode (don't echo input)
             silent_mode = true;
+        } else if (strcmp(arg, "-a") == 0 || strcmp(arg, "-ra") == 0 ||
+                   strcmp(arg, "-ar") == 0) {
+            /// -a NAME: split input on IFS and assign to array NAME.
+            /// Combined `-ra` / `-ar` flips raw mode on as well so
+            /// the common `read -ra parts <<< "..."` idiom works.
+            if (opt_index + 1 >= argc) {
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(), "-a requires an array name");
+                return 1;
+            }
+            if (arg[1] == 'r' || arg[2] == 'r') {
+                raw_mode = true;
+            }
+            array_name = argv[++opt_index];
+            if (!is_valid_identifier(array_name)) {
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(),
+                    "'%s' not a valid identifier", array_name);
+                return 1;
+            }
         } else if (strcmp(arg, "--") == 0) {
             /// End of options
             opt_index++;
@@ -152,8 +175,10 @@ int bin_read(int argc, char **argv) {
         opt_index++;
     }
 
-    /// Must have at least one variable name
-    if (opt_index >= argc) {
+    /// Must have at least one variable name -- unless `-a NAME` was
+    /// given, in which case the array name supplied with the flag is
+    /// the destination and no trailing positional varname is needed.
+    if (opt_index >= argc && !array_name) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
             shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
@@ -195,20 +220,29 @@ int bin_read(int argc, char **argv) {
     /// (including any internal IFS chars) is assigned to the Nth
     /// variable. If fewer than N words are present, trailing
     /// variables get the empty string. Issue #101.
+    /// When -a is given the array name was the option argument, not a
+    /// trailing positional; positional varnames are only required for
+    /// the non-array case.
     int n_varnames = argc - opt_index;
-    if (n_varnames <= 0) {
+    if (n_varnames <= 0 && !array_name) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                               builtin_get_source_location(),
                               "at least one variable name required");
         return 1;
     }
-    char *varname = argv[opt_index]; /* first name; kept for the
-                                      * single-var fast paths below */
-    if (!is_valid_identifier(varname)) {
-        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                              builtin_get_source_location(),
-                              "'%s' not a valid identifier", varname);
-        return 1;
+    /// In array mode the positional-varname identifier checks below
+    /// shouldn't fire; first-name and the loop are gated on
+    /// n_varnames > 0, which only the non-array path requires.
+    char *varname = NULL;
+    if (n_varnames > 0) {
+        varname = argv[opt_index]; /* first name; kept for the
+                                    * single-var fast paths below */
+        if (!is_valid_identifier(varname)) {
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "'%s' not a valid identifier", varname);
+            return 1;
+        }
     }
     for (int i = 1; i < n_varnames; i++) {
         if (!is_valid_identifier(argv[opt_index + i])) {
@@ -397,6 +431,57 @@ int bin_read(int argc, char **argv) {
             free(line);
             line = processed;
         }
+    }
+
+    /// `-a NAME`: split line on IFS and assign each field as an
+    /// indexed-array element of NAME. Mirrors bash's `read -a`.
+    if (array_name) {
+        const char *src = line ? line : "";
+        char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
+        const char *ifs = ifs_val ? ifs_val : " \t\n";
+
+        array_value_t *array = symtable_array_create(false);
+        if (!array) {
+            free(ifs_val);
+            free(line);
+            return 1;
+        }
+
+        /// Walk the line collecting IFS-delimited fields. Leading and
+        /// trailing IFS whitespace is dropped; runs of IFS-whitespace
+        /// coalesce. This matches the standard read field-splitting.
+        int idx = 0;
+        while (*src) {
+            while (*src && strchr(ifs, *src)) {
+                src++;
+            }
+            if (!*src) {
+                break;
+            }
+            const char *field_start = src;
+            while (*src && !strchr(ifs, *src)) {
+                src++;
+            }
+            size_t flen = (size_t)(src - field_start);
+            char *field = malloc(flen + 1);
+            if (!field) {
+                symtable_array_free(array);
+                free(ifs_val);
+                free(line);
+                return 1;
+            }
+            memcpy(field, field_start, flen);
+            field[flen] = '\0';
+            symtable_array_set_index(array, idx++, field);
+            free(field);
+        }
+
+        symtable_set_array(array_name, array);
+        free(ifs_val);
+        if (line) {
+            free(line);
+        }
+        return result;
     }
 
     /// Assign the line to one or more variables. Single-name fast
