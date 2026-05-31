@@ -206,6 +206,14 @@ jobs:
           str="hello world"
           echo ${str^^}
           [[ "foo" == "foo" ]] && echo "match"
+          # Issue #163: scalar / empty / re-array overwrite of an
+          # existing array binding must release the prior
+          # array_value_t backing memory. Each of these used to leak
+          # a 190-byte array struct under valgrind.
+          drain1=(a b c); drain1=scalar
+          drain2=(a b c); drain2=
+          drain3=(a b c); drain3=(d e f g)
+          loopvar=(a b c); for loopvar in 1 2 3; do :; done
           exit 0
           EOF
 
