@@ -9414,6 +9414,13 @@ static int execute_function_call(executor_t *executor,
         return 1;
     }
 
+    /// Expose the currently-executing function's name as FUNCNAME for
+    /// the body of the call (bash + zsh consensus; #185). The scope
+    /// push above means this local automatically goes out of scope
+    /// when the function returns, matching bash's "FUNCNAME is unset
+    /// outside any function" behavior.
+    (void)symtable_set_local_var(executor->symtable, "FUNCNAME", function_name);
+
     /// Set parameters (both positional and named)
     if (func->params) {
         /// Set named parameters with defaults
