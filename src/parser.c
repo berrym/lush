@@ -4450,12 +4450,20 @@ static node_t *parse_case_statement(parser_t *parser) {
 
         token_t *word_token = tokenizer_current(parser->tokenizer);
 
-        /// Accept word-like tokens, variables, strings, and colons for case
-        /// words
+        /// Accept word-like tokens, variables, strings, command
+        /// substitutions, arithmetic expansions, and backticks for case
+        /// words. POSIX 2.10.2 case_clause syntax allows any word, and a
+        /// word is any sequence of expansions / characters; in practice
+        /// real-world scripts (autoconf's gendocs.sh:425, configure
+        /// scripts, init scripts) use `case $(cmd) in ...` and
+        /// `case \`cmd\` in ...` heavily. Issue #202.
         if (token_is_word_like(word_token->type) ||
             word_token->type == TOK_VARIABLE ||
             word_token->type == TOK_STRING ||
-            word_token->type == TOK_EXPANDABLE_STRING) {
+            word_token->type == TOK_EXPANDABLE_STRING ||
+            word_token->type == TOK_COMMAND_SUB ||
+            word_token->type == TOK_ARITH_EXP ||
+            word_token->type == TOK_BACKQUOTE) {
 
             size_t token_len = strlen(word_token->text);
             char *new_word = realloc(case_word, case_word_len + token_len + 1);
