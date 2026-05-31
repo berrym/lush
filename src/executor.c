@@ -4757,20 +4757,36 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        /// ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognized
-        /// flag chars: k (keys), v (values, default), o (sort ascending),
-        /// O (sort descending), a (array-order, no sort), u (unique).
-        /// Builds the vector directly and short-circuits the rest of
-        /// try_expand_vector_arg. Issue #104.
+        /// ${(FLAGS)NAME} or ${(FLAGS)NAME[@]} -- zsh parameter-flag
+        /// vector form. Recognized flag chars: k (keys), v (values,
+        /// default), o (sort ascending), O (sort descending), a
+        /// (array-order, no sort), u (unique), @ (vector presentation),
+        /// s:SEP: (split scalar NAME on SEP -- returns a list of
+        /// substrings). Builds the vector directly and short-circuits
+        /// the rest of try_expand_vector_arg. Issue #104 + #188.
         if (*p == '(') {
             const char *flag_start = p + 1;
             const char *flag_end = flag_start;
-            while (flag_end < end && *flag_end != ')') {
+            int paren_depth = 1;
+            /// Scan for the closing `)`. Multi-char sub-args like
+            /// `s:SEP:` may contain any character including ones that
+            /// look special; only `)` at depth 0 terminates the flag
+            /// list. (We DO NOT respect arbitrary nested parens here --
+            /// no zsh flag uses them.)
+            while (flag_end < end && paren_depth > 0) {
+                if (*flag_end == ')') {
+                    paren_depth--;
+                    if (paren_depth == 0) {
+                        break;
+                    }
+                }
                 flag_end++;
             }
             if (flag_end < end && *flag_end == ')') {
                 bool flag_k = false, flag_o = false, flag_O = false;
                 bool flag_u = false;
+                bool flag_s = false;
+                char *split_sep = NULL; /// owned; set when flag_s
                 bool ok_flags = true;
                 for (const char *f = flag_start; f < flag_end; f++) {
                     switch (*f) {
@@ -4801,6 +4817,38 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         /// it as a no-op flag so ${(@)arr} yields
                         /// exactly what ${arr[@]} would.
                         break;
+                    case 's': {
+                        /// (s:SEP:) -- split scalar parameter on SEP.
+                        /// The next char after `s` is the delimiter
+                        /// character used to bracket SEP; SEP is the
+                        /// span up to the matching delimiter.
+                        flag_s = true;
+                        if (f + 1 >= flag_end) {
+                            ok_flags = false;
+                            break;
+                        }
+                        char d = f[1];
+                        const char *sep_start = f + 2;
+                        const char *sep_end = sep_start;
+                        while (sep_end < flag_end && *sep_end != d) {
+                            sep_end++;
+                        }
+                        if (sep_end >= flag_end) {
+                            ok_flags = false;
+                            break;
+                        }
+                        size_t sep_len = (size_t)(sep_end - sep_start);
+                        free(split_sep);
+                        split_sep = malloc(sep_len + 1);
+                        if (!split_sep) {
+                            ok_flags = false;
+                            break;
+                        }
+                        memcpy(split_sep, sep_start, sep_len);
+                        split_sep[sep_len] = '\0';
+                        f = sep_end; /// will be incremented by loop
+                        break;
+                    }
                     default:
                         ok_flags = false;
                         break;
@@ -4816,93 +4864,163 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     }
                     np += n;
                 }
-                if (ok_flags && np == end && np > nstart) {
+                /// Accept an optional [@] / [*] subscript after the
+                /// name so `${(u)arr[@]}` parses (zsh idiom for "uniq
+                /// the all-elements presentation"). The subscript is
+                /// redundant with our vector-yielding semantics: we
+                /// already iterate all elements either way.
+                const char *name_end = np;
+                if (np + 2 < end && np[0] == '[' &&
+                    (np[1] == '@' || np[1] == '*') && np[2] == ']') {
+                    np += 3;
+                }
+                if (ok_flags && np == end && name_end > nstart) {
                     char nbuf[256];
-                    size_t nlen = (size_t)(np - nstart);
+                    size_t nlen = (size_t)(name_end - nstart);
                     if (nlen < sizeof(nbuf)) {
                         memcpy(nbuf, nstart, nlen);
                         nbuf[nlen] = '\0';
-                        array_value_t *arr = symtable_get_array(nbuf);
-                        if (arr) {
-                            size_t kc = 0;
-                            char **items = NULL;
-                            if (flag_k) {
-                                items = symtable_array_get_keys(arr, &kc);
-                            } else {
-                                size_t total = symtable_array_length(arr);
-                                items = malloc(sizeof(char *) * (total + 1));
-                                if (items) {
-                                    for (size_t i = 0; i < total; i++) {
-                                        const char *e =
-                                            symtable_array_get_index(arr,
-                                                                     (int)i);
-                                        items[i] = strdup(e ? e : "");
-                                    }
-                                    kc = total;
-                                }
-                            }
-                            if (items) {
-                                if (flag_u) {
-                                    size_t w = 0;
-                                    for (size_t i = 0; i < kc; i++) {
-                                        bool dup = false;
-                                        for (size_t j = 0; j < w; j++) {
-                                            if (strcmp(items[i], items[j]) ==
-                                                0) {
-                                                dup = true;
-                                                break;
+                        size_t kc = 0;
+                        char **items = NULL;
+                        if (flag_s && split_sep) {
+                            /// (s:SEP:) on a SCALAR: look up the named
+                            /// scalar, split on SEP, yield a list of
+                            /// substrings. If the name is bound to an
+                            /// array we still treat it as a scalar by
+                            /// joining (matching zsh's behavior of
+                            /// applying (s) to the textual value).
+                            char *scalar =
+                                symtable_get_var(executor->symtable, nbuf);
+                            const char *src = scalar ? scalar : "";
+                            size_t seplen = strlen(split_sep);
+                            size_t cap = 4;
+                            items = malloc(sizeof(char *) * cap);
+                            if (items && seplen > 0) {
+                                const char *cursor = src;
+                                while (1) {
+                                    const char *hit = strstr(cursor, split_sep);
+                                    size_t flen = hit ? (size_t)(hit - cursor)
+                                                      : strlen(cursor);
+                                    if (kc + 1 >= cap) {
+                                        cap *= 2;
+                                        char **grown = realloc(
+                                            items, sizeof(char *) * cap);
+                                        if (!grown) {
+                                            for (size_t i = 0; i < kc; i++) {
+                                                free(items[i]);
                                             }
+                                            free(items);
+                                            items = NULL;
+                                            break;
                                         }
-                                        if (dup) {
+                                        items = grown;
+                                    }
+                                    char *piece = malloc(flen + 1);
+                                    if (!piece) {
+                                        for (size_t i = 0; i < kc; i++) {
                                             free(items[i]);
-                                        } else {
-                                            items[w++] = items[i];
                                         }
-                                    }
-                                    kc = w;
-                                }
-                                if (flag_o || flag_O) {
-                                    for (size_t i = 0; i + 1 < kc; i++) {
-                                        for (size_t j = i + 1; j < kc; j++) {
-                                            int cmp =
-                                                strcmp(items[i], items[j]);
-                                            if ((flag_O && cmp < 0) ||
-                                                (!flag_O && cmp > 0)) {
-                                                char *tmp = items[i];
-                                                items[i] = items[j];
-                                                items[j] = tmp;
-                                            }
-                                        }
-                                    }
-                                }
-                                char **vec = NULL;
-                                int vcount = 0, vcap = 0;
-                                bool ok = true;
-                                for (size_t i = 0; i < kc; i++) {
-                                    if (!add_to_argv_list(&vec, &vcount, &vcap,
-                                                          items[i])) {
-                                        ok = false;
+                                        free(items);
+                                        items = NULL;
                                         break;
                                     }
-                                }
-                                free(items);
-                                if (!ok) {
-                                    for (int j = 0; j < vcount; j++) {
-                                        free(vec[j]);
+                                    memcpy(piece, cursor, flen);
+                                    piece[flen] = '\0';
+                                    items[kc++] = piece;
+                                    if (!hit) {
+                                        break;
                                     }
-                                    free(vec);
-                                    return false;
+                                    cursor = hit + seplen;
                                 }
-                                *out_vec = vec;
-                                *out_count = vcount;
-                                return true;
+                            } else if (items && seplen == 0) {
+                                /// Degenerate empty-separator: treat as
+                                /// a single-element list to avoid the
+                                /// infinite loop a 0-length step would
+                                /// trigger.
+                                items[0] = strdup(src);
+                                kc = items[0] ? 1 : 0;
                             }
+                            free(scalar);
+                            free(split_sep);
+                            split_sep = NULL;
+                        } else {
+                            array_value_t *arr = symtable_get_array(nbuf);
+                            if (arr) {
+                                if (flag_k) {
+                                    items = symtable_array_get_keys(arr, &kc);
+                                } else {
+                                    size_t total = symtable_array_length(arr);
+                                    items =
+                                        malloc(sizeof(char *) * (total + 1));
+                                    if (items) {
+                                        for (size_t i = 0; i < total; i++) {
+                                            const char *e =
+                                                symtable_array_get_index(
+                                                    arr, (int)i);
+                                            items[i] = strdup(e ? e : "");
+                                        }
+                                        kc = total;
+                                    }
+                                }
+                            }
+                        }
+                        if (items) {
+                            if (flag_u) {
+                                size_t w = 0;
+                                for (size_t i = 0; i < kc; i++) {
+                                    bool dup = false;
+                                    for (size_t j = 0; j < w; j++) {
+                                        if (strcmp(items[i], items[j]) == 0) {
+                                            dup = true;
+                                            break;
+                                        }
+                                    }
+                                    if (dup) {
+                                        free(items[i]);
+                                    } else {
+                                        items[w++] = items[i];
+                                    }
+                                }
+                                kc = w;
+                            }
+                            if (flag_o || flag_O) {
+                                for (size_t i = 0; i + 1 < kc; i++) {
+                                    for (size_t j = i + 1; j < kc; j++) {
+                                        int cmp = strcmp(items[i], items[j]);
+                                        if ((flag_O && cmp < 0) ||
+                                            (!flag_O && cmp > 0)) {
+                                            char *tmp = items[i];
+                                            items[i] = items[j];
+                                            items[j] = tmp;
+                                        }
+                                    }
+                                }
+                            }
+                            char **vec = NULL;
+                            int vcount = 0, vcap = 0;
+                            bool ok = true;
+                            for (size_t i = 0; i < kc; i++) {
+                                if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                                      items[i])) {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                            free(items);
+                            if (!ok) {
+                                for (int j = 0; j < vcount; j++) {
+                                    free(vec[j]);
+                                }
+                                free(vec);
+                                return false;
+                            }
+                            *out_vec = vec;
+                            *out_count = vcount;
+                            return true;
                         }
                     }
                 }
             }
-            /// Not our shape -- not a vector form.
-            return false;
         }
         if (*p == '!') {
             keys_form = true;
@@ -17613,6 +17731,40 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         }
                     }
                 } else {
+                    /// Splice list-kinded expansions into the array
+                    /// builder. Array construction `name=( ... )` is a
+                    /// collection-accepting context per the lush value-
+                    /// model: a list-yielding expansion like
+                    /// `${arr[@]}` or `${(s/:/)str}` here means "insert
+                    /// these N elements at the current index", not "the
+                    /// joined string occupies one slot."
+                    ///
+                    /// `try_expand_vector_arg` already recognises bare-
+                    /// array, `${arr[@]}`, and `$@`/`$*` shapes; when
+                    /// it succeeds we splice the resulting vector and
+                    /// skip the per-element expansion path. The
+                    /// quoted form `arr=("${other[@]}")` -- which used
+                    /// to fail with E1133 ("list in scalar position")
+                    /// -- now succeeds via this branch.
+                    if (!is_associative) {
+                        char **vec = NULL;
+                        int vcount = 0;
+                        if (try_expand_vector_arg(executor, elem, &vec,
+                                                  &vcount)) {
+                            for (int vi = 0; vi < vcount; vi++) {
+                                if (vec[vi]) {
+                                    symtable_array_set_index(array, index,
+                                                             vec[vi]);
+                                    index++;
+                                    free(vec[vi]);
+                                }
+                            }
+                            free(vec);
+                            elem = elem->next_sibling;
+                            continue;
+                        }
+                    }
+
                     /// Regular element without [key]=value syntax
                     if (is_associative) {
                         /// Zsh-style: arr=(key1 val1 key2 val2 ...)

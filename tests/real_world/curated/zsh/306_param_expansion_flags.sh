@@ -1,13 +1,7 @@
 #!/bin/zsh
 ## zsh-specific parameter-expansion flags: ${(j:sep:)arr} for join,
-## sort, uniq, case. Lush implements the zsh flag syntax natively
-## in its zsh mode; this script pins the curated behaviors that
-## already work cleanly.
-##
-## NOTE: ${(s:sep:)str} split and the ${(u)arr} array-uniq subscript
-## semantics are intentionally NOT exercised here because lush
-## diverges from zsh on both. Tracked separately so this script
-## stays in the green column.
+## sort, uniq, case, split. Lush implements the zsh flag syntax natively
+## in its zsh mode.
 
 arr=(banana apple cherry banana apple date)
 
@@ -34,3 +28,15 @@ echo "lower:      ${(L)text2}"
 ## --- 6. (C) capitalize each word ---------------------------------------
 text3="hello world from zsh"
 echo "cap:        ${(C)text3}"
+
+## --- 7. (s:sep:) split scalar on separator -----------------------------
+joined="alpha:beta:gamma:delta"
+split_arr=("${(s/:/)joined}")
+echo "split-len:  ${#split_arr[@]}"
+echo "split-[1]:  ${split_arr[1]}"
+echo "split-[4]:  ${split_arr[4]}"
+
+## --- 8. (u) unique with [@] subscript ----------------------------------
+uniq_arr=("${(u)arr[@]}")
+echo "uniq-len:   ${#uniq_arr[@]}"
+echo "uniq-vals:  ${uniq_arr[*]}"
