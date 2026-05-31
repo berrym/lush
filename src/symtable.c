@@ -62,7 +62,18 @@ static int current_lineno = 0;       /// For $LINENO
 /// Constants
 #define DEFAULT_HT_FLAGS (HT_STR_NONE | HT_SEED_RANDOM)
 #define MAX_SCOPE_DEPTH 256
-#define METADATA_SEPARATOR "|"
+/// Separator between value and metadata fields in the serialized
+/// per-binding storage string. Must be a byte that can never appear
+/// inside a shell variable value, because the deserializer locates
+/// the fields by strstr-scanning for the first occurrence. The
+/// previous choice `"|"` was unsafe: any value containing `|`
+/// (`x="a|b"`, command substitution capturing tool output with
+/// pipes, etc.) was silently truncated at the first pipe on
+/// readback. ASCII Unit Separator (0x1F) is the canonical
+/// "separator-inside-data" control character per ISO/IEC 6429,
+/// reserved by POSIX shells for exactly this purpose and never
+/// legal in a shell variable's literal text. Issue #211.
+#define METADATA_SEPARATOR "\x1f"
 #define METADATA_BUFFER_SIZE 64
 
 /// Forward declarations
