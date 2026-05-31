@@ -36,18 +36,35 @@ fn from_typed(n: scalar) -> scalar {
 let chained = from_typed("7")
 echo "chained: $chained"
 
-# Kind-mismatch detection: passing the literal "5" (scalar) to a
-# function expecting scalar succeeds; this just exercises the
-# call-site type check on a happy path. The negative case
-# (passing a list where scalar is expected) is exercised by
-# the kind-sigil test below.
+# Kind-mismatch detection on the happy path: scalar in, scalar out.
 fn echo_n(n: scalar) -> scalar {
     return "$n"
 }
 let e = echo_n("hello")
 echo "echo-n: $e"
 
-# TODO: list-kinded args via the @sigil are documented in
-# docs/features/typed-functions.md but currently report E1133 even
-# on the doc's own example `elements(@arr)`. Excluded from this
-# fixture pending the parity fix; tracked as issue #207.
+# List-kinded args via the @sigil. The call-site sigil resolves the
+# named binding kind-aware, preserving the list kind across the call
+# boundary so the typed-function body sees `values` as a list.
+fn count_items(values: list) -> scalar {
+    return "${#values[@]}"
+}
+arr=(apple banana cherry date)
+let n = count_items(@arr)
+echo "count-items: $n"
+
+fn first_item(values: list) -> scalar {
+    return "${values[0]}"
+}
+let f = first_item(@arr)
+echo "first-item: $f"
+
+# Map-kinded args via the %sigil.
+fn map_size(m: map) -> scalar {
+    return "${#m[@]}"
+}
+declare -A config
+config[shell]="lush"
+config[mode]="polyglot"
+let sz = map_size(%config)
+echo "map-size: $sz"

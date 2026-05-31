@@ -18964,15 +18964,22 @@ static int eval_fn_call_argument(executor_t *executor, node_t *arg,
         return out->scalar_value ? 0 : 1;
     }
 
-    /// NODE_VAR carries a bare $name (or ${name}) reference. Strip the
-    /// leading '$' / '${...}' to get the variable name and look it up
-    /// kind-aware via symtable_lookup. A list or map binding crosses
-    /// the call boundary as-is, preserving its kind tag for the
-    /// parameter-bind step rather than being flattened to a string.
+    /// NODE_VAR carries a variable reference -- either a bare $name
+    /// / ${name} or a kind-sigil form @name / %name (when
+    /// FEATURE_KIND_SIGILS is on; see docs/features/typed-functions.md
+    /// for the call-site sigil discipline). Strip whichever prefix is
+    /// present and look the underlying name up kind-aware. The
+    /// returned view preserves the symtable's actual kind tag, so a
+    /// list or map binding crosses the call boundary as-is rather
+    /// than being flattened to a string. Issue #207: failing to
+    /// strip @/% meant `elements(@arr)` looked up the literal name
+    /// `@arr`, missed, and reported the arg as an empty scalar --
+    /// triggering an E1133 against the declared list kind on the
+    /// docs' own example.
     if (arg->type == NODE_VAR) {
         const char *var_name = text;
         char name_buf[256];
-        if (var_name[0] == '$') {
+        if (var_name[0] == '$' || var_name[0] == '@' || var_name[0] == '%') {
             var_name++;
         }
         if (var_name[0] == '{') {
