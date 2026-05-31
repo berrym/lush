@@ -2545,3 +2545,77 @@ if fs.exists('tests/integration/test_env_sourcing.sh')
        suite: 'integration',
        timeout: 30)
 endif
+
+# Login-shell startup-file chain ordering (#L8).
+# Bash-style: spawns lush with controlled $HOME, asserts markers
+# appear in stdout in the canonical order. No PTY needed -- file
+# sourcing order is determined inside the shell process and does
+# not depend on controlling-terminal semantics.
+if fs.exists('tests/integration/test_login_init_chain.sh')
+  test('login startup-file chain',
+       find_program('tests/integration/test_login_init_chain.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
+
+# Non-login interactive startup-file chain (#L9).
+# Verifies that an interactive non-login shell sources ~/.lushrc
+# only, NOT ~/.profile or ~/.lush_login. The POSIX $ENV side is
+# already covered by test_env_sourcing.sh.
+if fs.exists('tests/integration/test_nonlogin_init.sh')
+  test('non-login startup chain',
+       find_program('tests/integration/test_nonlogin_init.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
+
+# Logout-script firing on explicit `exit` / `logout` (#L11 explicit).
+# Bash-style: lush -l -i with stdin pipe. The SIGHUP-induced variant
+# of this test is below as a PTY-required C test program.
+if fs.exists('tests/integration/test_logout_explicit.sh')
+  test('logout script (explicit exit)',
+       find_program('tests/integration/test_logout_explicit.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
+
+# PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
+# whose subject is defined by terminal semantics (SIGHUP delivery on
+# controlling-terminal hangup, SIGHUP cascade to the foreground
+# process group) requires a real PTY. forkpty(3) is BSD-derived but
+# available on macOS, Linux glibc, and the BSDs.
+#
+# macOS exposes forkpty via <util.h>; Linux glibc via <pty.h>; both
+# require linking against libutil on most BSDs and on Linux glibc.
+host_os = host_machine.system()
+if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os == 'openbsd' or host_os == 'netbsd'
+  cc = meson.get_compiler('c')
+  libutil_dep = cc.find_library('util', required: false)
+
+  # L10: SIGHUP cascade to background jobs at login-shell exit.
+  if fs.exists('tests/integration/test_pty_sighup_cascade.c')
+    test_pty_cascade = executable('test_pty_sighup_cascade',
+                                  ['tests/integration/test_pty_sighup_cascade.c'],
+                                  dependencies: libutil_dep)
+    test('PTY SIGHUP cascade to bg jobs',
+         test_pty_cascade,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 30)
+  endif
+
+  # L11 (SIGHUP variant): logout script fires on SIGHUP-induced exit.
+  if fs.exists('tests/integration/test_pty_sighup_logout.c')
+    test_pty_logout = executable('test_pty_sighup_logout',
+                                 ['tests/integration/test_pty_sighup_logout.c'],
+                                 dependencies: libutil_dep)
+    test('PTY logout script on SIGHUP',
+         test_pty_logout,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 30)
+  endif
+endif
