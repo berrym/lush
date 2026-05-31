@@ -24,6 +24,7 @@
 #include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
+#include "restricted_mode.h"
 #include "shell_error.h"
 #include "symtable.h"
 
@@ -120,6 +121,34 @@ int setup_redirections(executor_t *executor, node_t *command) {
 static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
     if (!redir_node) {
         return 1;
+    }
+
+    /// Restricted-shell mode forbids output redirections to files
+    /// (>, >|, >>, <>, >&FILE, &>FILE). Input redirection (<, <<,
+    /// <<<) and FD-to-FD duplication (2>&1) are still allowed --
+    /// they don't create or overwrite files. Matches bash's rbash
+    /// restrictions exactly.
+    if (restricted_mode_is_engaged()) {
+        bool reject = false;
+        switch (redir_node->type) {
+        case NODE_REDIR_OUT:         /// >
+        case NODE_REDIR_APPEND:      /// >>
+        case NODE_REDIR_CLOBBER:     /// >|
+        case NODE_REDIR_ERR:         /// N> (2>, 3>, etc.)
+        case NODE_REDIR_ERR_APPEND:  /// N>>
+        case NODE_REDIR_BOTH:        /// &>
+        case NODE_REDIR_BOTH_APPEND: /// &>>
+            reject = true;
+            break;
+        default:
+            break;
+        }
+        if (reject) {
+            executor_error_report(executor, SHELL_ERR_PERMISSION_DENIED,
+                                  redir_node->loc,
+                                  "restricted: output redirection forbidden");
+            return 1;
+        }
     }
 
     if (getenv("LUSH_DEBUG_REDIR")) {

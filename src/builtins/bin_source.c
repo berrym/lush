@@ -10,8 +10,10 @@
 #include "builtins.h"
 #include "input.h"
 #include "lush.h"
+#include "restricted_mode.h"
 
 #include <errno.h>
+#include <string.h>
 #include <sys/stat.h>
 
 /**
@@ -25,6 +27,16 @@
  * @return 0 on success, 1 on error, or last command's exit status
  */
 int bin_source(int argc, char **argv) {
+    /// Restricted-shell mode forbids `.` / `source` with a filename
+    /// containing `/`. Restricted users must source by basename
+    /// against the locked-down PATH; absolute or relative paths
+    /// would bypass the PATH lockdown. Matches bash rbash.
+    if (restricted_mode_is_engaged() && argc >= 2 && argv[1] &&
+        strchr(argv[1], '/')) {
+        return restricted_mode_reject(builtin_get_source_location(),
+                                      argv[0] ? argv[0] : "source");
+    }
+
     if (argc < 2) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =

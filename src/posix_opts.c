@@ -145,6 +145,8 @@ void init_posix_options(void) {
         true; /// Default to interactive comments enabled
     shell_opts.physical_mode = false;   /// Default to logical directory paths
     shell_opts.privileged_mode = false; /// Default to unrestricted mode
+    shell_opts.restricted_mode = false; /// `-r`: requested at invocation
+    shell_opts.restricted_mode_engaged = false; /// engaged after rc files
 }
 
 /**
@@ -187,6 +189,8 @@ bool is_posix_option_set(char option) {
         return shell_opts.onecmd;
     case 'b':
         return shell_opts.notify;
+    case 'r':
+        return shell_opts.restricted_mode;
     default:
         return false;
     }
@@ -304,6 +308,7 @@ static option_mapping_t option_map[] = {
     {"interactive-comments", &shell_opts.interactive_comments_mode,   0},
     {            "physical",             &shell_opts.physical_mode,   0},
     {          "privileged",           &shell_opts.privileged_mode,   0},
+    {          "restricted",           &shell_opts.restricted_mode, 'r'},
     {                  NULL,                                  NULL,   0}
 };
 
@@ -628,6 +633,16 @@ int builtin_set(char **args) {
                         "use `mode <name>` to switch presets",
                         args[i]);
                     return 1;
+                } else if (strcmp(args[i], "restricted") == 0 &&
+                           shell_opts.restricted_mode_engaged) {
+                    /// `set +o restricted` is rejected once `-r` has
+                    /// taken effect -- restricted mode is one-way,
+                    /// matching bash (rbash) and POSIX 2024 text.
+                    executor_error_report(
+                        current_executor, SHELL_ERR_PERMISSION_DENIED,
+                        builtin_get_source_location(),
+                        "set: cannot clear restricted mode once engaged");
+                    return 1;
                 } else {
                     option_mapping_t *opt = find_option_by_name(args[i]);
                     if (opt) {
@@ -744,6 +759,17 @@ int builtin_set(char **args) {
         } else if (arg[0] == '+' && arg[1] != '+') {
             /// Handle short options like +e, +x, etc.
             for (int j = 1; arg[j]; j++) {
+                /// Restricted mode is one-way: once `-r` is engaged it
+                /// cannot be cleared. Matches bash (rbash refuses
+                /// `set +r`) and POSIX 2024 `set -r` text. The check
+                /// fires whether the user typed `+r` or `+o restricted`.
+                if (arg[j] == 'r' && shell_opts.restricted_mode_engaged) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_PERMISSION_DENIED,
+                        builtin_get_source_location(),
+                        "set: cannot clear restricted mode once engaged");
+                    return 1;
+                }
                 option_mapping_t *opt = find_option_by_short(arg[j]);
                 if (opt) {
                     *(opt->flag) = false;

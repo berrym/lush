@@ -8,6 +8,7 @@
 
 #include "builtins.h"
 #include "lush.h"
+#include "restricted_mode.h"
 #include "signals.h"
 #include "symtable.h"
 
@@ -27,6 +28,15 @@
  * @return Does not return on success; 1 on error or restricted mode
  */
 int bin_exec(int argc, char **argv) {
+    /// Restricted-shell mode forbids `exec`-with-arguments (replacing
+    /// the shell). Redirection-only `exec >file` is also forbidden
+    /// by the broader output-redirection ban, enforced in
+    /// redirection.c -- so we reject the whole invocation up front
+    /// when restrictions are engaged, matching bash's rbash.
+    if (restricted_mode_is_engaged() && argc > 1) {
+        return restricted_mode_reject(builtin_get_source_location(), "exec");
+    }
+
     /// Privileged mode security check
     if (shell_opts.privileged_mode) {
         source_location_t loc = builtin_get_source_location();

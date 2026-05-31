@@ -432,6 +432,68 @@ default legitimately differs across shells register per-mode overrides.
 
 ---
 
+## Restricted shell (`-r` / `--restricted` / `rlush`)
+
+Lush supports a restricted-shell mode matching bash's `rbash`, zsh's
+`RESTRICTED`, and POSIX 2024 `set -r`. It is invoked by:
+
+- `lush -r` or `lush --restricted` on the command line
+- `set -r` or `set -o restricted` from within a shell
+- Invocation as `rlush` (symlink to the lush binary; bash's `rbash`
+  pattern). The leading dash for login-shell invocation
+  (`-rlush`) is recognized too.
+
+### What's restricted
+
+The bash-rbash set, applied verbatim:
+
+1. `cd` is disabled.
+2. `SHELL`, `PATH`, `HISTFILE`, `ENV`, `BASH_ENV` are made readonly.
+3. Command names containing `/` are rejected (must resolve via `PATH`).
+4. `.` / `source` with a filename containing `/` is rejected.
+5. Output redirections `>`, `>|`, `>>`, `>&`, `&>`, `&>>`, `2>`, `2>>`
+   are forbidden. Input redirection (`<`, `<<`, `<<<`) and FD-to-FD
+   duplication (`2>&1`) are still allowed.
+6. `exec` with arguments (process replacement) is disabled.
+7. `set +r` and `set +o restricted` are rejected -- restricted mode
+   is one-way once engaged.
+
+### When restrictions engage
+
+Restrictions activate **after** rc-file processing -- the same order
+bash and zsh use. The intent is that an administrator can configure
+the environment in `/etc/profile`, `~/.profile`, `~/.lush_login`, and
+`~/.lushrc` (set up a locked-down `PATH`, define aliases, etc.) and
+then have restrictions take effect before the user gets the prompt.
+The `restricted_mode_engaged` flag (in `shell_opts`) is the gate
+every enforcement site consults.
+
+### Not a security boundary
+
+This is the explicit, deliberate matching of bash's stance:
+
+> "It is not intended to be a completely secure environment for
+>  running shell scripts where absolute security is required."
+
+A restricted shell is a **usability boundary** -- it keeps an unsuspecting
+user from `cd`'ing out of the menu-shell's working directory or
+clobbering files by accident. It is **not** a sandbox against a
+determined adversary. Common escapes (none of which lush patches):
+
+- `vi` / `vim` / `nano` / `less` / `man` -- shell-out via `:!sh`, `!sh`,
+  `:shell`, etc.
+- `find . -exec sh {} \;`
+- `awk 'BEGIN{system("sh")}'`
+- Any script invoked by full path that runs `unset PATH; exec /bin/sh`
+- `ssh user@host` -- escapes by hopping to an unrestricted shell
+
+Lock these down by curating `PATH` to a directory of admin-vetted
+binaries before engaging restrictions, the same as you would with
+bash's rbash. The restriction list is the perimeter; what's inside
+the perimeter is the admin's responsibility.
+
+---
+
 ## Startup ordering
 
 For reference and debugging, the configuration startup sequence is:
@@ -452,6 +514,10 @@ For reference and debugging, the configuration startup sequence is:
    - Load `~/.config/lush/lushrc.toml` -- user values layer on top.
 6. `config_apply_settings()` -- propagate registry values to runtime
    state (legacy fields, symbol table, subsystem hooks).
+7. **Login + interactive rc-file sourcing** (`config_execute_*` series).
+8. **`restricted_mode_engage()` if `-r` was requested.** Lockdown of
+   protected variables happens here, AFTER step 7, so admin rc files
+   can configure the environment before restrictions bite.
 
 The `mode` builtin and the `set -o posix`/`set +o posix` bridge use
 `apply_mode_preset()` at runtime; the registry side of the re-seed fires

@@ -38,6 +38,7 @@
 #include "parser.h"
 #include "pattern_match.h"
 #include "redirection.h"
+#include "restricted_mode.h"
 #include "shell_mode.h"
 #include "signals.h"
 #include "symtable.h"
@@ -8856,6 +8857,17 @@ static int execute_external_command_with_setup(executor_t *executor,
                                                bool redirect_stderr,
                                                node_t *command) {
     if (!argv || !argv[0]) {
+        return 1;
+    }
+
+    /// Restricted-shell mode forbids command names containing `/`.
+    /// Matches bash rbash and zsh RESTRICTED -- a restricted user
+    /// must use PATH lookup, not arbitrary filesystem traversal.
+    if (restricted_mode_is_engaged() && strchr(argv[0], '/')) {
+        source_location_t loc = command ? command->loc : SOURCE_LOC_UNKNOWN;
+        executor_error_report(
+            executor, SHELL_ERR_PERMISSION_DENIED, loc,
+            "%s: restricted: command names cannot contain '/'", argv[0]);
         return 1;
     }
 

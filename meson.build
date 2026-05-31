@@ -190,6 +190,7 @@ src = ['src/arithmetic.c',
        'src/posix_history.c',
        'src/posix_opts.c',
        'src/redirection.c',
+       'src/restricted_mode.c',
        'src/shell_error.c',
        'src/shell_mode.c',
        'src/signals.c',
@@ -2577,6 +2578,19 @@ endif
 if fs.exists('tests/integration/test_logout_explicit.sh')
   test('logout script (explicit exit)',
        find_program('tests/integration/test_logout_explicit.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
+
+# Restricted-shell mode (#L15). Exercises -r / --restricted and the
+# full bash-rbash restriction set: cd disabled, /-containing command
+# names rejected, output redirections forbidden, exec blocked,
+# /-paths to source rejected, PATH/SHELL/ENV/BASH_ENV/HISTFILE
+# readonly, set +r / set +o restricted rejected.
+if fs.exists('tests/integration/test_restricted_shell.sh')
+  test('restricted shell (-r)',
+       find_program('tests/integration/test_restricted_shell.sh'),
        args: [lush_exe.full_path()],
        suite: 'integration',
        timeout: 30)
