@@ -1,14 +1,16 @@
 #!/bin/bash
 ## Function semantics: local variables, dynamic scope, recursion,
-## return-vs-exit. The dynamic-scoping rules here are the same
-## across bash, zsh, and dash (zsh defaults to dynamic like bash;
-## per `project-defaults-bash-zsh-consensus` lush follows that
-## consensus).
-##
-## NOTE: $FUNCNAME inspection is intentionally NOT exercised here
-## because lush's $FUNCNAME is unset inside function bodies (the
-## three reference shells set it). Tracked separately so this script
-## stays in the green column while the underlying gap is addressed.
+## return-vs-exit, $FUNCNAME. The dynamic-scoping rules here are
+## the same across bash, zsh, and dash (zsh defaults to dynamic
+## like bash; per `project-defaults-bash-zsh-consensus` lush follows
+## that consensus).
+
+## --- 0. $FUNCNAME is set during function body execution ----------------
+named() {
+    echo "name: $FUNCNAME"
+}
+named
+echo "outside-funcname: [$FUNCNAME]"   ## empty outside any function
 
 ## --- 1. local hides the outer binding inside the function --------------
 x=outer
