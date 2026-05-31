@@ -573,6 +573,62 @@ TEST(rt_case_extglob_alternation) {
     ASSERT_STDOUT_EQ(r, "pet:cat\npet:dog\nword:bird\n");
 }
 
+TEST(rt_bash_shopt_extglob_takes_effect_next_batch) {
+    /// Issue #151: bash-mode `shopt -s extglob` on its own line must
+    /// flip FEATURE_EXTENDED_GLOB before the next batch is tokenized,
+    /// so an extglob shape in a following case statement parses
+    /// instead of erroring at the tokenizer. Drives the per-batch
+    /// driver in executor_execute_command_line: each top-level
+    /// statement runs to completion (executing any feature flips)
+    /// before the next is parsed, matching bash's parse-then-execute
+    /// model line by line.
+    ///
+    /// The same-line form (`shopt -s extglob; case ... esac` on one
+    /// line) intentionally still errors -- bash itself errors there
+    /// too, since the shopt hasn't run by the time the case is
+    /// tokenized. Mode-accurate defaults stay intact.
+    run_result_t r = run_shell("mode bash\n"
+                               "shopt -s extglob\n"
+                               "case cat in @(cat|dog)) echo pet;; esac\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "pet\n");
+}
+
+TEST(rt_set_e_aborts_remaining_batches) {
+    /// `set -e` must abort subsequent batches in a non-interactive
+    /// shell, matching bash. The per-batch driver respects errexit
+    /// across batch boundaries -- a failing batch returns non-zero
+    /// to the loop and the loop stops feeding more lines. Without
+    /// this, multi-line scripts kept running past failing commands.
+    run_result_t r = run_shell("set -e\n"
+                               "false\n"
+                               "echo should-not-print\n");
+    ASSERT_EXIT_STATUS(r, 1);
+    ASSERT_STDOUT_EQ(r, "");
+    /// Harness shares shell_opts globally across run_shell calls
+    /// (see project-shell-harness-global-state); clear errexit so
+    /// subsequent tests don't observe it.
+    run_shell("set +e\n");
+}
+
+TEST(rt_err_trap_fires_across_batch_boundaries) {
+    /// The ERR trap must fire when a command in a later batch returns
+    /// non-zero. Previously the trap-firing logic lived only inside
+    /// the command-list walker; a single-command AST (each batch in
+    /// the per-batch driver) bypassed it. Routing executor_execute
+    /// through the command chain unconditionally fixed this.
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r =
+        run_shell_with_executor(exec, "trap 'echo TRAP_FIRED' ERR\n"
+                                      "false\n"
+                                      "echo continuing\n"
+                                      "trap - ERR\n");
+    ASSERT_STDOUT_CONTAINS(r, "TRAP_FIRED");
+    ASSERT_STDOUT_CONTAINS(r, "continuing");
+    executor_free(exec);
+}
+
 TEST(rt_case_plain_alternation_unregressed) {
     /// The paren/bracket-aware separator must still split ordinary
     /// top-level `|` alternation, including an empty alternative.
@@ -4465,6 +4521,9 @@ int main(void) {
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
     RUN_TEST(rt_case_extglob_alternation);
+    RUN_TEST(rt_bash_shopt_extglob_takes_effect_next_batch);
+    RUN_TEST(rt_set_e_aborts_remaining_batches);
+    RUN_TEST(rt_err_trap_fires_across_batch_boundaries);
     RUN_TEST(rt_case_plain_alternation_unregressed);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

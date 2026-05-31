@@ -625,15 +625,37 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
         state->escaped = false; /// Reset for next line
     }
 
-    /// Check if line ends with pipe character (requires continuation)
-    /// Need to check backwards from end, skipping whitespace
-    const char *end = line + strlen(line);
-    while (end > line && isspace(*(end - 1))) {
-        end--;
-    }
-    if (end > line && *(end - 1) == '|') {
-        /// Line ends with pipe - needs continuation
-        state->has_continuation = true;
+    /// Trailing logical/pipe operator forces line continuation. A line
+    /// ending in `&&`, `||`, or a bare `|` (after trailing whitespace,
+    /// with the operator not inside quotes) has its statement
+    /// obviously not complete -- the next command appears on the
+    /// following line. Bash and zsh both keep reading; without this
+    /// check, an `&&`-at-EOL is treated as one statement and the
+    /// parser sees the operator with nothing on its right.
+    ///
+    /// The local analyzer in src/input.c already does this for the
+    /// file/stdin reader path; this shared analyzer is used by the
+    /// executor's per-batch splitter (issue #151) and by the LLE
+    /// interactive multi-line driver. The two analyzers should
+    /// eventually collapse onto a single canonical implementation
+    /// (tracked: duplicate-path audit).
+    if (!state->in_single_quote && !state->in_double_quote &&
+        !state->in_backtick && !state->in_here_doc) {
+        const char *trim_end = line + strlen(line);
+        while (trim_end > line &&
+               (*(trim_end - 1) == ' ' || *(trim_end - 1) == '\t')) {
+            trim_end--;
+        }
+        size_t trim_len = (size_t)(trim_end - line);
+        if (trim_len >= 2 && ((trim_end[-2] == '&' && trim_end[-1] == '&') ||
+                              (trim_end[-2] == '|' && trim_end[-1] == '|'))) {
+            state->has_continuation = true;
+        } else if (trim_len >= 1 && trim_end[-1] == '|' &&
+                   (trim_len < 2 || trim_end[-2] != '|')) {
+            /// Bare `|` at end of line (not part of `||`); pipeline
+            /// continues on next line.
+            state->has_continuation = true;
+        }
     }
 
     /// Handle remaining word at end of line
@@ -729,6 +751,17 @@ bool continuation_is_complete(const continuation_state_t *state) {
 
     /// Check for here documents
     if (state->in_here_doc) {
+        return false;
+    }
+
+    /// POSIX function header `name()` seen but body brace not yet
+    /// opened. The function body may start on a following line; keep
+    /// reading until the `{` arrives (analyze_line clears this flag
+    /// when it does). Without this, `name()\n{ body }` is split into
+    /// two statements and the parser sees `name()` followed by EOF.
+    /// Ported from input.c's local needs_continuation as part of the
+    /// dual-analyzer unification.
+    if (state->saw_posix_func_parens) {
         return false;
     }
 
