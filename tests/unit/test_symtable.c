@@ -409,6 +409,56 @@ TEST(array_associative) {
  * ============================================================================
  */
 
+/// Issue #163: scalar assignment over an existing array binding must
+/// release the array_value_t backing memory. The previous serialized
+/// value was a hex-encoded pointer string; ht_strstr_insert overwrites
+/// it as ASCII text, leaving no C pointer to the array. Without the
+/// hand-off in symtable_set_var the array becomes unreachable -- the
+/// CI memcheck-linux job picks it up as "definitely lost".
+///
+/// This test exercises the type-switch path so a regression that
+/// reintroduces the leak still crashes or misbehaves observably
+/// (kind-flip stops working, lookup returns stale array, etc.). The
+/// quantitative leak signal stays with the valgrind CI job.
+TEST(array_scalar_overwrite_releases_backing) {
+    init_symtable();
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    if (!mgr) {
+        printf(
+            "    (Skipped - global manager not initialized in test context)\n");
+        return;
+    }
+
+    array_value_t *arr = symtable_array_create(false);
+    ASSERT_NOT_NULL(arr, "array_create");
+    symtable_array_append(arr, "one");
+    symtable_array_append(arr, "two");
+    symtable_array_append(arr, "three");
+    int rc = symtable_set_array("lush_163_arr", arr);
+    ASSERT_EQ(rc, 0, "set_array should store the binding");
+
+    /// Confirm the array round-trips before we overwrite it.
+    array_value_t *probe = symtable_get_array("lush_163_arr");
+    ASSERT_NOT_NULL(probe, "array binding lookup before overwrite");
+    ASSERT_EQ(symtable_array_length(probe), 3, "length 3 before overwrite");
+
+    /// Scalar assignment over the same name -- the path that used to
+    /// leak the array_value_t.
+    rc = symtable_set_var(mgr, "lush_163_arr", "scalar_value", SYMVAR_NONE);
+    ASSERT_EQ(rc, 0, "scalar overwrite should succeed");
+
+    /// The binding is now a scalar; array lookup must return NULL.
+    probe = symtable_get_array("lush_163_arr");
+    ASSERT_NULL(probe, "array lookup after scalar overwrite returns NULL");
+
+    char *scalar = symtable_get_var(mgr, "lush_163_arr");
+    ASSERT_NOT_NULL(scalar, "scalar lookup after overwrite");
+    ASSERT_STR_EQ(scalar, "scalar_value", "scalar value matches");
+    free(scalar);
+
+    symtable_unset_var(mgr, "lush_163_arr");
+}
+
 TEST(value_view_scalar_lookup) {
     /// symtable_lookup queries the global manager. Ensure it is up;
     /// init_symtable() is a no-op if already initialized.
@@ -569,6 +619,7 @@ int main(void) {
 
     printf("\nArray tests:\n");
     RUN_TEST(array_create);
+    RUN_TEST(array_scalar_overwrite_releases_backing);
     RUN_TEST(value_view_scalar_lookup);
     RUN_TEST(value_view_list_lookup);
     RUN_TEST(value_view_map_lookup);

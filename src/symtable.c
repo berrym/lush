@@ -672,19 +672,33 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
     }
     name = canon;
 
-    /// Readonly enforcement (current scope). If an entry already lives
-    /// in this scope and carries SYMVAR_READONLY, refuse the write and
-    /// return SYMTABLE_ERR_READONLY so callers can surface a specific
-    /// error message. The check looks at the existing serialized entry
-    /// rather than the incoming `flags` argument so re-asserting the
-    /// readonly bit (`readonly X=1` twice) is correctly refused -- bash
-    /// matches this behavior.
+    /// Readonly enforcement (current scope) + array-backing release.
+    /// If an entry already lives in this scope:
+    ///   - When it carries SYMVAR_READONLY, refuse the write and return
+    ///     SYMTABLE_ERR_READONLY so callers can surface a specific
+    ///     error message. The check looks at the existing serialized
+    ///     entry rather than the incoming `flags` argument so
+    ///     re-asserting the readonly bit (`readonly X=1` twice) is
+    ///     correctly refused -- bash matches this behavior.
+    ///   - When it is SYMVAR_ARRAY, free the array_value_t backing
+    ///     memory before the ht_strstr_insert below overwrites the
+    ///     hex-encoded pointer string. The pointer lives only in the
+    ///     serialized value (no separate C pointer), so without this
+    ///     hand-off the array becomes unreachable and leaks. Drives
+    ///     issue #163. The unset path (flags includes SYMVAR_UNSET) is
+    ///     skipped here because symtable_unset_var has already walked
+    ///     the scope chain via find_var and freed the array_value_t --
+    ///     freeing again would double-free.
     const char *existing_serialized =
         ht_strstr_get(manager->current_scope->vars_ht, name);
     if (existing_serialized) {
         symvar_t *existing = deserialize_variable(name, existing_serialized);
         if (existing) {
             bool readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
+            if (existing->type == SYMVAR_ARRAY && existing->array &&
+                !(flags & SYMVAR_UNSET)) {
+                symtable_array_free(existing->array);
+            }
             free_symvar(existing);
             if (readonly_blocked) {
                 free(canon);
