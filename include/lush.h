@@ -263,6 +263,16 @@ typedef struct shell_options {
     bool physical_mode;             ///< physical: resolve symlinks in paths
     bool privileged_mode; ///< privileged: restricted shell security mode
 
+    /// `-r` / `--restricted` / `rlush` invocation: a usability-not-
+    /// security restricted shell (matches bash's rbash, zsh's RESTRICTED,
+    /// POSIX 2024 `set -r`). Restrictions engage AFTER rc-file
+    /// processing so admins can pre-configure the environment; once
+    /// engaged the flag cannot be cleared (set +r / set +o restricted
+    /// is rejected). See restricted_mode_engaged below for the actual
+    /// "is restriction enforcement live" gate.
+    bool restricted_mode;
+    bool restricted_mode_engaged; ///< true after restricted_mode_engage()
+
     /* Early-init CLI mode override. Populated by --posix/--bash/--zsh/--lush
      * during parse_opts; consumed by detect_initial_mode() before
      * config_init so the user's lushrc layers on top of the right preset.

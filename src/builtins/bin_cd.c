@@ -10,6 +10,7 @@
 #include "dirstack.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lush.h"
+#include "restricted_mode.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
@@ -105,6 +106,13 @@ int bin_cd(int argc __attribute__((unused)),
     static char *previous_dir = NULL;
     char *current_dir = NULL;
     char *target_dir = NULL;
+
+    /// Restricted-shell mode forbids `cd` outright. Matches bash's
+    /// rbash and zsh's RESTRICTED. See include/restricted_mode.h for
+    /// the full restriction set.
+    if (restricted_mode_is_engaged()) {
+        return restricted_mode_reject(builtin_get_source_location(), "cd");
+    }
 
     /// Privileged mode security check
     if (shell_opts.privileged_mode) {

@@ -25,6 +25,7 @@
 #include "errors.h"
 #include "input.h"
 #include "posix_history.h"
+#include "restricted_mode.h"
 #include "shell_error.h"
 #include "shell_mode.h"
 
@@ -457,6 +458,23 @@ int init(int argc, char **argv, FILE **in) {
     /// 1. Determine if this is a login shell
     IS_LOGIN_SHELL = (**argv == '-') || shell_opts.login_shell;
 
+    /// `rlush` symlink invocation: matches bash's rbash and zsh's rzsh
+    /// conventions. When argv[0]'s basename is exactly "rlush" (the
+    /// `r`-prefixed lush), turn on restricted mode the same way `-r`
+    /// would. Also covers `-rlush` (login-shell + rlush symlink) by
+    /// skipping a leading dash before basename comparison.
+    {
+        const char *prog = argv[0];
+        const char *slash = strrchr(prog, '/');
+        const char *base = slash ? slash + 1 : prog;
+        if (*base == '-') {
+            base++; /// strip the login-shell dash prefix
+        }
+        if (strcmp(base, "rlush") == 0) {
+            shell_opts.restricted_mode = true;
+        }
+    }
+
     /// 2. Check if we are the session leader (PID == SID)
     IS_SESSION_LEADER = (getsid(0) == getpid());
 
@@ -489,6 +507,16 @@ int init(int argc, char **argv, FILE **in) {
     /// below
     if (preliminary_interactive && !shell_opts.command_mode) {
         config_execute_startup_scripts();
+    }
+
+    /// `-r` / `rlush` / `set -o restricted` taking effect: bash and
+    /// zsh both engage restrictions AFTER rc-file processing so admin
+    /// startup scripts can set up PATH to a restricted bin directory,
+    /// lock down command paths, etc. Once engaged the flag cannot be
+    /// cleared (set +r / set +o restricted are rejected; see
+    /// posix_opts.c). Matches POSIX 2024 `set -r` semantics.
+    if (shell_opts.restricted_mode && !shell_opts.restricted_mode_engaged) {
+        restricted_mode_engage();
     }
 
     /// POSIX: an interactive non-login shell must source the file
@@ -998,6 +1026,10 @@ static int parse_opts(int argc, char **argv) {
                 /// Long-flag spelling of `-l`. Bash accepts both forms;
                 /// lush matches for ergonomic parity.
                 shell_opts.login_shell = true;
+            } else if (strcmp(arg, "--restricted") == 0) {
+                /// Long-flag spelling of `-r`. Bash supports both
+                /// `--restricted` and `-r`; lush matches.
+                shell_opts.restricted_mode = true;
             } else if (strcmp(arg, "--strict") == 0) {
                 /// Enable strict compatibility mode - warnings become errors
                 compat_set_strict(true);
@@ -1149,6 +1181,14 @@ static int parse_opts(int argc, char **argv) {
             case 'l':
                 shell_opts.login_shell = true;
                 break;
+            case 'r':
+                /// Bash's rbash / zsh's RESTRICTED / POSIX 2024 set -r:
+                /// usability-not-security restricted shell. Recorded
+                /// here; actually engaged AFTER rc-file processing via
+                /// restricted_mode_engage() so admin startup scripts
+                /// can pre-configure PATH etc.
+                shell_opts.restricted_mode = true;
+                break;
             case 'e':
                 shell_opts.exit_on_error = true;
                 break;
@@ -1241,6 +1281,11 @@ static void usage(int err) {
     printf("  -s               Read commands from standard input\n");
     printf("  -i               Force interactive mode\n");
     printf("  -l, --login      Act as a login shell\n");
+    printf("  -r, --restricted Restricted shell (no cd, no `/' in command "
+           "names, no\n");
+    printf(
+        "                   output redirection, no exec; usability boundary, "
+        "not security)\n");
     printf("  -e               Exit immediately on command failure (set -e)\n");
     printf("  -x               Trace command execution (set -x)\n");
     printf("  -n               Syntax check mode - read but don't execute (set "
