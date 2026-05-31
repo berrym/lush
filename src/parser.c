@@ -2683,6 +2683,14 @@ static node_t *parse_redirection(parser_t *parser) {
         char *concatenated_target = NULL;
         size_t total_len = 0;
         size_t last_end_pos = target_token->end_position;
+        /// Track whether the collected run includes anything that
+        /// needs expansion. If every collected token is a single-
+        /// quoted TOK_STRING the result must be NODE_STRING_LITERAL
+        /// so the downstream redirection-target handler skips
+        /// expand_if_needed and writes the bytes verbatim. Any
+        /// double-quoted, $VAR, arith, command-sub, backtick, or
+        /// bare-word token means the result has to be expanded.
+        bool any_needs_expansion = false;
 
         /// Collect all consecutive tokens without whitespace (like
         /// /tmp/file_$VAR)
@@ -2693,6 +2701,10 @@ static node_t *parse_redirection(parser_t *parser) {
                                  current_token->type == TOK_COMMAND_SUB ||
                                  current_token->type == TOK_BACKQUOTE ||
                                  current_token->type == TOK_COMMA)) {
+
+            if (current_token->type != TOK_STRING) {
+                any_needs_expansion = true;
+            }
 
             size_t token_len = strlen(current_token->text);
             char *new_target =
@@ -2722,10 +2734,16 @@ static node_t *parse_redirection(parser_t *parser) {
         } else {
             /// Fallback to single token
             concatenated_target = strdup(target_token->text);
+            if (target_token->type != TOK_STRING) {
+                any_needs_expansion = true;
+            }
             tokenizer_advance(parser->tokenizer);
         }
 
-        node_t *target_node = new_node(NODE_VAR);
+        /// Single-quoted-only -> NODE_STRING_LITERAL (no expansion).
+        /// Anything else falls through to NODE_VAR (existing default).
+        node_t *target_node =
+            new_node(any_needs_expansion ? NODE_VAR : NODE_STRING_LITERAL);
         if (!target_node) {
             free(concatenated_target);
             free_node_tree(redir_node);
