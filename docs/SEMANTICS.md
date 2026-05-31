@@ -284,6 +284,26 @@ exactly as `${arr[@]}` does. In a scalar-requiring slot it is a type
 error. `${arr[*]}` and explicit joins produce a scalar and are valid
 in scalar-requiring slots.
 
+**Quotes do not flatten.** Slot category is set by the surrounding
+syntactic position, not by the quotes around the expansion. A
+vector-yielding expansion inside double quotes is still a vector
+when it sits in a vector-accepting slot:
+
+```
+arr=(alpha beta gamma)
+copy=("${arr[@]}")           # array initializer slot, splices flat
+                             # copy is 3 elements, not "alpha beta gamma"
+
+parts=("${(s/:/)str}")       # split-yielded list, splices flat
+uniq=("${(u)other[@]}")      # uniq-yielded list, splices flat
+```
+
+Quotes are a whitespace anchor (§3.6); they preserve the grouping of
+each individual element, but they do not coerce a list into a scalar.
+The principle is data topology (list vs. scalar) versus evaluation
+context (preserve word boundaries inside each element): these are
+orthogonal axes, and the engine treats them as such.
+
 **Type-mismatch diagnostic.** A list or map value that reaches a
 scalar-requiring slot, or that violates the whole-word constraint, is
 a runtime type error. The engine halts the offending evaluation and
