@@ -361,6 +361,20 @@ int main(int argc, char **argv) {
             exit_flag = true;
         }
 
+        /// `set -e` (errexit) across batches: the executor's per-batch
+        /// driver already honors exit_on_error inside a single batch
+        /// (execute_command_chain returns early on non-zero, respecting
+        /// all bash exemption rules). When that non-zero result reaches
+        /// the read loop, errexit also has to STOP reading further
+        /// script lines -- otherwise a non-interactive script keeps
+        /// running after the failing command, diverging from bash. The
+        /// interactive shell deliberately ignores errexit at this layer
+        /// so a failed prompt command doesn't kill the session.
+        if (shell_opts.exit_on_error && last_exit_status != 0 &&
+            !is_interactive_shell()) {
+            exit_flag = true;
+        }
+
         /// Advance cumulative line counter by the number of source
         /// lines consumed by this batch. Interactive mode skips this
         /// since the counter stays at 1.

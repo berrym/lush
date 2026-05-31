@@ -24,6 +24,7 @@
 #include "ht.h"
 #include "identifier.h"
 #include "init.h"
+#include "input_continuation.h"
 #include "lle/lle_pager.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
@@ -1020,18 +1021,20 @@ int executor_execute(executor_t *executor, node_t *ast) {
     executor->has_error = false;
     executor->error_message = NULL;
 
-    /// Check if this is a command sequence (has siblings) or a single command
-    if (ast->next_sibling) {
-        /// This is a command sequence, execute all siblings
-        int result = execute_command_list(executor, ast);
-        executor->exit_status = result;
-        return result;
-    } else {
-        /// Single command, execute normally
-        int result = execute_node(executor, ast);
-        executor->exit_status = result;
-        return result;
-    }
+    /// Always route through execute_command_list. The historical
+    /// single-command shortcut (call execute_node directly) bypassed
+    /// the post-command bookkeeping that execute_command_chain runs
+    /// after every node: ERR-trap firing on non-zero exit, errexit
+    /// check, shell_exit_requested propagation. Those side-effects
+    /// must fire for batch-of-one inputs too -- a script's first
+    /// line, or any single-command -c invocation, has to behave the
+    /// same as the same line inside a longer list. The chain walker
+    /// already handles a 1-node chain correctly; collapsing onto it
+    /// removes the divergence between the "single" and "list" paths.
+    /// Surfaced while building the per-batch driver for issue #151.
+    int result = execute_command_list(executor, ast);
+    executor->exit_status = result;
+    return result;
 }
 
 /**
@@ -1044,6 +1047,142 @@ int executor_execute(executor_t *executor, node_t *ast) {
  * @param input Shell command string to parse and execute
  * @return Exit status of executed command, or error code
  */
+/// Find the end of the first syntactically-complete batch starting at
+/// `input`. A "batch" is the same logical unit `get_input_complete_counted`
+/// builds from a file: a single simple command, a multi-line construct
+/// (if/case/for/function/heredoc), or the contents of a quoted string
+/// spanning multiple lines. Returns the byte offset just past the last
+/// consumed character (including the terminating newline, if any).
+/// `*out_lines` receives the number of source lines this batch covers.
+///
+/// Reusing the canonical continuation analyzer (input_continuation.h)
+/// means a -c string with `shopt -s extglob\ncase ... esac` is split
+/// into the same two batches a file would produce -- the shopt batch
+/// runs, flips FEATURE_EXTENDED_GLOB, and the case batch is then
+/// tokenized with extglob in effect. Mode-accurate defaults stay
+/// intact (`-c '...; ...'` on one line is still one batch and still
+/// errors exactly as bash does -- bash doesn't fix the one-line form
+/// either). Drives issue #151.
+static size_t find_next_batch_end(const char *input, size_t input_len,
+                                  size_t *out_lines) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    size_t pos = 0;
+    size_t lines = 0;
+    bool produced_any = false;
+
+    while (pos < input_len) {
+        size_t line_start = pos;
+        while (pos < input_len && input[pos] != '\n') {
+            pos++;
+        }
+        size_t line_len = pos - line_start;
+
+        char *line = malloc(line_len + 1);
+        if (!line) {
+            continuation_state_cleanup(&state);
+            if (out_lines) {
+                *out_lines = lines;
+            }
+            return pos;
+        }
+        memcpy(line, input + line_start, line_len);
+        line[line_len] = '\0';
+
+        continuation_analyze_line(line, &state);
+        free(line);
+
+        /// A blank/whitespace-only line on its own doesn't constitute a
+        /// batch: skip past the newline and keep looking so we don't
+        /// hand the parser an empty string. Only treat it as
+        /// significant once a non-blank line has been seen.
+        bool blank = true;
+        for (size_t i = 0; i < line_len; i++) {
+            if (!isspace((unsigned char)input[line_start + i])) {
+                blank = false;
+                break;
+            }
+        }
+        if (!blank) {
+            produced_any = true;
+            lines++;
+        } else if (produced_any) {
+            lines++;
+        }
+
+        if (pos < input_len && input[pos] == '\n') {
+            pos++;
+        }
+
+        if (!produced_any) {
+            /// Don't end on a blank-prefix; keep scanning for the first
+            /// real line.
+            continue;
+        }
+
+        if (!continuation_needs_continuation(&state)) {
+            break;
+        }
+    }
+
+    continuation_state_cleanup(&state);
+    if (out_lines) {
+        *out_lines = lines;
+    }
+    return pos;
+}
+
+/// Parse + execute a single already-extracted batch. Owns the parser
+/// lifecycle and the stashed source-text view for the structured-error
+/// system. Factored out so executor_execute_command_line can iterate
+/// over batches without duplicating the parser plumbing.
+static int execute_one_batch(executor_t *executor, const char *batch,
+                             const char *source_name, size_t starting_line) {
+    parser_t *parser =
+        parser_new_with_source(batch, source_name, starting_line);
+    if (!parser) {
+        set_executor_error(executor, "Failed to create parser");
+        return 1;
+    }
+
+    node_t *ast = parser_parse(parser);
+
+    if (shell_opts.syntax_check) {
+        int rc = 0;
+        if (parser_has_error(parser)) {
+            parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
+            const char *legacy_err = parser_error(parser);
+            if (legacy_err) {
+                set_executor_error(executor, legacy_err);
+            }
+            rc = 2;
+        }
+        parser_free(parser);
+        return rc;
+    }
+
+    if (parser_has_error(parser)) {
+        parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
+        const char *legacy_err = parser_error(parser);
+        if (legacy_err) {
+            set_executor_error(executor, legacy_err);
+        }
+        parser_free(parser);
+        return 1;
+    }
+
+    if (!ast) {
+        parser_free(parser);
+        return 0;
+    }
+
+    int rc = executor_execute(executor, ast);
+    free_node_tree(ast);
+    parser_free(parser);
+    return rc;
+}
+
 int executor_execute_command_line(executor_t *executor, const char *input,
                                   size_t starting_line) {
     if (!executor || !input) {
@@ -1058,13 +1197,12 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     /// source line via executor_get_source_line() and attach it via
     /// shell_error_set_source_line() to produce the full rust-style
     /// snippet block (`N | source line / ^~~~~`). The stash is set to
-    /// the input we're about to parse and restored on exit so re-entrant
-    /// dispatch (e.g. command substitution running its own batch
-    /// recursively) doesn't leak text from one batch into another.
+    /// the current batch we're about to parse and restored on exit so
+    /// re-entrant dispatch (e.g. command substitution running its own
+    /// batch recursively) doesn't leak text from one batch into
+    /// another.
     const char *saved_source_text = executor->source_text;
     size_t saved_source_starting_line = executor->source_starting_line;
-    executor->source_text = input;
-    executor->source_starting_line = starting_line;
 
     /// Preprocess input to handle line continuation (backslash-newline)
     /// This is needed for -c option where the string comes directly without
@@ -1092,69 +1230,103 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         }
     }
 
-    /// Parse the input, using script filename if executing a script
     const char *source_name = executor->current_script_file
                                   ? executor->current_script_file
                                   : "<stdin>";
+
+    /// Iterate over syntactically-complete batches. The file/stdin path
+    /// already batches at the reader (get_input_complete_counted); -c
+    /// and other in-process callers (eval-style, traps, autoload, fc,
+    /// shell-hooks) used to bypass that batching and hand multi-batch
+    /// strings to a single parse. Re-using the canonical continuation
+    /// analyzer here closes that gap so every entry point sees the
+    /// same batch granularity. Issue #151.
+    size_t input_pos = 0;
+    size_t input_len = strlen(parse_input);
+    size_t batch_starting_line = starting_line;
     int result = 0;
-    parser_t *parser =
-        parser_new_with_source(parse_input, source_name, starting_line);
-    if (!parser) {
-        set_executor_error(executor, "Failed to create parser");
-        result = 1;
-        goto cleanup;
-    }
 
-    node_t *ast = parser_parse(parser);
+    while (input_pos < input_len) {
+        size_t batch_lines = 0;
+        size_t batch_consumed = find_next_batch_end(
+            parse_input + input_pos, input_len - input_pos, &batch_lines);
+        if (batch_consumed == 0) {
+            break;
+        }
 
-    /// Check syntax check mode (set -n) - parse but don't execute
-    if (shell_opts.syntax_check) {
-        if (parser_has_error(parser)) {
-            /// Display structured errors if available
-            parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
-            /// Set executor error for legacy compatibility (may be NULL with
-            /// new system)
-            const char *legacy_err = parser_error(parser);
-            if (legacy_err) {
-                set_executor_error(executor, legacy_err);
+        /// Trim the trailing newline (if any) for the batch buffer the
+        /// parser sees, but report the full consumed length to the
+        /// caller-line tracker via batch_lines.
+        size_t batch_text_len = batch_consumed;
+        if (batch_text_len > 0 &&
+            parse_input[input_pos + batch_text_len - 1] == '\n') {
+            batch_text_len--;
+        }
+
+        /// Skip a pure-whitespace batch (no parser invocation needed).
+        bool all_blank = true;
+        for (size_t i = 0; i < batch_text_len; i++) {
+            if (!isspace((unsigned char)parse_input[input_pos + i])) {
+                all_blank = false;
+                break;
             }
-            result = 2; /// Syntax error
-        } else {
-            result = 0; /// Syntax check successful
         }
-        parser_free(parser);
-        goto cleanup;
-    }
-
-    if (parser_has_error(parser)) {
-        /// Display structured errors if available
-        parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
-        /// Set executor error for legacy compatibility (may be NULL with new
-        /// system)
-        const char *legacy_err = parser_error(parser);
-        if (legacy_err) {
-            set_executor_error(executor, legacy_err);
+        if (all_blank) {
+            input_pos += batch_consumed;
+            batch_starting_line += batch_lines;
+            continue;
         }
-        parser_free(parser);
-        result = 1;
-        goto cleanup;
+
+        char *batch = malloc(batch_text_len + 1);
+        if (!batch) {
+            set_executor_error(executor, "Failed to allocate batch buffer");
+            result = 1;
+            break;
+        }
+        memcpy(batch, parse_input + input_pos, batch_text_len);
+        batch[batch_text_len] = '\0';
+
+        executor->source_text = batch;
+        executor->source_starting_line = batch_starting_line;
+
+        result = execute_one_batch(executor, batch, source_name,
+                                   batch_starting_line);
+
+        free(batch);
+
+        input_pos += batch_consumed;
+        batch_starting_line += batch_lines;
+
+        /// Honor mid-stream shell-exit requests: ${var:?word}, builtin
+        /// exit, errexit-style abort, etc. The remaining batches must
+        /// not run once the shell has decided to terminate the script.
+        if (executor->shell_exit_requested) {
+            break;
+        }
+
+        /// Parse / syntax-check failure in non-first batch: stop
+        /// processing further batches and surface the error. This
+        /// matches bash's behavior where a parse error in the middle
+        /// of a -c string aborts the rest.
+        if (result != 0 && shell_opts.syntax_check) {
+            break;
+        }
+
+        /// `set -e` (errexit) at batch granularity: a non-zero result
+        /// from a batch -- where the chain inside the batch already
+        /// honored set -e's exemption rules (conditional context,
+        /// pipeline LHS, etc.) and STILL surfaced non-zero -- aborts
+        /// the remaining batches, matching bash's script-wide errexit
+        /// semantics. Without this the historical "test passes / real
+        /// script keeps running" divergence persisted because the
+        /// chain returned to the batch loop but the loop kept feeding
+        /// new batches.
+        if (shell_opts.exit_on_error && result != 0) {
+            break;
+        }
     }
 
-    if (!ast) {
-        parser_free(parser);
-        result = 0; /// Empty command
-        goto cleanup;
-    }
-
-    result = executor_execute(executor, ast);
-
-    free_node_tree(ast);
-    parser_free(parser);
-
-cleanup:
     free(processed_input);
-    /// Restore previous source-text stash so re-entrant batches don't
-    /// leak text from one batch into another.
     executor->source_text = saved_source_text;
     executor->source_starting_line = saved_source_starting_line;
     return result;
