@@ -269,6 +269,92 @@ static inline int pty_spawn(pty_session_t *session, const char *lush_path,
     return 0;
 }
 
+/// Spawn lush with ALL THREE stdio streams on the same PTY pair.
+/// Unlike pty_spawn, this configuration makes stdin a TTY (the slave),
+/// so isatty(STDIN_FILENO) returns true inside the child and the LLE
+/// enters interactive mode. Use this when the test needs to drive
+/// real keystrokes through the line editor (TAB completion menus,
+/// arrow-key navigation, etc.). pty_send writes through the master
+/// fd; the child reads them from its stdin (slave). pty_drain reads
+/// the same master fd; the child's stdout (slave) writes echo +
+/// render bytes for the parent to capture.
+///
+/// TERM=xterm-256color (not dumb) so the LLE does not fall back to
+/// non-interactive degraded mode.
+static inline int pty_spawn_lle(pty_session_t *session, const char *lush_path,
+                                const char *const argv[]) {
+    memset(session, 0, sizeof(*session));
+    session->home_dir = pty_make_tmpdir();
+    if (!session->home_dir) {
+        perror("pty_spawn_lle: mkdtemp");
+        return -1;
+    }
+
+    session->output = (char *)calloc(1, PTY_BUF_SIZE);
+    if (!session->output) {
+        pty_rmrf(session->home_dir);
+        free(session->home_dir);
+        return -1;
+    }
+    session->out_cap = PTY_BUF_SIZE;
+
+    int master, slave;
+    if (openpty(&master, &slave, NULL, NULL, NULL) != 0) {
+        perror("pty_spawn_lle: openpty");
+        free(session->output);
+        pty_rmrf(session->home_dir);
+        free(session->home_dir);
+        return -1;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("pty_spawn_lle: fork");
+        close(master);
+        close(slave);
+        free(session->output);
+        pty_rmrf(session->home_dir);
+        free(session->home_dir);
+        return -1;
+    }
+
+    if (pid == 0) {
+        setsid();
+#ifdef TIOCSCTTY
+        ioctl(slave, TIOCSCTTY, 0);
+#endif
+        dup2(slave, STDIN_FILENO);
+        dup2(slave, STDOUT_FILENO);
+        dup2(slave, STDERR_FILENO);
+        if (slave > STDERR_FILENO) {
+            close(slave);
+        }
+        close(master);
+
+        const char *parent_path = getenv("PATH");
+        char home_buf[1024];
+        char path_buf[2048];
+        char term_buf[] = "TERM=xterm-256color";
+        snprintf(home_buf, sizeof(home_buf), "HOME=%s", session->home_dir);
+        snprintf(path_buf, sizeof(path_buf), "PATH=%s",
+                 parent_path ? parent_path : "/usr/bin:/bin");
+        char *envp[] = {home_buf, path_buf, term_buf, NULL};
+        execve(lush_path, (char *const *)argv, envp);
+        perror("pty_spawn_lle: execve");
+        _exit(127);
+    }
+
+    close(slave);
+    session->pid = pid;
+    session->master_fd = master;
+    /// Single bidirectional fd: pty_send writes here, pty_drain reads
+    /// here. The PTY slave is shared between child stdin / stdout /
+    /// stderr, so the parent sees its own input echoed back along
+    /// with the LLE's render bytes.
+    session->stdin_fd = master;
+    return 0;
+}
+
 /// Write a NUL-terminated string to the child's stdin (the pipe end).
 /// Returns 0 on success or -1 with errno set.
 static inline int pty_send(pty_session_t *session, const char *s) {

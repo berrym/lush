@@ -2682,6 +2682,18 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          timeout: 30)
   endif
 
+  # PTY-driven compdef TAB-completion end-to-end test
+  if fs.exists('tests/integration/test_pty_compdef.c')
+    test_pty_compdef = executable('test_pty_compdef',
+                                  ['tests/integration/test_pty_compdef.c'],
+                                  dependencies: libutil_dep)
+    test('PTY compdef TAB completion',
+         test_pty_compdef,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 30)
+  endif
+
   # L11 (SIGHUP variant): logout script fires on SIGHUP-induced exit.
   if fs.exists('tests/integration/test_pty_sighup_logout.c')
     test_pty_logout = executable('test_pty_sighup_logout',
