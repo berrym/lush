@@ -18583,6 +18583,28 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
     return result;
 }
 
+int executor_run_function(executor_t *executor, const char *fn_name, int argc,
+                          char **argv) {
+    if (!executor || !fn_name || argc < 1 || !argv) {
+        return 0;
+    }
+    /// Autoload-style semantics: an undefined function silently
+    /// produces no effect, matching how compdef bindings reference
+    /// function names that may be loaded later (or never).
+    if (!find_function(executor, fn_name)) {
+        return 0;
+    }
+    int result = execute_function_call(executor, fn_name, argv, argc,
+                                       SOURCE_LOC_UNKNOWN);
+    /// Mirror executor_call_hook's translation of the internal
+    /// return-signal range so a `return N` from the function surfaces
+    /// the user's intended exit code, not the encoded signal.
+    if (result >= 200 && result <= 455) {
+        result = result - 200;
+    }
+    return result;
+}
+
 /**
  * @brief Call precmd hook (before prompt display)
  *

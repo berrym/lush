@@ -190,6 +190,7 @@ src = ['src/arithmetic.c',
        'src/brace_match.c',
        'src/identifier.c',
        'src/completion_bridge.c',
+       'src/compdef_source.c',
        'src/posix_history.c',
        'src/posix_opts.c',
        'src/redirection.c',
@@ -2273,6 +2274,25 @@ if fs.exists('tests/unit/test_compdef.c')
                             include_directories: [inc, include_directories('tests')],
                             dependencies: [lle_dep, libm])
   test('Compdef + Compadd', test_compdef,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Compdef LLE source tests
+if fs.exists('tests/unit/test_compdef_source.c')
+  test_compdef_source_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_compdef_source_sources += s
+    endif
+  endforeach
+  test_compdef_source = executable('test_compdef_source',
+                                    'tests/unit/test_compdef_source.c',
+                                    'tests/unit/test_executor_stubs.c',
+                                    test_compdef_source_sources + lle_shell_sources,
+                                    include_directories: [inc, include_directories('tests')],
+                                    dependencies: [lle_dep, libm])
+  test('Compdef LLE Source', test_compdef_source,
        suite: 'unit',
        timeout: 30)
 endif

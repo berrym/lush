@@ -21,6 +21,7 @@
 #include "builtins.h"
 #include "compat.h"
 #include "compdef.h"
+#include "compdef_source.h"
 #include "config.h"
 #include "dirstack.h"
 #include "errors.h"
@@ -936,6 +937,13 @@ int init(int argc, char **argv, FILE **in) {
 
     /// Initialize compdef bindings table
     init_compdef_bindings();
+
+    /// Register the compdef LLE completion source. Requires the LLE
+    /// source manager to exist (created by lle_shell_integration_init
+    /// above). When LLE initialization failed earlier the registration
+    /// call is a no-op inside liblle; we still call it unconditionally
+    /// to keep the init sequence linear.
+    compdef_source_init();
 
     /// Initialize command hash table
     init_command_hash();
