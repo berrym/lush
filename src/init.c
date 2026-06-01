@@ -20,6 +20,7 @@
 #include "autocorrect.h"
 #include "builtins.h"
 #include "compat.h"
+#include "compdef.h"
 #include "config.h"
 #include "dirstack.h"
 #include "errors.h"
@@ -933,6 +934,9 @@ int init(int argc, char **argv, FILE **in) {
     /// Initialize aliases
     init_aliases();
 
+    /// Initialize compdef bindings table
+    init_compdef_bindings();
+
     /// Initialize command hash table
     init_command_hash();
 
@@ -950,6 +954,7 @@ int init(int argc, char **argv, FILE **in) {
     /// Register in order: last-to-run first, first-to-run last
     atexit(free_global_symtable);
     atexit(free_aliases);
+    atexit(free_compdef_bindings);
     atexit(free_command_hash);
     atexit(dirstack_cleanup);
     atexit(autocorrect_cleanup);

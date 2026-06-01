@@ -146,6 +146,15 @@ typedef struct executor {
      * currently executing. */
     source_location_t active_loc;
 
+    /* Active completion-result accumulator. NULL outside a
+     * completion-function call. Populated by the LLE completion-source
+     * bridge before invoking a compdef-bound user function and cleared
+     * after. The compadd builtin appends candidates here; it errors
+     * when this field is NULL. Treated as opaque on the shell side
+     * (real type is lle_completion_result_t, owned by liblle); the
+     * shell-LLE bridge in completion_bridge.h provides typed access. */
+    void *active_comp_result;
+
     /// Process substitution fd tracking (for cleanup after command execution)
     int procsub_fds[32];    ///< File descriptors from process substitutions
     pid_t procsub_pids[32]; ///< Child PIDs from process substitutions
