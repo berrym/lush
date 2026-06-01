@@ -2297,6 +2297,25 @@ if fs.exists('tests/unit/test_compdef_source.c')
        timeout: 30)
 endif
 
+# Compdef end-to-end integration test through full source-manager dispatch
+if fs.exists('tests/integration/test_compdef_e2e.c')
+  test_compdef_e2e_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_compdef_e2e_sources += s
+    endif
+  endforeach
+  test_compdef_e2e = executable('test_compdef_e2e',
+                                 'tests/integration/test_compdef_e2e.c',
+                                 'tests/integration/test_compdef_e2e_stubs.c',
+                                 test_compdef_e2e_sources + lle_shell_sources,
+                                 include_directories: [inc, include_directories('tests')],
+                                 dependencies: [lle_dep, libm])
+  test('Compdef End-to-End', test_compdef_e2e,
+       suite: 'integration',
+       timeout: 30)
+endif
+
 # Redirection Tests
 if fs.exists('tests/unit/test_redirection.c')
   test_redirection_sources = []

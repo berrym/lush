@@ -35,7 +35,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-extern executor_t *current_executor;
+/// get_global_executor returns the session-lifetime executor that
+/// outlives any single command invocation. Using current_executor
+/// here would be wrong: execute_builtin_command sets current_executor
+/// at entry and clears it on exit, so it is NULL between commands --
+/// exactly when LLE TAB completion fires.
+extern executor_t *get_global_executor(void);
 
 bool compdef_source_applicable(void *user_data,
                                const lle_word_context_t *context) {
@@ -53,7 +58,8 @@ lle_result_t compdef_source_generate(void *user_data,
     if (!context || !result) {
         return LLE_SUCCESS;
     }
-    if (!current_executor) {
+    executor_t *exec = get_global_executor();
+    if (!exec) {
         return LLE_SUCCESS;
     }
     const char *fn = compdef_lookup(context->command_name);
@@ -79,14 +85,11 @@ lle_result_t compdef_source_generate(void *user_data,
     char *argv[] = {(char *)fn, cmd, cur, prev};
     int argc = 4;
 
-    /// Snapshot the executor pointer BEFORE running the function:
-    /// execute_builtin_command (inside the function body's compadd
-    /// call) sets `current_executor` to its executor argument and then
-    /// clears it back to NULL on return, so after executor_run_function
-    /// returns the global is NULL even though our stack-local executor
-    /// is still valid. Use the stack-local for the active_comp_result
-    /// push/pop so the restore doesn't dereference NULL.
-    executor_t *exec = current_executor;
+    /// Save + restore the session executor's active_comp_result on
+    /// the exec pointer (not on current_executor, which the inner
+    /// compadd's execute_builtin_command path clears to NULL on
+    /// return, so the restore would dereference NULL on a global
+    /// read).
     void *prior = exec->active_comp_result;
     exec->active_comp_result = result;
     (void)executor_run_function(exec, fn, argc, argv);
