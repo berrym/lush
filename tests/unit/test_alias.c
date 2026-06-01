@@ -547,6 +547,111 @@ TEST(bin_alias_double_dash_ends_options) {
     teardown_aliases();
 }
 
+TEST(bin_alias_dash_g_set_and_lookup_global) {
+    setup_aliases();
+
+    /// `alias -g NAME=value` stores in the global table, not the regular one.
+    /// Regression target: if the two tables ever get merged or the routing
+    /// breaks, regular lookup would surface globals (or vice versa).
+    char argv0[] = "alias";
+    char argv1[] = "-g";
+    char argv2[] = "GLOB=hello world";
+    char *argv[] = {argv0, argv1, argv2};
+    int rc = bin_alias(3, argv);
+    ASSERT_EQ(rc, 0, "alias -g GLOB=hello world should return 0");
+    ASSERT_STR_EQ(lookup_global_alias("GLOB"), "hello world",
+                  "global alias GLOB should be in the global table");
+    ASSERT_NULL(lookup_alias("GLOB"),
+                "global alias must NOT appear in the regular table");
+
+    teardown_aliases();
+}
+
+TEST(bin_alias_dash_g_lookup_undefined_returns_error) {
+    setup_aliases();
+
+    /// `alias -g NAME` for a name not defined globally must return non-zero
+    /// so scripts can detect missing globals via $?. Silent success would
+    /// mask typos.
+    char argv0[] = "alias";
+    char argv1[] = "-g";
+    char argv2[] = "DOES_NOT_EXIST_GLOBALLY";
+    char *argv[] = {argv0, argv1, argv2};
+    int rc = bin_alias(3, argv);
+    ASSERT_NE(rc, 0,
+              "alias -g NAME should return non-zero when NAME is not "
+              "a defined global alias");
+
+    teardown_aliases();
+}
+
+TEST(bin_alias_invalid_flag_returns_error) {
+    setup_aliases();
+
+    /// Unknown `-x` flags must error rather than be silently accepted; an
+    /// accepted-but-ignored flag would mask typos and ship unintended
+    /// behavior.
+    char argv0[] = "alias";
+    char argv1[] = "-xyz";
+    char argv2[] = "name=value";
+    char *argv[] = {argv0, argv1, argv2};
+    int rc = bin_alias(3, argv);
+    ASSERT_NE(rc, 0, "alias -xyz should return non-zero (unknown flag)");
+    ASSERT_NULL(lookup_alias("name"),
+                "no alias should be created when a flag is rejected");
+
+    teardown_aliases();
+}
+
+TEST(bin_alias_dash_g_then_double_dash) {
+    setup_aliases();
+
+    /// `alias -g -- NAME=value` must work: -g sets global-mode, -- ends
+    /// option parsing, then NAME=value is an assignment. Regression target:
+    /// the option-parsing loop must consume flags in any order and not lose
+    /// the global-mode bit when -- appears after -g.
+    char argv0[] = "alias";
+    char argv1[] = "-g";
+    char argv2[] = "--";
+    char argv3[] = "AFTER_DD=afterval";
+    char *argv[] = {argv0, argv1, argv2, argv3};
+    int rc = bin_alias(4, argv);
+    ASSERT_EQ(rc, 0, "alias -g -- AFTER_DD=afterval should return 0");
+    ASSERT_STR_EQ(lookup_global_alias("AFTER_DD"), "afterval",
+                  "global alias must be set after -g -- terminator");
+    ASSERT_NULL(lookup_alias("AFTER_DD"),
+                "alias must NOT land in the regular table");
+
+    teardown_aliases();
+}
+
+TEST(set_global_alias_rejects_null_inputs) {
+    setup_aliases();
+
+    /// NULL-safe API contract: set_global_alias must reject NULL key/value
+    /// without crashing. Tested directly because the bin_alias path is
+    /// already guarded by argv-validity checks earlier.
+    ASSERT_FALSE(set_global_alias(NULL, "value"),
+                 "set_global_alias(NULL, value) should return false");
+    ASSERT_FALSE(set_global_alias("name", NULL),
+                 "set_global_alias(name, NULL) should return false");
+    ASSERT_FALSE(set_global_alias(NULL, NULL),
+                 "set_global_alias(NULL, NULL) should return false");
+
+    teardown_aliases();
+}
+
+TEST(lookup_global_alias_uninitialized_returns_null) {
+    /// Pre-init / post-free: lookup_global_alias must return NULL rather
+    /// than crash. Lifecycle invariant: callers can probe before the alias
+    /// subsystem is initialized.
+    free_aliases(); /// ensure post-free state
+    ASSERT_NULL(lookup_global_alias("anything"),
+                "lookup_global_alias on uninitialized table returns NULL");
+    ASSERT_NULL(lookup_global_alias(NULL),
+                "lookup_global_alias(NULL) returns NULL");
+}
+
 TEST(bin_alias_digit_name) {
     setup_aliases();
 
@@ -660,6 +765,14 @@ int main(void) {
     RUN_TEST(bin_alias_double_dash_ends_options);
     RUN_TEST(bin_alias_digit_name);
     RUN_TEST(many_aliases);
+
+    printf("\nGlobal Alias (-g) Tests:\n");
+    RUN_TEST(bin_alias_dash_g_set_and_lookup_global);
+    RUN_TEST(bin_alias_dash_g_lookup_undefined_returns_error);
+    RUN_TEST(bin_alias_invalid_flag_returns_error);
+    RUN_TEST(bin_alias_dash_g_then_double_dash);
+    RUN_TEST(set_global_alias_rejects_null_inputs);
+    RUN_TEST(lookup_global_alias_uninitialized_returns_null);
 
     return TEST_RESULT();
 }

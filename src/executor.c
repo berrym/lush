@@ -2022,6 +2022,31 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         }
     }
 
+    /// zsh `alias -g NAME=value`: substitute non-command argv slots
+    /// against the global-alias table before the command-position
+    /// alias expansion below. Each slot's text is replaced verbatim
+    /// (single-slot substitution) so `alias -g ...='../..'` works for
+    /// directory shortcuts. Structural-operator substitutions
+    /// (e.g. `alias -g G='| grep'`) are NOT supported because we don't
+    /// re-tokenize after substitution; the value would be passed as a
+    /// single argv slot rather than introducing a real pipe. Issue #204.
+    for (int gi = 1; gi < filtered_argc; gi++) {
+        char *gv = lookup_global_alias(filtered_argv[gi]);
+        if (gv) {
+            char *replacement = strdup(gv);
+            if (replacement) {
+                /// Only free the slot if filtered_argv is owned by us.
+                /// build_argv_from_ast hands us an owned argv; the
+                /// pre-existing free below at command-position
+                /// expansion uses the same condition.
+                if (filtered_argv != argv) {
+                    free(filtered_argv[gi]);
+                }
+                filtered_argv[gi] = replacement;
+            }
+        }
+    }
+
     /// Check for alias expansion and rebuild argv if needed
     char *alias_expanded = lookup_alias(filtered_argv[0]);
     if (alias_expanded) {
