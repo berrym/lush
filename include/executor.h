@@ -658,6 +658,30 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
                        const char *arg);
 
 /**
+ * @brief Invoke a user-defined shell function in-process with positional args.
+ *
+ * Thin public wrapper around the internal execute_function_call. Looks up
+ * `fn_name` in the function table, pushes a function scope, binds
+ * argv[1..argc-1] as $1..$N within that scope, runs the body, and pops
+ * the scope on return. argv[0] is conventionally the function name.
+ *
+ * Used by the compdef LLE completion source to invoke a compdef-bound
+ * shell function while executor->active_comp_result is set so the
+ * function's `compadd` calls populate the active accumulator.
+ *
+ * @param executor Executor context (must be non-NULL).
+ * @param fn_name Function name to look up.
+ * @param argc Argument count.
+ * @param argv Argument vector; argv[0] is the function name.
+ * @return Function exit status, or non-zero on lookup / scope failure.
+ *         Returns 0 silently if no function named fn_name is defined,
+ *         matching the autoload-style philosophy of compdef: a binding
+ *         to an undefined function is not itself an error.
+ */
+int executor_run_function(executor_t *executor, const char *fn_name, int argc,
+                          char **argv);
+
+/**
  * @brief Call precmd hook (before prompt display)
  *
  * @param executor Executor context
