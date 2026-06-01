@@ -365,6 +365,7 @@ executor_t *executor_new(void) {
         executor->context_locations[i] = SOURCE_LOC_UNKNOWN;
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
+    executor->active_comp_result = NULL;
 
     /// Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;
@@ -435,6 +436,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
         executor->context_locations[i] = SOURCE_LOC_UNKNOWN;
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
+    executor->active_comp_result = NULL;
 
     /// Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;

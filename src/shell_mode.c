@@ -104,6 +104,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PARAM_MODIFIERS] =
                 false,                 /// ${var:x} is substring-offset in POSIX
             [FEATURE_XPG_ECHO] = true, /// POSIX XSI mandates escape interp
+            [FEATURE_COMPLETION_DSL] =
+                false, /// compdef/compadd are not POSIX builtins
 
             /// History Behavior
             [FEATURE_HISTAPPEND] = false,
@@ -195,6 +197,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PARAM_MODIFIERS] =
                 false,                  /// ${var:x} is substring-offset in bash
             [FEATURE_XPG_ECHO] = false, /// shopt xpg_echo, off by default
+            [FEATURE_COMPLETION_DSL] =
+                true, /// compdef/compadd available in bash mode for
+                      /// cross-shell completion scripts
 
             /// History Behavior
             [FEATURE_HISTAPPEND] = true,          /// Bash default on
@@ -289,6 +294,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PARAM_MODIFIERS] = true, /// native zsh modifiers
             [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
                             by default in zsh's echo builtin */
+            [FEATURE_COMPLETION_DSL] =
+                true, /// compdef/compadd are zsh-native; oh-my-zsh / prezto
+                      /// init scripts depend on them
 
             /// History Behavior
             [FEATURE_HISTAPPEND] = true, /// APPEND_HISTORY
@@ -401,6 +409,14 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             literal-by-default — `echo "\n"` produces a newline
                             consistently. Use `unsetopt xpg_echo` or
                             `setopt bsd_echo` for bash-style literal. */
+            [FEATURE_COMPLETION_DSL] =
+                true, /* Curated: a polyglot shell needs a callable
+                            completion-binding surface. compdef + compadd
+                            give scripts authored for zsh (oh-my-zsh,
+                            prezto) a working entry point and give bash
+                            scripts a cleaner alternative to COMPREPLY.
+                            Disable in strict-posix scripts via
+                            `unsetopt completion_dsl`. */
 
             /// History Behavior - better defaults
             [FEATURE_HISTAPPEND] = true,         /// Preserve history
@@ -509,6 +525,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
     [FEATURE_ZSH_PARAM_MODIFIERS] = "zsh_param_modifiers",
     [FEATURE_XPG_ECHO] = "xpg_echo",
+    [FEATURE_COMPLETION_DSL] = "completion_dsl",
 
     /// History Behavior
     [FEATURE_HISTAPPEND] = "histappend",

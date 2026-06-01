@@ -197,6 +197,18 @@ typedef enum {
                                  ///< otherwise change meaning. setopt name
                                  ///< `zsh_param_modifiers`.
 
+    FEATURE_COMPLETION_DSL, ///< compdef + compadd builtins for binding
+                            ///< user-defined completion functions to
+                            ///< commands. On in bash, zsh, lush modes;
+                            ///< off in posix. compdef stores a
+                            ///< command->function-name binding;
+                            ///< compadd, called from inside a bound
+                            ///< function during completion, appends
+                            ///< candidates (plus optional descriptions)
+                            ///< to the active completion result owned
+                            ///< by the LLE engine. setopt name
+                            ///< `completion_dsl`.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;

@@ -63,6 +63,8 @@ src = ['src/arithmetic.c',
        'src/builtins/bin_clear.c',
        'src/builtins/bin_colon.c',
        'src/builtins/bin_command.c',
+       'src/builtins/bin_compadd.c',
+       'src/builtins/bin_compdef.c',
        'src/builtins/bin_config.c',
        'src/builtins/bin_continue.c',
        'src/builtins/bin_debug.c',
@@ -187,6 +189,7 @@ src = ['src/arithmetic.c',
        'src/escape.c',
        'src/brace_match.c',
        'src/identifier.c',
+       'src/completion_bridge.c',
        'src/posix_history.c',
        'src/posix_opts.c',
        'src/redirection.c',
@@ -2251,6 +2254,25 @@ if fs.exists('tests/unit/test_alias.c')
                           include_directories: [inc, include_directories('tests')],
                           dependencies: [lle_dep, libm])
   test('Alias System', test_alias,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Compdef + compadd Tests
+if fs.exists('tests/unit/test_compdef.c')
+  test_compdef_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_compdef_sources += s
+    endif
+  endforeach
+  test_compdef = executable('test_compdef',
+                            'tests/unit/test_compdef.c',
+                            'tests/unit/test_executor_stubs.c',
+                            test_compdef_sources + lle_shell_sources,
+                            include_directories: [inc, include_directories('tests')],
+                            dependencies: [lle_dep, libm])
+  test('Compdef + Compadd', test_compdef,
        suite: 'unit',
        timeout: 30)
 endif
