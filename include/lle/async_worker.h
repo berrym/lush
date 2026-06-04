@@ -82,7 +82,16 @@ extern "C" {
  */
 typedef enum lle_async_request_type {
     LLE_ASYNC_GIT_STATUS, ///< Get git repository status
-    LLE_ASYNC_CUSTOM      ///< Custom request with user-provided handler
+    LLE_ASYNC_CUSTOM,     ///< Custom request with user-provided handler
+    LLE_ASYNC_NOOP        ///< Immediate-success no-op. Worker dequeues, sets
+                          ///< response.result = LLE_SUCCESS, fires the
+                          ///< completion callback, frees the request. No
+                          ///< filesystem, no subprocess, no payload. Use
+                          ///< for: worker warm-up after start, smoke-
+                          ///< probing that the queue and callback path
+                          ///< are alive, unit tests that need to verify
+                          ///< completion wiring without the timing
+                          ///< dependency of a real workload.
 } lle_async_request_type_t;
 
 /**

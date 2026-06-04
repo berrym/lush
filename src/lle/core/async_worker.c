@@ -338,6 +338,13 @@ static void *lle_async_worker_thread(void *arg) {
             response.result = LLE_ERROR_FEATURE_NOT_AVAILABLE;
             break;
 
+        case LLE_ASYNC_NOOP:
+            /// Immediate-success no-op. The worker proves it dequeued
+            /// the request and that the completion-notify path fires;
+            /// no external work is performed.
+            response.result = LLE_SUCCESS;
+            break;
+
         default:
             response.result = LLE_ERROR_INVALID_PARAMETER;
             break;
