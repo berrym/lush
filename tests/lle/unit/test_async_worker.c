@@ -215,23 +215,31 @@ TEST(callback_invoked_on_completion) {
     lle_async_worker_init(&worker, test_completion_callback, NULL);
     lle_async_worker_start(worker);
 
-    /// Get current directory for the request
-    char cwd[PATH_MAX];
-    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
-
-    lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
-    snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);
+    /// Use LLE_ASYNC_NOOP so the wiring (worker thread dequeue ->
+    /// type-dispatch -> completion-callback fire) is tested without
+    /// any subprocess / filesystem dependency. The git-status request
+    /// path is independently covered by git_status_detects_repo /
+    /// git_status_non_repo below; conflating wiring with workload
+    /// timing made this test race against Docker-on-macOS fork/exec
+    /// overhead (~4.5s for the four sequential git subprocess
+    /// launches) and intermittently fail at the 5000ms callback wait.
+    lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_NOOP);
+    ASSERT_NOT_NULL(req, "request_create should succeed for NOOP");
 
     lle_result_t result = lle_async_worker_submit(worker, req);
     ASSERT_EQ(result, LLE_SUCCESS, "Submit should succeed");
 
-    /// Wait for callback
+    /// NOOP completes in microseconds; 5000ms is generous headroom
+    /// for the worker-thread schedule plus the pthread_cond_wait
+    /// round-trip in the test, with no jitter coming from external
+    /// work.
     bool received = wait_for_response(5000);
     ASSERT_TRUE(received, "Should receive response within timeout");
 
     pthread_mutex_lock(&callback_mutex);
     ASSERT_EQ(callback_count, 1, "Callback should be called once");
-    ASSERT_EQ(last_response.result, LLE_SUCCESS, "Result should be success");
+    ASSERT_EQ(last_response.result, LLE_SUCCESS,
+              "NOOP response should be LLE_SUCCESS");
     pthread_mutex_unlock(&callback_mutex);
 
     lle_async_worker_shutdown(worker);
