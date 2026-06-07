@@ -46,11 +46,17 @@ bool completion_bridge_active(struct executor *e);
  * to check completion_bridge_active() first and surface a builtin
  * error). The candidate / description strings are copied internally.
  *
+ * When executor->active_comp_prefix is non-empty, candidates that do
+ * not NFC-prefix-match the prefix are silently skipped and the call
+ * returns 0 (a deliberately filtered candidate is not a failure). The
+ * filter uses lle_unicode_is_prefix_z so normalization-form
+ * differences in either side do not mismatch.
+ *
  * @param e Executor whose active_comp_result is the target.
  * @param candidate Candidate text. Must be non-NULL, non-empty.
  * @param description Description text. NULL for no description.
- * @return 0 on success, -1 on failure (no active result, OOM, or
- *         invalid input).
+ * @return 0 on success or prefix-filtered skip, -1 on failure (no
+ *         active result, OOM, or invalid input).
  */
 int completion_bridge_add(struct executor *e, const char *candidate,
                           const char *description);

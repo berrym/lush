@@ -110,7 +110,41 @@ int main(int argc, char **argv_main) {
             s.out_len, s.output);
     }
 
-    /// Cancel the partial line (Ctrl-C) then exit cleanly.
+    /// Cancel the partial line (Ctrl-C) then re-run the test with a
+    /// typed prefix that should narrow the candidate set. Only
+    /// "checkout" starts with "c"; "branch" and "merge" must be
+    /// filtered out by the bridge so they don't appear in the menu.
+    pty_send(&s, "\x03");
+    pty_drain(&s, 100);
+
+    s.out_len = 0;
+    s.output[0] = '\0';
+    pty_send(&s, "git c\t");
+    pty_drain(&s, 500);
+
+    if (!strstr(s.output, "checkout")) {
+        fprintf(stderr,
+                "test_pty_compdef: 'checkout' missing under c-prefix\n");
+        failures++;
+    }
+    if (strstr(s.output, "branch")) {
+        fprintf(stderr,
+                "test_pty_compdef: 'branch' leaked through c-prefix filter\n");
+        failures++;
+    }
+    if (strstr(s.output, "merge")) {
+        fprintf(stderr,
+                "test_pty_compdef: 'merge' leaked through c-prefix filter\n");
+        failures++;
+    }
+
+    if (failures) {
+        fprintf(stderr,
+                "test_pty_compdef: prefix-filter captured output (%zu bytes):"
+                "\n---\n%s\n---\n",
+                s.out_len, s.output);
+    }
+
     pty_send(&s, "\x03");
     pty_drain(&s, 100);
     pty_send(&s, "exit\r");

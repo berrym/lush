@@ -182,6 +182,39 @@ TEST(system_dispatch_with_compdef_to_undefined_function) {
                 "no compdef-emitted candidate is present");
 }
 
+TEST(system_dispatch_filters_candidates_by_typed_prefix) {
+    per_test_reset();
+    /// Function emits its full candidate set blindly; the bridge
+    /// filters down to the single one that matches the typed prefix.
+    /// This is the user-facing fix: `git c<TAB>` shows only checkout,
+    /// not all six git subcommands.
+    executor_execute_command_line(
+        test_exec,
+        "_subs() { compadd checkout branch merge clone commit pull; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_completion_result_t *result = NULL;
+    /// Buffer "git c", cursor at position 5: command_name = "git",
+    /// dequoted_filename_prefix = "c". Only candidates starting with
+    /// "c" should survive the bridge filter.
+    lle_result_t r =
+        lle_completion_system_generate(test_system, "git c", 5, &result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "system_generate succeeded");
+    ASSERT_NOT_NULL(result, "result is allocated");
+    ASSERT_TRUE(find_candidate(result, "checkout") >= 0,
+                "checkout survived the c-prefix filter");
+    ASSERT_TRUE(find_candidate(result, "clone") >= 0,
+                "clone survived the c-prefix filter");
+    ASSERT_TRUE(find_candidate(result, "commit") >= 0,
+                "commit survived the c-prefix filter");
+    ASSERT_TRUE(find_candidate(result, "branch") < 0,
+                "branch filtered out by c-prefix");
+    ASSERT_TRUE(find_candidate(result, "merge") < 0,
+                "merge filtered out by c-prefix");
+    ASSERT_TRUE(find_candidate(result, "pull") < 0,
+                "pull filtered out by c-prefix");
+}
+
 TEST(system_dispatch_passes_command_name_to_function) {
     per_test_reset();
     /// The function emits its $1 (command name) as a candidate. Going
@@ -214,6 +247,7 @@ int main(int argc, char **argv) {
     RUN_TEST(system_dispatch_fires_compdef_source);
     RUN_TEST(system_dispatch_skips_compdef_when_no_binding);
     RUN_TEST(system_dispatch_with_compdef_to_undefined_function);
+    RUN_TEST(system_dispatch_filters_candidates_by_typed_prefix);
     RUN_TEST(system_dispatch_passes_command_name_to_function);
 
     int rc = TEST_RESULT();
