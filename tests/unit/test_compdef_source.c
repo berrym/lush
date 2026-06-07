@@ -191,23 +191,124 @@ TEST(generate_runs_function_and_surfaces_positional_candidates) {
     teardown_env();
 }
 
-TEST(generate_passes_command_and_prefix_via_positional_params) {
+TEST(generate_passes_command_name_via_dollar_one) {
     setup_env();
-    /// The function emits its received positional params as candidates;
-    /// reading them back through the accumulator verifies the argv
-    /// layout (argv[1]=cmd, argv[2]=cur, argv[3]=prev) flows through
-    /// executor_run_function correctly.
-    executor_execute_command_line(test_exec,
-                                  "_echo_args() { compadd \"$1\" \"$2\"; }", 1);
-    compdef_set("git", "_echo_args");
+    /// Verifies argv[1] (the command name) flows through
+    /// executor_run_function to "$1" inside the bound function.
+    /// Empty prefix bypasses the bridge filter so the test isolates
+    /// argv forwarding.
+    executor_execute_command_line(test_exec, "_echo_cmd() { compadd \"$1\"; }",
+                                  1);
+    compdef_set("git", "_echo_cmd");
+
+    lle_word_context_t ctx;
+    make_context(&ctx, "git", "");
+    lle_result_t r = compdef_source_generate(NULL, &ctx, test_result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "generate returns LLE_SUCCESS");
+    ASSERT_EQ(test_result->count, 1u, "one candidate accumulated");
+    ASSERT_TRUE(find_candidate("git") >= 0, "$1 carried the command name");
+    teardown_env();
+}
+
+TEST(generate_passes_current_prefix_via_dollar_two) {
+    setup_env();
+    /// Verifies argv[2] (the current-word prefix) flows through to
+    /// "$2". The function emits "${2}_suffix" so the candidate
+    /// naturally starts with the prefix and survives the bridge
+    /// filter; if "$2" were not the typed prefix, the resulting
+    /// candidate would not begin with "che" and would be filtered
+    /// out, producing a count of zero.
+    executor_execute_command_line(
+        test_exec, "_echo_prefix() { compadd \"${2}_suffix\"; }", 1);
+    compdef_set("git", "_echo_prefix");
 
     lle_word_context_t ctx;
     make_context(&ctx, "git", "che");
     lle_result_t r = compdef_source_generate(NULL, &ctx, test_result);
     ASSERT_TRUE(r == LLE_SUCCESS, "generate returns LLE_SUCCESS");
-    ASSERT_EQ(test_result->count, 2u, "two candidates accumulated");
-    ASSERT_TRUE(find_candidate("git") >= 0, "$1 carried the command name");
-    ASSERT_TRUE(find_candidate("che") >= 0, "$2 carried the current prefix");
+    ASSERT_EQ(test_result->count, 1u, "one candidate accumulated");
+    ASSERT_TRUE(find_candidate("che_suffix") >= 0,
+                "$2 carried the current prefix to the function");
+    teardown_env();
+}
+
+TEST(generate_filters_candidates_against_active_prefix) {
+    setup_env();
+    /// The user's bound function emits its entire candidate set blindly
+    /// (no manual prefix filter). The bridge filters down to only those
+    /// that NFC-prefix-match the current word -- prefix "c" keeps
+    /// "checkout"; "branch" and "merge" are silently skipped. This is
+    /// the user-facing fix for `git c<TAB>` showing all candidates
+    /// instead of narrowing to commit/checkout/clone.
+    executor_execute_command_line(
+        test_exec, "_subs() { compadd checkout branch merge; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_word_context_t ctx;
+    make_context(&ctx, "git", "c");
+    lle_result_t r = compdef_source_generate(NULL, &ctx, test_result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "generate returns LLE_SUCCESS");
+    ASSERT_EQ(test_result->count, 1u,
+              "only the prefix-matching candidate kept");
+    ASSERT_TRUE(find_candidate("checkout") >= 0, "checkout matched prefix 'c'");
+    ASSERT_TRUE(find_candidate("branch") < 0, "branch filtered out");
+    ASSERT_TRUE(find_candidate("merge") < 0, "merge filtered out");
+    teardown_env();
+}
+
+TEST(generate_filter_skips_all_when_no_candidate_matches) {
+    setup_env();
+    /// A prefix that no candidate shares produces an empty result --
+    /// no spurious match, no candidate inserted as inline preview.
+    executor_execute_command_line(
+        test_exec, "_subs() { compadd checkout branch merge; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_word_context_t ctx;
+    make_context(&ctx, "git", "xyz");
+    lle_result_t r = compdef_source_generate(NULL, &ctx, test_result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "generate returns LLE_SUCCESS");
+    ASSERT_EQ(test_result->count, 0u,
+              "no candidates matched the non-matching prefix");
+    teardown_env();
+}
+
+TEST(generate_filter_inactive_with_empty_prefix) {
+    setup_env();
+    /// Empty / NULL prefix accepts every candidate (matches the
+    /// first-TAB-at-word-boundary case where the user has typed
+    /// nothing yet for the current word).
+    executor_execute_command_line(
+        test_exec, "_subs() { compadd checkout branch merge; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_word_context_t ctx;
+    make_context(&ctx, "git", "");
+    lle_result_t r = compdef_source_generate(NULL, &ctx, test_result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "generate returns LLE_SUCCESS");
+    ASSERT_EQ(test_result->count, 3u,
+              "every candidate kept when the prefix is empty");
+    teardown_env();
+}
+
+TEST(generate_filter_restores_prior_prefix) {
+    setup_env();
+    /// active_comp_prefix must be saved + restored just like
+    /// active_comp_result so nested completion contexts (a function
+    /// that itself triggers completion lookups) don't leak the inner
+    /// prefix to the outer scope.
+    executor_execute_command_line(test_exec, "_noop() { compadd x; }", 1);
+    compdef_set("git", "_noop");
+    const char *sentinel = "outer-prefix";
+    test_exec->active_comp_prefix = sentinel;
+
+    lle_word_context_t ctx;
+    make_context(&ctx, "git", "inner");
+    (void)compdef_source_generate(NULL, &ctx, test_result);
+    ASSERT_TRUE(test_exec->active_comp_prefix == sentinel,
+                "active_comp_prefix restored to prior value after the call");
+
+    test_exec->active_comp_prefix = NULL;
     teardown_env();
 }
 
@@ -255,7 +356,12 @@ int main(int argc, char **argv) {
     RUN_TEST(generate_no_binding_returns_success_silently);
     RUN_TEST(generate_undefined_function_returns_success_silently);
     RUN_TEST(generate_runs_function_and_surfaces_positional_candidates);
-    RUN_TEST(generate_passes_command_and_prefix_via_positional_params);
+    RUN_TEST(generate_passes_command_name_via_dollar_one);
+    RUN_TEST(generate_passes_current_prefix_via_dollar_two);
+    RUN_TEST(generate_filters_candidates_against_active_prefix);
+    RUN_TEST(generate_filter_skips_all_when_no_candidate_matches);
+    RUN_TEST(generate_filter_inactive_with_empty_prefix);
+    RUN_TEST(generate_filter_restores_prior_prefix);
     RUN_TEST(generate_restores_active_comp_result);
 
     return TEST_RESULT();

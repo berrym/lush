@@ -12,6 +12,7 @@
 
 #include "executor.h"
 #include "lle/completion/completion_types.h"
+#include "lle/unicode_compare.h"
 
 bool completion_bridge_active(struct executor *e) {
     return e != NULL && e->active_comp_result != NULL;
@@ -21,6 +22,16 @@ int completion_bridge_add(struct executor *e, const char *candidate,
                           const char *description) {
     if (!e || !e->active_comp_result || !candidate || candidate[0] == '\0') {
         return -1;
+    }
+    /// Skip candidates that don't NFC-prefix-match the current word.
+    /// Empty / NULL prefix accepts everything (the first TAB at a word
+    /// boundary). Filtering here means every compadd code path
+    /// (positional, -a, -k) and any future emit path benefits without
+    /// per-site duplication, and the user's bound function can emit
+    /// its entire candidate set blindly.
+    if (e->active_comp_prefix && e->active_comp_prefix[0] != '\0' &&
+        !lle_unicode_is_prefix_z(e->active_comp_prefix, candidate, NULL)) {
+        return 0;
     }
     lle_completion_result_t *r =
         (lle_completion_result_t *)e->active_comp_result;

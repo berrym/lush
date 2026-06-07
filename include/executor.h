@@ -146,14 +146,25 @@ typedef struct executor {
      * currently executing. */
     source_location_t active_loc;
 
-    /* Active completion-result accumulator. NULL outside a
-     * completion-function call. Populated by the LLE completion-source
-     * bridge before invoking a compdef-bound user function and cleared
-     * after. The compadd builtin appends candidates here; it errors
-     * when this field is NULL. Treated as opaque on the shell side
-     * (real type is lle_completion_result_t, owned by liblle); the
-     * shell-LLE bridge in completion_bridge.h provides typed access. */
+    /// Active completion-result accumulator. NULL outside a
+    /// completion-function call. Populated by the LLE completion-source
+    /// bridge before invoking a compdef-bound user function and cleared
+    /// after. The compadd builtin appends candidates here; it errors
+    /// when this field is NULL. Treated as opaque on the shell side
+    /// (real type is lle_completion_result_t, owned by liblle); the
+    /// shell-LLE bridge in completion_bridge.h provides typed access.
     void *active_comp_result;
+
+    /// Current-word prefix that compdef-emitted candidates must match.
+    /// Set by the LLE completion source from
+    /// lle_word_context_t.dequoted_filename_prefix right before invoking
+    /// the bound function and cleared on return. NULL or "" means no
+    /// filtering (every candidate is accepted). completion_bridge_add
+    /// uses lle_unicode_is_prefix_z (NFC-aware) so callers don't have to
+    /// filter manually inside their bound function -- a single emit-path
+    /// filter in the bridge covers every compadd code path (positional,
+    /// -a, -k).
+    const char *active_comp_prefix;
 
     /// Process substitution fd tracking (for cleanup after command execution)
     int procsub_fds[32];    ///< File descriptors from process substitutions

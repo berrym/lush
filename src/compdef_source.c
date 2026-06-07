@@ -89,11 +89,18 @@ lle_result_t compdef_source_generate(void *user_data,
     /// the exec pointer (not on current_executor, which the inner
     /// compadd's execute_builtin_command path clears to NULL on
     /// return, so the restore would dereference NULL on a global
-    /// read).
-    void *prior = exec->active_comp_result;
+    /// read). active_comp_prefix is paired with active_comp_result so
+    /// completion_bridge_add can filter candidates that don't match
+    /// what the user has typed for the current word -- a single
+    /// emit-path filter that covers compadd's positional / -a / -k
+    /// arms without any per-call work inside the bound function.
+    void *prior_result = exec->active_comp_result;
+    const char *prior_prefix = exec->active_comp_prefix;
     exec->active_comp_result = result;
+    exec->active_comp_prefix = cur;
     (void)executor_run_function(exec, fn, argc, argv);
-    exec->active_comp_result = prior;
+    exec->active_comp_result = prior_result;
+    exec->active_comp_prefix = prior_prefix;
     return LLE_SUCCESS;
 }
 
