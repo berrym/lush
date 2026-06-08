@@ -404,6 +404,153 @@ TEST(options_fast) {
 }
 
 /* ============================================================================
+ * COMPLETION SCORE TESTS (fzy-style)
+ * ============================================================================
+ */
+
+TEST(completion_empty_pattern_matches_all) {
+    /// Empty pattern = no-filter sentinel; every candidate gets 100.
+    ASSERT_EQ(fuzzy_completion_score("", "git checkout", NULL), 100,
+              "empty pattern returns 100");
+    ASSERT_EQ(fuzzy_completion_score("", "", NULL), 100,
+              "empty/empty returns 100");
+}
+
+TEST(completion_empty_text_zero) {
+    ASSERT_EQ(fuzzy_completion_score("abc", "", NULL), 0,
+              "empty candidate scores 0");
+}
+
+TEST(completion_exact_match_perfect) {
+    ASSERT_EQ(fuzzy_completion_score("git", "git", NULL), 100,
+              "identical pattern/text scores 100");
+}
+
+TEST(completion_case_insensitive_default) {
+    /// Default options are case-insensitive; the same input scored
+    /// against uppercase candidate should match.
+    int s = fuzzy_completion_score("gco", "GIT CHECKOUT", NULL);
+    ASSERT_TRUE(s > 0, "case-insensitive default scores a real match");
+}
+
+TEST(completion_non_subsequence_returns_zero) {
+    /// `xyz` is not a subsequence of `git checkout`; the subsequence
+    /// gate must return 0 (no partial credit for unrelated chars).
+    ASSERT_EQ(fuzzy_completion_score("xyz", "git checkout", NULL), 0,
+              "non-subsequence scores 0");
+}
+
+TEST(completion_subsequence_order_required) {
+    /// `gco` IS a subsequence of `git checkout`; `cog` is NOT (c then
+    /// o appear in order but g comes before c in the text). This is
+    /// the core gate that fuzzy_match_score lacks.
+    ASSERT_TRUE(fuzzy_completion_score("gco", "git checkout", NULL) > 0,
+                "gco is a subsequence of 'git checkout'");
+    ASSERT_EQ(fuzzy_completion_score("cog", "git checkout", NULL), 0,
+              "cog is NOT a subsequence of 'git checkout'");
+}
+
+TEST(completion_first_char_bonus_outranks_mid_word) {
+    /// Pattern matching at text[0] should outrank the same pattern
+    /// matching only in the middle. `ls` vs `ls` at start vs `tools`
+    /// (matches mid-word).
+    int leading = fuzzy_completion_score("ls", "ls", NULL);
+    int internal = fuzzy_completion_score("ls", "tools", NULL);
+    ASSERT_TRUE(leading > internal, "first-char match outranks mid-word match");
+}
+
+TEST(completion_word_boundary_bonus_outranks_internal) {
+    /// `c` matching after the space in `git checkout` (word boundary)
+    /// should outrank `c` matching inside `gcc -o file` (the `c` in
+    /// `gcc` is at position 2, inside the word).
+    int boundary = fuzzy_completion_score("c", "git checkout", NULL);
+    int internal = fuzzy_completion_score("c", "gcc -o file", NULL);
+    ASSERT_TRUE(boundary > internal,
+                "word-boundary match outranks mid-word match");
+}
+
+TEST(completion_diagnosis_case_keeps_candidates_above_zero) {
+    /// The diagnosis case that motivated this scorer. User types
+    /// `gco`; libfuzzy's autocorrect-tuned `fuzzy_match_score()`
+    /// ranks both `git checkout` and `gcc -o file` BELOW the default
+    /// threshold of 60 (edit-distance weight dominates), so both are
+    /// dropped from the candidate list entirely. The completion
+    /// scorer keeps both candidates positive so the user sees their
+    /// options and can pick.
+    ///
+    /// Note: fzy-style scoring legitimately prefers `gcc -o file`
+    /// (g+c adjacency at positions 0,1 earns the consecutive bonus)
+    /// over `git checkout` (g and c scattered). That is fzy's
+    /// behavior, not a bug. Acronym-matching ("first letter of each
+    /// whitespace-separated token") is a separate scoring axis that
+    /// would invert this ranking; it's tracked as a future
+    /// enhancement on top of the base fzy algorithm.
+    int checkout = fuzzy_completion_score("gco", "git checkout", NULL);
+    int gcc_o = fuzzy_completion_score("gco", "gcc -o file", NULL);
+    ASSERT_TRUE(checkout > 0,
+                "git checkout matches (autocorrect blend would drop it)");
+    ASSERT_TRUE(gcc_o > 0,
+                "gcc -o file matches (autocorrect blend would drop it)");
+}
+
+TEST(completion_camel_case_boundary) {
+    /// CamelCase boundary: `gc` matching `GitCommit` should score
+    /// well even though the chars are mid-text -- the `C` is a
+    /// camel-case word start.
+    int camel = fuzzy_completion_score("gc", "GitCommit", NULL);
+    int internal = fuzzy_completion_score("gc", "wagecmd", NULL);
+    ASSERT_TRUE(camel > internal, "CamelCase boundary outranks mid-word match");
+}
+
+TEST(completion_adjacency_bonus) {
+    /// Adjacent matches stack better than scattered ones. `co`
+    /// adjacent in `coup` should outrank `co` scattered in `cargo`.
+    int adjacent = fuzzy_completion_score("co", "coup", NULL);
+    int scattered = fuzzy_completion_score("co", "cargo", NULL);
+    ASSERT_TRUE(adjacent > scattered,
+                "adjacent match outranks scattered match");
+}
+
+TEST(completion_threshold_distinguishes_strong_from_weak) {
+    /// A strong match (prefix + adjacency) should land high; a weak
+    /// match (scattered across many gaps) should land low. The
+    /// configured completion.threshold (default 60) sits between them
+    /// so users get meaningful filter behavior out of the box.
+    int strong = fuzzy_completion_score("git", "git", NULL);
+    int weak = fuzzy_completion_score("git", "gargantuan-inner-thing", NULL);
+    ASSERT_TRUE(strong >= 60, "strong match scores >= 60");
+    ASSERT_TRUE(weak < strong, "weak match scores below strong");
+    ASSERT_TRUE(weak > 0, "weak match still positive (subsequence holds)");
+}
+
+TEST(completion_pattern_longer_than_text_zero) {
+    /// Edge: pattern can never be a subsequence of shorter text.
+    ASSERT_EQ(fuzzy_completion_score("hello world", "hi", NULL), 0,
+              "pattern longer than text scores 0");
+}
+
+TEST(completion_unicode_nfc_normalization) {
+    /// Default options normalize to NFC, so a precomposed and a
+    /// decomposed form of the same string match identically.
+    const char *precomposed = "caf\xc3\xa9"; // café (U+00E9)
+    const char *decomposed = "cafe\xcc\x81"; // cafe + COMBINING ACUTE
+    int s_pre = fuzzy_completion_score("caf", precomposed, NULL);
+    int s_dec = fuzzy_completion_score("caf", decomposed, NULL);
+    ASSERT_TRUE(s_pre > 0 && s_dec > 0,
+                "both NFC forms produce positive matches");
+    ASSERT_EQ(s_pre, s_dec, "NFC-equivalent forms score identically");
+}
+
+TEST(completion_case_sensitive_strict) {
+    /// Strict options preserve case; `LS` should not subsequence-match
+    /// `ls` under strict comparison.
+    ASSERT_EQ(fuzzy_completion_score("LS", "ls", &FUZZY_MATCH_STRICT), 0,
+              "strict case-sensitive blocks the cross-case match");
+    ASSERT_TRUE(fuzzy_completion_score("LS", "ls", NULL) > 0,
+                "default case-insensitive permits the match");
+}
+
+/* ============================================================================
  * MAIN TEST RUNNER
  * ============================================================================
  */
@@ -489,6 +636,24 @@ int main(void) {
     RUN_TEST(options_default);
     RUN_TEST(options_strict);
     RUN_TEST(options_fast);
+
+    /// Completion score tests (fzy-style)
+    printf("\n=== Completion Score Tests ===\n");
+    RUN_TEST(completion_empty_pattern_matches_all);
+    RUN_TEST(completion_empty_text_zero);
+    RUN_TEST(completion_exact_match_perfect);
+    RUN_TEST(completion_case_insensitive_default);
+    RUN_TEST(completion_non_subsequence_returns_zero);
+    RUN_TEST(completion_subsequence_order_required);
+    RUN_TEST(completion_first_char_bonus_outranks_mid_word);
+    RUN_TEST(completion_word_boundary_bonus_outranks_internal);
+    RUN_TEST(completion_diagnosis_case_keeps_candidates_above_zero);
+    RUN_TEST(completion_camel_case_boundary);
+    RUN_TEST(completion_adjacency_bonus);
+    RUN_TEST(completion_threshold_distinguishes_strong_from_weak);
+    RUN_TEST(completion_pattern_longer_than_text_zero);
+    RUN_TEST(completion_unicode_nfc_normalization);
+    RUN_TEST(completion_case_sensitive_strict);
 
     return TEST_RESULT();
 }
