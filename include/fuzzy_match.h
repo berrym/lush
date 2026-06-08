@@ -200,6 +200,49 @@ int fuzzy_subsequence_score(const char *pattern, const char *text,
 bool fuzzy_is_subsequence(const char *pattern, const char *text,
                           const fuzzy_match_options_t *options);
 
+/**
+ * @brief Calculate fzy-style completion match score
+ *
+ * Optimized for "user typed a partial prefix or shorthand" rather than
+ * "user typed a near-complete word with typos". This is the right scorer
+ * for completion menus and type-to-filter narrowing; fuzzy_match_score()
+ * is the right scorer for autocorrect ("did you mean") use cases.
+ *
+ * Algorithm: subsequence gate followed by dynamic-programming ranking
+ * with positional bonuses, modeled on fzy:
+ *
+ *   - **Subsequence gate**: returns 0 if pattern is not a subsequence
+ *     of text. No partial credit for near-misses.
+ *   - **First-char bonus**: largest bonus when pattern[0] matches
+ *     text[0] -- "ls<TAB>" should prefer `ls` over `tools`.
+ *   - **Word-boundary bonus**: match at the start of a word
+ *     (preceded by `/`, `.`, `-`, `_`, space, or any non-letter)
+ *     scores well. `git c<TAB>` prefers `git checkout` over `gcc -o`.
+ *   - **CamelCase boundary bonus**: match at a lowercase->uppercase
+ *     transition scores well. `gc<TAB>` matches `GitCommit` strongly.
+ *   - **Adjacency bonus**: consecutive pattern chars matched at
+ *     consecutive text positions stack -- `gco<TAB>` prefers
+ *     `git-co` (adjacent `co`) over `goc` (split).
+ *   - **Gap penalty**: characters skipped between matches reduce
+ *     the score. Leading gaps (before the first match) penalized
+ *     less, since they're often unavoidable for tail-of-text matches.
+ *
+ * Empty pattern returns 100 (every candidate trivially matches).
+ * Identical pattern/text returns 100 (exact match).
+ *
+ * @param pattern Pattern string the user typed (UTF-8). Subject to
+ *                NFC normalization and case folding per @p options.
+ * @param text    Candidate string (UTF-8). Same normalization.
+ * @param options Matching options (NULL for FUZZY_MATCH_DEFAULT).
+ *                @c case_sensitive @c false (default) makes matching
+ *                case-insensitive while still detecting CamelCase
+ *                boundaries from the original casing.
+ * @return Score 0-100. 0 means pattern is not a subsequence of
+ *         text. Higher scores indicate stronger matches.
+ */
+int fuzzy_completion_score(const char *pattern, const char *text,
+                           const fuzzy_match_options_t *options);
+
 /* ============================================================================
  * BATCH MATCHING (for completion/suggestion lists)
  * ============================================================================

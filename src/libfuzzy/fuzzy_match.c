@@ -659,6 +659,298 @@ bool fuzzy_is_subsequence(const char *pattern, const char *text,
 }
 
 /* ============================================================================
+ * COMPLETION SCORE (fzy-style)
+ * ============================================================================
+ */
+
+/// Length cap for completion candidates. Real completion text is short
+/// (paths, command names, options); a hard cap keeps the DP matrices
+/// bounded and rejects pathological inputs without allocating huge
+/// buffers. 256 codepoints covers every realistic case and is below
+/// the MAX_CODEPOINTS=1024 limit shared by the other scorers.
+#define COMPLETION_MAX_LEN 256
+
+/// Integer-scaled scoring constants modeled on fzy. The DP accumulates
+/// into int; the final result is renormalized to 0-100 against the
+/// theoretical maximum (every match getting the consecutive bonus).
+/// Position 0 is treated as if preceded by a separator -- a match at
+/// the start of the text gets the SLASH bonus, the strongest position
+/// bonus.
+///
+/// Known limitation: fzy-style scoring does NOT specially reward
+/// multi-word-acronym matches (e.g., `gco` matching `git checkout` as
+/// "first letter of each whitespace-separated token"). Plain
+/// adjacency-rich matches like `gco` in `gcc -o file` can outrank the
+/// acronym intent. Adding an acronym-matching axis on top of this
+/// scorer is a tracked future enhancement -- shell users have strong
+/// acronym mnemonics (gco, gcm, gst, gba) that the base fzy algorithm
+/// doesn't optimize for.
+#define COMP_BONUS_SLASH 90        ///< match after '/' or text position 0
+#define COMP_BONUS_WORD 80         ///< match after [-_. space]
+#define COMP_BONUS_CAMEL 70        ///< match at lower->upper transition
+#define COMP_BONUS_CONSECUTIVE 100 ///< pattern[p-1] matched at text[t-1]
+#define COMP_BONUS_NORMAL 0        ///< match in the middle of a word
+#define COMP_PENALTY_GAP_LEAD -1   ///< gap before the first match
+#define COMP_PENALTY_GAP -1        ///< gap between matches
+
+/// Decode a UTF-8 string into a parallel pair of codepoint arrays:
+/// one with case folding applied (used for matching) and one raw
+/// (used for CamelCase boundary detection). NFC normalization runs
+/// once before decoding so both arrays share the same canonical
+/// composition. Returns -1 on invalid input, otherwise the codepoint
+/// count.
+static int decode_completion_codepoints(const char *str, uint32_t *folded,
+                                        uint32_t *raw,
+                                        const fuzzy_match_options_t *opts) {
+    if (!str || !folded || !raw) {
+        return -1;
+    }
+
+    const char *input = str;
+    size_t input_len = strlen(str);
+
+    char norm_buf[NORM_BUFFER_SIZE];
+    if (opts && opts->unicode_normalize) {
+        size_t norm_len;
+        if (lle_unicode_normalize_nfc(str, input_len, norm_buf,
+                                      NORM_BUFFER_SIZE, &norm_len) == 0) {
+            input = norm_buf;
+            input_len = norm_len;
+        }
+    }
+
+    const char *ptr = input;
+    const char *end = input + input_len;
+    int n = 0;
+    while (ptr < end && n < COMPLETION_MAX_LEN) {
+        uint32_t cp;
+        int len = lle_utf8_decode_codepoint(ptr, end - ptr, &cp);
+        if (len <= 0) {
+            ptr++;
+            continue;
+        }
+        raw[n] = cp;
+        folded[n] = (opts && !opts->case_sensitive)
+                        ? lle_unicode_tolower_codepoint(cp)
+                        : cp;
+        n++;
+        ptr += len;
+    }
+    return n;
+}
+
+/// Test whether @p cp is a word-separator codepoint for boundary-bonus
+/// purposes. ASCII conservative set plus space. Sufficient for the
+/// shell-completion vocabulary (paths, flags, identifiers); a broader
+/// Unicode property check would not change ranking on realistic
+/// candidates and would cost a table lookup per text codepoint.
+static inline bool comp_is_separator(uint32_t cp) {
+    return cp == '/' || cp == '.' || cp == '-' || cp == '_' || cp == ' ';
+}
+
+/// Compute the bonus this text position should award when it ends up
+/// being the match for some pattern char. Looks at the RAW (unfolded)
+/// codepoint at position @p t and its predecessor so case-fold doesn't
+/// erase CamelCase information. Position 0 is treated as if preceded
+/// by a separator (SLASH bonus) so leading matches outrank mid-word
+/// matches.
+static int comp_position_bonus(const uint32_t *raw, int t) {
+    if (t == 0) {
+        return COMP_BONUS_SLASH;
+    }
+    uint32_t prev = raw[t - 1];
+    uint32_t cur = raw[t];
+    if (prev == '/') {
+        return COMP_BONUS_SLASH;
+    }
+    if (comp_is_separator(prev)) {
+        return COMP_BONUS_WORD;
+    }
+    /// CamelCase boundary: previous char is a (Unicode-aware)
+    /// lowercase letter and the current char is uppercase. Uses the
+    /// raw codepoints so case folding hasn't already collapsed the
+    /// signal; lle_unicode_tolower_codepoint returns the input
+    /// unchanged when no mapping applies, so we can detect "would
+    /// fold to something different" as "is currently uppercase".
+    if (cur != lle_unicode_tolower_codepoint(cur) &&
+        prev == lle_unicode_tolower_codepoint(prev)) {
+        return COMP_BONUS_CAMEL;
+    }
+    return COMP_BONUS_NORMAL;
+}
+
+int fuzzy_completion_score(const char *pattern, const char *text,
+                           const fuzzy_match_options_t *options) {
+    if (!pattern || !text) {
+        return 0;
+    }
+    if (*pattern == '\0') {
+        /// Empty pattern matches every candidate trivially. Caller
+        /// uses this to mean "no filter active"; returning 100 lets
+        /// menu code treat the completion score uniformly without a
+        /// special case.
+        return 100;
+    }
+    if (*text == '\0') {
+        return 0;
+    }
+
+    const fuzzy_match_options_t *opts =
+        options ? options : &FUZZY_MATCH_DEFAULT;
+
+    uint32_t pat_folded[COMPLETION_MAX_LEN];
+    uint32_t pat_raw[COMPLETION_MAX_LEN];
+    uint32_t txt_folded[COMPLETION_MAX_LEN];
+    uint32_t txt_raw[COMPLETION_MAX_LEN];
+
+    int pat_len =
+        decode_completion_codepoints(pattern, pat_folded, pat_raw, opts);
+    int txt_len = decode_completion_codepoints(text, txt_folded, txt_raw, opts);
+    if (pat_len <= 0 || txt_len <= 0) {
+        return 0;
+    }
+    if (pat_len > txt_len) {
+        /// Pattern longer than text -- can't be a subsequence.
+        return 0;
+    }
+
+    /// Quick exact-match shortcut: identical length AND identical
+    /// codepoints (after folding) is a perfect 100, no DP needed.
+    if (pat_len == txt_len) {
+        bool all_eq = true;
+        for (int i = 0; i < pat_len; i++) {
+            if (pat_folded[i] != txt_folded[i]) {
+                all_eq = false;
+                break;
+            }
+        }
+        if (all_eq) {
+            return 100;
+        }
+    }
+
+    /// Subsequence gate. If pattern is not a subsequence of text,
+    /// return 0 immediately without allocating the DP matrices.
+    int gp = 0, gt = 0;
+    while (gp < pat_len && gt < txt_len) {
+        if (pat_folded[gp] == txt_folded[gt]) {
+            gp++;
+        }
+        gt++;
+    }
+    if (gp < pat_len) {
+        return 0;
+    }
+
+    /// DP matrices. M[p][t] = best score considering pattern[0..p]
+    /// over text[0..t] where the last decision may or may not have
+    /// been a match. D[p][t] = best score where text[t] IS the
+    /// match for pattern[p] (needed so the next pattern char can
+    /// claim the adjacency bonus). Cells unreachable under the
+    /// subsequence constraint stay at INT_MIN/2 so they never get
+    /// selected.
+    const int NEG_INF = -1000000;
+    int *M = (int *)malloc((size_t)pat_len * (size_t)txt_len * sizeof(int));
+    int *D = (int *)malloc((size_t)pat_len * (size_t)txt_len * sizeof(int));
+    if (!M || !D) {
+        free(M);
+        free(D);
+        return 0;
+    }
+
+    for (int p = 0; p < pat_len; p++) {
+        int prev_M = NEG_INF;
+        for (int t = 0; t < txt_len; t++) {
+            int idx = p * txt_len + t;
+            int d_here = NEG_INF;
+            if (pat_folded[p] == txt_folded[t]) {
+                int pos_bonus = comp_position_bonus(txt_raw, t);
+                int starting; ///< pattern[p-1] matched anywhere <= t-1
+                if (p == 0) {
+                    /// First pattern char: pay leading-gap penalty
+                    /// for everything before this match, then add
+                    /// the position bonus.
+                    starting = t * COMP_PENALTY_GAP_LEAD + pos_bonus;
+                } else if (t == 0) {
+                    starting = NEG_INF;
+                } else {
+                    int prev = M[(p - 1) * txt_len + (t - 1)];
+                    starting =
+                        (prev <= NEG_INF / 2) ? NEG_INF : prev + pos_bonus;
+                }
+
+                int consecutive = NEG_INF;
+                if (p > 0 && t > 0) {
+                    int prev_d = D[(p - 1) * txt_len + (t - 1)];
+                    if (prev_d > NEG_INF / 2) {
+                        /// Consecutive match: previous pattern char
+                        /// matched at t-1. Per fzy, the contribution
+                        /// is max(CONSECUTIVE, position_bonus) -- a
+                        /// consecutive match at a normal mid-word
+                        /// position still gets the CONSECUTIVE bonus,
+                        /// while a consecutive match at a strong
+                        /// boundary takes whichever is larger.
+                        int contrib = (COMP_BONUS_CONSECUTIVE > pos_bonus)
+                                          ? COMP_BONUS_CONSECUTIVE
+                                          : pos_bonus;
+                        consecutive = prev_d + contrib;
+                    }
+                }
+
+                d_here = starting > consecutive ? starting : consecutive;
+            }
+
+            /// M[p][t] = best of (this position used the match) or
+            /// (skip text[t], take gap penalty).
+            int m_skip =
+                (prev_M > NEG_INF / 2) ? prev_M + COMP_PENALTY_GAP : NEG_INF;
+            int m_here = d_here > m_skip ? d_here : m_skip;
+
+            M[idx] = m_here;
+            D[idx] = d_here;
+            prev_M = m_here;
+        }
+    }
+
+    int raw_score = M[(pat_len - 1) * txt_len + (txt_len - 1)];
+
+    free(M);
+    free(D);
+
+    if (raw_score <= NEG_INF / 2) {
+        /// Subsequence existed but the DP couldn't reach the final
+        /// cell -- shouldn't happen given the gate above, but
+        /// defensive.
+        return 0;
+    }
+
+    /// Normalize to 0-100. The theoretical maximum is reached when
+    /// every match contributes the CONSECUTIVE bonus (the largest
+    /// per-step contribution under the fzy recurrence): pat_len *
+    /// COMP_BONUS_CONSECUTIVE. Scale linearly against that. Negative
+    /// scores (heavy gaps dominating) clamp to 0; over-max clamps to
+    /// 100. Mid-range scores typically land 30-70 which is where the
+    /// configured completion.threshold knob has meaningful effect.
+    int theoretical_max = pat_len * COMP_BONUS_CONSECUTIVE;
+    if (theoretical_max <= 0) {
+        return 0;
+    }
+    int score = (raw_score * 100) / theoretical_max;
+    if (score < 0) {
+        score = 0;
+    }
+    if (score > 100) {
+        score = 100;
+    }
+    /// Floor a subsequence match at 1 so the caller can distinguish
+    /// "matched but penalty-heavy" from "did not match at all".
+    if (score == 0) {
+        score = 1;
+    }
+    return score;
+}
+
+/* ============================================================================
  * COMBINED SCORE FUNCTIONS
  * ============================================================================
  */
