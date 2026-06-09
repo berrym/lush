@@ -9,7 +9,11 @@
  */
 
 #include "lle/completion/completion_menu_logic.h"
+
+#include "lle/completion/completion_menu_state.h"
+
 #include <stddef.h>
+#include <stdint.h>
 
 /**
  * @brief Ensure selected item is visible in the current view
@@ -754,11 +758,19 @@ lle_result_t lle_completion_menu_cancel(lle_completion_menu_state_t *state) {
 /**
  * @brief Handle a character input while menu is active
  *
- * Currently cancels the menu on any character input.
- * Future: implement incremental filtering.
+ * Non-printable input cancels the menu; printable input is treated as
+ * a type-to-filter character: appended to the menu's filter_string and
+ * the predicate is re-applied. When the predicate leaves zero
+ * candidates the caller is signaled to cancel (the keybinding intercept
+ * then lets the character flow through to the buffer's normal insert
+ * path), keeping the user's progress visible rather than silently
+ * swallowing the typed character.
  *
  * @param state Menu state to modify
- * @param c Character that was typed
+ * @param c Character that was typed (single byte; non-ASCII printable
+ *          characters that should narrow the menu must be appended via
+ *          lle_completion_menu_append_filter_char directly with their
+ *          full codepoint)
  * @param should_cancel Output flag indicating if menu should be cancelled
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER on error
  */
@@ -768,11 +780,34 @@ lle_result_t lle_completion_menu_handle_char(lle_completion_menu_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// For now, any character input cancels the menu
-    /// Future: implement incremental filtering
-    (void)c; /// Unused for now
-    *should_cancel = true;
-    state->menu_active = false;
+    unsigned char uc = (unsigned char)c;
+    /// Non-printable input cancels the menu. The printable range is
+    /// 0x20-0x7E; control characters and high bytes fall through to
+    /// the existing dismiss-on-char behavior.
+    if (uc < 0x20 || uc > 0x7E) {
+        *should_cancel = true;
+        state->menu_active = false;
+        return LLE_SUCCESS;
+    }
 
+    /// Printable: append to filter and re-apply the predicate.
+    lle_result_t res =
+        lle_completion_menu_append_filter_char(state, (uint32_t)uc);
+    if (res != LLE_SUCCESS) {
+        *should_cancel = true;
+        state->menu_active = false;
+        return res;
+    }
+
+    /// Empty result after filter means no candidate matches the user's
+    /// typed input. Cancel so the keybinding intercept lets the char
+    /// fall through to a normal buffer insert; the menu does not
+    /// linger in an empty "no matches" state.
+    if (state->result == NULL || state->result->count == 0) {
+        *should_cancel = true;
+        state->menu_active = false;
+    } else {
+        *should_cancel = false;
+    }
     return LLE_SUCCESS;
 }

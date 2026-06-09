@@ -32,6 +32,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,10 +62,11 @@ typedef struct {
  * @brief Completion menu state
  */
 typedef struct {
-    lle_completion_result_t *result; /**< Completion result (not owned) */
+    lle_completion_result_t
+        *result; /**< Active view (unfiltered or filtered) */
 
     // Navigation state
-    size_t selected_index; /**< Currently selected item (global index) */
+    size_t selected_index; /**< Currently selected item (index into result) */
     size_t first_visible;  /**< First visible item index (for scrolling) */
     size_t visible_count;  /**< Number of visible items */
     size_t target_column;  /**< Sticky column for UP/DOWN navigation */
@@ -86,6 +88,29 @@ typedef struct {
 
     // Memory pool
     lle_memory_pool_t *memory_pool; /**< Memory pool for allocations */
+
+    /**
+     * @name In-menu type-to-filter state
+     *
+     * The unfiltered result is the candidate set the engine produced at
+     * TAB time. When the user types printable characters while the
+     * menu is visible, filter_string accumulates the typed input and
+     * the menu narrows by applying the configured completion predicate
+     * against (original_prefix + filter_string). The narrowed view is
+     * stored in filtered_result; @c result swaps to point at it.
+     * Backspace pops a character and re-applies. When filter_string is
+     * empty @c result points back at @c unfiltered_result.
+     */
+    /**@{*/
+    lle_completion_result_t
+        *unfiltered_result; /**< Original candidate set (not owned) */
+    lle_completion_result_t
+        *filtered_result;   /**< Narrowed view (pool-allocated) */
+    char *filter_string;    /**< Chars typed since menu opened */
+    size_t filter_len;      /**< Length of filter_string in bytes */
+    size_t filter_capacity; /**< Allocated capacity of filter_string */
+    char *original_prefix;  /**< TAB-time word prefix (pool-allocated) */
+    /**@}*/
 } lle_completion_menu_state_t;
 
 // ============================================================================
@@ -105,14 +130,17 @@ lle_completion_menu_config_t lle_completion_menu_default_config(void);
  * @param memory_pool memory pool for allocations
  * @param result completion result (caller retains ownership)
  * @param config menu configuration (NULL for defaults)
+ * @param original_prefix the word prefix at TAB time, used to
+ *        construct the combined prefix during in-menu filtering.
+ *        May be NULL or empty when the menu has no notion of a typed
+ *        prefix; the filter then operates against filter_string alone.
  * @param state output parameter for created state
  * @return LLE_SUCCESS on success, error code on failure
  */
-lle_result_t
-lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
-                                 lle_completion_result_t *result,
-                                 const lle_completion_menu_config_t *config,
-                                 lle_completion_menu_state_t **state);
+lle_result_t lle_completion_menu_state_create(
+    lle_memory_pool_t *memory_pool, lle_completion_result_t *result,
+    const lle_completion_menu_config_t *config, const char *original_prefix,
+    lle_completion_menu_state_t **state);
 
 /**
  * @brief Free menu state
@@ -225,6 +253,74 @@ lle_completion_menu_update_layout(lle_completion_menu_state_t *state,
  */
 size_t
 lle_completion_menu_get_num_columns(const lle_completion_menu_state_t *state);
+
+// ============================================================================
+// TYPE-TO-FILTER OPERATIONS
+// ============================================================================
+
+/**
+ * @brief Append one Unicode codepoint to the type-to-filter buffer.
+ *
+ * Encodes the codepoint as UTF-8, appends it to filter_string (growing
+ * the capacity as needed), then re-applies the active completion
+ * predicate against unfiltered_result. The narrowed view is stored in
+ * filtered_result and selected_index resets to 0.
+ *
+ * @param state menu state
+ * @param codepoint Unicode codepoint to append. The caller is expected
+ *        to have already verified that this is a printable character;
+ *        non-printables are not validated here.
+ * @return LLE_SUCCESS, LLE_ERROR_INVALID_PARAMETER on NULL state,
+ *         LLE_ERROR_OUT_OF_MEMORY on allocation failure.
+ */
+lle_result_t
+lle_completion_menu_append_filter_char(lle_completion_menu_state_t *state,
+                                       uint32_t codepoint);
+
+/**
+ * @brief Remove the last codepoint from the type-to-filter buffer.
+ *
+ * Walks the filter_string backwards over UTF-8 continuation bytes to
+ * find the start of the last codepoint, truncates there, then
+ * re-applies the predicate. When filter_string becomes empty the menu
+ * view swaps back to unfiltered_result. No-op (returns LLE_SUCCESS)
+ * when the buffer is already empty.
+ *
+ * @param state menu state
+ * @return LLE_SUCCESS, LLE_ERROR_INVALID_PARAMETER on NULL state.
+ */
+lle_result_t
+lle_completion_menu_pop_filter_char(lle_completion_menu_state_t *state);
+
+/**
+ * @brief Reapply the filter against the current filter_string.
+ *
+ * Constructs the combined prefix (original_prefix + filter_string) and
+ * calls lle_completion_filter_invoke for each item in unfiltered_result.
+ * Items that admit become entries in filtered_result. Empty
+ * filter_string short-circuits to swapping result back at
+ * unfiltered_result without allocating a filtered copy. selected_index
+ * is reset to 0; first_visible likewise so the new top item is
+ * immediately in view.
+ *
+ * @param state menu state
+ * @return LLE_SUCCESS, LLE_ERROR_INVALID_PARAMETER on NULL state,
+ *         LLE_ERROR_OUT_OF_MEMORY on allocation failure.
+ */
+lle_result_t
+lle_completion_menu_apply_filter(lle_completion_menu_state_t *state);
+
+/**
+ * @brief True if a non-empty filter string is currently in effect.
+ *
+ * Used by keybinding intercepts and the renderer to distinguish "menu
+ * open with type-to-filter active" from "menu open at TAB-time state".
+ *
+ * @param state menu state (may be NULL)
+ * @return true when filter_string is non-empty.
+ */
+bool lle_completion_menu_filter_active(
+    const lle_completion_menu_state_t *state);
 
 #ifdef __cplusplus
 }

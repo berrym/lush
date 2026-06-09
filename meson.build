@@ -2298,6 +2298,17 @@ if fs.exists('tests/unit/test_completion_filter.c')
        timeout: 30)
 endif
 
+# In-menu type-to-filter state-machine tests
+if fs.exists('tests/unit/test_menu_filter.c')
+  test_menu_filter = executable('test_menu_filter',
+                                 'tests/unit/test_menu_filter.c',
+                                 include_directories: [inc, include_directories('tests')],
+                                 dependencies: [lle_dep, libm])
+  test('Menu Type-to-Filter', test_menu_filter,
+       suite: 'lle-unit',
+       timeout: 30)
+endif
+
 # Compdef LLE source tests
 if fs.exists('tests/unit/test_compdef_source.c')
   test_compdef_source_sources = []

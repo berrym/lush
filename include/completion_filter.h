@@ -45,4 +45,13 @@
  */
 bool completion_filter_admits(const char *prefix, const char *candidate);
 
+/**
+ * @brief Register the shell-side filter with the LLE menu/bridge.
+ *
+ * Calls lle_completion_set_filter_fn(completion_filter_admits) so the
+ * in-menu type-to-filter path and the compdef bridge invoke the same
+ * predicate. Idempotent; safe to call multiple times during init.
+ */
+void completion_filter_bridge_init(void);
+
 #endif /* LUSH_COMPLETION_FILTER_H */

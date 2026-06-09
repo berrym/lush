@@ -1187,9 +1187,31 @@ lle_result_t lle_backward_delete_char(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Dismiss completion menu on backspace
+    /// In-menu type-to-filter: when the menu is open and the user has
+    /// already typed filter characters, backspace widens the filter
+    /// by one codepoint rather than mutating the buffer. When no
+    /// filter is active, backspace dismisses the menu and proceeds
+    /// to a normal buffer delete -- the legacy behavior.
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
+        lle_completion_menu_state_t *menu =
+            lle_completion_system_get_menu(editor->completion_system);
+        if (menu && lle_completion_menu_filter_active(menu)) {
+            lle_result_t pres = lle_completion_menu_pop_filter_char(menu);
+            if (pres == LLE_SUCCESS && menu->result &&
+                menu->result->count > 0) {
+                lle_completion_state_t *cstate =
+                    lle_completion_system_get_state(editor->completion_system);
+                if (cstate) {
+                    update_inline_completion(editor, menu, cstate);
+                }
+                display_controller_t *dc = display_integration_get_controller();
+                if (dc) {
+                    dc->menu_state_changed = true;
+                }
+                return LLE_SUCCESS;
+            }
+        }
         clear_completion_menu(editor);
     }
 
@@ -2962,9 +2984,40 @@ lle_result_t lle_self_insert(lle_editor_t *editor, uint32_t codepoint) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Dismiss completion menu on character input
+    /// In-menu type-to-filter: when the completion menu is visible and
+    /// the user types a printable character, treat it as a filter
+    /// keystroke rather than a buffer insert. The narrowed menu's new
+    /// top candidate is previewed in place of the prior preview, so
+    /// the buffer continuously reflects the most-relevant completion
+    /// for what has been typed so far. Non-printable input or a
+    /// filter that admits zero candidates falls through to the
+    /// legacy dismiss-on-char path; the character is then inserted
+    /// into the buffer normally.
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
+        bool printable = codepoint >= 0x20 && codepoint != 0x7F;
+        lle_completion_menu_state_t *menu =
+            lle_completion_system_get_menu(editor->completion_system);
+        if (printable && menu) {
+            lle_result_t fres =
+                lle_completion_menu_append_filter_char(menu, codepoint);
+            if (fres == LLE_SUCCESS && menu->result &&
+                menu->result->count > 0) {
+                lle_completion_state_t *cstate =
+                    lle_completion_system_get_state(editor->completion_system);
+                if (cstate) {
+                    update_inline_completion(editor, menu, cstate);
+                }
+                display_controller_t *dc = display_integration_get_controller();
+                if (dc) {
+                    dc->menu_state_changed = true;
+                }
+                return LLE_SUCCESS;
+            }
+            /// Filter admitted nothing or allocation failed -- drop
+            /// to the normal dismiss path so the user retains
+            /// progress and the typed character lands in the buffer.
+        }
         clear_completion_menu(editor);
     }
 
