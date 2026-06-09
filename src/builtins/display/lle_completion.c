@@ -12,10 +12,13 @@
 
 #include "builtins.h"
 #include "builtins/display.h"
+#include "config.h"
 #include "config_registry.h"
 #include "lle/completion/completion_state.h"
 #include "lle/completion/completion_system.h"
 #include "lle/completion/custom_source.h"
+
+extern config_values_t config;
 
 int display_lle_completion(int argc, char **argv) {
     /// LLE completion subsystem. The umbrella command groups
@@ -160,17 +163,60 @@ int display_lle_completion(int argc, char **argv) {
             return 1;
         }
 
+    } else if (strcmp(comp_subcmd, "match_mode") == 0) {
+        /// completion.match_mode: filter predicate used by the
+        /// bridge pre-emit filter and (subsequent commit) the
+        /// in-menu type-to-filter. Values: prefix | substring |
+        /// fuzzy. Per-mode default: lush=fuzzy, others=prefix.
+        if (argc < 3) {
+            const char *display = "prefix";
+            switch (config.completion_match_mode) {
+            case COMPLETION_MATCH_SUBSTRING:
+                display = "substring";
+                break;
+            case COMPLETION_MATCH_FUZZY:
+                display = "fuzzy";
+                break;
+            case COMPLETION_MATCH_PREFIX:
+            default:
+                display = "prefix";
+                break;
+            }
+            printf("match_mode: %s\n", display);
+            printf("Usage: display lle completion match_mode "
+                   "<prefix|substring|fuzzy>\n");
+            return 0;
+        }
+
+        const char *mode = argv[2];
+        if (strcmp(mode, "prefix") != 0 && strcmp(mode, "substring") != 0 &&
+            strcmp(mode, "fuzzy") != 0) {
+            fprintf(stderr,
+                    "display lle completion match_mode: "
+                    "invalid value '%s' (use prefix|substring|fuzzy)\n",
+                    mode);
+            return 1;
+        }
+        /// config_set_value validates and writes through the
+        /// canonical config_options storage pointer; it also prints
+        /// "Set <key> = <value>" on success, which is the
+        /// project-wide feedback line, so no extra echo here.
+        config_set_value("completion.match_mode", mode);
+        return 0;
+
     } else if (strcmp(comp_subcmd, "help") == 0 ||
                strcmp(comp_subcmd, "--help") == 0) {
         printf("LLE Completion Subsystem\n");
         printf("========================\n\n");
         printf("Usage: display lle completion <subcommand>\n\n");
         printf("Subcommands:\n");
-        printf("  sources [list|reload|help]   - Manage completion "
+        printf("  sources [list|reload|help]              - Manage completion "
                "sources\n");
-        printf("  chain_directories <on|off>   - Re-trigger "
+        printf("  chain_directories <on|off>              - Re-trigger "
                "completion after directory accept\n");
-        printf("  help                         - Show this help "
+        printf("  match_mode <prefix|substring|fuzzy>     - Set the filter "
+               "predicate\n");
+        printf("  help                                    - Show this help "
                "message\n");
         return 0;
 
@@ -178,7 +224,7 @@ int display_lle_completion(int argc, char **argv) {
         fprintf(stderr, "display lle completion: Unknown subcommand '%s'\n",
                 comp_subcmd);
         fprintf(stderr, "Usage: display lle completion "
-                        "<sources|chain_directories|help>\n");
+                        "<sources|chain_directories|match_mode|help>\n");
         return 1;
     }
 }
