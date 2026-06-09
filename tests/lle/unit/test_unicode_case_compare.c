@@ -269,6 +269,97 @@ static void test_prefix_case_insensitive(void) {
 }
 
 /* ============================================================================
+ * UNICODE SUBSTRING (CONTAINS) MATCHING TESTS
+ * ============================================================================
+ */
+
+static void test_contains_ascii_middle(void) {
+    TEST("ASCII contains - substring in the middle");
+    ASSERT_TRUE(lle_unicode_contains("ell", 3, "hello", 5, NULL),
+                "ell is contained in hello");
+    ASSERT_TRUE(!lle_unicode_contains("xyz", 3, "hello", 5, NULL),
+                "xyz is not contained in hello");
+    PASS();
+}
+
+static void test_contains_ascii_endpoints(void) {
+    TEST("ASCII contains - prefix and suffix substrings");
+    ASSERT_TRUE(lle_unicode_contains("hel", 3, "hello", 5, NULL),
+                "hel matches as prefix substring");
+    ASSERT_TRUE(lle_unicode_contains("llo", 3, "hello", 5, NULL),
+                "llo matches as suffix substring");
+    ASSERT_TRUE(lle_unicode_contains("hello", 5, "hello", 5, NULL),
+                "exact-length match counts as contained");
+    PASS();
+}
+
+static void test_contains_empty_needle(void) {
+    TEST("Contains - empty needle matches everything");
+    ASSERT_TRUE(lle_unicode_contains("", 0, "hello", 5, NULL),
+                "empty needle matches non-empty haystack");
+    ASSERT_TRUE(lle_unicode_contains_z("", "hello", NULL),
+                "empty needle (z) matches non-empty haystack");
+    PASS();
+}
+
+static void test_contains_empty_haystack(void) {
+    TEST("Contains - empty haystack rejects non-empty needle");
+    ASSERT_TRUE(!lle_unicode_contains("a", 1, "", 0, NULL),
+                "non-empty needle cannot be in empty haystack");
+    PASS();
+}
+
+static void test_contains_needle_longer(void) {
+    TEST("Contains - needle longer than haystack");
+    ASSERT_TRUE(!lle_unicode_contains("hello world", 11, "hello", 5, NULL),
+                "longer needle returns false");
+    PASS();
+}
+
+static void test_contains_z_basic(void) {
+    TEST("Null-terminated contains");
+    ASSERT_TRUE(lle_unicode_contains_z("lo wo", "hello world", NULL),
+                "lo wo is contained in hello world (z)");
+    ASSERT_TRUE(!lle_unicode_contains_z("zzz", "hello world", NULL),
+                "zzz is not contained in hello world (z)");
+    PASS();
+}
+
+static void test_contains_case_insensitive(void) {
+    TEST("Case-insensitive contains");
+    lle_unicode_compare_options_t opts = LLE_UNICODE_COMPARE_DEFAULT;
+    opts.case_insensitive = true;
+    ASSERT_TRUE(lle_unicode_contains("ELL", 3, "hello", 5, &opts),
+                "ELL matches hello case-insensitive");
+    ASSERT_TRUE(lle_unicode_contains("ell", 3, "HELLO", 5, &opts),
+                "ell matches HELLO case-insensitive");
+    PASS();
+}
+
+static void test_contains_case_sensitive_strict(void) {
+    TEST("Case-sensitive contains rejects cross-case match");
+    lle_unicode_compare_options_t opts = LLE_UNICODE_COMPARE_DEFAULT;
+    opts.case_insensitive = false;
+    ASSERT_TRUE(!lle_unicode_contains("ELL", 3, "hello", 5, &opts),
+                "ELL does not match hello case-sensitive");
+    PASS();
+}
+
+static void test_contains_nfc_equivalence(void) {
+    TEST("NFC-equivalent forms match under contains");
+    /// Decomposed cafe (cafe + COMBINING ACUTE U+0301) versus
+    /// precomposed cafe (U+00E9). Searching for "afe" in either
+    /// form should succeed once NFC normalization runs.
+    const char *precomposed = "caf\xC3\xA9";
+    const char *decomposed = "cafe\xCC\x81";
+    ASSERT_TRUE(lle_unicode_contains_z("af", precomposed, NULL),
+                "af contained in precomposed cafe");
+    ASSERT_TRUE(lle_unicode_contains_z("af", decomposed, NULL),
+                "af contained in decomposed cafe");
+    PASS();
+}
+
+/* ============================================================================
  * NFC NORMALIZATION TESTS
  * ============================================================================
  */
@@ -447,6 +538,15 @@ int main(void) {
     RUN_TEST(prefix_longer_than_string);
     RUN_TEST(prefix_null_terminated);
     RUN_TEST(prefix_case_insensitive);
+    RUN_TEST(contains_ascii_middle);
+    RUN_TEST(contains_ascii_endpoints);
+    RUN_TEST(contains_empty_needle);
+    RUN_TEST(contains_empty_haystack);
+    RUN_TEST(contains_needle_longer);
+    RUN_TEST(contains_z_basic);
+    RUN_TEST(contains_case_insensitive);
+    RUN_TEST(contains_case_sensitive_strict);
+    RUN_TEST(contains_nfc_equivalence);
 
     printf("NFC Normalization:\n");
     RUN_TEST(nfc_ascii_passthrough);

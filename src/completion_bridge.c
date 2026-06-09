@@ -10,9 +10,9 @@
 
 #include "completion_bridge.h"
 
+#include "completion_filter.h"
 #include "executor.h"
 #include "lle/completion/completion_types.h"
-#include "lle/unicode_compare.h"
 
 bool completion_bridge_active(struct executor *e) {
     return e != NULL && e->active_comp_result != NULL;
@@ -23,14 +23,16 @@ int completion_bridge_add(struct executor *e, const char *candidate,
     if (!e || !e->active_comp_result || !candidate || candidate[0] == '\0') {
         return -1;
     }
-    /// Skip candidates that don't NFC-prefix-match the current word.
-    /// Empty / NULL prefix accepts everything (the first TAB at a word
-    /// boundary). Filtering here means every compadd code path
-    /// (positional, -a, -k) and any future emit path benefits without
-    /// per-site duplication, and the user's bound function can emit
-    /// its entire candidate set blindly.
-    if (e->active_comp_prefix && e->active_comp_prefix[0] != '\0' &&
-        !lle_unicode_is_prefix_z(e->active_comp_prefix, candidate, NULL)) {
+    /// Filtering here means every compadd code path (positional,
+    /// -a, -k) and any future emit path benefits without per-site
+    /// duplication; the user's bound function can emit its entire
+    /// candidate set blindly. completion_filter_admits dispatches on
+    /// completion.match_mode (prefix / substring / fuzzy) so the
+    /// active configuration choice applies uniformly across the
+    /// engine; switching modes never produces divergent ranking
+    /// between the pre-emit filter and other consumers.
+    if (e->active_comp_prefix &&
+        !completion_filter_admits(e->active_comp_prefix, candidate)) {
         return 0;
     }
     lle_completion_result_t *r =

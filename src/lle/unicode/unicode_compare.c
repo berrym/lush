@@ -820,6 +820,136 @@ bool lle_unicode_is_prefix_z(const char *prefix, const char *str,
                                  options);
 }
 
+/// Compare a single codepoint pair under the configured options.
+/// Folding via to_lowercase mirrors what lle_unicode_is_prefix uses
+/// on its case-insensitive path, keeping prefix and contains
+/// behaviorally aligned.
+static inline bool cp_equal_under_opts(uint32_t a, uint32_t b,
+                                       bool case_insensitive) {
+    if (a == b) {
+        return true;
+    }
+    if (!case_insensitive) {
+        return false;
+    }
+    return to_lowercase(a) == to_lowercase(b);
+}
+
+bool lle_unicode_contains(const char *needle, size_t needle_len,
+                          const char *haystack, size_t haystack_len,
+                          const lle_unicode_compare_options_t *options) {
+    if (!needle || needle_len == 0) {
+        return true; /// Empty needle matches every haystack
+    }
+    if (!haystack || haystack_len == 0) {
+        return false; /// Non-empty needle cannot be in empty haystack
+    }
+    if (needle_len > haystack_len) {
+        return false; /// Quick rejection on length
+    }
+
+    lle_unicode_compare_options_t opts =
+        options ? *options : LLE_UNICODE_COMPARE_DEFAULT;
+
+    /// Fast path: no normalization, no case folding -> memmem-style
+    /// byte search. Common for the ASCII-only inputs that dominate
+    /// shell completion candidates.
+    if (!opts.normalize && !opts.case_insensitive) {
+        for (size_t i = 0; i + needle_len <= haystack_len; i++) {
+            if (memcmp(haystack + i, needle, needle_len) == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+#define CONTAINS_NORM_BUF_SIZE 4096
+    char norm_needle[CONTAINS_NORM_BUF_SIZE];
+    char norm_hay[CONTAINS_NORM_BUF_SIZE];
+    size_t norm_needle_len, norm_hay_len;
+
+    if (opts.normalize) {
+        if (lle_unicode_normalize_nfc(needle, needle_len, norm_needle,
+                                      CONTAINS_NORM_BUF_SIZE,
+                                      &norm_needle_len) != 0) {
+            return false; /// Normalization failed; conservative reject
+        }
+        if (lle_unicode_normalize_nfc(haystack, haystack_len, norm_hay,
+                                      CONTAINS_NORM_BUF_SIZE,
+                                      &norm_hay_len) != 0) {
+            return false;
+        }
+    } else {
+        if (needle_len >= CONTAINS_NORM_BUF_SIZE ||
+            haystack_len >= CONTAINS_NORM_BUF_SIZE) {
+            return false; /// Strings exceed buffers; conservative reject
+        }
+        memcpy(norm_needle, needle, needle_len);
+        norm_needle[needle_len] = '\0';
+        norm_needle_len = needle_len;
+        memcpy(norm_hay, haystack, haystack_len);
+        norm_hay[haystack_len] = '\0';
+        norm_hay_len = haystack_len;
+    }
+
+    if (norm_needle_len > norm_hay_len) {
+        return false;
+    }
+
+    /// Codepoint-aligned search. Walk haystack one codepoint per
+    /// outer iteration; for each starting position attempt to match
+    /// the needle codepoint-by-codepoint under the configured
+    /// folding. Byte-level memmem would miss case-fold matches and
+    /// could land mid-codepoint, so the explicit decode is required
+    /// when either option diverges from raw bytes.
+    const char *hp = norm_hay;
+    const char *hp_end = norm_hay + norm_hay_len;
+    while (hp < hp_end) {
+        const char *np = norm_needle;
+        const char *np_end = norm_needle + norm_needle_len;
+        const char *sp = hp;
+        bool matched = true;
+        while (np < np_end && sp < hp_end) {
+            uint32_t cp_n, cp_h;
+            int len_n = lle_utf8_decode_codepoint(np, np_end - np, &cp_n);
+            int len_h = lle_utf8_decode_codepoint(sp, hp_end - sp, &cp_h);
+            if (len_n <= 0 || len_h <= 0) {
+                matched = false;
+                break;
+            }
+            if (!cp_equal_under_opts(cp_n, cp_h, opts.case_insensitive)) {
+                matched = false;
+                break;
+            }
+            np += len_n;
+            sp += len_h;
+        }
+        if (matched && np >= np_end) {
+            return true;
+        }
+        /// Advance haystack by one codepoint and retry.
+        uint32_t skip_cp;
+        int skip_len = lle_utf8_decode_codepoint(hp, hp_end - hp, &skip_cp);
+        if (skip_len <= 0) {
+            return false; /// Invalid UTF-8; conservative reject
+        }
+        hp += skip_len;
+    }
+    return false;
+}
+
+bool lle_unicode_contains_z(const char *needle, const char *haystack,
+                            const lle_unicode_compare_options_t *options) {
+    if (!needle) {
+        return true;
+    }
+    if (!haystack) {
+        return false;
+    }
+    return lle_unicode_contains(needle, strlen(needle), haystack,
+                                strlen(haystack), options);
+}
+
 /**
  * @brief Compare two UTF-8 strings with explicit lengths for equality
  * @param str1 First string

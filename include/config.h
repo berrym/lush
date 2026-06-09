@@ -129,6 +129,29 @@ typedef enum {
 } lle_dedup_strategy_t;
 
 /**
+ * @brief Completion match mode
+ *
+ * Selects the predicate used to filter completion candidates against
+ * the typed word prefix. Applies uniformly to the bridge pre-emit
+ * filter and (subsequent commit) the in-menu type-to-filter:
+ *
+ *  - PREFIX: NFC-aware prefix match via lle_unicode_is_prefix_z.
+ *    Most predictable; matches bash / zsh consensus.
+ *  - SUBSTRING: NFC-aware substring containment via
+ *    lle_unicode_contains_z. Matches a typed pattern anywhere in
+ *    the candidate.
+ *  - FUZZY: fzy-style subsequence scoring via fuzzy_completion_score,
+ *    gated by completion.threshold. Most forgiving.
+ *
+ * Per-mode defaults: prefix for posix / bash / zsh; fuzzy for lush.
+ */
+typedef enum {
+    COMPLETION_MATCH_PREFIX,    ///< NFC prefix match (default outside lush)
+    COMPLETION_MATCH_SUBSTRING, ///< NFC substring containment
+    COMPLETION_MATCH_FUZZY      ///< fzy-style scoring (default in lush)
+} completion_match_mode_t;
+
+/**
  * @brief Configuration context structure
  *
  * Tracks the current parsing context during configuration file processing.
@@ -186,9 +209,9 @@ typedef struct {
     bool lle_readline_compatible_mode; ///< Readline compatibility mode
 
     /// Completion settings
-    bool completion_enabled;        ///< Enable tab completion
-    bool fuzzy_completion;          ///< Enable fuzzy matching
-    int completion_threshold;       ///< Minimum match score
+    bool completion_enabled;                       ///< Enable tab completion
+    completion_match_mode_t completion_match_mode; ///< Match predicate
+    int completion_threshold;                      ///< Minimum match score
     bool completion_case_sensitive; ///< Case-sensitive completion
     bool completion_show_all;       ///< Show all completions
     bool hints_enabled;             ///< Enable inline hints
@@ -507,6 +530,14 @@ bool config_validate_ambiguous_width(const char *value);
  * @return true if valid arrow mode, false otherwise
  */
 bool config_validate_lle_arrow_mode(const char *value);
+
+/**
+ * @brief Validate a completion match mode value
+ *
+ * @param value Match mode string to validate ("prefix", "substring", "fuzzy")
+ * @return true if valid match mode, false otherwise
+ */
+bool config_validate_completion_match_mode(const char *value);
 
 /**
  * @brief Validate an LLE storage mode value

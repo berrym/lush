@@ -26,6 +26,7 @@
 
 #include "compdef.h"
 #include "compdef_source.h"
+#include "config.h"
 #include "executor.h"
 #include "lle/completion/completion_system.h"
 #include "lle/completion/completion_types.h"
@@ -39,6 +40,7 @@
 #include <string.h>
 
 extern void init_symtable(void);
+extern config_values_t config;
 
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
@@ -215,6 +217,68 @@ TEST(system_dispatch_filters_candidates_by_typed_prefix) {
                 "pull filtered out by c-prefix");
 }
 
+TEST(system_dispatch_substring_mode_admits_internal_match) {
+    per_test_reset();
+    /// Substring match_mode admits candidates where the typed
+    /// prefix appears anywhere inside the candidate, not just at
+    /// the start. Buffer "git eck" -> prefix "eck" -> only
+    /// "checkout" contains "eck", so only checkout survives.
+    completion_match_mode_t saved = config.completion_match_mode;
+    config.completion_match_mode = COMPLETION_MATCH_SUBSTRING;
+
+    executor_execute_command_line(
+        test_exec,
+        "_subs() { compadd checkout branch merge clone commit pull; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_completion_result_t *result = NULL;
+    lle_result_t r =
+        lle_completion_system_generate(test_system, "git eck", 7, &result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "system_generate succeeded");
+    ASSERT_NOT_NULL(result, "result is allocated");
+    ASSERT_TRUE(find_candidate(result, "checkout") >= 0,
+                "checkout contains 'eck' as a substring");
+    ASSERT_TRUE(find_candidate(result, "branch") < 0,
+                "branch does not contain 'eck'");
+    ASSERT_TRUE(find_candidate(result, "merge") < 0,
+                "merge does not contain 'eck'");
+
+    config.completion_match_mode = saved;
+}
+
+TEST(system_dispatch_fuzzy_mode_admits_subsequence) {
+    per_test_reset();
+    /// Fuzzy match_mode admits subsequence matches. Buffer
+    /// "git cko" -> prefix "cko" -> "checkout" matches the
+    /// subsequence (c then k then o appear in order).
+    completion_match_mode_t saved_mode = config.completion_match_mode;
+    int saved_threshold = config.completion_threshold;
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    config.completion_threshold = 1;
+
+    executor_execute_command_line(
+        test_exec,
+        "_subs() { compadd checkout branch merge clone commit pull; }", 1);
+    compdef_set("git", "_subs");
+
+    lle_completion_result_t *result = NULL;
+    lle_result_t r =
+        lle_completion_system_generate(test_system, "git cko", 7, &result);
+    ASSERT_TRUE(r == LLE_SUCCESS, "system_generate succeeded");
+    ASSERT_NOT_NULL(result, "result is allocated");
+    ASSERT_TRUE(find_candidate(result, "checkout") >= 0,
+                "checkout is a subsequence-match for 'cko'");
+    /// `merge` has no 'k' so it can never subsequence-match;
+    /// `branch`'s subsequence is c-?-? but order is wrong (no k).
+    ASSERT_TRUE(find_candidate(result, "merge") < 0,
+                "merge fails the subsequence gate (no k)");
+    ASSERT_TRUE(find_candidate(result, "branch") < 0,
+                "branch fails the subsequence gate (no k in order)");
+
+    config.completion_match_mode = saved_mode;
+    config.completion_threshold = saved_threshold;
+}
+
 TEST(system_dispatch_passes_command_name_to_function) {
     per_test_reset();
     /// The function emits its $1 (command name) as a candidate. Going
@@ -248,6 +312,8 @@ int main(int argc, char **argv) {
     RUN_TEST(system_dispatch_skips_compdef_when_no_binding);
     RUN_TEST(system_dispatch_with_compdef_to_undefined_function);
     RUN_TEST(system_dispatch_filters_candidates_by_typed_prefix);
+    RUN_TEST(system_dispatch_substring_mode_admits_internal_match);
+    RUN_TEST(system_dispatch_fuzzy_mode_admits_subsequence);
     RUN_TEST(system_dispatch_passes_command_name_to_function);
 
     int rc = TEST_RESULT();

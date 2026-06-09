@@ -210,4 +210,40 @@ bool lle_unicode_is_prefix(const char *prefix, size_t prefix_len,
 bool lle_unicode_is_prefix_z(const char *prefix, const char *str,
                              const lle_unicode_compare_options_t *options);
 
+/**
+ * @brief Check if one UTF-8 string contains another as a substring
+ *
+ * Performs Unicode-normalized substring search using NFC normalization.
+ * Handles precomposed vs decomposed forms, optional case folding, and
+ * grapheme boundaries the same way as lle_unicode_is_prefix.
+ *
+ * Empty needle returns true (every string contains the empty string).
+ * Empty haystack returns false unless the needle is also empty.
+ *
+ * @param needle     Substring to search for (UTF-8)
+ * @param needle_len Length of needle in bytes
+ * @param haystack   String to search within (UTF-8)
+ * @param haystack_len Length of haystack in bytes
+ * @param options    Comparison options (NULL for defaults with normalization)
+ * @return true if a starting position in haystack matches needle codepoint-
+ *         by-codepoint under the configured options
+ */
+bool lle_unicode_contains(const char *needle, size_t needle_len,
+                          const char *haystack, size_t haystack_len,
+                          const lle_unicode_compare_options_t *options);
+
+/**
+ * @brief Check if one null-terminated UTF-8 string contains another
+ *
+ * Convenience wrapper around lle_unicode_contains() for null-terminated
+ * inputs.
+ *
+ * @param needle   Substring to search for (UTF-8, null-terminated)
+ * @param haystack String to search within (UTF-8, null-terminated)
+ * @param options  Comparison options (NULL for defaults)
+ * @return true if needle is a Unicode-normalized substring of haystack
+ */
+bool lle_unicode_contains_z(const char *needle, const char *haystack,
+                            const lle_unicode_compare_options_t *options);
+
 #endif /// LLE_UNICODE_COMPARE_H

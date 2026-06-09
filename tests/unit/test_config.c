@@ -170,6 +170,29 @@ TEST(validate_lle_arrow_mode_invalid) {
 }
 
 /* ============================================================================
+ * COMPLETION MATCH MODE VALIDATION TESTS
+ * ============================================================================
+ */
+
+TEST(validate_completion_match_mode_valid) {
+    ASSERT_TRUE(config_validate_completion_match_mode("prefix"),
+                "prefix should be valid");
+    ASSERT_TRUE(config_validate_completion_match_mode("substring"),
+                "substring should be valid");
+    ASSERT_TRUE(config_validate_completion_match_mode("fuzzy"),
+                "fuzzy should be valid");
+}
+
+TEST(validate_completion_match_mode_invalid) {
+    ASSERT_FALSE(config_validate_completion_match_mode("invalid"),
+                 "invalid mode should be rejected");
+    ASSERT_FALSE(config_validate_completion_match_mode(""),
+                 "empty string should be rejected");
+    ASSERT_FALSE(config_validate_completion_match_mode("PREFIX"),
+                 "case-mismatched mode should be rejected");
+}
+
+/* ============================================================================
  * LLE STORAGE MODE VALIDATION TESTS
  * ============================================================================
  */
@@ -669,6 +692,8 @@ int main(void) {
     printf("\n=== LLE Arrow Mode Validation Tests ===\n");
     RUN_TEST(validate_lle_arrow_mode_valid);
     RUN_TEST(validate_lle_arrow_mode_invalid);
+    RUN_TEST(validate_completion_match_mode_valid);
+    RUN_TEST(validate_completion_match_mode_invalid);
 
     /// LLE storage mode validation
     printf("\n=== LLE Storage Mode Validation Tests ===\n");
