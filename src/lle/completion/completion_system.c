@@ -276,8 +276,16 @@ lle_completion_system_generate(lle_completion_system_t *system,
             .enable_scrolling = true,
             .min_items_for_menu = 2};
 
-        res = lle_completion_menu_state_create(system->pool, result,
-                                               &menu_config, &menu);
+        /// Pass the dequoted word prefix so the menu's in-menu
+        /// type-to-filter pass can construct the combined prefix
+        /// (original_prefix + filter_string) when the user types
+        /// additional characters while the menu is open.
+        const char *original_prefix =
+            (context && context->dequoted_filename_prefix)
+                ? context->dequoted_filename_prefix
+                : "";
+        res = lle_completion_menu_state_create(
+            system->pool, result, &menu_config, original_prefix, &menu);
         if (res != LLE_SUCCESS) {
             /// state owns result and context, so freeing state frees them too.
             /// Do NOT call result_free or context_free separately - that would

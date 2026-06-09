@@ -16,6 +16,11 @@
  */
 
 #include "lle/completion/completion_menu_state.h"
+
+#include "lle/completion/menu_filter.h"
+#include "lle/utf8_support.h"
+
+#include <stdint.h>
 #include <string.h>
 
 /// ============================================================================
@@ -108,11 +113,10 @@ calculate_category_positions(lle_completion_menu_state_t *state) {
  * @param state Output for created state
  * @return LLE_SUCCESS or error code
  */
-lle_result_t
-lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
-                                 lle_completion_result_t *result,
-                                 const lle_completion_menu_config_t *config,
-                                 lle_completion_menu_state_t **state) {
+lle_result_t lle_completion_menu_state_create(
+    lle_memory_pool_t *memory_pool, lle_completion_result_t *result,
+    const lle_completion_menu_config_t *config, const char *original_prefix,
+    lle_completion_menu_state_t **state) {
     if (!memory_pool || !result || !state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -135,6 +139,27 @@ lle_completion_menu_state_create(lle_memory_pool_t *memory_pool,
     new_state->category_count = 0;
     new_state->menu_active = true; /// Menu is active when created
     new_state->memory_pool = memory_pool;
+
+    /// In-menu type-to-filter state. unfiltered_result aliases the
+    /// engine's result so apply_filter has a stable source to scan;
+    /// filter_string starts empty and lazily allocates on first
+    /// append. original_prefix is duplicated into the pool when the
+    /// caller passes a non-empty value so it survives the source
+    /// context's lifetime.
+    new_state->unfiltered_result = result;
+    new_state->filtered_result = NULL;
+    new_state->filter_string = NULL;
+    new_state->filter_len = 0;
+    new_state->filter_capacity = 0;
+    new_state->original_prefix = NULL;
+    if (original_prefix && original_prefix[0] != '\0') {
+        size_t pref_len = strlen(original_prefix);
+        new_state->original_prefix = (char *)lle_pool_alloc(pref_len + 1);
+        if (new_state->original_prefix) {
+            memcpy(new_state->original_prefix, original_prefix, pref_len);
+            new_state->original_prefix[pref_len] = '\0';
+        }
+    }
 
     /// Copy configuration or use defaults
     if (config) {
@@ -181,11 +206,201 @@ lle_completion_menu_state_free(lle_completion_menu_state_t *state) {
         lle_pool_free(state->category_positions);
     }
 
+    /// Filter-state buffers are pool-allocated; release them so a
+    /// recycled pool does not retain stale entries. unfiltered_result
+    /// is owned by the completion system; filtered_result owns its
+    /// items array (pool-allocated) but not the per-item strings
+    /// (those alias into unfiltered_result and the completion
+    /// system's pool).
+    if (state->filter_string) {
+        lle_pool_free(state->filter_string);
+    }
+    if (state->original_prefix) {
+        lle_pool_free(state->original_prefix);
+    }
+    if (state->filtered_result) {
+        if (state->filtered_result->items) {
+            lle_pool_free(state->filtered_result->items);
+        }
+        lle_pool_free(state->filtered_result);
+    }
+
     /// Free state structure
     /// Note: result is owned by caller, so we don't free it
     lle_pool_free(state);
 
     return LLE_SUCCESS;
+}
+
+/// ============================================================================
+/// TYPE-TO-FILTER STATE OPERATIONS
+/// ============================================================================
+
+/// Build the combined prefix used by the filter predicate. Writes up
+/// to out_size-1 bytes followed by a NUL. Returns the bytes written
+/// (excluding NUL), or -1 if the combined string would not fit.
+static int combine_prefix(const lle_completion_menu_state_t *state, char *out,
+                          size_t out_size) {
+    size_t orig_len =
+        state->original_prefix ? strlen(state->original_prefix) : 0;
+    size_t total = orig_len + state->filter_len;
+    if (total + 1 > out_size) {
+        return -1;
+    }
+    if (orig_len) {
+        memcpy(out, state->original_prefix, orig_len);
+    }
+    if (state->filter_len) {
+        memcpy(out + orig_len, state->filter_string, state->filter_len);
+    }
+    out[total] = '\0';
+    return (int)total;
+}
+
+bool lle_completion_menu_filter_active(
+    const lle_completion_menu_state_t *state) {
+    return state != NULL && state->filter_len > 0;
+}
+
+lle_result_t
+lle_completion_menu_apply_filter(lle_completion_menu_state_t *state) {
+    if (!state) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+    if (!state->unfiltered_result) {
+        /// Menu has no source to scan -- nothing to do.
+        return LLE_SUCCESS;
+    }
+
+    /// Empty filter clamps back to the unfiltered view. The filtered
+    /// items buffer is intentionally retained so future filter
+    /// additions can reuse its capacity without a second allocation.
+    if (state->filter_len == 0) {
+        state->result = state->unfiltered_result;
+        state->selected_index = 0;
+        state->first_visible = 0;
+        return LLE_SUCCESS;
+    }
+
+    char combined[1024];
+    if (combine_prefix(state, combined, sizeof(combined)) < 0) {
+        /// Combined prefix exceeds our scratch buffer; refuse to
+        /// narrow rather than truncate (truncation would silently
+        /// admit candidates that don't match the actual input).
+        return LLE_ERROR_OUT_OF_MEMORY;
+    }
+
+    /// Lazily allocate the filtered_result container and items array
+    /// on first use. The items array is sized to the full unfiltered
+    /// capacity so it never reallocates as filtered_count grows or
+    /// shrinks between filter passes.
+    if (!state->filtered_result) {
+        state->filtered_result = (lle_completion_result_t *)lle_pool_alloc(
+            sizeof(lle_completion_result_t));
+        if (!state->filtered_result) {
+            return LLE_ERROR_OUT_OF_MEMORY;
+        }
+        memset(state->filtered_result, 0, sizeof(lle_completion_result_t));
+        size_t cap = state->unfiltered_result->count;
+        if (cap == 0) {
+            cap = 1;
+        }
+        state->filtered_result->items = (lle_completion_item_t *)lle_pool_alloc(
+            cap * sizeof(lle_completion_item_t));
+        if (!state->filtered_result->items) {
+            return LLE_ERROR_OUT_OF_MEMORY;
+        }
+        state->filtered_result->capacity = cap;
+    }
+
+    /// Shallow-copy admitted items; per-item strings live in the
+    /// unfiltered result's pool and are not duplicated.
+    size_t kept = 0;
+    for (size_t i = 0; i < state->unfiltered_result->count; i++) {
+        const lle_completion_item_t *item = &state->unfiltered_result->items[i];
+        if (!item->text) {
+            continue;
+        }
+        if (lle_completion_filter_invoke(combined, item->text)) {
+            state->filtered_result->items[kept++] = *item;
+        }
+    }
+    state->filtered_result->count = kept;
+
+    state->result = state->filtered_result;
+    state->selected_index = 0;
+    state->first_visible = 0;
+    return LLE_SUCCESS;
+}
+
+lle_result_t
+lle_completion_menu_append_filter_char(lle_completion_menu_state_t *state,
+                                       uint32_t codepoint) {
+    if (!state) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    char encoded[4];
+    int n = lle_utf8_encode_codepoint(codepoint, encoded);
+    if (n <= 0) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    /// Grow filter_string to fit. Start at 16 bytes (enough for any
+    /// realistic shell filter session) and double thereafter so the
+    /// amortized cost stays linear in the typed length.
+    size_t needed = state->filter_len + (size_t)n + 1;
+    if (needed > state->filter_capacity) {
+        size_t new_cap = state->filter_capacity ? state->filter_capacity : 16;
+        while (new_cap < needed) {
+            new_cap *= 2;
+        }
+        char *new_buf = (char *)lle_pool_alloc(new_cap);
+        if (!new_buf) {
+            return LLE_ERROR_OUT_OF_MEMORY;
+        }
+        if (state->filter_len) {
+            memcpy(new_buf, state->filter_string, state->filter_len);
+        }
+        if (state->filter_string) {
+            lle_pool_free(state->filter_string);
+        }
+        state->filter_string = new_buf;
+        state->filter_capacity = new_cap;
+    }
+
+    memcpy(state->filter_string + state->filter_len, encoded, (size_t)n);
+    state->filter_len += (size_t)n;
+    state->filter_string[state->filter_len] = '\0';
+
+    return lle_completion_menu_apply_filter(state);
+}
+
+lle_result_t
+lle_completion_menu_pop_filter_char(lle_completion_menu_state_t *state) {
+    if (!state) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+    if (state->filter_len == 0) {
+        return LLE_SUCCESS;
+    }
+
+    /// Walk backward over UTF-8 continuation bytes (0x80-0xBF) to find
+    /// the start of the last codepoint, then truncate there. A single
+    /// ASCII byte hits the != continuation test on the first
+    /// iteration so the cost is constant for the common case.
+    size_t i = state->filter_len;
+    while (i > 0) {
+        i--;
+        unsigned char b = (unsigned char)state->filter_string[i];
+        if ((b & 0xC0) != 0x80) {
+            break;
+        }
+    }
+    state->filter_len = i;
+    state->filter_string[i] = '\0';
+
+    return lle_completion_menu_apply_filter(state);
 }
 
 /// ============================================================================

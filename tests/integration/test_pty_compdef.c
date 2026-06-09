@@ -145,6 +145,48 @@ int main(int argc, char **argv_main) {
                 s.out_len, s.output);
     }
 
+    /// In-menu type-to-filter: open the menu with a bare prefix,
+    /// then type additional characters while the menu is visible.
+    /// The new chars must narrow the menu rather than insert into
+    /// the buffer; "checkout" must stay visible after typing "h"
+    /// because it is the only candidate that matches "ch".
+    pty_send(&s, "\x03");
+    pty_drain(&s, 100);
+
+    s.out_len = 0;
+    s.output[0] = '\0';
+    /// Open menu with prefix "c": all three c-prefix candidates
+    /// (checkout, clone, commit) appear; first is auto-previewed.
+    pty_send(&s, "git c\t");
+    pty_drain(&s, 500);
+    /// Type 'h' while menu is open. The keybinding intercept treats
+    /// it as a filter keystroke; result must narrow to "checkout"
+    /// only.
+    pty_send(&s, "h");
+    pty_drain(&s, 500);
+
+    if (!strstr(s.output, "checkout")) {
+        fprintf(stderr,
+                "test_pty_compdef: 'checkout' missing after in-menu 'h'\n");
+        failures++;
+    }
+    if (strstr(s.output, "clone")) {
+        fprintf(stderr, "test_pty_compdef: 'clone' leaked after in-menu 'h'\n");
+        failures++;
+    }
+    if (strstr(s.output, "commit")) {
+        fprintf(stderr,
+                "test_pty_compdef: 'commit' leaked after in-menu 'h'\n");
+        failures++;
+    }
+
+    if (failures) {
+        fprintf(stderr,
+                "test_pty_compdef: in-menu type-to-filter output "
+                "(%zu bytes):\n---\n%s\n---\n",
+                s.out_len, s.output);
+    }
+
     pty_send(&s, "\x03");
     pty_drain(&s, 100);
     pty_send(&s, "exit\r");

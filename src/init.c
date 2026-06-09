@@ -22,6 +22,7 @@
 #include "compat.h"
 #include "compdef.h"
 #include "compdef_source.h"
+#include "completion_filter.h"
 #include "config.h"
 #include "dirstack.h"
 #include "errors.h"
@@ -944,6 +945,11 @@ int init(int argc, char **argv, FILE **in) {
     /// call is a no-op inside liblle; we still call it unconditionally
     /// to keep the init sequence linear.
     compdef_source_init();
+
+    /// Register completion_filter_admits with the LLE menu/bridge so
+    /// the in-menu type-to-filter pass and the compdef pre-emit
+    /// filter share a single predicate driven by completion.match_mode.
+    completion_filter_bridge_init();
 
     /// Initialize command hash table
     init_command_hash();

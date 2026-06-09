@@ -205,6 +205,7 @@ lle_sources += files(
   'completion/completion_menu_state.c',
   'completion/completion_menu_logic.c',
   'completion/completion_menu_renderer.c',
+  'completion/menu_filter.c',
   'completion/source_manager.c',
   'completion/completion_state.c',
   'completion/completion_system.c',

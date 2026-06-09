@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "fuzzy_match.h"
+#include "lle/completion/menu_filter.h"
 #include "lle/unicode_compare.h"
 
 /// Project-wide config storage. Defined in src/config.c.
@@ -41,4 +42,8 @@ bool completion_filter_admits(const char *prefix, const char *candidate) {
     default:
         return lle_unicode_is_prefix_z(prefix, candidate, &cmp_opts);
     }
+}
+
+void completion_filter_bridge_init(void) {
+    lle_completion_set_filter_fn(completion_filter_admits);
 }
