@@ -11,9 +11,10 @@
  * docs/lle_specification/05_libhashtable_integration_complete.md
  *
  * COMPLIANCE:
- * - Uses libhashtable (ht_strblob_t) as exclusive hashtable solution.
- *   Switched from ht_strstr_t for binary safety (issue #49) so cached
- *   entries containing embedded NUL bytes round-trip intact.
+ * - Uses libhashtable (ht_u64blob_t) as exclusive hashtable solution.
+ *   The uint64 cache key is hashed directly with the integer finalizer; the
+ *   blob value preserves embedded NUL bytes (issue #49) so cached entries
+ *   round-trip intact.
  * - Thread-safe operations with pthread_rwlock
  * - Full memory pool integration
  * - Comprehensive error handling
@@ -356,7 +357,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /// rwlock and metrics so the bare libhashtable type is sufficient
     /// here; an lle_strblob wrapper can be added later if a second
     /// consumer needs memory-context or metrics integration.
-    c->cache_table = ht_strblob_create(NULL);
+    c->cache_table = ht_u64blob_create(NULL);
     if (!c->cache_table) {
         lle_pool_free(c);
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -365,7 +366,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /// Step 5: Allocate cache metrics
     c->metrics = lle_pool_alloc(sizeof(lle_cache_metrics_t));
     if (!c->metrics) {
-        ht_strblob_destroy(c->cache_table);
+        ht_u64blob_destroy(c->cache_table);
         lle_pool_free(c);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -376,7 +377,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         &c->policy, LLE_CACHE_DEFAULT_MAX_ENTRIES, memory_pool);
     if (result != LLE_SUCCESS) {
         lle_pool_free(c->metrics);
-        ht_strblob_destroy(c->cache_table);
+        ht_u64blob_destroy(c->cache_table);
         lle_pool_free(c);
         return result;
     }
@@ -385,7 +386,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     if (pthread_rwlock_init(&c->cache_lock, NULL) != 0) {
         lle_cache_policy_cleanup(c->policy);
         lle_pool_free(c->metrics);
-        ht_strblob_destroy(c->cache_table);
+        ht_u64blob_destroy(c->cache_table);
         lle_pool_free(c);
         return LLE_ERROR_INITIALIZATION_FAILED;
     }
@@ -408,7 +409,7 @@ lle_result_t lle_display_cache_cleanup(lle_display_cache_t *cache) {
 
     /// Destroy libhashtable (frees all entries)
     if (cache->cache_table) {
-        ht_strblob_destroy(cache->cache_table);
+        ht_u64blob_destroy(cache->cache_table);
     }
 
     /// Destroy lock
@@ -448,11 +449,7 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Step 2: Convert key to string
-    char key_str[32];
-    snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
-
-    /// Step 3: Create cache entry
+    /// Step 2: Create cache entry
     lle_cached_entry_t entry;
     memset(&entry, 0, sizeof(entry));
     entry.data = (void *)data;
@@ -467,20 +464,20 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
     entry.access_count = 0;
     entry.valid = true;
 
-    /// Step 4: Serialize entry into a length-prefixed binary blob
+    /// Step 3: Serialize entry into a length-prefixed binary blob
     size_t serialized_size = 0;
     void *serialized = serialize_cache_entry(&entry, &serialized_size);
     if (!serialized) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /// Step 5: Acquire write lock
+    /// Step 4: Acquire write lock
     pthread_rwlock_wrlock(&cache->cache_lock);
 
-    /// Step 6: Insert into libhashtable (deep copies the blob)
-    ht_strblob_insert(cache->cache_table, key_str, serialized, serialized_size);
+    /// Step 5: Insert into libhashtable (deep copies the blob)
+    ht_u64blob_insert(cache->cache_table, key, serialized, serialized_size);
 
-    /// Step 7: Release lock
+    /// Step 6: Release lock
     pthread_rwlock_unlock(&cache->cache_lock);
 
     /// Free serialized buffer (libhashtable made its own copy)
@@ -507,17 +504,13 @@ lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Step 2: Convert key to string
-    char key_str[32];
-    snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
-
-    /// Step 3: Acquire read lock
+    /// Step 2: Acquire read lock
     pthread_rwlock_rdlock(&cache->cache_lock);
 
-    /// Step 4: Lookup in libhashtable
+    /// Step 3: Lookup in libhashtable
     size_t serialized_size = 0;
     const void *serialized =
-        ht_strblob_get(cache->cache_table, key_str, &serialized_size);
+        ht_u64blob_get(cache->cache_table, key, &serialized_size);
 
     if (!serialized) {
         /// Cache miss
@@ -567,15 +560,11 @@ lle_result_t lle_display_cache_invalidate(lle_display_cache_t *cache,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Convert key to string
-    char key_str[32];
-    snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
-
     /// Acquire write lock
     pthread_rwlock_wrlock(&cache->cache_lock);
 
     /// Remove from libhashtable
-    ht_strblob_remove(cache->cache_table, key_str);
+    ht_u64blob_remove(cache->cache_table, key);
 
     /// Update metrics
     cache->metrics->evictions++;
@@ -604,10 +593,10 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
 
     /// Destroy and recreate libhashtable to clear all entries
     if (cache->cache_table) {
-        ht_strblob_destroy(cache->cache_table);
+        ht_u64blob_destroy(cache->cache_table);
     }
 
-    cache->cache_table = ht_strblob_create(NULL);
+    cache->cache_table = ht_u64blob_create(NULL);
     if (!cache->cache_table) {
         pthread_rwlock_unlock(&cache->cache_lock);
         return LLE_ERROR_OUT_OF_MEMORY;
