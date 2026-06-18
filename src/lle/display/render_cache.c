@@ -356,7 +356,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /// rwlock and metrics so the bare libhashtable type is sufficient
     /// here; an lle_strblob wrapper can be added later if a second
     /// consumer needs memory-context or metrics integration.
-    c->cache_table = ht_strblob_create(HT_SEED_RANDOM);
+    c->cache_table = ht_strblob_create(NULL);
     if (!c->cache_table) {
         lle_pool_free(c);
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -607,7 +607,7 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
         ht_strblob_destroy(cache->cache_table);
     }
 
-    cache->cache_table = ht_strblob_create(HT_SEED_RANDOM);
+    cache->cache_table = ht_strblob_create(NULL);
     if (!cache->cache_table) {
         pthread_rwlock_unlock(&cache->cache_lock);
         return LLE_ERROR_OUT_OF_MEMORY;

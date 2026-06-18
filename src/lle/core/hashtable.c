@@ -54,7 +54,8 @@ lle_set_current_memory_context(lle_hashtable_memory_context_t *ctx) {
  * @param key The key to copy (must be a null-terminated string)
  * @return Pointer to the copied key, or NULL on failure
  */
-void *lle_hashtable_key_copy_pooled(const void *key) {
+void *lle_hashtable_key_copy_pooled(const void *key, void *user_data) {
+    (void)user_data;
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!key || !ctx || !ctx->pool) {
@@ -88,7 +89,8 @@ void *lle_hashtable_key_copy_pooled(const void *key) {
  * @brief Free a key that was allocated from the memory pool
  * @param key The key to free (may be NULL)
  */
-void lle_hashtable_key_free_pooled(const void *key) {
+void lle_hashtable_key_free_pooled(const void *key, void *user_data) {
+    (void)user_data;
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!key) {
@@ -115,7 +117,8 @@ void lle_hashtable_key_free_pooled(const void *key) {
  * @param value The value to copy (must be a null-terminated string)
  * @return Pointer to the copied value, or NULL on failure
  */
-void *lle_hashtable_value_copy_pooled(const void *value) {
+void *lle_hashtable_value_copy_pooled(const void *value, void *user_data) {
+    (void)user_data;
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!value || !ctx || !ctx->pool) {
@@ -149,7 +152,8 @@ void *lle_hashtable_value_copy_pooled(const void *value) {
  * @brief Free a value that was allocated from the memory pool
  * @param value The value to free (may be NULL)
  */
-void lle_hashtable_value_free_pooled(const void *value) {
+void lle_hashtable_value_free_pooled(const void *value, void *user_data) {
+    (void)user_data;
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!value) {
@@ -468,13 +472,10 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
         lle_set_current_memory_context(ht_wrapper->mem_ctx);
     }
 
-    /// Create underlying libhashtable
-    uint32_t flags = 0;
-    if (cfg->random_seed) {
-        flags |= HT_SEED_RANDOM;
-    }
-
-    ht_wrapper->ht = ht_strstr_create(flags);
+    /// Create underlying libhashtable. lush's keys are local and trusted, so
+    /// the table runs unkeyed FNV-1a; cfg->random_seed (old HT_SEED_RANDOM) is
+    /// not flooding resistance and is intentionally not translated.
+    ht_wrapper->ht = ht_strstr_create(NULL);
     if (!ht_wrapper->ht) {
         if (ht_wrapper->mem_ctx) {
             free(ht_wrapper->mem_ctx);
@@ -552,8 +553,8 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
 
 lle_result_t lle_hashtable_factory_create_generic(
     lle_hashtable_factory_t *factory, const lle_hashtable_config_t *config,
-    ht_hash hash_func, ht_keyeq key_eq, const ht_callbacks_t *callbacks,
-    lle_generic_hashtable_t **hashtable) {
+    ht_hash hash_func, ht_keyeq key_eq, ht_keylen key_len,
+    const ht_callbacks_t *callbacks, lle_generic_hashtable_t **hashtable) {
     if (!factory || !hashtable) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -593,9 +594,14 @@ lle_result_t lle_hashtable_factory_create_generic(
         lle_set_current_memory_context(ht_wrapper->mem_ctx);
     }
 
-    /// Create underlying libhashtable (requires flags parameter)
-    uint32_t flags = cfg->random_seed ? HT_SEED_RANDOM : 0;
-    ht_wrapper->ht = ht_create(hash_func, key_eq, callbacks, flags);
+    /// Create underlying libhashtable. cfg->random_seed (old HT_SEED_RANDOM) is
+    /// not flooding resistance and is intentionally not translated.
+    ht_wrapper->ht = ht_create(&(ht_options_t){
+        .hash = hash_func,
+        .keyeq = key_eq,
+        .keylen = key_len,
+        .callbacks = callbacks ? *callbacks : (ht_callbacks_t){0},
+    });
     if (!ht_wrapper->ht) {
         if (ht_wrapper->mem_ctx) {
             free(ht_wrapper->mem_ctx);

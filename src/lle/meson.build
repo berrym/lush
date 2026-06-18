@@ -28,17 +28,8 @@ lle_sources += files('../lush_memory_pool.c')
 # TOML parser (shared with main config system)
 lle_sources += files('../toml_parser.c')
 
-# libhashtable (Spec 05)
-libhashtable_root = '../libhashtable'
-lle_sources += files(
-  libhashtable_root + '/ht.c',
-  libhashtable_root + '/ht_fnv1a.c',
-  libhashtable_root + '/ht_strdouble.c',
-  libhashtable_root + '/ht_strfloat.c',
-  libhashtable_root + '/ht_strblob.c',
-  libhashtable_root + '/ht_strint.c',
-  libhashtable_root + '/ht_strstr.c',
-)
+# libhashtable 0.9.0 is provided by the meson subproject (libhashtable_dep,
+# wired into lle_lib/lle_dep in the top-level meson.build), not vendored sources.
 
 # ============================================================================
 # CORE MODULE (Spec 14, 15, 16, 17, 25)

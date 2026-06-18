@@ -16,7 +16,7 @@
  */
 
 #include "lle/keybinding.h"
-#include "libhashtable/ht.h"
+#include "ht.h"
 #include "lle/hashtable.h"
 #include "lle/keybinding_actions.h"
 #include <ctype.h>

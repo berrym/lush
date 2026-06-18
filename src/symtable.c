@@ -60,7 +60,6 @@ static unsigned int random_seed = 0; /// For $RANDOM
 static int current_lineno = 0;       /// For $LINENO
 
 /// Constants
-#define DEFAULT_HT_FLAGS (HT_STR_NONE | HT_SEED_RANDOM)
 #define MAX_SCOPE_DEPTH 256
 /// Separator between value and metadata fields in the serialized
 /// per-binding storage string. Must be a byte that can never appear
@@ -261,7 +260,7 @@ symtable_manager_t *symtable_manager_new(void) {
 
     global->scope_type = SCOPE_GLOBAL;
     global->level = 0;
-    global->vars_ht = ht_strstr_create(DEFAULT_HT_FLAGS);
+    global->vars_ht = ht_strstr_create(NULL);
     global->parent = NULL;
     global->scope_name = strdup("global");
 
@@ -404,7 +403,7 @@ int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
 
     new_scope->scope_type = type;
     new_scope->level = manager->current_scope->level + 1;
-    new_scope->vars_ht = ht_strstr_create(DEFAULT_HT_FLAGS);
+    new_scope->vars_ht = ht_strstr_create(NULL);
     new_scope->parent = manager->current_scope;
     new_scope->scope_name = strdup(name);
 
@@ -490,7 +489,7 @@ int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
 
     new_scope->scope_type = SCOPE_LEXICAL;
     new_scope->level = manager->current_scope->level + 1;
-    new_scope->vars_ht = ht_strstr_create(DEFAULT_HT_FLAGS);
+    new_scope->vars_ht = ht_strstr_create(NULL);
     new_scope->parent = parent;
     new_scope->scope_name = strdup(name);
 
@@ -2495,7 +2494,7 @@ array_value_t *symtable_array_create(bool is_associative) {
 
     if (is_associative) {
         /// Create hash table for associative array
-        array->assoc_map = ht_strstr_create(DEFAULT_HT_FLAGS);
+        array->assoc_map = ht_strstr_create(NULL);
         if (!array->assoc_map) {
             free(array);
             return NULL;

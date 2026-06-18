@@ -256,8 +256,8 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
  */
 lle_result_t lle_hashtable_factory_create_generic(
     lle_hashtable_factory_t *factory, const lle_hashtable_config_t *config,
-    ht_hash hash_func, ht_keyeq key_eq, const ht_callbacks_t *callbacks,
-    lle_generic_hashtable_t **hashtable);
+    ht_hash hash_func, ht_keyeq key_eq, ht_keylen key_len,
+    const ht_callbacks_t *callbacks, lle_generic_hashtable_t **hashtable);
 
 /* ============================================================================
  * CONFIGURATION FUNCTIONS
@@ -372,22 +372,22 @@ lle_hashtable_integrate_memory_pool(lle_hashtable_factory_t *factory,
 /**
  * @brief Memory pool callback: key copy
  */
-void *lle_hashtable_key_copy_pooled(const void *key);
+void *lle_hashtable_key_copy_pooled(const void *key, void *user_data);
 
 /**
  * @brief Memory pool callback: key free
  */
-void lle_hashtable_key_free_pooled(const void *key);
+void lle_hashtable_key_free_pooled(const void *key, void *user_data);
 
 /**
  * @brief Memory pool callback: value copy
  */
-void *lle_hashtable_value_copy_pooled(const void *value);
+void *lle_hashtable_value_copy_pooled(const void *value, void *user_data);
 
 /**
  * @brief Memory pool callback: value free
  */
-void lle_hashtable_value_free_pooled(const void *value);
+void lle_hashtable_value_free_pooled(const void *value, void *user_data);
 
 /* ============================================================================
  * REGISTRY FUNCTIONS

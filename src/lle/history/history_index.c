@@ -29,8 +29,9 @@
  * @param seed Hash seed (unused for deterministic hashing)
  * @return Hash value
  */
-static uint64_t hash_uint64(const void *key, uint64_t seed) {
-    (void)seed; /// Unused for deterministic integer hashing
+static uint64_t hash_uint64(const void *key, size_t len, const void *hashkey) {
+    (void)len;     /// Fixed-width key; the hash reads the full uint64_t
+    (void)hashkey; /// Unkeyed deterministic integer hashing
 
     uint64_t k = *(const uint64_t *)key;
 
@@ -44,6 +45,16 @@ static uint64_t hash_uint64(const void *key, uint64_t seed) {
     k = k + (k << 31);
 
     return k;
+}
+
+/**
+ * @brief Key length for uint64_t keys, fed to the hash function.
+ * @param key Pointer to the uint64_t key (unused; length is constant)
+ * @return sizeof(uint64_t)
+ */
+static size_t keylen_uint64(const void *key) {
+    (void)key;
+    return sizeof(uint64_t);
 }
 
 /**
@@ -61,7 +72,8 @@ static bool eq_uint64(const void *key1, const void *key2) {
  * @param key Key to copy
  * @return Pointer to copied key, or NULL on allocation failure
  */
-static void *copy_uint64_key(const void *key) {
+static void *copy_uint64_key(const void *key, void *user_data) {
+    (void)user_data;
     uint64_t *new_key = lle_pool_alloc(sizeof(uint64_t));
     if (new_key) {
         *new_key = *(const uint64_t *)key;
@@ -73,7 +85,8 @@ static void *copy_uint64_key(const void *key) {
  * @brief Key free function for uint64_t keys
  * @param key Key to free
  */
-static void free_uint64_key(const void *key) {
+static void free_uint64_key(const void *key, void *user_data) {
+    (void)user_data;
     if (key) {
         lle_pool_free((void *)key);
     }
@@ -84,7 +97,10 @@ static void free_uint64_key(const void *key) {
  * @param value Entry pointer to store
  * @return The same pointer (entries are managed by history core)
  */
-static void *copy_entry_ptr(const void *value) { return (void *)value; }
+static void *copy_entry_ptr(const void *value, void *user_data) {
+    (void)user_data;
+    return (void *)value;
+}
 
 /**
  * @brief Value free function - no-op for entry pointers
@@ -93,8 +109,9 @@ static void *copy_entry_ptr(const void *value) { return (void *)value; }
  *
  * @param value Entry pointer (unused)
  */
-static void free_entry_ptr(const void *value) {
+static void free_entry_ptr(const void *value, void *user_data) {
     (void)value; /// No-op - entries are owned by history core
+    (void)user_data;
 }
 
 /* ============================================================================
@@ -119,15 +136,17 @@ lle_result_t lle_history_index_create(lle_hashtable_t **index,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Set up callbacks for uint64_t keys and entry pointer values
-    ht_callbacks_t callbacks = {.key_copy = copy_uint64_key,
-                                .key_free = free_uint64_key,
-                                .val_copy = copy_entry_ptr,
-                                .val_free = free_entry_ptr};
-
     /// Create hashtable with custom hash and equality functions
-    ht_t *ht = ht_create(hash_uint64, eq_uint64, &callbacks,
-                         (unsigned int)initial_capacity);
+    ht_t *ht = ht_create(&(ht_options_t){
+        .hash = hash_uint64,
+        .keyeq = eq_uint64,
+        .keylen = keylen_uint64,
+        .callbacks = {.key_copy = copy_uint64_key,
+                      .key_free = free_uint64_key,
+                      .val_copy = copy_entry_ptr,
+                      .val_free = free_entry_ptr},
+        .initial_capacity = initial_capacity,
+    });
     if (!ht) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }

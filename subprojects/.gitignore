@@ -1,0 +1,7 @@
+/*
+!/.gitignore
+!/*.wrap
+!/packagecache/
+# Track the committed release tarball even though the repo-root .gitignore
+# excludes *.tar.gz; the packagecache copy is what makes the build hermetic.
+!/packagecache/*.tar.gz

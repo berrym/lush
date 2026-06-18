@@ -43,10 +43,12 @@ static ht_strstr_t *global_aliases = NULL;
  */
 void init_aliases(void) {
     if (aliases == NULL) {
-        aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+        aliases =
+            ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
     }
     if (global_aliases == NULL) {
-        global_aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+        global_aliases =
+            ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
     }
 
     /// set some example aliases
@@ -968,7 +970,8 @@ int bin_unalias(int argc, char **argv) {
     if (argc == 2 && strcmp(argv[1], "-a") == 0) {
         if (aliases) {
             ht_strstr_destroy(aliases);
-            aliases = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+            aliases =
+                ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
         }
         return 0;
     }

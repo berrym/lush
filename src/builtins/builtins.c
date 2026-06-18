@@ -471,7 +471,8 @@ int builtin_loop_control(int argc, char **argv, const char *verb,
 
 void init_command_hash(void) {
     if (command_hash == NULL) {
-        command_hash = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+        command_hash =
+            ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
     }
 }
 
