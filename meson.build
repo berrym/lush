@@ -56,9 +56,7 @@ inc = include_directories('include',
 # hermetic and offline. Built static so the lush binary carries no shared dependency.
 libhashtable_dep = dependency('libhashtable',
                               fallback: ['libhashtable', 'libhashtable_dep'],
-                              default_options: ['default_library=static',
-                                                'warning_level=1',
-                                                'werror=false'])
+                              default_options: ['default_library=static'])
 
 src = ['src/arithmetic.c',
        'src/autocorrect.c',
