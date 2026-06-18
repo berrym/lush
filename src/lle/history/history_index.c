@@ -8,111 +8,17 @@
  * Phase: Phase 1 Day 2 - Entry Management and Indexing
  *
  * Provides hashtable-based indexing for O(1) entry lookup by ID.
- * Uses libhashtable (Spec 05) with custom hash functions for uint64_t keys.
+ * Uses the libhashtable ht_u64ptr wrapper: a uint64 key hashed directly with
+ * the integer finalizer, mapping to a caller-owned entry pointer. The wrapper
+ * copies the 8-byte key and stores the entry pointer as given; the history core
+ * owns entry lifetime, so the table frees neither the entries nor (here) more.
  */
 
 #include "ht.h"
 #include "lle/error_handling.h"
 #include "lle/history.h"
-#include "lle/memory_management.h"
 #include <stdlib.h>
 #include <string.h>
-
-/* ============================================================================
- * HASH FUNCTIONS FOR UINT64_T KEYS
- * ============================================================================
- */
-
-/**
- * @brief Hash function for uint64_t keys using Thomas Wang's algorithm
- * @param key Pointer to uint64_t key
- * @param seed Hash seed (unused for deterministic hashing)
- * @return Hash value
- */
-static uint64_t hash_uint64(const void *key, size_t len, const void *hashkey) {
-    (void)len;     /// Fixed-width key; the hash reads the full uint64_t
-    (void)hashkey; /// Unkeyed deterministic integer hashing
-
-    uint64_t k = *(const uint64_t *)key;
-
-    /// Thomas Wang's 64-bit integer hash
-    k = (~k) + (k << 21);
-    k = k ^ (k >> 24);
-    k = (k + (k << 3)) + (k << 8);
-    k = k ^ (k >> 14);
-    k = (k + (k << 2)) + (k << 4);
-    k = k ^ (k >> 28);
-    k = k + (k << 31);
-
-    return k;
-}
-
-/**
- * @brief Key length for uint64_t keys, fed to the hash function.
- * @param key Pointer to the uint64_t key (unused; length is constant)
- * @return sizeof(uint64_t)
- */
-static size_t keylen_uint64(const void *key) {
-    (void)key;
-    return sizeof(uint64_t);
-}
-
-/**
- * @brief Equality function for uint64_t keys
- * @param key1 First key to compare
- * @param key2 Second key to compare
- * @return true if keys are equal, false otherwise
- */
-static bool eq_uint64(const void *key1, const void *key2) {
-    return *(const uint64_t *)key1 == *(const uint64_t *)key2;
-}
-
-/**
- * @brief Key copy function - allocates and copies uint64_t
- * @param key Key to copy
- * @return Pointer to copied key, or NULL on allocation failure
- */
-static void *copy_uint64_key(const void *key, void *user_data) {
-    (void)user_data;
-    uint64_t *new_key = lle_pool_alloc(sizeof(uint64_t));
-    if (new_key) {
-        *new_key = *(const uint64_t *)key;
-    }
-    return new_key;
-}
-
-/**
- * @brief Key free function for uint64_t keys
- * @param key Key to free
- */
-static void free_uint64_key(const void *key, void *user_data) {
-    (void)user_data;
-    if (key) {
-        lle_pool_free((void *)key);
-    }
-}
-
-/**
- * @brief Value copy function - returns pointer as-is (no deep copy)
- * @param value Entry pointer to store
- * @return The same pointer (entries are managed by history core)
- */
-static void *copy_entry_ptr(const void *value, void *user_data) {
-    (void)user_data;
-    return (void *)value;
-}
-
-/**
- * @brief Value free function - no-op for entry pointers
- *
- * Entries are managed by history core, not the hashtable.
- *
- * @param value Entry pointer (unused)
- */
-static void free_entry_ptr(const void *value, void *user_data) {
-    (void)value; /// No-op - entries are owned by history core
-    (void)user_data;
-}
 
 /* ============================================================================
  * INDEX CREATION AND DESTRUCTION
@@ -122,31 +28,22 @@ static void free_entry_ptr(const void *value, void *user_data) {
 /**
  * @brief Create hashtable index for fast ID lookup
  *
- * Creates a hashtable using libhashtable with custom hash functions
- * for uint64_t keys and entry pointer values.
+ * Creates an ht_u64ptr table mapping entry IDs to entry pointers. The wrapper
+ * supplies the integer-finalizer hash and copies the 8-byte key internally.
  *
  * @param index Output pointer for created hashtable (must not be NULL)
  * @param initial_capacity Initial capacity hint for the hashtable
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index is NULL,
  *         LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
-lle_result_t lle_history_index_create(lle_hashtable_t **index,
+lle_result_t lle_history_index_create(ht_u64ptr_t **index,
                                       size_t initial_capacity) {
     if (!index) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Create hashtable with custom hash and equality functions
-    ht_t *ht = ht_create(&(ht_options_t){
-        .hash = hash_uint64,
-        .keyeq = eq_uint64,
-        .keylen = keylen_uint64,
-        .callbacks = {.key_copy = copy_uint64_key,
-                      .key_free = free_uint64_key,
-                      .val_copy = copy_entry_ptr,
-                      .val_free = free_entry_ptr},
-        .initial_capacity = initial_capacity,
-    });
+    ht_u64ptr_t *ht = ht_u64ptr_create(
+        &(ht_u64_options_t){.initial_capacity = initial_capacity});
     if (!ht) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -163,9 +60,9 @@ lle_result_t lle_history_index_create(lle_hashtable_t **index,
  *
  * @param index Hashtable to destroy (may be NULL)
  */
-void lle_history_index_destroy(lle_hashtable_t *index) {
+void lle_history_index_destroy(ht_u64ptr_t *index) {
     if (index) {
-        ht_destroy(index);
+        ht_u64ptr_destroy(index);
     }
 }
 
@@ -185,14 +82,14 @@ void lle_history_index_destroy(lle_hashtable_t *index) {
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry
  * is NULL
  */
-lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
+lle_result_t lle_history_index_insert(ht_u64ptr_t *index, uint64_t entry_id,
                                       lle_history_entry_t *entry) {
     if (!index || !entry) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
     /// Insert into hashtable (void return - assumes success)
-    ht_insert(index, &entry_id, entry);
+    ht_u64ptr_insert(index, entry_id, entry);
 
     return LLE_SUCCESS;
 }
@@ -210,15 +107,14 @@ lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry
  * is NULL
  */
-lle_result_t lle_history_index_lookup(lle_hashtable_t *index, uint64_t entry_id,
+lle_result_t lle_history_index_lookup(ht_u64ptr_t *index, uint64_t entry_id,
                                       lle_history_entry_t **entry) {
     if (!index || !entry) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
     /// Lookup in hashtable (returns NULL if not found)
-    void *found = ht_get(index, &entry_id);
-    *entry = (lle_history_entry_t *)found;
+    *entry = (lle_history_entry_t *)ht_u64ptr_get(index, entry_id);
 
     return LLE_SUCCESS;
 }
@@ -232,14 +128,13 @@ lle_result_t lle_history_index_lookup(lle_hashtable_t *index, uint64_t entry_id,
  * @param entry_id Entry ID to remove
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index is NULL
  */
-lle_result_t lle_history_index_remove(lle_hashtable_t *index,
-                                      uint64_t entry_id) {
+lle_result_t lle_history_index_remove(ht_u64ptr_t *index, uint64_t entry_id) {
     if (!index) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
     /// Remove from hashtable (void return - assumes success)
-    ht_remove(index, &entry_id);
+    ht_u64ptr_remove(index, entry_id);
 
     return LLE_SUCCESS;
 }
@@ -247,21 +142,21 @@ lle_result_t lle_history_index_remove(lle_hashtable_t *index,
 /**
  * @brief Clear all entries from index
  *
- * Note: libhashtable doesn't have a clear function, so this is a no-op.
- * The caller should destroy and recreate the hashtable if needed.
+ * Removes every key, freeing the copied keys, and keeps the table allocated and
+ * reusable. Entry pointers are stored as passthrough values, so the history
+ * core (which owns the entries) is unaffected.
  *
  * @param index Hashtable index (must not be NULL)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index is NULL
  */
-lle_result_t lle_history_index_clear(lle_hashtable_t *index) {
+lle_result_t lle_history_index_clear(ht_u64ptr_t *index) {
     if (!index) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// libhashtable doesn't provide ht_clear(), so we iterate and remove
-    /// For now, return success - caller will destroy/recreate if needed
-    /// Phase 1 Day 2: Acceptable since clear is only used in
-    /// lle_history_clear() which destroys the whole core anyway
+    /// The typed wrappers are opaque aliases over the generic table, so the
+    /// generic compound ops apply to the base pointer.
+    ht_clear((ht_t *)index);
 
     return LLE_SUCCESS;
 }
@@ -269,22 +164,17 @@ lle_result_t lle_history_index_clear(lle_hashtable_t *index) {
 /**
  * @brief Get index size (number of entries)
  *
- * Note: libhashtable doesn't expose a size function, so this always returns 0.
- * Callers should track size themselves via the history core's entry_count.
- *
  * @param index Hashtable index (must not be NULL)
  * @param size Output pointer for size (must not be NULL)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or size
  * is NULL
  */
-lle_result_t lle_history_index_get_size(lle_hashtable_t *index, size_t *size) {
+lle_result_t lle_history_index_get_size(ht_u64ptr_t *index, size_t *size) {
     if (!index || !size) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// libhashtable doesn't expose ht_size()
-    /// Return 0 for now - callers should use core->entry_count instead
-    *size = 0;
+    *size = ht_size((const ht_t *)index);
 
     return LLE_SUCCESS;
 }

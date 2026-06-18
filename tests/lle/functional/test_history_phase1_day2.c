@@ -304,7 +304,7 @@ void test_index_rebuild(void) {
 void test_index_operations(void) {
     TEST("Direct index operations (insert/lookup/remove)");
 
-    lle_hashtable_t *index = NULL;
+    ht_u64ptr_t *index = NULL;
     lle_result_t result;
 
     /// Create index
