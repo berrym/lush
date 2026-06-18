@@ -362,10 +362,10 @@ flags. There is no implicit `IFS`-driven splitting of command output.
 ### 4.2 Maps preserve insertion order
 
 A map enumerates in the order its keys were first inserted. Order is
-deterministic, never hash-bucket order. This is already implemented
-(`array_value_t.assoc_insertion_order`, Issue #69) and already
-documented as a deliberate divergence (`known_divergences.txt` entry
-052); this model ratifies it.
+deterministic, never hash-bucket order. This is implemented by building
+`array_value_t.assoc_map` as an insertion-ordered libhashtable table
+(Issue #69) and is documented as a deliberate divergence
+(`known_divergences.txt` entry 052); this model ratifies it.
 
 Insertion order is the modern consensus (Python 3.7+, Ruby, JS) and
 the only choice compatible with §2 -- a map that enumerated
@@ -486,7 +486,7 @@ sizes are rough engineering estimates.)
 |------|---------------|--------|-----|
 | Value kinds | scalar/list/map all live in per-scope `vars_ht` as kind-tagged `symvar` entries; the previous global `array_storage` side-table is removed; `symtable_lookup` returns a kind-tagged view (`lush_value_view_t`) | scalar/list/map are first-class throughout the expansion engine | **match** |
 | Flatness / nesting | none (a list element is always `char *`) | none (bounded, §3.2) | **match** |
-| Map insertion order | implemented -- `array_value_t.assoc_insertion_order` (Issue #69) | insertion order (§4.2) | **match** |
+| Map insertion order | implemented -- insertion-ordered `array_value_t.assoc_map` (Issue #69) | insertion order (§4.2) | **match** |
 | Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (§3.5) | **match** |
 | Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (§3.5) | **match** |
 | Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (§3.6) -- so the un-threaded state is *correct*, not a gap | **match** |

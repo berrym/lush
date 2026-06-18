@@ -85,23 +85,14 @@ typedef struct array_value {
      * array; read by symtable_set_array_element.
      */
     symvar_flags_t flags;
-    ht_strstr_t *assoc_map; ///< Hash table for associative arrays
     /**
-     * For associative arrays only: parallel ordered list of keys
-     * recording the order in which each key was first set. Enables
-     * zsh-style insertion-order iteration without modifying
-     * libhashtable (which deliberately stays generic and
-     * bucket-order-only). The key strings here ARE owned by this
-     * struct (strdup'd on insert, freed on unset and on
-     * array destroy) — there is no public API to retrieve the
-     * canonical key pointer from inside the hashtable, so this list
-     * keeps its own copies. Memory cost is one duplicate of each
-     * key string; negligible compared to value strings.
-     * (Issue #69.)
+     * Associative arrays use an insertion-ordered ht_strstr table, so the
+     * map itself enumerates keys in first-set order (zsh-style, SEMANTICS.md
+     * 4.2). A key keeps its original position when overwritten, and the
+     * table owns the canonical key copies, so no parallel order list is
+     * needed. (Issue #69.)
      */
-    char **assoc_insertion_order;    ///< Keys in first-set order
-    size_t assoc_insertion_count;    ///< Number of keys tracked
-    size_t assoc_insertion_capacity; ///< Allocated capacity
+    ht_strstr_t *assoc_map; ///< Insertion-ordered hash table for assoc arrays
 } array_value_t;
 
 /* ============================================================================

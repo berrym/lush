@@ -2493,8 +2493,10 @@ array_value_t *symtable_array_create(bool is_associative) {
     array->max_index = 0;
 
     if (is_associative) {
-        /// Create hash table for associative array
-        array->assoc_map = ht_strstr_create(NULL);
+        /// Create hash table for associative array. Insertion ordering makes
+        /// enumeration yield elements in definition order without a sidecar.
+        array->assoc_map =
+            ht_strstr_create(&(ht_str_options_t){.insertion_ordered = true});
         if (!array->assoc_map) {
             free(array);
             return NULL;
@@ -2531,13 +2533,6 @@ void symtable_array_free(array_value_t *array) {
         /// Free associative array hash table
         if (array->assoc_map) {
             ht_strstr_destroy(array->assoc_map);
-        }
-        /// Free insertion-order tracking (strdup'd keys + the array)
-        if (array->assoc_insertion_order) {
-            for (size_t i = 0; i < array->assoc_insertion_count; i++) {
-                free(array->assoc_insertion_order[i]);
-            }
-            free(array->assoc_insertion_order);
         }
     } else {
         /// Free indexed array elements
@@ -2738,33 +2733,11 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
 
     bool is_new = !ht_strstr_get(array->assoc_map, lookup_key);
 
-    /// Check if key exists and update count
+    /// Check if key exists and update count. The insertion-ordered table keeps
+    /// a key at its first-set position when overwritten (zsh semantic, issue
+    /// #69), so no separate order list is needed.
     if (is_new) {
         array->count++;
-        /// Append to insertion-order list. zsh semantic: a key keeps
-        /// its original position when overwritten; only first-set
-        /// appends. (Issue #69.)
-        if (array->assoc_insertion_count >= array->assoc_insertion_capacity) {
-            size_t new_cap = array->assoc_insertion_capacity
-                                 ? array->assoc_insertion_capacity * 2
-                                 : 8;
-            char **grown =
-                realloc(array->assoc_insertion_order, new_cap * sizeof(char *));
-            if (grown) {
-                array->assoc_insertion_order = grown;
-                array->assoc_insertion_capacity = new_cap;
-            }
-            /// If realloc fails, we still set the value; iteration just
-            /// won't include this key in insertion order. Hashtable
-            /// fallback path remains correct.
-        }
-        if (array->assoc_insertion_count < array->assoc_insertion_capacity) {
-            char *key_copy = strdup(lookup_key);
-            if (key_copy) {
-                array->assoc_insertion_order[array->assoc_insertion_count++] =
-                    key_copy;
-            }
-        }
     }
 
     ht_strstr_insert(array->assoc_map, lookup_key, value ? value : "");
@@ -2878,26 +2851,6 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
     if (ht_strstr_get(array->assoc_map, lookup_key)) {
         ht_strstr_remove(array->assoc_map, lookup_key);
         array->count--;
-
-        /// Remove from insertion-order list. Linear scan + memmove down;
-        /// acceptable since assoc-array unset is uncommon and the list
-        /// is typically small. The stored entries are NFC bytes
-        /// (set path uses lookup_key, which is the NFC form), so the
-        /// strcmp here matches byte-for-byte against the same canonical
-        /// form. (Issue #69.)
-        for (size_t i = 0; i < array->assoc_insertion_count; i++) {
-            if (strcmp(array->assoc_insertion_order[i], lookup_key) == 0) {
-                free(array->assoc_insertion_order[i]);
-                size_t to_move = array->assoc_insertion_count - i - 1;
-                if (to_move > 0) {
-                    memmove(&array->assoc_insertion_order[i],
-                            &array->assoc_insertion_order[i + 1],
-                            to_move * sizeof(char *));
-                }
-                array->assoc_insertion_count--;
-                break;
-            }
-        }
     }
 
     free(nfc);
@@ -2926,37 +2879,19 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /// Iteration order is mode-aware (Issue #69):
-        ///   - zsh / lush mode: insertion order (matches zsh native;
-        ///     lush curated default for predictability + determinism)
-        ///   - bash / POSIX mode: hashtable bucket order (matches
-        ///     bash's documented behavior for compat)
-        /// If insertion-order tracking is empty (e.g. realloc failure
-        /// during a previous set), fall back to hashtable order so we
-        /// never return fewer keys than the caller expects.
-        shell_mode_t mode = shell_mode_get();
-        bool use_insertion_order =
-            (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
-            array->assoc_insertion_order &&
-            array->assoc_insertion_count == array->count;
-
-        if (use_insertion_order) {
-            for (size_t i = 0; i < array->count; i++) {
-                keys[i] = strdup(array->assoc_insertion_order[i]);
+        /// Maps enumerate in insertion order in every mode (SEMANTICS.md
+        /// 4.2): the assoc_map is insertion-ordered, so ht_strstr_enum
+        /// yields keys oldest-first. (Issue #69.)
+        ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
+        if (enumerator) {
+            size_t i = 0;
+            const char *key;
+            const char *val;
+            while (ht_strstr_enum_next(enumerator, &key, &val) &&
+                   i < array->count) {
+                keys[i++] = strdup(key);
             }
-        } else {
-            /// Get keys from hash table (bucket order)
-            ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
-            if (enumerator) {
-                size_t i = 0;
-                const char *key;
-                const char *val;
-                while (ht_strstr_enum_next(enumerator, &key, &val) &&
-                       i < array->count) {
-                    keys[i++] = strdup(key);
-                }
-                ht_strstr_enum_destroy(enumerator);
-            }
+            ht_strstr_enum_destroy(enumerator);
         }
     } else {
         /// Convert indices to strings
@@ -2992,35 +2927,20 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /// Same mode-aware iteration as symtable_array_get_keys —
-        /// critical that BOTH functions use the same order so that
-        /// keys[i] and values[i] pair correctly when callers fetch
-        /// both (e.g. ${(kv)assoc_map}). (Issue #69.)
-        shell_mode_t mode = shell_mode_get();
-        bool use_insertion_order =
-            (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
-            array->assoc_insertion_order &&
-            array->assoc_insertion_count == array->count;
-
-        if (use_insertion_order) {
-            for (size_t i = 0; i < array->count; i++) {
-                const char *v = ht_strstr_get(array->assoc_map,
-                                              array->assoc_insertion_order[i]);
-                values[i] = strdup(v ? v : "");
+        /// Same insertion-order iteration as symtable_array_get_keys --
+        /// critical that BOTH functions use the same order so that keys[i]
+        /// and values[i] pair correctly when callers fetch both
+        /// (e.g. ${(kv)assoc_map}). (Issue #69.)
+        ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
+        if (enumerator) {
+            size_t i = 0;
+            const char *key;
+            const char *val;
+            while (ht_strstr_enum_next(enumerator, &key, &val) &&
+                   i < array->count) {
+                values[i++] = val ? strdup(val) : strdup("");
             }
-        } else {
-            /// Get values from hash table (bucket order)
-            ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
-            if (enumerator) {
-                size_t i = 0;
-                const char *key;
-                const char *val;
-                while (ht_strstr_enum_next(enumerator, &key, &val) &&
-                       i < array->count) {
-                    values[i++] = val ? strdup(val) : strdup("");
-                }
-                ht_strstr_enum_destroy(enumerator);
-            }
+            ht_strstr_enum_destroy(enumerator);
         }
     } else {
         /// Copy indexed array values
