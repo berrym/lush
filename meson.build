@@ -569,17 +569,6 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Hashtable wrapper unit tests (Spec 05)
-  test_hashtable = executable(
-    'test_hashtable',
-    'tests/lle/unit/test_hashtable.c',
-    include_directories: [inc, include_directories('tests')],
-    dependencies: [lle_dep])
-
-  test('LLE Hashtable Wrapper', test_hashtable,
-       suite: 'lle-unit',
-       timeout: 30)
-
   # Async Worker Unit Tests (Spec 25 Section 7)
   # Tests async worker thread pool for non-blocking git status
   test_async_worker = executable(

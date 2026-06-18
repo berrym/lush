@@ -42,8 +42,8 @@
 /// Lush Display System Dependencies
 #include "display/display_controller.h"
 
-/// libhashtable Integration (Spec 05) - Use LLE wrapper
-#include "lle/hashtable.h"
+/// libhashtable: ht_u64blob_t for the render cache table
+#include "ht.h"
 
 /// LLE Event System - Use existing event types
 #include "lle/event_system.h"

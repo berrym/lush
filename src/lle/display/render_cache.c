@@ -23,9 +23,9 @@
  * Week 4 Day 4-5: Simple Caching
  */
 
+#include "ht.h"
 #include "lle/display_integration.h"
 #include "lle/error_handling.h"
-#include "lle/hashtable.h"
 #include "lle/memory_management.h"
 #include <inttypes.h>
 #include <stdio.h>

@@ -12,6 +12,7 @@
  */
 
 #include "lle/widget_system.h"
+#include "ht.h"
 #include "lle/lle_editor.h"
 #include <string.h>
 #include <time.h>

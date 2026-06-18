@@ -42,7 +42,6 @@ lle_sources += files(
   'core/arena.c',
   'core/performance.c',
   'core/testing.c',
-  'core/hashtable.c',
   'core/async_worker.c',
   'core/git_command.c',
 )
