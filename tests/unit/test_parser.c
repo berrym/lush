@@ -15,6 +15,7 @@
 
 #include "node.h"
 #include "parser.h"
+#include "shell_error.h"
 #include "test_shell_harness.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -898,39 +899,37 @@ TEST(parse_complex_pipeline) {
  * ============================================================================
  */
 
-TEST(parse_error_unclosed_if) {
-    parser_t *parser = parser_new("if true; then echo yes");
+/// A malformed construct must yield no AST, flag parser_has_error, and
+/// record a structured diagnostic in the error collector.
+static void assert_parse_error(const char *src, const char *what) {
+    parser_t *parser = parser_new(src);
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
     node_t *ast = parser_parse(parser);
-    /// Should either return NULL or have error flag set
+    ASSERT(ast == NULL, what);
+    ASSERT(parser_has_error(parser), "error flag should be set");
+    ASSERT(shell_error_collector_has_errors(parser_get_error_collector(parser)),
+           "structured diagnostic should be recorded");
+
     if (ast) {
         free_node_tree(ast);
     }
-    /// Note: Some parsers may allow incomplete input for interactive use
     parser_free(parser);
+}
+
+TEST(parse_error_unclosed_if) {
+    assert_parse_error("if true; then echo yes",
+                       "unclosed if should not produce an AST");
 }
 
 TEST(parse_error_unclosed_quote) {
-    parser_t *parser = parser_new("echo 'unterminated");
-    ASSERT_NOT_NULL(parser, "parser_new failed");
-
-    node_t *ast = parser_parse(parser);
-    if (ast) {
-        free_node_tree(ast);
-    }
-    parser_free(parser);
+    assert_parse_error("echo 'unterminated",
+                       "unterminated quote should not produce an AST");
 }
 
 TEST(parse_error_missing_done) {
-    parser_t *parser = parser_new("for i in 1 2; do echo $i");
-    ASSERT_NOT_NULL(parser, "parser_new failed");
-
-    node_t *ast = parser_parse(parser);
-    if (ast) {
-        free_node_tree(ast);
-    }
-    parser_free(parser);
+    assert_parse_error("for i in 1 2; do echo $i",
+                       "for without done should not produce an AST");
 }
 
 /* ============================================================================
@@ -945,22 +944,31 @@ TEST(parser_has_error_api) {
     ASSERT(!parser_has_error(parser), "New parser should not have error");
 
     node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "Valid input should parse to an AST");
     ASSERT(!parser_has_error(parser), "Valid parse should not have error");
+    ASSERT(
+        !shell_error_collector_has_errors(parser_get_error_collector(parser)),
+        "Valid parse should record no diagnostics");
 
-    if (ast)
-        free_node_tree(ast);
+    free_node_tree(ast);
     parser_free(parser);
 }
 
 TEST(parser_error_message_api) {
-    parser_t *parser = parser_new("echo hello");
+    /// The error collector is the diagnostic surface: empty before parsing,
+    /// populated after a malformed parse, and reachable via the accessor.
+    parser_t *parser = parser_new("if true; then");
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
-    /// Valid input should have NULL or empty error
+    shell_error_collector_t *collector = parser_get_error_collector(parser);
+    ASSERT_NOT_NULL(collector, "parser should expose an error collector");
+    ASSERT(!shell_error_collector_has_errors(collector),
+           "collector is empty before parsing");
+
     node_t *ast = parser_parse(parser);
-    const char *err = parser_error(parser);
-    /// Error message may be NULL or empty string for success
-    (void)err;
+    ASSERT(parser_has_error(parser), "malformed input should flag an error");
+    ASSERT(shell_error_collector_has_errors(collector),
+           "collector should hold the diagnostic after a failed parse");
 
     if (ast)
         free_node_tree(ast);
