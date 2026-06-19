@@ -346,11 +346,10 @@ int bin_declare(int argc, char **argv) {
             /// Check if it's an array
             array_value_t *arr = symtable_get_array(name);
             if (arr) {
-                if (arr->is_associative) {
-                    printf("declare -A %s\n", name);
-                } else {
-                    printf("declare -a %s\n", name);
-                }
+                /// Print the full array with its elements, the same way the
+                /// no-argument `declare -p` listing does (and as bash does for
+                /// `declare -p NAME`), rather than just the name and type.
+                declare_print_array_callback(name, arr, stdout);
             } else if (manager) {
                 char *var_value = symtable_get(manager, name);
                 if (var_value) {
