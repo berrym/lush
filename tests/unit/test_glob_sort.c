@@ -66,6 +66,39 @@ TEST(for_loop_glob_is_sorted) {
     ASSERT_STDOUT_EQ(r, "5.txt\n6.txt\n");
 }
 
+TEST(extglob_glob_is_sorted) {
+    /// Bash-style extglob expansion (expand_extglob_pattern) sorts its
+    /// matches rather than returning raw readdir order.
+    run_result_t r = run_shell_subprocess(GLOB_SORT_PREAMBLE
+                                          "shopt -s extglob; echo @(6|5).txt");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5.txt 6.txt\n");
+}
+
+TEST(globstar_glob_is_sorted) {
+    /// Globstar expansion (expand_globstar_pattern) sorts across the
+    /// recursive directory walk. Files are created in reverse order.
+    run_result_t r = run_shell_subprocess(
+        "DIR=/tmp/lush_test_globsort_gs_$$ && mkdir -p \"$DIR/sub\" && "
+        "touch \"$DIR/sub/3.txt\" \"$DIR/sub/1.txt\" && "
+        "trap 'rm -rf \"$DIR\"' EXIT && cd \"$DIR\" && "
+        "shopt -s globstar; echo sub/**/*.txt");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "sub/1.txt sub/3.txt\n");
+}
+
+TEST(dotglob_qualifier_is_sorted) {
+    /// The zsh (D) dotglob qualifier (expand_glob_dotglob) sorts its
+    /// readdir scan. Dotfiles are created in reverse order.
+    run_result_t r = run_shell_subprocess(
+        "DIR=/tmp/lush_test_globsort_d_$$ && mkdir -p \"$DIR\" && "
+        "touch \"$DIR/.zz\" \"$DIR/.aa\" && "
+        "trap 'rm -rf \"$DIR\"' EXIT && cd \"$DIR\" && "
+        "echo .*(D)");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, ".aa .zz\n");
+}
+
 int main(void) {
     init_symtable();
 
@@ -74,6 +107,9 @@ int main(void) {
     RUN_TEST(range_glob_is_sorted);
     RUN_TEST(letter_glob_is_sorted);
     RUN_TEST(for_loop_glob_is_sorted);
+    RUN_TEST(extglob_glob_is_sorted);
+    RUN_TEST(globstar_glob_is_sorted);
+    RUN_TEST(dotglob_qualifier_is_sorted);
 
     return TEST_RESULT();
 }
