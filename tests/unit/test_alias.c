@@ -267,11 +267,10 @@ TEST(expand_aliases_recursive_chain) {
 TEST(expand_aliases_recursive_nonexistent) {
     setup_aliases();
 
+    /// A name with no alias expands to nothing.
     char *expanded = expand_aliases_recursive("notanalias", 10);
-    /// Should return NULL or original
-    if (expanded != NULL) {
-        free(expanded);
-    }
+    ASSERT(expanded == NULL, "non-alias name should not expand");
+    free(expanded);
 
     teardown_aliases();
 }
@@ -286,12 +285,11 @@ TEST(expand_aliases_recursive_depth_limit) {
     set_alias("d", "e");
     set_alias("e", "f");
 
-    /// With depth 2, should not fully expand
+    /// Depth 2 expands a->b->c and stops; it must not run the chain to "f".
     char *expanded = expand_aliases_recursive("a", 2);
-    /// Should have stopped early
-    if (expanded != NULL) {
-        free(expanded);
-    }
+    ASSERT_NOT_NULL(expanded, "depth-2 expansion should produce a result");
+    ASSERT_STR_EQ(expanded, "c", "depth 2 expands a->b->c then stops");
+    free(expanded);
 
     teardown_aliases();
 }
@@ -303,12 +301,14 @@ TEST(expand_aliases_recursive_circular) {
     set_alias("a", "b");
     set_alias("b", "a");
 
-    /// Should handle circular reference without infinite loop
+    /// Circular a<->b must terminate at the depth bound rather than loop
+    /// forever or expand without limit.
     char *expanded = expand_aliases_recursive("a", 10);
-    /// Should terminate
-    if (expanded != NULL) {
-        free(expanded);
-    }
+    ASSERT_NOT_NULL(expanded,
+                    "circular expansion must terminate with a result");
+    ASSERT(strlen(expanded) <= 1,
+           "circular expansion stays bounded (no runaway growth)");
+    free(expanded);
 
     teardown_aliases();
 }

@@ -241,11 +241,16 @@ TEST(readonly_variable) {
     symvar_flags_t flags = symtable_get_flags(mgr, "CONST");
     ASSERT(flags & SYMVAR_READONLY, "Variable should have READONLY flag");
 
-    /// Attempting to overwrite readonly should fail
+    /// Overwriting a readonly variable is refused and leaves it unchanged.
     int result = symtable_set_var(mgr, "CONST", "new_value", SYMVAR_NONE);
-    /// Note: exact behavior depends on implementation - may return error or
-    /// silently fail
-    (void)result;
+    ASSERT_EQ(result, SYMTABLE_ERR_READONLY,
+              "overwrite of a readonly variable should be rejected");
+
+    char *value = symtable_get_var(mgr, "CONST");
+    ASSERT_NOT_NULL(value, "CONST should still be set");
+    ASSERT_STR_EQ(value, "value",
+                  "readonly value unchanged after blocked write");
+    free(value);
 
     symtable_manager_free(mgr);
 }

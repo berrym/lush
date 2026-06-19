@@ -107,26 +107,46 @@ TEST(restore_file_descriptors_empty_state) {
 }
 
 TEST(save_restore_preserves_fds) {
+    /// Identify the original stdout target so we can prove it is restored.
+    struct stat before;
+    ASSERT_EQ(fstat(STDOUT_FILENO, &before), 0, "stat stdout before save");
+
     redirection_state_t state = {0};
+    ASSERT_EQ(save_file_descriptors(&state), 0, "save should succeed");
+    ASSERT(state.stdout_saved, "stdout should be recorded as saved");
+    ASSERT(state.saved_stdout >= 0, "saved stdout fd should be valid");
 
-    /// Get original FDs
-    int orig_stdin = dup(STDIN_FILENO);
-    int orig_stdout = dup(STDOUT_FILENO);
-    int orig_stderr = dup(STDERR_FILENO);
+    /// Redirect stdout to a temp file (no assertions fire while redirected,
+    /// so a longjmp on failure cannot leave stdout pointing at the temp fd).
+    char tmpl[] = "/tmp/redir_test_XXXXXX";
+    int tfd = mkstemp(tmpl);
+    ASSERT(tfd >= 0, "temp file should be created");
+    unlink(tmpl);
+    dup2(tfd, STDOUT_FILENO);
+    const char *marker = "redirected-output\n";
+    ssize_t wrote = write(STDOUT_FILENO, marker, strlen(marker));
 
-    save_file_descriptors(&state);
+    int restored = restore_file_descriptors(&state);
 
-    /// Verify we can still use standard FDs
-    ASSERT(isatty(STDIN_FILENO) >= 0 || 1, "stdin should still work");
-    ASSERT(isatty(STDOUT_FILENO) >= 0 || 1, "stdout should still work");
-    ASSERT(isatty(STDERR_FILENO) >= 0 || 1, "stderr should still work");
+    /// Back on the original stdout: assertions are safe again.
+    ASSERT_EQ(restored, 0, "restore should succeed");
+    ASSERT_EQ(wrote, (ssize_t)strlen(marker), "write while redirected");
 
-    restore_file_descriptors(&state);
+    struct stat after;
+    ASSERT_EQ(fstat(STDOUT_FILENO, &after), 0, "stat stdout after restore");
+    ASSERT(before.st_dev == after.st_dev && before.st_ino == after.st_ino,
+           "stdout should be restored to its original target");
 
-    /// Clean up our test dups
-    close(orig_stdin);
-    close(orig_stdout);
-    close(orig_stderr);
+    /// The bytes written while redirected landed in the temp file, not on
+    /// the restored stdout.
+    char buf[64] = {0};
+    lseek(tfd, 0, SEEK_SET);
+    ssize_t got = read(tfd, buf, sizeof(buf) - 1);
+    ASSERT(got == (ssize_t)strlen(marker),
+           "temp file holds the redirected bytes");
+    ASSERT_STR_EQ(buf, marker,
+                  "redirected output was captured by the temp file");
+    close(tfd);
 }
 
 TEST(multiple_save_restore_cycles) {
