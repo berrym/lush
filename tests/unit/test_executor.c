@@ -3642,6 +3642,22 @@ TEST(rt_pe_at_value_transform_on_map_still_errors) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
+TEST(rt_declare_p_named_assoc_prints_elements) {
+    /// `declare -p NAME` for an associative array prints the full array with
+    /// its elements in insertion order, the same as the no-argument listing
+    /// (and as bash does), not just `declare -A NAME`. (Regression.)
+    run_result_t r = run_shell("declare -A m=([zebra]=1 [apple]=2)\n"
+                               "declare -p m\n");
+    ASSERT_STDOUT_EQ(r, "declare -A m=([zebra]=\"1\" [apple]=\"2\")\n");
+}
+
+TEST(rt_declare_p_named_indexed_prints_elements) {
+    /// `declare -p NAME` for an indexed array prints its elements too.
+    run_result_t r = run_shell("declare -a a=(x y z)\n"
+                               "declare -p a\n");
+    ASSERT_STDOUT_EQ(r, "declare -a a=([0]=\"x\" [1]=\"y\" [2]=\"z\")\n");
+}
+
 TEST(rt_pe_catalog_conditional_on_map) {
     run_result_t r = run_shell("declare -A m=([a]=1 [b]=2)\n"
                                "echo \"[${m:-default}]\"\n");
@@ -4794,6 +4810,8 @@ int main(void) {
     RUN_TEST(rt_lle_feature_bridge_enumerates_matrix);
     RUN_TEST(rt_setopt_completion_lists_matrix_features);
     RUN_TEST(rt_pe_at_value_transform_on_map_still_errors);
+    RUN_TEST(rt_declare_p_named_assoc_prints_elements);
+    RUN_TEST(rt_declare_p_named_indexed_prints_elements);
     RUN_TEST(rt_pe_catalog_conditional_on_map);
     RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
     RUN_TEST(rt_pe_catalog_per_element_case_mod_via_slice);
