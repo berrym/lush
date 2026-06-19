@@ -17,6 +17,7 @@
 
 #include "builtins.h"
 #include "executor.h"
+#include "fc_internal.h"
 #include "lle/history.h"
 #include "lle/lle_editor.h"
 #include "lle/lle_pager.h"
@@ -34,19 +35,8 @@
 /// Maximum editor command length
 #define FC_MAX_EDITOR_COMMAND 4096
 
-/// fc command options
-typedef struct fc_options {
-    bool list_mode;
-    bool reverse_order;
-    bool suppress_numbers;
-    bool substitute_mode;
-    char *editor;
-    char *old_pattern;
-    char *new_pattern;
-    int first;
-    int last;
-    bool range_valid;
-} fc_options_t;
+/// fc_options_t is declared in fc_internal.h so tests drive the real
+/// listing and range logic against a seeded history core.
 
 /* ============================================================================
  * Helper Functions
@@ -97,8 +87,8 @@ static size_t get_history_count(lle_history_core_t *history) {
  * must free)
  * @return true on success, false on allocation failure
  */
-static bool parse_substitution_pattern(const char *pattern, char **old,
-                                       char **new_str) {
+bool fc_parse_substitution_pattern(const char *pattern, char **old,
+                                   char **new_str) {
     if (!pattern || !old || !new_str) {
         return false;
     }
@@ -141,7 +131,7 @@ static bool parse_substitution_pattern(const char *pattern, char **old,
  *
  * @return Newly allocated string with editor command (caller must free)
  */
-static char *get_default_editor(void) {
+char *fc_get_default_editor(void) {
     const char *fcedit = getenv("FCEDIT");
     if (fcedit && *fcedit) {
         return strdup(fcedit);
@@ -336,8 +326,8 @@ static bool resolve_range_spec(lle_history_core_t *history, const char *spec,
  * @param opts Options structure to populate with resolved range
  * @return true on success, false if range is invalid or out of bounds
  */
-static bool parse_range(lle_history_core_t *history, const char *first_str,
-                        const char *last_str, fc_options_t *opts) {
+bool fc_parse_range(lle_history_core_t *history, const char *first_str,
+                    const char *last_str, fc_options_t *opts) {
     size_t count = get_history_count(history);
     if (count == 0) {
         executor_error_report(current_executor, SHELL_ERR_HISTORY_ERROR,
@@ -412,7 +402,7 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
  * @param opts Options containing range and display preferences
  * @return 0 on success, 1 on error
  */
-static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
+int fc_list(lle_history_core_t *history, fc_options_t *opts) {
     if (!opts->range_valid) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                               builtin_get_source_location(),
@@ -548,7 +538,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
 
     /// Determine editor to use
     char *editor_cmd =
-        opts->editor ? strdup(opts->editor) : get_default_editor();
+        opts->editor ? strdup(opts->editor) : fc_get_default_editor();
     if (!editor_cmd) {
         unlink(temp_filename);
         free(temp_filename);
@@ -789,8 +779,8 @@ int bin_fc(int argc, char **argv) {
     /// Handle substitute mode pattern parsing
     if (opts.substitute_mode) {
         if (optind < argc && strchr(argv[optind], '=')) {
-            if (!parse_substitution_pattern(argv[optind], &opts.old_pattern,
-                                            &opts.new_pattern)) {
+            if (!fc_parse_substitution_pattern(argv[optind], &opts.old_pattern,
+                                               &opts.new_pattern)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
                                       builtin_get_source_location(),
@@ -810,7 +800,7 @@ int bin_fc(int argc, char **argv) {
     const char *first_str = (optind < argc) ? argv[optind] : NULL;
     const char *last_str = (optind + 1 < argc) ? argv[optind + 1] : NULL;
 
-    if (!parse_range(history, first_str, last_str, &opts)) {
+    if (!fc_parse_range(history, first_str, last_str, &opts)) {
         free(opts.editor);
         free(opts.old_pattern);
         free(opts.new_pattern);
