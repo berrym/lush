@@ -4256,6 +4256,7 @@ TEST(rt_typed_fn_lexical_scope) {
 /// Forward declarations for initialization
 extern void init_symtable(void);
 extern void free_global_symtable(void);
+extern void free_shell_argv(void);
 
 /* ============================================================================
  * Regression: readonly enforcement
@@ -4940,8 +4941,9 @@ int main(void) {
     RUN_TEST(rt_declare_u_unicode_fold);
     RUN_TEST(rt_declare_no_value_preserves_existing);
 
-    /// Cleanup global symbol table
+    /// Cleanup global symbol table and positional-parameter vector
     free_global_symtable();
+    free_shell_argv();
 
     return TEST_RESULT();
 }

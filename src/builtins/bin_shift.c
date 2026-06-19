@@ -148,6 +148,15 @@ int bin_shift(int argc, char **argv) {
 
     /// Perform the shift by adjusting shell_argc and shell_argv
     if (shift_count > 0 && shell_argc > 1) {
+        /// Free the parameters being shifted out before they are overwritten.
+        /// Only the dynamically-allocated vector (from `set --`) owns its
+        /// strings; when shell_argv still points at the process argv the
+        /// entries are not heap-allocated and must not be freed.
+        if (shell_argv_is_dynamic) {
+            for (int i = 1; i <= shift_count && i < shell_argc; i++) {
+                free(shell_argv[i]);
+            }
+        }
         /// Shift the argv array
         for (int i = 1; i < shell_argc - shift_count; i++) {
             shell_argv[i] = shell_argv[i + shift_count];
