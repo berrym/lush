@@ -2386,24 +2386,12 @@ TEST(command_substitution_syntax) {
 }
 
 TEST(command_substitution_exit_status) {
-    /// KNOWN BUG: Command substitution exit status not preserved
-    /// Issue #58: $? after $(false) returns 0 instead of 1
-    /// The exit status of the command inside $() should be available via $?
-    executor_t *exec = executor_new();
-    ASSERT_NOT_NULL(exec, "executor_new failed");
-
-    /// For now, just test that the syntax works
-    run_result_t r = run_shell_with_executor(exec, "X=$(true)");
+    /// $? reflects the exit status of the command inside $() (issue #58,
+    /// fixed).
+    run_result_t r = run_shell("x=$(false); echo \"after_false=$?\"\n"
+                               "y=$(true); echo \"after_true=$?\"\n");
     ASSERT_EXIT_STATUS(r, 0);
-
-    /// TODO: Re-enable when bug is fixed:
-    /// status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
-    /// ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
-    /// char *y = symtable_get_var(exec->symtable, "Y");
-    /// ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
-    /// free(y);
-
-    executor_free(exec);
+    ASSERT_STDOUT_EQ(r, "after_false=1\nafter_true=0\n");
 }
 
 /* ============================================================================
@@ -2527,24 +2515,11 @@ TEST(elif_chain) {
  */
 
 TEST(negation_command) {
-    /// KNOWN BUG: Negation command causes memory corruption (double-free)
-    /// Issue #57: "! command" syntax triggers malloc error
-    /// TODO: Fix the negation handling in executor.c
-    executor_t *exec = executor_new();
-    ASSERT_NOT_NULL(exec, "executor_new failed");
-
-    /// Skip actual negation test until bug is fixed
-    /// int status = executor_execute_command_line(exec, "! false", 1);
-    /// ASSERT_EQ(status, 0, "Negated false should return 0");
-
-    /// status = executor_execute_command_line(exec, "! true", 1);
-    /// ASSERT_EQ(status, 1, "Negated true should return 1");
-
-    /// For now, just verify executor works without negation
-    run_result_t r = run_shell_with_executor(exec, "true");
+    /// `! command` negates the exit status (issue #57, fixed).
+    run_result_t r = run_shell("! false; echo \"not_false=$?\"\n"
+                               "! true; echo \"not_true=$?\"\n");
     ASSERT_EXIT_STATUS(r, 0);
-
-    executor_free(exec);
+    ASSERT_STDOUT_EQ(r, "not_false=0\nnot_true=1\n");
 }
 
 /* ============================================================================

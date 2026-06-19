@@ -817,18 +817,15 @@ TEST(readonly_variable) {
 }
 
 TEST(readonly_prevents_modification) {
-    /// KNOWN LIMITATION: readonly enforcement not yet implemented
-    /// The readonly builtin sets variables but doesn't prevent modification.
-    /// See bin_readonly() comments in builtins.c - "simplified implementation"
-    /// TODO: Implement readonly enforcement in symbol table
+    /// A readonly variable rejects assignment and keeps its value.
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "readonly ROVAR2=original", 1);
+    executor_execute_command_line(exec, "ROVAR2=changed", 1);
 
-    /// For now, just verify readonly command works - enforcement is TODO
     char *value = symtable_get_var(exec->symtable, "ROVAR2");
     ASSERT_NOT_NULL(value, "ROVAR2 should be set");
-    ASSERT_STR_EQ(value, "original", "ROVAR2 should have initial value");
+    ASSERT_STR_EQ(value, "original", "readonly should block reassignment");
     free(value);
 
     teardown_executor(exec);
