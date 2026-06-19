@@ -3632,6 +3632,8 @@ TEST(rt_setopt_completion_lists_matrix_features) {
         }
     }
     ASSERT_TRUE(found, "setopt completion must offer errexit_in_loops");
+
+    lle_completion_result_free(result);
 }
 
 TEST(rt_pe_at_value_transform_on_map_still_errors) {

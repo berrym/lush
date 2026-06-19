@@ -1163,6 +1163,9 @@ static int execute_one_batch(executor_t *executor, const char *batch,
             }
             rc = 2;
         }
+        /// parser_parse may return a partial tree even on error; free it
+        /// (the success path frees it below).
+        free_node_tree(ast);
         parser_free(parser);
         return rc;
     }
@@ -1173,6 +1176,8 @@ static int execute_one_batch(executor_t *executor, const char *batch,
         if (legacy_err) {
             set_executor_error(executor, legacy_err);
         }
+        /// Free any partial tree the parser produced before erroring.
+        free_node_tree(ast);
         parser_free(parser);
         return 1;
     }
@@ -13118,14 +13123,18 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
 
         /// Simple indirect expansion: ${!name} - value of variable named by
-        /// name
+        /// name. symtable_get_var returns owned copies; free both the pointer
+        /// name and the resolved value.
         char *indirect_name = symtable_get_var(executor->symtable, var_name);
+        char *result = NULL;
         if (indirect_name && indirect_name[0]) {
             /// Get the value of the variable whose name is in indirect_name
-            char *result = symtable_get_var(executor->symtable, indirect_name);
-            return strdup(result ? result : "");
+            char *value = symtable_get_var(executor->symtable, indirect_name);
+            result = strdup(value ? value : "");
+            free(value);
         }
-        return strdup("");
+        free(indirect_name);
+        return result ? result : strdup("");
     }
 
     /// Handle array length: ${#arr[@]} or ${#arr[*]}
