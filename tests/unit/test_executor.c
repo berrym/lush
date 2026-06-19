@@ -3416,12 +3416,13 @@ TEST(rt_typed_fn_void_called_via_let) {
 }
 
 TEST(rt_typed_fn_void_no_return) {
+    /// A typed fn lives in its own namespace, distinct from POSIX functions,
+    /// so a bare call site does not resolve to it: invoking `nop` by name is
+    /// command-not-found (127). Typed call sites use the parens form, which
+    /// for a void function is rejected by rt_typed_fn_void_called_via_let.
     run_result_t r = run_shell("fn nop() { echo hello; }\n"
                                "nop\n");
-    /// nop is a POSIX-form call site (no parens at statement position
-    /// yet); for now this just confirms the fn declaration parses and
-    /// does not fire a runtime error before reaching its body.
-    (void)r;
+    ASSERT_EXIT_STATUS(r, 127);
 }
 
 /// --- parameter-expansion catalog --------------------------------------

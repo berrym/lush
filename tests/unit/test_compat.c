@@ -54,9 +54,12 @@ TEST(compat_cleanup_without_init) {
 
 TEST(compat_reload) {
     compat_init(NULL);
-    int result = compat_reload();
-    /// May succeed or fail depending on file availability
-    (void)result;
+    /// Reloading re-reads the same sources, so the loaded set is preserved:
+    /// the entry count is identical before and after, whatever it is.
+    size_t before = compat_get_entry_count();
+    compat_reload();
+    ASSERT_EQ(compat_get_entry_count(), before,
+              "reload should preserve the entry count");
     compat_cleanup();
 }
 
@@ -262,11 +265,14 @@ TEST(compat_is_strict_default) {
  */
 
 TEST(compat_get_entry_count) {
-    compat_init(NULL);
+    /// Load the shipped database from its source location. The default
+    /// search path is relative to cwd/exe and does not resolve from the
+    /// build directory the test runner uses, so point init at the data
+    /// directory directly to make the count deterministic.
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
     size_t count = compat_get_entry_count();
-    /// Count may be 0 if no data files found, which is okay for testing
-    (void)count;
+    ASSERT(count > 0, "compatibility database should load entries");
 
     compat_cleanup();
 }
@@ -274,9 +280,10 @@ TEST(compat_get_entry_count) {
 TEST(compat_get_entry_nonexistent) {
     compat_init(NULL);
 
+    /// An id that is in no database returns NULL regardless of what is
+    /// loaded -- the lookup must not return a stale or garbage entry.
     const compat_entry_t *entry = compat_get_entry("nonexistent_entry_id");
-    /// May or may not find it depending on database content
-    (void)entry;
+    ASSERT_NULL(entry, "unknown entry id should return NULL");
 
     compat_cleanup();
 }
@@ -306,9 +313,13 @@ TEST(compat_get_by_feature) {
 TEST(compat_get_first_by_feature) {
     compat_init(NULL);
 
-    const compat_entry_t *entry = compat_get_first_by_feature("arrays");
-    /// May or may not find it
-    (void)entry;
+    /// The single-result accessor must agree with the bulk query: a hit one
+    /// way is a hit the other, whatever the database happens to catalogue.
+    const compat_entry_t *first = compat_get_first_by_feature("arrays");
+    const compat_entry_t *bulk[10];
+    size_t n = compat_get_by_feature("arrays", bulk, 10);
+    ASSERT_EQ(first != NULL, n > 0,
+              "get_first_by_feature should agree with get_by_feature");
 
     compat_cleanup();
 }
@@ -346,10 +357,11 @@ TEST(compat_foreach_entry) {
 TEST(compat_is_portable_simple) {
     compat_init(NULL);
 
+    /// 'echo hello' is plain POSIX with no compatibility caveats, so it is
+    /// reported portable.
     compat_result_t result;
     bool portable = compat_is_portable("echo hello", SHELL_MODE_POSIX, &result);
-    /// Basic echo should be portable
-    (void)portable; /// May vary by database content
+    ASSERT(portable, "'echo hello' should be reported portable in POSIX mode");
 
     compat_cleanup();
 }
@@ -357,9 +369,15 @@ TEST(compat_is_portable_simple) {
 TEST(compat_is_portable_null_result) {
     compat_init(NULL);
 
-    /// Should not crash with NULL result
-    bool portable = compat_is_portable("echo hello", SHELL_MODE_POSIX, NULL);
-    (void)portable;
+    /// Passing a NULL result struct must not crash and must yield the same
+    /// verdict as passing a real one -- the out-param is optional detail,
+    /// not part of the decision.
+    compat_result_t result;
+    bool with_result =
+        compat_is_portable("echo hello", SHELL_MODE_POSIX, &result);
+    bool null_result = compat_is_portable("echo hello", SHELL_MODE_POSIX, NULL);
+    ASSERT_EQ(null_result, with_result,
+              "NULL result pointer should not change the verdict");
 
     compat_cleanup();
 }
