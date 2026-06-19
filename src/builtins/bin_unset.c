@@ -65,15 +65,18 @@ int bin_unset(int argc, char **argv) {
         /// Resolve nameref if applicable - unset the target, not the nameref
         /// itself
         symtable_manager_t *mgr = symtable_get_global_manager();
+        char *resolved_owned = NULL;
         if (mgr && symtable_is_nameref(mgr, var_name)) {
-            const char *target = symtable_resolve_nameref(mgr, var_name, 10);
-            if (target && target != var_name) {
-                var_name = target;
+            resolved_owned =
+                (char *)symtable_resolve_nameref(mgr, var_name, 10);
+            if (resolved_owned) {
+                var_name = resolved_owned;
             }
         }
 
         /// Use legacy API function for unsetting variables
         symtable_unset_global(var_name);
+        free(resolved_owned);
     }
     return 0;
 }
