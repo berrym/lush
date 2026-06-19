@@ -351,6 +351,7 @@ int bin_declare(int argc, char **argv) {
                 /// `declare -p NAME`), rather than just the name and type.
                 declare_print_array_callback(name, arr, stdout);
             } else if (manager) {
+                /// symtable_get returns an owned copy; free it after printing.
                 char *var_value = symtable_get(manager, name);
                 if (var_value) {
                     printf("declare -- %s=\"%s\"\n", name, var_value);
@@ -359,6 +360,7 @@ int bin_declare(int argc, char **argv) {
                         current_executor, SHELL_ERR_INVALID_ARGUMENT,
                         builtin_get_source_location(), "%s: not found", name);
                 }
+                free(var_value);
             } else {
                 executor_error_report(
                     current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -692,10 +694,13 @@ int bin_declare(int argc, char **argv) {
         if (opt_export) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (manager) {
+                /// symtable_get returns an owned copy; setenv copies it, so
+                /// free it afterward.
                 char *var_value = symtable_get(manager, name);
                 if (var_value) {
                     setenv(name, var_value, 1);
                 }
+                free(var_value);
             }
         }
 

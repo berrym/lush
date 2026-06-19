@@ -3810,7 +3810,16 @@ static void run_inspect(const char *text, size_t cursor_pos) {
 }
 
 static const char *inspect_var(const char *name) {
-    return symtable_get_var(symtable_get_global_manager(), name);
+    /// symtable_get_var returns an owned copy. Copy it into a static buffer and
+    /// free the original so the inline ASSERT_STR_EQ callers do not leak it.
+    static char buf[512];
+    char *owned = symtable_get_var(symtable_get_global_manager(), name);
+    if (!owned) {
+        return NULL;
+    }
+    snprintf(buf, sizeof(buf), "%s", owned);
+    free(owned);
+    return buf;
 }
 
 TEST(rt_inspect_scalar_at_cursor) {
