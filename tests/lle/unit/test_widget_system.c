@@ -447,8 +447,5 @@ int main(void) {
     RUN_TEST(multiple_widget_types);
     RUN_TEST(widget_exists);
     RUN_TEST(widget_count);
-    printf("========================================\n");
-    printf("All Widget System tests PASSED!\n");
-
-    return 0;
+    return TEST_RESULT();
 }
