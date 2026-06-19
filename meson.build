@@ -1114,6 +1114,27 @@ endif
          env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
   endif
 
+  # Pathname expansion sort-order regression tests
+  if fs.exists('tests/unit/test_glob_sort.c')
+    test_glob_sort_sources = []
+    foreach s : src
+      if not s.endswith('lush.c')
+        test_glob_sort_sources += s
+      endif
+    endforeach
+    test_glob_sort = executable('test_glob_sort',
+                                'tests/unit/test_glob_sort.c',
+                                'tests/unit/test_executor_stubs.c',
+                                test_glob_sort_sources + lle_shell_sources,
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep, libm])
+    test('Glob Sort Order', test_glob_sort,
+         suite: 'unit',
+         timeout: 30,
+         depends: [lush_exe],
+         env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
+  endif
+
   # Word-Context Analyzer Tests
   # Exercises lle_word_context_analyze across quote/escape state, word
   # boundaries respecting quote state, filename_portion_start computation,
