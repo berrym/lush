@@ -18730,17 +18730,20 @@ static array_value_t *typed_fn_dup_array(const array_value_t *src) {
         return NULL;
     }
     if (is_assoc) {
-        /// Walk insertion order so the copy preserves the map's
-        /// original key ordering rather than reflecting hashtable
-        /// iteration order.
-        for (size_t i = 0; i < src->assoc_insertion_count; i++) {
-            const char *key = src->assoc_insertion_order[i];
-            const char *value =
-                symtable_array_get_assoc((array_value_t *)src, key);
-            if (symtable_array_set_assoc(dup, key, value ? value : "") != 0) {
-                symtable_array_free(dup);
-                return NULL;
+        /// Walk the insertion-ordered map so the copy preserves the
+        /// original key ordering (SEMANTICS.md 4.2).
+        ht_enum_t *e = ht_strstr_enum_create(src->assoc_map);
+        if (e) {
+            const char *key, *value;
+            while (ht_strstr_enum_next(e, &key, &value)) {
+                if (symtable_array_set_assoc(dup, key, value ? value : "") !=
+                    0) {
+                    ht_strstr_enum_destroy(e);
+                    symtable_array_free(dup);
+                    return NULL;
+                }
             }
+            ht_strstr_enum_destroy(e);
         }
     } else {
         size_t n = symtable_array_length((array_value_t *)src);

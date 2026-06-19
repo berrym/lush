@@ -12,6 +12,7 @@
  */
 
 #include "lle/widget_system.h"
+#include "ht.h"
 #include "lle/lle_editor.h"
 #include <string.h>
 #include <time.h>
@@ -74,8 +75,13 @@ lle_result_t lle_widget_registry_init(lle_widget_registry_t **registry,
 
     memset(reg, 0, sizeof(lle_widget_registry_t));
 
-    // Initialize hash table (16 buckets initially, will grow as needed)
-    reg->widgets = ht_create(fnv1a_hash_str, str_eq, NULL, 16);
+    // Initialize hash table (16 buckets initially, will grow as needed).
+    // Passthrough callbacks (zero-initialized): the table owns neither the
+    // widget->name keys nor the widget pointers; widget_list owns lifetime.
+    reg->widgets = ht_create(&(ht_options_t){.hash = ht_hash_fnv1a,
+                                             .keyeq = str_eq,
+                                             .keylen = str_len,
+                                             .initial_capacity = 16});
     if (!reg->widgets) {
         lle_pool_free(reg);
         return LLE_ERROR_OUT_OF_MEMORY;

@@ -31,7 +31,8 @@ int bin_hash(int argc, char **argv) {
     if (argc == 2 && strcmp(argv[1], "-r") == 0) {
         if (command_hash) {
             ht_strstr_destroy(command_hash);
-            command_hash = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+            command_hash =
+                ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
         }
         path_negative_cache_clear();
         return 0;

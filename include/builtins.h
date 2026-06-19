@@ -24,7 +24,7 @@
  * Threshold for inclusion here was ~50/56 usage across the bin_*.c
  * files at split time. Headers used by smaller subsets stay per-file. */
 #include "executor.h"
-#include "libhashtable/ht.h"
+#include "ht.h"
 #include "shell_error.h"
 
 #include <stdbool.h>

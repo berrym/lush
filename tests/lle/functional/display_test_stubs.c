@@ -15,8 +15,8 @@
 
 #include "builtins.h"
 #include "config.h"
+#include "ht.h"
 #include "input_continuation.h"
-#include "libhashtable/ht.h"
 
 /* ============================================================================
  * Global Variables

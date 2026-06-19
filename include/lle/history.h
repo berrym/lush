@@ -42,6 +42,11 @@ struct lle_event;
  * ============================================================================
  */
 
+/// libhashtable uint64->pointer wrapper backing the ID index (opaque; full
+/// definition in ht.h). Forward-declared here to keep ht.h out of this widely
+/// included header, matching the ht_t forward declaration in performance.h.
+typedef struct ht_u64ptr ht_u64ptr_t;
+
 /// Core types
 typedef struct lle_history_entry lle_history_entry_t;
 typedef struct lle_history_core lle_history_core_t;
@@ -250,7 +255,7 @@ struct lle_history_core {
     lle_history_entry_t *last_entry;  ///< Last entry in list
 
     /// Indexing - Phase 2
-    lle_hashtable_t *entry_lookup; ///< ID -> entry hashtable (Phase 2)
+    ht_u64ptr_t *entry_lookup; ///< ID -> entry hashtable (uint64 -> entry ptr)
 
     /// Advanced engines - Phase 4
     lle_history_dedup_engine_t
@@ -409,41 +414,40 @@ lle_result_t lle_history_get_stats(lle_history_core_t *core,
 /**
  * Create hashtable index for fast ID lookup
  */
-lle_result_t lle_history_index_create(lle_hashtable_t **index,
+lle_result_t lle_history_index_create(ht_u64ptr_t **index,
                                       size_t initial_capacity);
 
 /**
  * Destroy hashtable index
  */
-void lle_history_index_destroy(lle_hashtable_t *index);
+void lle_history_index_destroy(ht_u64ptr_t *index);
 
 /**
  * Insert entry into index
  */
-lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
+lle_result_t lle_history_index_insert(ht_u64ptr_t *index, uint64_t entry_id,
                                       lle_history_entry_t *entry);
 
 /**
  * Lookup entry by ID in index
  */
-lle_result_t lle_history_index_lookup(lle_hashtable_t *index, uint64_t entry_id,
+lle_result_t lle_history_index_lookup(ht_u64ptr_t *index, uint64_t entry_id,
                                       lle_history_entry_t **entry);
 
 /**
  * Remove entry from index
  */
-lle_result_t lle_history_index_remove(lle_hashtable_t *index,
-                                      uint64_t entry_id);
+lle_result_t lle_history_index_remove(ht_u64ptr_t *index, uint64_t entry_id);
 
 /**
  * Clear all entries from index
  */
-lle_result_t lle_history_index_clear(lle_hashtable_t *index);
+lle_result_t lle_history_index_clear(ht_u64ptr_t *index);
 
 /**
  * Get index size
  */
-lle_result_t lle_history_index_get_size(lle_hashtable_t *index, size_t *size);
+lle_result_t lle_history_index_get_size(ht_u64ptr_t *index, size_t *size);
 
 /**
  * Rebuild index from core entries

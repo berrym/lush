@@ -1,0 +1,15 @@
+[wrap-file]
+directory = libhashtable-0.9.1
+source_filename = libhashtable-0.9.1.tar.gz
+source_url = https://github.com/berrym/libhashtable/releases/download/v0.9.1/libhashtable-0.9.1.tar.gz
+source_hash = 04eb8b0c063de83868a1782ecff57b94e5968cbe58d7fd23f43296b892d08c2d
+
+# The release tarball is committed under subprojects/packagecache/. Meson checks
+# the cache (hash-verified) before any download, so configuration is hermetic and
+# offline; source_url is only a fallback for a fresh checkout missing the cache.
+# A published release asset MUST be this exact tarball, produced with:
+#   git archive --format=tar --prefix=libhashtable-0.9.1/ v0.9.1 | gzip -n -9
+# so the hash matches.
+
+[provide]
+dependency_names = libhashtable

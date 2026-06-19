@@ -10,7 +10,6 @@
 #include "builtins.h"
 #include "identifier.h"
 #include "lle/lle_pager.h"
-#include "shell_mode.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -36,39 +35,20 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         return;
     if (array->is_associative) {
         fprintf(out, "declare -A %s=(", name);
-        /// Print associative array elements. Iteration order matches
-        /// the rest of the shell (issue #69): zsh / lush mode use
-        /// insertion order for predictable output; bash / POSIX use
-        /// hashtable bucket order. The insertion-order list lives on
-        /// the array itself; we look up each value via ht_strstr_get.
+        /// Print associative array elements in insertion order (issue #69,
+        /// SEMANTICS.md 4.2): the assoc_map is insertion-ordered, so
+        /// ht_strstr_enum yields elements oldest-first in every mode.
         if (array->assoc_map) {
-            shell_mode_t mode = shell_mode_get();
-            bool use_insertion_order =
-                (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
-                array->assoc_insertion_order &&
-                array->assoc_insertion_count == array->count;
-
-            if (use_insertion_order) {
+            ht_enum_t *e = ht_strstr_enum_create(array->assoc_map);
+            if (e) {
+                const char *k, *v;
                 bool first = true;
-                for (size_t i = 0; i < array->assoc_insertion_count; i++) {
-                    const char *k = array->assoc_insertion_order[i];
-                    const char *v = ht_strstr_get(array->assoc_map, k);
+                while (ht_strstr_enum_next(e, &k, &v)) {
                     fprintf(out, "%s[%s]=\"%s\"", first ? "" : " ", k,
                             v ? v : "");
                     first = false;
                 }
-            } else {
-                ht_enum_t *e = ht_strstr_enum_create(array->assoc_map);
-                if (e) {
-                    const char *k, *v;
-                    bool first = true;
-                    while (ht_strstr_enum_next(e, &k, &v)) {
-                        fprintf(out, "%s[%s]=\"%s\"", first ? "" : " ", k,
-                                v ? v : "");
-                        first = false;
-                    }
-                    ht_strstr_enum_destroy(e);
-                }
+                ht_strstr_enum_destroy(e);
             }
         }
         fputs(")\n", out);

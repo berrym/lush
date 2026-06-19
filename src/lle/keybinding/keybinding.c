@@ -2,8 +2,8 @@
  * @file keybinding.c
  * @brief Keybinding Engine Implementation
  *
- * Implements fast key sequence lookup and binding management using libhashtable
- * through LLE's hashtable wrapper for O(1) lookup performance. Supports both
+ * Implements fast key sequence lookup and binding management using the
+ * libhashtable ht_strptr wrapper for O(1) lookup performance. Supports both
  * simple and context-aware keybinding actions with Emacs and Vi mode presets.
  *
  * @author Michael Berry <trismegustis@gmail.com>
@@ -16,8 +16,7 @@
  */
 
 #include "lle/keybinding.h"
-#include "libhashtable/ht.h"
-#include "lle/hashtable.h"
+#include "ht.h"
 #include "lle/keybinding_actions.h"
 #include <ctype.h>
 #include <stdlib.h>
@@ -52,7 +51,7 @@ typedef struct {
  * Keybinding manager structure
  */
 struct lle_keybinding_manager {
-    lle_strstr_hashtable_t *bindings;     ///< Key sequence -> entry mapping
+    ht_strptr_t *bindings;                ///< Key sequence -> entry pointer
     lle_keymap_mode_t current_mode;       ///< Active keymap mode
     lle_key_sequence_buffer_t seq_buffer; ///< Multi-key sequence buffer
     lush_memory_pool_t *pool;             ///< Memory pool for allocations
@@ -230,37 +229,19 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
     new_manager->pool = pool;
     new_manager->current_mode = LLE_KEYMAP_EMACS;
 
-    /// Create hashtable for bindings
-    lle_hashtable_config_t config;
-    lle_hashtable_config_init_default(&config);
-    config.initial_capacity = LLE_KEYBINDING_INITIAL_SIZE;
-    config.memory_pool = pool;
-    config.use_memory_pool = (pool != NULL);
-    config.hashtable_name = "keybindings";
+    /// Create the bindings table: key sequence -> caller-owned entry pointer.
+    /// The table copies the key strings and stores entry pointers as
+    /// passthrough values; this manager owns and frees the entries.
+    new_manager->bindings = ht_strptr_create(
+        &(ht_str_options_t){.initial_capacity = LLE_KEYBINDING_INITIAL_SIZE});
 
-    /// Use factory to create hashtable
-    lle_hashtable_factory_t *factory = NULL;
-    lle_result_t result = lle_hashtable_factory_init(&factory, pool);
-    if (result != LLE_SUCCESS) {
+    if (new_manager->bindings == NULL) {
         if (pool != NULL) {
             lush_pool_free(new_manager);
         } else {
             free(new_manager);
         }
-        return result;
-    }
-
-    result = lle_hashtable_factory_create_strstr(factory, &config,
-                                                 &new_manager->bindings);
-    lle_hashtable_factory_destroy(factory);
-
-    if (result != LLE_SUCCESS) {
-        if (pool != NULL) {
-            lush_pool_free(new_manager);
-        } else {
-            free(new_manager);
-        }
-        return result;
+        return LLE_ERROR_OUT_OF_MEMORY;
     }
 
     *manager = new_manager;
@@ -279,28 +260,21 @@ lle_result_t lle_keybinding_manager_destroy(lle_keybinding_manager_t *manager) {
 
     /// Free all keybinding entries before destroying hashtable
     if (manager->bindings != NULL) {
-        /// Use libhashtable enumeration to iterate through all entries
-        ht_enum_t *enumerator = ht_strstr_enum_create(manager->bindings->ht);
+        ht_enum_t *enumerator = ht_strptr_enum_create(manager->bindings);
         if (enumerator != NULL) {
             const char *key;
-            const char *value_str;
+            void *value;
 
-            /// Iterate through all key-value pairs
-            while (ht_strstr_enum_next(enumerator, &key, &value_str)) {
-                /// Value is a pointer stored as string - convert back to
-                /// pointer
-                lle_keybinding_entry_t *entry;
-                sscanf(value_str, "%p", (void **)&entry);
-
-                /// Free the entry and its allocated strings
-                free_keybinding_entry(manager->pool, entry);
+            /// Each value is the entry pointer; free the entry and its strings
+            while (ht_strptr_enum_next(enumerator, &key, &value)) {
+                free_keybinding_entry(manager->pool,
+                                      (lle_keybinding_entry_t *)value);
             }
 
-            ht_strstr_enum_destroy(enumerator);
+            ht_strptr_enum_destroy(enumerator);
         }
 
-        /// Now destroy the hashtable itself
-        lle_strstr_hashtable_destroy(manager->bindings);
+        ht_strptr_destroy(manager->bindings);
     }
 
     /// Free manager structure
@@ -536,19 +510,8 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
     entry->function_name =
         function_name ? keybinding_strdup(manager->pool, function_name) : NULL;
 
-    /// Convert entry to string for storage (hackish but works with strstr
-    /// hashtable)
-    char entry_str[32];
-    snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
-
-    /// Insert into hashtable
-    lle_result_t result =
-        lle_strstr_hashtable_insert(manager->bindings, key_sequence, entry_str);
-
-    if (result != LLE_SUCCESS) {
-        free_keybinding_entry(manager->pool, entry);
-        return result;
-    }
+    /// Store the entry pointer directly under the key sequence.
+    ht_strptr_insert(manager->bindings, key_sequence, entry);
 
     return LLE_SUCCESS;
 }
@@ -590,19 +553,8 @@ lle_result_t lle_keybinding_manager_bind_context(
     entry->function_name =
         function_name ? keybinding_strdup(manager->pool, function_name) : NULL;
 
-    /// Convert entry to string for storage (hackish but works with strstr
-    /// hashtable)
-    char entry_str[32];
-    snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
-
-    /// Insert into hashtable
-    lle_result_t result =
-        lle_strstr_hashtable_insert(manager->bindings, key_sequence, entry_str);
-
-    if (result != LLE_SUCCESS) {
-        free_keybinding_entry(manager->pool, entry);
-        return result;
-    }
+    /// Store the entry pointer directly under the key sequence.
+    ht_strptr_insert(manager->bindings, key_sequence, entry);
 
     return LLE_SUCCESS;
 }
@@ -620,16 +572,15 @@ lle_result_t lle_keybinding_manager_unbind(lle_keybinding_manager_t *manager,
     }
 
     /// Lookup entry first to free it
-    const char *entry_str =
-        lle_strstr_hashtable_lookup(manager->bindings, key_sequence);
-    if (entry_str != NULL) {
-        lle_keybinding_entry_t *entry;
-        sscanf(entry_str, "%p", (void **)&entry);
+    lle_keybinding_entry_t *entry =
+        ht_strptr_get(manager->bindings, key_sequence);
+    if (entry != NULL) {
         free_keybinding_entry(manager->pool, entry);
     }
 
     /// Remove from hashtable
-    return lle_strstr_hashtable_delete(manager->bindings, key_sequence);
+    ht_strptr_remove(manager->bindings, key_sequence);
+    return LLE_SUCCESS;
 }
 
 /**
@@ -642,10 +593,21 @@ lle_result_t lle_keybinding_manager_clear(lle_keybinding_manager_t *manager) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    /// Note: This leaks entries, but since we're clearing everything,
-    /// it's acceptable if the hashtable and manager are about to be destroyed.
-    /// For a proper implementation, we'd need to enumerate and free each entry.
-    lle_strstr_hashtable_clear(manager->bindings);
+    /// Free every entry, then empty the table while keeping it reusable.
+    ht_enum_t *enumerator = ht_strptr_enum_create(manager->bindings);
+    if (enumerator != NULL) {
+        const char *key;
+        void *value;
+        while (ht_strptr_enum_next(enumerator, &key, &value)) {
+            free_keybinding_entry(manager->pool,
+                                  (lle_keybinding_entry_t *)value);
+        }
+        ht_strptr_enum_destroy(enumerator);
+    }
+
+    /// The typed wrapper is an opaque alias over the generic table, so the
+    /// generic ht_clear applies to the base pointer.
+    ht_clear((ht_t *)manager->bindings);
 
     return LLE_SUCCESS;
 }
@@ -681,9 +643,8 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
     }
 
     /// Lookup binding
-    const char *entry_str =
-        lle_strstr_hashtable_lookup(manager->bindings, key_str);
-    if (entry_str == NULL) {
+    lle_keybinding_entry_t *entry = ht_strptr_get(manager->bindings, key_str);
+    if (entry == NULL) {
         /// Update stats
         uint64_t elapsed = get_time_us() - start_time;
         manager->total_lookups++;
@@ -694,10 +655,6 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
 
         return LLE_ERROR_NOT_FOUND;
     }
-
-    /// Parse entry pointer
-    lle_keybinding_entry_t *entry;
-    sscanf(entry_str, "%p", (void **)&entry);
 
     /// Update stats
     uint64_t elapsed = get_time_us() - start_time;
@@ -1126,21 +1083,22 @@ typedef struct {
     size_t index;                    ///< Next slot to write
 } list_bindings_fill_t;
 
-/// Visitor: each hashtable value is a "%p" pointer to the entry; copy its
-/// key sequence and action metadata into the next output slot.
-static void list_bindings_visit(const char *key, const char *value,
+/// Visitor: each hashtable value is the entry pointer; copy its key sequence
+/// and action metadata into the next output slot.
+static void list_bindings_visit(const void *key, const void *value,
                                 void *user_data) {
     list_bindings_fill_t *fill = (list_bindings_fill_t *)user_data;
     if (fill->index >= fill->capacity) {
         return;
     }
-    lle_keybinding_entry_t *entry = NULL;
-    if (sscanf(value, "%p", (void **)&entry) != 1 || entry == NULL) {
+    const lle_keybinding_entry_t *entry = value;
+    if (entry == NULL) {
         return;
     }
     lle_keybinding_info_t *info = &fill->bindings[fill->index];
     memset(info, 0, sizeof(*info));
-    snprintf(info->key_sequence, sizeof(info->key_sequence), "%s", key);
+    snprintf(info->key_sequence, sizeof(info->key_sequence), "%s",
+             (const char *)key);
     info->action = entry->action;
     info->function_name = entry->function_name;
     info->mode = entry->mode;
@@ -1156,7 +1114,7 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
     }
 
     /// Get hashtable size
-    size_t count = lle_strstr_hashtable_size(manager->bindings);
+    size_t count = ht_size((const ht_t *)manager->bindings);
     if (count == 0) {
         *bindings_out = NULL;
         *count_out = 0;
@@ -1177,13 +1135,12 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /// Enumerate the bindings table and copy each entry into the output
-    /// array. ht_strstr_enum (via lle_strstr_hashtable_foreach) walks the
-    /// table reliably -- the same API backs the wrapper's clear() and the
-    /// executor's associative-array iteration.
+    /// Enumerate the bindings table and copy each entry into the output array.
+    /// The typed wrapper is an opaque alias over the generic table, so the
+    /// generic ht_foreach walks it via the base pointer.
     list_bindings_fill_t fill = {
         .bindings = bindings, .capacity = count, .index = 0};
-    lle_strstr_hashtable_foreach(manager->bindings, list_bindings_visit, &fill);
+    ht_foreach((const ht_t *)manager->bindings, list_bindings_visit, &fill);
 
     *bindings_out = bindings;
     *count_out = fill.index;
@@ -1206,14 +1163,11 @@ lle_keybinding_manager_lookup(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    const char *entry_str =
-        lle_strstr_hashtable_lookup(manager->bindings, key_sequence);
-    if (entry_str == NULL) {
+    lle_keybinding_entry_t *entry =
+        ht_strptr_get(manager->bindings, key_sequence);
+    if (entry == NULL) {
         return LLE_ERROR_NOT_FOUND;
     }
-
-    lle_keybinding_entry_t *entry;
-    sscanf(entry_str, "%p", (void **)&entry);
 
     /// Return pointer to action structure in entry
     *action_out = &entry->action;
@@ -1232,7 +1186,7 @@ lle_result_t lle_keybinding_manager_get_count(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    *count_out = lle_strstr_hashtable_size(manager->bindings);
+    *count_out = ht_size((const ht_t *)manager->bindings);
     return LLE_SUCCESS;
 }
 

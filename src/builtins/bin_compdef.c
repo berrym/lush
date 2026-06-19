@@ -24,7 +24,7 @@
 
 #include "builtins.h"
 #include "executor.h"
-#include "libhashtable/ht.h"
+#include "ht.h"
 #include "shell_error.h"
 #include "shell_mode.h"
 
@@ -36,7 +36,8 @@ static ht_strstr_t *compdef_bindings = NULL;
 
 void init_compdef_bindings(void) {
     if (compdef_bindings == NULL) {
-        compdef_bindings = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
+        compdef_bindings =
+            ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
     }
 }
 

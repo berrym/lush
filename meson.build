@@ -48,9 +48,15 @@ else
 endif
 
 inc = include_directories('include',
-                          'include/libhashtable',
                           'include/display',
                           'src')
+
+# libhashtable 0.9.0 is consumed as a meson subproject (subprojects/libhashtable.wrap).
+# The release tarball is committed under subprojects/packagecache/, so configuration is
+# hermetic and offline. Built static so the lush binary carries no shared dependency.
+libhashtable_dep = dependency('libhashtable',
+                              fallback: ['libhashtable', 'libhashtable_dep'],
+                              default_options: ['default_library=static'])
 
 src = ['src/arithmetic.c',
        'src/autocorrect.c',
@@ -171,13 +177,6 @@ src = ['src/arithmetic.c',
        'src/input_continuation.c',
        'src/input.c',
        'src/libfuzzy/fuzzy_match.c',
-       'src/libhashtable/ht_fnv1a.c',
-       'src/libhashtable/ht_strblob.c',
-       'src/libhashtable/ht_strdouble.c',
-       'src/libhashtable/ht_strfloat.c',
-       'src/libhashtable/ht_strint.c',
-       'src/libhashtable/ht_strstr.c',
-       'src/libhashtable/ht.c',
        'src/lush_memory_pool.c',
        'src/lush_plugin.c',
        'src/lush.c',
@@ -261,11 +260,11 @@ if lle_sources.length() > 0
                            sources: lle_sources,
                            include_directories: inc,
                            c_args: lle_c_args,
-                           dependencies: [ncurses_compile_dep, fuzzy_dep])
+                           dependencies: [ncurses_compile_dep, fuzzy_dep, libhashtable_dep])
 
   lle_dep = declare_dependency(link_with: lle_lib,
                                include_directories: include_directories('include/lle'),
-                               dependencies: [ncurses_link_dep])
+                               dependencies: [ncurses_link_dep, libhashtable_dep])
 else
   # LLE not yet implemented, create empty dependency
   message('LLE: No modules implemented yet (zero source files)')
@@ -353,9 +352,6 @@ if lle_sources.length() > 0
                                'src/identifier.c',
                                'src/symtable.c',
                                'src/shell_mode.c',
-                               'src/libhashtable/ht.c',
-                               'src/libhashtable/ht_fnv1a.c',
-                               'src/libhashtable/ht_strstr.c',
                                'src/globals.c'],
                               include_directories: inc,
                               dependencies: [lle_dep])
@@ -570,17 +566,6 @@ if lle_sources.length() > 0
     dependencies: [lle_dep, display_dep])
 
   test('LLE Render Pipeline', test_render_pipeline,
-       suite: 'lle-unit',
-       timeout: 30)
-
-  # Hashtable wrapper unit tests (Spec 05)
-  test_hashtable = executable(
-    'test_hashtable',
-    'tests/lle/unit/test_hashtable.c',
-    include_directories: [inc, include_directories('tests')],
-    dependencies: [lle_dep])
-
-  test('LLE Hashtable Wrapper', test_hashtable,
        suite: 'lle-unit',
        timeout: 30)
 
@@ -884,9 +869,6 @@ endif
                                                'src/identifier.c',
                                                'src/symtable.c',
                                                'src/shell_mode.c',
-                                               'src/libhashtable/ht.c',
-                                               'src/libhashtable/ht_fnv1a.c',
-                                               'src/libhashtable/ht_strstr.c',
                                                'src/globals.c'],
                                               include_directories: inc,
                                               dependencies: [lle_dep])
@@ -1328,9 +1310,6 @@ if fs.exists('tests/unit/test_parser.c')
                            'src/shell_mode.c',
                            'src/shell_error.c',
                            'src/symtable.c',
-                           'src/libhashtable/ht.c',
-                           'src/libhashtable/ht_fnv1a.c',
-                           'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
@@ -1350,9 +1329,6 @@ if fs.exists('tests/unit/test_parser_fuzzer.c')
                            'src/shell_mode.c',
                            'src/shell_error.c',
                            'src/symtable.c',
-                           'src/libhashtable/ht.c',
-                           'src/libhashtable/ht_fnv1a.c',
-                           'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
@@ -1372,9 +1348,6 @@ if fs.exists('tests/unit/test_parser_negative.c')
                            'src/shell_mode.c',
                            'src/shell_error.c',
                            'src/symtable.c',
-                           'src/libhashtable/ht.c',
-                           'src/libhashtable/ht_fnv1a.c',
-                           'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
@@ -1395,9 +1368,6 @@ if fs.exists('tests/unit/test_ast_roundtrip.c')
                            'src/shell_mode.c',
                            'src/shell_error.c',
                            'src/symtable.c',
-                           'src/libhashtable/ht.c',
-                           'src/libhashtable/ht_fnv1a.c',
-                           'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
@@ -1414,9 +1384,6 @@ if fs.exists('tests/unit/test_symtable.c')
                              'tests/unit/test_symtable.c',
                              'src/identifier.c',
                              'src/symtable.c',
-                             'src/libhashtable/ht.c',
-                             'src/libhashtable/ht_fnv1a.c',
-                             'src/libhashtable/ht_strstr.c',
                              'tests/unit/test_symtable_stubs.c',
                              include_directories: [inc, include_directories('tests')],
                              dependencies: [lle_dep])
@@ -2008,9 +1975,6 @@ if fuzzing_enabled
     'src/shell_error.c',
     'src/globals.c',
     'src/symtable.c',
-    'src/libhashtable/ht.c',
-    'src/libhashtable/ht_fnv1a.c',
-    'src/libhashtable/ht_strstr.c',
     # Tokenizer uses lle_utf8_sequence_length for UTF-8 byte-length
     # decoding (issue #50). The fuzz binaries do not link liblle.a,
     # so the LLE sources providing this symbol are compiled in directly.
@@ -2127,6 +2091,7 @@ if fuzzing_enabled
                              c_args: fuzz_args,
                              link_args: fuzz_link_args,
                              build_rpath: fuzz_rpath,
+                             dependencies: [libhashtable_dep],
                              build_by_default: false)
 
     # Tokenizer fuzzer (libFuzzer)
@@ -2137,6 +2102,7 @@ if fuzzing_enabled
                                 c_args: fuzz_args,
                                 link_args: fuzz_link_args,
                                 build_rpath: fuzz_rpath,
+                                dependencies: [libhashtable_dep],
                                 build_by_default: false)
 
     # Executor fuzzer (libFuzzer). Unlike fuzz_parser/fuzz_tokenizer
@@ -2187,6 +2153,7 @@ if fuzzing_enabled
                                  fuzz_common_sources,
                                  include_directories: inc,
                                  c_args: afl_args,
+                                 dependencies: [libhashtable_dep],
                                  build_by_default: false)
 
     # Tokenizer fuzzer (AFL++)
@@ -2195,6 +2162,7 @@ if fuzzing_enabled
                                     fuzz_common_sources,
                                     include_directories: inc,
                                     c_args: afl_args,
+                                    dependencies: [libhashtable_dep],
                                     build_by_default: false)
 
     message('AFL++ targets: fuzz_parser_afl, fuzz_tokenizer_afl')
@@ -2480,23 +2448,10 @@ if fs.exists('tests/unit/test_expand.c')
        timeout: 30)
 endif
 
-# Hash Table Library Tests
-if fs.exists('tests/unit/test_hashtable.c')
-  test_hashtable = executable('test_hashtable_lib',
-                              'tests/unit/test_hashtable.c',
-                              'src/libhashtable/ht.c',
-                              'src/libhashtable/ht_fnv1a.c',
-                              'src/libhashtable/ht_strstr.c',
-                              'src/libhashtable/ht_strint.c',
-                              'src/libhashtable/ht_strfloat.c',
-                              'src/libhashtable/ht_strdouble.c',
-                              include_directories: [inc, include_directories('tests')],
-                              dependencies: [libm])
-  test('Hash Table Library', test_hashtable,
-       suite: 'unit',
-       timeout: 30)
-endif
-
+# The hashtable library's own API is tested upstream (libhashtable 0.9.0 ships a
+# valgrind-clean unit/functional/integration suite). lush's tests cover lush's
+# *use* of the library, not the library internals, so the former vendored-API
+# test (tests/unit/test_hashtable.c) was retired with the subproject migration.
 
 # Node to Source Tests
 if fs.exists('tests/unit/test_node_to_source.c')
@@ -2510,9 +2465,6 @@ if fs.exists('tests/unit/test_node_to_source.c')
                                    'src/shell_mode.c',
                                    'src/shell_error.c',
                                    'src/symtable.c',
-                                   'src/libhashtable/ht.c',
-                                   'src/libhashtable/ht_fnv1a.c',
-                                   'src/libhashtable/ht_strstr.c',
                                    'tests/unit/test_parser_stubs.c',
                                    include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep])
