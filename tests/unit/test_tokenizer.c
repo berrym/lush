@@ -848,9 +848,5 @@ int main(void) {
     printf("\nRegression tests:\n");
     RUN_TEST(utf8_partial_sequence_at_eof_brace_expansion);
 
-    printf("\n========================================\n");
-    printf("All tokenizer tests PASSED!\n");
-    printf("========================================\n");
-
-    return 0;
+    return TEST_RESULT();
 }

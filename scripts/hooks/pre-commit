@@ -20,6 +20,28 @@ if [ -x scripts/check_comment_style.sh ]; then
 fi
 
 # ============================================================================
+# TEST EXIT-STATUS INTEGRITY GATE
+# ============================================================================
+# A test binary that uses RUN_TEST() must return TEST_RESULT() from main, so a
+# failing assertion propagates to the process exit code. A bare `return 0`
+# makes the suite always-green: it cannot fail in CI regardless of assertions.
+# The 2026-06-19 test-quality audit found five core suites (parser, tokenizer,
+# symtable, AST node, widget) with exactly this defect.
+
+echo "Checking test exit-status integrity..."
+STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d | grep -E '^tests/.*\.c$' || true)
+for t in $STAGED_TESTS; do
+    [ -f "$t" ] || continue
+    if grep -q 'RUN_TEST(' "$t" && ! grep -q 'TEST_RESULT(' "$t"; then
+        echo "❌ TEST INTEGRITY VIOLATION: $t uses RUN_TEST() but never returns TEST_RESULT()"
+        echo "   main() must end with 'return TEST_RESULT();' so a failing test reaches"
+        echo "   the process exit code; a bare 'return 0' makes the suite always-green."
+        echo ""
+        CHECKS_FAILED=1
+    fi
+done
+
+# ============================================================================
 # DOCUMENTATION POLICY ENFORCEMENT (SAFE | ORGANIZED | CLEAN | PRUNED)
 # ============================================================================
 

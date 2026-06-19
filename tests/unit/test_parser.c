@@ -1092,9 +1092,5 @@ int main(void) {
     RUN_TEST(parser_error_message_api);
     RUN_TEST(parser_set_source_name);
 
-    printf("\n========================================\n");
-    printf("All parser tests PASSED!\n");
-    printf("========================================\n");
-
-    return 0;
+    return TEST_RESULT();
 }

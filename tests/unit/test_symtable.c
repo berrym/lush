@@ -633,9 +633,5 @@ int main(void) {
     printf("\nGlobal convenience API tests:\n");
     RUN_TEST(global_convenience_api);
 
-    printf("\n========================================\n");
-    printf("All symbol table tests PASSED!\n");
-    printf("========================================\n");
-
-    return 0;
+    return TEST_RESULT();
 }

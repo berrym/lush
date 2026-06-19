@@ -433,9 +433,5 @@ int main(void) {
     RUN_TEST(extended_test_node);
     RUN_TEST(redirection_node_types);
 
-    printf("\n========================================\n");
-    printf("All AST node tests PASSED!\n");
-    printf("========================================\n");
-
-    return 0;
+    return TEST_RESULT();
 }
