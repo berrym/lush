@@ -178,6 +178,7 @@ int bin_readonly(int argc, char **argv) {
                 symtable_array_add_flags(arg, SYMVAR_READONLY);
             } else {
                 symtable_manager_t *manager = symtable_get_global_manager();
+                /// symtable_get_global returns an owned copy; free it.
                 char *current_value = symtable_get_global(arg);
                 if (!current_value) {
                     symtable_set_readonly_global(arg, "");
@@ -185,6 +186,7 @@ int bin_readonly(int argc, char **argv) {
                     symvar_flags_t cur = symtable_get_flags(manager, arg);
                     symtable_set_flags(manager, arg, cur | SYMVAR_READONLY);
                 }
+                free(current_value);
             }
         }
     }

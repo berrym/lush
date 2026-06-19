@@ -500,6 +500,25 @@ static void print_all_shell_variables(void) {
  * @param args Argument array (NULL-terminated)
  * @return 0 on success, 1 on error
  */
+
+/**
+ * @brief Free the positional-parameter vector at shell exit
+ *
+ * `set --` replaces shell_argv with a dynamically allocated vector of strdup'd
+ * parameters (freeing the previous one each time). Nothing freed the final
+ * vector at exit, so the last positional parameters leaked. Registered via
+ * atexit; a no-op when shell_argv still points at the process argv.
+ */
+void free_shell_argv(void) {
+    if (shell_argv && shell_argv_is_dynamic) {
+        for (int j = 0; j < shell_argc; j++) {
+            free(shell_argv[j]);
+        }
+        free(shell_argv);
+        shell_argv = NULL;
+        shell_argv_is_dynamic = false;
+    }
+}
 int builtin_set(char **args) {
     /// Privileged mode security check - block all set operations
     if (shell_opts.privileged_mode && args[1]) {

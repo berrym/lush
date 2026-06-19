@@ -67,6 +67,9 @@ extern pid_t last_background_pid;
 /** @brief Whether shell_argv was dynamically allocated */
 extern bool shell_argv_is_dynamic;
 
+/** @brief Free a dynamically-allocated shell_argv (registered via atexit) */
+void free_shell_argv(void);
+
 /** @brief Get the shell source name, defaults to SHELL_NAME */
 #define SOURCE_NAME get_shell_varp("0", SHELL_NAME)
 

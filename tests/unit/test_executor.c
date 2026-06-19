@@ -3632,6 +3632,8 @@ TEST(rt_setopt_completion_lists_matrix_features) {
         }
     }
     ASSERT_TRUE(found, "setopt completion must offer errexit_in_loops");
+
+    lle_completion_result_free(result);
 }
 
 TEST(rt_pe_at_value_transform_on_map_still_errors) {
@@ -3810,7 +3812,16 @@ static void run_inspect(const char *text, size_t cursor_pos) {
 }
 
 static const char *inspect_var(const char *name) {
-    return symtable_get_var(symtable_get_global_manager(), name);
+    /// symtable_get_var returns an owned copy. Copy it into a static buffer and
+    /// free the original so the inline ASSERT_STR_EQ callers do not leak it.
+    static char buf[512];
+    char *owned = symtable_get_var(symtable_get_global_manager(), name);
+    if (!owned) {
+        return NULL;
+    }
+    snprintf(buf, sizeof(buf), "%s", owned);
+    free(owned);
+    return buf;
 }
 
 TEST(rt_inspect_scalar_at_cursor) {
@@ -4245,6 +4256,7 @@ TEST(rt_typed_fn_lexical_scope) {
 /// Forward declarations for initialization
 extern void init_symtable(void);
 extern void free_global_symtable(void);
+extern void free_shell_argv(void);
 
 /* ============================================================================
  * Regression: readonly enforcement
@@ -4929,8 +4941,9 @@ int main(void) {
     RUN_TEST(rt_declare_u_unicode_fold);
     RUN_TEST(rt_declare_no_value_preserves_existing);
 
-    /// Cleanup global symbol table
+    /// Cleanup global symbol table and positional-parameter vector
     free_global_symtable();
+    free_shell_argv();
 
     return TEST_RESULT();
 }

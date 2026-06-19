@@ -1163,6 +1163,9 @@ static int execute_one_batch(executor_t *executor, const char *batch,
             }
             rc = 2;
         }
+        /// parser_parse may return a partial tree even on error; free it
+        /// (the success path frees it below).
+        free_node_tree(ast);
         parser_free(parser);
         return rc;
     }
@@ -1173,6 +1176,8 @@ static int execute_one_batch(executor_t *executor, const char *batch,
         if (legacy_err) {
             set_executor_error(executor, legacy_err);
         }
+        /// Free any partial tree the parser produced before erroring.
+        free_node_tree(ast);
         parser_free(parser);
         return 1;
     }
@@ -3609,14 +3614,17 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                  shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT));
 
                             if (should_word_split) {
-                                const char *ifs =
+                                /// symtable_get returns an owned copy; keep it
+                                /// to free after the split (NULL => default
+                                /// IFS).
+                                char *ifs_owned =
                                     symtable_get(executor->symtable, "IFS");
-                                if (!ifs) {
-                                    ifs = " \t\n"; /// Default IFS
-                                }
+                                const char *ifs =
+                                    ifs_owned ? ifs_owned : " \t\n";
                                 int field_count = 0;
                                 char **fields = ifs_field_split(expanded, ifs,
                                                                 &field_count);
+                                free(ifs_owned);
                                 for (int fi = 0; fi < field_count; fi++) {
                                     char **grown = realloc(expanded_words,
                                                            (word_count + 1) *
@@ -4108,14 +4116,13 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                         /// Unquoted: split via the canonical ifs_field_split
                         /// (respects live IFS and preserves non-whitespace
                         /// empty-field semantics strtok cannot express).
-                        const char *ifs =
+                        char *ifs_owned =
                             symtable_get(executor->symtable, "IFS");
-                        if (!ifs) {
-                            ifs = " \t\n";
-                        }
+                        const char *ifs = ifs_owned ? ifs_owned : " \t\n";
                         int field_count = 0;
                         char **fields =
                             ifs_field_split(expanded, ifs, &field_count);
+                        free(ifs_owned);
                         for (int fi = 0; fi < field_count; fi++) {
                             char **grown = realloc(
                                 menu_items, (item_count + 1) * sizeof(char *));
@@ -4166,11 +4173,10 @@ static int execute_select(executor_t *executor, node_t *select_node) {
     int last_result = 0;
     char input_buf[256];
 
-    /// Get PS3 prompt (default is "#? ")
-    const char *ps3 = symtable_get(executor->symtable, "PS3");
-    if (!ps3 || !*ps3) {
-        ps3 = "#? ";
-    }
+    /// Get PS3 prompt (default is "#? "). symtable_get returns an owned copy;
+    /// hold it for the loop and free it in the cleanup section below.
+    char *ps3_owned = symtable_get(executor->symtable, "PS3");
+    const char *ps3 = (ps3_owned && *ps3_owned) ? ps3_owned : "#? ";
 
     while (1) {
         /// Display menu
@@ -4250,6 +4256,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
     /// Cleanup
     executor->loop_depth--;
     symtable_pop_scope(executor->symtable);
+    free(ps3_owned);
 
     for (int i = 0; i < item_count; i++) {
         free(menu_items[i]);
@@ -4314,7 +4321,8 @@ static int execute_time(executor_t *executor, node_t *time_node) {
         (end_usage.ru_stime.tv_usec - start_usage.ru_stime.tv_usec) / 1000000.0;
 
     /// Check for TIMEFORMAT variable (Bash extension)
-    const char *timeformat = symtable_get(executor->symtable, "TIMEFORMAT");
+    /// symtable_get returns an owned copy; free it before returning.
+    char *timeformat = symtable_get(executor->symtable, "TIMEFORMAT");
 
     if (posix_format) {
         /// POSIX format: real, user, sys in seconds
@@ -4332,6 +4340,7 @@ static int execute_time(executor_t *executor, node_t *time_node) {
                 (int)(sys_time / 60), fmod(sys_time, 60.0));
     }
 
+    free(timeformat);
     return result;
 }
 
@@ -5954,12 +5963,12 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
 
                         if (should_word_split) {
 
-                            /// Get IFS for field splitting
-                            const char *ifs =
+                            /// Get IFS for field splitting. symtable_get
+                            /// returns an owned copy; free it once the scan and
+                            /// split below have consumed it.
+                            char *ifs_owned =
                                 symtable_get(executor->symtable, "IFS");
-                            if (!ifs) {
-                                ifs = " \t\n"; /// Default IFS
-                            }
+                            const char *ifs = ifs_owned ? ifs_owned : " \t\n";
 
                             /// Check if expanded_arg contains any IFS
                             /// characters
@@ -5975,6 +5984,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 int field_count = 0;
                                 char **fields = ifs_field_split(
                                     expanded_arg, ifs, &field_count);
+                                free(ifs_owned);
 
                                 if (fields && field_count > 0) {
                                     /// Add each field as separate argument
@@ -6008,6 +6018,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 }
                             } else {
                                 /// No field splitting needed
+                                free(ifs_owned);
                                 if (!add_to_argv_list(&argv_list, &argv_count,
                                                       &argv_capacity,
                                                       expanded_arg)) {
@@ -13112,14 +13123,18 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
 
         /// Simple indirect expansion: ${!name} - value of variable named by
-        /// name
+        /// name. symtable_get_var returns owned copies; free both the pointer
+        /// name and the resolved value.
         char *indirect_name = symtable_get_var(executor->symtable, var_name);
+        char *result = NULL;
         if (indirect_name && indirect_name[0]) {
             /// Get the value of the variable whose name is in indirect_name
-            char *result = symtable_get_var(executor->symtable, indirect_name);
-            return strdup(result ? result : "");
+            char *value = symtable_get_var(executor->symtable, indirect_name);
+            result = strdup(value ? value : "");
+            free(value);
         }
-        return strdup("");
+        free(indirect_name);
+        return result ? result : strdup("");
     }
 
     /// Handle array length: ${#arr[@]} or ${#arr[*]}
@@ -18095,14 +18110,13 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         /// strtok cannot express. Quoted elements are not
                         /// split.
                         if (!is_quoted) {
-                            const char *ifs =
+                            char *ifs_owned =
                                 symtable_get(executor->symtable, "IFS");
-                            if (!ifs) {
-                                ifs = " \t\n";
-                            }
+                            const char *ifs = ifs_owned ? ifs_owned : " \t\n";
                             int field_count = 0;
                             char **fields =
                                 ifs_field_split(final_value, ifs, &field_count);
+                            free(ifs_owned);
                             if (fields && field_count > 0) {
                                 for (int fi = 0; fi < field_count; fi++) {
                                     if (fields[fi] && *fields[fi]) {

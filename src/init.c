@@ -967,6 +967,7 @@ int init(int argc, char **argv, FILE **in) {
     /// Note: atexit handlers run in REVERSE order of registration (LIFO)
     /// Register in order: last-to-run first, first-to-run last
     atexit(free_global_symtable);
+    atexit(free_shell_argv);
     atexit(free_aliases);
     atexit(free_compdef_bindings);
     atexit(free_command_hash);
