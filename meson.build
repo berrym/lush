@@ -1529,7 +1529,8 @@ if fs.exists('tests/unit/test_fc.c')
                        'tests/unit/test_fc.c',
                        'tests/unit/test_executor_stubs.c',
                        test_fc_sources + lle_shell_sources,
-                       include_directories: [inc, include_directories('tests')],
+                       include_directories: [inc, include_directories('tests'),
+                                             include_directories('src/builtins')],
                        dependencies: [lle_dep, libm])
   test('FC Builtin', test_fc,
        suite: 'unit',
