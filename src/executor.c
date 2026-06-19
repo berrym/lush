@@ -7990,7 +7990,10 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     }
 
     glob_t globbuf;
-    int glob_result = glob(base_pattern, GLOB_NOSORT, NULL, &globbuf);
+    /// Sort matches: POSIX pathname expansion sorts results per the current
+    /// LC_COLLATE, and bash/zsh do the same. GLOB_NOSORT would return raw
+    /// readdir order, which is filesystem-dependent and non-deterministic.
+    int glob_result = glob(base_pattern, 0, NULL, &globbuf);
     free(base_pattern);
 
     if (glob_result == GLOB_NOMATCH) {
