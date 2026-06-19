@@ -2424,6 +2424,7 @@ if fs.exists('tests/unit/test_compat.c')
                            'tests/unit/test_executor_stubs.c',
                            test_compat_sources + lle_shell_sources,
                            include_directories: [inc, include_directories('tests')],
+                           c_args: ['-DLUSH_COMPAT_DATA_DIR="' + (meson.project_source_root() / 'data/compat') + '"'],
                            dependencies: [lle_dep, libm])
   test('Compatibility Database', test_compat,
        suite: 'unit',

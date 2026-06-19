@@ -776,10 +776,12 @@ TEST(declare_variable) {
 TEST(local_outside_function) {
     executor_t *exec = setup_executor();
 
-    /// local outside function might succeed but has no effect
+    /// local outside a function is an error and sets nothing.
     int status = executor_execute_command_line(exec, "local LOCALVAR=test", 1);
-    /// Some shells return error, some succeed - just verify it runs
-    (void)status;
+    ASSERT(status != 0, "local outside a function should fail");
+
+    char *value = symtable_get_var(exec->symtable, "LOCALVAR");
+    ASSERT_NULL(value, "LOCALVAR should not be set by a failed local");
 
     teardown_executor(exec);
 }
@@ -897,9 +899,9 @@ TEST(unalias_removes) {
 TEST(hash_list) {
     executor_t *exec = setup_executor();
 
+    /// Listing an empty hash table succeeds.
     int status = executor_execute_command_line(exec, "hash", 1);
-    /// hash with no commands may return 0 or 1 depending on state
-    (void)status;
+    ASSERT_EQ(status, 0, "hash with no commands should succeed");
 
     teardown_executor(exec);
 }
