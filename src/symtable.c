@@ -955,16 +955,19 @@ static char *symtable_get_var_impl(symtable_manager_t *manager,
         return strdup(flags);
     }
 
-    /// Resolve nameref if applicable
+    /// Resolve nameref if applicable. The resolved name is owned, so free it
+    /// once find_var has consumed it (resolved_name is not used past that).
     const char *resolved_name = name;
+    char *resolved_owned = NULL;
     if (symtable_is_nameref(manager, name)) {
-        const char *target = symtable_resolve_nameref(manager, name, 10);
-        if (target && target != name) {
-            resolved_name = target;
+        resolved_owned = (char *)symtable_resolve_nameref(manager, name, 10);
+        if (resolved_owned) {
+            resolved_name = resolved_owned;
         }
     }
 
     symvar_t *var = find_var(manager->current_scope, resolved_name);
+    free(resolved_owned);
     if (!var) {
         return NULL;
     }
@@ -1070,7 +1073,11 @@ int symtable_set_nameref(symtable_manager_t *manager, const char *name,
  * @param manager Manager instance
  * @param name Variable name (may be a nameref)
  * @param max_depth Maximum chain depth to follow (prevents infinite loops)
- * @return Resolved variable name or NULL if circular/not found
+ * @return A newly-allocated copy of the resolved variable name that the caller
+ *         must free, or NULL on a circular reference or allocation failure. The
+ *         return is always owned (even when it equals @p name), so callers free
+ *         it unconditionally and never compare it against @p name for
+ * ownership.
  */
 const char *symtable_resolve_nameref(symtable_manager_t *manager,
                                      const char *name, int max_depth) {
@@ -1080,20 +1087,20 @@ const char *symtable_resolve_nameref(symtable_manager_t *manager,
 
     symvar_t *var = find_var(manager->current_scope, name);
     if (!var) {
-        return name; /// Not found, return original name
+        return strdup(name); /// Not found: owned copy of the original name
     }
 
     /// Check if this is a nameref
     if (!(var->flags & SYMVAR_NAMEREF_FLAG)) {
         free_symvar(var);
-        return name; /// Not a nameref, return original name
+        return strdup(name); /// Not a nameref: owned copy of the original name
     }
 
     /// Get the target name
     const char *target = var->value;
     if (!target || !*target) {
         free_symvar(var);
-        return name; /// No target, return original
+        return strdup(name); /// No target: owned copy of the original name
     }
 
     /// Make a copy since we need to free var
@@ -1101,24 +1108,15 @@ const char *symtable_resolve_nameref(symtable_manager_t *manager,
     free_symvar(var);
 
     if (!target_copy) {
-        return name;
+        return NULL;
     }
 
-    /// Recursively resolve (with depth limit)
+    /// Recursively resolve (with depth limit). Each level returns an owned
+    /// string, so free our intermediate copy and hand the result up.
     const char *resolved =
         symtable_resolve_nameref(manager, target_copy, max_depth - 1);
-
-    /// If resolution returns the copy, we need to keep it
-    /// Otherwise, free the copy
-    if (resolved != target_copy) {
-        free(target_copy);
-        return resolved;
-    }
-
-    /// The resolved name is our copy - caller shouldn't free this
-    /// This is a limitation - we should use a static buffer or allocate
-    /// For now, return the copy (small memory leak potential)
-    return target_copy;
+    free(target_copy);
+    return resolved;
 }
 
 /**

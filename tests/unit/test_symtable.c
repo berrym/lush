@@ -328,6 +328,7 @@ TEST(nameref_resolve) {
     ASSERT_NOT_NULL(resolved,
                     "symtable_resolve_nameref should return target name");
     ASSERT_STR_EQ(resolved, "TARGET", "Should resolve to TARGET");
+    free((char *)resolved); /// Resolved name is owned by the caller
 
     symtable_manager_free(mgr);
 }

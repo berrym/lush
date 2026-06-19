@@ -13365,18 +13365,21 @@ static char *parse_parameter_expansion(executor_t *executor,
                 strncpy(subscript, bracket + 1, sub_len);
                 subscript[sub_len] = '\0';
 
-                /// Resolve nameref if applicable
+                /// Resolve nameref if applicable. The resolved name is owned,
+                /// so free it once symtable_get_array has consumed it.
                 const char *resolved_arr_name = arr_name;
+                char *resolved_arr_owned = NULL;
                 symtable_manager_t *mgr = symtable_get_global_manager();
                 if (mgr && symtable_is_nameref(mgr, arr_name)) {
-                    const char *target =
-                        symtable_resolve_nameref(mgr, arr_name, 10);
-                    if (target) {
-                        resolved_arr_name = target;
+                    resolved_arr_owned =
+                        (char *)symtable_resolve_nameref(mgr, arr_name, 10);
+                    if (resolved_arr_owned) {
+                        resolved_arr_name = resolved_arr_owned;
                     }
                 }
 
                 array_value_t *array = symtable_get_array(resolved_arr_name);
+                free(resolved_arr_owned);
                 if (array) {
                     char *result = NULL;
 

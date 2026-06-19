@@ -499,7 +499,9 @@ int symtable_set_nameref(symtable_manager_t *manager, const char *name,
  * @param manager Manager instance
  * @param name Variable name (may be a nameref)
  * @param max_depth Maximum chain depth to follow (prevents infinite loops)
- * @return Resolved variable name or NULL if circular/not found
+ * @return A newly-allocated copy of the resolved variable name that the caller
+ *         must free, or NULL on a circular reference or allocation failure. The
+ *         return is always owned (even when it equals @p name).
  */
 const char *symtable_resolve_nameref(symtable_manager_t *manager,
                                      const char *name, int max_depth);
