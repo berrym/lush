@@ -7338,9 +7338,10 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
         return NULL;
     }
 
-    /// Sort results
-    qsort(results, result_count, sizeof(char *),
-          (int (*)(const void *, const void *))strcmp);
+    /// Sort results. The element type is char *, so the comparator must
+    /// dereference to the string; casting strcmp directly would compare the
+    /// pointer bytes instead of the names.
+    qsort(results, result_count, sizeof(char *), strptr_cmp);
 
     results[result_count] = NULL;
     *expanded_count = result_count;
@@ -7471,6 +7472,9 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
         free(results);
         return NULL;
     }
+
+    /// Sort like POSIX pathname expansion (readdir order is not sorted).
+    qsort(results, (size_t)count, sizeof(char *), strptr_cmp);
 
     /// Add NULL terminator
     char **final = realloc(results, (count + 1) * sizeof(char *));
@@ -7696,6 +7700,10 @@ static char **expand_globstar_pattern(const char *pattern,
         return NULL;
     }
 
+    /// Sort like POSIX pathname expansion: the recursive walk collects in
+    /// directory order, which is not sorted.
+    qsort(results, (size_t)count, sizeof(char *), strptr_cmp);
+
     /// Add NULL terminator
     char **final = realloc(results, (count + 1) * sizeof(char *));
     if (final) {
@@ -7810,6 +7818,8 @@ static char **expand_glob_dotglob(const char *base_pattern,
         *count = 0;
         return result;
     }
+    /// Sort like POSIX pathname expansion (readdir order is not sorted).
+    qsort(result, result_count, sizeof(char *), strptr_cmp);
     result[result_count] = NULL;
     *count = (int)result_count;
     return result;
