@@ -20,6 +20,7 @@
 /// Include display headers
 #include "display/command_layer.h"
 #include "display/layer_events.h"
+#include "lle/syntax_highlighting.h"
 #include "test_framework.h"
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
@@ -55,6 +56,14 @@ create_initialized_layer(layer_event_system_t **events_out) {
         command_layer_destroy(layer);
         layer_events_destroy(events);
         return NULL;
+    }
+
+    /// Force truecolor so highlighting output is deterministic across CI
+    /// environments. Terminal detection in a headless Docker run reports no
+    /// color support, which collapses every token class to bold-only and
+    /// makes per-class color assertions environment-dependent.
+    if (layer->spec_highlighter) {
+        layer->spec_highlighter->color_depth = 3;
     }
 
     if (events_out) {
@@ -205,20 +214,56 @@ TEST(command_layer_clear) {
  * ============================================================================
  */
 
+/// Extract the SGR parameter bytes of the ANSI color sequence that
+/// immediately precedes `token` in `buffer` -- i.e. the text between the
+/// "ESC [" introducer and the final "m" of "ESC [ <params> m <token>".
+/// Returns true and fills `out` when `token` is found wrapped in a color;
+/// false when it is absent or rendered without a preceding color. This lets
+/// the highlighting tests assert that each token class is colored, and that
+/// distinct classes receive distinct colors, without hardcoding theme RGB.
+static bool sgr_before(const char *buffer, const char *token, char *out,
+                       size_t outsz) {
+    const char *p = strstr(buffer, token);
+    if (!p || p == buffer || *(p - 1) != 'm') {
+        return false;
+    }
+    const char *m = p - 1;
+    const char *esc = m;
+    while (esc > buffer && (unsigned char)*esc != 0x1b) {
+        esc--;
+    }
+    if ((unsigned char)*esc != 0x1b || *(esc + 1) != '[') {
+        return false;
+    }
+    size_t len = (size_t)(m - (esc + 2));
+    if (len >= outsz) {
+        len = outsz - 1;
+    }
+    memcpy(out, esc + 2, len);
+    out[len] = '\0';
+    return true;
+}
+
 TEST(command_layer_syntax_command) {
     layer_event_system_t *events = NULL;
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /// Commands like 'ls', 'echo' should be highlighted
+    /// The command word 'ls' is wrapped in a color sequence; its argument
+    /// '-la' is colored differently (command class != argument class).
     command_layer_set_command(layer, "ls -la", 0);
     command_layer_update(layer);
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
 
-    /// Buffer should contain output
-    ASSERT(strlen(buffer) >= 6, "Highlighted output should not be empty");
+    char cmd_color[64], arg_color[64];
+    ASSERT(sgr_before(buffer, "ls", cmd_color, sizeof(cmd_color)),
+           "command 'ls' should be color-wrapped");
+    ASSERT(sgr_before(buffer, "-la", arg_color, sizeof(arg_color)),
+           "argument '-la' should be color-wrapped");
+    ASSERT(strcmp(cmd_color, arg_color) != 0,
+           "command and argument should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
@@ -233,7 +278,15 @@ TEST(command_layer_syntax_pipe) {
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should render piped command");
+
+    /// The pipe operator is colored, and distinctly from the command word.
+    char cmd_color[64], pipe_color[64];
+    ASSERT(sgr_before(buffer, "ls", cmd_color, sizeof(cmd_color)),
+           "command 'ls' should be color-wrapped");
+    ASSERT(sgr_before(buffer, "|", pipe_color, sizeof(pipe_color)),
+           "pipe operator should be color-wrapped");
+    ASSERT(strcmp(pipe_color, cmd_color) != 0,
+           "pipe operator and command should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
@@ -248,7 +301,15 @@ TEST(command_layer_syntax_redirect) {
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should render redirection");
+
+    /// The redirection operator is colored, and distinctly from the command.
+    char cmd_color[64], redir_color[64];
+    ASSERT(sgr_before(buffer, "echo", cmd_color, sizeof(cmd_color)),
+           "command 'echo' should be color-wrapped");
+    ASSERT(sgr_before(buffer, ">", redir_color, sizeof(redir_color)),
+           "redirection operator should be color-wrapped");
+    ASSERT(strcmp(redir_color, cmd_color) != 0,
+           "redirection operator and command should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
@@ -263,7 +324,15 @@ TEST(command_layer_syntax_variable) {
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should render variable");
+
+    /// The variable expansion is colored, and distinctly from the command.
+    char cmd_color[64], var_color[64];
+    ASSERT(sgr_before(buffer, "echo", cmd_color, sizeof(cmd_color)),
+           "command 'echo' should be color-wrapped");
+    ASSERT(sgr_before(buffer, "$HOME", var_color, sizeof(var_color)),
+           "variable '$HOME' should be color-wrapped");
+    ASSERT(strcmp(var_color, cmd_color) != 0,
+           "variable and command should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
@@ -278,7 +347,15 @@ TEST(command_layer_syntax_string) {
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should render quoted string");
+
+    /// The quoted string is colored as one span, distinctly from the command.
+    char cmd_color[64], str_color[64];
+    ASSERT(sgr_before(buffer, "echo", cmd_color, sizeof(cmd_color)),
+           "command 'echo' should be color-wrapped");
+    ASSERT(sgr_before(buffer, "\"hello world\"", str_color, sizeof(str_color)),
+           "quoted string should be color-wrapped as a single span");
+    ASSERT(strcmp(str_color, cmd_color) != 0,
+           "string and command should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
@@ -293,7 +370,16 @@ TEST(command_layer_syntax_keyword) {
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should render keywords");
+
+    /// The 'if' keyword is colored, and distinctly from the command 'echo'
+    /// (keywords and commands are separate token classes).
+    char kw_color[64], cmd_color[64];
+    ASSERT(sgr_before(buffer, "if", kw_color, sizeof(kw_color)),
+           "keyword 'if' should be color-wrapped");
+    ASSERT(sgr_before(buffer, "echo", cmd_color, sizeof(cmd_color)),
+           "command 'echo' should be color-wrapped");
+    ASSERT(strcmp(kw_color, cmd_color) != 0,
+           "keyword and command should use distinct colors");
 
     destroy_initialized_layer(layer, events);
 }
