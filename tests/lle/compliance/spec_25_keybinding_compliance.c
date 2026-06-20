@@ -1,50 +1,32 @@
 /**
  * @file spec_25_keybinding_compliance.c
- * @brief Spec 25 keybinding compliance test
+ * @brief Spec 25 default-keybindings behavioral compliance test
+ *
+ * Verifies the editing actions and preset loaders defined by Spec 25 by
+ * running each against a real editor and asserting the resulting buffer,
+ * cursor, or binding -- not merely that the function symbols exist.
+ *
+ * The kill ring and keybinding-manager APIs are exercised behaviorally by
+ * test_kill_ring.c and test_keybinding.c; the per-character/word movement
+ * actions by test_utf8_movement.c. This file covers what those do not: the
+ * line-movement, deletion, kill, case-change, transpose, insertion, and
+ * preset-loading behavior, plus the NULL-editor contract shared by the
+ * integration-level actions (history, completion, shell control) whose full
+ * behavior requires a live terminal loop.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-/**
- * spec_25_keybinding_compliance.c - Spec 25 Compliance Test
- *
- * Tests for LLE Specification 25: Default Keybindings
- * Validates API completeness - all functions and types are declared
- *
- * This is a HEADER-ONLY compliance test that verifies:
- * - All types are defined
- * - All functions are declared
- * - No runtime behavior testing (link-free)
- *
- * NOTE: This test does NOT call functions or test runtime behavior.
- * It only verifies the API exists as specified via function pointer checks.
- * Functional testing is done via integration tests that link with liblle.a.
- *
- * Test Coverage:
- * - Phase 1: Kill Ring System (7 functions)
- * - Phase 2: Keybinding Manager (4 core functions)
- * - Phase 3: Keybinding Actions (42 action functions + 2 preset loaders)
- * - Phase 4: Editor Context Structure
- *
- * Specification:
- * docs/lle_specification/critical_gaps/25_default_keybindings_complete.md Date:
- * 2025-11-02
- */
-
-/// API verified from include/lle/kill_ring.h on 2025-11-02
-/// API verified from include/lle/keybinding.h on 2025-11-02
-/// API verified from include/lle/keybinding_actions.h on 2025-11-02
-/// API verified from include/lle/lle_editor.h on 2025-11-02
-
+#include "lle/buffer_management.h"
 #include "lle/keybinding.h"
 #include "lle/keybinding_actions.h"
-#include "lle/kill_ring.h"
 #include "lle/lle_editor.h"
+#include "lush_memory_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-/// Test assertion counter
 static int assertions_passed = 0;
 
 #define COMPLIANCE_ASSERT(condition, message)                                  \
@@ -57,202 +39,218 @@ static int assertions_passed = 0;
         assertions_passed++;                                                   \
     } while (0)
 
+/// Build an editor holding @p content with the cursor reset to byte 0.
+static lle_editor_t *editor_with(const char *content) {
+    lle_editor_t *editor = NULL;
+    if (lle_editor_create(&editor, NULL) != LLE_SUCCESS || !editor) {
+        return NULL;
+    }
+    if (content && *content) {
+        if (lle_buffer_insert_text(editor->buffer, 0, content,
+                                   strlen(content)) != LLE_SUCCESS) {
+            lle_editor_destroy(editor);
+            return NULL;
+        }
+    }
+    lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, 0);
+    return editor;
+}
+
+/// Move the cursor to an absolute byte offset.
+static void seek(lle_editor_t *editor, size_t offset) {
+    lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, offset);
+}
+
+/// Current cursor byte offset.
+static size_t cursor(lle_editor_t *editor) {
+    lle_cursor_position_t pos;
+    lle_cursor_manager_get_position(editor->cursor_manager, &pos);
+    return pos.byte_offset;
+}
+
+/// True when the buffer text equals @p expected.
+static bool text_is(lle_editor_t *editor, const char *expected) {
+    size_t len = editor->buffer->length;
+    return strlen(expected) == len &&
+           (len == 0 || memcmp(editor->buffer->data, expected, len) == 0);
+}
+
 int main(void) {
-    printf("Spec 25 Default Keybindings Compliance Test\n");
-    printf("============================================\n\n");
+    printf("Spec 25 Default Keybindings Behavioral Compliance\n");
+    printf("==================================================\n\n");
+
+    lush_pool_config_t pool_config = lush_pool_get_default_config();
+    if (lush_pool_init(&pool_config) != LUSH_POOL_SUCCESS) {
+        fprintf(stderr, "FATAL: failed to initialize memory pool\n");
+        return 1;
+    }
+
+    lle_editor_t *ed;
 
     /// =====================================================================
-    /// PHASE 1: KILL RING SYSTEM
+    /// Line movement: beginning-of-line / end-of-line
     /// =====================================================================
-
-    printf("Phase 1: Kill Ring System API\n");
-    printf("------------------------------\n");
-
-    /// Opaque type - verify pointer type exists
-    lle_kill_ring_t *kill_ring_ptr = NULL;
-    COMPLIANCE_ASSERT(kill_ring_ptr == NULL,
-                      "lle_kill_ring_t opaque type defined");
-
-    /// Kill ring lifecycle
-    COMPLIANCE_ASSERT(lle_kill_ring_create != NULL,
-                      "lle_kill_ring_create declared");
-    COMPLIANCE_ASSERT(lle_kill_ring_destroy != NULL,
-                      "lle_kill_ring_destroy declared");
-
-    /// Kill ring operations
-    COMPLIANCE_ASSERT(lle_kill_ring_add != NULL, "lle_kill_ring_add declared");
-    COMPLIANCE_ASSERT(lle_kill_ring_get_current != NULL,
-                      "lle_kill_ring_get_current declared");
-    COMPLIANCE_ASSERT(lle_kill_ring_yank_pop != NULL,
-                      "lle_kill_ring_yank_pop declared");
-    COMPLIANCE_ASSERT(lle_kill_ring_clear != NULL,
-                      "lle_kill_ring_clear declared");
-    COMPLIANCE_ASSERT(lle_kill_ring_reset_yank_state != NULL,
-                      "lle_kill_ring_reset_yank_state declared");
-
-    printf("  ✓ Kill ring API complete (7 functions)\n\n");
+    ed = editor_with("hello world");
+    COMPLIANCE_ASSERT(ed != NULL, "editor creation");
+    seek(ed, 5);
+    lle_beginning_of_line(ed);
+    COMPLIANCE_ASSERT(cursor(ed) == 0, "beginning-of-line moves cursor to 0");
+    lle_end_of_line(ed);
+    COMPLIANCE_ASSERT(cursor(ed) == 11, "end-of-line moves cursor to EOL");
+    lle_editor_destroy(ed);
 
     /// =====================================================================
-    /// PHASE 2: KEYBINDING MANAGER
+    /// Deletion: delete-char / backward-delete-char
     /// =====================================================================
+    ed = editor_with("hello");
+    seek(ed, 0);
+    lle_delete_char(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "ello"),
+                      "delete-char removes the char at the cursor");
+    lle_editor_destroy(ed);
 
-    printf("Phase 2: Keybinding Manager API\n");
-    printf("--------------------------------\n");
-
-    /// Opaque type - verify pointer type exists
-    lle_keybinding_manager_t *kb_mgr_ptr = NULL;
-    COMPLIANCE_ASSERT(kb_mgr_ptr == NULL,
-                      "lle_keybinding_manager_t opaque type defined");
-
-    /// Keybinding manager lifecycle
-    COMPLIANCE_ASSERT(lle_keybinding_manager_create != NULL,
-                      "lle_keybinding_manager_create declared");
-    COMPLIANCE_ASSERT(lle_keybinding_manager_destroy != NULL,
-                      "lle_keybinding_manager_destroy declared");
-
-    /// Keybinding operations
-    COMPLIANCE_ASSERT(lle_keybinding_manager_bind != NULL,
-                      "lle_keybinding_manager_bind declared");
-    COMPLIANCE_ASSERT(lle_keybinding_manager_unbind != NULL,
-                      "lle_keybinding_manager_unbind declared");
-    COMPLIANCE_ASSERT(lle_keybinding_manager_process_key != NULL,
-                      "lle_keybinding_manager_process_key declared");
-    COMPLIANCE_ASSERT(lle_keybinding_manager_list_bindings != NULL,
-                      "lle_keybinding_manager_list_bindings declared");
-
-    printf("  ✓ Keybinding manager API complete (6 functions)\n\n");
+    ed = editor_with("hello");
+    seek(ed, 5);
+    lle_backward_delete_char(ed);
+    COMPLIANCE_ASSERT(
+        text_is(ed, "hell"),
+        "backward-delete-char removes the char before the cursor");
+    lle_editor_destroy(ed);
 
     /// =====================================================================
-    /// PHASE 3: KEYBINDING ACTIONS (44 FUNCTIONS TOTAL)
+    /// Kill: kill-line / kill-word / backward-kill-word
     /// =====================================================================
+    ed = editor_with("hello world");
+    seek(ed, 5);
+    lle_kill_line(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "hello"), "kill-line removes through EOL");
+    lle_editor_destroy(ed);
 
-    printf("Phase 3: Keybinding Actions API\n");
-    printf("--------------------------------\n");
+    ed = editor_with("hello world");
+    seek(ed, 0);
+    lle_kill_word(ed);
+    COMPLIANCE_ASSERT(text_is(ed, " world"),
+                      "kill-word removes the word after the cursor");
+    lle_editor_destroy(ed);
 
-    /// Movement actions (6)
-    COMPLIANCE_ASSERT(lle_beginning_of_line != NULL,
-                      "lle_beginning_of_line declared");
-    COMPLIANCE_ASSERT(lle_end_of_line != NULL, "lle_end_of_line declared");
-    COMPLIANCE_ASSERT(lle_forward_char != NULL, "lle_forward_char declared");
-    COMPLIANCE_ASSERT(lle_backward_char != NULL, "lle_backward_char declared");
-    COMPLIANCE_ASSERT(lle_forward_word != NULL, "lle_forward_word declared");
-    COMPLIANCE_ASSERT(lle_backward_word != NULL, "lle_backward_word declared");
-    printf("  ✓ Movement actions (6 functions)\n");
-
-    /// Editing/kill actions (6)
-    COMPLIANCE_ASSERT(lle_delete_char != NULL, "lle_delete_char declared");
-    COMPLIANCE_ASSERT(lle_backward_delete_char != NULL,
-                      "lle_backward_delete_char declared");
-    COMPLIANCE_ASSERT(lle_kill_line != NULL, "lle_kill_line declared");
-    COMPLIANCE_ASSERT(lle_backward_kill_line != NULL,
-                      "lle_backward_kill_line declared");
-    COMPLIANCE_ASSERT(lle_kill_word != NULL, "lle_kill_word declared");
-    COMPLIANCE_ASSERT(lle_backward_kill_word != NULL,
-                      "lle_backward_kill_word declared");
-    printf("  ✓ Editing/kill actions (6 functions)\n");
-
-    /// Yank/transpose actions (4)
-    COMPLIANCE_ASSERT(lle_yank != NULL, "lle_yank declared");
-    COMPLIANCE_ASSERT(lle_yank_pop != NULL, "lle_yank_pop declared");
-    COMPLIANCE_ASSERT(lle_transpose_chars != NULL,
-                      "lle_transpose_chars declared");
-    COMPLIANCE_ASSERT(lle_transpose_words != NULL,
-                      "lle_transpose_words declared");
-    printf("  ✓ Yank/transpose actions (4 functions)\n");
-
-    /// Case change actions (3)
-    COMPLIANCE_ASSERT(lle_upcase_word != NULL, "lle_upcase_word declared");
-    COMPLIANCE_ASSERT(lle_downcase_word != NULL, "lle_downcase_word declared");
-    COMPLIANCE_ASSERT(lle_capitalize_word != NULL,
-                      "lle_capitalize_word declared");
-    printf("  ✓ Case change actions (3 functions)\n");
-
-    /// History actions (6)
-    COMPLIANCE_ASSERT(lle_history_previous != NULL,
-                      "lle_history_previous declared");
-    COMPLIANCE_ASSERT(lle_history_next != NULL, "lle_history_next declared");
-    COMPLIANCE_ASSERT(lle_reverse_search_history != NULL,
-                      "lle_reverse_search_history declared");
-    COMPLIANCE_ASSERT(lle_forward_search_history != NULL,
-                      "lle_forward_search_history declared");
-    COMPLIANCE_ASSERT(lle_history_search_backward != NULL,
-                      "lle_history_search_backward declared");
-    COMPLIANCE_ASSERT(lle_history_search_forward != NULL,
-                      "lle_history_search_forward declared");
-    printf("  ✓ History actions (6 functions)\n");
-
-    /// Completion actions (3)
-    COMPLIANCE_ASSERT(lle_complete != NULL, "lle_complete declared");
-    COMPLIANCE_ASSERT(lle_possible_completions != NULL,
-                      "lle_possible_completions declared");
-    COMPLIANCE_ASSERT(lle_insert_completions != NULL,
-                      "lle_insert_completions declared");
-    printf("  ✓ Completion actions (3 functions)\n");
-
-    /// Shell operations (6)
-    COMPLIANCE_ASSERT(lle_accept_line != NULL, "lle_accept_line declared");
-    COMPLIANCE_ASSERT(lle_abort_line != NULL, "lle_abort_line declared");
-    COMPLIANCE_ASSERT(lle_send_eof != NULL, "lle_send_eof declared");
-    COMPLIANCE_ASSERT(lle_interrupt != NULL, "lle_interrupt declared");
-    COMPLIANCE_ASSERT(lle_suspend != NULL, "lle_suspend declared");
-    COMPLIANCE_ASSERT(lle_clear_screen != NULL, "lle_clear_screen declared");
-    printf("  ✓ Shell operations (6 functions)\n");
-
-    /// Utility actions (8)
-    COMPLIANCE_ASSERT(lle_quoted_insert != NULL, "lle_quoted_insert declared");
-    COMPLIANCE_ASSERT(lle_unix_line_discard != NULL,
-                      "lle_unix_line_discard declared");
-    COMPLIANCE_ASSERT(lle_unix_word_rubout != NULL,
-                      "lle_unix_word_rubout declared");
-    COMPLIANCE_ASSERT(lle_delete_horizontal_space != NULL,
-                      "lle_delete_horizontal_space declared");
-    COMPLIANCE_ASSERT(lle_self_insert != NULL, "lle_self_insert declared");
-    COMPLIANCE_ASSERT(lle_newline != NULL, "lle_newline declared");
-    COMPLIANCE_ASSERT(lle_tab_insert != NULL, "lle_tab_insert declared");
-    printf("  ✓ Utility actions (7 functions)\n");
-
-    /// Preset loaders (2)
-    COMPLIANCE_ASSERT(lle_keybinding_load_emacs_preset != NULL,
-                      "lle_keybinding_load_emacs_preset declared");
-    COMPLIANCE_ASSERT(lle_keybinding_load_vi_preset != NULL,
-                      "lle_keybinding_load_vi_preset declared");
-    printf("  ✓ Preset loaders (2 functions)\n\n");
+    ed = editor_with("hello world");
+    seek(ed, 11);
+    lle_backward_kill_word(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "hello "),
+                      "backward-kill-word removes the word before the cursor");
+    lle_editor_destroy(ed);
 
     /// =====================================================================
-    /// PHASE 4: EDITOR CONTEXT STRUCTURE
+    /// Case change: upcase / downcase / capitalize word
     /// =====================================================================
+    ed = editor_with("hello");
+    seek(ed, 0);
+    lle_upcase_word(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "HELLO"), "upcase-word uppercases the word");
+    lle_editor_destroy(ed);
 
-    printf("Phase 4: Editor Context API\n");
-    printf("---------------------------\n");
+    ed = editor_with("HELLO");
+    seek(ed, 0);
+    lle_downcase_word(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "hello"),
+                      "downcase-word lowercases the word");
+    lle_editor_destroy(ed);
 
-    /// Editor structure - verify type exists
-    lle_editor_t *editor_ptr = NULL;
-    COMPLIANCE_ASSERT(editor_ptr == NULL, "lle_editor_t structure defined");
-
-    /// Editor lifecycle
-    COMPLIANCE_ASSERT(lle_editor_create != NULL, "lle_editor_create declared");
-    COMPLIANCE_ASSERT(lle_editor_destroy != NULL,
-                      "lle_editor_destroy declared");
-    COMPLIANCE_ASSERT(lle_editor_reset != NULL, "lle_editor_reset declared");
-
-    printf("  ✓ Editor context API complete (3 functions)\n\n");
+    ed = editor_with("hello");
+    seek(ed, 0);
+    lle_capitalize_word(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "Hello"),
+                      "capitalize-word capitalizes the first letter");
+    lle_editor_destroy(ed);
 
     /// =====================================================================
-    /// SUMMARY
+    /// Transpose and insertion
     /// =====================================================================
+    ed = editor_with("abc");
+    seek(ed, 1);
+    lle_transpose_chars(ed);
+    COMPLIANCE_ASSERT(text_is(ed, "bac"),
+                      "transpose-chars swaps the two chars around the cursor");
+    lle_editor_destroy(ed);
 
-    printf("============================================\n");
-    printf("Spec 25 Compliance: ALL TESTS PASSED\n");
-    printf("Total Assertions: %d\n", assertions_passed);
-    printf("============================================\n");
-    printf("\n");
-    printf("API Summary:\n");
-    printf("  Phase 1: Kill Ring (7 functions)\n");
-    printf("  Phase 2: Keybinding Manager (6 functions)\n");
-    printf("  Phase 3: Keybinding Actions (42 functions)\n");
-    printf("  Phase 4: Editor Context (3 functions)\n");
-    printf("  Total: 58 API functions verified\n");
-    printf("\n");
+    ed = editor_with("hi");
+    seek(ed, 2);
+    lle_self_insert(ed, '!');
+    COMPLIANCE_ASSERT(text_is(ed, "hi!"),
+                      "self-insert inserts the codepoint at the cursor");
+    lle_editor_destroy(ed);
 
+    ed = editor_with("foo bar");
+    seek(ed, 7);
+    lle_unix_word_rubout(ed);
+    COMPLIANCE_ASSERT(
+        text_is(ed, "foo "),
+        "unix-word-rubout kills the whitespace-delimited word back");
+    lle_editor_destroy(ed);
+
+    /// =====================================================================
+    /// Preset loaders install the documented bindings
+    /// =====================================================================
+    ed = editor_with("");
+    lle_keybinding_manager_t *mgr = NULL;
+    COMPLIANCE_ASSERT(lle_keybinding_manager_create(&mgr, NULL) == LLE_SUCCESS,
+                      "keybinding manager creation");
+    ed->keybinding_manager = mgr;
+
+    COMPLIANCE_ASSERT(lle_keybinding_load_emacs_preset(ed) == LLE_SUCCESS,
+                      "emacs preset loads");
+    lle_keybinding_action_t *action = NULL;
+    COMPLIANCE_ASSERT(lle_keybinding_manager_lookup(mgr, "C-a", &action) ==
+                              LLE_SUCCESS &&
+                          action != NULL,
+                      "emacs preset binds C-a");
+    COMPLIANCE_ASSERT(strcmp(action->name, "beginning-of-line") == 0,
+                      "C-a is bound to beginning-of-line");
+    COMPLIANCE_ASSERT(lle_keybinding_manager_lookup(mgr, "C-e", &action) ==
+                              LLE_SUCCESS &&
+                          action != NULL,
+                      "emacs preset binds C-e");
+    COMPLIANCE_ASSERT(strcmp(action->name, "end-of-line") == 0,
+                      "C-e is bound to end-of-line");
+
+    COMPLIANCE_ASSERT(lle_keybinding_load_vi_preset(ed) == LLE_SUCCESS,
+                      "vi preset loads");
+
+    ed->keybinding_manager = NULL;
+    lle_keybinding_manager_destroy(mgr);
+    lle_editor_destroy(ed);
+
+    /// =====================================================================
+    /// Editor lifecycle: reset clears the buffer
+    /// =====================================================================
+    ed = editor_with("scratch");
+    COMPLIANCE_ASSERT(!text_is(ed, ""), "editor holds its initial content");
+    COMPLIANCE_ASSERT(lle_editor_reset(ed) == LLE_SUCCESS, "editor reset");
+    COMPLIANCE_ASSERT(text_is(ed, ""), "reset clears the buffer");
+    lle_editor_destroy(ed);
+
+    /// =====================================================================
+    /// Integration-level actions (history, completion, shell control) need a
+    /// live terminal loop; their behavior is exercised by the integration and
+    /// e2e suites. Here verify the NULL-editor contract they all share, which
+    /// guards against a regression that would crash or wrongly succeed.
+    /// =====================================================================
+    COMPLIANCE_ASSERT(lle_history_previous(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "history-previous rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_history_next(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "history-next rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_complete(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "complete rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_accept_line(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "accept-line rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_abort_line(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "abort-line rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_interrupt(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "interrupt rejects a NULL editor");
+    COMPLIANCE_ASSERT(lle_clear_screen(NULL) == LLE_ERROR_INVALID_PARAMETER,
+                      "clear-screen rejects a NULL editor");
+
+    printf("\nSpec 25 behavioral compliance: %d assertions passed\n",
+           assertions_passed);
     return 0;
 }

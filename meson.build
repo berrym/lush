@@ -801,9 +801,10 @@ endif
   # Validates compliance with Spec 25 requirements
   if fs.exists('tests/lle/compliance/spec_25_keybinding_compliance.c')
     test_spec25_compliance = executable('spec_25_compliance',
-                                        'tests/lle/compliance/spec_25_keybinding_compliance.c',
+                                        ['tests/lle/compliance/spec_25_keybinding_compliance.c',
+                                         'tests/lle/functional/display_test_stubs.c'],
                                         include_directories: inc,
-                                        dependencies: [lle_dep])
+                                        dependencies: [lle_dep, display_dep])
     test('Spec 25 Keybinding System Compliance', test_spec25_compliance,
          suite: 'lle-compliance',
          timeout: 60)
