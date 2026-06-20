@@ -161,9 +161,19 @@ TEST(register_duplicate_section) {
     creg_result_t result = config_registry_register_section(&shell_section);
     ASSERT_EQ(result, CREG_SUCCESS);
 
-    /// Duplicate registration should be a no-op
+    char before[64];
+    ASSERT_EQ(config_registry_get_string("shell.mode", before, sizeof(before)),
+              CREG_SUCCESS);
+
+    /// Duplicate registration is a no-op: it succeeds and leaves the existing
+    /// section's value untouched.
     result = config_registry_register_section(&shell_section);
     ASSERT_EQ(result, CREG_SUCCESS);
+
+    char after[64];
+    ASSERT_EQ(config_registry_get_string("shell.mode", after, sizeof(after)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(before, after);
 }
 
 TEST(register_null_section) {
@@ -525,6 +535,10 @@ TEST(load_nonexistent_file) {
 TEST(load_empty_file) {
     config_registry_register_section(&shell_section);
 
+    char before[64];
+    ASSERT_EQ(config_registry_get_string("shell.mode", before, sizeof(before)),
+              CREG_SUCCESS);
+
     /// Create empty temp file
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
@@ -533,6 +547,12 @@ TEST(load_empty_file) {
 
     creg_result_t result = config_registry_load(tmpfile);
     ASSERT_EQ(result, CREG_SUCCESS);
+
+    /// Loading an empty file changes nothing.
+    char after[64];
+    ASSERT_EQ(config_registry_get_string("shell.mode", after, sizeof(after)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(before, after);
 
     unlink(tmpfile);
 }
