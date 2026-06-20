@@ -27,6 +27,50 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
+/// AST navigation helpers for structural assertions. The parsed result is a
+/// forest: parser_parse returns the first top-level node, with further
+/// statements chained through next_sibling, and each node's children chained
+/// through first_child/next_sibling.
+
+/// True if any node in the forest has the given type.
+static bool tree_has_type(const node_t *root, node_type_t type) {
+    for (const node_t *n = root; n; n = n->next_sibling) {
+        if (n->type == type) {
+            return true;
+        }
+        if (tree_has_type(n->first_child, type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// Count of nodes in the forest with the given type.
+static size_t tree_count_type(const node_t *root, node_type_t type) {
+    size_t k = 0;
+    for (const node_t *n = root; n; n = n->next_sibling) {
+        if (n->type == type) {
+            k++;
+        }
+        k += tree_count_type(n->first_child, type);
+    }
+    return k;
+}
+
+/// First node in the forest with the given type, or NULL.
+static const node_t *tree_find_type(const node_t *root, node_type_t type) {
+    for (const node_t *n = root; n; n = n->next_sibling) {
+        if (n->type == type) {
+            return n;
+        }
+        const node_t *found = tree_find_type(n->first_child, type);
+        if (found) {
+            return found;
+        }
+    }
+    return NULL;
+}
+
 /// Test framework macros
 
 /* ============================================================================
@@ -112,6 +156,7 @@ TEST(parse_simple_pipe) {
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
     /// Should have a PIPE or PIPELINE node somewhere in tree
+    ASSERT(tree_has_type(ast, NODE_PIPE), "pipe should parse to a NODE_PIPE");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -124,6 +169,10 @@ TEST(parse_multi_pipe) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT_EQ(tree_count_type(ast, NODE_PIPE), 2,
+              "three-stage pipeline has two pipe nodes");
+    ASSERT_EQ(tree_count_type(ast, NODE_COMMAND), 3,
+              "three-stage pipeline has three commands");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -136,6 +185,7 @@ TEST(parse_pipe_stderr) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_PIPE), "|& should parse to a NODE_PIPE");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -153,6 +203,8 @@ TEST(parse_semicolon_list) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT_EQ(tree_count_type(ast, NODE_COMMAND), 3,
+              "semicolon list has three commands");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -165,6 +217,8 @@ TEST(parse_logical_and) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_LOGICAL_AND),
+           "&& should parse to a NODE_LOGICAL_AND");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -177,6 +231,8 @@ TEST(parse_logical_or) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_LOGICAL_OR),
+           "|| should parse to a NODE_LOGICAL_OR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -189,6 +245,8 @@ TEST(parse_background) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_BACKGROUND),
+           "& should parse to a NODE_BACKGROUND");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -206,6 +264,8 @@ TEST(parse_redirect_in) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_IN),
+           "< should attach a NODE_REDIR_IN");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -218,6 +278,8 @@ TEST(parse_redirect_out) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_OUT),
+           "> should attach a NODE_REDIR_OUT");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -230,6 +292,8 @@ TEST(parse_redirect_append) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_APPEND),
+           ">> should attach a NODE_REDIR_APPEND (not a truncate)");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -242,6 +306,8 @@ TEST(parse_redirect_stderr) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_ERR),
+           "2> should attach a NODE_REDIR_ERR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -254,6 +320,8 @@ TEST(parse_redirect_both) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_BOTH),
+           "&> should attach a NODE_REDIR_BOTH");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -266,6 +334,8 @@ TEST(parse_heredoc) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_HEREDOC),
+           "<< should attach a NODE_REDIR_HEREDOC");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -278,6 +348,8 @@ TEST(parse_herestring) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_HERESTRING),
+           "<<< should attach a NODE_REDIR_HERESTRING");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -290,6 +362,10 @@ TEST(parse_multiple_redirects) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_REDIR_IN) &&
+               tree_has_type(ast, NODE_REDIR_OUT) &&
+               tree_has_type(ast, NODE_REDIR_ERR),
+           "all three redirections should be attached");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -307,6 +383,7 @@ TEST(parse_if_then_fi) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_IF), "should parse to a NODE_IF");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -319,6 +396,12 @@ TEST(parse_if_then_else_fi) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    {
+        const node_t *iff = tree_find_type(ast, NODE_IF);
+        ASSERT_NOT_NULL((void *)iff, "should parse to a NODE_IF");
+        ASSERT_EQ(iff->children, 3,
+                  "if/else has condition, then, and else children");
+    }
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -332,6 +415,12 @@ TEST(parse_if_elif_else_fi) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    {
+        const node_t *iff = tree_find_type(ast, NODE_IF);
+        ASSERT_NOT_NULL((void *)iff, "should parse to a NODE_IF");
+        ASSERT_EQ(iff->children, 5,
+                  "if/elif/else has cond, then, elif-cond, elif-then, else");
+    }
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -344,6 +433,7 @@ TEST(parse_for_loop) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_FOR), "should parse to a NODE_FOR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -359,6 +449,7 @@ TEST(parse_for_loop_no_in) {
                     "parser_parse should return AST for 'for var;' syntax");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_FOR), "should parse to a NODE_FOR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -371,6 +462,7 @@ TEST(parse_while_loop) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_WHILE), "should parse to a NODE_WHILE");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -383,6 +475,8 @@ TEST(parse_until_loop) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_UNTIL),
+           "until should parse to NODE_UNTIL, distinct from NODE_WHILE");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -403,6 +497,9 @@ TEST(parse_while_logical_and_simple) {
     ASSERT_NOT_NULL(ast, "while + && condition must parse");
     ASSERT(!parser_has_error(parser),
            "while + && condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_WHILE) &&
+               tree_has_type(ast, NODE_LOGICAL_AND),
+           "while condition should contain a logical-AND");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -415,6 +512,9 @@ TEST(parse_while_logical_or_simple) {
     ASSERT_NOT_NULL(ast, "while + || condition must parse");
     ASSERT(!parser_has_error(parser),
            "while + || condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_WHILE) &&
+               tree_has_type(ast, NODE_LOGICAL_OR),
+           "while condition should contain a logical-OR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -427,6 +527,9 @@ TEST(parse_until_logical_and_simple) {
     ASSERT_NOT_NULL(ast, "until + && condition must parse");
     ASSERT(!parser_has_error(parser),
            "until + && condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_UNTIL) &&
+               tree_has_type(ast, NODE_LOGICAL_AND),
+           "until condition should contain a logical-AND");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -439,6 +542,9 @@ TEST(parse_until_logical_or_simple) {
     ASSERT_NOT_NULL(ast, "until + || condition must parse");
     ASSERT(!parser_has_error(parser),
            "until + || condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_UNTIL) &&
+               tree_has_type(ast, NODE_LOGICAL_OR),
+           "until condition should contain a logical-OR");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -451,6 +557,10 @@ TEST(parse_while_logical_arith_compound) {
     ASSERT_NOT_NULL(ast, "while + (( )) && (( )) condition must parse");
     ASSERT(!parser_has_error(parser),
            "while + (( )) && (( )) condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_WHILE) &&
+               tree_has_type(ast, NODE_LOGICAL_AND) &&
+               tree_count_type(ast, NODE_ARITH_CMD) >= 2,
+           "while cond is a logical-AND of two arithmetic commands");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -463,6 +573,10 @@ TEST(parse_while_logical_brace_group) {
     ASSERT_NOT_NULL(ast, "while + brace-group + && condition must parse");
     ASSERT(!parser_has_error(parser),
            "while + brace-group + && condition must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_WHILE) &&
+               tree_has_type(ast, NODE_LOGICAL_AND) &&
+               tree_has_type(ast, NODE_BRACE_GROUP),
+           "while cond logical-AND with a brace-group side");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -475,6 +589,7 @@ TEST(parse_case) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_CASE), "should parse to a NODE_CASE");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -488,6 +603,9 @@ TEST(parse_case_with_patterns) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_CASE) &&
+               tree_count_type(ast, NODE_CASE_ITEM) >= 2,
+           "case has at least two pattern clauses");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -508,6 +626,8 @@ TEST(parse_function_keyword) {
         ast, "parser_parse should return AST for 'function name { }' syntax");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_FUNCTION),
+           "should parse to a NODE_FUNCTION");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -520,6 +640,8 @@ TEST(parse_function_posix) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_FUNCTION),
+           "should parse to a NODE_FUNCTION");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -540,6 +662,9 @@ TEST(parse_function_body_subshell) {
     ASSERT_NOT_NULL(ast, "function with subshell body must parse");
     ASSERT(!parser_has_error(parser),
            "function with subshell body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_SUBSHELL),
+           "function body should be a subshell");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -551,6 +676,8 @@ TEST(parse_function_body_if) {
     ASSERT_NOT_NULL(ast, "function with if body must parse");
     ASSERT(!parser_has_error(parser),
            "function with if body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) && tree_has_type(ast, NODE_IF),
+           "function body should be an if");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -562,6 +689,8 @@ TEST(parse_function_body_while) {
     ASSERT_NOT_NULL(ast, "function with while body must parse");
     ASSERT(!parser_has_error(parser),
            "function with while body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) && tree_has_type(ast, NODE_WHILE),
+           "function body should be a while");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -573,6 +702,8 @@ TEST(parse_function_body_for) {
     ASSERT_NOT_NULL(ast, "function with for body must parse");
     ASSERT(!parser_has_error(parser),
            "function with for body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) && tree_has_type(ast, NODE_FOR),
+           "function body should be a for");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -584,6 +715,8 @@ TEST(parse_function_body_case) {
     ASSERT_NOT_NULL(ast, "function with case body must parse");
     ASSERT(!parser_has_error(parser),
            "function with case body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) && tree_has_type(ast, NODE_CASE),
+           "function body should be a case");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -595,6 +728,9 @@ TEST(parse_function_body_arith) {
     ASSERT_NOT_NULL(ast, "function with arithmetic body must parse");
     ASSERT(!parser_has_error(parser),
            "function with arithmetic body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_ARITH_CMD),
+           "function body should be an arithmetic command");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -608,6 +744,9 @@ TEST(parse_function_body_keyword_form_subshell) {
         "'function name() ( body )' (keyword form, subshell body) must parse");
     ASSERT(!parser_has_error(parser),
            "keyword form with subshell body must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_SUBSHELL),
+           "function body should be a subshell");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -629,6 +768,9 @@ TEST(parse_function_trailing_redir_out) {
     ASSERT_NOT_NULL(ast, "POSIX form with > redirect must parse");
     ASSERT(!parser_has_error(parser),
            "POSIX form with > redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_OUT),
+           "function should carry a trailing output redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -640,6 +782,9 @@ TEST(parse_function_trailing_redir_keyword_form) {
     ASSERT_NOT_NULL(ast, "keyword form with > redirect must parse");
     ASSERT(!parser_has_error(parser),
            "keyword form with > redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_OUT),
+           "function should carry a trailing output redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -651,6 +796,9 @@ TEST(parse_function_trailing_redir_keyword_parens_form) {
     ASSERT_NOT_NULL(ast, "keyword+parens form with > redirect must parse");
     ASSERT(!parser_has_error(parser),
            "keyword+parens form with > redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_OUT),
+           "function should carry a trailing output redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -662,6 +810,9 @@ TEST(parse_function_trailing_redir_stderr) {
     ASSERT_NOT_NULL(ast, "function with 2> redirect must parse");
     ASSERT(!parser_has_error(parser),
            "function with 2> redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_ERR),
+           "function should carry a trailing stderr redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -673,6 +824,9 @@ TEST(parse_function_trailing_redir_in) {
     ASSERT_NOT_NULL(ast, "function with < redirect must parse");
     ASSERT(!parser_has_error(parser),
            "function with < redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_IN),
+           "function should carry a trailing input redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -684,6 +838,9 @@ TEST(parse_function_trailing_redir_append) {
     ASSERT_NOT_NULL(ast, "function with >> redirect must parse");
     ASSERT(!parser_has_error(parser),
            "function with >> redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_FUNCTION) &&
+               tree_has_type(ast, NODE_REDIR_APPEND),
+           "function should carry a trailing append redirection");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -700,6 +857,8 @@ TEST(parse_function_trailing_redir_subshell_body) {
     ASSERT_NOT_NULL(ast, "function with subshell body + > redirect must parse");
     ASSERT(!parser_has_error(parser), "function with subshell body + > "
                                       "redirect must not produce parse error");
+    ASSERT(tree_has_type(ast, NODE_REDIR_OUT),
+           "a trailing output redirection should be present");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -717,6 +876,8 @@ TEST(parse_subshell) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_SUBSHELL),
+           "( ) should parse to a NODE_SUBSHELL");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -729,6 +890,8 @@ TEST(parse_brace_group) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_BRACE_GROUP),
+           "{ } should parse to a NODE_BRACE_GROUP");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -746,6 +909,8 @@ TEST(parse_arithmetic_command) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_ARITH_CMD),
+           "(( )) should parse to a NODE_ARITH_CMD");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -758,6 +923,8 @@ TEST(parse_extended_test) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_EXTENDED_TEST),
+           "[[ ]] should parse to a NODE_EXTENDED_TEST");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -770,6 +937,8 @@ TEST(parse_process_substitution_in) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_PROC_SUB_IN),
+           "<( ) should parse to a NODE_PROC_SUB_IN");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -782,6 +951,8 @@ TEST(parse_process_substitution_out) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_PROC_SUB_OUT),
+           ">( ) should parse to a NODE_PROC_SUB_OUT");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -794,6 +965,8 @@ TEST(parse_command_substitution) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_COMMAND_SUB),
+           "$( ) should parse to a NODE_COMMAND_SUB");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -806,6 +979,8 @@ TEST(parse_arithmetic_expansion) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_ARITH_EXP),
+           "$(( )) should parse to a NODE_ARITH_EXP");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -823,6 +998,11 @@ TEST(parse_variable_assignment) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(ast->type == NODE_COMMAND, "bare assignment parses to a command");
+    ASSERT(ast->val_type == VAL_STR && ast->val.str != NULL,
+           "command word should be set");
+    ASSERT_STR_EQ(ast->val.str, "FOO=bar",
+                  "assignment word should be preserved verbatim");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -835,6 +1015,8 @@ TEST(parse_multiple_assignments) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT_EQ(tree_count_type(ast, NODE_ASSIGN), 3,
+              "three prefix assignments should be parsed");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -847,6 +1029,17 @@ TEST(parse_export_assignment) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(ast->type == NODE_COMMAND && ast->val_type == VAL_STR &&
+               ast->val.str != NULL,
+           "export parses to a command");
+    ASSERT_STR_EQ(ast->val.str, "export", "command word should be export");
+    ASSERT_NOT_NULL((void *)ast->first_child,
+                    "export should carry an argument");
+    ASSERT(ast->first_child->val_type == VAL_STR &&
+               ast->first_child->val.str != NULL,
+           "argument word should be set");
+    ASSERT_STR_EQ(ast->first_child->val.str, "FOO=bar",
+                  "argument should be the assignment FOO=bar");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -864,6 +1057,8 @@ TEST(parse_nested_if) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_count_type(ast, NODE_IF) >= 2,
+           "nested if should produce two NODE_IF nodes");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -877,6 +1072,8 @@ TEST(parse_nested_loops) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_count_type(ast, NODE_FOR) >= 2,
+           "nested for should produce two NODE_FOR nodes");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -890,6 +1087,9 @@ TEST(parse_complex_pipeline) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    ASSERT(tree_has_type(ast, NODE_PIPE) &&
+               tree_has_type(ast, NODE_BRACE_GROUP),
+           "pipeline stage should be a brace-group");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -980,7 +1180,9 @@ TEST(parser_set_source_name) {
     ASSERT_NOT_NULL(parser, "parser_new failed");
 
     parser_set_source_name(parser, "test_script.sh");
-    /// Should not crash
+    ASSERT_NOT_NULL((void *)parser->source_name, "source name should be set");
+    ASSERT_STR_EQ(parser->source_name, "test_script.sh",
+                  "source name should round-trip through the setter");
 
     parser_free(parser);
 }
