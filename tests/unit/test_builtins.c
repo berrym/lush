@@ -13,7 +13,7 @@
 #include "builtins.h"
 #include "executor.h"
 #include "symtable.h"
-#include "test_framework.h"
+#include "test_shell_harness.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -315,20 +315,13 @@ TEST(cd_to_tmp) {
 }
 
 TEST(cd_to_home) {
-    executor_t *exec = setup_executor();
-    char *original_dir = getcwd(NULL, 0);
-    char *home = getenv("HOME");
-
-    if (home) {
-        int status = executor_execute_command_line(exec, "cd", 1);
-        ASSERT_EQ(status, 0, "cd with no args should succeed");
-    }
-
-    /// Return to original directory
-    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
-    free(original_dir);
-
-    teardown_executor(exec);
+    const char *home = getenv("HOME");
+    ASSERT_NOT_NULL((void *)home, "HOME should be set in the test environment");
+    char expect[1100];
+    snprintf(expect, sizeof(expect), "%s\n", home);
+    run_result_t r = run_shell("cd\npwd\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, expect);
 }
 
 TEST(cd_nonexistent_fails) {
@@ -449,12 +442,9 @@ TEST(unset_variable) {
  */
 
 TEST(type_builtin_command) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "type echo", 1);
-    ASSERT_EQ(status, 0, "type echo should succeed (echo is builtin)");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("type echo\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "builtin");
 }
 
 TEST(type_external_command) {
@@ -467,22 +457,15 @@ TEST(type_external_command) {
 }
 
 TEST(type_nonexistent_command) {
-    executor_t *exec = setup_executor();
-
-    int status =
-        executor_execute_command_line(exec, "type nonexistent_cmd_xyz", 1);
-    ASSERT_EQ(status, 1, "type nonexistent command should fail");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("type nonexistent_xyz_cmd\n");
+    ASSERT(r.exit_status != 0, "type of an unknown command should fail");
+    ASSERT_STDOUT_CONTAINS(r, "not found");
 }
 
 TEST(type_t_option) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "type -t true", 1);
-    ASSERT_EQ(status, 0, "type -t true should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("type -t true\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "builtin\n");
 }
 
 /* ============================================================================
@@ -491,50 +474,35 @@ TEST(type_t_option) {
  */
 
 TEST(echo_simple) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "echo hello", 1);
-    ASSERT_EQ(status, 0, "echo hello should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("echo hello\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hello\n");
 }
 
 TEST(echo_multiple_args) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "echo hello world", 1);
-    ASSERT_EQ(status, 0, "echo hello world should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("echo a b c\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a b c\n");
 }
 
 TEST(echo_no_newline) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "echo -n hello", 1);
-    ASSERT_EQ(status, 0, "echo -n should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("echo -n hi\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hi");
 }
 
 TEST(echo_escape_sequences) {
-    executor_t *exec = setup_executor();
-
-    int status =
-        executor_execute_command_line(exec, "echo -e 'hello\\nworld'", 1);
-    ASSERT_EQ(status, 0, "echo -e with escapes should succeed");
-
-    teardown_executor(exec);
+    /// -e interprets backslash escapes: \\t becomes a real tab.
+    run_result_t r = run_shell("echo -e \"a\\tb\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a\tb\n");
 }
 
 TEST(echo_no_escapes) {
-    executor_t *exec = setup_executor();
-
-    int status =
-        executor_execute_command_line(exec, "echo -E 'hello\\nworld'", 1);
-    ASSERT_EQ(status, 0, "echo -E should succeed");
-
-    teardown_executor(exec);
+    /// -E leaves backslash escapes literal.
+    run_result_t r = run_shell("echo -E \"a\\tb\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a\\tb\n");
 }
 
 /* ============================================================================
@@ -543,49 +511,33 @@ TEST(echo_no_escapes) {
  */
 
 TEST(printf_string) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "printf '%s' hello", 1);
-    ASSERT_EQ(status, 0, "printf %s should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("mode posix\nprintf \"%s\" hello\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hello");
 }
 
 TEST(printf_integer) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "printf '%d' 42", 1);
-    ASSERT_EQ(status, 0, "printf %d should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("mode posix\nprintf \"%d\" 42\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "42");
 }
 
 TEST(printf_hex) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "printf '%x' 255", 1);
-    ASSERT_EQ(status, 0, "printf %x should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("mode posix\nprintf \"%x\" 255\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "ff");
 }
 
 TEST(printf_width) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "printf '%10s' hello", 1);
-    ASSERT_EQ(status, 0, "printf with width should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("mode posix\nprintf \"[%10s]\" hi\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[        hi]");
 }
 
 TEST(printf_escape_newline) {
-    executor_t *exec = setup_executor();
-
-    int status =
-        executor_execute_command_line(exec, "printf 'line1\\nline2'", 1);
-    ASSERT_EQ(status, 0, "printf with \\n should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("mode posix\nprintf \"a\\nb\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a\nb");
 }
 
 /* ============================================================================
@@ -594,22 +546,15 @@ TEST(printf_escape_newline) {
  */
 
 TEST(eval_simple) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "eval echo hello", 1);
-    ASSERT_EQ(status, 0, "eval echo hello should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("eval \"echo hi\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hi\n");
 }
 
 TEST(eval_variable_expansion) {
-    executor_t *exec = setup_executor();
-
-    executor_execute_command_line(exec, "CMD=echo", 1);
-    int status = executor_execute_command_line(exec, "eval $CMD hello", 1);
-    ASSERT_EQ(status, 0, "eval $CMD should expand and execute");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("CMD=\"echo hello\"\neval \"$CMD\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hello\n");
 }
 
 TEST(eval_no_args) {
@@ -940,19 +885,9 @@ TEST(umask_display) {
 }
 
 TEST(umask_set) {
-    executor_t *exec = setup_executor();
-
-    /// Save current umask
-    mode_t old_mask = umask(0);
-    umask(old_mask);
-
-    int status = executor_execute_command_line(exec, "umask 022", 1);
-    ASSERT_EQ(status, 0, "umask 022 should succeed");
-
-    /// Restore
-    umask(old_mask);
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("umask 0077\numask\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "0077\n");
 }
 
 /* ============================================================================
