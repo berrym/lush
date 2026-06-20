@@ -464,6 +464,13 @@ char *debug_get_node_description(node_t *node) {
     case NODE_PIPE:
         snprintf(desc, 256, "PIPE");
         break;
+    case NODE_PIPELINE:
+        snprintf(desc, 256, "PIPELINE");
+        break;
+    case NODE_VAR:
+        snprintf(desc, 256, "VAR: %s",
+                 node->val.str ? node->val.str : "(empty)");
+        break;
     case NODE_IF:
         snprintf(desc, 256, "IF");
         break;
