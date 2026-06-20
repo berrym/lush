@@ -123,19 +123,20 @@ TEST(trace_node_enabled) {
 }
 
 TEST(trace_node_with_timing) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
     ctx->show_timing = true;
-
-    node_t *node = new_node(NODE_PIPELINE);
+    node_t *node = new_node(NODE_COMMAND);
     ASSERT_NOT_NULL(node, "new_node should succeed");
-
-    /// Should not crash with timing enabled
-    debug_trace_node(ctx, node, "script.sh", 5);
-
+    long before = ctx->total_commands;
+    debug_trace_node(ctx, node, "script.sh", 3);
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "TRACE:") != NULL, "node trace should be emitted");
+    ASSERT_TRUE(strstr(buf, "Time:") != NULL, "timing should be shown");
+    ASSERT_EQ(ctx->total_commands, before + 1,
+              "command count should increment");
     free_node_tree(node);
     debug_cleanup(ctx);
 }
@@ -171,56 +172,56 @@ TEST(trace_node_multiple_types) {
 /// ============================================================================
 
 TEST(trace_command_null_params) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    /// Should not crash with NULL
-    debug_trace_command(NULL, "ls", NULL, 0);
+    debug_trace_command(NULL, NULL, NULL, 0);
     debug_trace_command(ctx, NULL, NULL, 0);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "COMMAND:") == NULL, "NULL command traces nothing");
     debug_cleanup(ctx);
 }
 
 TEST(trace_command_simple) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
     char *argv[] = {"ls", NULL};
     debug_trace_command(ctx, "ls", argv, 1);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "COMMAND: ls") != NULL,
+                "command name should be traced");
     debug_cleanup(ctx);
 }
 
 TEST(trace_command_with_args) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    char *argv[] = {"grep", "-r", "pattern", "dir/", NULL};
-    debug_trace_command(ctx, "grep", argv, 4);
-
+    char *argv[] = {"grep", "-i", "pattern", NULL};
+    debug_trace_command(ctx, "grep", argv, 3);
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "COMMAND: grep") != NULL,
+                "command should be traced");
+    ASSERT_TRUE(strstr(buf, "'-i'") != NULL && strstr(buf, "'pattern'") != NULL,
+                "arguments should be traced");
     debug_cleanup(ctx);
 }
 
 TEST(trace_command_disabled) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->enabled = false;
     ctx->trace_execution = true;
-
-    char *argv[] = {"echo", "hello", NULL};
-    /// Should do nothing when disabled
-    debug_trace_command(ctx, "echo", argv, 2);
-
+    char *argv[] = {"ls", NULL};
+    debug_trace_command(ctx, "ls", argv, 1);
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "COMMAND:") == NULL,
+                "disabled tracing should emit no command line");
     debug_cleanup(ctx);
 }
 
@@ -229,42 +230,43 @@ TEST(trace_command_disabled) {
 /// ============================================================================
 
 TEST(trace_builtin_null_params) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    /// Should not crash
-    debug_trace_builtin(NULL, "cd", NULL, 0);
+    debug_trace_builtin(NULL, NULL, NULL, 0);
     debug_trace_builtin(ctx, NULL, NULL, 0);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "BUILTIN:") == NULL, "NULL builtin traces nothing");
     debug_cleanup(ctx);
 }
 
 TEST(trace_builtin_simple) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    char *argv[] = {"cd", NULL};
-    debug_trace_builtin(ctx, "cd", argv, 1);
-
+    char *argv[] = {"export", NULL};
+    debug_trace_builtin(ctx, "export", argv, 1);
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "BUILTIN: export") != NULL,
+                "builtin should be traced");
     debug_cleanup(ctx);
 }
 
 TEST(trace_builtin_with_args) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    char *argv[] = {"export", "PATH=/usr/bin", "HOME=/home/user", NULL};
+    char *argv[] = {"export", "PATH=/x", "HOME=/y", NULL};
     debug_trace_builtin(ctx, "export", argv, 3);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "BUILTIN: export") != NULL,
+                "builtin should be traced");
+    ASSERT_TRUE(strstr(buf, "'PATH=/x'") != NULL &&
+                    strstr(buf, "'HOME=/y'") != NULL,
+                "builtin arguments should be traced");
     debug_cleanup(ctx);
 }
 
@@ -273,42 +275,43 @@ TEST(trace_builtin_with_args) {
 /// ============================================================================
 
 TEST(trace_function_null_params) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    /// Should not crash
-    debug_trace_function_call(NULL, "myfunc", NULL, 0);
+    debug_trace_function_call(NULL, NULL, NULL, 0);
     debug_trace_function_call(ctx, NULL, NULL, 0);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "FUNCTION:") == NULL,
+                "NULL function traces nothing");
     debug_cleanup(ctx);
 }
 
 TEST(trace_function_simple) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
     char *argv[] = {"myfunc", NULL};
     debug_trace_function_call(ctx, "myfunc", argv, 1);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "FUNCTION: myfunc") != NULL,
+                "function should be traced");
     debug_cleanup(ctx);
 }
 
 TEST(trace_function_with_args) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->trace_execution = true;
-
-    char *argv[] = {"process_file", "input.txt", "output.txt", NULL};
-    debug_trace_function_call(ctx, "process_file", argv, 3);
-
+    char *argv[] = {"myfunc", "alpha", "beta", NULL};
+    debug_trace_function_call(ctx, "myfunc", argv, 3);
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "FUNCTION: myfunc") != NULL,
+                "function should be traced");
+    ASSERT_TRUE(strstr(buf, "'alpha'") != NULL && strstr(buf, "'beta'") != NULL,
+                "function arguments should be traced");
     debug_cleanup(ctx);
 }
 
@@ -510,31 +513,33 @@ TEST(update_frame_node_null) {
 }
 
 TEST(show_stack_empty) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should not crash with empty stack
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_show_stack(ctx);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "Call Stack") != NULL,
+                "stack header should render");
+    ASSERT_TRUE(strstr(buf, "(empty)") != NULL,
+                "empty stack should be labeled");
     debug_cleanup(ctx);
 }
 
 TEST(show_stack_with_frames) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     ctx->show_timing = true;
-
     debug_push_frame(ctx, "main", "script.sh", 1);
     debug_push_frame(ctx, "helper", "script.sh", 10);
     debug_push_frame(ctx, "worker", "lib.sh", 5);
-
-    /// Should not crash
     debug_show_stack(ctx);
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "Call Stack") != NULL,
+                "stack header should render");
+    ASSERT_TRUE(strstr(buf, "main") != NULL && strstr(buf, "helper") != NULL &&
+                    strstr(buf, "worker") != NULL,
+                "all pushed frames should appear in the listing");
     debug_cleanup(ctx);
 }
 
@@ -543,41 +548,36 @@ TEST(show_stack_with_frames) {
 /// ============================================================================
 
 TEST(inspect_variable_null_params) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should not crash
-    debug_inspect_variable(NULL, "var");
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
+    debug_inspect_variable(NULL, NULL);
     debug_inspect_variable(ctx, NULL);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "[Variable:") == NULL,
+                "NULL name inspects nothing");
     debug_cleanup(ctx);
 }
 
 TEST(inspect_variable_with_dollar) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should handle $ prefix
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_inspect_variable(ctx, "$PATH");
-    debug_inspect_variable(ctx, "$HOME");
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "[Variable: PATH]") != NULL,
+                "$ prefix should be stripped so $PATH resolves to PATH");
     debug_cleanup(ctx);
 }
 
 TEST(inspect_variable_without_dollar) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should handle without $ prefix
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_inspect_variable(ctx, "PATH");
-    debug_inspect_variable(ctx, "HOME");
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "[Variable: PATH]") != NULL,
+                "bare name should be inspected under its own header");
     debug_cleanup(ctx);
 }
 
@@ -637,16 +637,15 @@ TEST(inspect_variable_accepts_pct_sigil) {
 }
 
 TEST(inspect_variable_special) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Special variables
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_inspect_variable(ctx, "$?");
     debug_inspect_variable(ctx, "$$");
     debug_inspect_variable(ctx, "PWD");
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "[Variable: PWD]") != NULL,
+                "special and normal names should each be inspected");
     debug_cleanup(ctx);
 }
 
@@ -656,27 +655,25 @@ TEST(inspect_all_variables_null) {
 }
 
 TEST(inspect_all_variables_basic) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should not crash
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_inspect_all_variables(ctx);
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "Variable Inspection") != NULL,
+                "all-variables inspection should render its section");
     debug_cleanup(ctx);
 }
 
 TEST(inspect_all_variables_with_frame) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-    debug_push_frame(ctx, "test_func", "test.sh", 1);
-
-    /// Should not crash with active frame
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
+    debug_push_frame(ctx, "fn", "script.sh", 1);
     debug_inspect_all_variables(ctx);
-
+    char buf[2048];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "Variable Inspection") != NULL,
+                "all-variables inspection should render with an active frame");
     debug_cleanup(ctx);
 }
 
@@ -972,39 +969,35 @@ TEST(view_frame_brackets_render_around_title) {
 }
 
 TEST(watch_variable_null_params) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should not crash
-    debug_watch_variable(NULL, "var");
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
+    debug_watch_variable(NULL, NULL);
     debug_watch_variable(ctx, NULL);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "WATCH:") == NULL, "NULL name watches nothing");
     debug_cleanup(ctx);
 }
 
 TEST(watch_variable_basic) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_watch_variable(ctx, "MY_VAR");
-    debug_watch_variable(ctx, "$PATH");
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "WATCH: MY_VAR") != NULL,
+                "watching a variable should announce it");
     debug_cleanup(ctx);
 }
 
 TEST(show_variable_changes) {
-    debug_context_t *ctx = debug_init();
-    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-
-    debug_enable(ctx, true);
-
-    /// Should not crash
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured context");
     debug_show_variable_changes(ctx);
-
+    char buf[1024];
+    read_debug_output(ctx, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "Variable Changes Monitor") != NULL,
+                "the change monitor section should render");
     debug_cleanup(ctx);
 }
 
