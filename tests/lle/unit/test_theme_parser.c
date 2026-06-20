@@ -461,34 +461,57 @@ TEST(value_free_clears_scalar_safely) {
 
 TEST(color_spec_named_basic_colors) {
     lle_color_t c;
-    ASSERT_EQ(lle_parse_color_spec("red", &c), LLE_SUCCESS, "red");
-    ASSERT_EQ(lle_parse_color_spec("blue", &c), LLE_SUCCESS, "blue");
-    ASSERT_EQ(lle_parse_color_spec("green", &c), LLE_SUCCESS, "green");
-    ASSERT_EQ(lle_parse_color_spec("black", &c), LLE_SUCCESS, "black");
-    ASSERT_EQ(lle_parse_color_spec("white", &c), LLE_SUCCESS, "white");
+    ASSERT_EQ(lle_parse_color_spec("red", &c), LLE_SUCCESS, "red parses");
+    ASSERT_EQ(c.mode, LLE_COLOR_MODE_BASIC, "red is a basic color");
+    ASSERT_EQ(c.value.basic, LLE_COLOR_RED, "red maps to ANSI index 1");
+    ASSERT_EQ(lle_parse_color_spec("blue", &c), LLE_SUCCESS, "blue parses");
+    ASSERT_EQ(c.value.basic, LLE_COLOR_BLUE, "blue maps to ANSI index 4");
+    ASSERT_EQ(lle_parse_color_spec("green", &c), LLE_SUCCESS, "green parses");
+    ASSERT_EQ(c.value.basic, LLE_COLOR_GREEN, "green maps to ANSI index 2");
+    ASSERT_EQ(lle_parse_color_spec("black", &c), LLE_SUCCESS, "black parses");
+    ASSERT_EQ(c.value.basic, LLE_COLOR_BLACK, "black maps to ANSI index 0");
+    ASSERT_EQ(lle_parse_color_spec("white", &c), LLE_SUCCESS, "white parses");
+    ASSERT_EQ(c.value.basic, LLE_COLOR_WHITE, "white maps to ANSI index 7");
 }
 
 TEST(color_spec_256_color_index) {
     lle_color_t c;
-    ASSERT_EQ(lle_parse_color_spec("196", &c), LLE_SUCCESS,
-              "256-color index 196");
-    ASSERT_EQ(lle_parse_color_spec("255", &c), LLE_SUCCESS,
-              "256-color index 255");
-    ASSERT_EQ(lle_parse_color_spec("0", &c), LLE_SUCCESS, "256-color index 0");
+    ASSERT_EQ(lle_parse_color_spec("196", &c), LLE_SUCCESS, "196 parses");
+    ASSERT_EQ(c.mode, LLE_COLOR_MODE_256, "196 is a 256-color index");
+    ASSERT_EQ(c.value.palette, 196, "the palette index is 196");
+    ASSERT_EQ(lle_parse_color_spec("255", &c), LLE_SUCCESS, "255 parses");
+    ASSERT_EQ(c.value.palette, 255, "the palette index is 255");
+    ASSERT_EQ(lle_parse_color_spec("0", &c), LLE_SUCCESS, "0 parses");
+    ASSERT_EQ(c.value.palette, 0, "the palette index is 0");
 }
 
 TEST(color_spec_hex_rgb_long_form) {
     lle_color_t c;
-    ASSERT_EQ(lle_parse_color_spec("#ff5500", &c), LLE_SUCCESS, "#ff5500");
-    ASSERT_EQ(lle_parse_color_spec("#000000", &c), LLE_SUCCESS, "#000000");
+    ASSERT_EQ(lle_parse_color_spec("#ff5500", &c), LLE_SUCCESS,
+              "#ff5500 parses");
+    ASSERT_EQ(c.mode, LLE_COLOR_MODE_TRUE, "#ff5500 is true color");
+    ASSERT_EQ(c.value.rgb.r, 0xff, "red channel is 0xff");
+    ASSERT_EQ(c.value.rgb.g, 0x55, "green channel is 0x55");
+    ASSERT_EQ(c.value.rgb.b, 0x00, "blue channel is 0x00");
     ASSERT_EQ(lle_parse_color_spec("#FFFFFF", &c), LLE_SUCCESS,
-              "#FFFFFF (uppercase)");
+              "#FFFFFF parses");
+    ASSERT_EQ(c.value.rgb.r, 0xff, "uppercase hex red is 0xff");
+    ASSERT_EQ(c.value.rgb.g, 0xff, "uppercase hex green is 0xff");
+    ASSERT_EQ(c.value.rgb.b, 0xff, "uppercase hex blue is 0xff");
 }
 
 TEST(color_spec_hex_rgb_short_form) {
+    /// #RGB expands each nibble to a byte: #f50 -> #ff5500.
     lle_color_t c;
-    ASSERT_EQ(lle_parse_color_spec("#f50", &c), LLE_SUCCESS, "#f50");
-    ASSERT_EQ(lle_parse_color_spec("#000", &c), LLE_SUCCESS, "#000");
+    ASSERT_EQ(lle_parse_color_spec("#f50", &c), LLE_SUCCESS, "#f50 parses");
+    ASSERT_EQ(c.mode, LLE_COLOR_MODE_TRUE, "#f50 is true color");
+    ASSERT_EQ(c.value.rgb.r, 0xff, "f expands to 0xff");
+    ASSERT_EQ(c.value.rgb.g, 0x55, "5 expands to 0x55");
+    ASSERT_EQ(c.value.rgb.b, 0x00, "0 expands to 0x00");
+    ASSERT_EQ(lle_parse_color_spec("#000", &c), LLE_SUCCESS, "#000 parses");
+    ASSERT_EQ(c.value.rgb.r, 0x00, "0 expands to 0x00 (r)");
+    ASSERT_EQ(c.value.rgb.g, 0x00, "0 expands to 0x00 (g)");
+    ASSERT_EQ(c.value.rgb.b, 0x00, "0 expands to 0x00 (b)");
 }
 
 TEST(color_spec_rejects_null) {
