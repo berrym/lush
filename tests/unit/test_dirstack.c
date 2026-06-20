@@ -18,7 +18,9 @@
 #include <string.h>
 
 #include "dirstack.h"
+#include "symtable.h"
 #include "test_framework.h"
+#include <unistd.h>
 
 /// Test framework macros
 
@@ -26,6 +28,29 @@
  * INITIALIZATION TESTS
  * ============================================================================
  */
+
+/// Capture dirstack_print() stdout (its output is the only observable).
+static void capture_dirstack(bool one_per_line, bool show_index, char *buf,
+                             size_t cap) {
+    buf[0] = '\0';
+    char tmpl[] = "/tmp/lush_dirstack_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return;
+    }
+    unlink(tmpl);
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    dirstack_print(one_per_line, show_index);
+    fflush(stdout);
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+    lseek(fd, 0, SEEK_SET);
+    ssize_t n = read(fd, buf, cap - 1);
+    buf[n > 0 ? (size_t)n : 0] = '\0';
+    close(fd);
+}
 
 TEST(dirstack_init_cleanup) {
     dirstack_init();
@@ -356,8 +381,17 @@ TEST(dirstack_size_after_operations) {
 
 TEST(dirstack_print_empty) {
     dirstack_init();
-    dirstack_print(false, false);
-    dirstack_print(true, true);
+    char buf[512];
+    capture_dirstack(true, true, buf, sizeof(buf));
+    /// An empty stack prints exactly one line: the current directory.
+    int newlines = 0;
+    for (size_t i = 0; buf[i]; i++) {
+        if (buf[i] == '\n') {
+            newlines++;
+        }
+    }
+    ASSERT_EQ(newlines, 1, "empty stack prints one line (the cwd)");
+    ASSERT_TRUE(strstr(buf, "0") != NULL, "the cwd is shown at index 0");
     dirstack_cleanup();
 }
 
@@ -365,13 +399,14 @@ TEST(dirstack_print_with_entries) {
     dirstack_init();
     dirstack_push("/first");
     dirstack_push("/second");
-
-    /// Just verify these don't crash
-    dirstack_print(false, false);
-    dirstack_print(true, false);
-    dirstack_print(false, true);
-    dirstack_print(true, true);
-
+    char buf[512];
+    capture_dirstack(true, true, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "/second") != NULL, "top entry should be listed");
+    ASSERT_TRUE(strstr(buf, "/first") != NULL, "bottom entry should be listed");
+    /// Without indices the same entries appear, just unnumbered.
+    capture_dirstack(true, false, buf, sizeof(buf));
+    ASSERT_TRUE(strstr(buf, "/second") != NULL, "top entry without index");
+    ASSERT_TRUE(strstr(buf, "/first") != NULL, "bottom entry without index");
     dirstack_cleanup();
 }
 
@@ -381,13 +416,20 @@ TEST(dirstack_print_with_entries) {
  */
 
 TEST(dirstack_sync_variable) {
+    init_symtable();
     dirstack_init();
     dirstack_push("/first");
     dirstack_push("/second");
-
-    /// Should not crash
     dirstack_sync_variable();
-
+    /// The stack syncs to the DIRSTACK array with the top at index 0.
+    char *top = symtable_get_array_element("DIRSTACK", "0");
+    char *next = symtable_get_array_element("DIRSTACK", "1");
+    ASSERT_NOT_NULL(top, "DIRSTACK[0] should be set");
+    ASSERT_NOT_NULL(next, "DIRSTACK[1] should be set");
+    ASSERT_STR_EQ(top, "/second", "stack top syncs to DIRSTACK[0]");
+    ASSERT_STR_EQ(next, "/first", "next entry syncs to DIRSTACK[1]");
+    free(top);
+    free(next);
     dirstack_cleanup();
 }
 
