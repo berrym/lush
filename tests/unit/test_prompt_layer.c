@@ -57,7 +57,7 @@ static layer_event_system_t *create_test_event_system(void) {
 static int test_error_string_success(void) {
     const char *msg = prompt_layer_error_string(PROMPT_LAYER_SUCCESS);
     ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_STR_EQ(msg, "Success");
     return 1;
 }
 
@@ -65,7 +65,7 @@ static int test_error_string_invalid_param(void) {
     const char *msg =
         prompt_layer_error_string(PROMPT_LAYER_ERROR_INVALID_PARAM);
     ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_STR_EQ(msg, "Invalid parameter");
     return 1;
 }
 
@@ -149,9 +149,10 @@ static int test_error_string_unknown(void) {
 }
 
 static int test_error_string_invalid_code(void) {
+    /// An out-of-range code falls through to a generic message.
     const char *msg = prompt_layer_error_string((prompt_layer_error_t)999);
     ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_STR_EQ(msg, "Unknown error");
     return 1;
 }
 
@@ -160,8 +161,13 @@ static int test_error_string_invalid_code(void) {
  * ============================================================ */
 
 static int test_get_version_all_null(void) {
-    /// Should not crash
+    /// NULL pointers are skipped; real pointers receive the version triple.
     prompt_layer_get_version(NULL, NULL, NULL);
+    int major = -1, minor = -1, patch = -1;
+    prompt_layer_get_version(&major, &minor, &patch);
+    ASSERT_EQ(major, PROMPT_LAYER_VERSION_MAJOR);
+    ASSERT_EQ(minor, PROMPT_LAYER_VERSION_MINOR);
+    ASSERT_EQ(patch, PROMPT_LAYER_VERSION_PATCH);
     return 1;
 }
 
@@ -237,12 +243,12 @@ static int test_destroy_null_layer(void) {
 }
 
 static int test_destroy_twice(void) {
+    /// A real layer destroys cleanly, and destroy tolerates NULL (so a
+    /// double-free guard at the call site is a safe no-op rather than a crash).
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-
     prompt_layer_destroy(layer);
-    /// Second call with same pointer would be undefined, but we test
-    ///        that the first destroy doesn't crash
+    prompt_layer_destroy(NULL);
     return 1;
 }
 
@@ -653,17 +659,15 @@ static int test_get_rendered_content_zero_size(void) {
 static int test_get_rendered_content_no_content_set(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-
     prompt_layer_init(layer, events);
 
+    /// Rendering with no content set is an invalid-state error, not success.
     char output[256];
     prompt_layer_error_t result =
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
-    /// May return empty string or error - implementation dependent
-    (void)result;
+    ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_STATE);
 
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
@@ -673,20 +677,16 @@ static int test_get_rendered_content_no_content_set(void) {
 static int test_get_rendered_content_basic(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-
     prompt_layer_init(layer, events);
 
     prompt_layer_set_content(layer, "$ ");
-
     char output[256];
     prompt_layer_error_t result =
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
-
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    ASSERT(strlen(output) > 0);
+    ASSERT_STR_EQ(output, "$ ");
 
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
@@ -696,22 +696,16 @@ static int test_get_rendered_content_basic(void) {
 static int test_get_rendered_content_preserves_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-
     prompt_layer_init(layer, events);
 
-    const char *prompt = "[test]$ ";
-    prompt_layer_set_content(layer, prompt);
-
+    prompt_layer_set_content(layer, "[test]$ ");
     char output[256];
     prompt_layer_error_t result =
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
-
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    /// Output should contain the original content (possibly with theme colors)
-    ASSERT(strstr(output, "test") != NULL || strstr(output, "$") != NULL);
+    ASSERT_STR_EQ(output, "[test]$ ");
 
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
@@ -771,16 +765,14 @@ static int test_get_metrics_null_metrics(void) {
 static int test_get_metrics_no_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-
     prompt_layer_init(layer, events);
 
+    /// Metrics with no content set is an invalid-state error.
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    /// Should succeed with zeroed metrics or return error
-    (void)result;
+    ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_STATE);
 
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
