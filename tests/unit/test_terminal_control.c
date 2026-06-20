@@ -47,81 +47,82 @@
  * ============================================================ */
 
 static int test_error_string_success(void) {
-    const char *msg = terminal_control_error_string(TERMINAL_CONTROL_SUCCESS);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    const char *m = terminal_control_error_string(TERMINAL_CONTROL_SUCCESS);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Success");
     return 1;
 }
 
 static int test_error_string_invalid_param(void) {
-    const char *msg =
+    const char *m =
         terminal_control_error_string(TERMINAL_CONTROL_ERROR_INVALID_PARAM);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Invalid parameter");
     return 1;
 }
 
 static int test_error_string_memory_allocation(void) {
-    const char *msg =
+    const char *m =
         terminal_control_error_string(TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Memory allocation failed");
     return 1;
 }
 
 static int test_error_string_capability_detection(void) {
-    const char *msg = terminal_control_error_string(
+    const char *m = terminal_control_error_string(
         TERMINAL_CONTROL_ERROR_CAPABILITY_DETECTION);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Capability detection failed");
     return 1;
 }
 
 static int test_error_string_sequence_too_long(void) {
-    const char *msg =
+    const char *m =
         terminal_control_error_string(TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Generated sequence too long");
     return 1;
 }
 
 static int test_error_string_unsupported_operation(void) {
-    const char *msg = terminal_control_error_string(
+    const char *m = terminal_control_error_string(
         TERMINAL_CONTROL_ERROR_UNSUPPORTED_OPERATION);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Operation not supported by terminal");
     return 1;
 }
 
 static int test_error_string_color_out_of_range(void) {
-    const char *msg = terminal_control_error_string(
+    const char *m = terminal_control_error_string(
         TERMINAL_CONTROL_ERROR_COLOR_OUT_OF_RANGE);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Color value out of valid range");
     return 1;
 }
 
 static int test_error_string_position_out_of_range(void) {
-    const char *msg = terminal_control_error_string(
+    const char *m = terminal_control_error_string(
         TERMINAL_CONTROL_ERROR_POSITION_OUT_OF_RANGE);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Cursor position out of range");
     return 1;
 }
 
 static int test_error_string_terminal_not_ready(void) {
-    const char *msg = terminal_control_error_string(
+    const char *m = terminal_control_error_string(
         TERMINAL_CONTROL_ERROR_TERMINAL_NOT_READY);
-    ASSERT_NOT_NULL(msg);
-    ASSERT(strlen(msg) > 0);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Terminal not properly initialized");
     return 1;
 }
 
 static int test_error_string_unknown(void) {
-    const char *msg =
-        terminal_control_error_string((terminal_control_error_t)9999);
-    ASSERT_NOT_NULL(msg);
-    /// Should return some string for unknown errors
+    /// An out-of-range code falls through to the default message.
+    const char *m =
+        terminal_control_error_string((terminal_control_error_t)999);
+    ASSERT_NOT_NULL(m);
+    ASSERT_STR_EQ(m, "Unknown error");
     return 1;
 }
 
@@ -243,13 +244,10 @@ static int test_color_from_basic_max_value(void) {
  * ============================================================ */
 
 static int test_create_null_base_terminal(void) {
+    /// A NULL base terminal is rejected rather than producing a half-built
+    /// control object.
     terminal_control_t *tc = terminal_control_create(NULL);
-    /// Should handle NULL gracefully - either return NULL or create with NULL
-    /// base
-    /// Implementation may vary
-    if (tc) {
-        terminal_control_destroy(tc);
-    }
+    ASSERT_NULL(tc);
     return 1;
 }
 
@@ -475,10 +473,10 @@ static int test_validate_color_null_control(void) {
 }
 
 static int test_color_from_rgb_null_control(void) {
+    /// With no control to query for truecolor support, RGB degrades to the
+    /// basic color type rather than crashing.
     terminal_color_t color = terminal_control_color_from_rgb(NULL, 128, 0, 128);
-    /// Should still return a color, but may default to basic type
-    /// The function should handle NULL gracefully
-    (void)color;
+    ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     return 1;
 }
 
@@ -534,8 +532,13 @@ static int test_get_version_not_null(void) {
 }
 
 static int test_get_version_null_params(void) {
-    /// Should not crash with NULL params
+    /// NULL pointers are skipped; real pointers receive the version triple.
     terminal_control_get_version(NULL, NULL, NULL);
+    int major = -1, minor = -1, patch = -1;
+    terminal_control_get_version(&major, &minor, &patch);
+    ASSERT_EQ(major, TERMINAL_CONTROL_VERSION_MAJOR);
+    ASSERT_EQ(minor, TERMINAL_CONTROL_VERSION_MINOR);
+    ASSERT_EQ(patch, TERMINAL_CONTROL_VERSION_PATCH);
     return 1;
 }
 
