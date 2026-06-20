@@ -262,30 +262,22 @@ TEST(bin_test_bracket_missing_close) {
  */
 
 TEST(pwd_returns_directory) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "pwd", 1);
-    ASSERT_EQ(status, 0, "pwd should succeed");
-
-    teardown_executor(exec);
+    /// pwd reflects the current directory after a cd to a known location.
+    run_result_t r = run_shell("cd /\npwd\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/\n");
 }
 
 TEST(pwd_logical_option) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "pwd -L", 1);
-    ASSERT_EQ(status, 0, "pwd -L should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("cd /\npwd -L\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/\n");
 }
 
 TEST(pwd_physical_option) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "pwd -P", 1);
-    ASSERT_EQ(status, 0, "pwd -P should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("cd /\npwd -P\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/\n");
 }
 
 /* ============================================================================
@@ -448,12 +440,9 @@ TEST(type_builtin_command) {
 }
 
 TEST(type_external_command) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "type ls", 1);
-    ASSERT_EQ(status, 0, "type ls should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("type cat\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "cat is /");
 }
 
 TEST(type_nonexistent_command) {
@@ -732,15 +721,11 @@ TEST(local_outside_function) {
 }
 
 TEST(local_in_function) {
-    executor_t *exec = setup_executor();
-
-    /// Define function with local variable
-    executor_execute_command_line(
-        exec, "testlocal() { local X=inside; echo $X; }", 1);
-    int status = executor_execute_command_line(exec, "testlocal", 1);
-    ASSERT_EQ(status, 0, "Function with local should succeed");
-
-    teardown_executor(exec);
+    /// X is local to the function: it prints inside and is unset outside.
+    run_result_t r =
+        run_shell("f() { local X=in; echo $X; }\nf\necho \"${X:-out}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "in\nout\n");
 }
 
 /* ============================================================================
@@ -784,22 +769,18 @@ TEST(readonly_prevents_modification) {
  */
 
 TEST(command_runs_external) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "command true", 1);
-    ASSERT_EQ(status, 0, "command true should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("command echo hi\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hi\n");
 }
 
 TEST(command_bypasses_alias) {
-    executor_t *exec = setup_executor();
-
-    /// Even if 'ls' were aliased, command ls should run the real ls
-    int status = executor_execute_command_line(exec, "command ls /tmp", 1);
-    ASSERT_EQ(status, 0, "command ls should succeed");
-
-    teardown_executor(exec);
+    /// With ls aliased to print a marker, `command ls` must bypass the alias
+    /// and run the real ls, so the marker never appears.
+    run_result_t r = run_shell("alias ls='echo ALIASED'\ncommand ls\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT(strstr(r.out, "ALIASED") == NULL,
+           "command should bypass the alias and run real ls");
 }
 
 /* ============================================================================
@@ -808,32 +789,22 @@ TEST(command_bypasses_alias) {
  */
 
 TEST(alias_definition) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "alias ll='ls -l'", 1);
-    ASSERT_EQ(status, 0, "alias definition should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("alias ll='ls -l'\nalias ll\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "alias ll='ls -l'\n");
 }
 
 TEST(alias_list) {
-    executor_t *exec = setup_executor();
-
-    /// alias with no args should list aliases
-    int status = executor_execute_command_line(exec, "alias", 1);
-    ASSERT_EQ(status, 0, "alias list should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("alias myxx='echo hi'\nalias\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "myxx");
 }
 
 TEST(unalias_removes) {
-    executor_t *exec = setup_executor();
-
-    executor_execute_command_line(exec, "alias myalias='echo test'", 1);
-    int status = executor_execute_command_line(exec, "unalias myalias", 1);
-    ASSERT_EQ(status, 0, "unalias should succeed");
-
-    teardown_executor(exec);
+    /// After removal, querying the alias fails with a not-found diagnostic.
+    run_result_t r = run_shell("alias xx='ls'\nunalias xx\nalias xx\n");
+    ASSERT(r.exit_status != 0, "querying a removed alias should fail");
+    ASSERT_STDERR_CONTAINS(r, "not found");
 }
 
 /* ============================================================================
@@ -852,22 +823,16 @@ TEST(hash_list) {
 }
 
 TEST(hash_command) {
-    executor_t *exec = setup_executor();
-
-    /// Hash ls to remember its location
-    int status = executor_execute_command_line(exec, "hash ls", 1);
-    ASSERT_EQ(status, 0, "hash ls should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("hash cat\nhash\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "cat");
 }
 
 TEST(hash_clear) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "hash -r", 1);
-    ASSERT_EQ(status, 0, "hash -r should succeed");
-
-    teardown_executor(exec);
+    /// hash -r empties the table, so the previously hashed entry is gone.
+    run_result_t r = run_shell("hash cat\nhash -r\nhash\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT(strstr(r.out, "cat") == NULL, "hash -r should clear the table");
 }
 
 /* ============================================================================
@@ -876,12 +841,13 @@ TEST(hash_clear) {
  */
 
 TEST(umask_display) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "umask", 1);
-    ASSERT_EQ(status, 0, "umask display should succeed");
-
-    teardown_executor(exec);
+    mode_t cur = umask(0);
+    umask(cur);
+    char expect[16];
+    snprintf(expect, sizeof(expect), "%04o\n", cur);
+    run_result_t r = run_shell("umask\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, expect);
 }
 
 TEST(umask_set) {
@@ -896,32 +862,23 @@ TEST(umask_set) {
  */
 
 TEST(trap_list) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "trap", 1);
-    ASSERT_EQ(status, 0, "trap list should succeed");
-
-    teardown_executor(exec);
+    /// A fresh shell has no traps installed, so the listing is empty.
+    run_result_t r = run_shell("trap\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "");
 }
 
 TEST(trap_set_exit) {
-    executor_t *exec = setup_executor();
-
-    int status =
-        executor_execute_command_line(exec, "trap 'echo exiting' EXIT", 1);
-    ASSERT_EQ(status, 0, "trap EXIT should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("trap 'echo BYE' EXIT\ntrap\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "EXIT");
 }
 
 TEST(trap_reset) {
-    executor_t *exec = setup_executor();
-
-    executor_execute_command_line(exec, "trap 'echo test' INT", 1);
-    int status = executor_execute_command_line(exec, "trap - INT", 1);
-    ASSERT_EQ(status, 0, "trap - INT should reset trap");
-
-    teardown_executor(exec);
+    /// trap - INT removes the handler, so it no longer appears in the listing.
+    run_result_t r = run_shell("trap 'echo X' INT\ntrap - INT\ntrap\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT(strstr(r.out, "INT") == NULL, "trap - INT should clear the handler");
 }
 
 /* ============================================================================
@@ -930,28 +887,17 @@ TEST(trap_reset) {
  */
 
 TEST(pushd_and_popd) {
-    executor_t *exec = setup_executor();
-    char *original_dir = getcwd(NULL, 0);
-
-    int status = executor_execute_command_line(exec, "pushd /tmp", 1);
-    ASSERT_EQ(status, 0, "pushd /tmp should succeed");
-
-    status = executor_execute_command_line(exec, "popd", 1);
-    ASSERT_EQ(status, 0, "popd should succeed");
-
-    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
-    free(original_dir);
-
-    teardown_executor(exec);
+    /// From a known directory, pushd moves to /usr and popd restores /.
+    run_result_t r = run_shell("cd /\npwd\npushd /usr >/dev/null\npwd\npopd "
+                               ">/dev/null\npwd\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/\n/usr\n/\n");
 }
 
 TEST(dirs_command) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "dirs", 1);
-    ASSERT_EQ(status, 0, "dirs should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("cd /\ndirs\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/\n");
 }
 
 /* ============================================================================
@@ -960,12 +906,9 @@ TEST(dirs_command) {
  */
 
 TEST(help_command) {
-    executor_t *exec = setup_executor();
-
-    int status = executor_execute_command_line(exec, "help", 1);
-    ASSERT_EQ(status, 0, "help should succeed");
-
-    teardown_executor(exec);
+    run_result_t r = run_shell("help\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "change directory");
 }
 
 /* ============================================================================
@@ -1066,10 +1009,9 @@ TEST(bin_mode_too_many_args_errors) {
 }
 
 TEST(bin_mode_show_succeeds) {
-    apply_mode_preset(SHELL_MODE_LUSH);
-    char *argv[] = {"mode", "--show", NULL};
-    int result = bin_mode(2, argv);
-    ASSERT_EQ(result, 0, "mode --show should return 0");
+    run_result_t r = run_shell("mode --show\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "Active mode");
 }
 
 TEST(bin_mode_reset_drops_overrides) {
