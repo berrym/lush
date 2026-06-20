@@ -772,6 +772,18 @@ endif
          timeout: 60)
   endif
 
+  # Memory Management Compliance Tests (Spec 15)
+  # Validates the LLE pool allocator behavior
+  if fs.exists('tests/lle/compliance/spec_15_memory_management_compliance.c')
+    test_memory_compliance = executable('spec_15_compliance',
+                                        'tests/lle/compliance/spec_15_memory_management_compliance.c',
+                                        include_directories: inc,
+                                        dependencies: [lle_dep])
+    test('Spec 15 Memory Management Compliance', test_memory_compliance,
+         suite: 'lle-compliance',
+         timeout: 30)
+  endif
+
   # Completion System Compliance Tests (Spec 12)
   # Validates compliance with Spec 12 requirements
   if fs.exists('tests/lle/compliance/spec_12_completion_compliance.c')
