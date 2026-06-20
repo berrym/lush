@@ -18,12 +18,60 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
  * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
  * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
+/// Capture shell_error_display(err) output into buf. The display goes to a
+/// FILE*, so route it through a tmpfile and read it back.
+static void capture_error_display(shell_error_t *err, bool color, char *buf,
+                                  size_t cap) {
+    buf[0] = '\0';
+    char tmpl[] = "/tmp/lush_se_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return;
+    }
+    unlink(tmpl);
+    FILE *fp = fdopen(fd, "w+");
+    if (!fp) {
+        close(fd);
+        return;
+    }
+    shell_error_display(err, fp, color);
+    fflush(fp);
+    rewind(fp);
+    size_t n = fread(buf, 1, cap - 1, fp);
+    buf[n] = '\0';
+    fclose(fp);
+}
+
+/// Capture shell_error_display_all(collector) output into buf.
+static void capture_display_all(shell_error_collector_t *collector, char *buf,
+                                size_t cap) {
+    buf[0] = '\0';
+    char tmpl[] = "/tmp/lush_seall_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return;
+    }
+    unlink(tmpl);
+    FILE *fp = fdopen(fd, "w+");
+    if (!fp) {
+        close(fd);
+        return;
+    }
+    shell_error_display_all(collector, fp, false);
+    fflush(fp);
+    rewind(fp);
+    size_t n = fread(buf, 1, cap - 1, fp);
+    buf[n] = '\0';
+    fclose(fp);
+}
 
 /// Test framework macros
 
@@ -384,27 +432,29 @@ TEST(collector_free_null) {
  */
 
 TEST(error_code_str_parse) {
+    /// The code string is "E" followed by the four-digit numeric code.
     const char *str = shell_error_code_str(SHELL_ERR_UNEXPECTED_TOKEN);
     ASSERT_NOT_NULL(str, "Error code string should not be NULL");
-    ASSERT(strstr(str, "1001") != NULL || strlen(str) > 0,
-           "Should return a code string");
+    ASSERT_STR_EQ(str, "E1001", "unexpected-token code is E1001");
 }
 
 TEST(error_code_str_runtime) {
     const char *str = shell_error_code_str(SHELL_ERR_COMMAND_NOT_FOUND);
     ASSERT_NOT_NULL(str, "Error code string should not be NULL");
+    ASSERT_STR_EQ(str, "E1101", "command-not-found code is E1101");
 }
 
 TEST(error_category_parse) {
     const char *cat = shell_error_category(SHELL_ERR_UNEXPECTED_TOKEN);
     ASSERT_NOT_NULL(cat, "Category should not be NULL");
-    /// Parse errors are in range 1000-1099
-    ASSERT(strlen(cat) > 0, "Category should have content");
+    ASSERT_STR_EQ(cat, "parse error", "a parse code is in the parse category");
 }
 
 TEST(error_category_runtime) {
     const char *cat = shell_error_category(SHELL_ERR_COMMAND_NOT_FOUND);
     ASSERT_NOT_NULL(cat, "Category should not be NULL");
+    ASSERT_STR_EQ(cat, "runtime error",
+                  "a runtime code is in the runtime category");
 }
 
 TEST(error_severity_str) {
@@ -435,13 +485,13 @@ TEST(error_display_basic) {
                            loc, "unexpected token");
     shell_error_set_source_line(err, "echo hello world", 5, 10);
 
-    /// Should not crash - redirect to /dev/null in practice
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        shell_error_display(err, null_out, false);
-        shell_error_display(err, null_out, true); /// With color
-        fclose(null_out);
-    }
+    char out[1024];
+    capture_error_display(err, false, out, sizeof(out));
+    ASSERT(strstr(out, "error[E1001]") != NULL, "renders the code");
+    ASSERT(strstr(out, "unexpected token") != NULL, "renders the message");
+    ASSERT(strstr(out, "test.sh:5:10") != NULL, "renders the location");
+    ASSERT(strstr(out, "echo hello world") != NULL, "renders the source line");
+    ASSERT(strstr(out, "^~~") != NULL, "renders the caret under the span");
 
     shell_error_free(err);
 }
@@ -459,12 +509,10 @@ TEST(error_display_all) {
         SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_WARNING, loc, "warning");
     shell_error_collector_add(collector, err2);
 
-    /// Should not crash
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        shell_error_display_all(collector, null_out, false);
-        fclose(null_out);
-    }
+    char out[2048];
+    capture_display_all(collector, out, sizeof(out));
+    ASSERT(strstr(out, "error 1") != NULL, "renders the first error");
+    ASSERT(strstr(out, "warning") != NULL, "renders the second error");
 
     shell_error_collector_free(collector);
 }
