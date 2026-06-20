@@ -362,12 +362,13 @@ TEST(profile_function_tracking) {
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
     debug_profile_start(ctx);
-
     debug_profile_function_enter(ctx, "test_func");
-    /// Simulate some work
     debug_profile_function_exit(ctx, "test_func");
 
+    /// Profiling records an entry keyed by the function name.
     ASSERT_NOT_NULL(ctx->profile_data, "Profile data should exist");
+    ASSERT_STR_EQ(ctx->profile_data->function_name, "test_func",
+                  "the profile entry names the profiled function");
 
     debug_profile_stop(ctx);
     debug_cleanup(ctx);
@@ -496,14 +497,15 @@ TEST(utility_get_time_ns) {
 TEST(utility_format_time) {
     char buffer[64];
 
+    /// Times render with a unit scaled to magnitude.
     debug_format_time(1000, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should format time");
+    ASSERT_STR_EQ(buffer, "1.00 us", "1000 ns is 1.00 us");
 
     debug_format_time(1000000, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should format microseconds");
+    ASSERT_STR_EQ(buffer, "1.00 ms", "1000000 ns is 1.00 ms");
 
     debug_format_time(1000000000, buffer, sizeof(buffer));
-    ASSERT(strlen(buffer) > 0, "Should format milliseconds");
+    ASSERT_STR_EQ(buffer, "1.00 s", "1000000000 ns is 1.00 s");
 }
 
 TEST(utility_get_node_description) {
@@ -512,24 +514,41 @@ TEST(utility_get_node_description) {
 
     char *desc = debug_get_node_description(node);
     ASSERT_NOT_NULL(desc, "Should return description");
-    ASSERT(strlen(desc) > 0, "Description should not be empty");
+    ASSERT_STR_EQ(desc, "COMMAND: (empty)",
+                  "an empty command describes as COMMAND: (empty)");
 
     free(desc);
     free_node_tree(node);
 }
 
 TEST(utility_node_description_various_types) {
-    node_type_t types[] = {NODE_COMMAND,  NODE_PIPELINE, NODE_IF,
-                           NODE_FOR,      NODE_WHILE,    NODE_CASE,
-                           NODE_FUNCTION, NODE_VAR,      NODE_SUBSHELL};
-    int num_types = 9;
+    struct {
+        node_type_t type;
+        const char *name;
+    } cases[] = {
+        { NODE_COMMAND,  "COMMAND"},
+        {NODE_PIPELINE, "PIPELINE"},
+        {      NODE_IF,       "IF"},
+        {     NODE_FOR,      "FOR"},
+        {   NODE_WHILE,    "WHILE"},
+        {    NODE_CASE,     "CASE"},
+        {NODE_FUNCTION, "FUNCTION"},
+        {     NODE_VAR,      "VAR"},
+        {NODE_SUBSHELL, "SUBSHELL"},
+    };
 
-    for (int i = 0; i < num_types; i++) {
-        node_t *node = new_node(types[i]);
+    /// Every type describes with its own name -- none falls through to the
+    /// UNKNOWN_NODE_TYPE default.
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        node_t *node = new_node(cases[i].type);
         ASSERT_NOT_NULL(node, "new_node should succeed");
 
         char *desc = debug_get_node_description(node);
         ASSERT_NOT_NULL(desc, "Should return description");
+        ASSERT(strstr(desc, cases[i].name) != NULL,
+               "description names the node type");
+        ASSERT(strstr(desc, "UNKNOWN") == NULL,
+               "no type falls through to UNKNOWN");
 
         free(desc);
         free_node_tree(node);
@@ -562,12 +581,17 @@ TEST(loop_context_enter_exit) {
 TEST(loop_context_update_variable) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true); /// Enable debug mode for loop tracking
+    debug_enable(ctx, true);
 
     debug_enter_loop(ctx, "for", "i", "1");
+    ASSERT_STR_EQ(ctx->execution_context.loop_variable_value, "1",
+                  "the loop starts at its first value");
 
     debug_update_loop_variable(ctx, "i", "2");
-    /// Value should be updated - exact check depends on implementation
+    ASSERT_STR_EQ(ctx->execution_context.loop_variable, "i",
+                  "the loop variable name is tracked");
+    ASSERT_STR_EQ(ctx->execution_context.loop_variable_value, "2",
+                  "updating the loop variable records the new value");
 
     debug_exit_loop(ctx);
     debug_cleanup(ctx);
@@ -631,7 +655,69 @@ TEST(execution_context_cleanup) {
  * ============================================================================
  */
 
+static void probe_dbg(void) {
+    char b[64];
+    debug_format_time(1000, b, sizeof b);
+    fprintf(stderr, "PDB ft1000=[%s]\n", b);
+    debug_format_time(1000000, b, sizeof b);
+    fprintf(stderr, "PDB ft1e6=[%s]\n", b);
+    debug_format_time(1000000000, b, sizeof b);
+    fprintf(stderr, "PDB ft1e9=[%s]\n", b);
+    node_t *n = new_node(NODE_COMMAND);
+    char *d = debug_get_node_description(n);
+    fprintf(stderr, "PDB nodedesc=[%s]\n", d ? d : "(null)");
+    free(d);
+    free_node_tree(n);
+    debug_context_t *ctx = debug_init();
+    debug_enable(ctx, true);
+    debug_enter_loop(ctx, "for", "i", "1");
+    debug_update_loop_variable(ctx, "i", "2");
+    fprintf(stderr, "PDB loop var=[%s] val=[%s] in_loop=%d\n",
+            ctx->execution_context.loop_variable,
+            ctx->execution_context.loop_variable_value,
+            (int)ctx->execution_context.in_loop);
+    debug_exit_loop(ctx);
+    debug_profile_start(ctx);
+    debug_profile_function_enter(ctx, "test_func");
+    debug_profile_function_exit(ctx, "test_func");
+    fprintf(stderr, "PDB profile fn=[%s] calls=%d\n",
+            ctx->profile_data ? ctx->profile_data->function_name : "(null)",
+            ctx->profile_data ? ctx->profile_data->call_count : -1);
+    debug_profile_stop(ctx);
+    debug_cleanup(ctx);
+}
+
+static void probe_nd(void) {
+    node_type_t types[] = {NODE_COMMAND,  NODE_PIPELINE, NODE_IF,
+                           NODE_FOR,      NODE_WHILE,    NODE_CASE,
+                           NODE_FUNCTION, NODE_VAR,      NODE_SUBSHELL};
+    const char *nm[] = {"COMMAND", "PIPELINE", "IF",  "FOR",     "WHILE",
+                        "CASE",    "FUNCTION", "VAR", "SUBSHELL"};
+    for (int i = 0; i < 9; i++) {
+        node_t *n = new_node(types[i]);
+        char *d = debug_get_node_description(n);
+        fprintf(stderr, "PND %s -> [%s]\n", nm[i], d ? d : "(null)");
+        free(d);
+        free_node_tree(n);
+    }
+}
+
+static void probe_v(void) {
+    node_t *p = new_node(NODE_PIPELINE);
+    char *dp = debug_get_node_description(p);
+    node_t *v = new_node(NODE_VAR);
+    char *dv = debug_get_node_description(v);
+    fprintf(stderr, "PV pipeline=[%s] var=[%s]\n", dp, dv);
+    free(dp);
+    free(dv);
+    free_node_tree(p);
+    free_node_tree(v);
+}
+
 int main(void) {
+    probe_v();
+    probe_nd();
+    probe_dbg();
     printf("\n=== Debug Subsystem Unit Tests ===\n\n");
 
     /// Lifecycle tests
