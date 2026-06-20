@@ -27,6 +27,31 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
+/// Capture list_traps() stdout into buf (the only observable for trap state;
+/// there is no trap getter). Signal NUMBERS are platform-specific
+/// (e.g. SIGUSR1 is 30 on macOS, 10 on Linux), so callers assert on the
+/// trap COMMAND text, not the number.
+static void capture_traps(char *buf, size_t cap) {
+    buf[0] = '\0';
+    char tmpl[] = "/tmp/lush_traps_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return;
+    }
+    unlink(tmpl);
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    list_traps();
+    fflush(stdout);
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+    lseek(fd, 0, SEEK_SET);
+    ssize_t n = read(fd, buf, cap - 1);
+    buf[n > 0 ? (size_t)n : 0] = '\0';
+    close(fd);
+}
+
 /// Test framework macros
 
 /* ============================================================================
@@ -90,17 +115,15 @@ TEST(get_signal_number_empty) {
 }
 
 TEST(get_signal_number_lowercase) {
-    /// May or may not be supported
-    int sig = get_signal_number("int");
-    /// Accept either SIGINT or -1 depending on implementation
-    ASSERT(sig == SIGINT || sig == -1, "Lowercase may or may not be supported");
+    /// Signal names are case-sensitive: the uppercase form resolves, the
+    /// lowercase form does not.
+    ASSERT(get_signal_number("INT") == SIGINT, "INT resolves to SIGINT");
+    ASSERT(get_signal_number("int") == -1, "lowercase int is not recognized");
 }
 
 TEST(get_signal_number_numeric) {
-    /// Some implementations support numeric strings
-    int sig = get_signal_number("2");
-    /// SIGINT is typically 2 on most systems
-    ASSERT(sig == 2 || sig == -1, "Numeric may or may not be supported");
+    ASSERT(get_signal_number("2") == 2, "numeric signal string resolves");
+    ASSERT(get_signal_number("notasignal") == -1, "unknown name is rejected");
 }
 
 /* ============================================================================
@@ -109,68 +132,67 @@ TEST(get_signal_number_numeric) {
  */
 
 TEST(set_trap_basic) {
-    int result = set_trap(SIGUSR1, "echo trapped");
-    ASSERT_EQ(result, 0, "set_trap should succeed");
-
-    /// Clean up
+    char traps[1024];
+    ASSERT_EQ(set_trap(SIGUSR1, "echo trapped"), 0, "set_trap should succeed");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo trapped") != NULL,
+           "the trap command should appear in the listing");
     remove_trap(SIGUSR1);
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo trapped") == NULL,
+           "the trap should be gone after removal");
 }
 
 TEST(set_trap_null_removes) {
-    set_trap(SIGUSR1, "echo test");
-    int result = set_trap(SIGUSR1, NULL);
-    ASSERT_EQ(result, 0, "Setting NULL trap should succeed");
+    char traps[1024];
+    set_trap(SIGUSR1, "echo first");
+    ASSERT_EQ(set_trap(SIGUSR1, NULL), 0, "set_trap NULL should succeed");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo first") == NULL,
+           "passing NULL should remove the trap");
 }
 
 TEST(remove_trap_basic) {
-    set_trap(SIGUSR1, "echo test");
-    int result = remove_trap(SIGUSR1);
-    ASSERT_EQ(result, 0, "remove_trap should succeed");
+    char traps[1024];
+    set_trap(SIGUSR1, "echo to_remove");
+    ASSERT_EQ(remove_trap(SIGUSR1), 0, "remove_trap should succeed");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo to_remove") == NULL,
+           "the removed trap should not be listed");
 }
 
 TEST(remove_trap_nonexistent) {
-    /// Removing a trap that doesn't exist
-    int result = remove_trap(SIGUSR2);
-    /// Should either succeed (no-op) or return appropriate error
-    ASSERT(result == 0 || result == -1,
-           "Remove nonexistent should handle gracefully");
+    /// Removing a signal that has no trap reports failure.
+    ASSERT(remove_trap(SIGUSR2) == -1, "removing an unset trap should fail");
 }
 
 TEST(set_trap_overwrite) {
-    set_trap(SIGUSR1, "echo first");
-    int result = set_trap(SIGUSR1, "echo second");
-    ASSERT_EQ(result, 0, "Overwriting trap should succeed");
-
+    char traps[1024];
+    set_trap(SIGUSR1, "echo old");
+    ASSERT_EQ(set_trap(SIGUSR1, "echo new"), 0, "overwrite should succeed");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo new") != NULL, "the new command should be set");
+    ASSERT(strstr(traps, "echo old") == NULL,
+           "the old command should be replaced");
     remove_trap(SIGUSR1);
 }
 
 TEST(set_trap_exit) {
-    /// EXIT is signal 0
-    int result = set_trap(0, "echo exiting");
-    ASSERT_EQ(result, 0, "EXIT trap should be settable");
-
+    char traps[1024];
+    ASSERT_EQ(set_trap(0, "echo exiting"), 0, "EXIT trap should be settable");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo exiting") != NULL, "EXIT command should be set");
+    ASSERT(strstr(traps, "EXIT") != NULL, "the EXIT label should be shown");
     remove_trap(0);
 }
 
 TEST(list_traps) {
-    /// Set up some traps
-    set_trap(SIGUSR1, "echo usr1");
-    set_trap(SIGUSR2, "echo usr2");
-
-    /// Should not crash - output goes to stdout
-    /// Redirect to /dev/null in a real test environment
-    FILE *old_stdout = stdout;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stdout = null_out;
-        list_traps();
-        fclose(null_out);
-        stdout = old_stdout;
-    }
-
-    /// Clean up
+    char traps[1024];
+    set_trap(SIGUSR1, "echo listed");
+    capture_traps(traps, sizeof(traps));
+    ASSERT(strstr(traps, "echo listed") != NULL,
+           "list_traps should render a registered trap");
     remove_trap(SIGUSR1);
-    remove_trap(SIGUSR2);
 }
 
 /* ============================================================================
@@ -244,13 +266,13 @@ TEST(set_signal_handler_basic) {
 }
 
 TEST(set_signal_handler_ignore) {
-    int result = set_signal_handler(SIGUSR1, SIG_IGN);
-    ASSERT_EQ(result, 0, "Setting SIG_IGN should succeed");
-
-    /// Signal should be ignored - should not crash
+    ASSERT_EQ(set_signal_handler(SIGUSR1, SIG_IGN), 0,
+              "setting SIG_IGN should succeed");
+    struct sigaction sa;
+    sigaction(SIGUSR1, NULL, &sa);
+    ASSERT(sa.sa_handler == SIG_IGN, "the handler should be SIG_IGN");
+    /// The raised signal is ignored rather than terminating the process.
     kill(getpid(), SIGUSR1);
-
-    /// Restore default
     set_signal_handler(SIGUSR1, SIG_DFL);
 }
 
@@ -265,8 +287,12 @@ TEST(set_signal_handler_default) {
  */
 
 TEST(init_signal_handlers) {
-    /// Should not crash
     init_signal_handlers();
+    /// init installs a handler for SIGINT (not left at the default).
+    struct sigaction sa;
+    sigaction(SIGINT, NULL, &sa);
+    ASSERT(sa.sa_handler != SIG_DFL,
+           "init_signal_handlers should install a SIGINT handler");
 }
 
 /* Note: set_sigint_handler test removed - function declared but not implemented
