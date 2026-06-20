@@ -939,10 +939,11 @@ static int test_render_line_with_prefix_no_prefix(void) {
 
     screen_buffer_render(&buffer, "", "hello", 5);
 
+    /// With no prompt prefix, line 0 renders just the command content.
     bool result = screen_buffer_render_line_with_prefix(&buffer, 0, output,
                                                         sizeof(output));
     ASSERT_EQ(result, true);
-    /// Should contain just the command content
+    ASSERT_STR_EQ(output, "hello");
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -1025,9 +1026,9 @@ static int test_add_text_rows_null_text(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    int result = screen_buffer_add_text_rows(&buffer, 0, NULL);
-    /// Should return 0 for empty/null text
-    ASSERT(result >= 0 || result == -1); /// Implementation dependent
+    /// NULL text is rejected with -1; a real two-line string adds two rows.
+    ASSERT_EQ(screen_buffer_add_text_rows(&buffer, 0, NULL), -1);
+    ASSERT_EQ(screen_buffer_add_text_rows(&buffer, 0, "line1\nline2"), 2);
 
     screen_buffer_cleanup(&buffer);
     return 1;
