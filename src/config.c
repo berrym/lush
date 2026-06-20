@@ -3097,6 +3097,8 @@ int config_parse_section(const char *section_name) {
     return 0;
 }
 
+config_section_t config_get_current_section(void) { return current_section; }
+
 /**
  * @brief Parse a configuration option
  *

@@ -465,8 +465,6 @@ TEST(config_get_xdg_dir) {
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_xdg_dir(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_xdg_dir should succeed");
-    ASSERT_NOT_NULL(buffer, "buffer should be populated");
-    /// Should contain "lush"
     ASSERT(strstr(buffer, "lush") != NULL, "XDG dir should contain 'lush'");
 }
 
@@ -513,41 +511,57 @@ TEST(config_get_system_config_path) {
 TEST(config_parse_section_history) {
     int result = config_parse_section("history");
     ASSERT_EQ(result, 0, "parsing 'history' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_HISTORY,
+              "the history section should be selected");
 }
 
 TEST(config_parse_section_completion) {
     int result = config_parse_section("completion");
     ASSERT_EQ(result, 0, "parsing 'completion' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_COMPLETION,
+              "the completion section should be selected");
 }
 
 TEST(config_parse_section_prompt) {
     int result = config_parse_section("prompt");
     ASSERT_EQ(result, 0, "parsing 'prompt' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_PROMPT,
+              "the prompt section should be selected");
 }
 
 TEST(config_parse_section_behavior) {
     int result = config_parse_section("behavior");
     ASSERT_EQ(result, 0, "parsing 'behavior' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_BEHAVIOR,
+              "the behavior section should be selected");
 }
 
 TEST(config_parse_section_aliases) {
     int result = config_parse_section("aliases");
     ASSERT_EQ(result, 0, "parsing 'aliases' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_ALIASES,
+              "the aliases section should be selected");
 }
 
 TEST(config_parse_section_network) {
     int result = config_parse_section("network");
     ASSERT_EQ(result, 0, "parsing 'network' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_NETWORK,
+              "the network section should be selected");
 }
 
 TEST(config_parse_section_scripts) {
     int result = config_parse_section("scripts");
     ASSERT_EQ(result, 0, "parsing 'scripts' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_SCRIPTS,
+              "the scripts section should be selected");
 }
 
 TEST(config_parse_section_keys) {
     int result = config_parse_section("keys");
     ASSERT_EQ(result, 0, "parsing 'keys' section should succeed");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_KEYS,
+              "the keys section should be selected");
 }
 
 TEST(config_parse_section_invalid) {
@@ -586,6 +600,8 @@ TEST(config_parse_line_section_header) {
     config_init();
     int result = config_parse_line("[history]", 1, "test");
     ASSERT_EQ(result, 0, "section header should be parsed successfully");
+    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_HISTORY,
+              "the [history] header should select the history section");
 }
 
 /* ============================================================================
