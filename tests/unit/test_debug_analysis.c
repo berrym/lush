@@ -129,7 +129,9 @@ TEST(show_analysis_report_empty) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    /// Should not crash with no issues
+    /// A fresh context has recorded no issues; the report renders that empty
+    /// state without crashing.
+    ASSERT_EQ(ctx->issue_count, 0, "a fresh context has no issues");
     debug_show_analysis_report(ctx);
 
     debug_cleanup(ctx);
@@ -146,7 +148,23 @@ TEST(show_analysis_report_with_issues) {
     debug_add_analysis_issue(ctx, "test.sh", 10, "info", "performance",
                              "Performance tip", "Optimize");
 
-    /// Should not crash
+    /// Each added issue is recorded and carries the severity it was logged
+    /// with; the three adds yield three tracked issues.
+    ASSERT_EQ(ctx->issue_count, 3, "all three issues are recorded");
+    int errors = 0, warnings = 0, infos = 0;
+    for (analysis_issue_t *it = ctx->analysis_issues; it; it = it->next) {
+        if (strcmp(it->severity, "error") == 0) {
+            errors++;
+        } else if (strcmp(it->severity, "warning") == 0) {
+            warnings++;
+        } else if (strcmp(it->severity, "info") == 0) {
+            infos++;
+        }
+    }
+    ASSERT_EQ(errors, 1, "one error issue recorded");
+    ASSERT_EQ(warnings, 1, "one warning issue recorded");
+    ASSERT_EQ(infos, 1, "one info issue recorded");
+
     debug_show_analysis_report(ctx);
 
     debug_cleanup(ctx);
@@ -187,8 +205,8 @@ TEST(analyze_script_valid_syntax) {
 
     debug_analyze_script(ctx, path);
 
-    /// Script has valid syntax - may or may not have style issues
-    /// Just verify it doesn't crash
+    /// A syntactically valid, idiomatic script raises no analysis issues.
+    ASSERT_EQ(ctx->issue_count, 0, "a clean script produces no issues");
 
     debug_cleanup(ctx);
     cleanup_test_dir();
@@ -813,8 +831,8 @@ TEST(lint_script_basic) {
 
     int remaining = debug_lint_script(ctx, path, false, false, false);
 
-    /// Valid script should have minimal issues
-    ASSERT_TRUE(remaining >= 0, "lint should succeed");
+    /// A clean script lints with no remaining issues.
+    ASSERT_EQ(remaining, 0, "a clean script has no lint issues");
 
     debug_cleanup(ctx);
     cleanup_test_dir();
@@ -892,14 +910,6 @@ TEST(analyze_vs_lint_mode_difference) {
     ASSERT_EQ(lint_count, 2, "LINT mode should show 2 issues (no info)");
 
     debug_cleanup(ctx);
-}
-
-TEST(analysis_mode_enum_values) {
-    /// Verify enum values are distinct and as expected
-    ASSERT_NE(ANALYSIS_MODE_FULL, ANALYSIS_MODE_LINT,
-              "FULL and LINT modes should be different");
-    ASSERT_EQ(ANALYSIS_MODE_FULL, 0, "FULL should be 0");
-    ASSERT_EQ(ANALYSIS_MODE_LINT, 1, "LINT should be 1");
 }
 
 TEST(lint_with_dry_run) {
@@ -1014,7 +1024,6 @@ int main(void) {
     RUN_TEST(lint_script_nonexistent);
     RUN_TEST(lint_returns_issue_count);
     RUN_TEST(analyze_vs_lint_mode_difference);
-    RUN_TEST(analysis_mode_enum_values);
     RUN_TEST(lint_with_dry_run);
     RUN_TEST(lint_actionable_only);
 

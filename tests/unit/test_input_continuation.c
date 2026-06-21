@@ -519,9 +519,9 @@ TEST(prompt_for_single_quote) {
     continuation_state_init(&state);
     state.in_single_quote = true;
 
+    /// An open quote uses the dedicated quote-context prompt.
     const char *prompt = continuation_get_prompt(&state);
-    ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
-    /// Prompt should indicate quote context
+    ASSERT_STR_EQ(prompt, "quote> ", "single-quote context prompt");
 }
 
 TEST(prompt_for_double_quote) {
@@ -529,8 +529,9 @@ TEST(prompt_for_double_quote) {
     continuation_state_init(&state);
     state.in_double_quote = true;
 
+    /// Single and double quotes share the same quote-context prompt.
     const char *prompt = continuation_get_prompt(&state);
-    ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
+    ASSERT_STR_EQ(prompt, "quote> ", "double-quote context prompt");
 }
 
 TEST(prompt_for_here_doc) {
@@ -538,16 +539,20 @@ TEST(prompt_for_here_doc) {
     continuation_state_init(&state);
     state.in_here_doc = true;
 
+    /// A here-doc has no dedicated prompt; it falls back to the default PS2
+    /// continuation prompt.
     const char *prompt = continuation_get_prompt(&state);
-    ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
+    ASSERT_STR_EQ(prompt, "> ",
+                  "here-doc uses the default continuation prompt");
 }
 
 TEST(prompt_for_complete_state) {
     continuation_state_t state;
     continuation_state_init(&state);
 
+    /// A complete (non-continuing) state uses the default PS2 prompt.
     const char *prompt = continuation_get_prompt(&state);
-    ASSERT_NOT_NULL(prompt, "Prompt should not be NULL for complete state");
+    ASSERT_STR_EQ(prompt, "> ", "complete state uses the default prompt");
 }
 
 /* ============================================================================
@@ -607,9 +612,10 @@ TEST(pipe_at_end) {
 
     continuation_analyze_line("ls |", &state);
 
-    /// Note: Whether pipe at end needs continuation depends on implementation
-    /// Just verify it doesn't crash and returns a valid result
-    (void)continuation_is_complete(&state);
+    /// A line ending in a pipe is incomplete: the pipeline still needs its
+    /// right-hand command, so continuation is required.
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "a trailing pipe needs continuation");
 }
 
 TEST(operators_analyzed) {
@@ -732,9 +738,12 @@ TEST(quote_in_comment) {
 
     continuation_analyze_line("# this is a comment with \"quotes\"", &state);
 
-    /// Just verify the line is analyzed without crashing
-    /// Note: Implementation may or may not track quotes in comments
-    (void)continuation_is_complete(&state);
+    /// Quotes inside a comment are not shell quotes: the comment is ignored,
+    /// so the line is complete and no quote context is left open.
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "a fully-commented line is complete");
+    ASSERT_FALSE(state.in_double_quote,
+                 "quotes inside a comment do not open a quote context");
 }
 
 TEST(semicolon_separates_commands) {
