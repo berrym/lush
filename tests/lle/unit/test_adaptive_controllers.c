@@ -30,20 +30,10 @@
 #include <string.h>
 #include <unistd.h>
 
-/// Test tracking
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST_ASSERT(condition, message)                                        \
-    do {                                                                       \
-        tests_run++;                                                           \
-        if (condition) {                                                       \
-            tests_passed++;                                                    \
-            printf("  [PASS] %s\n", message);                                  \
-        } else {                                                               \
-            printf("  [FAIL] %s\n", message);                                  \
-        }                                                                      \
-    } while (0)
+/// Route the suite's TEST_ASSERT through the framework's ASSERT_TRUE so a
+/// failed assertion actually fails the test (longjmp back to RUN_TEST and a
+/// non-zero process exit) instead of only printing a line the harness ignores.
+#define TEST_ASSERT(condition, message) ASSERT_TRUE(condition, message)
 
 /* ============================================================================
  * CONTEXT INITIALIZATION TESTS
@@ -81,8 +71,6 @@ TEST(context_initialization) {
                             res == LLE_SUCCESS,
                         "Context initialization handles non-TTY correctly");
             printf("  [SKIP] Context creation skipped (no TTY)\n");
-            tests_run++;
-            tests_passed++;
         }
 
         if (context) {
@@ -126,8 +114,6 @@ TEST(interface_creation) {
                     "Interface creation handles non-TTY correctly");
         if (res != LLE_SUCCESS) {
             printf("  [SKIP] Interface creation skipped (no TTY)\n");
-            tests_run++;
-            tests_passed++;
             return;
         }
     }
@@ -214,9 +200,12 @@ TEST(config_recommendations) {
 
     lle_adaptive_get_recommended_config(&config);
 
-    TEST_ASSERT(config.recommended_mode >= LLE_ADAPTIVE_MODE_NONE &&
-                    config.recommended_mode <= LLE_ADAPTIVE_MODE_MULTIPLEXED,
-                "Recommended mode is valid");
+    /// The recommended mode must be a real, nameable mode (it maps to a
+    /// known string) and must not exceed the highest defined mode.
+    TEST_ASSERT(config.recommended_mode <= LLE_ADAPTIVE_MODE_MULTIPLEXED,
+                "Recommended mode does not exceed the highest defined mode");
+    TEST_ASSERT(lle_adaptive_mode_to_string(config.recommended_mode) != NULL,
+                "Recommended mode maps to a known mode name");
 
     TEST_ASSERT(config.color_support_level >= 0 &&
                     config.color_support_level <= 3,
@@ -260,10 +249,13 @@ TEST(shell_integration) {
     interactive = lle_adaptive_should_shell_be_interactive(false, false, true);
     TEST_ASSERT(interactive == false, "Stdin mode disables interactive");
 
-    /// Test 4: Normal case - depends on detection
-    interactive = lle_adaptive_should_shell_be_interactive(false, false, false);
-    printf("  Normal detection interactive: %s\n", interactive ? "yes" : "no");
-    /// Don't assert - depends on environment
+    /// Test 4: precedence is deterministic regardless of the environment.
+    /// A script file is non-interactive even when interactive is forced, and
+    /// the forced-interactive flag overrides stdin mode.
+    TEST_ASSERT(!lle_adaptive_should_shell_be_interactive(true, true, false),
+                "a script file is non-interactive even when forced");
+    TEST_ASSERT(lle_adaptive_should_shell_be_interactive(true, false, true),
+                "forced interactive overrides stdin mode");
 }
 
 /* ============================================================================
