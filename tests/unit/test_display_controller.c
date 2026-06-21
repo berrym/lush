@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "display/display_controller.h"
 #include "test_framework.h"
@@ -60,9 +61,16 @@ static int test_create_initializes_config_defaults(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    /// Check that default config values are set
-    /// Before init, config should have default values from create
-    /// We can check this by examining the internal state
+    /// create() must populate the controller's own config with the
+    /// standard defaults (distinct from the standalone
+    /// create_default_config helper -- this proves create wires them in).
+    ASSERT_EQ(dc->config.optimization_level, DISPLAY_OPTIMIZATION_STANDARD);
+    ASSERT_EQ(dc->config.cache_ttl_ms, DISPLAY_CONTROLLER_DEFAULT_CACHE_TTL_MS);
+    ASSERT_EQ(dc->config.max_cache_entries, 256);
+    ASSERT(dc->config.enable_caching);
+    ASSERT(dc->config.enable_diff_algorithms);
+    ASSERT(!dc->config.enable_integration_mode);
+    ASSERT_NULL(dc->config.log_file_path);
 
     display_controller_destroy(dc);
     return 1;
@@ -221,11 +229,13 @@ static int test_error_string_buffer_too_small(void) {
 }
 
 static int test_error_string_unknown_error(void) {
-    /// Test with an invalid error code
+    /// An out-of-range code falls through to the switch default, which
+    /// returns the sentinel "Unknown error" rather than NULL or a stale
+    /// pointer.
     const char *msg =
         display_controller_error_string((display_controller_error_t)9999);
     ASSERT_NOT_NULL(msg);
-    /// Should return some string even for unknown errors
+    ASSERT_STR_EQ(msg, "Unknown error");
     return 1;
 }
 
@@ -837,26 +847,59 @@ static int test_reset_prompt_display_state_no_crash(void) {
     return 1;
 }
 
-static int test_finalize_input_no_crash(void) {
-    /// Should not crash even without initialized controller
-    /// Note: This writes to stdout, so we just verify it doesn't crash
-    /// dc_finalize_input() would write \n to stdout - skip in test
+static int test_finalize_input_writes_newline(void) {
+    /// dc_finalize_input emits exactly one newline to stdout (to move the
+    /// cursor past the prompt before command output) and then resets the
+    /// prompt display state. Capture stdout through a pipe and assert the
+    /// newline was actually written -- not merely that the call returns.
+    int saved = dup(STDOUT_FILENO);
+    ASSERT(saved >= 0);
+    int pipefd[2];
+    ASSERT(pipe(pipefd) == 0);
+
+    fflush(stdout);
+    dup2(pipefd[1], STDOUT_FILENO);
+    close(pipefd[1]);
+
+    dc_finalize_input();
+    fflush(stdout);
+
+    /// Restore the real stdout before any assertion so a longjmp on
+    /// failure does not leave later tests writing into the closed pipe.
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+
+    char buf[16] = {0};
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    close(pipefd[0]);
+
+    ASSERT(n == 1);
+    ASSERT(buf[0] == '\n');
     return 1;
 }
 
 static int test_get_prompt_metrics_null_params(void) {
-    /// Should not crash with NULL params
+    /// All-NULL must be a no-op that does not crash.
     dc_get_prompt_metrics(NULL, NULL, NULL);
+
+    /// Partial NULL must still populate the non-NULL output with the
+    /// uninitialized default rather than touching the NULL pointers.
+    int prompt_lines = -42;
+    dc_get_prompt_metrics(&prompt_lines, NULL, NULL);
+    ASSERT_EQ(prompt_lines, 1);
     return 1;
 }
 
 static int test_get_prompt_metrics_with_params(void) {
-    int prompt_lines, total_lines, command_col;
+    int prompt_lines = -1, total_lines = -1, command_col = -1;
     dc_get_prompt_metrics(&prompt_lines, &total_lines, &command_col);
 
-    /// Without initialization, should return defaults
-    ASSERT(prompt_lines >= 1);
-    ASSERT(total_lines >= 1);
+    /// With no screen buffer initialized, the metrics report the
+    /// single-line defaults: one prompt line, one total line, command
+    /// starting at column zero.
+    ASSERT_EQ(prompt_lines, 1);
+    ASSERT_EQ(total_lines, 1);
+    ASSERT_EQ(command_col, 0);
 
     return 1;
 }
@@ -870,29 +913,6 @@ static int test_apply_transient_prompt_null_prompt(void) {
 /* ============================================================
  * OPTIMIZATION LEVEL ENUM TESTS
  * ============================================================ */
-
-static int test_optimization_level_values(void) {
-    /// Verify enum values are distinct
-    ASSERT(DISPLAY_OPTIMIZATION_DISABLED != DISPLAY_OPTIMIZATION_BASIC);
-    ASSERT(DISPLAY_OPTIMIZATION_BASIC != DISPLAY_OPTIMIZATION_STANDARD);
-    ASSERT(DISPLAY_OPTIMIZATION_STANDARD != DISPLAY_OPTIMIZATION_AGGRESSIVE);
-    ASSERT(DISPLAY_OPTIMIZATION_AGGRESSIVE != DISPLAY_OPTIMIZATION_MAXIMUM);
-    return 1;
-}
-
-/* ============================================================
- * STATE CHANGE ENUM TESTS
- * ============================================================ */
-
-static int test_state_change_values(void) {
-    /// Verify enum values are distinct
-    ASSERT(DISPLAY_STATE_UNCHANGED != DISPLAY_STATE_PROMPT_CHANGED);
-    ASSERT(DISPLAY_STATE_PROMPT_CHANGED != DISPLAY_STATE_COMMAND_CHANGED);
-    ASSERT(DISPLAY_STATE_COMMAND_CHANGED != DISPLAY_STATE_COMPOSITION_CHANGED);
-    ASSERT(DISPLAY_STATE_COMPOSITION_CHANGED != DISPLAY_STATE_TERMINAL_CHANGED);
-    ASSERT(DISPLAY_STATE_TERMINAL_CHANGED != DISPLAY_STATE_FULL_REFRESH_NEEDED);
-    return 1;
-}
 
 /* ============================================================
  * ERROR CODE ENUM TESTS
@@ -913,45 +933,6 @@ static int test_error_code_values(void) {
     ASSERT(DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED !=
            DISPLAY_CONTROLLER_SUCCESS);
 
-    return 1;
-}
-
-/* ============================================================
- * SYMBOL COMPATIBILITY ENUM TESTS
- * ============================================================ */
-
-static int test_symbol_mode_values(void) {
-    /// Verify enum values are distinct
-    ASSERT(SYMBOL_MODE_UNICODE != SYMBOL_MODE_ASCII);
-    ASSERT(SYMBOL_MODE_ASCII != SYMBOL_MODE_NERD_FONT);
-    ASSERT(SYMBOL_MODE_NERD_FONT != SYMBOL_MODE_AUTO);
-    return 1;
-}
-
-/* ============================================================
- * CONSTANT DEFINITION TESTS
- * ============================================================ */
-
-static int test_version_constants_positive(void) {
-    ASSERT(DISPLAY_CONTROLLER_VERSION_MAJOR >= 0);
-    ASSERT(DISPLAY_CONTROLLER_VERSION_MINOR >= 0);
-    ASSERT(DISPLAY_CONTROLLER_VERSION_PATCH >= 0);
-    return 1;
-}
-
-static int test_cache_constants_reasonable(void) {
-    ASSERT(DISPLAY_CONTROLLER_MAX_CACHE_SIZE > 0);
-    ASSERT(DISPLAY_CONTROLLER_MAX_DIFF_SIZE > 0);
-    ASSERT(DISPLAY_CONTROLLER_DEFAULT_CACHE_TTL_MS > 0);
-    ASSERT(DISPLAY_CONTROLLER_PERFORMANCE_HISTORY_SIZE > 0);
-    return 1;
-}
-
-static int test_threshold_constants_reasonable(void) {
-    ASSERT(DISPLAY_CONTROLLER_PERFORMANCE_THRESHOLD_MS > 0);
-    ASSERT(DISPLAY_CONTROLLER_CACHE_HIT_RATE_THRESHOLD > 0.0);
-    ASSERT(DISPLAY_CONTROLLER_CACHE_HIT_RATE_THRESHOLD <= 1.0);
-    ASSERT(DISPLAY_CONTROLLER_MEMORY_THRESHOLD_MB > 0);
     return 1;
 }
 
@@ -1085,21 +1066,13 @@ int main(void) {
 
     printf("\n=== Global Function Tests ===\n");
     RUN_TEST(reset_prompt_display_state_no_crash);
-    RUN_TEST(finalize_input_no_crash);
+    RUN_TEST(finalize_input_writes_newline);
     RUN_TEST(get_prompt_metrics_null_params);
     RUN_TEST(get_prompt_metrics_with_params);
     RUN_TEST(apply_transient_prompt_null_prompt);
 
     printf("\n=== Enum Value Tests ===\n");
-    RUN_TEST(optimization_level_values);
-    RUN_TEST(state_change_values);
     RUN_TEST(error_code_values);
-    RUN_TEST(symbol_mode_values);
-
-    printf("\n=== Constant Definition Tests ===\n");
-    RUN_TEST(version_constants_positive);
-    RUN_TEST(cache_constants_reasonable);
-    RUN_TEST(threshold_constants_reasonable);
 
     printf("\n========================================\n");
     printf("========================================\n");

@@ -265,13 +265,18 @@ TEST(render_controller_double_cleanup) {
         lle_render_controller_init(&controller, bridge, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller init should succeed");
 
-    /// First cleanup
+    /// First cleanup tears down every sub-component and NULLs its pointer.
     result = lle_render_controller_cleanup(controller);
     ASSERT_EQ(result, LLE_SUCCESS, "First cleanup should succeed");
 
-    /// Second cleanup - controller memory was freed, so we can't safely call
-    /// again
-    /// This test just verifies that single cleanup works correctly
+    /// Cleanup does not free the controller struct itself (the caller owns
+    /// that allocation), so a second cleanup runs against a valid struct whose
+    /// sub-pointers are all NULL. It must be idempotent: every guarded
+    /// teardown step is skipped and the call still reports success rather than
+    /// double-freeing a sub-component.
+    result = lle_render_controller_cleanup(controller);
+    ASSERT_EQ(result, LLE_SUCCESS,
+              "Second cleanup should be idempotent and succeed");
 
     /// Bridge cleanup
     destroy_mock_display_bridge(bridge);
@@ -1046,13 +1051,23 @@ TEST(cache_hit_rate_calculation) {
 }
 
 TEST(cache_policy_initialized) {
-    /// Test that LRU policy is initialized
+    /// Test that the LRU policy is initialized to its empty default state.
     lle_display_cache_t *cache = NULL;
     lle_result_t result = lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Cache init should succeed");
 
-    /// Verify policy is initialized
     ASSERT_NOT_NULL(cache->policy, "Cache policy should be initialized");
+
+    /// A fresh policy has an empty LRU list (no entries cached yet), the
+    /// default capacity, and no evictions recorded.
+    ASSERT_NULL(cache->policy->lru_head,
+                "Fresh policy LRU list head should be empty");
+    ASSERT_NULL(cache->policy->lru_tail,
+                "Fresh policy LRU list tail should be empty");
+    ASSERT_EQ(cache->policy->max_entries, (size_t)1000,
+              "Policy should adopt the default maximum entry count");
+    ASSERT_EQ(cache->policy->eviction_count, (uint32_t)0,
+              "Fresh policy should have evicted nothing");
 
     /// Cleanup
     lle_display_cache_cleanup(cache);
