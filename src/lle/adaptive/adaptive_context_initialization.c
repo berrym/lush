@@ -603,36 +603,36 @@ bool lle_adaptive_perform_health_check(lle_adaptive_context_t *context) {
  * - MULTIPLEXED -> NATIVE -> ENHANCED -> MINIMAL
  * - MINIMAL -> (no fallback available)
  */
+lle_adaptive_mode_t lle_adaptive_fallback_mode_for(lle_adaptive_mode_t mode) {
+    switch (mode) {
+    case LLE_ADAPTIVE_MODE_NATIVE:
+        return LLE_ADAPTIVE_MODE_ENHANCED;
+    case LLE_ADAPTIVE_MODE_ENHANCED:
+        return LLE_ADAPTIVE_MODE_MINIMAL;
+    case LLE_ADAPTIVE_MODE_MULTIPLEXED:
+        // Multiplexer failure: try native first, then enhanced
+        return LLE_ADAPTIVE_MODE_NATIVE;
+    case LLE_ADAPTIVE_MODE_MINIMAL:
+    case LLE_ADAPTIVE_MODE_NONE:
+        // Terminal modes: no further degradation is possible. Returning the
+        // same mode signals "no fallback" to callers.
+        return mode;
+    }
+    return LLE_ADAPTIVE_MODE_MINIMAL;
+}
+
 lle_result_t lle_adaptive_try_fallback_mode(lle_adaptive_context_t *context) {
     if (!context) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Determine fallback mode based on current mode
-    lle_adaptive_mode_t fallback_mode =
-        LLE_ADAPTIVE_MODE_MINIMAL; // Default fallback
+    // Determine fallback mode based on current mode.
     lle_adaptive_mode_t original_mode = context->mode;
+    lle_adaptive_mode_t fallback_mode =
+        lle_adaptive_fallback_mode_for(original_mode);
 
-    switch (context->mode) {
-    case LLE_ADAPTIVE_MODE_NATIVE:
-        fallback_mode = LLE_ADAPTIVE_MODE_ENHANCED;
-        break;
-
-    case LLE_ADAPTIVE_MODE_ENHANCED:
-        fallback_mode = LLE_ADAPTIVE_MODE_MINIMAL;
-        break;
-
-    case LLE_ADAPTIVE_MODE_MULTIPLEXED:
-        // Multiplexer failure: try native first, then enhanced
-        fallback_mode = LLE_ADAPTIVE_MODE_NATIVE;
-        break;
-
-    case LLE_ADAPTIVE_MODE_MINIMAL:
-        // Already at minimal - no further fallback
-        return LLE_ERROR_FEATURE_NOT_AVAILABLE;
-
-    case LLE_ADAPTIVE_MODE_NONE:
-        // Non-interactive - cannot fallback
+    // A terminal mode (MINIMAL/NONE) maps to itself: no further fallback.
+    if (fallback_mode == original_mode) {
         return LLE_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
