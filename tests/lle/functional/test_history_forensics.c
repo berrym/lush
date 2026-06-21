@@ -606,7 +606,7 @@ void test_all_forensics_features_together(void) {
 
 int main(void) {
     printf("=======================================================\n");
-    printf("  LLE HISTORY SYSTEM - PHASE 4 COMPREHENSIVE TESTS\n");
+    printf("  LLE HISTORY FORENSICS TESTS\n");
     printf("=======================================================\n");
 
     printf("\n--- FORENSIC TRACKING TESTS ---\n");

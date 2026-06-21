@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # =============================================================================
-# PHASE 4: EXTENDED PARAMETER EXPANSION TESTS
+# EXTENDED PARAMETER EXPANSION TESTS
 # =============================================================================
 #
-# Tests Phase 4 extended language features including:
+# Tests extended language features including:
 # - Case modification: ${var^^}, ${var,,}, ${var^}, ${var,}
 # - Substring extraction: ${var:offset:length}
 # - Pattern substitution: ${var/pattern/replacement}, ${var//pattern/replacement}
@@ -371,7 +371,7 @@ test_existing_features() {
 # =============================================================================
 
 main() {
-    print_header "PHASE 4: EXTENDED PARAMETER EXPANSION TESTS"
+    print_header "EXTENDED PARAMETER EXPANSION TESTS"
 
     echo -e "${CYAN}Lush binary: $LUSH${NC}"
 
@@ -398,7 +398,7 @@ main() {
     echo -e "Failed:       ${RED}$FAILED_TESTS${NC}"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}All Phase 4 tests passed!${NC}"
+        echo -e "\n${GREEN}All tests passed!${NC}"
         exit 0
     else
         echo -e "\n${RED}Some tests failed.${NC}"

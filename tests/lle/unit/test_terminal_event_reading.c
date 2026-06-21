@@ -9,7 +9,7 @@
 /*
  * test_terminal_event_reading.c - Unit tests for terminal event reading
  *
- * Tests Spec 02 Phase 3: Event Reading
+ * Tests Spec 02: Event Reading
  *
  * Test Categories:
  * 1. Timeout behavior
@@ -694,7 +694,7 @@ TEST(csi_shift_pageup_no_trailing_leak) {
  */
 
 int main(void) {
-    printf("Running Terminal Event Reading Tests (Spec 02 Phase 3)\n");
+    printf("Running Terminal Event Reading Tests (Spec 02)\n");
     printf("========================================================\n\n");
 
     printf("Timeout Tests:\n");

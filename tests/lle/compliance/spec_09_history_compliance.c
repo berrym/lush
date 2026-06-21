@@ -4,7 +4,7 @@
  *
  * Drives a real history core -- adding and retrieving entries -- and asserts
  * the resulting state, rather than assigning to a local struct and reading
- * the values back. Covers Phase 1: entry storage, exit-code persistence,
+ * the values back. Covers entry storage, exit-code persistence,
  * statistics, and the core entry-count lifecycle.
  *
  * @author Michael Berry <trismegustis@gmail.com>

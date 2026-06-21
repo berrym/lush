@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # =============================================================================
-# PHASE 3: PROCESS SUBSTITUTION AND EXTENDED PIPES TESTS
+# PROCESS SUBSTITUTION AND EXTENDED PIPES TESTS
 # =============================================================================
 #
-# Tests Phase 3 extended language features including:
+# Tests extended language features including:
 # - Process substitution <(cmd) - input from command output
 # - Process substitution >(cmd) - output to command input
 # - Pipe stderr |& - pipe both stdout and stderr
@@ -19,7 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LUSH="${1:-$PROJECT_DIR/build/lush}"
-TEST_DIR="/tmp/lush_phase3_test_$$"
+TEST_DIR="/tmp/lush__test_$$"
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -346,7 +346,7 @@ test_syntax() {
 # =============================================================================
 
 main() {
-    print_header "PHASE 3: PROCESS SUBSTITUTION AND EXTENDED PIPES TESTS"
+    print_header "PROCESS SUBSTITUTION AND EXTENDED PIPES TESTS"
 
     echo -e "${CYAN}Lush binary: $LUSH${NC}"
 
@@ -375,7 +375,7 @@ main() {
     echo -e "Failed:       ${RED}$FAILED_TESTS${NC}"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}All Phase 3 tests passed!${NC}"
+        echo -e "\n${GREEN}All tests passed!${NC}"
         exit 0
     else
         echo -e "\n${RED}Some tests failed.${NC}"

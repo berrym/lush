@@ -9,7 +9,7 @@
 /*
  * test_terminal_state.c - Unit tests for terminal state management
  *
- * Tests Spec 02 Phase 2: Terminal State Management
+ * Tests Spec 02: Terminal State Management
  *
  * Test Categories:
  * 1. Interface initialization and cleanup
@@ -330,8 +330,7 @@ TEST(window_size_fallback_values) {
  */
 
 TEST(read_event_stub) {
-    /// Phase 2 only provides a stub for read_event, which will be
-    /// fully implemented in Phase 3. Verify the stub exists and
+    /// read_event in this interface is a stub; verify it exists and
     /// handles null parameters correctly.
 
     lle_unix_interface_t *interface = NULL;
@@ -419,7 +418,7 @@ TEST(full_lifecycle) {
  */
 
 int main(void) {
-    printf("Running Terminal State Management Tests (Spec 02 Phase 2)\n");
+    printf("Running Terminal State Management Tests (Spec 02)\n");
     printf("============================================================\n\n");
 
     printf("Interface Initialization Tests:\n");

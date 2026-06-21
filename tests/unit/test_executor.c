@@ -360,9 +360,9 @@ TEST(case_wildcard) {
  * collector now accepts that token as literal "[[" text so the resulting
  * pattern string "[[:class:]]" reaches match_pattern intact. */
 /* The bash-style ERR pseudo-signal trap fires after a command's
- * non-zero exit, before set -e would otherwise abort. Phase 1 of
- * issue #108 -- the errtrace option (inheritance into functions and
- * subshells) is not yet implemented; this asserts only that the
+ * non-zero exit, before set -e would otherwise abort. Per issue #108,
+ * the errtrace option (inheritance into functions and subshells) is
+ * not yet implemented; this asserts only that the
  * trap registers and fires for a top-level non-zero exit. */
 TEST(trap_err_fires_on_nonzero_exit) {
     executor_t *exec = executor_new();
@@ -382,7 +382,7 @@ TEST(trap_err_fires_on_nonzero_exit) {
     executor_free(exec);
 }
 
-/* Phase 2 of issue #108: the errtrace option controls whether the ERR
+/* Issue #108: the errtrace option controls whether the ERR
  * trap is inherited into function bodies. Without errtrace, lush
  * matches bash's default: the trap fires only at the function's call
  * site (where the function returns non-zero), not inside the body.

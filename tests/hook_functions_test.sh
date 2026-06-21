@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 7 Hook Functions Test Suite
+# Hook Functions Test Suite
 # Tests precmd, preexec, and chpwd hook functions
 
 LUSH="./build/lush"
@@ -34,7 +34,7 @@ run_lush() {
 }
 
 echo "========================================"
-echo "Phase 7: Hook Functions Test Suite"
+echo "Hook Functions Test Suite"
 echo "========================================"
 echo ""
 

@@ -12,7 +12,7 @@
  * Tests graceful degradation when controllers fail.
  * Verifies fallback hierarchy and error recovery.
  *
- * Specification: Spec 26 Phase 3 - Graceful Degradation
+ * Specification: Spec 26 - Graceful Degradation
  * Date: 2025-11-02
  */
 
@@ -221,7 +221,7 @@ TEST(degradation_chain) {
  * Main test runner
  */
 int main(void) {
-    printf("=== Adaptive Terminal Fallback Tests (Spec 26 Phase 3) ===\n");
+    printf("=== Adaptive Terminal Fallback Tests (Spec 26) ===\n");
     RUN_TEST(fallback_hierarchy);
     RUN_TEST(multiple_fallbacks);
     RUN_TEST(fallback_errors);

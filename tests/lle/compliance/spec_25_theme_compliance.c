@@ -61,7 +61,7 @@ static int tests_run = 0;
 /* ========================================================================== */
 
 static void test_theme_registry_api(void) {
-    printf("Phase 1: Theme Registry API\n");
+    printf("Theme Registry API\n");
     printf("----------------------------\n");
 
     TEST_START("lle_theme_registry_init function");
@@ -108,7 +108,7 @@ static void test_theme_registry_api(void) {
                       "registry not initialized after cleanup");
     TEST_PASS();
 
-    printf("  Phase 1 complete (7 tests)\n\n");
+    printf("  complete (7 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -116,7 +116,7 @@ static void test_theme_registry_api(void) {
 /* ========================================================================== */
 
 static void test_theme_lifecycle_api(void) {
-    printf("Phase 2: Theme Lifecycle API\n");
+    printf("Theme Lifecycle API\n");
     printf("-----------------------------\n");
 
     TEST_START("lle_theme_create sets identity and is freed cleanly");
@@ -177,7 +177,7 @@ static void test_theme_lifecycle_api(void) {
     lle_theme_registry_cleanup(&empty);
     TEST_PASS();
 
-    printf("  Phase 2 complete (3 tests)\n\n");
+    printf("  complete (3 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -185,7 +185,7 @@ static void test_theme_lifecycle_api(void) {
 /* ========================================================================== */
 
 static void test_color_helper_api(void) {
-    printf("Phase 3: Color Helper API\n");
+    printf("Color Helper API\n");
     printf("--------------------------\n");
 
     TEST_START("lle_color_basic function");
@@ -216,7 +216,7 @@ static void test_color_helper_api(void) {
     COMPLIANCE_ASSERT(strstr(buf, "\033[") != NULL, "contains escape sequence");
     TEST_PASS();
 
-    printf("  Phase 3 complete (4 tests)\n\n");
+    printf("  complete (4 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -224,7 +224,7 @@ static void test_color_helper_api(void) {
 /* ========================================================================== */
 
 static void test_symbol_set_api(void) {
-    printf("Phase 4: Symbol Set API\n");
+    printf("Symbol Set API\n");
     printf("------------------------\n");
 
     TEST_START("lle_symbol_set_init_unicode function");
@@ -243,7 +243,7 @@ static void test_symbol_set_api(void) {
                       "prompt is $ for ASCII");
     TEST_PASS();
 
-    printf("  Phase 4 complete (2 tests)\n\n");
+    printf("  complete (2 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -251,7 +251,7 @@ static void test_symbol_set_api(void) {
 /* ========================================================================== */
 
 static void test_builtin_themes(void) {
-    printf("Phase 5: Built-in Themes\n");
+    printf("Built-in Themes\n");
     printf("-------------------------\n");
 
     TEST_START("lle_theme_create_minimal function");
@@ -334,7 +334,7 @@ static void test_builtin_themes(void) {
     lle_theme_registry_cleanup(&registry);
     TEST_PASS();
 
-    printf("  Phase 5 complete (7 tests)\n\n");
+    printf("  complete (7 tests)\n\n");
 }
 
 /* ========================================================================== */

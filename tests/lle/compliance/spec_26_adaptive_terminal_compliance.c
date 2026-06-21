@@ -52,9 +52,9 @@
  * - lle_capability_level_to_string()
  */
 
-/// @brief Test Phase 1: Detection System API
-static void test_phase1_detection_api(void) {
-    printf("Testing Phase 1: Detection System API...\n");
+/// @brief Test: Detection System API
+static void test_detection_api(void) {
+    printf("Testing Detection System API...\n");
 
     /// Test 1: Core detection function exists and works
     lle_terminal_detection_result_t *result = NULL;
@@ -83,12 +83,12 @@ static void test_phase1_detection_api(void) {
     /// Test 5: Detection result cleanup
     lle_terminal_detection_result_destroy(result);
 
-    printf("  Phase 1 Detection API: PASS\n");
+    printf("  Detection API: PASS\n");
 }
 
-/// @brief Test Phase 2: Controller System API
-static void test_phase2_controller_api(void) {
-    printf("Testing Phase 2: Controller System API...\n");
+/// @brief Test: Controller System API
+static void test_controller_api(void) {
+    printf("Testing Controller System API...\n");
 
     /// Test 1: Context initialization
     lle_terminal_detection_result_t *detection = NULL;
@@ -102,7 +102,7 @@ static void test_phase2_controller_api(void) {
     /// NONE mode may fail initialization (non-interactive)
     if (detection->recommended_mode == LLE_ADAPTIVE_MODE_NONE) {
         assert(res == LLE_ERROR_FEATURE_NOT_AVAILABLE);
-        printf("  Phase 2 Controller API: PASS (non-interactive mode)\n");
+        printf("  Controller API: PASS (non-interactive mode)\n");
         return;
     }
 
@@ -152,7 +152,7 @@ static void test_phase2_controller_api(void) {
     lle_adaptive_interface_destroy(interface);
     lle_adaptive_context_destroy(context);
 
-    printf("  Phase 2 Controller API: PASS\n");
+    printf("  Controller API: PASS\n");
 }
 
 /**
@@ -168,8 +168,8 @@ int main(void) {
            "=============\n");
     printf("\n");
 
-    test_phase1_detection_api();
-    test_phase2_controller_api();
+    test_detection_api();
+    test_controller_api();
 
     printf("\n");
     printf("==================================================================="

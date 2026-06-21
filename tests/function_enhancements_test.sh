@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 6: Function Enhancements Tests
+# Function Enhancements Tests
 # Tests nameref variables (local -n), enhanced declare options (-g, -l, -u, -t),
 # and return from sourced scripts
 
@@ -70,7 +70,7 @@ run_test_exit_code() {
 }
 
 echo "=================================="
-echo "Phase 6: Function Enhancements Tests"
+echo "Function Enhancements Tests"
 echo "=================================="
 echo ""
 

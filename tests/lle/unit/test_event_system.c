@@ -1,6 +1,6 @@
 /**
  * @file test_event_system.c
- * @brief Unit tests for LLE Event System (Spec 04 Phase 1)
+ * @brief Unit tests for LLE Event System (Spec 04)
  *
  * Tests cover:
  * - Event system lifecycle (init/stop)
@@ -11,7 +11,7 @@
  * - Error handling
  *
  * SPECIFICATION: docs/lle_specification/04_event_system_complete.md
- * PHASE: Phase 1 - Core Infrastructure
+ * Coverage: Core Infrastructure
  *
  * NOTE: Uses mock memory pool (test_memory_mock.c) for standalone testing
  */
@@ -643,7 +643,7 @@ TEST(event_type_name_unknown) {
 /* ========================================================================== */
 
 int main(void) {
-    printf("=== LLE Event System Phase 1 Tests ===\n\n");
+    printf("=== LLE Event System Tests ===\n\n");
 
     printf("--- Lifecycle ---\n");
     RUN_TEST(event_system_init_success);

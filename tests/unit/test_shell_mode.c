@@ -1,6 +1,6 @@
 /**
  * @file test_shell_mode.c
- * @brief Unit tests for shell mode system (Phase 0: Extended Language Support)
+ * @brief Unit tests for shell mode system (Extended Language Support)
  *
  * Tests the multi-mode architecture including:
  * - Mode switching (POSIX, Bash, Zsh, Lush)

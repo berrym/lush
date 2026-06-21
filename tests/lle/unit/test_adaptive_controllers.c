@@ -7,7 +7,7 @@
  */
 
 /**
- * test_adaptive_controllers.c - Phase 2 Controller Tests
+ * test_adaptive_controllers.c - Controller Tests
  *
  * Comprehensive tests for all four adaptive terminal controllers:
  * - Native Terminal Controller
@@ -17,7 +17,7 @@
  *
  * Tests initialization, basic operations, and controller-specific features.
  *
- * Specification: Spec 26 Phase 2
+ * Specification: Spec 26
  * Date: 2025-11-02
  */
 
@@ -398,7 +398,7 @@ TEST(error_handling) {
  */
 
 int main(void) {
-    printf("=== Adaptive Terminal Controllers Tests (Spec 26 Phase 2) ===\n");
+    printf("=== Adaptive Terminal Controllers Tests (Spec 26) ===\n");
     RUN_TEST(context_initialization);
     RUN_TEST(interface_creation);
     RUN_TEST(mode_utilities);

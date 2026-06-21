@@ -3,7 +3,7 @@
 # Provides easy copy/paste test strings for manual testing
 
 echo "=========================================="
-echo "Phase 1 UTF-8 Quick Test - Copy/Paste Strings"
+echo "UTF-8 Quick Test - Copy/Paste Strings"
 echo "=========================================="
 echo ""
 echo "Copy each line below and paste into lush to test:"

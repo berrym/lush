@@ -61,7 +61,7 @@ static int tests_run = 0;
 /* ========================================================================== */
 
 static void test_segment_type_definitions(void) {
-    printf("Phase 1: Segment Type Definitions\n");
+    printf("Segment Type Definitions\n");
     printf("----------------------------------\n");
 
     TEST_START("lle_segment_capability_t enum defined");
@@ -106,7 +106,7 @@ static void test_segment_type_definitions(void) {
     COMPLIANCE_ASSERT(sizeof(registry) > 0, "registry structure has size");
     TEST_PASS();
 
-    printf("  Phase 1 complete (4 tests)\n\n");
+    printf("  complete (4 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -114,7 +114,7 @@ static void test_segment_type_definitions(void) {
 /* ========================================================================== */
 
 static void test_segment_registry_api(void) {
-    printf("Phase 2: Segment Registry API\n");
+    printf("Segment Registry API\n");
     printf("-----------------------------\n");
 
     TEST_START("lle_segment_registry_init function");
@@ -162,7 +162,7 @@ static void test_segment_registry_api(void) {
     /// No crash = success
     TEST_PASS();
 
-    printf("  Phase 2 complete (5 tests)\n\n");
+    printf("  complete (5 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -170,7 +170,7 @@ static void test_segment_registry_api(void) {
 /* ========================================================================== */
 
 static void test_prompt_context_api(void) {
-    printf("Phase 3: Prompt Context API\n");
+    printf("Prompt Context API\n");
     printf("---------------------------\n");
 
     TEST_START("lle_prompt_context_init function");
@@ -200,7 +200,7 @@ static void test_prompt_context_api(void) {
                       "refresh_directory returns LLE_SUCCESS");
     TEST_PASS();
 
-    printf("  Phase 3 complete (3 tests)\n\n");
+    printf("  complete (3 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -208,7 +208,7 @@ static void test_prompt_context_api(void) {
 /* ========================================================================== */
 
 static void test_segment_lifecycle_api(void) {
-    printf("Phase 4: Segment Lifecycle API\n");
+    printf("Segment Lifecycle API\n");
     printf("------------------------------\n");
 
     TEST_START("lle_segment_create function");
@@ -228,7 +228,7 @@ static void test_segment_lifecycle_api(void) {
     /// No crash = success
     TEST_PASS();
 
-    printf("  Phase 4 complete (2 tests)\n\n");
+    printf("  complete (2 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -236,7 +236,7 @@ static void test_segment_lifecycle_api(void) {
 /* ========================================================================== */
 
 static void test_builtin_segment_factories(void) {
-    printf("Phase 5: Built-in Segment Factories\n");
+    printf("Built-in Segment Factories\n");
     printf("------------------------------------\n");
 
     TEST_START("lle_segment_create_directory");
@@ -312,7 +312,7 @@ static void test_builtin_segment_factories(void) {
     lle_segment_free(git);
     TEST_PASS();
 
-    printf("  Phase 5 complete (8 tests)\n\n");
+    printf("  complete (8 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -320,7 +320,7 @@ static void test_builtin_segment_factories(void) {
 /* ========================================================================== */
 
 static void test_segment_callback_interface(void) {
-    printf("Phase 6: Segment Callback Interface\n");
+    printf("Segment Callback Interface\n");
     printf("------------------------------------\n");
 
     lle_prompt_context_t ctx;
@@ -371,7 +371,7 @@ static void test_segment_callback_interface(void) {
     lle_segment_free(dir2);
     TEST_PASS();
 
-    printf("  Phase 6 complete (4 tests)\n\n");
+    printf("  complete (4 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -379,7 +379,7 @@ static void test_segment_callback_interface(void) {
 /* ========================================================================== */
 
 static void test_segment_output_specification(void) {
-    printf("Phase 7: Segment Output Specification\n");
+    printf("Segment Output Specification\n");
     printf("--------------------------------------\n");
 
     lle_prompt_context_t ctx;
@@ -433,7 +433,7 @@ static void test_segment_output_specification(void) {
     lle_segment_free(time_seg);
     TEST_PASS();
 
-    printf("  Phase 7 complete (4 tests)\n\n");
+    printf("  complete (4 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -441,7 +441,7 @@ static void test_segment_output_specification(void) {
 /* ========================================================================== */
 
 static void test_register_builtins(void) {
-    printf("Phase 8: Built-in Registration\n");
+    printf("Built-in Registration\n");
     printf("-------------------------------\n");
 
     TEST_START("lle_segment_register_builtins function");
@@ -487,7 +487,7 @@ static void test_register_builtins(void) {
     lle_segment_registry_cleanup(&registry);
     TEST_PASS();
 
-    printf("  Phase 8 complete (1 test)\n\n");
+    printf("  complete (1 test)\n\n");
 }
 
 /* ========================================================================== */
