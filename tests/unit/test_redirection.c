@@ -57,9 +57,13 @@ TEST(save_file_descriptors_stdin) {
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "save_file_descriptors should succeed");
 
-    if (state.stdin_saved) {
-        ASSERT(state.saved_stdin >= 0, "Saved stdin should be valid FD");
-    }
+    /// stdin (fd 0) is open in the test process, so it must be recorded as
+    /// saved and dup'd to a fresh descriptor distinct from fd 0 itself --
+    /// not merely "valid if it happened to be saved".
+    ASSERT(state.stdin_saved, "stdin should be recorded as saved");
+    ASSERT(state.saved_stdin >= 0, "saved stdin fd should be valid");
+    ASSERT(state.saved_stdin != STDIN_FILENO,
+           "saved stdin should be a distinct dup, not fd 0");
 
     restore_file_descriptors(&state);
 }
@@ -70,9 +74,10 @@ TEST(save_file_descriptors_stdout) {
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "save_file_descriptors should succeed");
 
-    if (state.stdout_saved) {
-        ASSERT(state.saved_stdout >= 0, "Saved stdout should be valid FD");
-    }
+    ASSERT(state.stdout_saved, "stdout should be recorded as saved");
+    ASSERT(state.saved_stdout >= 0, "saved stdout fd should be valid");
+    ASSERT(state.saved_stdout != STDOUT_FILENO,
+           "saved stdout should be a distinct dup, not fd 1");
 
     restore_file_descriptors(&state);
 }
@@ -83,9 +88,10 @@ TEST(save_file_descriptors_stderr) {
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "save_file_descriptors should succeed");
 
-    if (state.stderr_saved) {
-        ASSERT(state.saved_stderr >= 0, "Saved stderr should be valid FD");
-    }
+    ASSERT(state.stderr_saved, "stderr should be recorded as saved");
+    ASSERT(state.saved_stderr >= 0, "saved stderr fd should be valid");
+    ASSERT(state.saved_stderr != STDERR_FILENO,
+           "saved stderr should be a distinct dup, not fd 2");
 
     restore_file_descriptors(&state);
 }
@@ -328,28 +334,45 @@ TEST(count_redirections_null) {
  * ============================================================================
  */
 
+/// Capture exactly what redirection_error(message) writes to stderr into
+/// `out`. stderr fd 2 is dup'd aside, pointed at a temp file for the call,
+/// then restored before any assertion runs (so a longjmp on failure cannot
+/// leave stderr pointing at the closed temp fd).
+static void capture_redirection_error(const char *message, char *out,
+                                      size_t outsz) {
+    int saved = dup(STDERR_FILENO);
+    char tmpl[] = "/tmp/redir_err_XXXXXX";
+    int tfd = mkstemp(tmpl);
+    unlink(tmpl);
+
+    fflush(stderr);
+    dup2(tfd, STDERR_FILENO);
+    redirection_error(message);
+    fflush(stderr);
+    dup2(saved, STDERR_FILENO);
+    close(saved);
+
+    lseek(tfd, 0, SEEK_SET);
+    ssize_t n = read(tfd, out, outsz - 1);
+    out[n > 0 ? n : 0] = '\0';
+    close(tfd);
+}
+
 TEST(redirection_error_basic) {
-    /// Should not crash - output goes to stderr
-    FILE *old_stderr = stderr;
-    FILE *null_err = fopen("/dev/null", "w");
-    if (null_err) {
-        stderr = null_err;
-        redirection_error("test error message");
-        fclose(null_err);
-        stderr = old_stderr;
-    }
+    /// redirection_error prefixes the message with "redirection: " and adds a
+    /// trailing newline -- assert the exact rendered diagnostic, not just that
+    /// the call returns.
+    char out[256];
+    capture_redirection_error("test error message", out, sizeof(out));
+    ASSERT_STR_EQ(out, "redirection: test error message\n",
+                  "renders the prefixed diagnostic");
 }
 
 TEST(redirection_error_null_message) {
-    /// Should handle NULL gracefully
-    FILE *old_stderr = stderr;
-    FILE *null_err = fopen("/dev/null", "w");
-    if (null_err) {
-        stderr = null_err;
-        redirection_error(NULL);
-        fclose(null_err);
-        stderr = old_stderr;
-    }
+    /// A NULL message is guarded: nothing is written to stderr at all.
+    char out[256];
+    capture_redirection_error(NULL, out, sizeof(out));
+    ASSERT_STR_EQ(out, "", "NULL message produces no output");
 }
 
 /* ============================================================================
@@ -393,9 +416,19 @@ TEST(alloc_fd_untrack_then_executor_free_does_not_double_close) {
     int rc = close(fd);
     ASSERT_EQ(rc, 0, "manual close after untrack succeeds");
 
-    /// executor_free must not attempt to close the recycled fd. Test passes
-    /// if we exit cleanly without any double-close-on-recycled-fd hazard.
+    /// Open a fresh descriptor that the kernel will hand back the just-freed
+    /// number for. Because the original fd was untracked, executor_free must
+    /// not close that recycled number -- so the new descriptor stays open
+    /// across the free. (Without the untrack, executor_free would close the
+    /// recycled fd here, a real double-close-on-recycled-fd bug.)
+    int recycled = open("/etc/hosts", O_RDONLY);
+    ASSERT_TRUE(recycled >= 0, "reopen after close");
+
     executor_free(executor);
+
+    ASSERT_TRUE(fd_is_open(recycled),
+                "executor_free must not close the untracked, recycled fd");
+    close(recycled);
 }
 
 TEST(alloc_fd_registry_grows_past_initial_capacity) {
@@ -430,12 +463,22 @@ TEST(alloc_fd_untrack_unknown_is_noop) {
     executor_t *executor = executor_new();
     ASSERT_TRUE(executor != NULL, "executor_new");
 
-    /// Untrack on never-tracked fd must not crash, even with an empty
-    /// registry. The function must also handle invalid fd values silently.
+    /// Track one real fd, then untrack descriptors that were never tracked
+    /// (an out-of-range number and an invalid negative). Those untracks must
+    /// be no-ops that leave the genuinely-tracked fd in the registry, so
+    /// executor_free still closes it. This proves untrack does not silently
+    /// corrupt or clear the registry when handed an unknown fd.
+    int fd = open("/etc/hosts", O_RDONLY);
+    ASSERT_TRUE(fd >= 0, "open /etc/hosts");
+    executor_track_alloc_fd(executor, fd);
+
     executor_untrack_alloc_fd(executor, 999);
     executor_untrack_alloc_fd(executor, -1);
+    ASSERT_TRUE(fd_is_open(fd), "tracked fd survives unknown untracks");
 
     executor_free(executor);
+    ASSERT_FALSE(fd_is_open(fd),
+                 "executor_free still closes the genuinely tracked fd");
 }
 
 /* ============================================================================
