@@ -45,7 +45,9 @@
  * ============================================================ */
 
 static int test_init_null_buffer(void) {
-    /// Should not crash
+    /// A NULL buffer must be guarded against: the call returns without
+    /// dereferencing it. Removing that guard would segfault here, so this
+    /// pins the crash-safety contract even though there is no state to read.
     screen_buffer_init(NULL, 80);
     return 1;
 }
@@ -207,8 +209,11 @@ static int test_copy_null_dest(void) {
     screen_buffer_t src;
     screen_buffer_init(&src, 80);
 
-    /// Should not crash
+    /// A NULL destination is rejected by an early return; the source must be
+    /// left untouched (its initialized width still 80), proving copy did not
+    /// corrupt the valid operand.
     screen_buffer_copy(NULL, &src);
+    ASSERT_EQ(src.terminal_width, 80);
 
     screen_buffer_cleanup(&src);
     return 1;
@@ -218,8 +223,10 @@ static int test_copy_null_src(void) {
     screen_buffer_t dest;
     screen_buffer_init(&dest, 80);
 
-    /// Should not crash
+    /// A NULL source is rejected by an early return, so the destination keeps
+    /// its initialized state rather than being overwritten or zeroed.
     screen_buffer_copy(&dest, NULL);
+    ASSERT_EQ(dest.terminal_width, 80);
 
     screen_buffer_cleanup(&dest);
     return 1;
@@ -1087,7 +1094,9 @@ static const char *test_continuation_cb(const char *line_text, size_t line_len,
 }
 
 static int test_render_with_continuation_null_buffer(void) {
-    /// Should not crash
+    /// A NULL buffer must be guarded: the render returns without writing
+    /// through it. Dropping that guard would segfault here, so this pins the
+    /// crash-safety contract.
     screen_buffer_render_with_continuation(NULL, "$ ", "cmd", 3,
                                            test_continuation_cb, NULL);
     return 1;

@@ -107,6 +107,15 @@ TEST(command_layer_set_command_simple) {
         command_layer_set_command(layer, "echo hello", 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_command should succeed");
 
+    /// The layer should now hold the command: its metrics report the byte
+    /// length of "echo hello" and the cursor at the requested offset 0.
+    command_metrics_t metrics;
+    ASSERT_EQ(command_layer_get_metrics(layer, &metrics), COMMAND_LAYER_SUCCESS,
+              "get_metrics should succeed after set_command");
+    ASSERT_EQ(metrics.command_length, strlen("echo hello"),
+              "metrics should report the command byte length");
+    ASSERT_EQ(metrics.cursor_position, 0u, "cursor should be at offset 0");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -143,6 +152,21 @@ TEST(command_layer_update) {
     command_layer_error_t err = command_layer_update(layer);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "update should succeed");
 
+    /// After update the highlighted text must contain the command's tokens
+    /// (colorized but byte-preserved), and metrics must reflect the cursor
+    /// offset that was set.
+    char buffer[1024];
+    ASSERT_EQ(command_layer_get_highlighted_text(layer, buffer, sizeof(buffer)),
+              COMMAND_LAYER_SUCCESS, "get_highlighted_text should succeed");
+    ASSERT(strstr(buffer, "echo") != NULL, "highlighted text should keep echo");
+    ASSERT(strstr(buffer, "hello") != NULL,
+           "highlighted text should keep hello");
+
+    command_metrics_t metrics;
+    ASSERT_EQ(command_layer_get_metrics(layer, &metrics), COMMAND_LAYER_SUCCESS,
+              "get_metrics should succeed");
+    ASSERT_EQ(metrics.cursor_position, 5u, "cursor should be at offset 5");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -161,6 +185,14 @@ TEST(command_layer_cursor_position) {
     err = command_layer_set_cursor_position(layer, 8);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_cursor_position should succeed");
 
+    /// The new cursor offset must be reflected in the layer's metrics, not
+    /// merely accepted by the setter.
+    command_metrics_t metrics;
+    ASSERT_EQ(command_layer_get_metrics(layer, &metrics), COMMAND_LAYER_SUCCESS,
+              "get_metrics should succeed");
+    ASSERT_EQ(metrics.cursor_position, 8u,
+              "metrics should report the updated cursor offset");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -178,6 +210,15 @@ TEST(command_layer_get_highlighted_text) {
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
               "get_highlighted_text should succeed");
 
+    /// The highlighted output keeps the source tokens verbatim and wraps
+    /// them in ANSI color sequences, so it both contains the words and is
+    /// strictly longer than the bare command text.
+    ASSERT(strstr(buffer, "echo") != NULL, "highlighted text should keep echo");
+    ASSERT(strstr(buffer, "hello") != NULL,
+           "highlighted text should keep hello");
+    ASSERT(strlen(buffer) > strlen("echo hello"),
+           "highlighted text should add color sequences around the tokens");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -193,6 +234,14 @@ TEST(command_layer_get_metrics) {
     command_layer_error_t err = command_layer_get_metrics(layer, &metrics);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "get_metrics should succeed");
 
+    /// "echo hello" is a single-line command of ten bytes with the cursor
+    /// at the start.
+    ASSERT_EQ(metrics.command_length, strlen("echo hello"),
+              "metrics should report the command byte length");
+    ASSERT_EQ(metrics.cursor_position, 0u, "cursor should be at offset 0");
+    ASSERT_FALSE(metrics.is_multiline_command,
+                 "single-line command should not be multiline");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -206,6 +255,14 @@ TEST(command_layer_clear) {
     command_layer_error_t err = command_layer_clear(layer);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "clear should succeed");
 
+    /// Clearing must empty the command: its length and cursor both return to
+    /// zero rather than retaining the previous "echo hello" state.
+    command_metrics_t metrics;
+    ASSERT_EQ(command_layer_get_metrics(layer, &metrics), COMMAND_LAYER_SUCCESS,
+              "get_metrics should succeed after clear");
+    ASSERT_EQ(metrics.command_length, 0u, "cleared command length should be 0");
+    ASSERT_EQ(metrics.cursor_position, 0u, "cleared cursor should be 0");
+
     destroy_initialized_layer(layer, events);
 }
 
@@ -213,6 +270,29 @@ TEST(command_layer_clear) {
  * SYNTAX HIGHLIGHTING TESTS
  * ============================================================================
  */
+
+/// Copy `src` into `dst` with every ANSI SGR escape sequence ("ESC [ ... m")
+/// removed, leaving only the literal payload text. The highlighter wraps each
+/// token in color codes and may split a single shell operator across multiple
+/// colored spans, so the way to assert the source text round-trips verbatim is
+/// to strip the color and compare the remaining bytes.
+static void strip_ansi(const char *src, char *dst, size_t dstsz) {
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 1 < dstsz;) {
+        if (src[i] == '\x1b' && src[i + 1] == '[') {
+            i += 2;
+            while (src[i] && src[i] != 'm') {
+                i++;
+            }
+            if (src[i] == 'm') {
+                i++;
+            }
+            continue;
+        }
+        dst[j++] = src[i++];
+    }
+    dst[j] = '\0';
+}
 
 /// Extract the SGR parameter bytes of the ANSI color sequence that
 /// immediately precedes `token` in `buffer` -- i.e. the text between the
@@ -431,6 +511,17 @@ TEST(layer_events_subscribe) {
         test_event_callback, NULL, LAYER_EVENT_PRIORITY_NORMAL);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "subscribe should succeed");
 
+    /// A successful return is not enough: the subscription must be live.
+    /// Publish a matching event and process it; the callback fires exactly
+    /// once, proving the subscriber was actually registered.
+    test_event_callback_count = 0;
+    layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
+                                LAYER_ID_PROMPT_LAYER, LAYER_ID_COMMAND_LAYER,
+                                LAYER_EVENT_PRIORITY_NORMAL);
+    layer_events_process_pending(events, 0, 100);
+    ASSERT_EQ(test_event_callback_count, 1,
+              "subscribed callback should fire once for a matching event");
+
     layer_events_destroy(events);
 }
 
@@ -446,6 +537,16 @@ TEST(layer_events_unsubscribe) {
     layer_events_error_t err = layer_events_unsubscribe(
         events, LAYER_EVENT_CONTENT_CHANGED, LAYER_ID_COMMAND_LAYER);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "unsubscribe should succeed");
+
+    /// After unsubscribing, a matching event must no longer reach the
+    /// callback: publish and process, then assert the callback stays silent.
+    test_event_callback_count = 0;
+    layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
+                                LAYER_ID_PROMPT_LAYER, LAYER_ID_COMMAND_LAYER,
+                                LAYER_EVENT_PRIORITY_NORMAL);
+    layer_events_process_pending(events, 0, 100);
+    ASSERT_EQ(test_event_callback_count, 0,
+              "unsubscribed callback should not fire");
 
     layer_events_destroy(events);
 }
@@ -466,6 +567,20 @@ TEST(layer_events_unsubscribe_all) {
         layer_events_unsubscribe_all(events, LAYER_ID_COMMAND_LAYER);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "unsubscribe_all should succeed");
 
+    /// unsubscribe_all must remove every subscription for the layer, not
+    /// just one event type: publish both subscribed types and process, then
+    /// assert neither reaches the callback.
+    test_event_callback_count = 0;
+    layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
+                                LAYER_ID_PROMPT_LAYER, LAYER_ID_COMMAND_LAYER,
+                                LAYER_EVENT_PRIORITY_NORMAL);
+    layer_events_publish_simple(events, LAYER_EVENT_CURSOR_MOVED,
+                                LAYER_ID_PROMPT_LAYER, LAYER_ID_COMMAND_LAYER,
+                                LAYER_EVENT_PRIORITY_NORMAL);
+    layer_events_process_pending(events, 0, 100);
+    ASSERT_EQ(test_event_callback_count, 0,
+              "no callback should fire after unsubscribe_all");
+
     layer_events_destroy(events);
 }
 
@@ -485,8 +600,11 @@ TEST(layer_events_publish_simple) {
         LAYER_ID_COMMAND_LAYER, LAYER_EVENT_PRIORITY_NORMAL);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "publish_simple should succeed");
 
-    /// Process pending events
+    /// Processing the queue must deliver the published event to the
+    /// subscribed callback exactly once.
     layer_events_process_pending(events, 0, 100);
+    ASSERT_EQ(test_event_callback_count, 1,
+              "published event should reach the subscriber once");
 
     layer_events_destroy(events);
 }
@@ -496,10 +614,22 @@ TEST(layer_events_publish_content_changed) {
     ASSERT_NOT_NULL(events, "layer_events_create should succeed");
     layer_events_init(events);
 
+    /// Subscribe so the published content-changed event has a destination,
+    /// then assert it is actually delivered rather than only that the
+    /// publish call returned success.
+    test_event_callback_count = 0;
+    layer_events_subscribe(events, LAYER_EVENT_CONTENT_CHANGED,
+                           LAYER_ID_COMMAND_LAYER, test_event_callback, NULL,
+                           LAYER_EVENT_PRIORITY_NORMAL);
+
     layer_events_error_t err = layer_events_publish_content_changed(
         events, LAYER_ID_COMMAND_LAYER, "test content", 12, false);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS,
               "publish_content_changed should succeed");
+
+    layer_events_process_pending(events, 0, 100);
+    ASSERT_EQ(test_event_callback_count, 1,
+              "content-changed event should reach the subscriber once");
 
     layer_events_destroy(events);
 }
@@ -571,8 +701,12 @@ TEST(layer_events_process_pending) {
                                 LAYER_ID_PROMPT_LAYER, LAYER_ID_COMMAND_LAYER,
                                 LAYER_EVENT_PRIORITY_NORMAL);
 
+    /// Exactly one event was published to a subscribed layer, so processing
+    /// must report one event handled and invoke the callback once.
     int processed = layer_events_process_pending(events, 0, 100);
-    ASSERT(processed >= 0, "process_pending should not return negative");
+    ASSERT_EQ(processed, 1, "process_pending should process the one event");
+    ASSERT_EQ(test_event_callback_count, 1,
+              "the processed event should reach the subscriber once");
 
     layer_events_destroy(events);
 }
@@ -582,18 +716,24 @@ TEST(layer_events_process_priority) {
     ASSERT_NOT_NULL(events, "layer_events_create should succeed");
     layer_events_init(events);
 
-    /// Publish events with different priorities
+    /// Publish one low-priority and one high-priority event.
     layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
                                 LAYER_ID_PROMPT_LAYER, 0,
                                 LAYER_EVENT_PRIORITY_LOW);
     layer_events_publish_simple(events, LAYER_EVENT_CURSOR_MOVED,
                                 LAYER_ID_PROMPT_LAYER, 0,
                                 LAYER_EVENT_PRIORITY_HIGH);
+    ASSERT_EQ(layer_events_get_pending_count(events), 2u,
+              "both events should be queued before processing");
 
-    /// Process only high priority
+    /// Processing only the high priority level drains exactly the one
+    /// high-priority event and leaves the low-priority event queued --
+    /// proving priority selectivity rather than draining everything.
     int processed =
         layer_events_process_priority(events, LAYER_EVENT_PRIORITY_HIGH, 10);
-    ASSERT(processed >= 0, "process_priority should not return negative");
+    ASSERT_EQ(processed, 1, "only the high-priority event should be processed");
+    ASSERT_EQ(layer_events_get_pending_count(events), 1u,
+              "the low-priority event should remain queued");
 
     layer_events_destroy(events);
 }
@@ -811,10 +951,39 @@ TEST(command_layer_special_chars) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /// Special shell characters
-    command_layer_set_command(layer, "echo $HOME && ls || true", 0);
-    command_layer_set_command(layer, "cat < input > output 2>&1", 0);
-    command_layer_set_command(layer, "echo $(pwd) `date`", 0);
+    /// Each command mixes shell metacharacters (variables, operators,
+    /// redirections, command substitution). The layer must accept each,
+    /// report the correct command length, and -- once the highlighter's
+    /// color codes are stripped -- reproduce the source bytes exactly. The
+    /// highlighter may split an operator like "2>&1" across several colored
+    /// spans, so stripping ANSI is the reliable round-trip check.
+    const char *cmds[] = {
+        "echo $HOME && ls || true",
+        "cat < input > output 2>&1",
+        "echo $(pwd) `date`",
+    };
+
+    char buffer[2048];
+    char stripped[2048];
+    for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
+        ASSERT_EQ(command_layer_set_command(layer, cmds[i], 0),
+                  COMMAND_LAYER_SUCCESS,
+                  "set_command should accept special characters");
+        command_layer_update(layer);
+
+        command_metrics_t metrics;
+        ASSERT_EQ(command_layer_get_metrics(layer, &metrics),
+                  COMMAND_LAYER_SUCCESS, "get_metrics should succeed");
+        ASSERT_EQ(metrics.command_length, strlen(cmds[i]),
+                  "metrics should report the full command length");
+
+        ASSERT_EQ(
+            command_layer_get_highlighted_text(layer, buffer, sizeof(buffer)),
+            COMMAND_LAYER_SUCCESS, "get_highlighted_text should succeed");
+        strip_ansi(buffer, stripped, sizeof(stripped));
+        ASSERT_STR_EQ(stripped, cmds[i],
+                      "stripping color must reproduce the source command");
+    }
 
     destroy_initialized_layer(layer, events);
 }
