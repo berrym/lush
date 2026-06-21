@@ -20,10 +20,12 @@
 #include "test_framework.h"
 #include "version.h"
 
+#include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* Wrap older 2-arg / no-arg ASSERT forms over the shared framework so
@@ -49,6 +51,33 @@ static lle_prompt_expand_ctx_t make_ctx(void) {
     memset(&ctx, 0, sizeof(ctx));
     ctx.color_depth = 3;
     return ctx;
+}
+
+/// Expand `fmt` from inside a freshly created, uniquely named temporary
+/// directory so the cwd-derived escapes (\w, \W, %~, %c, %.) have
+/// deterministic, assertable values regardless of where the test runs. The
+/// original working directory is restored before returning (so a later
+/// assertion failure cannot leave the process in the temp dir). The absolute
+/// path the OS resolved (e.g. /private/tmp/... on macOS) is written to
+/// `cwd_out` and the directory's basename to `base_out`.
+#define PE_TEST_DIR_BASE "lush_prompt_expand_test_dir"
+static void expand_in_temp_dir(const char *fmt, char *out, size_t outsz,
+                               char *cwd_out, size_t cwdsz, char *base_out,
+                               size_t basesz) {
+    char saved[PATH_MAX];
+    (void)!getcwd(saved, sizeof(saved));
+
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof(dir), "/tmp/%s", PE_TEST_DIR_BASE);
+    (void)!mkdir(dir, 0755);
+    (void)!chdir(dir);
+    (void)!getcwd(cwd_out, cwdsz);
+    snprintf(base_out, basesz, "%s", PE_TEST_DIR_BASE);
+
+    lle_prompt_expand_ctx_t ctx = make_ctx();
+    lle_prompt_expand(fmt, out, outsz, &ctx);
+
+    (void)!chdir(saved);
 }
 
 /* ========================================================================== */
@@ -130,30 +159,32 @@ TEST(bash_hostname_short) {
 }
 
 TEST(bash_hostname_full) {
+    char host[256];
+    (void)!gethostname(host, sizeof(host));
     char out[256];
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\H", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    /// \H is the full hostname exactly as gethostname reports it.
+    ASSERT_STR_EQ(out, host);
     PASS();
 }
 
 TEST(bash_cwd_tilde) {
-    char out[1024];
-    lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r = lle_prompt_expand("\\w", out, sizeof(out), &ctx);
-    ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    char out[1024], cwd[1024], base[256];
+    expand_in_temp_dir("\\w", out, sizeof(out), cwd, sizeof(cwd), base,
+                       sizeof(base));
+    /// The temp dir is not under HOME, so \w is the absolute cwd unchanged.
+    ASSERT_STR_EQ(out, cwd);
     PASS();
 }
 
 TEST(bash_cwd_basename) {
-    char out[256];
-    lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r = lle_prompt_expand("\\W", out, sizeof(out), &ctx);
-    ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
-    /// Should not contain / (unless root dir)
+    char out[256], cwd[1024], base[256];
+    expand_in_temp_dir("\\W", out, sizeof(out), cwd, sizeof(cwd), base,
+                       sizeof(base));
+    /// \W is the trailing path component of the cwd.
+    ASSERT_STR_EQ(out, base);
     PASS();
 }
 
@@ -300,8 +331,11 @@ TEST(bash_tty_name) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\l", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    /// Should produce something (or "?" if no tty)
+    /// \l is the controlling tty's basename, or "?" when there is none;
+    /// either way it is a non-empty name with no path separator (never the
+    /// full /dev/... path).
     ASSERT(strlen(out) > 0);
+    ASSERT(strchr(out, '/') == NULL);
     PASS();
 }
 
@@ -410,11 +444,14 @@ TEST(zsh_hostname_short) {
 }
 
 TEST(zsh_hostname_full) {
+    char host[256];
+    (void)!gethostname(host, sizeof(host));
     char out[256];
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("%M", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    /// %M is the full hostname, matching the bash \H escape.
+    ASSERT_STR_EQ(out, host);
     PASS();
 }
 
@@ -438,29 +475,30 @@ TEST(zsh_cwd_slash) {
 }
 
 TEST(zsh_cwd_tilde) {
-    char out[1024];
-    lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r = lle_prompt_expand("%~", out, sizeof(out), &ctx);
-    ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    char out[1024], cwd[1024], base[256];
+    expand_in_temp_dir("%~", out, sizeof(out), cwd, sizeof(cwd), base,
+                       sizeof(base));
+    /// %~ tilde-collapses the cwd; outside HOME it is the absolute path.
+    ASSERT_STR_EQ(out, cwd);
     PASS();
 }
 
 TEST(zsh_cwd_tail) {
-    char out[256];
-    lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r = lle_prompt_expand("%c", out, sizeof(out), &ctx);
-    ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    char out[256], cwd[1024], base[256];
+    expand_in_temp_dir("%c", out, sizeof(out), cwd, sizeof(cwd), base,
+                       sizeof(base));
+    /// %c is the trailing path component of the cwd.
+    ASSERT_STR_EQ(out, base);
     PASS();
 }
 
 TEST(zsh_cwd_dot) {
-    char out[256];
-    lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r = lle_prompt_expand("%.", out, sizeof(out), &ctx);
-    ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) > 0);
+    char out[256], cwd[1024], base[256];
+    expand_in_temp_dir("%.", out, sizeof(out), cwd, sizeof(cwd), base,
+                       sizeof(base));
+    /// %. is the trailing component (with leading-dot handling); for an
+    /// ordinary directory it is the basename.
+    ASSERT_STR_EQ(out, base);
     PASS();
 }
 
@@ -650,9 +688,11 @@ TEST(zsh_color_none) {
     ctx.color_depth = 0; /// no color
     lle_result_t r = lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    /// No ANSI escape for color, just the text and reset
+    /// With color disabled the foreground-set escape (\033[31m) is suppressed
+    /// while the literal text survives. (%f still emits \033[39m reset, which
+    /// is harmless and not asserted against here.)
     ASSERT_STR_CONTAINS(out, "hi");
-    /// The %f still emits \033[39m - that's fine, the fg color is skipped
+    ASSERT(strstr(out, "\033[31m") == NULL);
     PASS();
 }
 

@@ -5,23 +5,17 @@
  * Tests for LLE Specification 25 Section 5: Segment Architecture
  * Validates API completeness and spec adherence.
  *
- * This compliance test verifies:
- * - All segment types are defined
- * - All segment API functions are declared
- * - Segment registry operations work correctly
- * - Built-in segments implement required callbacks
- * - Segment output structure matches specification
- *
- * Test Coverage:
- * - Segment Registry API (5 functions)
- * - Prompt Context API (2 functions)
- * - Segment Lifecycle API (2 functions)
- * - Built-in Segment Factories (8 segments)
- * - Segment Callback Interface (4 callbacks)
+ * This compliance test verifies observable segment behavior:
+ * - Capability flags are distinct single-bit values and OR-combine cleanly
+ * - Rendered output stays within its buffer and is correctly NUL-terminated
+ * - Registry register/find/list round-trips return the registered segments
+ * - Prompt context init/update populate and mutate the documented fields
+ * - Built-in factories produce segments with the correct name and callbacks
+ * - Render/is_visible/get_property callbacks return spec-conformant results
+ *   (HH:MM:SS time, $/# symbol, status hidden on exit 0)
  *
  * Specification:
  * docs/lle_specification/25_prompt_theme_system_complete.md Section 5
- * Date: 2025-12-26
  */
 
 #include "lle/error_handling.h"
@@ -60,53 +54,74 @@ static int tests_run = 0;
 /// Test: Segment Type Definitions
 /* ========================================================================== */
 
+/// True when `v` is exactly one set bit (a single distinct flag).
+static bool is_single_bit(unsigned v) { return v != 0 && (v & (v - 1)) == 0; }
+
 static void test_segment_type_definitions(void) {
     printf("Segment Type Definitions\n");
     printf("----------------------------------\n");
 
-    TEST_START("lle_segment_capability_t enum defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_NONE == 0, "LLE_SEG_CAP_NONE defined as 0");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_ASYNC >= 0, "LLE_SEG_CAP_ASYNC defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_CACHEABLE >= 0,
-                      "LLE_SEG_CAP_CACHEABLE defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_EXPENSIVE >= 0,
-                      "LLE_SEG_CAP_EXPENSIVE defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_THEME_AWARE >= 0,
-                      "LLE_SEG_CAP_THEME_AWARE defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_DYNAMIC >= 0, "LLE_SEG_CAP_DYNAMIC defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_OPTIONAL >= 0,
-                      "LLE_SEG_CAP_OPTIONAL defined");
-    COMPLIANCE_ASSERT(LLE_SEG_CAP_PROPERTIES >= 0,
-                      "LLE_SEG_CAP_PROPERTIES defined");
+    TEST_START("capability flags are distinct single-bit values");
+    /// Capabilities are OR-combined into a bitmask on each segment, so every
+    /// flag must occupy exactly one bit and no two may collide. A regression
+    /// that gave two capabilities the same value would silently conflate them.
+    const lle_segment_capability_t caps[] = {
+        LLE_SEG_CAP_ASYNC,       LLE_SEG_CAP_CACHEABLE, LLE_SEG_CAP_EXPENSIVE,
+        LLE_SEG_CAP_THEME_AWARE, LLE_SEG_CAP_DYNAMIC,   LLE_SEG_CAP_OPTIONAL,
+        LLE_SEG_CAP_PROPERTIES};
+    const size_t cap_count = sizeof(caps) / sizeof(caps[0]);
+    COMPLIANCE_ASSERT(LLE_SEG_CAP_NONE == 0, "NONE is the empty bitmask");
+    unsigned seen = 0;
+    for (size_t i = 0; i < cap_count; i++) {
+        COMPLIANCE_ASSERT(is_single_bit((unsigned)caps[i]),
+                          "each capability is a single bit");
+        COMPLIANCE_ASSERT((seen & (unsigned)caps[i]) == 0,
+                          "no two capabilities share a bit");
+        seen |= (unsigned)caps[i];
+    }
     TEST_PASS();
 
-    TEST_START("lle_segment_output_t structure defined");
-    lle_segment_output_t output;
-    COMPLIANCE_ASSERT(sizeof(output.content) == LLE_SEGMENT_OUTPUT_MAX,
-                      "content buffer size matches LLE_SEGMENT_OUTPUT_MAX");
-    COMPLIANCE_ASSERT(sizeof(output.content_len) == sizeof(size_t),
-                      "content_len is size_t");
-    COMPLIANCE_ASSERT(sizeof(output.visual_width) == sizeof(size_t),
-                      "visual_width is size_t");
+    TEST_START("capabilities OR-combine and remain individually testable");
+    /// A segment stores its capability set verbatim; combined flags must each
+    /// be recoverable by masking.
+    lle_segment_capability_t combined =
+        (lle_segment_capability_t)(LLE_SEG_CAP_ASYNC | LLE_SEG_CAP_CACHEABLE |
+                                   LLE_SEG_CAP_THEME_AWARE);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("caps", "capability round-trip", combined);
+    COMPLIANCE_ASSERT(seg != NULL, "segment created with combined caps");
+    COMPLIANCE_ASSERT(seg->capabilities == combined,
+                      "capabilities stored verbatim");
+    COMPLIANCE_ASSERT((seg->capabilities & LLE_SEG_CAP_ASYNC) != 0,
+                      "ASYNC bit recoverable");
+    COMPLIANCE_ASSERT((seg->capabilities & LLE_SEG_CAP_CACHEABLE) != 0,
+                      "CACHEABLE bit recoverable");
+    COMPLIANCE_ASSERT((seg->capabilities & LLE_SEG_CAP_THEME_AWARE) != 0,
+                      "THEME_AWARE bit recoverable");
+    COMPLIANCE_ASSERT((seg->capabilities & LLE_SEG_CAP_DYNAMIC) == 0,
+                      "unset DYNAMIC bit reads as absent");
+    lle_segment_free(seg);
     TEST_PASS();
 
-    TEST_START("lle_prompt_context_t structure defined");
+    TEST_START("rendered output respects the content buffer bound");
+    /// content_len must never exceed the fixed content[] capacity, and the
+    /// content string must be NUL-terminated at exactly content_len.
     lle_prompt_context_t ctx;
-    COMPLIANCE_ASSERT(sizeof(ctx.cwd) > 0, "cwd field exists");
-    COMPLIANCE_ASSERT(sizeof(ctx.username) > 0, "username field exists");
-    COMPLIANCE_ASSERT(sizeof(ctx.hostname) > 0, "hostname field exists");
-    COMPLIANCE_ASSERT(sizeof(ctx.last_exit_code) == sizeof(int),
-                      "last_exit_code is int");
-    COMPLIANCE_ASSERT(sizeof(ctx.background_job_count) == sizeof(int),
-                      "background_job_count is int");
+    lle_prompt_context_init(&ctx);
+    lle_prompt_segment_t *dir = lle_segment_create_directory();
+    lle_segment_output_t output;
+    memset(&output, 0, sizeof(output));
+    dir->render(dir, &ctx, NULL, &output);
+    COMPLIANCE_ASSERT(output.content_len < LLE_SEGMENT_OUTPUT_MAX,
+                      "content_len stays within LLE_SEGMENT_OUTPUT_MAX");
+    COMPLIANCE_ASSERT(output.content[output.content_len] == '\0',
+                      "content NUL-terminated at content_len");
+    COMPLIANCE_ASSERT(strlen(output.content) == output.content_len,
+                      "content_len equals strlen of content");
+    lle_segment_free(dir);
     TEST_PASS();
 
-    TEST_START("lle_segment_registry_t structure defined");
-    lle_segment_registry_t registry;
-    COMPLIANCE_ASSERT(sizeof(registry) > 0, "registry structure has size");
-    TEST_PASS();
-
-    printf("  complete (4 tests)\n\n");
+    printf("  complete (3 tests)\n\n");
 }
 
 /* ========================================================================== */
@@ -118,8 +133,6 @@ static void test_segment_registry_api(void) {
     printf("-----------------------------\n");
 
     TEST_START("lle_segment_registry_init function");
-    COMPLIANCE_ASSERT(lle_segment_registry_init != NULL,
-                      "lle_segment_registry_init declared");
     lle_segment_registry_t registry;
     lle_result_t result = lle_segment_registry_init(&registry);
     COMPLIANCE_ASSERT(result == LLE_SUCCESS,
@@ -127,8 +140,6 @@ static void test_segment_registry_api(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_registry_register function");
-    COMPLIANCE_ASSERT(lle_segment_registry_register != NULL,
-                      "lle_segment_registry_register declared");
     lle_prompt_segment_t *seg = lle_segment_create_directory();
     COMPLIANCE_ASSERT(seg != NULL, "segment creation works");
     result = lle_segment_registry_register(&registry, seg);
@@ -137,8 +148,6 @@ static void test_segment_registry_api(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_registry_find function");
-    COMPLIANCE_ASSERT(lle_segment_registry_find != NULL,
-                      "lle_segment_registry_find declared");
     lle_prompt_segment_t *found =
         lle_segment_registry_find(&registry, "directory");
     COMPLIANCE_ASSERT(found != NULL, "find returns registered segment");
@@ -146,8 +155,6 @@ static void test_segment_registry_api(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_registry_list function");
-    COMPLIANCE_ASSERT(lle_segment_registry_list != NULL,
-                      "lle_segment_registry_list declared");
     const char *names[16];
     size_t count = lle_segment_registry_list(&registry, names, 16);
     COMPLIANCE_ASSERT(count == 1, "list returns correct count");
@@ -156,8 +163,6 @@ static void test_segment_registry_api(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_registry_cleanup function");
-    COMPLIANCE_ASSERT(lle_segment_registry_cleanup != NULL,
-                      "lle_segment_registry_cleanup declared");
     lle_segment_registry_cleanup(&registry);
     /// No crash = success
     TEST_PASS();
@@ -174,8 +179,6 @@ static void test_prompt_context_api(void) {
     printf("---------------------------\n");
 
     TEST_START("lle_prompt_context_init function");
-    COMPLIANCE_ASSERT(lle_prompt_context_init != NULL,
-                      "lle_prompt_context_init declared");
     lle_prompt_context_t ctx;
     lle_result_t result = lle_prompt_context_init(&ctx);
     COMPLIANCE_ASSERT(result == LLE_SUCCESS,
@@ -185,16 +188,12 @@ static void test_prompt_context_api(void) {
     TEST_PASS();
 
     TEST_START("lle_prompt_context_update function");
-    COMPLIANCE_ASSERT(lle_prompt_context_update != NULL,
-                      "lle_prompt_context_update declared");
     lle_prompt_context_update(&ctx, 42, 1000);
     COMPLIANCE_ASSERT(ctx.last_exit_code == 42, "exit code updated");
     COMPLIANCE_ASSERT(ctx.last_cmd_duration_ms == 1000, "duration updated");
     TEST_PASS();
 
     TEST_START("lle_prompt_context_refresh_directory function");
-    COMPLIANCE_ASSERT(lle_prompt_context_refresh_directory != NULL,
-                      "lle_prompt_context_refresh_directory declared");
     result = lle_prompt_context_refresh_directory(&ctx);
     COMPLIANCE_ASSERT(result == LLE_SUCCESS,
                       "refresh_directory returns LLE_SUCCESS");
@@ -212,8 +211,6 @@ static void test_segment_lifecycle_api(void) {
     printf("------------------------------\n");
 
     TEST_START("lle_segment_create function");
-    COMPLIANCE_ASSERT(lle_segment_create != NULL,
-                      "lle_segment_create declared");
     lle_prompt_segment_t *seg =
         lle_segment_create("test", "Test segment", LLE_SEG_CAP_NONE);
     COMPLIANCE_ASSERT(seg != NULL, "lle_segment_create returns segment");
@@ -223,7 +220,6 @@ static void test_segment_lifecycle_api(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_free function");
-    COMPLIANCE_ASSERT(lle_segment_free != NULL, "lle_segment_free declared");
     lle_segment_free(seg);
     /// No crash = success
     TEST_PASS();
@@ -240,8 +236,6 @@ static void test_builtin_segment_factories(void) {
     printf("------------------------------------\n");
 
     TEST_START("lle_segment_create_directory");
-    COMPLIANCE_ASSERT(lle_segment_create_directory != NULL,
-                      "lle_segment_create_directory declared");
     lle_prompt_segment_t *dir = lle_segment_create_directory();
     COMPLIANCE_ASSERT(dir != NULL, "creates directory segment");
     COMPLIANCE_ASSERT(strcmp(dir->name, "directory") == 0, "correct name");
@@ -250,8 +244,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_user");
-    COMPLIANCE_ASSERT(lle_segment_create_user != NULL,
-                      "lle_segment_create_user declared");
     lle_prompt_segment_t *user = lle_segment_create_user();
     COMPLIANCE_ASSERT(user != NULL, "creates user segment");
     COMPLIANCE_ASSERT(strcmp(user->name, "user") == 0, "correct name");
@@ -259,8 +251,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_host");
-    COMPLIANCE_ASSERT(lle_segment_create_host != NULL,
-                      "lle_segment_create_host declared");
     lle_prompt_segment_t *host = lle_segment_create_host();
     COMPLIANCE_ASSERT(host != NULL, "creates host segment");
     COMPLIANCE_ASSERT(strcmp(host->name, "host") == 0, "correct name");
@@ -268,8 +258,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_time");
-    COMPLIANCE_ASSERT(lle_segment_create_time != NULL,
-                      "lle_segment_create_time declared");
     lle_prompt_segment_t *time_seg = lle_segment_create_time();
     COMPLIANCE_ASSERT(time_seg != NULL, "creates time segment");
     COMPLIANCE_ASSERT(strcmp(time_seg->name, "time") == 0, "correct name");
@@ -277,8 +265,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_status");
-    COMPLIANCE_ASSERT(lle_segment_create_status != NULL,
-                      "lle_segment_create_status declared");
     lle_prompt_segment_t *status = lle_segment_create_status();
     COMPLIANCE_ASSERT(status != NULL, "creates status segment");
     COMPLIANCE_ASSERT(strcmp(status->name, "status") == 0, "correct name");
@@ -286,8 +272,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_jobs");
-    COMPLIANCE_ASSERT(lle_segment_create_jobs != NULL,
-                      "lle_segment_create_jobs declared");
     lle_prompt_segment_t *jobs = lle_segment_create_jobs();
     COMPLIANCE_ASSERT(jobs != NULL, "creates jobs segment");
     COMPLIANCE_ASSERT(strcmp(jobs->name, "jobs") == 0, "correct name");
@@ -295,8 +279,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_symbol");
-    COMPLIANCE_ASSERT(lle_segment_create_symbol != NULL,
-                      "lle_segment_create_symbol declared");
     lle_prompt_segment_t *symbol = lle_segment_create_symbol();
     COMPLIANCE_ASSERT(symbol != NULL, "creates symbol segment");
     COMPLIANCE_ASSERT(strcmp(symbol->name, "symbol") == 0, "correct name");
@@ -304,8 +286,6 @@ static void test_builtin_segment_factories(void) {
     TEST_PASS();
 
     TEST_START("lle_segment_create_git");
-    COMPLIANCE_ASSERT(lle_segment_create_git != NULL,
-                      "lle_segment_create_git declared");
     lle_prompt_segment_t *git = lle_segment_create_git();
     COMPLIANCE_ASSERT(git != NULL, "creates git segment");
     COMPLIANCE_ASSERT(strcmp(git->name, "git") == 0, "correct name");
@@ -445,8 +425,6 @@ static void test_register_builtins(void) {
     printf("-------------------------------\n");
 
     TEST_START("lle_segment_register_builtins function");
-    COMPLIANCE_ASSERT(lle_segment_register_builtins != NULL,
-                      "lle_segment_register_builtins declared");
     lle_segment_registry_t registry;
     lle_segment_registry_init(&registry);
     size_t count = lle_segment_register_builtins(&registry);
