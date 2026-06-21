@@ -68,12 +68,18 @@ TEST(autocorrect_default_config) {
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
 
-    ASSERT_TRUE(config.enabled, "Default should be enabled");
-    ASSERT(config.max_suggestions >= 1 && config.max_suggestions <= 5,
-           "Max suggestions should be 1-5");
-    ASSERT(config.similarity_threshold >= 0 &&
-               config.similarity_threshold <= 100,
-           "Threshold should be 0-100");
+    /// Assert the exact documented defaults, not just in-range values: a bounds
+    /// check passes for any of several wrong values, an exact check does not.
+    ASSERT_TRUE(config.enabled, "enabled defaults to true");
+    ASSERT_EQ(config.max_suggestions, 3, "max_suggestions defaults to 3");
+    ASSERT_EQ(config.similarity_threshold, MIN_SIMILARITY_SCORE,
+              "similarity_threshold defaults to MIN_SIMILARITY_SCORE");
+    ASSERT_TRUE(config.interactive_prompts,
+                "interactive_prompts defaults true");
+    ASSERT_TRUE(config.learn_from_history, "learn_from_history defaults true");
+    ASSERT_TRUE(config.correct_builtins, "correct_builtins defaults true");
+    ASSERT_TRUE(config.correct_external, "correct_external defaults true");
+    ASSERT_FALSE(config.case_sensitive, "case_sensitive defaults false");
 }
 
 TEST(autocorrect_validate_config_valid) {
@@ -310,18 +316,27 @@ TEST(suggest_builtins_basic) {
     correction_t suggestions[5];
     int count = autocorrect_suggest_builtins("ehco", suggestions, 5, true);
 
-    /// Should find 'echo' as a suggestion
+    /// Every returned suggestion must clear the similarity threshold and carry
+    /// the "builtin" source tag; the 'echo' suggestion's score must equal the
+    /// scoring function applied to the same inputs (it is not an arbitrary
+    /// non-zero number).
     bool found_echo = false;
+    int echo_score = -1;
     for (int i = 0; i < count; i++) {
-        if (suggestions[i].command &&
-            strcmp(suggestions[i].command, "echo") == 0) {
+        ASSERT(suggestions[i].command != NULL, "suggestion has a command");
+        ASSERT(suggestions[i].score >= MIN_SIMILARITY_SCORE,
+               "suggestion score clears the threshold");
+        ASSERT_STR_EQ(suggestions[i].source, "builtin",
+                      "suggestion source is 'builtin'");
+        if (strcmp(suggestions[i].command, "echo") == 0) {
             found_echo = true;
-            free(suggestions[i].command);
-        } else if (suggestions[i].command) {
-            free(suggestions[i].command);
+            echo_score = suggestions[i].score;
         }
+        free(suggestions[i].command);
     }
     ASSERT_TRUE(found_echo, "Should find 'echo' for 'ehco' typo");
+    ASSERT_EQ(echo_score, autocorrect_similarity_score("ehco", "echo", true),
+              "echo score matches the similarity function");
 
     autocorrect_cleanup();
 }
