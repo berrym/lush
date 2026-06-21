@@ -462,37 +462,97 @@ TEST(config_shell_option_xtrace) {
  */
 
 TEST(config_get_xdg_dir) {
+    /// With XDG_CONFIG_HOME set, the directory is exactly
+    /// "$XDG_CONFIG_HOME/lush" (CONFIG_XDG_DIR). Pin it to a known value so the
+    /// full path is assertable; restore the prior environment before asserting
+    /// to avoid leaking state to later tests.
+    char *saved = getenv("XDG_CONFIG_HOME");
+    char saved_copy[CONFIG_PATH_MAX];
+    bool had = saved != NULL;
+    if (had) {
+        snprintf(saved_copy, sizeof(saved_copy), "%s", saved);
+    }
+    setenv("XDG_CONFIG_HOME", "/tmp/lush_xdg_probe", 1);
+
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_xdg_dir(buffer, sizeof(buffer));
+
+    if (had) {
+        setenv("XDG_CONFIG_HOME", saved_copy, 1);
+    } else {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+
     ASSERT_EQ(result, 0, "config_get_xdg_dir should succeed");
-    ASSERT(strstr(buffer, "lush") != NULL, "XDG dir should contain 'lush'");
+    ASSERT_STR_EQ(buffer, "/tmp/lush_xdg_probe/lush",
+                  "XDG dir is $XDG_CONFIG_HOME/lush");
 }
 
 TEST(config_get_xdg_config_path) {
+    /// Full TOML config path is "$XDG_CONFIG_HOME/lush/lushrc.toml".
+    char *saved = getenv("XDG_CONFIG_HOME");
+    char saved_copy[CONFIG_PATH_MAX];
+    bool had = saved != NULL;
+    if (had) {
+        snprintf(saved_copy, sizeof(saved_copy), "%s", saved);
+    }
+    setenv("XDG_CONFIG_HOME", "/tmp/lush_xdg_probe", 1);
+
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_xdg_config_path(buffer, sizeof(buffer));
+
+    if (had) {
+        setenv("XDG_CONFIG_HOME", saved_copy, 1);
+    } else {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+
     ASSERT_EQ(result, 0, "config_get_xdg_config_path should succeed");
-    /// Should end with lushrc.toml
-    ASSERT(strstr(buffer, "lushrc.toml") != NULL,
-           "XDG config path should contain 'lushrc.toml'");
+    ASSERT_STR_EQ(buffer, "/tmp/lush_xdg_probe/lush/lushrc.toml",
+                  "XDG config path is <xdg-dir>/lushrc.toml");
 }
 
 TEST(config_get_legacy_config_path) {
+    /// Legacy path is "$HOME/.lushrc.toml" (USER_CONFIG_FILE), independent of
+    /// XDG_CONFIG_HOME.
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_legacy_config_path(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_legacy_config_path should succeed");
-    /// Should end with .lushrc
-    ASSERT(strstr(buffer, ".lushrc") != NULL,
-           "Legacy config path should contain '.lushrc'");
+
+    const char *home = getenv("HOME");
+    if (home) {
+        char expected[CONFIG_PATH_MAX];
+        snprintf(expected, sizeof(expected), "%s/.lushrc.toml", home);
+        ASSERT_STR_EQ(buffer, expected, "legacy path is $HOME/.lushrc.toml");
+    } else {
+        ASSERT(strlen(buffer) > 0, "legacy path is non-empty");
+    }
 }
 
 TEST(config_get_script_config_path) {
+    /// Script (non-TOML) path is "$XDG_CONFIG_HOME/lush/lushrc"
+    /// (CONFIG_XDG_SCRIPT); it must not carry the .toml suffix of the TOML
+    /// variant.
+    char *saved = getenv("XDG_CONFIG_HOME");
+    char saved_copy[CONFIG_PATH_MAX];
+    bool had = saved != NULL;
+    if (had) {
+        snprintf(saved_copy, sizeof(saved_copy), "%s", saved);
+    }
+    setenv("XDG_CONFIG_HOME", "/tmp/lush_xdg_probe", 1);
+
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_script_config_path(buffer, sizeof(buffer));
+
+    if (had) {
+        setenv("XDG_CONFIG_HOME", saved_copy, 1);
+    } else {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+
     ASSERT_EQ(result, 0, "config_get_script_config_path should succeed");
-    /// Should contain lushrc (but not .toml)
-    ASSERT(strstr(buffer, "lush") != NULL,
-           "Script config path should contain 'lush'");
+    ASSERT_STR_EQ(buffer, "/tmp/lush_xdg_probe/lush/lushrc",
+                  "script path is <xdg-dir>/lushrc (no .toml)");
 }
 
 TEST(config_get_system_config_path) {
