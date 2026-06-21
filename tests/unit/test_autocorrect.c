@@ -122,11 +122,17 @@ TEST(autocorrect_apply_config) {
 
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
+
+    /// Applying a config takes effect: enabling it makes the engine report
+    /// enabled, and applying a disabled config turns it back off.
     config.enabled = true;
     config.max_suggestions = 3;
+    ASSERT_EQ(autocorrect_apply_config(&config), 0, "applying config succeeds");
+    ASSERT(autocorrect_is_enabled(), "config with enabled=true takes effect");
 
-    int result = autocorrect_apply_config(&config);
-    ASSERT_EQ(result, 0, "Applying config should succeed");
+    config.enabled = false;
+    ASSERT_EQ(autocorrect_apply_config(&config), 0, "applying config succeeds");
+    ASSERT(!autocorrect_is_enabled(), "config with enabled=false takes effect");
 
     autocorrect_cleanup();
 }
@@ -364,7 +370,12 @@ TEST(free_results_with_data) {
     results.suggestions[0].source = "test";
 
     autocorrect_free_results(&results);
-    /// Should not crash and should clean up memory
+
+    /// Freeing resets the struct: owned strings are released and their
+    /// pointers cleared, and the count returns to zero.
+    ASSERT_EQ(results.count, 0, "count is reset to 0 after free");
+    ASSERT_NULL(results.original_command, "original_command is cleared");
+    ASSERT_NULL(results.suggestions[0].command, "suggestion command cleared");
 }
 
 /* ============================================================================
@@ -378,9 +389,10 @@ TEST(stats_initial) {
     int offered = -1, accepted = -1, learned = -1;
     autocorrect_get_stats(&offered, &accepted, &learned);
 
-    ASSERT(offered >= 0, "Offered should be non-negative");
-    ASSERT(accepted >= 0, "Accepted should be non-negative");
-    ASSERT(learned >= 0, "Learned should be non-negative");
+    /// A freshly initialized engine has done nothing yet: all counters are 0.
+    ASSERT_EQ(offered, 0, "no corrections offered yet");
+    ASSERT_EQ(accepted, 0, "no corrections accepted yet");
+    ASSERT_EQ(learned, 0, "nothing learned yet");
 
     autocorrect_cleanup();
 }
@@ -519,22 +531,35 @@ TEST(command_exists_external) {
  */
 
 TEST(null_inputs) {
-    /// These should not crash
-    autocorrect_similarity_score(NULL, "test", true);
-    autocorrect_similarity_score("test", NULL, true);
-    autocorrect_levenshtein_distance(NULL, "test");
-    autocorrect_levenshtein_distance("test", NULL);
-    autocorrect_jaro_winkler_score(NULL, "test");
-    autocorrect_common_prefix_length(NULL, "test", true);
-    autocorrect_subsequence_score(NULL, "test", true);
+    /// NULL inputs are handled gracefully with defined return values rather
+    /// than crashing. Similarity, Jaro-Winkler, prefix, and subsequence
+    /// scoring all treat a NULL operand as "no match" and return 0.
+    ASSERT_EQ(autocorrect_similarity_score(NULL, "test", true), 0,
+              "similarity with a NULL operand is 0");
+    ASSERT_EQ(autocorrect_similarity_score("test", NULL, true), 0,
+              "similarity with a NULL operand is 0");
+    ASSERT_EQ(autocorrect_jaro_winkler_score(NULL, "test"), 0,
+              "jaro-winkler with a NULL operand is 0");
+    ASSERT_EQ(autocorrect_common_prefix_length(NULL, "test", true), 0,
+              "prefix length with a NULL operand is 0");
+    ASSERT_EQ(autocorrect_subsequence_score(NULL, "test", true), 0,
+              "subsequence score with a NULL operand is 0");
+
+    /// Levenshtein treats a NULL operand as the empty string, so the distance
+    /// is the length of the other string.
+    ASSERT_EQ(autocorrect_levenshtein_distance(NULL, "test"), 4,
+              "distance from NULL to \"test\" is its length");
+    ASSERT_EQ(autocorrect_levenshtein_distance("test", NULL), 4,
+              "distance from \"test\" to NULL is its length");
 }
 
 TEST(empty_strings) {
     int dist = autocorrect_levenshtein_distance("", "");
     ASSERT_EQ(dist, 0, "Two empty strings should have distance 0");
 
+    /// Two empty strings are identical, so the similarity is the maximum 100.
     int score = autocorrect_jaro_winkler_score("", "");
-    ASSERT(score >= 0, "Two empty strings should have valid score");
+    ASSERT_EQ(score, 100, "Two empty strings score a perfect 100");
 
     int prefix = autocorrect_common_prefix_length("", "", true);
     ASSERT_EQ(prefix, 0, "Two empty strings should have prefix 0");
