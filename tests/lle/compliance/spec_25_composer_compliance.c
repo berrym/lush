@@ -30,11 +30,10 @@
 
 static int tests_run = 0;
 static int tests_passed = 0;
-static int current_phase = 0;
 
 #define TEST(name) static void test_##name(void)
 
-#define RUN_TEST(name)                                                         \
+#define RUN_COMPLIANCE_TEST(name)                                              \
     do {                                                                       \
         tests_run++;                                                           \
         printf("    [%d] %s... ", tests_run, #name);                           \
@@ -60,10 +59,9 @@ static int current_phase = 0;
 #define ASSERT_TRUE(a) ASSERT((a))
 #define ASSERT_FALSE(a) ASSERT(!(a))
 
-#define BEGIN_PHASE(num, name)                                                 \
+#define BEGIN_SECTION(name)                                                    \
     do {                                                                       \
-        current_phase = num;                                                   \
-        printf("\n  Phase %d: %s\n", num, name);                               \
+        printf("\n  %s\n", name);                                              \
     } while (0)
 
 /* ========================================================================== */
@@ -95,7 +93,7 @@ static void teardown_full_composer(void) {
 }
 
 /* ========================================================================== */
-/// Phase 1: Composer Lifecycle Compliance
+/// Composer Lifecycle Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_init_returns_success) {
@@ -151,7 +149,7 @@ TEST(spec25_composer_configure_sets_options) {
 }
 
 /* ========================================================================== */
-/// Phase 2: Template Integration Compliance
+/// Template Integration Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_renders_literal_templates) {
@@ -239,7 +237,7 @@ TEST(spec25_composer_renders_multiple_segments) {
 }
 
 /* ========================================================================== */
-/// Phase 3: Theme Integration Compliance
+/// Theme Integration Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_uses_active_theme) {
@@ -318,7 +316,7 @@ TEST(spec25_composer_invalid_theme_rejected) {
 }
 
 /* ========================================================================== */
-/// Phase 4: Context Management Compliance
+/// Context Management Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_tracks_exit_code) {
@@ -362,7 +360,7 @@ TEST(spec25_composer_invalidates_caches) {
 }
 
 /* ========================================================================== */
-/// Phase 5: Render Output Compliance
+/// Render Output Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_generates_ps1) {
@@ -439,7 +437,7 @@ TEST(spec25_composer_detects_multiline) {
 }
 
 /* ========================================================================== */
-/// Phase 6: Error Handling Compliance
+/// Error Handling Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_rejects_null_composer) {
@@ -491,53 +489,53 @@ TEST(spec25_composer_render_ctx_null_safe) {
 int main(void) {
     printf("=== Spec 25 Prompt Composer Compliance Tests ===\n");
 
-    /// Phase 1: Composer Lifecycle
-    BEGIN_PHASE(1, "Composer Lifecycle Compliance");
-    RUN_TEST(spec25_composer_init_returns_success);
-    RUN_TEST(spec25_composer_init_with_registries);
-    RUN_TEST(spec25_composer_cleanup_releases_resources);
-    RUN_TEST(spec25_composer_configure_sets_options);
+    /// Composer Lifecycle
+    BEGIN_SECTION("Composer Lifecycle Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_init_returns_success);
+    RUN_COMPLIANCE_TEST(spec25_composer_init_with_registries);
+    RUN_COMPLIANCE_TEST(spec25_composer_cleanup_releases_resources);
+    RUN_COMPLIANCE_TEST(spec25_composer_configure_sets_options);
 
-    /// Phase 2: Template Integration
-    BEGIN_PHASE(2, "Template Integration Compliance");
-    RUN_TEST(spec25_composer_renders_literal_templates);
-    RUN_TEST(spec25_composer_renders_segment_tokens);
-    RUN_TEST(spec25_composer_renders_directory_segment);
-    RUN_TEST(spec25_composer_renders_conditionals);
-    RUN_TEST(spec25_composer_handles_unknown_segments);
-    RUN_TEST(spec25_composer_renders_multiple_segments);
+    /// Template Integration
+    BEGIN_SECTION("Template Integration Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_renders_literal_templates);
+    RUN_COMPLIANCE_TEST(spec25_composer_renders_segment_tokens);
+    RUN_COMPLIANCE_TEST(spec25_composer_renders_directory_segment);
+    RUN_COMPLIANCE_TEST(spec25_composer_renders_conditionals);
+    RUN_COMPLIANCE_TEST(spec25_composer_handles_unknown_segments);
+    RUN_COMPLIANCE_TEST(spec25_composer_renders_multiple_segments);
 
-    /// Phase 3: Theme Integration
-    BEGIN_PHASE(3, "Theme Integration Compliance");
-    RUN_TEST(spec25_composer_uses_active_theme);
-    RUN_TEST(spec25_composer_theme_switching);
-    RUN_TEST(spec25_composer_theme_affects_output);
-    RUN_TEST(spec25_composer_color_rendering);
-    RUN_TEST(spec25_composer_invalid_theme_rejected);
+    /// Theme Integration
+    BEGIN_SECTION("Theme Integration Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_uses_active_theme);
+    RUN_COMPLIANCE_TEST(spec25_composer_theme_switching);
+    RUN_COMPLIANCE_TEST(spec25_composer_theme_affects_output);
+    RUN_COMPLIANCE_TEST(spec25_composer_color_rendering);
+    RUN_COMPLIANCE_TEST(spec25_composer_invalid_theme_rejected);
 
-    /// Phase 4: Context Management
-    BEGIN_PHASE(4, "Context Management Compliance");
-    RUN_TEST(spec25_composer_tracks_exit_code);
-    RUN_TEST(spec25_composer_tracks_duration);
-    RUN_TEST(spec25_composer_refreshes_directory);
-    RUN_TEST(spec25_composer_invalidates_caches);
+    /// Context Management
+    BEGIN_SECTION("Context Management Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_tracks_exit_code);
+    RUN_COMPLIANCE_TEST(spec25_composer_tracks_duration);
+    RUN_COMPLIANCE_TEST(spec25_composer_refreshes_directory);
+    RUN_COMPLIANCE_TEST(spec25_composer_invalidates_caches);
 
-    /// Phase 5: Render Output
-    BEGIN_PHASE(5, "Render Output Compliance");
-    RUN_TEST(spec25_composer_generates_ps1);
-    RUN_TEST(spec25_composer_generates_ps2);
-    RUN_TEST(spec25_composer_calculates_visual_width);
-    RUN_TEST(spec25_composer_tracks_render_count);
-    RUN_TEST(spec25_composer_detects_multiline);
+    /// Render Output
+    BEGIN_SECTION("Render Output Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_generates_ps1);
+    RUN_COMPLIANCE_TEST(spec25_composer_generates_ps2);
+    RUN_COMPLIANCE_TEST(spec25_composer_calculates_visual_width);
+    RUN_COMPLIANCE_TEST(spec25_composer_tracks_render_count);
+    RUN_COMPLIANCE_TEST(spec25_composer_detects_multiline);
 
-    /// Phase 6: Error Handling
-    BEGIN_PHASE(6, "Error Handling Compliance");
-    RUN_TEST(spec25_composer_rejects_null_composer);
-    RUN_TEST(spec25_composer_rejects_null_output);
-    RUN_TEST(spec25_composer_rejects_uninitialized);
-    RUN_TEST(spec25_composer_handles_null_cleanup);
-    RUN_TEST(spec25_composer_handles_null_invalidate);
-    RUN_TEST(spec25_composer_render_ctx_null_safe);
+    /// Error Handling
+    BEGIN_SECTION("Error Handling Compliance");
+    RUN_COMPLIANCE_TEST(spec25_composer_rejects_null_composer);
+    RUN_COMPLIANCE_TEST(spec25_composer_rejects_null_output);
+    RUN_COMPLIANCE_TEST(spec25_composer_rejects_uninitialized);
+    RUN_COMPLIANCE_TEST(spec25_composer_handles_null_cleanup);
+    RUN_COMPLIANCE_TEST(spec25_composer_handles_null_invalidate);
+    RUN_COMPLIANCE_TEST(spec25_composer_render_ctx_null_safe);
 
     printf("\n=== Compliance Results: %d/%d tests passed ===\n", tests_passed,
            tests_run);
