@@ -442,7 +442,8 @@ void test_statistics_tracking(void) {
         FAIL("Failed to create core");
     }
 
-    /// Add entries with different exit codes
+    /// Add three entries (the exit code is recorded per entry but does not
+    /// feed the aggregate stats, which track entry and operation counts).
     uint64_t id;
     result = lle_history_add_entry(core, "success1", 0, &id);
     result = lle_history_add_entry(core, "success2", 0, &id);
@@ -455,9 +456,24 @@ void test_statistics_tracking(void) {
         FAIL("Failed to get stats");
     }
 
+    /// All three adds are reflected across the tracked dimensions: every
+    /// entry is present and active, none are deleted, and the add operation
+    /// counter recorded all three calls.
     if (stats->total_entries != 3) {
         lle_history_core_destroy(core);
         FAIL("Stats total_entries should be 3");
+    }
+    if (stats->active_entries != 3) {
+        lle_history_core_destroy(core);
+        FAIL("Stats active_entries should be 3");
+    }
+    if (stats->deleted_entries != 0) {
+        lle_history_core_destroy(core);
+        FAIL("Stats deleted_entries should be 0");
+    }
+    if (stats->add_count != 3) {
+        lle_history_core_destroy(core);
+        FAIL("Stats add_count should be 3");
     }
 
     /// Cleanup
