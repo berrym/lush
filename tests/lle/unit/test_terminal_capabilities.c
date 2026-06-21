@@ -26,42 +26,86 @@
 #include <string.h>
 #include <unistd.h>
 
+/// Detect capabilities as if running under the given TERM/COLORTERM, then
+/// restore the real environment before returning. Because detection reads
+/// these variables, this makes the type- and colorterm-derived capabilities
+/// deterministic regardless of the terminal the test actually runs in.
+/// Restoring before return means a later assertion failure cannot leave the
+/// process environment polluted for subsequent tests.
+static lle_terminal_capabilities_t *detect_as(const char *term,
+                                              const char *colorterm) {
+    char *saved_term = getenv("TERM");
+    saved_term = saved_term ? strdup(saved_term) : NULL;
+    char *saved_ct = getenv("COLORTERM");
+    saved_ct = saved_ct ? strdup(saved_ct) : NULL;
+
+    if (term) {
+        setenv("TERM", term, 1);
+    } else {
+        unsetenv("TERM");
+    }
+    if (colorterm) {
+        setenv("COLORTERM", colorterm, 1);
+    } else {
+        unsetenv("COLORTERM");
+    }
+
+    lle_terminal_capabilities_t *caps = NULL;
+    lle_capabilities_detect_environment(&caps, NULL);
+
+    if (saved_term) {
+        setenv("TERM", saved_term, 1);
+        free(saved_term);
+    } else {
+        unsetenv("TERM");
+    }
+    if (saved_ct) {
+        setenv("COLORTERM", saved_ct, 1);
+        free(saved_ct);
+    } else {
+        unsetenv("COLORTERM");
+    }
+    return caps;
+}
+
 /* ============================================================================
  * TERMINAL TYPE DETECTION TESTS
  * ============================================================================
  */
 
 TEST(capability_detection_basic) {
-    lle_terminal_capabilities_t *caps = NULL;
-    lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
+    /// A recognized TERM classifies to the matching terminal type; an
+    /// unrecognized TERM does not classify as that type. This pins the
+    /// detection to a deterministic input rather than the >= UNKNOWN range
+    /// check, which an unsigned enum always satisfies.
+    lle_terminal_capabilities_t *xterm = detect_as("xterm-256color", NULL);
+    ASSERT(xterm != NULL);
+    int xterm_type = xterm->terminal_type_enum;
+    int has_strings =
+        xterm->terminal_type != NULL && xterm->terminal_program != NULL;
+    lle_capabilities_destroy(xterm);
 
-    ASSERT(result == LLE_SUCCESS);
-    ASSERT(caps != NULL);
-    ASSERT(caps->terminal_type != NULL);
-    ASSERT(caps->terminal_program != NULL);
+    lle_terminal_capabilities_t *dumb = detect_as("dumb", NULL);
+    ASSERT(dumb != NULL);
+    int dumb_type = dumb->terminal_type_enum;
+    lle_capabilities_destroy(dumb);
 
-    /// Should detect some terminal type
-    ASSERT(caps->terminal_type_enum >= LLE_TERMINAL_UNKNOWN);
-    ASSERT(caps->terminal_type_enum <= LLE_TERMINAL_KITTY);
-
-    /// Cleanup
-    lle_capabilities_destroy(caps);
+    ASSERT(has_strings);
+    ASSERT(xterm_type == LLE_TERMINAL_XTERM);
+    ASSERT(dumb_type != LLE_TERMINAL_XTERM);
 }
 
 TEST(terminal_type_strings) {
-    lle_terminal_capabilities_t *caps = NULL;
-    lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
-
-    ASSERT(result == LLE_SUCCESS);
+    /// The terminal_type string echoes the detected TERM verbatim, so a known
+    /// TERM yields exactly that string. terminal_program is derived from the
+    /// host's TERM_PROGRAM (not controlled here), so only assert it is a
+    /// populated, non-empty string.
+    lle_terminal_capabilities_t *caps = detect_as("xterm-256color", NULL);
     ASSERT(caps != NULL);
 
-    /// Terminal type string should not be empty
-    ASSERT(strlen(caps->terminal_type) > 0);
+    ASSERT(strcmp(caps->terminal_type, "xterm-256color") == 0);
+    ASSERT(caps->terminal_program != NULL);
     ASSERT(strlen(caps->terminal_program) > 0);
-
-    /// Should be valid strings
-    ASSERT(strcmp(caps->terminal_type, "") != 0);
-    ASSERT(strcmp(caps->terminal_program, "") != 0);
 
     lle_capabilities_destroy(caps);
 }
@@ -152,16 +196,21 @@ TEST(text_attributes_detected) {
     /// Note: This might fail in very minimal environments, but that's OK
     /// We're just testing that detection ran, not enforcing support
 
-    /// Text attribute flags should be boolean
-    ASSERT(caps->supports_bold == true || caps->supports_bold == false);
-    ASSERT(caps->supports_italic == true || caps->supports_italic == false);
-    ASSERT(caps->supports_underline == true ||
-           caps->supports_underline == false);
-    ASSERT(caps->supports_strikethrough == true ||
-           caps->supports_strikethrough == false);
-    ASSERT(caps->supports_reverse == true || caps->supports_reverse == false);
-    ASSERT(caps->supports_dim == true || caps->supports_dim == false);
+    /// The text-attribute flags are queried from the terminfo database, so
+    /// their exact values vary by platform and cannot be pinned to a literal.
+    /// What is invariant is that detection is deterministic: two detections of
+    /// the same environment agree on every text-attribute flag.
+    lle_terminal_capabilities_t *again = NULL;
+    ASSERT(lle_capabilities_detect_environment(&again, NULL) == LLE_SUCCESS);
+    ASSERT(again != NULL);
+    ASSERT(caps->supports_bold == again->supports_bold);
+    ASSERT(caps->supports_italic == again->supports_italic);
+    ASSERT(caps->supports_underline == again->supports_underline);
+    ASSERT(caps->supports_strikethrough == again->supports_strikethrough);
+    ASSERT(caps->supports_reverse == again->supports_reverse);
+    ASSERT(caps->supports_dim == again->supports_dim);
 
+    lle_capabilities_destroy(again);
     lle_capabilities_destroy(caps);
 }
 
@@ -171,42 +220,39 @@ TEST(text_attributes_detected) {
  */
 
 TEST(advanced_features_detected) {
-    lle_terminal_capabilities_t *caps = NULL;
-    lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
-
-    ASSERT(result == LLE_SUCCESS);
+    /// These feature flags are derived from the terminal type, so an
+    /// xterm-class terminal deterministically reports mouse reporting,
+    /// bracketed paste, focus events, and Unicode support.
+    lle_terminal_capabilities_t *caps =
+        detect_as("xterm-256color", "truecolor");
     ASSERT(caps != NULL);
-
-    /// Feature flags should be boolean
-    ASSERT(caps->supports_mouse_reporting == true ||
-           caps->supports_mouse_reporting == false);
-    ASSERT(caps->supports_bracketed_paste == true ||
-           caps->supports_bracketed_paste == false);
-    ASSERT(caps->supports_focus_events == true ||
-           caps->supports_focus_events == false);
-    ASSERT(caps->supports_synchronized_output == true ||
-           caps->supports_synchronized_output == false);
-    ASSERT(caps->supports_unicode == true || caps->supports_unicode == false);
-
+    bool mouse = caps->supports_mouse_reporting;
+    bool paste = caps->supports_bracketed_paste;
+    bool focus = caps->supports_focus_events;
+    bool unicode = caps->supports_unicode;
     lle_capabilities_destroy(caps);
+
+    ASSERT(mouse == true);
+    ASSERT(paste == true);
+    ASSERT(focus == true);
+    ASSERT(unicode == true);
 }
 
 TEST(feature_correlation) {
-    lle_terminal_capabilities_t *caps = NULL;
-    lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
-
-    ASSERT(result == LLE_SUCCESS);
+    /// A modern terminal (Kitty) correlates to the full feature set:
+    /// Unicode, mouse reporting, and bracketed paste are all present. Driving
+    /// the terminal type makes this run rather than being skipped because the
+    /// host terminal happened not to be modern.
+    lle_terminal_capabilities_t *caps = detect_as("kitty", NULL);
     ASSERT(caps != NULL);
-
-    /// Modern terminals (Alacritty, Kitty) should support most features
-    if (caps->terminal_type_enum == LLE_TERMINAL_ALACRITTY ||
-        caps->terminal_type_enum == LLE_TERMINAL_KITTY) {
-        ASSERT(caps->supports_unicode == true);
-        ASSERT(caps->supports_mouse_reporting == true);
-        ASSERT(caps->supports_bracketed_paste == true);
-    }
-
+    bool unicode = caps->supports_unicode;
+    bool mouse = caps->supports_mouse_reporting;
+    bool paste = caps->supports_bracketed_paste;
     lle_capabilities_destroy(caps);
+
+    ASSERT(unicode == true);
+    ASSERT(mouse == true);
+    ASSERT(paste == true);
 }
 
 /* ============================================================================
@@ -266,28 +312,19 @@ TEST(geometry_update) {
  */
 
 TEST(performance_characteristics) {
-    lle_terminal_capabilities_t *caps = NULL;
-    lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
-
-    ASSERT(result == LLE_SUCCESS);
+    /// Drive a known modern terminal (Alacritty) so the performance profile
+    /// is deterministic: estimated latency is within the sane 1-100ms band,
+    /// is in the low-latency tier (<= 10ms), and fast updates are supported.
+    lle_terminal_capabilities_t *caps = detect_as("alacritty", NULL);
     ASSERT(caps != NULL);
-
-    /// Latency should be reasonable (1-100ms)
-    ASSERT(caps->estimated_latency_ms >= 1);
-    ASSERT(caps->estimated_latency_ms <= 100);
-
-    /// Fast update flag should be boolean
-    ASSERT(caps->supports_fast_updates == true ||
-           caps->supports_fast_updates == false);
-
-    /// Modern terminals should have lower latency
-    if (caps->terminal_type_enum == LLE_TERMINAL_ALACRITTY ||
-        caps->terminal_type_enum == LLE_TERMINAL_KITTY) {
-        ASSERT(caps->estimated_latency_ms <= 10);
-        ASSERT(caps->supports_fast_updates == true);
-    }
-
+    int latency = caps->estimated_latency_ms;
+    bool fast = caps->supports_fast_updates;
     lle_capabilities_destroy(caps);
+
+    ASSERT(latency >= 1);
+    ASSERT(latency <= 100);
+    ASSERT(latency <= 10);
+    ASSERT(fast == true);
 }
 
 TEST(optimization_flags) {
