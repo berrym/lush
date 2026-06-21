@@ -122,7 +122,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
 
     lle_result_t result = LLE_SUCCESS;
 
-    /// === PHASE 1: Count codepoints and grapheme clusters ===
+    /// === PASS 1: Count codepoints and grapheme clusters ===
 
     size_t codepoint_count = 0;
     size_t grapheme_count = 0;
@@ -163,7 +163,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
         ptr += sequence_length;
     }
 
-    /// === PHASE 2: Allocate index arrays ===
+    /// === PASS 2: Allocate index arrays ===
 
     size_t *new_byte_to_codepoint = NULL;
     size_t *new_codepoint_to_byte = NULL;
@@ -198,7 +198,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
         goto cleanup;
     }
 
-    /// === PHASE 3: Build index mappings ===
+    /// === PASS 3: Build index mappings ===
 
     ptr = text;
     size_t byte_pos = 0;
@@ -255,7 +255,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
         ptr += sequence_length;
     }
 
-    /// === PHASE 4: Complete final grapheme cluster ===
+    /// === PASS 4: Complete final grapheme cluster ===
 
     if (codepoint_count > 0 &&
         current_grapheme_start_codepoint < codepoint_count) {
@@ -265,7 +265,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
         }
     }
 
-    /// === PHASE 5: Replace old arrays with new ones ===
+    /// === PASS 5: Replace old arrays with new ones ===
 
     free(index->byte_to_codepoint);
     free(index->codepoint_to_byte);

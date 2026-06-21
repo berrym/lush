@@ -4,9 +4,9 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 09 - History System (Phase 2 Day 5)
+ * Specification: Spec 09 - History System
  * Version: 1.0.0
- * Status: Phase 2 Day 5 - Lush Integration Bridge
+ * Status: Lush Integration Bridge
  *
  * Provides bidirectional synchronization between:
  * - LLE history core engine

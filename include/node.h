@@ -63,28 +63,28 @@ typedef enum {
     /// Job control
     NODE_BACKGROUND, ///< & operator (background execution)
 
-    /// Extended language features (Phase 1: Arrays and Arithmetic)
+    /// Extended language features (Arrays and Arithmetic)
     NODE_ARITH_CMD,     ///< (( expr )) - arithmetic command evaluation
     NODE_ARRAY_LITERAL, ///< (a b c) - array literal
     NODE_ARRAY_ACCESS,  ///< ${arr[index]} - array element access
     NODE_ARRAY_ASSIGN,  ///< arr[n]=value or arr=(...) - array assignment
     NODE_ARRAY_APPEND,  ///< arr+=(a b c) - append elements to array
 
-    /// Extended language features (Phase 2: Extended Tests)
+    /// Extended language features (Extended Tests)
     NODE_EXTENDED_TEST, ///< [[ expr ]] - extended test command
 
-    /// Extended language features (Phase 3: Process Substitution)
+    /// Extended language features (Process Substitution)
     NODE_PROC_SUB_IN,  ///< <(cmd) - process substitution input
     NODE_PROC_SUB_OUT, ///< >(cmd) - process substitution output
     NODE_COPROC,       ///< coproc name cmd - coprocess
 
-    /// Extended language features (Phase 5: Control Flow)
+    /// Extended language features (Control Flow)
     NODE_CASE_ITEM, ///< Case item with terminator type
     NODE_SELECT,    ///< select var in list; do body; done
     NODE_TIME,      ///< time [-p] pipeline
     NODE_NEGATE,    ///< ! pipeline - negate exit status
 
-    /// Extended language features (Phase 7: Zsh-Specific)
+    /// Extended language features (Zsh-Specific)
     NODE_ANON_FUNCTION, ///< () { body } - anonymous function (immediately
                         ///< executed)
 

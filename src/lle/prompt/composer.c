@@ -960,7 +960,7 @@ lle_composer_get_theme(const lle_prompt_composer_t *composer) {
 }
 
 /* ============================================================================
- * PS1/PS2 Ownership Notification (Spec 28 Phase 2)
+ * PS1/PS2 Ownership Notification (Spec 28)
  * ============================================================================
  */
 

@@ -95,7 +95,7 @@ typedef struct executor {
     char *current_script_file; ///< Current script file being executed
     bool in_script_execution;  ///< True if executing from script file
 
-    /// Sourced script tracking (Phase 6: return from sourced scripts)
+    /// Sourced script tracking (return from sourced scripts)
     int source_depth;   ///< Depth of nested source commands (0 = not sourced)
     bool source_return; ///< True if return was called in sourced script
 
@@ -131,7 +131,7 @@ typedef struct executor {
     char *pending_readonly_var;
     source_location_t pending_readonly_loc;
 
-    /// Error context stack (Phase 3: context-aware error management)
+    /// Error context stack (context-aware error management)
     char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; ///< "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
     size_t context_depth; ///< Current depth of context stack
@@ -386,7 +386,7 @@ bool executor_has_error(executor_t *executor);
 const char *executor_error(executor_t *executor);
 
 /* ============================================================================
- * Error Context Stack (Phase 3)
+ * Error Context Stack
  * ============================================================================
  */
 
@@ -650,7 +650,7 @@ const char *executor_get_current_script_file(executor_t *executor);
 bool is_privileged_redirection_allowed(const char *target);
 
 /* ============================================================================
- * Hook Functions (Phase 7: Zsh-Specific)
+ * Hook Functions (Zsh-Specific)
  * ============================================================================
  */
 
@@ -728,7 +728,7 @@ int executor_call_chpwd(executor_t *executor);
 bool executor_in_hook(void);
 
 /* ============================================================================
- * Structured Error Reporting (Phase 4)
+ * Structured Error Reporting
  * ============================================================================
  */
 

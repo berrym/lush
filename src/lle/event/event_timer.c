@@ -19,7 +19,7 @@
  * - Timers own their events (deep copy on creation)
  * - Manual processing via lle_event_timer_process()
  *
- * Spec 04: Event System - Phase 2D
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"

@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 03 Phase 7 - Multiline Buffer Operations
+ * Specification: Spec 03 - Multiline Buffer Operations
  *
  * This module wraps the existing input_continuation.c parser to provide
  * LLE-specific multiline state tracking. It delegates core shell construct

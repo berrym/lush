@@ -6,17 +6,17 @@
  *
  * Specification: Spec 09 - History System Complete Specification
  * Version: 1.0.0
- * Status: Phase 1 Day 1 - Core Structures and Lifecycle
+ * Status: Core Structures and Lifecycle
  *
  * Provides comprehensive command history management with forensic-grade
  * capabilities, seamless Lush integration, and advanced features including
  * intelligent search, deduplication, and multiline command support.
  *
  * IMPLEMENTATION PHASES:
- * - Phase 1 (Days 1-4): Core engine, indexing, persistence
- * - Phase 2 (Days 5-7): Lush integration, event system
- * - Phase 3 (Days 8-10): Search and navigation
- * - Phase 4 (Days 11-14): Advanced features (forensics, dedup, multiline)
+ * (Days 1-4): Core engine, indexing, persistence
+ * (Days 5-7): Lush integration, event system
+ * (Days 8-10): Search and navigation
+ * (Days 11-14): Advanced features (forensics, dedup, multiline)
  */
 
 #ifndef LLE_HISTORY_H
@@ -53,7 +53,7 @@ typedef struct lle_history_core lle_history_core_t;
 typedef struct lle_history_config lle_history_config_t;
 typedef struct lle_history_stats lle_history_stats_t;
 
-/// Advanced types (Phase 2+)
+/// Advanced types
 typedef struct lle_history_search_engine lle_history_search_engine_t;
 typedef struct lle_history_dedup_engine lle_history_dedup_engine_t;
 /* Note: lle_history_system_t already defined in performance.h - no redefinition
@@ -137,35 +137,35 @@ typedef enum lle_history_operation {
 } lle_history_operation_t;
 
 /* ============================================================================
- * CORE STRUCTURES - PHASE 1
+ * CORE STRUCTURES
  * ============================================================================
  */
 
 /**
  * History entry - stores a single command with metadata
  *
- * Phase 1: Basic fields (command, timestamp, ID, exit code)
- * Phase 4: Advanced fields (forensics, multiline, etc.)
+ * Basic fields (command, timestamp, ID, exit code)
+ * Advanced fields (forensics, multiline, etc.)
  */
 struct lle_history_entry {
-    /// Core entry data - Phase 1
+    /// Core entry data
     uint64_t entry_id;     ///< Unique entry identifier
     char *command;         ///< Command text
     size_t command_length; ///< Command length in bytes
     uint64_t timestamp;    ///< Unix timestamp (seconds)
     int exit_code;         ///< Command exit status
 
-    /// Basic metadata - Phase 1
+    /// Basic metadata
     char *working_directory;         ///< Working directory when executed
     lle_history_entry_state_t state; ///< Entry state
 
-    /// Phase 4: Advanced features (initialized to NULL/0 in Phase 1)
-    char *original_multiline; ///< Original multiline format (Phase 4)
-    bool is_multiline;        ///< Multiline flag (Phase 4)
-    uint32_t duration_ms;     ///< Execution duration (Phase 4)
-    uint32_t edit_count;      ///< Edit count (Phase 4)
+    /// Advanced features (initialized to NULL/0 in Phase 1)
+    char *original_multiline; ///< Original multiline format
+    bool is_multiline;        ///< Multiline flag
+    uint32_t duration_ms;     ///< Execution duration
+    uint32_t edit_count;      ///< Edit count
 
-    /// Phase 4 Day 11: Forensic metadata
+    /// Forensic metadata
     pid_t process_id;          ///< Process ID when executed
     pid_t session_id;          ///< Session ID for command
     uid_t user_id;             ///< User ID when executed
@@ -244,7 +244,7 @@ struct lle_history_config {
  * History core engine - central management
  */
 struct lle_history_core {
-    /// Entry storage - Phase 1
+    /// Entry storage
     lle_history_entry_t **entries; ///< Dynamic array of entry pointers
     size_t entry_count;            ///< Current number of entries
     size_t entry_capacity;         ///< Current array capacity
@@ -254,12 +254,11 @@ struct lle_history_core {
     lle_history_entry_t *first_entry; ///< First entry in list
     lle_history_entry_t *last_entry;  ///< Last entry in list
 
-    /// Indexing - Phase 2
+    /// Indexing
     ht_u64ptr_t *entry_lookup; ///< ID -> entry hashtable (uint64 -> entry ptr)
 
-    /// Advanced engines - Phase 4
-    lle_history_dedup_engine_t
-        *dedup_engine; ///< Deduplication engine (Phase 4 Day 12)
+    /// Advanced engines
+    lle_history_dedup_engine_t *dedup_engine; ///< Deduplication engine
 
     /// Configuration and statistics
     lle_history_config_t *config; ///< Configuration
@@ -275,7 +274,7 @@ struct lle_history_core {
 };
 
 /* ============================================================================
- * CORE API - PHASE 1 DAY 1
+ * CORE API
  * ============================================================================
  */
 
@@ -407,7 +406,7 @@ lle_result_t lle_history_get_stats(lle_history_core_t *core,
                                    const lle_history_stats_t **stats);
 
 /* ============================================================================
- * INDEXING AND FAST LOOKUP (Phase 1 Day 2)
+ * INDEXING AND FAST LOOKUP
  * ============================================================================
  */
 
@@ -470,7 +469,7 @@ lle_history_get_entry_by_reverse_index(lle_history_core_t *core,
                                        lle_history_entry_t **entry);
 
 /* ============================================================================
- * PERSISTENCE AND FILE STORAGE (Phase 1 Day 3)
+ * PERSISTENCE AND FILE STORAGE
  * ============================================================================
  */
 
@@ -493,7 +492,7 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
                                       const char *file_path);
 
 /* ============================================================================
- * LUSH INTEGRATION BRIDGE (Phase 2 Day 5)
+ * LUSH INTEGRATION BRIDGE
  * ============================================================================
  */
 
@@ -699,7 +698,7 @@ lle_result_t lle_history_bridge_get_stats(size_t *readline_imports,
 lle_result_t lle_history_bridge_print_diagnostics(void);
 
 /* ============================================================================
- * EVENT SYSTEM INTEGRATION (Phase 2 Day 6)
+ * EVENT SYSTEM INTEGRATION
  * ============================================================================
  */
 
@@ -903,7 +902,7 @@ lle_result_t lle_history_validate_entry(const lle_history_entry_t *entry);
 lle_result_t lle_history_get_cwd(char *buffer, size_t size);
 
 /* ============================================================================
- * SEARCH ENGINE API (Phase 3 Day 8)
+ * SEARCH ENGINE API
  * ============================================================================
  */
 
@@ -1053,7 +1052,7 @@ lle_history_search_fuzzy(lle_history_core_t *history_core, const char *query,
                          size_t max_results);
 
 /* ============================================================================
- * INTERACTIVE SEARCH API (Phase 3 Day 9) - Ctrl+R Reverse Incremental Search
+ * INTERACTIVE SEARCH API - Ctrl+R Reverse Incremental Search
  * ============================================================================
  */
 
@@ -1198,7 +1197,7 @@ void lle_history_interactive_search_print_stats(void);
 void lle_history_interactive_search_reset_stats(void);
 
 /* ============================================================================
- * HISTORY EXPANSION API (Phase 3 Day 10)
+ * HISTORY EXPANSION API
  * ============================================================================
  */
 
@@ -1289,7 +1288,7 @@ lle_result_t lle_history_expansion_set_verify(bool enabled);
 bool lle_history_expansion_get_verify(void);
 
 /* ============================================================================
- * FORENSIC TRACKING API (Phase 4 Day 11)
+ * FORENSIC TRACKING API
  * ============================================================================
  */
 
@@ -1388,7 +1387,7 @@ uint64_t lle_forensic_get_timestamp_ns(void);
 void lle_forensic_free_context(lle_forensic_context_t *context);
 
 /* ============================================================================
- * DEDUPLICATION API (Phase 4 Day 12)
+ * DEDUPLICATION API
  * ============================================================================
  */
 
@@ -1571,7 +1570,7 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                                          size_t *duplicates_removed);
 
 /* ============================================================================
- * MULTILINE COMMAND SUPPORT API (Phase 4 Day 13)
+ * MULTILINE COMMAND SUPPORT API
  * ============================================================================
  */
 

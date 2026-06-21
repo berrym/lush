@@ -53,28 +53,28 @@ typedef enum {
  * via shell_mode_allows() to determine if it should be active.
  */
 typedef enum {
-    /// Arrays (Phase 1)
+    /// Arrays
     FEATURE_INDEXED_ARRAYS,     ///< arr=(a b c), ${arr[0]}
     FEATURE_ASSOCIATIVE_ARRAYS, ///< declare -A, ${arr[key]}
     FEATURE_ARRAY_ZERO_INDEXED, ///< Bash: 0-indexed, Zsh: 1-indexed
     FEATURE_ARRAY_APPEND,       ///< arr+=(value) syntax
 
-    /// Arithmetic (Phase 1)
+    /// Arithmetic
     FEATURE_ARITH_COMMAND, ///< (( expr )) as command
     FEATURE_LET_BUILTIN,   ///< let builtin command
 
-    /// Extended Tests (Phase 2)
+    /// Extended Tests
     FEATURE_EXTENDED_TEST, ///< [[ ]] extended test
     FEATURE_REGEX_MATCH,   ///< =~ regex matching
     FEATURE_PATTERN_MATCH, ///< == pattern matching in [[ ]]
 
-    /// Process Substitution (Phase 3)
+    /// Process Substitution
     FEATURE_PROCESS_SUBSTITUTION, ///< <(cmd) and >(cmd)
     FEATURE_PIPE_STDERR,          ///< |& pipe stderr too
     FEATURE_APPEND_BOTH,          ///< &>> append both streams
     FEATURE_COPROC,               ///< coproc command
 
-    /// Extended Parameter Expansion (Phase 4)
+    /// Extended Parameter Expansion
     FEATURE_CASE_MODIFICATION,    ///< ${var^^}, ${var,,}
     FEATURE_SUBSTRING_EXPANSION,  ///< ${var:offset:length}
     FEATURE_PATTERN_SUBSTITUTION, ///< ${var/pattern/replacement}
@@ -94,7 +94,7 @@ typedef enum {
     FEATURE_ANSI_QUOTING,   ///< $'...' ANSI-C quoting with escape sequences
     FEATURE_LOCALE_QUOTING, ///< $"..." locale-aware quoting (gettext)
 
-    /// Control Flow Extensions (Phase 5)
+    /// Control Flow Extensions
     FEATURE_CASE_FALLTHROUGH, ///< ;& and ;;& in case statements
     FEATURE_SELECT_LOOP,      ///< select var in list; do ... done
     FEATURE_TIME_KEYWORD,     ///< time command with TIMEFORMAT
@@ -122,12 +122,12 @@ typedef enum {
     FEATURE_HIST_VERIFY,        ///< Verify history expansion before execution
     FEATURE_CHECKJOBS,          ///< Warn about running jobs on exit
 
-    /// Function Enhancements (Phase 6)
+    /// Function Enhancements
     FEATURE_NAMEREF,             ///< local -n nameref variables
     FEATURE_ANONYMOUS_FUNCTIONS, ///< Zsh () { } anonymous functions
     FEATURE_RETURN_ANYWHERE,     ///< return from sourced scripts
 
-    /// Zsh-Specific (Phase 7)
+    /// Zsh-Specific
     FEATURE_GLOB_QUALIFIERS,    ///< Zsh glob qualifiers: *(.) *(/)
     FEATURE_HOOK_FUNCTIONS,     ///< precmd, preexec, chpwd hooks
     FEATURE_SIMPLE_HOOK_ARRAYS, ///< precmd+=(fn) in addition to

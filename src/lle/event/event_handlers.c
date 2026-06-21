@@ -5,9 +5,9 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Handler registration, unregistration, and event dispatching with filtering.
- * Implements Phase 1 core handlers and Phase 2C filtering/hooks.
+ * Implements the core handlers and the filtering/hooks layer.
  *
- * Spec 04: Event System - Phase 1 + Phase 2C
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"
@@ -197,7 +197,7 @@ size_t lle_event_handler_count(lle_event_system_t *system,
  * @param event The event to dispatch
  * @return LLE_SUCCESS on success, or last error from handlers
  *
- * Phase 2C enhancements:
+ * Filtering and hook enhancements:
  * - Applies event filters before dispatch (can block events)
  * - Calls pre-dispatch hook before handlers
  * - Updates system state to PROCESSING during dispatch
@@ -209,7 +209,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Phase 2C: Apply event filters
+    /// Apply event filters
     if (system->filter_system) {
         lle_filter_result_t filter_result =
             lle_event_filter_apply(system, event);
@@ -219,7 +219,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         /// FILTER_PASS, FILTER_TRANSFORM, or FILTER_ERROR: continue dispatch
     }
 
-    /// Phase 2C: Call pre-dispatch hook
+    /// Call pre-dispatch hook
     if (system->pre_dispatch_hook) {
         lle_result_t hook_result =
             system->pre_dispatch_hook(event, system->pre_dispatch_data);
@@ -267,7 +267,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
     system->current_state = previous_state;
     pthread_mutex_unlock(&system->system_mutex);
 
-    /// Phase 2C: Call post-dispatch hook
+    /// Call post-dispatch hook
     if (system->post_dispatch_hook) {
         system->post_dispatch_hook(event, dispatch_result,
                                    system->post_dispatch_data);

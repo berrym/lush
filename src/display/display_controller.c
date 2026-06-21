@@ -3354,7 +3354,7 @@ display_controller_error_t display_controller_get_integration_interface(
     }
 
     /// For now, this is a placeholder for future integration interface
-    /// In Week 8, this would provide function pointers for shell integration
+    /// A future revision would provide function pointers for shell integration
     memset(interface_buffer, 0, buffer_size);
 
     return DISPLAY_CONTROLLER_SUCCESS;

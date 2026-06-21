@@ -1033,7 +1033,7 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
 }
 
 /* ============================================================================
- * NAMEREF SUPPORT (Phase 6: Function Enhancements)
+ * NAMEREF SUPPORT (Function Enhancements)
  * ============================================================================
  */
 
@@ -2468,7 +2468,7 @@ void symtable_seed_random(unsigned int seed) {
 }
 
 /// ============================================================================
-/// ARRAY VARIABLE IMPLEMENTATION (Phase 1: Extended Language Support)
+/// ARRAY VARIABLE IMPLEMENTATION (Extended Language Support)
 /// ============================================================================
 
 /** Initial capacity for indexed arrays */

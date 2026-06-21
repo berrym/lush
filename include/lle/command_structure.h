@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Part of Spec 22 Phase 2: Multiline Reconstruction Engine
+ * Part of Spec 22: Multiline Reconstruction Engine
  * Defines structures and types for analyzing shell command constructs
  * (loops, conditionals, functions, etc.) and preserving their structure.
  */

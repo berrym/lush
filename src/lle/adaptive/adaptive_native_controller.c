@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 26 Phase 2 - Native Terminal Controller
+ * Specification: Spec 26 - Native Terminal Controller
  *
  * Implements the native controller for traditional TTY terminals.
  * Provides full terminal control with raw mode and comprehensive

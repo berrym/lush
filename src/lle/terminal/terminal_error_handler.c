@@ -11,7 +11,7 @@
  * - Provide terminal error recovery strategies
  * - Handle terminal state restoration on errors
  *
- * NOTE: Full error logging will be implemented when Spec 16 Phase 2 is
+ * NOTE: Full error logging will be implemented when Spec 16 is
  * complete. For now, provides basic error handling and recovery.
  *
  * Spec 02: Terminal Abstraction - Subsystem 7

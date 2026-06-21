@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 26 Phase 2 - Context Initialization
+ * Specification: Spec 26 - Context Initialization
  *
  * Provides unified initialization and lifecycle management for adaptive
  * terminal integration contexts. Handles detection, controller selection,

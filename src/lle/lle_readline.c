@@ -986,7 +986,7 @@ static lle_result_t handle_character_input(lle_event_t *event,
     /// End change sequence
     end_change_sequence(ctx);
 
-    /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
+    /// Synchronize cursor fields after insert
     if (result == LLE_SUCCESS && ctx->editor && ctx->editor->cursor_manager) {
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
@@ -1002,7 +1002,7 @@ static lle_result_t handle_character_input(lle_event_t *event,
 
 /// @brief Event handler for backspace
 /// Step 4: Handler modifies buffer and refreshes display
-/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
+/// Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1127,7 +1127,7 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         lle_result_t result = lle_buffer_insert_text(
             ctx->buffer, ctx->buffer->cursor.byte_offset, "\n", 1);
 
-        /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
+        /// Synchronize cursor fields after insert
         if (result == LLE_SUCCESS && ctx->editor &&
             ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
@@ -1837,7 +1837,7 @@ static lle_result_t handle_yank(lle_event_t *event, void *user_data) {
         /// End change sequence
         end_change_sequence(ctx);
 
-        /// Synchronize cursor fields after insert (PHASE 2 STEP 0 FIX)
+        /// Synchronize cursor fields after insert
         if (result == LLE_SUCCESS && ctx->editor &&
             ctx->editor->cursor_manager) {
             lle_cursor_manager_move_to_byte_offset(
@@ -1943,7 +1943,7 @@ static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
 
 /// @brief Event handler for Left arrow key
 /// Step 5: Move cursor left one grapheme cluster
-/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
+/// Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1970,7 +1970,7 @@ static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
 
 /// @brief Event handler for Right arrow key
 /// Step 5: Move cursor right one grapheme cluster
-/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
+/// Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2047,7 +2047,7 @@ static lle_result_t handle_end(lle_event_t *event, void *user_data) {
 
 /// @brief Event handler for Delete key
 /// Step 5: Delete character at cursor position
-/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
+/// Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;

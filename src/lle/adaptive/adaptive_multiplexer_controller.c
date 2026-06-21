@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 26 Phase 2 - Multiplexer Controller
+ * Specification: Spec 26 - Multiplexer Controller
  *
  * Implements the multiplexer controller for terminal multiplexers
  * (tmux/screen). Provides special handling for multiplexer-specific escape

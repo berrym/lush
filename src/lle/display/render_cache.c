@@ -20,7 +20,7 @@
  * - Comprehensive error handling
  * - Cache metrics tracking
  *
- * Week 4 Day 4-5: Simple Caching
+ * Simple Caching
  */
 
 #include "ht.h"

@@ -77,7 +77,7 @@ void lle_terminal_monitor_display_generation(
     const uint64_t TARGET_GENERATION_TIME_US = 500; /// 500us target
 
     if (generation_time_us > TARGET_GENERATION_TIME_US) {
-        /// Log performance warning (when Spec 14 Phase 2 implemented)
+        /// Log performance warning (when Spec 14 implemented)
         /// For now, just track the metric
     }
 

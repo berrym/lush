@@ -598,8 +598,6 @@ int bin_display(int argc, char **argv) {
         printf("  2 - Standard (default optimization)\n");
         printf("  3 - Aggressive (aggressive optimization)\n");
         printf("  4 - Maximum (maximum performance mode)\n");
-        printf("\nFor more information, see the Week 8 implementation "
-               "documentation.\n");
         return 0;
 
     } else {

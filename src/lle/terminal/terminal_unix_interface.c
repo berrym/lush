@@ -488,7 +488,7 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
 }
 
 /* ============================================================================
- * UTF-8 DECODING HELPERS (Phase 3)
+ * UTF-8 DECODING HELPERS
  * ============================================================================
  */
 
@@ -600,7 +600,7 @@ static lle_result_t decode_utf8(lle_unix_interface_t *interface,
 }
 
 /* ============================================================================
- * EVENT READING (Phase 3)
+ * EVENT READING
  * ============================================================================
  */
 

@@ -116,7 +116,7 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
     }
 
     /// Step 8: Initialize error handling and performance monitoring
-    /// NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
+    /// NOTE: When Spec 16 and Spec 14 are implemented,
     /// we will call initialization functions here:
     /// - lle_error_context_init(&abs->error_ctx)
     /// - lle_performance_monitor_init(&abs->perf_monitor)
@@ -144,7 +144,7 @@ void lle_terminal_abstraction_destroy(lle_terminal_abstraction_t *abstraction) {
     /// Destroy in reverse order of initialization
 
     /// Step 8: Destroy performance monitoring and error handling
-    /// NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
+    /// NOTE: When Spec 16 and Spec 14 are implemented,
     /// we will call destroy functions here. For now, they are NULL.
     abstraction->perf_monitor = NULL;
     abstraction->error_ctx = NULL;

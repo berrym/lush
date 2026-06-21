@@ -1,7 +1,6 @@
 /**
  * @file history_interactive_search.c
- * @brief LLE History System - Interactive Search Implementation (Spec 09 Phase
- * 3 Day 9)
+ * @brief LLE History System - Interactive Search Implementation (Spec 09)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *

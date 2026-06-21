@@ -57,22 +57,22 @@ static bool is_redirection_token(token_type_t type);
 static bool parse_trailing_redirections(parser_t *parser,
                                         node_t *compound_node);
 
-/// Forward declarations for extended language features (Phase 1)
+/// Forward declarations for extended language features
 static node_t *parse_arithmetic_command(parser_t *parser);
 static node_t *parse_array_literal(parser_t *parser);
 
-/// Forward declarations for extended language features (Phase 2)
+/// Forward declarations for extended language features
 static node_t *parse_extended_test(parser_t *parser);
 
-/// Forward declarations for extended language features (Phase 3)
+/// Forward declarations for extended language features
 static node_t *parse_process_substitution(parser_t *parser);
 
-/// Forward declarations for extended language features (Phase 5)
+/// Forward declarations for extended language features
 static node_t *parse_select_statement(parser_t *parser);
 static node_t *parse_time_command(parser_t *parser);
 static node_t *parse_coproc(parser_t *parser);
 
-/// Forward declarations for extended language features (Phase 7: Zsh)
+/// Forward declarations for extended language features (Zsh)
 static node_t *parse_anonymous_function(parser_t *parser);
 
 /// Typed-function form (`fn name(p: kind, ...) [-> kind] { body }`).
@@ -207,7 +207,7 @@ static void set_parser_error(parser_t *parser, const char *message) {
 }
 
 /* ============================================================================
- * Structured Error Collection (Phase 2)
+ * Structured Error Collection
  * ============================================================================
  */
 

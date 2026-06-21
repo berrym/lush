@@ -1,14 +1,14 @@
 /**
  * @file error_handling.c
- * @brief LLE Error Handling System - Phase 1 Core Implementation
+ * @brief LLE Error Handling System Core Implementation
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Specification: Spec 16 - Error Handling Complete Specification
- * Phase: 1 - Core Error Handling
+ * 1 - Core Error Handling
  * Version: 1.0.0
  *
- * This file contains COMPLETE implementations of Phase 1 error handling:
+ * This file contains COMPLETE implementations of the core error handling:
  * - Error context creation and management
  * - Error reporting and formatting
  * - Error code conversion and string functions
@@ -16,8 +16,8 @@
  * - Thread-local error storage
  *
  * All implementations are production-ready, spec-compliant, and
- * performance-optimized. Phase 1 functions are fully implemented. Phase 2
- * functions marked for future implementation.
+ * performance-optimized. The core functions are fully implemented;
+ * the recovery and state-machine functions are implemented below.
  */
 
 #include "lle/error_handling.h"
@@ -218,8 +218,8 @@ lle_result_t lle_init_error_memory_pools(void) {
         return LLE_SUCCESS;
     }
 
-    /// For Phase 1, use simple malloc-based allocation
-    /// Phase 2 will integrate with Document 15 memory pools
+    /// Use simple malloc-based allocation for now
+    /// A future revision will integrate with the Document 15 memory pools
     g_error_memory_pools.error_context_pool =
         malloc(sizeof(lle_error_context_t) * LLE_ERROR_POOL_BLOCKS);
 
@@ -248,8 +248,8 @@ lle_result_t lle_init_error_memory_pools(void) {
  * @brief Allocate memory from error pool
  */
 void *lle_error_pool_alloc(size_t size) {
-    /// Simple allocation for Phase 1
-    /// Phase 2 will use proper pool allocation
+    /// Simple allocation for now
+    /// A future revision will use proper pool allocation
     return malloc(size);
 }
 
@@ -939,7 +939,7 @@ bool lle_should_suppress_error(lle_error_reporting_system_t *system,
         return false;
     }
 
-    /// Phase 2 will implement full suppression table
+    /// A future revision will implement the full suppression table
     return false;
 }
 
@@ -969,7 +969,7 @@ lle_result_t lle_report_error(const lle_error_context_t *context) {
 
     uint64_t reporting_start = lle_get_timestamp_ns();
 
-    /// Console reporting - always enabled for Phase 1
+    /// Console reporting - always enabled for now
     lle_report_error_to_console(context);
 
     /// Log file reporting if system is configured
@@ -1137,7 +1137,7 @@ lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
                                                   lle_error_severity_t severity,
                                                   uint64_t recovery_time_ns,
                                                   bool recovery_successful) {
-    (void)error_code; /// Error code is encoded in severity for Phase 1
+    (void)error_code; /// Error code is encoded in severity for now
 
     /// Update total errors counter
     lle_error_increment_counter(&g_error_atomic_counters.total_errors_handled);
@@ -1303,12 +1303,12 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
     entry->system_snapshot.operations_per_second = 0;
     entry->system_snapshot.cache_hit_rate_percent = 0;
 
-    /// Stack trace - Phase 2 will implement full backtrace
+    /// Stack trace will implement full backtrace
     entry->stack_trace.frame_count = 0;
     entry->stack_trace.symbol_names = NULL;
     entry->stack_trace.stack_trace_complete = false;
 
-    /// Component state dumps - Phase 2 will implement
+    /// Component state dumps will implement
     entry->component_state.buffer_state_dump = NULL;
     entry->component_state.event_system_state_dump = NULL;
     entry->component_state.terminal_state_dump = NULL;
@@ -1324,9 +1324,10 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
 }
 
 /* ============================================================================
- * PHASE 2 IMPLEMENTATION - RECOVERY STRATEGIES AND ERROR STATE MACHINE
+ * RECOVERY STRATEGIES AND ERROR STATE MACHINE
  * ============================================================================
- * Complete implementations for Phase 2 error handling functions including:
+ * Complete implementations for the recovery and state-machine functions
+ * including:
  * - Recovery strategy selection algorithms
  * - Recovery strategy execution and application
  * - Error state machine implementation

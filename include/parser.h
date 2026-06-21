@@ -66,7 +66,7 @@ typedef struct parser {
     const char *error_message;
     bool has_error;
 
-    /// Structured error collection (Phase 2 error management)
+    /// Structured error collection (error management)
     shell_error_collector_t *error_collector;
     const char *source_name; ///< Script name for error display
 
@@ -190,7 +190,7 @@ bool parser_has_error(parser_t *parser);
 const char *parser_error(parser_t *parser);
 
 /* ============================================================================
- * Structured Error Collection (Phase 2)
+ * Structured Error Collection
  * ============================================================================
  */
 

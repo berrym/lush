@@ -6,7 +6,7 @@
  *
  * Specification: Spec 17 - Testing Framework Complete Specification
  * Version: 1.0.0
- * Phase: Complete core testing framework
+ * Complete core testing framework
  *
  * CRITICAL MANDATE: Complete implementations only.
  * Every function in this file has a COMPLETE implementation with real logic.
@@ -730,7 +730,7 @@ lle_result_t lle_test_results_add_failure(lle_test_results_t *results,
     results->failure_count++;
 
     /// In a complete implementation, we would reallocate the failures array
-    /// For Phase 1, we just track the count
+    /// For now, we just track the count
 
     return LLE_SUCCESS;
 }

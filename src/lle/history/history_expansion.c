@@ -1,7 +1,6 @@
 /**
  * @file history_expansion.c
- * @brief LLE History System - History Expansion Implementation (Spec 09 Phase 3
- * Day 10)
+ * @brief LLE History System - History Expansion Implementation (Spec 09)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *

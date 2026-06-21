@@ -114,7 +114,7 @@ typedef struct lle_prompt_composer {
     char cached_right_format[LLE_TEMPLATE_MAX];
     char cached_ps2_format[LLE_TEMPLATE_MAX];
 
-    /** @brief PS1/PS2 ownership tracking (Spec 28 Phase 2) */
+    /** @brief PS1/PS2 ownership tracking (Spec 28) */
     lle_ps1_owner_t ps1_owner; /**< Who last set PS1 */
     lle_ps1_owner_t ps2_owner; /**< Who last set PS2 */
 
@@ -269,7 +269,7 @@ const lle_theme_t *
 lle_composer_get_theme(const lle_prompt_composer_t *composer);
 
 /* ============================================================================
- * PS1/PS2 OWNERSHIP API (Spec 28 Phase 2)
+ * PS1/PS2 OWNERSHIP API (Spec 28)
  * ============================================================================
  */
 

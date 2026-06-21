@@ -1,6 +1,6 @@
 /**
  * @file terminal_capabilities.c
- * @brief Terminal Capability Detection (Spec 02 Phase 1)
+ * @brief Terminal Capability Detection (Spec 02)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
@@ -10,7 +10,7 @@
  * Critical Principle: ONE-TIME DETECTION at startup. NO runtime terminal
  * queries.
  *
- * Spec 02: Terminal Abstraction - Phase 1
+ * Spec 02: Terminal Abstraction
  */
 
 #include "lle/terminal_abstraction.h"
@@ -398,7 +398,7 @@ lle_capabilities_detect_environment(lle_terminal_capabilities_t **caps,
     }
 
     /// Note: unix_iface may be NULL - not required for capability detection
-    (void)unix_iface; /// Unused in Phase 1
+    (void)unix_iface; /// Currently unused
 
     /// Allocate capabilities structure
     lle_terminal_capabilities_t *c =

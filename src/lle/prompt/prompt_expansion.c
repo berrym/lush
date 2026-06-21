@@ -1,6 +1,6 @@
 /**
  * @file prompt_expansion.c
- * @brief Unified Prompt Expansion Engine (Spec 28 Phase 1)
+ * @brief Unified Prompt Expansion Engine (Spec 28)
  *
  * Two-pass architecture:
  *   Pass 1: lle_template_evaluate() resolves ${...} segments

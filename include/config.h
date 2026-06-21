@@ -305,7 +305,7 @@ typedef struct {
     /// Script execution control
     bool script_execution; ///< Enable script execution
 
-    /// Shell mode settings (Phase 0: Extended Language Support)
+    /// Shell mode settings (Extended Language Support)
     int shell_mode;         ///< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush
     bool shell_mode_strict; ///< Disallow runtime mode changes
 } config_values_t;

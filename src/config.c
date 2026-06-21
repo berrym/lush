@@ -136,7 +136,7 @@ static const config_enum_mapping_t lle_dedup_strategy_mappings[] = {
 static const config_enum_def_t lle_dedup_strategy_enum = {
     lle_dedup_strategy_mappings, LLE_DEDUP_STRATEGY_KEEP_RECENT};
 
-/// Shell Mode mappings (Phase 0: Extended Language Support)
+/// Shell Mode mappings (Extended Language Support)
 static const config_enum_mapping_t shell_mode_mappings[] = {
     {"posix", SHELL_MODE_POSIX},
     {   "sh", SHELL_MODE_POSIX}, /// Alias for posix
@@ -535,7 +535,7 @@ static config_option_t config_options[] = {
     {                    "shell.privileged",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,                                     NULL,
      "Restricted shell security (set -o privileged)",          config_validate_shell_option,                        NULL                     },
 
-    /// Shell mode settings (Phase 0: Extended Language Support)
+    /// Shell mode settings (Extended Language Support)
     {                          "shell.mode",   CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL,                       &config.shell_mode,
      "Shell compatibility mode (posix, bash, zsh, lush)",            config_validate_shell_mode,            &shell_mode_enum                 },
     {                   "shell.mode_strict",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
@@ -3238,7 +3238,7 @@ void config_apply_settings(void) {
     /// Apply settings safely - only set basic variables for now
     /// More complex integrations will be added after basic functionality works
 
-    /// Apply shell mode settings (Phase 0: Extended Language Support)
+    /// Apply shell mode settings (Extended Language Support)
     shell_mode_set((shell_mode_t)config.shell_mode);
     shell_mode_set_strict(config.shell_mode_strict);
 
