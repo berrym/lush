@@ -1,6 +1,6 @@
 /**
- * @file test_history_phase3_day10.c
- * @brief Functional tests for LLE History Phase 3 Day 10 - History Expansion
+ * @file test_history_expansion.c
+ * @brief Functional tests for LLE history expansion (!!, !$, etc.)
  *
  * Tests bash-compatible history expansion including:
  * - !! (repeat last command)
@@ -445,7 +445,7 @@ TEST(test_multiple_expansions) {
 int main(void) {
     printf(
         "=================================================================\n");
-    printf("LLE History Phase 3 Day 10 - History Expansion Tests\n");
+    printf("LLE History Expansion Tests\n");
     printf("================================================================="
            "\n\n");
 

@@ -1,6 +1,6 @@
 /**
- * @file test_error_handling_phase2.c
- * @brief Functional Test for Spec 16 Error Handling - Full Implementation
+ * @file test_lle_error_handling.c
+ * @brief Functional tests for the LLE error-handling system (Spec 16)
  *
  * Tests all error handling capabilities including backtrace capture,
  * component state dumps, and forensic logging.

@@ -1,13 +1,13 @@
 /**
- * @file test_history_phase3_day8.c
- * @brief Functional tests for history phase3 day8
+ * @file test_history_search_results.c
+ * @brief Functional tests for the LLE history search-results container
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * test_history_phase3_day8.c - Search Engine Tests (Spec 09 Phase 3 Day 8)
+ * History search-results tests (Spec 09)
  *
  * Comprehensive test suite for the LLE History Search Engine:
  * - Exact match search

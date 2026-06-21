@@ -492,13 +492,13 @@ if lle_sources.length() > 0
 
   # Event System Phase 2 Tests (Spec 04 Phase 2A-2D)
   # Tests filters, timers, enhanced stats, and priority queues
-  test_event_phase2 = executable('test_event_phase2',
-                                 ['tests/lle/unit/test_event_phase2.c',
+  test_event_filters_timers = executable('test_event_filters_timers',
+                                 ['tests/lle/unit/test_event_filters_timers.c',
                                   'tests/lle/functional/test_memory_mock.c'],
                                  include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep])
 
-  test('LLE Event System Phase 2', test_event_phase2,
+  test('LLE Event Filters and Timers', test_event_filters_timers,
        suite: 'lle-unit',
        timeout: 30)
 
@@ -683,9 +683,9 @@ endif
 
   # History Core Functional Tests (Phase 1 Day 1)
   # Tests basic history operations: add, get, search, navigate
-  if fs.exists('tests/lle/functional/test_history_phase1_day1.c')
-    test_history_core = executable('test_history_phase1_day1',
-                                   ['tests/lle/functional/test_history_phase1_day1.c',
+  if fs.exists('tests/lle/functional/test_history_core.c')
+    test_history_core = executable('test_history_core',
+                                   ['tests/lle/functional/test_history_core.c',
                                     'tests/lle/functional/test_memory_mock.c'],
                                    include_directories: inc,
                                    dependencies: [lle_dep])
@@ -696,9 +696,9 @@ endif
 
   # History Indexing Functional Tests (Phase 1 Day 2)
   # Tests command indexing, prefix search, full-text search
-  if fs.exists('tests/lle/functional/test_history_phase1_day2.c')
-    test_history_indexing = executable('test_history_phase1_day2',
-                                       ['tests/lle/functional/test_history_phase1_day2.c',
+  if fs.exists('tests/lle/functional/test_history_indexing.c')
+    test_history_indexing = executable('test_history_indexing',
+                                       ['tests/lle/functional/test_history_indexing.c',
                                         'tests/lle/functional/test_memory_mock.c'],
                                        include_directories: inc,
                                        dependencies: [lle_dep])
@@ -709,9 +709,9 @@ endif
 
   # History Persistence Functional Tests (Phase 1 Day 3)
   # Tests file I/O, format conversion, import/export
-  if fs.exists('tests/lle/functional/test_history_phase1_day3.c')
-    test_history_persistence = executable('test_history_phase1_day3',
-                                          ['tests/lle/functional/test_history_phase1_day3.c',
+  if fs.exists('tests/lle/functional/test_history_persistence.c')
+    test_history_persistence = executable('test_history_persistence',
+                                          ['tests/lle/functional/test_history_persistence.c',
                                            'tests/lle/functional/test_memory_mock.c'],
                                           include_directories: inc,
                                           dependencies: [lle_dep])
@@ -722,26 +722,26 @@ endif
 
   # History Phase 1 Integration Tests
   # Tests integration between core, indexing, and persistence
-  if fs.exists('tests/lle/integration/test_history_phase1_integration.c')
-    test_history_phase1_integration = executable('test_history_phase1_integration',
-                                                 ['tests/lle/integration/test_history_phase1_integration.c',
+  if fs.exists('tests/lle/integration/test_history_integration.c')
+    test_history_integration = executable('test_history_integration',
+                                                 ['tests/lle/integration/test_history_integration.c',
                                                   'tests/lle/functional/test_memory_mock.c'],
                                                  include_directories: inc,
                                                  dependencies: [lle_dep])
-    test('LLE History Phase 1 Integration', test_history_phase1_integration,
+    test('LLE History Integration', test_history_integration,
          suite: 'lle-integration',
          timeout: 60)
   endif
 
   # History Phase 3 Day 8 Tests - Search Engine
   # Tests exact, prefix, substring, and fuzzy search functionality
-  if fs.exists('tests/lle/functional/test_history_phase3_day8.c')
-    test_history_phase3_day8 = executable('test_history_phase3_day8',
-                                          ['tests/lle/functional/test_history_phase3_day8.c',
+  if fs.exists('tests/lle/functional/test_history_search_results.c')
+    test_history_search_results = executable('test_history_search_results',
+                                          ['tests/lle/functional/test_history_search_results.c',
                                            'tests/lle/functional/test_memory_mock.c'],
                                           include_directories: inc,
                                           dependencies: [lle_dep])
-    test('LLE History Phase 3 Day 8', test_history_phase3_day8,
+    test('LLE History Search Results', test_history_search_results,
          suite: 'lle-functional',
          timeout: 60)
   endif
@@ -874,9 +874,9 @@ endif
   # History Phase 4 Complete Tests
   # Tests Phase 4 features: forensics, deduplication, multiline
   # NOTE: Includes input_continuation.c for multiline support
-  if fs.exists('tests/lle/functional/test_history_phase4_complete.c')
-    test_history_phase4_complete = executable('test_history_phase4_complete',
-                                              ['tests/lle/functional/test_history_phase4_complete.c',
+  if fs.exists('tests/lle/functional/test_history_forensics.c')
+    test_history_forensics = executable('test_history_forensics',
+                                              ['tests/lle/functional/test_history_forensics.c',
                                                'tests/lle/functional/test_memory_mock.c',
                                                'src/input_continuation.c',
                                                'src/identifier.c',
@@ -885,7 +885,7 @@ endif
                                                'src/globals.c'],
                                               include_directories: inc,
                                               dependencies: [lle_dep])
-    test('LLE History Phase 4 Complete', test_history_phase4_complete,
+    test('LLE History Forensics', test_history_forensics,
          suite: 'lle-functional',
          timeout: 60)
   endif
