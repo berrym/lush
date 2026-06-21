@@ -88,11 +88,11 @@ TEST(pool_init_with_statistics) {
 TEST(pool_double_init) {
     lush_pool_config_t config = lush_pool_get_default_config();
     lush_pool_init(&config);
-    /// Second init should handle gracefully
+    /// Initializing an already-initialized pool is explicitly allowed and
+    /// returns success rather than an error.
     lush_pool_error_t err = lush_pool_init(&config);
-    /// May succeed (reinit) or fail gracefully
+    ASSERT_EQ(err, LUSH_POOL_SUCCESS, "re-init of an active pool succeeds");
     lush_pool_shutdown();
-    (void)err; /// Suppress unused warning
 }
 
 TEST(pool_shutdown_without_init) {
@@ -152,11 +152,10 @@ TEST(pool_alloc_xlarge) {
 TEST(pool_alloc_zero) {
     setup_pool();
 
+    /// A zero-byte request is rejected: the pool returns NULL rather than a
+    /// zero-length allocation.
     void *ptr = lush_pool_alloc(0);
-    /// May return NULL or minimal allocation
-    if (ptr) {
-        lush_pool_free(ptr);
-    }
+    ASSERT_NULL(ptr, "alloc(0) returns NULL");
 
     teardown_pool();
 }
@@ -422,12 +421,12 @@ TEST(pool_is_pool_pointer) {
     void *malloc_ptr = malloc(64);
     ASSERT_NOT_NULL(malloc_ptr, "Malloc should succeed");
 
-    bool is_pool = lush_pool_is_pool_pointer(pool_ptr);
-    /// May be true if from pool, false if from malloc fallback
-    (void)is_pool;
-
-    bool is_not_pool = lush_pool_is_pool_pointer(malloc_ptr);
-    ASSERT(!is_not_pool, "Malloc pointer should not be from pool");
+    /// A pointer handed out by the pool is recognized as pool-owned, while a
+    /// raw malloc pointer is not.
+    ASSERT(lush_pool_is_pool_pointer(pool_ptr),
+           "a pool allocation is recognized as a pool pointer");
+    ASSERT(!lush_pool_is_pool_pointer(malloc_ptr),
+           "a malloc pointer is not a pool pointer");
 
     lush_pool_free(pool_ptr);
     free(malloc_ptr);
@@ -489,12 +488,18 @@ TEST(pool_set_debug_mode) {
  */
 
 TEST(pool_meets_performance_targets) {
+    /// Without an initialized pool the targets cannot be met -- this is the
+    /// deterministic contract to pin.
+    lush_pool_shutdown();
+    ASSERT(!lush_pool_meets_performance_targets(),
+           "an uninitialized pool does not meet performance targets");
+
+    /// With a pool up the result is a definite bool, but whether the targets
+    /// are met depends on the host's allocation timing (the check requires
+    /// avg allocation time under 1000ns), so its value is not asserted here.
     setup_pool();
-
-    /// Just verify the function doesn't crash - actual performance may vary
     bool meets = lush_pool_meets_performance_targets();
-    (void)meets; /// Result is system-dependent
-
+    (void)meets;
     teardown_pool();
 }
 
@@ -506,11 +511,20 @@ TEST(pool_get_memory_usage) {
     uint64_t pool_bytes, malloc_bytes;
     double efficiency;
 
+    /// A freshly initialized pool has accounted nothing yet.
     lush_pool_get_memory_usage(&pool_bytes, &malloc_bytes, &efficiency);
-    /// Initially should be minimal
+    ASSERT_EQ(pool_bytes, (uint64_t)0, "no pool bytes before any allocation");
 
+    /// A 64-byte allocation served from the pool is accounted as 64 pool
+    /// bytes with no malloc fallback, so efficiency (the pool's share of
+    /// bytes) is 100%.
     void *ptr = lush_pool_alloc(64);
+    ASSERT_NOT_NULL(ptr, "allocation should succeed");
     lush_pool_get_memory_usage(&pool_bytes, &malloc_bytes, &efficiency);
+    ASSERT_EQ(pool_bytes, (uint64_t)64, "the 64-byte allocation is accounted");
+    ASSERT_EQ(malloc_bytes, (uint64_t)0, "no malloc fallback was used");
+    ASSERT(efficiency == 100.0,
+           "all bytes came from the pool (100% efficient)");
 
     lush_pool_free(ptr);
     lush_pool_shutdown();
