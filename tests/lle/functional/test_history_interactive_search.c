@@ -1,13 +1,13 @@
 /**
- * @file test_history_phase3_day9.c
- * @brief Functional tests for history phase3 day9
+ * @file test_history_interactive_search.c
+ * @brief Functional tests for the LLE interactive history search (Ctrl+R)
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * test_history_phase3_day9.c - Interactive Search Tests (Spec 09 Phase 3 Day 9)
+ * Interactive history search tests (Ctrl+R reverse incremental search):
  *
  * Comprehensive test suite for the LLE History Interactive Search (Ctrl+R):
  * - Session initialization and cleanup
@@ -253,31 +253,30 @@ void test_navigation_next(void) {
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
-    /// Add multiple matching entries
     lle_history_add_entry(core, "git status", 0, NULL);
     lle_history_add_entry(core, "git commit", 0, NULL);
     lle_history_add_entry(core, "git push", 0, NULL);
 
-    /// Init and search for "git"
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('g');
     lle_history_interactive_search_update_query('i');
     lle_history_interactive_search_update_query('t');
 
-    /// Should find matches
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_ACTIVE, "Should have active results");
 
-    /// Navigate to next result
-    (void)lle_history_interactive_search_next();
-    /// Should either succeed or indicate end of results
+    /// The most recent match is current; next moves to the following match.
+    const char *first = lle_history_interactive_search_get_current_command();
+    ASSERT_TRUE(first && strcmp(first, "git push") == 0,
+                "first match is the most recent 'git push'");
+    lle_history_interactive_search_next();
+    const char *second = lle_history_interactive_search_get_current_command();
+    ASSERT_TRUE(second && strcmp(second, "git commit") == 0,
+                "next moves to 'git commit'");
 
-    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 
@@ -286,25 +285,28 @@ void test_navigation_prev(void) {
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
     lle_history_add_entry(core, "test1", 0, NULL);
     lle_history_add_entry(core, "test2", 0, NULL);
     lle_history_add_entry(core, "test3", 0, NULL);
 
-    /// Init and search
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('t');
     lle_history_interactive_search_update_query('e');
 
-    /// Navigate next then prev
+    /// prev undoes next, returning to the original match.
+    char start[64];
+    snprintf(start, sizeof(start), "%s",
+             lle_history_interactive_search_get_current_command());
     lle_history_interactive_search_next();
-    (void)lle_history_interactive_search_prev();
-    /// Should either succeed or indicate start of results
+    const char *moved = lle_history_interactive_search_get_current_command();
+    ASSERT_TRUE(moved && strcmp(moved, start) != 0, "next changes the match");
+    lle_history_interactive_search_prev();
+    const char *back = lle_history_interactive_search_get_current_command();
+    ASSERT_TRUE(back && strcmp(back, start) == 0,
+                "prev returns to the original match");
 
-    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 
@@ -313,28 +315,28 @@ void test_navigation_no_results(void) {
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /// Init and search for non-existent
     lle_history_interactive_search_init(core, "", 0);
     lle_history_interactive_search_update_query('x');
     lle_history_interactive_search_update_query('y');
     lle_history_interactive_search_update_query('z');
 
-    /// Should have no results
     lle_interactive_search_state_t state =
         lle_history_interactive_search_get_state();
     ASSERT_EQ(state, LLE_SEARCH_STATE_NO_RESULTS, "Should have no results");
 
-    /// Navigation should not crash
+    /// Navigating with no results leaves no current command and the state
+    /// unchanged.
     lle_history_interactive_search_next();
     lle_history_interactive_search_prev();
+    ASSERT_TRUE(lle_history_interactive_search_get_current_command() == NULL,
+                "no current command when there are no results");
+    ASSERT_EQ(lle_history_interactive_search_get_state(),
+              LLE_SEARCH_STATE_NO_RESULTS, "state stays NO_RESULTS");
 
-    /// Cleanup
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 
@@ -344,30 +346,26 @@ void test_navigation_no_results(void) {
  */
 
 void test_accept_search(void) {
-    TEST_START("Interactive Search Accept");
+    TEST_START("Interactive Search - Accept");
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /// Init and search
     lle_history_interactive_search_init(core, "original", 0);
     lle_history_interactive_search_update_query('l');
     lle_history_interactive_search_update_query('s');
 
-    /// Accept should return the matched command
+    /// Accept returns the matched command and deactivates the search.
     const char *result = lle_history_interactive_search_accept();
     ASSERT_NOT_NULL(result, "Accept should return result");
-
-    /// State should be inactive after accept
-    lle_interactive_search_state_t state =
-        lle_history_interactive_search_get_state();
-    ASSERT_EQ(state, LLE_SEARCH_STATE_INACTIVE,
+    ASSERT_TRUE(strcmp(result, "ls -la") == 0,
+                "accept returns the matched command");
+    ASSERT_EQ(lle_history_interactive_search_get_state(),
+              LLE_SEARCH_STATE_INACTIVE,
               "State should be inactive after accept");
 
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 
@@ -401,23 +399,20 @@ void test_cancel_search(void) {
 }
 
 void test_accept_no_results(void) {
-    TEST_START("Interactive Search Accept - No Results");
+    TEST_START("Interactive Search - Accept No Results");
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /// Search for non-existent
     lle_history_interactive_search_init(core, "original", 0);
     lle_history_interactive_search_update_query('x');
 
-    /// Accept with no results should not crash
-    (void)lle_history_interactive_search_accept();
-    /// Should return original or empty string
+    /// With no match, accept returns NULL.
+    const char *result = lle_history_interactive_search_accept();
+    ASSERT_TRUE(result == NULL, "accept with no results returns NULL");
 
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 
@@ -514,26 +509,20 @@ void test_search_no_results_state(void) {
  */
 
 void test_prompt_string(void) {
-    TEST_START("Interactive Search Prompt String");
+    TEST_START("Interactive Search - Prompt String");
 
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
-
     lle_history_add_entry(core, "test", 0, NULL);
 
-    /// Init search
     lle_history_interactive_search_init(core, "", 0);
-
-    /// Get prompt string
     const char *prompt = lle_history_interactive_search_get_prompt();
     ASSERT_NOT_NULL(prompt, "Prompt should not be NULL");
-
-    /// Prompt should contain search indicator
-    /// Common formats: "(reverse-i-search)", "bck-i-search", etc.
+    ASSERT_TRUE(strstr(prompt, "reverse-i-search") != NULL,
+                "the prompt is the reverse-i-search prompt");
 
     lle_history_interactive_search_cancel();
     lle_history_core_destroy(core);
-
     TEST_PASS();
 }
 

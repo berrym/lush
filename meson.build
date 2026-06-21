@@ -746,15 +746,15 @@ endif
          timeout: 60)
   endif
 
-  # History Phase 3 Day 9 Tests - Interactive Search
+  # Interactive History Search Tests
   # Tests Ctrl+R style reverse incremental search functionality
-  if fs.exists('tests/lle/functional/test_history_phase3_day9.c')
-    test_history_phase3_day9 = executable('test_history_phase3_day9',
-                                          ['tests/lle/functional/test_history_phase3_day9.c',
+  if fs.exists('tests/lle/functional/test_history_interactive_search.c')
+    test_history_interactive_search = executable('test_history_interactive_search',
+                                          ['tests/lle/functional/test_history_interactive_search.c',
                                            'tests/lle/functional/test_memory_mock.c'],
                                           include_directories: inc,
                                           dependencies: [lle_dep])
-    test('LLE History Phase 3 Day 9', test_history_phase3_day9,
+    test('LLE Interactive History Search', test_history_interactive_search,
          suite: 'lle-functional',
          timeout: 60)
   endif
