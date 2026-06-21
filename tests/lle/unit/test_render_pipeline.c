@@ -201,8 +201,14 @@ TEST(pipeline_execute_simple_content) {
     ASSERT_EQ(result, LLE_SUCCESS,
               "Simple content should execute successfully");
     ASSERT_NOT_NULL(output, "Output should be allocated");
-    ASSERT_GT(output->content_length, 0, "Output should have content");
     ASSERT_NOT_NULL(output->content, "Output content should be allocated");
+
+    /// The pipeline composes the rendered line from the buffer contents;
+    /// for plain text the rendered bytes are the buffer bytes verbatim.
+    ASSERT_EQ(output->content_length, strlen("Hello, World!"),
+              "Rendered length should equal the input byte length");
+    ASSERT_EQ(memcmp(output->content, "Hello, World!", output->content_length),
+              0, "Rendered content should match the input text");
 
     destroy_mock_buffer(buffer);
     lle_render_pipeline_cleanup(pipeline);
@@ -212,7 +218,8 @@ TEST(pipeline_execute_multiline_content) {
     lle_render_pipeline_t *pipeline = NULL;
     lle_render_pipeline_init(&pipeline, mock_pool);
 
-    lle_buffer_t *buffer = create_mock_buffer("Line 1\nLine 2\nLine 3");
+    const char *multiline = "Line 1\nLine 2\nLine 3";
+    lle_buffer_t *buffer = create_mock_buffer(multiline);
     lle_render_context_t context = {0};
     context.buffer = buffer;
     lle_render_output_t *output = NULL;
@@ -223,7 +230,20 @@ TEST(pipeline_execute_multiline_content) {
     ASSERT_EQ(result, LLE_SUCCESS,
               "Multiline content should execute successfully");
     ASSERT_NOT_NULL(output, "Output should be allocated");
-    ASSERT_GT(output->content_length, 0, "Output should have content");
+
+    /// Embedded newlines must survive the pipeline intact -- both the byte
+    /// length and the newline count are preserved end to end.
+    ASSERT_EQ(output->content_length, strlen(multiline),
+              "Rendered length should equal the multiline input length");
+    ASSERT_EQ(memcmp(output->content, multiline, output->content_length), 0,
+              "Rendered content should match the multiline input verbatim");
+    size_t newlines = 0;
+    for (size_t i = 0; i < output->content_length; i++) {
+        if (output->content[i] == '\n') {
+            newlines++;
+        }
+    }
+    ASSERT_EQ(newlines, 2, "Both embedded newlines should be preserved");
 
     destroy_mock_buffer(buffer);
     lle_render_pipeline_cleanup(pipeline);
@@ -237,11 +257,13 @@ TEST(pipeline_multiple_executions) {
     lle_render_pipeline_t *pipeline = NULL;
     lle_render_pipeline_init(&pipeline, mock_pool);
 
-    lle_buffer_t *buffer = create_mock_buffer("test content");
+    const char *content_in = "test content";
+    lle_buffer_t *buffer = create_mock_buffer(content_in);
     lle_render_context_t context = {0};
     context.buffer = buffer;
 
-    /// Execute pipeline multiple times
+    /// Re-running the pipeline on unchanged input must be idempotent: every
+    /// execution yields the same rendered bytes, not just a non-NULL output.
     for (int i = 0; i < 3; i++) {
         lle_render_output_t *output = NULL;
         lle_result_t result =
@@ -249,6 +271,10 @@ TEST(pipeline_multiple_executions) {
 
         ASSERT_EQ(result, LLE_SUCCESS, "Each execution should succeed");
         ASSERT_NOT_NULL(output, "Each execution should produce output");
+        ASSERT_EQ(output->content_length, strlen(content_in),
+                  "Each execution should render the same length");
+        ASSERT_EQ(memcmp(output->content, content_in, output->content_length),
+                  0, "Each execution should render identical content");
     }
 
     destroy_mock_buffer(buffer);
@@ -279,6 +305,16 @@ TEST(pipeline_different_content_sizes) {
                   "Pipeline should handle various content sizes");
         ASSERT_NOT_NULL(output, "Output should be produced");
 
+        /// Rendered length must track the input length across the full size
+        /// range, including the empty string (length 0).
+        ASSERT_EQ(output->content_length, strlen(test_strings[i]),
+                  "Rendered length should match input length at every size");
+        if (output->content_length > 0) {
+            ASSERT_EQ(memcmp(output->content, test_strings[i],
+                             output->content_length),
+                      0, "Rendered content should match input at every size");
+        }
+
         destroy_mock_buffer(buffer);
     }
 
@@ -293,7 +329,8 @@ TEST(pipeline_handles_special_characters) {
     lle_render_pipeline_t *pipeline = NULL;
     lle_render_pipeline_init(&pipeline, mock_pool);
 
-    lle_buffer_t *buffer = create_mock_buffer("Special: \t\n\r!@#$%^&*()");
+    const char *special = "Special: \t\n\r!@#$%^&*()";
+    lle_buffer_t *buffer = create_mock_buffer(special);
     lle_render_context_t context = {0};
     context.buffer = buffer;
     lle_render_output_t *output = NULL;
@@ -304,6 +341,14 @@ TEST(pipeline_handles_special_characters) {
     ASSERT_EQ(result, LLE_SUCCESS, "Pipeline should handle special characters");
     ASSERT_NOT_NULL(output, "Output should be produced");
 
+    /// Control bytes (tab, newline, carriage return) and punctuation must pass
+    /// through byte-for-byte; nothing is stripped or re-encoded.
+    ASSERT_EQ(
+        output->content_length, strlen(special),
+        "Rendered length should equal the special-character input length");
+    ASSERT_EQ(memcmp(output->content, special, output->content_length), 0,
+              "Special characters should be preserved verbatim");
+
     destroy_mock_buffer(buffer);
     lle_render_pipeline_cleanup(pipeline);
 }
@@ -312,7 +357,10 @@ TEST(pipeline_handles_unicode) {
     lle_render_pipeline_t *pipeline = NULL;
     lle_render_pipeline_init(&pipeline, mock_pool);
 
-    lle_buffer_t *buffer = create_mock_buffer("Unicode: 你好世界 🎉");
+    /// 8 multibyte code points (4 CJK at 3 bytes, a space, an emoji at 4
+    /// bytes) plus the 9-byte ASCII prefix "Unicode: ".
+    const char *unicode = "Unicode: 你好世界 🎉";
+    lle_buffer_t *buffer = create_mock_buffer(unicode);
     lle_render_context_t context = {0};
     context.buffer = buffer;
     lle_render_output_t *output = NULL;
@@ -322,6 +370,13 @@ TEST(pipeline_handles_unicode) {
 
     ASSERT_EQ(result, LLE_SUCCESS, "Pipeline should handle Unicode content");
     ASSERT_NOT_NULL(output, "Output should be produced");
+
+    /// The UTF-8 byte sequence must survive intact -- no truncation at a
+    /// multibyte boundary and no transcoding.
+    ASSERT_EQ(output->content_length, strlen(unicode),
+              "Rendered length should equal the UTF-8 byte length");
+    ASSERT_EQ(memcmp(output->content, unicode, output->content_length), 0,
+              "UTF-8 bytes should be preserved verbatim");
 
     destroy_mock_buffer(buffer);
     lle_render_pipeline_cleanup(pipeline);
