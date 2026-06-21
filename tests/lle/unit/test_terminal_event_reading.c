@@ -331,65 +331,81 @@ TEST(resize_event_priority) {
  * ============================================================================
  */
 
-TEST(function_keys_f1_f4) {
-    /// Test F1-F4 keys using SS3 sequences (ESC O P/Q/R/S)
-    /// F1: ESC O P
-    unsigned char f1_data[] = {0x1B, 'O', 'P'};
-    int pipe_fd = create_pipe_with_data(f1_data, sizeof(f1_data), NULL);
+/// Feed one byte sequence through the unix interface and return the single
+/// decoded event. stdin is restored before returning so a later assertion
+/// failure cannot leave it pointing at the closed pipe.
+static lle_input_event_t decode_one_sequence(const unsigned char *seq,
+                                             size_t len) {
+    int pipe_fd = create_pipe_with_data(seq, len, NULL);
     ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
-    lle_result_t result = lle_unix_interface_init(&interface);
-    ASSERT(result == LLE_SUCCESS);
+    ASSERT(lle_unix_interface_init(&interface) == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
     interface->terminal_fd = STDIN_FILENO;
 
-    /// Without parser initialization, should use fallback escape handling
-    /// The fallback won't recognize F1, so it will return ESC or partial
-    /// sequence
-    /// With parser, it would recognize F1
-
-    /// For now, just verify it doesn't crash and returns some event
     lle_input_event_t event;
-    result = lle_unix_interface_read_event(interface, &event, 1000);
-
-    ASSERT(result == LLE_SUCCESS);
-    /// Event type could be CHARACTER (ESC), SPECIAL_KEY, or TIMEOUT depending
-    /// on parser
+    lle_result_t result =
+        lle_unix_interface_read_event(interface, &event, 1000);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
     close(pipe_fd);
     lle_unix_interface_destroy(interface);
+
+    ASSERT(result == LLE_SUCCESS);
+    return event;
+}
+
+TEST(function_keys_f1_f4) {
+    /// F1-F4 arrive as SS3 sequences: ESC O P/Q/R/S. Each must decode to the
+    /// matching special key with no modifiers, not leak as a bare ESC.
+    struct {
+        unsigned char seq[3];
+        lle_special_key_t key;
+    } cases[] = {
+        {{0x1B, 'O', 'P'}, LLE_KEY_F1},
+        {{0x1B, 'O', 'Q'}, LLE_KEY_F2},
+        {{0x1B, 'O', 'R'}, LLE_KEY_F3},
+        {{0x1B, 'O', 'S'}, LLE_KEY_F4},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        lle_input_event_t event = decode_one_sequence(cases[i].seq, 3);
+        ASSERT(event.type == LLE_INPUT_TYPE_SPECIAL_KEY);
+        ASSERT(event.data.special_key.key == cases[i].key);
+        ASSERT(event.data.special_key.modifiers == 0);
+    }
 }
 
 TEST(function_keys_f5_f12) {
-    /// Test F5 key using CSI sequence (ESC [ 1 5 ~)
-    unsigned char f5_data[] = {0x1B, '[', '1', '5', '~'};
-    int pipe_fd = create_pipe_with_data(f5_data, sizeof(f5_data), NULL);
-    ASSERT(pipe_fd >= 0);
+    /// F5-F12 arrive as CSI tilde sequences ESC [ <code> ~ with the xterm
+    /// numbering (note the gaps at 16 and 22). Each must decode to the
+    /// matching special key.
+    struct {
+        const char *seq;
+        size_t len;
+        lle_special_key_t key;
+    } cases[] = {
+        {"\x1b[15~", 5,  LLE_KEY_F5},
+        {"\x1b[17~", 5,  LLE_KEY_F6},
+        {"\x1b[18~", 5,  LLE_KEY_F7},
+        {"\x1b[19~", 5,  LLE_KEY_F8},
+        {"\x1b[20~", 5,  LLE_KEY_F9},
+        {"\x1b[21~", 5, LLE_KEY_F10},
+        {"\x1b[23~", 5, LLE_KEY_F11},
+        {"\x1b[24~", 5, LLE_KEY_F12},
+    };
 
-    lle_unix_interface_t *interface = NULL;
-    lle_result_t result = lle_unix_interface_init(&interface);
-    ASSERT(result == LLE_SUCCESS);
-
-    int saved_stdin = dup(STDIN_FILENO);
-    dup2(pipe_fd, STDIN_FILENO);
-    interface->terminal_fd = STDIN_FILENO;
-
-    /// Read events - should get something without crashing
-    lle_input_event_t event;
-    result = lle_unix_interface_read_event(interface, &event, 1000);
-
-    ASSERT(result == LLE_SUCCESS);
-    /// Without full parser integration, exact behavior varies
-
-    dup2(saved_stdin, STDIN_FILENO);
-    close(saved_stdin);
-    close(pipe_fd);
-    lle_unix_interface_destroy(interface);
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        lle_input_event_t event = decode_one_sequence(
+            (const unsigned char *)cases[i].seq, cases[i].len);
+        ASSERT(event.type == LLE_INPUT_TYPE_SPECIAL_KEY);
+        ASSERT(event.data.special_key.key == cases[i].key);
+        ASSERT(event.data.special_key.modifiers == 0);
+    }
 }
 
 /* ============================================================================
