@@ -449,6 +449,18 @@ void lle_adaptive_reset_detection_stats(void);
 bool lle_adaptive_perform_health_check(lle_adaptive_context_t *context);
 
 /**
+ * Pure mode-degradation mapping: the mode @p mode degrades to when its
+ * controller fails. NATIVE -> ENHANCED -> MINIMAL, MULTIPLEXED -> NATIVE,
+ * and the terminal modes MINIMAL and NONE map to themselves (no further
+ * fallback). Has no side effects and needs no context, so the degradation
+ * hierarchy can be verified directly.
+ *
+ * @param mode Current adaptive mode
+ * @return The next mode in the degradation chain, or @p mode if terminal
+ */
+lle_adaptive_mode_t lle_adaptive_fallback_mode_for(lle_adaptive_mode_t mode);
+
+/**
  * Try fallback mode if current mode fails.
  *
  * @param context Context to update

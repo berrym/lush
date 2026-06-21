@@ -23,20 +23,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/// Test tracking
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST_ASSERT(condition, message)                                        \
-    do {                                                                       \
-        tests_run++;                                                           \
-        if (condition) {                                                       \
-            tests_passed++;                                                    \
-            printf("  [PASS] %s\n", message);                                  \
-        } else {                                                               \
-            printf("  [FAIL] %s\n", message);                                  \
-        }                                                                      \
-    } while (0)
+/// Route the suite's TEST_ASSERT through the framework's ASSERT_TRUE so a
+/// failed assertion actually fails the test (longjmp back to RUN_TEST and a
+/// non-zero process exit) instead of only printing a line the harness ignores.
+#define TEST_ASSERT(condition, message) ASSERT_TRUE(condition, message)
 
 /**
  * Test fallback hierarchy logic
@@ -160,8 +150,9 @@ TEST(multiple_fallbacks) {
         }
     }
 
-    TEST_ASSERT(fallback_count >= 0 && fallback_count <= 3,
-                "Reasonable number of fallback levels");
+    /// The hierarchy is at most NATIVE -> ENHANCED -> MINIMAL, so the chain
+    /// from any start mode terminates within three fallbacks.
+    TEST_ASSERT(fallback_count <= 3, "at most three fallback levels");
     TEST_ASSERT(context->mode == LLE_ADAPTIVE_MODE_MINIMAL ||
                     context->mode == start_mode,
                 "Final mode is minimal or original (if no fallback needed)");
@@ -201,20 +192,40 @@ TEST(fallback_errors) {
 TEST(degradation_chain) {
     printf("\nGraceful Degradation Chain Tests:\n");
 
-    /// Verify expected fallback paths
-    printf("  Expected degradation paths:\n");
-    printf("    NATIVE -> ENHANCED -> MINIMAL\n");
-    printf("    ENHANCED -> MINIMAL\n");
-    printf("    MULTIPLEXED -> NATIVE -> ENHANCED -> MINIMAL\n");
-    printf("    MINIMAL -> (no fallback)\n");
+    /// The documented degradation paths are encoded by the pure
+    /// lle_adaptive_fallback_mode_for mapping, so verify each step directly
+    /// (no controller or TTY required):
+    ///   NATIVE -> ENHANCED -> MINIMAL
+    ///   MULTIPLEXED -> NATIVE -> ENHANCED -> MINIMAL
+    ///   MINIMAL / NONE -> themselves (terminal, no further fallback)
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(LLE_ADAPTIVE_MODE_NATIVE) ==
+                    LLE_ADAPTIVE_MODE_ENHANCED,
+                "NATIVE degrades to ENHANCED");
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(LLE_ADAPTIVE_MODE_ENHANCED) ==
+                    LLE_ADAPTIVE_MODE_MINIMAL,
+                "ENHANCED degrades to MINIMAL");
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(LLE_ADAPTIVE_MODE_MULTIPLEXED) ==
+                    LLE_ADAPTIVE_MODE_NATIVE,
+                "MULTIPLEXED degrades to NATIVE");
 
-    TEST_ASSERT(true, "Degradation hierarchy documented");
+    /// Terminal modes map to themselves, which is how the chain signals "no
+    /// further fallback".
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(LLE_ADAPTIVE_MODE_MINIMAL) ==
+                    LLE_ADAPTIVE_MODE_MINIMAL,
+                "MINIMAL has no further fallback");
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(LLE_ADAPTIVE_MODE_NONE) ==
+                    LLE_ADAPTIVE_MODE_NONE,
+                "NONE has no fallback");
 
-    /// These are verified by the actual fallback tests above
-    TEST_ASSERT(true, "Native degradation path verified");
-    TEST_ASSERT(true, "Enhanced degradation path verified");
-    TEST_ASSERT(true, "Multiplexed degradation path verified");
-    TEST_ASSERT(true, "Minimal has no degradation");
+    /// Following the chain from NATIVE reaches MINIMAL in two steps and then
+    /// terminates.
+    lle_adaptive_mode_t m = LLE_ADAPTIVE_MODE_NATIVE;
+    m = lle_adaptive_fallback_mode_for(m); /// ENHANCED
+    m = lle_adaptive_fallback_mode_for(m); /// MINIMAL
+    TEST_ASSERT(m == LLE_ADAPTIVE_MODE_MINIMAL,
+                "NATIVE reaches MINIMAL after two fallbacks");
+    TEST_ASSERT(lle_adaptive_fallback_mode_for(m) == m,
+                "the chain terminates at MINIMAL");
 }
 
 /**
