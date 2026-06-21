@@ -5,7 +5,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Specification: Spec 09 - History System
- * Phase: Phase 1 Day 1 - Core Structures and Lifecycle
+ * Core Structures and Lifecycle
  *
  * Implements the central history management engine with basic entry
  * management, storage, and retrieval functionality.
@@ -65,18 +65,18 @@ lle_result_t lle_history_config_create_default(lle_history_config_t **config,
         }
     }
 
-    cfg->auto_save = false;    /// Phase 3 - disable auto-save for now
-    cfg->load_on_init = false; /// Phase 3 - disable auto-load for now
+    cfg->auto_save = false;    /// disable auto-save for now
+    cfg->load_on_init = false; /// disable auto-load for now
 
     /// Behavior settings
-    cfg->ignore_duplicates = false;              /// Phase 4 - deduplication
-    cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT; /// Default strategy
+    cfg->ignore_duplicates = false;                     /// deduplication
+    cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT;        /// Default strategy
     cfg->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_SESSION; /// Default scope
     cfg->ignore_space_prefix = true; /// Standard shell behavior
     cfg->save_timestamps = true;
     cfg->save_working_dir = true;
     cfg->save_exit_codes = true;
-    cfg->use_indexing = true; /// Phase 2 - hashtable indexing
+    cfg->use_indexing = true; /// hashtable indexing
 
     *config = cfg;
     return LLE_SUCCESS;
@@ -174,13 +174,13 @@ lle_result_t lle_history_entry_create(lle_history_entry_t **entry,
     e->state = LLE_HISTORY_STATE_ACTIVE;
     e->exit_code = -1; /// Unknown
 
-    /// Phase 4 fields - initialize to defaults
+    /// Extended fields - initialize to defaults
     e->is_multiline = false;
     e->original_multiline = NULL;
     e->duration_ms = 0;
     e->edit_count = 0;
 
-    /// Phase 4 Day 11: Forensic fields - initialize to defaults
+    /// Forensic fields - initialize to defaults
     e->process_id = 0;
     e->session_id = 0;
     e->user_id = 0;
@@ -225,13 +225,13 @@ lle_result_t lle_history_entry_destroy(lle_history_entry_t *entry,
         entry->working_directory = NULL;
     }
 
-    /// Phase 4: Free multiline data if present
+    /// Free multiline data if present
     if (entry->original_multiline) {
         lle_pool_free(entry->original_multiline);
         entry->original_multiline = NULL;
     }
 
-    /// Phase 4 Day 11: Free forensic data if present
+    /// Free forensic data if present
     if (entry->terminal_name) {
         lle_pool_free(entry->terminal_name);
         entry->terminal_name = NULL;
@@ -348,7 +348,7 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
     c->first_entry = NULL;
     c->last_entry = NULL;
 
-    /// Phase 1 Day 2: Create hashtable index if enabled
+    /// Create hashtable index if enabled
     if (c->config->use_indexing) {
         result = lle_history_index_create(&c->entry_lookup, initial_cap);
         if (result != LLE_SUCCESS) {
@@ -361,7 +361,7 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
         c->entry_lookup = NULL;
     }
 
-    /// Phase 4 Day 12: Create deduplication engine if configured
+    /// Create deduplication engine if configured
     if (c->config->ignore_duplicates) {
         /// Use configured strategy and scope (defaults: KEEP_RECENT, SESSION)
         result = lle_history_dedup_create(&c->dedup_engine, c,
@@ -429,13 +429,13 @@ lle_result_t lle_history_core_destroy(lle_history_core_t *core) {
         lle_pool_free(core->entries);
     }
 
-    /// Phase 1 Day 2: Destroy hashtable index if present
+    /// Destroy hashtable index if present
     if (core->entry_lookup) {
         lle_history_index_destroy(core->entry_lookup);
         core->entry_lookup = NULL;
     }
 
-    /// Phase 4 Day 12: Destroy deduplication engine if present
+    /// Destroy deduplication engine if present
     if (core->dedup_engine) {
         lle_history_dedup_destroy(core->dedup_engine);
         core->dedup_engine = NULL;
@@ -571,14 +571,14 @@ lle_result_t lle_history_add_entry(lle_history_core_t *core,
     entry->entry_id = core->next_entry_id++;
     entry->exit_code = exit_code;
 
-    /// Phase 4 Day 11: Capture forensic context
+    /// Capture forensic context
     lle_forensic_context_t forensic_ctx;
     if (lle_forensic_capture_context(&forensic_ctx) == LLE_SUCCESS) {
         lle_forensic_apply_to_entry(entry, &forensic_ctx);
         lle_forensic_free_context(&forensic_ctx);
     }
 
-    /// Phase 4 Day 12: Check for duplicates if dedup engine is enabled
+    /// Check for duplicates if dedup engine is enabled
     if (core->dedup_engine) {
         bool entry_rejected = false;
         result =
@@ -618,7 +618,7 @@ lle_result_t lle_history_add_entry(lle_history_core_t *core,
 
     core->entry_count++;
 
-    /// Phase 1 Day 2: Add to hashtable index if enabled
+    /// Add to hashtable index if enabled
     if (core->entry_lookup) {
         result = lle_history_index_insert(core->entry_lookup, entry->entry_id,
                                           entry);
@@ -775,7 +775,7 @@ lle_result_t lle_history_get_entry_by_id(lle_history_core_t *core,
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
 
-    /// Phase 1 Day 2: Use hashtable lookup if available, otherwise linear
+    /// Use hashtable lookup if available, otherwise linear
     /// search
     lle_history_entry_t *found = NULL;
     lle_result_t lookup_result;
@@ -894,7 +894,7 @@ lle_result_t lle_history_clear(lle_history_core_t *core) {
     core->first_entry = NULL;
     core->last_entry = NULL;
 
-    /// Phase 1 Day 2: Clear hashtable index if present
+    /// Clear hashtable index if present
     if (core->entry_lookup) {
         lle_history_index_clear(core->entry_lookup);
     }

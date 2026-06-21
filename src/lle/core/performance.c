@@ -1,17 +1,17 @@
 /**
  * @file performance.c
- * @brief LLE Performance Optimization System - Phase 1 Core Implementation
+ * @brief LLE Performance Optimization System Core Implementation
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Specification: Spec 14 - Performance Optimization Complete Specification
- * Version: 1.0.0 - Phase 1
- * Phase: Core Performance Monitoring Only
+ * Version: 1.0.0
+ * Core Performance Monitoring Only
  *
  * CRITICAL MANDATE: Complete implementations only.
  * Every function in this file has a COMPLETE implementation with real logic.
  *
- * Phase 1 Scope:
+ * Scope:
  * 1. Performance monitor initialization and cleanup
  * 2. Measurement start/end operations
  * 3. Statistics calculation and aggregation
@@ -90,7 +90,7 @@ static void lle_perf_stats_update(lle_perf_statistics_t *stats,
 }
 
 /* ============================================================================
- * PHASE 1 CORE FUNCTIONS
+ * CORE FUNCTIONS
  * ============================================================================
  */
 
@@ -130,7 +130,7 @@ lle_result_t lle_perf_monitor_init(lle_performance_monitor_t *monitor,
     }
 
     /// Initialize history ring buffer
-    monitor->history_ring.capacity = 100; /// Fixed size for Phase 1
+    monitor->history_ring.capacity = 100; /// Fixed size for now
     monitor->history_ring.entries =
         calloc(monitor->history_ring.capacity, sizeof(lle_perf_statistics_t));
     if (!monitor->history_ring.entries) {
@@ -522,8 +522,8 @@ lle_result_t lle_perf_handle_warning_threshold_exceeded(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// In Phase 1, we simply track that a warning occurred
-    /// Phase 2 will add logging, alerting, and dashboard updates
+    /// For now, we simply track that a warning occurred
+    /// A future revision will add logging, alerting, and dashboard updates
 
     /// Could log to stderr for visibility
     if (monitor->monitoring_level >= LLE_PERF_MONITORING_DETAILED) {
@@ -548,8 +548,8 @@ lle_result_t lle_perf_handle_critical_threshold_exceeded(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// In Phase 1, we track critical threshold violations
-    /// Phase 2 will add comprehensive logging and alerting
+    /// For now, we track critical threshold violations
+    /// A future revision will add comprehensive logging and alerting
 
     /// Always log critical threshold violations
     fprintf(

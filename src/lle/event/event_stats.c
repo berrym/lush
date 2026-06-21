@@ -7,7 +7,7 @@
  * Enhanced statistics tracking and processing configuration.
  * Provides per-event-type statistics, cycle timing, and queue depth metrics.
  *
- * Spec 04: Event System - Phase 2B
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"
@@ -18,7 +18,7 @@
 #define LLE_ENHANCED_STATS_INITIAL_CAPACITY 32
 
 /* ============================================================================
- * Phase 2B: Enhanced Statistics Implementation
+ * Enhanced Statistics Implementation
  * ============================================================================
  */
 
@@ -305,7 +305,7 @@ lle_result_t lle_event_enhanced_stats_reset(lle_event_system_t *system) {
 }
 
 /* ============================================================================
- * Phase 2B: Processing Configuration Implementation
+ * Processing Configuration Implementation
  * ============================================================================
  */
 

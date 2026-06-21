@@ -332,7 +332,7 @@ lle_result_t lle_history_buffer_integration_unregister_callbacks(
     lle_history_buffer_integration_t *integration);
 
 /* ============================================================================
- * PHASE 3 - INTERACTIVE EDITING FUNCTIONS
+ * INTERACTIVE EDITING FUNCTIONS
  * ============================================================================
  */
 
@@ -378,7 +378,7 @@ lle_result_t
 lle_history_session_cancel(lle_history_buffer_integration_t *integration);
 
 /* ============================================================================
- * PHASE 4 - PERFORMANCE MONITORING FUNCTIONS
+ * PERFORMANCE MONITORING FUNCTIONS
  * ============================================================================
  */
 

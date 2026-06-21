@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * LLE Specification 22: History-Buffer Integration - Phase 4
+ * LLE Specification 22: History-Buffer Integration
  *
  * This module implements an LRU (Least Recently Used) cache for storing
  * edited history entries. The cache allows quick lookup of previously

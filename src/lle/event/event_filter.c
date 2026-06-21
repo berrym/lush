@@ -7,7 +7,7 @@
  * Callback-based event filtering, hooks, and system state tracking.
  * Filters can pass, block, transform, or error on events.
  *
- * Spec 04: Event System - Phase 2C
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"
@@ -18,7 +18,7 @@
 #define LLE_FILTER_INITIAL_CAPACITY 8
 
 /* ============================================================================
- * Phase 2C: Event Filter System Implementation
+ * Event Filter System Implementation
  * ============================================================================
  */
 
@@ -421,7 +421,7 @@ lle_result_t lle_event_filter_get_stats(lle_event_system_t *system,
 }
 
 /* ============================================================================
- * Phase 2C: Dispatch Hooks Implementation
+ * Dispatch Hooks Implementation
  * ============================================================================
  */
 
@@ -474,7 +474,7 @@ lle_result_t lle_event_set_post_dispatch_hook(lle_event_system_t *system,
 }
 
 /* ============================================================================
- * Phase 2C: System State Implementation
+ * System State Implementation
  * ============================================================================
  */
 

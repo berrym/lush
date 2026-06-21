@@ -413,7 +413,7 @@ composition_engine_error_t
 composition_engine_clear_cache(composition_engine_t *engine);
 
 /// ============================================================================
-/// CONTINUATION PROMPT SUPPORT (Phase 4)
+/// CONTINUATION PROMPT SUPPORT
 /// ============================================================================
 
 /**

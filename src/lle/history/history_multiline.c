@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Part of Spec 09: History System (Phase 4 Day 13)
+ * Part of Spec 09: History System
  *
  * Provides multiline command detection, formatting preservation, and
  * reconstruction for editing. Integrates with Lush's existing multiline

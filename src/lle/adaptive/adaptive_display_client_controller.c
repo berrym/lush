@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 26 Phase 2 - Display Client Controller
+ * Specification: Spec 26 - Display Client Controller
  *
  * Implements the display client controller for Enhanced mode terminals.
  * This mode is used for editor terminals (Zed, VS Code) and AI assistants

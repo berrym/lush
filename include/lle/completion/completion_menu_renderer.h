@@ -15,7 +15,7 @@
  * - Multi-column layout for efficient screen usage
  *
  * Integration:
- * - Input: lle_completion_menu_state_t (from Phase 4)
+ * - Input: lle_completion_menu_state_t
  * - Output: Formatted text string with \n separators
  * - Consumer: command_layer or display_controller
  * - Display: screen_buffer_render() handles actual rendering

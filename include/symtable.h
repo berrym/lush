@@ -34,7 +34,7 @@ typedef enum {
 } symvar_type_t;
 
 /* ============================================================================
- * ARRAY VALUE STORAGE (Phase 1: Extended Language Support)
+ * ARRAY VALUE STORAGE (Extended Language Support)
  * ============================================================================
  */
 
@@ -471,7 +471,7 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name);
 int symtable_unset_var(symtable_manager_t *manager, const char *name);
 
 /* ============================================================================
- * NAMEREF SUPPORT (Phase 6: Function Enhancements)
+ * NAMEREF SUPPORT (Function Enhancements)
  * ============================================================================
  */
 
@@ -1195,7 +1195,7 @@ void symtable_reset_seconds(void);
 void symtable_seed_random(unsigned int seed);
 
 /* ============================================================================
- * ARRAY VARIABLE API (Phase 1: Extended Language Support)
+ * ARRAY VARIABLE API (Extended Language Support)
  * ============================================================================
  */
 

@@ -257,7 +257,7 @@ lle_result_t lle_shell_integration_init(void) {
     }
     integ->init_state.event_hub_initialized = true;
 
-    /// Step 4.5: Initialize shell hook function bridge (Phase 7)
+    /// Step 4.5: Initialize shell hook function bridge
     /// This registers handlers that call user-defined hook functions
     /// (precmd, preexec, chpwd) when shell events fire.
     /// Note: We set g_lle_integration temporarily so hooks can register
@@ -360,7 +360,7 @@ void lle_shell_integration_shutdown(void) {
     /// Destroy editor
     destroy_editor(integ);
 
-    /// Cleanup shell hook function bridge (Phase 7)
+    /// Cleanup shell hook function bridge
     lle_shell_hooks_cleanup();
 
     /// Destroy event hub
@@ -581,7 +581,7 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         return result;
     }
 
-    /// Spec 28 Phase 2: Write theme's format strings to PS1/PS2.
+    /// Spec 28: Write theme's format strings to PS1/PS2.
     /// PS1 now holds the format string (with ${segment}, \u, %n escapes),
     /// not the rendered output. The prompt render loop will expand it.
     const lle_theme_t *theme = lle_composer_get_theme(integ->prompt_composer);
@@ -770,7 +770,7 @@ static int detect_prompt_color_depth(void) {
 /**
  * @brief Update the shell prompt by expanding the PS1 format string
  *
- * Spec 28 Phase 2: Reads PS1 as a format string (containing bash \u,
+ * Spec 28: Reads PS1 as a format string (containing bash \u,
  * zsh %n, and/or LLE ${segment} escapes), expands it via the unified
  * prompt expansion engine, and stores the rendered result for display.
  * PS1 in the symtable retains the format string — it is NOT overwritten
@@ -1106,7 +1106,7 @@ char *lush_readline_with_prompt(const char *prompt) {
 
     g_lle_integration->total_readline_calls++;
 
-    /// If prompt is NULL, expand PS1 format string (Spec 28 Phase 2).
+    /// If prompt is NULL, expand PS1 format string (Spec 28).
     /// PS1 now holds the format string with escapes (\u, %n, ${segment}).
     /// lle_shell_update_prompt() expands it into a rendered prompt.
     const char *effective_prompt = prompt;

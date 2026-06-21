@@ -84,17 +84,17 @@ typedef enum {
     TOK_DOUBLE_LBRACKET, ///< [[ - extended test start
     TOK_DOUBLE_RBRACKET, ///< ]] - extended test end
 
-    /// Extended operators (Phase 1-2)
+    /// Extended operators
     TOK_PLUS_ASSIGN, ///< += - append to array or add to integer
     TOK_REGEX_MATCH, ///< =~ - regex match operator in [[ ]]
 
-    /// Process substitution and extended pipes (Phase 3)
+    /// Process substitution and extended pipes
     TOK_PROC_SUB_IN,  ///< <( - process substitution input
     TOK_PROC_SUB_OUT, ///< >( - process substitution output
     TOK_PIPE_STDERR,  ///< |& - pipe both stdout and stderr
     TOK_APPEND_BOTH,  ///< &>> - append both stdout and stderr
 
-    /// Control flow extensions (Phase 5)
+    /// Control flow extensions
     TOK_CASE_FALLTHROUGH, ///< ;& - case fall-through (execute next without
                           ///< test)
     TOK_CASE_CONTINUE,    ///< ;;& - case continue (test next pattern)

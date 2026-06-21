@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * LLE Specification 22: History-Buffer Integration - Phase 2
+ * LLE Specification 22: History-Buffer Integration
  *
  * This module analyzes shell command structure, detecting keywords,
  * tracking nesting levels, and determining command completeness.

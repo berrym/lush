@@ -916,7 +916,7 @@ composition_engine_compose(composition_engine_t *engine) {
                                                      false);
 
     /// ========================================================================
-    /// PHASE 4: MULTILINE DETECTION AND PATH SELECTION
+    /// MULTILINE DETECTION AND PATH SELECTION
     /// ========================================================================
 
     /// Detect if command contains newlines (multiline command)

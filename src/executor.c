@@ -174,15 +174,15 @@ static int execute_brace_group(executor_t *executor, node_t *group);
 static int execute_subshell(executor_t *executor, node_t *subshell);
 static int execute_negate(executor_t *executor, node_t *negate_node);
 
-/// Forward declarations for Phase 1: Arrays and Arithmetic
+/// Forward declarations for Arrays and Arithmetic
 static int execute_arithmetic_command(executor_t *executor, node_t *arith_node);
 static int execute_array_assignment(executor_t *executor, node_t *assign_node);
 static int execute_array_append(executor_t *executor, node_t *append_node);
 
-/// Forward declarations for Phase 2: Extended Tests
+/// Forward declarations for Extended Tests
 static int execute_extended_test(executor_t *executor, node_t *test_node);
 
-/// Forward declarations for Phase 3: Process Substitution
+/// Forward declarations for Process Substitution
 char *expand_process_substitution(executor_t *executor, node_t *proc_sub);
 static bool is_builtin_command(const char *cmd);
 static void set_executor_error(executor_t *executor, const char *message);
@@ -358,7 +358,7 @@ executor_t *executor_new(void) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    /// Initialize error context stack (Phase 3)
+    /// Initialize error context stack
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -430,7 +430,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    /// Initialize error context stack (Phase 3)
+    /// Initialize error context stack
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -686,7 +686,7 @@ static void set_executor_error(executor_t *executor, const char *message) {
 }
 
 /* ============================================================================
- * Error Context Stack (Phase 3)
+ * Error Context Stack
  * ============================================================================
  */
 
@@ -2961,7 +2961,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    /// Push loop context for error reporting (Phase 3)
+    /// Push loop context for error reporting
     executor_push_context(executor, while_node->loc, "in while loop");
 
     /// Check for trailing redirections on the while loop
@@ -9824,7 +9824,7 @@ static int execute_function_call(executor_t *executor,
 
     /// No need to clear environment variables with new approach
 
-    /// Push function context for error reporting (Phase 3)
+    /// Push function context for error reporting
     source_location_t func_loc =
         func->body ? func->body->loc : SOURCE_LOC_UNKNOWN;
     executor_push_context(executor, func_loc, "in function '%s'",
@@ -13891,7 +13891,7 @@ static char *parse_parameter_expansion(executor_t *executor,
     /// Look for parameter expansion operators
     const char *op_pos = NULL;
     /// Order matters: longer operators first, then shorter ones
-    /// 0-14: existing operators, 15-18: new Phase 4 operators
+    /// 0-14: existing operators, 15-18: new operators
     const char *operators[] = {":-", /// 0: use default if unset or empty
                                ":+", /// 1: use alternative if set and non-empty
                                "##", /// 2: remove longest prefix pattern
@@ -18538,7 +18538,7 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
 }
 
 /* ============================================================================
- * HOOK FUNCTIONS (Phase 7: Zsh-Specific)
+ * HOOK FUNCTIONS (Zsh-Specific)
  * ============================================================================
  */
 

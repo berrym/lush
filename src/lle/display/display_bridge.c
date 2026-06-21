@@ -637,7 +637,7 @@ static void calculate_cursor_screen_position(const char *text,
             continue;
         }
 
-        /// GRAPHEME-AWARE WIDTH CALCULATION (Phase 2 Fix)
+        /// GRAPHEME-AWARE WIDTH CALCULATION
         ///
         /// Instead of processing individual UTF-8 codepoints, we now process
         /// entire grapheme clusters as atomic units. This correctly handles:

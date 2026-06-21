@@ -7,7 +7,7 @@
  * Simple circular buffer queue with thread safety.
  * Provides the core queueing mechanism for the event system.
  *
- * Spec 04: Event System - Phase 1
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"
@@ -88,7 +88,7 @@ void lle_event_queue_destroy(lle_event_queue_t *queue) {
  * @return LLE_SUCCESS on success, LLE_ERROR_QUEUE_FULL if queue is at capacity,
  *         or LLE_ERROR_INVALID_PARAMETER if parameters are invalid
  *
- * In Phase 2, critical priority events are routed to a separate priority queue.
+ * Critical priority events are routed to a separate priority queue.
  * Events dropped due to full queue are tracked in system statistics.
  */
 lle_result_t lle_event_enqueue(lle_event_system_t *system, lle_event_t *event) {
@@ -96,7 +96,7 @@ lle_result_t lle_event_enqueue(lle_event_system_t *system, lle_event_t *event) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Phase 2: Route to priority queue for CRITICAL priority events only
+    /// Route to priority queue for CRITICAL priority events only
     lle_event_queue_t *queue;
     if (system->use_priority_queue &&
         event->priority == LLE_PRIORITY_CRITICAL) {
@@ -121,7 +121,7 @@ lle_result_t lle_event_enqueue(lle_event_system_t *system, lle_event_t *event) {
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->count++;
 
-    /// Phase 2: Mark event as queued and update statistics
+    /// Mark event as queued and update statistics
     event->flags |= LLE_EVENT_FLAG_QUEUED;
     __atomic_fetch_add(&system->events_by_priority[event->priority], 1,
                        __ATOMIC_SEQ_CST);
@@ -138,7 +138,7 @@ lle_result_t lle_event_enqueue(lle_event_system_t *system, lle_event_t *event) {
  * @return LLE_SUCCESS on success, LLE_ERROR_QUEUE_EMPTY if no events available,
  *         or LLE_ERROR_INVALID_PARAMETER if parameters are invalid
  *
- * In Phase 2, priority queue is checked first before the main queue.
+ * The priority queue is checked first, before the main queue.
  * The event's queued flag is cleared upon dequeue.
  */
 lle_result_t lle_event_dequeue(lle_event_system_t *system,
@@ -147,7 +147,7 @@ lle_result_t lle_event_dequeue(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// Phase 2: Check priority queue first if enabled
+    /// Check priority queue first if enabled
     lle_event_queue_t *queue;
     bool from_priority_queue = false;
 
@@ -179,7 +179,7 @@ lle_result_t lle_event_dequeue(lle_event_system_t *system,
     queue->head = (queue->head + 1) % queue->capacity;
     queue->count--;
 
-    /// Phase 2: Update event flags and statistics
+    /// Update event flags and statistics
     if (*event) {
         (*event)->flags &= ~LLE_EVENT_FLAG_QUEUED; /// Clear queued flag
         if (from_priority_queue) {
@@ -196,7 +196,7 @@ lle_result_t lle_event_dequeue(lle_event_system_t *system,
 /**
  * @brief Get the total number of events in the queue(s)
  * @param system The event system to query
- * @return Total count of queued events (main + priority queue in Phase 2)
+ * @return Total count of queued events (main + priority queue)
  */
 size_t lle_event_queue_size(lle_event_system_t *system) {
     if (!system || !system->queue) {
@@ -210,7 +210,7 @@ size_t lle_event_queue_size(lle_event_system_t *system) {
     count += system->queue->count;
     pthread_mutex_unlock(&system->queue->mutex);
 
-    /// Phase 2: Count events in priority queue if enabled
+    /// Count events in priority queue if enabled
     if (system->use_priority_queue && system->priority_queue) {
         pthread_mutex_lock(&system->priority_queue->mutex);
         count += system->priority_queue->count;
@@ -234,7 +234,7 @@ bool lle_event_queue_empty(lle_event_system_t *system) {
  * @param system The event system to query
  * @return true if no more events can be queued, false otherwise
  *
- * In Phase 2, both main and priority queues must be full for this to return
+ * Both the main and priority queues must be full for this to return
  * true.
  */
 bool lle_event_queue_full(lle_event_system_t *system) {
@@ -250,7 +250,7 @@ bool lle_event_queue_full(lle_event_system_t *system) {
     main_full = (system->queue->count >= system->queue->capacity);
     pthread_mutex_unlock(&system->queue->mutex);
 
-    /// Phase 2: Check priority queue if enabled
+    /// Check priority queue if enabled
     if (system->use_priority_queue && system->priority_queue) {
         pthread_mutex_lock(&system->priority_queue->mutex);
         priority_full =

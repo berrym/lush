@@ -1,7 +1,6 @@
 /**
  * @file history_forensics.c
- * @brief LLE History System - Forensic Tracking Implementation (Spec 09 Phase 4
- * Day 11)
+ * @brief LLE History System - Forensic Tracking Implementation (Spec 09)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *

@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * LLE Specification 22: History-Buffer Integration - Phase 4
+ * LLE Specification 22: History-Buffer Integration
  * Provides caching of reconstructed command text for performance optimization.
  */
 

@@ -105,7 +105,7 @@ void lle_completion_system_clear(lle_completion_system_t *system) {
 }
 
 /// ============================================================================
-/// HELPER FUNCTIONS FOR PHASE 4
+/// HELPER FUNCTIONS
 /// ============================================================================
 
 /**

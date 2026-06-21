@@ -2,7 +2,7 @@
  * @file prompt_expansion.h
  * @brief Unified Prompt Expansion Engine
  *
- * Spec 28 Phase 1: Single expansion function that handles bash escapes
+ * Spec 28: Single expansion function that handles bash escapes
  * (\u, \h, \w), zsh escapes (%n, %m, %~), and LLE segment syntax
  * (${directory}, ${git}) in a unified two-pass architecture.
  *

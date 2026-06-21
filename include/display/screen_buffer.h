@@ -239,7 +239,7 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length);
 void screen_buffer_copy(screen_buffer_t *dest, const screen_buffer_t *src);
 
 /// ============================================================================
-/// PREFIX SUPPORT FUNCTIONS (Phase 2: Continuation Prompts)
+/// PREFIX SUPPORT FUNCTIONS (Continuation Prompts)
 /// ============================================================================
 
 /**

@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Part of Spec 09: History System (Phase 4 Day 12)
+ * Part of Spec 09: History System
  *
  * Provides intelligent duplicate detection and merging with configurable
  * strategies. Supports frequency tracking, recency-based preservation,

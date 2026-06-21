@@ -5,7 +5,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Specification: Spec 09 - History System
- * Phase: Phase 1 Day 2 - Entry Management and Indexing
+ * Entry Management and Indexing
  *
  * Provides hashtable-based indexing for O(1) entry lookup by ID.
  * Uses the libhashtable ht_u64ptr wrapper: a uint64 key hashed directly with

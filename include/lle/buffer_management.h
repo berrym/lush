@@ -11,14 +11,10 @@
  * This header contains ALL type definitions and function declarations for the
  * LLE buffer management system. NO implementations are included here.
  *
- * Implementation Status: PHASE 1 - Core Buffer Structure
- * - Phase 1: Core buffer structure and lifecycle (THIS PHASE)
- * - Phase 2: UTF-8 processing subsystem (FUTURE)
- * - Phase 3: Line structure management (FUTURE)
- * - Phase 4: Cursor management (FUTURE)
- * - Phase 5: Change tracking and undo/redo (FUTURE)
- * - Phase 6: Buffer operations (insert, delete, replace) (FUTURE)
- * - Phase 7: Multiline support (FUTURE)
+ * Subsystems: core buffer structure and lifecycle, UTF-8 processing,
+ * line structure management, cursor management, change tracking and
+ * undo/redo, buffer operations (insert, delete, replace), and multiline
+ * support.
  *
  * Layer 0: Type Definitions Only
  * Layer 1: Implementations in src/lle/buffer_management.c (separate file)
@@ -171,7 +167,7 @@ typedef uint8_t lle_line_flags_t;
 typedef uint8_t lle_cache_flags_t;
 
 /* ============================================================================
- * STRUCTURE DEFINITIONS - PHASE 1: CORE BUFFER
+ * STRUCTURE DEFINITIONS - CORE BUFFER
  * ============================================================================
  */
 
@@ -301,8 +297,8 @@ struct lle_cursor_manager_t {
  * Spec Reference: Line 212-269
  *
  * Complete buffer structure with ALL fields from specification.
- * Phase 1: Only basic lifecycle functions implemented.
- * Future phases will implement subsystem-specific operations.
+ * Only basic lifecycle functions are implemented so far.
+ * Future revisions will implement subsystem-specific operations.
  */
 struct lle_buffer_t {
     /// Buffer metadata
@@ -355,7 +351,7 @@ struct lle_buffer_t {
     lle_buffer_pool_t *pool;         ///< Associated buffer pool
     lush_memory_pool_t *memory_pool; ///< Lush memory pool reference
 
-    /// Security - Minimal Secure Mode (Spec 15 Phase 1)
+    /// Security - Minimal Secure Mode (Spec 15)
     bool secure_mode_enabled; ///< Secure mode active flag
     bool memory_locked;       ///< Memory mlock status
 };
@@ -365,7 +361,7 @@ struct lle_buffer_t {
  * Spec Reference: Line 269-294
  *
  * Complete line structure with ALL fields from specification.
- * Phase 3 will implement line structure management.
+ * Line structure management is a future addition.
  */
 struct lle_line_info_t {
     size_t start_offset;    ///< Line start byte offset
@@ -534,7 +530,7 @@ struct lle_multiline_manager_t {
 };
 
 /* ============================================================================
- * FUNCTION DECLARATIONS - PHASE 1: CORE BUFFER LIFECYCLE
+ * FUNCTION DECLARATIONS - CORE BUFFER LIFECYCLE
  * ============================================================================
  */
 

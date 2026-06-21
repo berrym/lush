@@ -1,6 +1,6 @@
 /**
  * @file history_search.c
- * @brief LLE History System - Search Engine Implementation (Spec 09 Phase 3 Day
+ * @brief LLE History System - Search Engine Implementation (Spec 09 Day
  * 8)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -409,7 +409,7 @@ void lle_history_search_results_sort(lle_history_search_results_t *results) {
  * metric's microsecond resolution; on a fast machine a small search can
  * run in well under 1us, which would otherwise truncate to 0 and make
  * search_time_us a useless metric (and trip the
- * history_phase3_day8 "search time should be recorded" assertion).
+ * the search-results test's "search time should be recorded" assertion).
  */
 static uint64_t search_elapsed_us(const struct timespec *start) {
     struct timespec end;

@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Part of Spec 22 Phase 2: Multiline Reconstruction Engine
+ * Part of Spec 22: Multiline Reconstruction Engine
  *
  * This module implements command structure management including creation,
  * destruction, and keyword tracking for shell command constructs.

@@ -4,7 +4,7 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Specification: Spec 26 Phase 2 - Minimal Controller
+ * Specification: Spec 26 - Minimal Controller
  *
  * Implements the minimal controller for basic line editing environments.
  * Provides simple text input/output without terminal control sequences.

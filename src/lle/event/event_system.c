@@ -7,7 +7,7 @@
  * Core event system lifecycle and event creation/destruction.
  * Implements the foundation of the LLE event-driven architecture.
  *
- * Spec 04: Event System - Phase 1
+ * Spec 04: Event System
  */
 
 #include "lle/event_system.h"
@@ -197,7 +197,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         return result;
     }
 
-    /// Phase 2: Initialize priority queue
+    /// Initialize priority queue
     result = lle_event_queue_init(&sys->priority_queue,
                                   LLE_EVENT_QUEUE_DEFAULT_CAPACITY / 2);
     if (result != LLE_SUCCESS) {
@@ -222,12 +222,12 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
     sys->sequence_counter = 1; /// Start at 1 so first event gets sequence 1
     sys->active = true; /// System is active after successful initialization
 
-    /// Phase 1 statistics
+    /// Core statistics
     sys->events_created = 0;
     sys->events_dispatched = 0;
     sys->events_dropped = 0;
 
-    /// Phase 2A configuration and statistics
+    /// Priority-queue configuration and statistics
     sys->use_priority_queue = true; /// Enable priority queue by default
     sys->priority_events_queued = 0;
     sys->priority_events_processed = 0;
@@ -235,7 +235,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         sys->events_by_priority[i] = 0;
     }
 
-    /// Phase 2B: Initialize processing configuration with defaults
+    /// Initialize processing configuration with defaults
     sys->processing_config.max_events_per_cycle =
         100; /// Default: 100 events per cycle
     sys->processing_config.cycle_time_limit_us =
@@ -244,31 +244,31 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
     sys->processing_config.record_detailed_stats =
         false; /// Default: disabled (opt-in)
 
-    /// Phase 2B: Initialize processing state
+    /// Initialize processing state
     sys->processing_state = LLE_PROCESSING_RUNNING; /// Default: running
 
-    /// Phase 2B: Enhanced statistics starts NULL (created on demand)
+    /// Enhanced statistics starts NULL (created on demand)
     sys->enhanced_stats = NULL;
 
-    /// Phase 2C: Initialize event filtering and hooks
+    /// Initialize event filtering and hooks
     sys->filter_system = NULL; /// Filter system created on demand
     sys->pre_dispatch_hook = NULL;
     sys->pre_dispatch_data = NULL;
     sys->post_dispatch_hook = NULL;
     sys->post_dispatch_data = NULL;
 
-    /// Phase 2C: Initialize system state tracking
+    /// Initialize system state tracking
     sys->current_state = LLE_STATE_INITIALIZING;
     sys->previous_state = LLE_STATE_INITIALIZING;
     sys->state_changed_time = lle_get_current_time_microseconds();
 
-    /// Phase 2D: Timer system starts NULL (created on demand)
+    /// Timer system starts NULL (created on demand)
     sys->timer_system = NULL;
 
     /// Initialize mutex
     pthread_mutex_init(&sys->system_mutex, NULL);
 
-    /// Phase 2C: Transition to IDLE state after successful initialization
+    /// Transition to IDLE state after successful initialization
     sys->current_state = LLE_STATE_IDLE;
     sys->state_changed_time = lle_get_current_time_microseconds();
 
@@ -289,7 +289,7 @@ void lle_event_system_destroy(lle_event_system_t *system) {
         return;
     }
 
-    /// Phase 2C: Set state to shutting down
+    /// Set state to shutting down
     system->current_state = LLE_STATE_SHUTTING_DOWN;
 
     /// Stop system if active
@@ -297,17 +297,17 @@ void lle_event_system_destroy(lle_event_system_t *system) {
         lle_event_system_stop(system);
     }
 
-    /// Phase 2D: Destroy timer system if allocated
+    /// Destroy timer system if allocated
     if (system->timer_system) {
         lle_event_timer_system_destroy(system);
     }
 
-    /// Phase 2C: Destroy filter system if allocated
+    /// Destroy filter system if allocated
     if (system->filter_system) {
         lle_event_filter_system_destroy(system);
     }
 
-    /// Phase 2B: Destroy enhanced statistics if allocated
+    /// Destroy enhanced statistics if allocated
     if (system->enhanced_stats) {
         lle_event_enhanced_stats_destroy(system);
     }
@@ -317,7 +317,7 @@ void lle_event_system_destroy(lle_event_system_t *system) {
         lle_event_queue_destroy(system->queue);
     }
 
-    /// Phase 2A: Destroy priority queue
+    /// Destroy priority queue
     if (system->priority_queue) {
         lle_event_queue_destroy(system->priority_queue);
     }
@@ -479,14 +479,14 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
         evt->data_size = data_size;
     }
 
-    /// Set Phase 1 event fields
+    /// Set the base event fields
     evt->type = type;
     evt->sequence_number =
         __atomic_fetch_add(&system->sequence_counter, 1, __ATOMIC_SEQ_CST);
     evt->timestamp = lle_get_current_time_microseconds();
     evt->next = NULL;
 
-    /// Set Phase 2 event fields
+    /// Set the extended event fields
     evt->source = LLE_EVENT_SOURCE_INTERNAL; /// Default source
     evt->priority = lle_event_get_priority_for_type(type);
     evt->flags = LLE_EVENT_FLAG_NONE;

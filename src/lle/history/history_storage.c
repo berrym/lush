@@ -5,7 +5,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Specification: Spec 09 - History System
- * Phase: Phase 1 Day 3 - Persistence Layer
+ * Persistence Layer
  *
  * Provides file-based persistence for history entries with:
  * - Save/load operations
