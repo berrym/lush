@@ -188,23 +188,6 @@ TEST(expand_ctx_quotes_initial) {
     ASSERT(!ctx.in_quotes, "Should not be in quotes initially");
 }
 
-TEST(expand_ctx_quotes_set) {
-    expand_ctx_t ctx;
-    expand_ctx_init(&ctx, EXPAND_NORMAL);
-
-    ctx.in_quotes = true;
-    ASSERT(ctx.in_quotes, "Should be in quotes after setting");
-}
-
-TEST(expand_ctx_quotes_clear) {
-    expand_ctx_t ctx;
-    expand_ctx_init(&ctx, EXPAND_NORMAL);
-
-    ctx.in_quotes = true;
-    ctx.in_quotes = false;
-    ASSERT(!ctx.in_quotes, "Should not be in quotes after clearing");
-}
-
 /* ============================================================================
  * BACKTICK STATE TESTS
  * ============================================================================
@@ -215,39 +198,6 @@ TEST(expand_ctx_backticks_initial) {
     expand_ctx_init(&ctx, EXPAND_NORMAL);
 
     ASSERT(!ctx.in_backticks, "Should not be in backticks initially");
-}
-
-TEST(expand_ctx_backticks_set) {
-    expand_ctx_t ctx;
-    expand_ctx_init(&ctx, EXPAND_NORMAL);
-
-    ctx.in_backticks = true;
-    ASSERT(ctx.in_backticks, "Should be in backticks after setting");
-}
-
-TEST(expand_ctx_backticks_clear) {
-    expand_ctx_t ctx;
-    expand_ctx_init(&ctx, EXPAND_NORMAL);
-
-    ctx.in_backticks = true;
-    ctx.in_backticks = false;
-    ASSERT(!ctx.in_backticks, "Should not be in backticks after clearing");
-}
-
-/* ============================================================================
- * COMBINED STATE TESTS
- * ============================================================================
- */
-
-TEST(expand_ctx_quotes_and_backticks) {
-    expand_ctx_t ctx;
-    expand_ctx_init(&ctx, EXPAND_NORMAL);
-
-    ctx.in_quotes = true;
-    ctx.in_backticks = true;
-
-    ASSERT(ctx.in_quotes, "Should be in quotes");
-    ASSERT(ctx.in_backticks, "Should be in backticks");
 }
 
 TEST(expand_ctx_mode_with_quotes) {
@@ -265,26 +215,24 @@ TEST(expand_ctx_mode_with_quotes) {
  * ============================================================================
  */
 
-TEST(expand_flag_values) {
-    /// Verify flags are distinct powers of 2
-    ASSERT_EQ(EXPAND_NORMAL, 0x00, "NORMAL should be 0");
-    ASSERT_EQ(EXPAND_ALIAS, 0x01, "ALIAS should be 0x01");
-    ASSERT_EQ(EXPAND_NOQUOTE, 0x02, "NOQUOTE should be 0x02");
-    ASSERT_EQ(EXPAND_NOVAR, 0x04, "NOVAR should be 0x04");
-    ASSERT_EQ(EXPAND_NOCMD, 0x08, "NOCMD should be 0x08");
-    ASSERT_EQ(EXPAND_NOGLOB, 0x10, "NOGLOB should be 0x10");
-}
-
 TEST(expand_flags_orthogonal) {
-    /// Verify flags don't overlap
-    ASSERT((EXPAND_ALIAS & EXPAND_NOQUOTE) == 0,
-           "ALIAS and NOQUOTE should be orthogonal");
-    ASSERT((EXPAND_NOQUOTE & EXPAND_NOVAR) == 0,
-           "NOQUOTE and NOVAR should be orthogonal");
-    ASSERT((EXPAND_NOVAR & EXPAND_NOCMD) == 0,
-           "NOVAR and NOCMD should be orthogonal");
-    ASSERT((EXPAND_NOCMD & EXPAND_NOGLOB) == 0,
-           "NOCMD and NOGLOB should be orthogonal");
+    /// The expansion flags are OR-combined into a mode (see the init_combined
+    /// tests), so each non-NORMAL flag must occupy a single distinct bit and
+    /// no two flags may share a bit. NORMAL is the empty (zero) mode.
+    ASSERT_EQ(EXPAND_NORMAL, 0, "NORMAL is the empty flag set");
+
+    const int flags[] = {EXPAND_ALIAS, EXPAND_NOQUOTE, EXPAND_NOVAR,
+                         EXPAND_NOCMD, EXPAND_NOGLOB};
+    const size_t n = sizeof(flags) / sizeof(flags[0]);
+    int combined = 0;
+    for (size_t i = 0; i < n; i++) {
+        /// Each flag is a single set bit (a power of two).
+        ASSERT(flags[i] != 0 && (flags[i] & (flags[i] - 1)) == 0,
+               "each flag is a single power-of-two bit");
+        /// It does not collide with any flag already accumulated.
+        ASSERT((flags[i] & combined) == 0, "flags occupy disjoint bits");
+        combined |= flags[i];
+    }
 }
 
 /* ============================================================================
@@ -363,20 +311,14 @@ int main(void) {
 
     printf("\nQuote State Tests:\n");
     RUN_TEST(expand_ctx_quotes_initial);
-    RUN_TEST(expand_ctx_quotes_set);
-    RUN_TEST(expand_ctx_quotes_clear);
 
     printf("\nBacktick State Tests:\n");
     RUN_TEST(expand_ctx_backticks_initial);
-    RUN_TEST(expand_ctx_backticks_set);
-    RUN_TEST(expand_ctx_backticks_clear);
 
     printf("\nCombined State Tests:\n");
-    RUN_TEST(expand_ctx_quotes_and_backticks);
     RUN_TEST(expand_ctx_mode_with_quotes);
 
     printf("\nFlag Constant Tests:\n");
-    RUN_TEST(expand_flag_values);
     RUN_TEST(expand_flags_orthogonal);
 
     printf("\nEdge Cases:\n");

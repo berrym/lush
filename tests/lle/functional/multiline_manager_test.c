@@ -219,15 +219,15 @@ TEST(test_multiline_prompt) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /// Complete line should have default prompt
+    /// A complete line uses the default continuation prompt.
     prompt = lle_multiline_get_prompt(ctx);
-    ASSERT_NOT_NULL(prompt, "Has prompt");
+    ASSERT_STR_EQ(prompt, "> ", "complete line uses the default prompt");
 
-    /// Quote should have quote prompt
+    /// An unterminated single quote switches to the quote-context prompt.
     result = lle_multiline_analyze_line(ctx, "echo '", 6);
     ASSERT_SUCCESS(result, "Analyze quote");
     prompt = lle_multiline_get_prompt(ctx);
-    ASSERT_NOT_NULL(prompt, "Has quote prompt");
+    ASSERT_STR_EQ(prompt, "quote> ", "open quote uses the quote prompt");
 
     lle_multiline_context_destroy(ctx);
 }
