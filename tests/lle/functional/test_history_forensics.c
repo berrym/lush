@@ -1,16 +1,17 @@
 /**
- * @file test_history_phase4_complete.c
- * @brief Functional tests for history phase4 complete
+ * @file test_history_forensics.c
+ * @brief Functional tests for LLE history forensics (context capture, dedup,
+ * multiline)
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * test_history_phase4_complete.c - Comprehensive Phase 4 Feature Tests
+ * History forensics feature tests
  *
  * Tests forensic tracking, deduplication, and multiline support together.
- * This is an automated test suite that can be run to validate Phase 4.
+ * Automated test suite for the history forensics features.
  */
 
 #include "lle/error_handling.h"
@@ -547,8 +548,8 @@ void test_forensics_and_multiline_integration(void) {
     TEST_PASS();
 }
 
-void test_all_phase4_features_together(void) {
-    TEST_START("All Phase 4 Features Together");
+void test_all_forensics_features_together(void) {
+    TEST_START("All Forensics Features Together");
 
     /// Create fully configured core
     lle_history_config_t config;
@@ -630,7 +631,7 @@ int main(void) {
     printf("\n--- INTEGRATION TESTS ---\n");
     test_forensics_and_dedup_integration();
     test_forensics_and_multiline_integration();
-    test_all_phase4_features_together();
+    test_all_forensics_features_together();
 
     printf("\n=======================================================\n");
     printf("  TEST RESULTS\n");

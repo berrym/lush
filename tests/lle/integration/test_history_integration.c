@@ -1,13 +1,14 @@
 /**
- * @file test_history_phase1_integration.c
- * @brief Integration tests for history phase1 integration
+ * @file test_history_integration.c
+ * @brief Integration tests for the LLE history system (end-to-end workflow,
+ * stress)
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * Integration Test: History System Phase 1
+ * Integration Test: History system
  *
  * Tests complete workflows combining multiple features:
  * - End-to-end: add → save → load → retrieve
@@ -429,7 +430,7 @@ void test_stress_rapid_operations(void) {
  */
 int main(void) {
     printf("==========================================================\n");
-    printf("History System Phase 1 - Integration Tests\n");
+    printf("History System - Integration Tests\n");
     printf("Complete Workflows and Performance Benchmarks\n");
     printf("==========================================================\n");
 
@@ -449,7 +450,7 @@ int main(void) {
 
     if (tests_failed == 0) {
         printf("ALL INTEGRATION TESTS PASSED\n");
-        printf("Phase 1 is production-ready\n");
+        printf("The history system is production-ready\n");
         printf("==========================================================\n");
         return 0;
     } else {

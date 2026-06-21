@@ -1,13 +1,14 @@
 /**
- * @file test_history_phase1_day1.c
- * @brief Functional tests for history phase1 day1
+ * @file test_history_core.c
+ * @brief Functional tests for the LLE history core (entry add/get, config,
+ * lifecycle)
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /*
- * Functional Test: History System Phase 1 Day 1
+ * Functional Test: History core
  *
  * Tests actual runtime behavior of core history engine:
  * - Lifecycle management (create/destroy)
@@ -117,9 +118,10 @@ void test_default_config_creation(void) {
         FAIL("Timestamps should be saved by default");
     }
 
-    /// Note: ignore_duplicates is false in Phase 1 (deduplication is Phase 4)
+    /// Note: ignore_duplicates is false by default (deduplication is a separate
+    /// feature)
     if (config->ignore_duplicates != false) {
-        FAIL("Duplicate ignoring should be disabled in Phase 1");
+        FAIL("Duplicate ignoring should be disabled by default");
     }
 
     if (config->history_file_path == NULL) {
@@ -515,7 +517,7 @@ void test_clear_history(void) {
  */
 int main(void) {
     printf("=================================================\n");
-    printf("History System Phase 1 Day 1 - Functional Tests\n");
+    printf("History Core - Functional Tests\n");
     printf("=================================================\n");
 
     /// Run all tests
@@ -539,12 +541,12 @@ int main(void) {
 
     if (tests_failed == 0) {
         printf("ALL FUNCTIONAL TESTS PASSED\n");
-        printf("Phase 1 Day 1 implementation is working correctly\n");
+        printf("History core is working correctly\n");
         printf("=================================================\n");
         return 0;
     } else {
         printf("SOME TESTS FAILED\n");
-        printf("Phase 1 Day 1 needs fixes\n");
+        printf("History core needs fixes\n");
         printf("=================================================\n");
         return 1;
     }

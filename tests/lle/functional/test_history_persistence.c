@@ -1,13 +1,13 @@
 /**
- * @file test_history_phase1_day3.c
- * @brief Functional tests for history phase1 day3
+ * @file test_history_persistence.c
+ * @brief Functional tests for LLE history persistence (save/load to disk)
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * Functional Test: History System Phase 1 Day 3
+ * Functional Test: History persistence
  *
  * Tests persistence functionality:
  * - Save history to file
@@ -394,7 +394,7 @@ void test_file_permissions(void) {
  */
 int main(void) {
     printf("=================================================\n");
-    printf("History System Phase 1 Day 3 - Functional Tests\n");
+    printf("History Persistence - Functional Tests\n");
     printf("Persistence and File Storage\n");
     printf("=================================================\n");
 
@@ -415,12 +415,12 @@ int main(void) {
 
     if (tests_failed == 0) {
         printf("ALL FUNCTIONAL TESTS PASSED\n");
-        printf("Phase 1 Day 3 persistence is working correctly\n");
+        printf("Persistence is working correctly\n");
         printf("=================================================\n");
         return 0;
     } else {
         printf("SOME TESTS FAILED\n");
-        printf("Phase 1 Day 3 needs fixes\n");
+        printf("Persistence needs fixes\n");
         printf("=================================================\n");
         return 1;
     }

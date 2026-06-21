@@ -1,16 +1,16 @@
 /**
- * @file test_event_phase2.c
- * @brief Unit tests for LLE Event System Phase 2 Features
+ * @file test_event_filters_timers.c
+ * @brief Unit tests for LLE event filters, timers, and enhanced statistics
  *
- * Tests cover Phase 2 additions:
- * - Event filtering system (Phase 2C)
- * - Timer events (Phase 2D)
- * - Enhanced statistics (Phase 2B)
- * - Priority queue handling (Phase 2A)
- * - Integration of all Phase 2 features
+ * Tests cover:
+ * - Event filtering system
+ * - Timer events
+ * - Enhanced statistics
+ * - Priority queue handling
+ * - Integration of all features
  *
  * SPECIFICATION: docs/lle_specification/04_event_system_complete.md
- * PHASES: Phase 2A-2D
+ *
  */
 
 #include "lle/error_handling.h"
@@ -61,7 +61,7 @@ static lle_filter_result_t test_filter_configurable(lle_event_t *event,
 }
 
 /* ============================================================================
- * FILTER SYSTEM TESTS (Phase 2C)
+ * FILTER SYSTEM TESTS
  * ============================================================================
  */
 
@@ -189,7 +189,7 @@ TEST(filter_statistics) {
 }
 
 /* ============================================================================
- * TIMER SYSTEM TESTS (Phase 2D)
+ * TIMER SYSTEM TESTS
  * ============================================================================
  */
 
@@ -380,7 +380,7 @@ TEST(timer_statistics) {
 }
 
 /* ============================================================================
- * ENHANCED STATISTICS TESTS (Phase 2B)
+ * ENHANCED STATISTICS TESTS
  * ============================================================================
  */
 
@@ -450,7 +450,7 @@ TEST(enhanced_stats_cycles) {
 }
 
 /* ============================================================================
- * PRIORITY QUEUE TESTS (Phase 2A)
+ * PRIORITY QUEUE TESTS
  * ============================================================================
  */
 
@@ -487,12 +487,12 @@ TEST(critical_events_use_priority_queue) {
  * ============================================================================
  */
 
-TEST(phase2_all_systems_together) {
+TEST(all_systems_together) {
     lle_event_system_t *system = NULL;
     lle_result_t result = lle_event_system_init(&system, mock_pool);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Initialize all Phase 2 systems
+    /// Initialize all systems
     result = lle_event_filter_system_init(system);
     ASSERT(result == LLE_SUCCESS);
 
@@ -517,17 +517,17 @@ TEST(phase2_all_systems_together) {
  */
 
 int main(void) {
-    printf("Running Event System Phase 2 Tests\n");
+    printf("Running Event Filters and Timers Tests\n");
     printf("====================================\n\n");
 
-    printf("Filter System Tests (Phase 2C):\n");
+    printf("Filter System Tests:\n");
     RUN_TEST(filter_system_init);
     RUN_TEST(filter_add_remove);
     RUN_TEST(filter_enable_disable);
     RUN_TEST(filter_multiple_filters);
     RUN_TEST(filter_statistics);
 
-    printf("\nTimer System Tests (Phase 2D):\n");
+    printf("\nTimer System Tests:\n");
     RUN_TEST(timer_system_init);
     RUN_TEST(timer_oneshot_add_cancel);
     RUN_TEST(timer_repeating_add);
@@ -536,18 +536,18 @@ int main(void) {
     RUN_TEST(timer_process_callable);
     RUN_TEST(timer_statistics);
 
-    printf("\nEnhanced Statistics Tests (Phase 2B):\n");
+    printf("\nEnhanced Statistics Tests:\n");
     RUN_TEST(enhanced_stats_init);
     RUN_TEST(enhanced_stats_per_type);
     RUN_TEST(enhanced_stats_all_types);
     RUN_TEST(enhanced_stats_cycles);
 
-    printf("\nPriority Queue Tests (Phase 2A):\n");
+    printf("\nPriority Queue Tests:\n");
     RUN_TEST(priority_queue_exists);
     RUN_TEST(critical_events_use_priority_queue);
 
     printf("\nIntegration Tests:\n");
-    RUN_TEST(phase2_all_systems_together);
+    RUN_TEST(all_systems_together);
 
     return TEST_RESULT();
 }

@@ -1,13 +1,13 @@
 /**
- * @file test_history_phase1_day2.c
- * @brief Functional tests for history phase1 day2
+ * @file test_history_indexing.c
+ * @brief Functional tests for LLE history fast-lookup indexing
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
 /**
- * Functional Test: History System Phase 1 Day 2
+ * Functional Test: History indexing
  *
  * Tests indexing functionality:
  * - Hashtable index creation and destruction
@@ -373,7 +373,7 @@ void test_index_operations(void) {
  */
 int main(void) {
     printf("=================================================\n");
-    printf("History System Phase 1 Day 2 - Functional Tests\n");
+    printf("History Indexing - Functional Tests\n");
     printf("Indexing and Fast Lookup\n");
     printf("=================================================\n");
 
@@ -394,12 +394,12 @@ int main(void) {
 
     if (tests_failed == 0) {
         printf("ALL FUNCTIONAL TESTS PASSED\n");
-        printf("Phase 1 Day 2 indexing is working correctly\n");
+        printf("Indexing is working correctly\n");
         printf("=================================================\n");
         return 0;
     } else {
         printf("SOME TESTS FAILED\n");
-        printf("Phase 1 Day 2 needs fixes\n");
+        printf("Indexing needs fixes\n");
         printf("=================================================\n");
         return 1;
     }
