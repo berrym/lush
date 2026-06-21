@@ -82,7 +82,11 @@ int main(int argc, char **argv_main) {
     /// cursor. The TAB byte (\x09) is processed by the LLE input
     /// layer as a TAB key press.
     pty_send(&s, "git \t");
-    pty_drain(&s, 500);
+    /// Wait for each candidate to render rather than for a fixed idle gap:
+    /// menu output can arrive in bursts on a loaded runner.
+    pty_expect(&s, "checkout", 5000);
+    pty_expect(&s, "branch", 5000);
+    pty_expect(&s, "merge", 5000);
 
     /// All three candidates should appear in the LLE's rendered
     /// output. The menu renderer outputs candidate text literally
@@ -120,7 +124,10 @@ int main(int argc, char **argv_main) {
     s.out_len = 0;
     s.output[0] = '\0';
     pty_send(&s, "git c\t");
-    pty_drain(&s, 500);
+    /// Wait for the menu to render the surviving candidate, then settle so
+    /// the absence checks below see the final menu state.
+    pty_expect(&s, "checkout", 5000);
+    pty_drain(&s, 300);
 
     if (!strstr(s.output, "checkout")) {
         fprintf(stderr,
@@ -158,12 +165,17 @@ int main(int argc, char **argv_main) {
     /// Open menu with prefix "c": all three c-prefix candidates
     /// (checkout, clone, commit) appear; first is auto-previewed.
     pty_send(&s, "git c\t");
-    pty_drain(&s, 500);
+    pty_expect(&s, "checkout", 5000);
+    /// Reset so the post-filter assertion sees only the re-render after 'h',
+    /// not the wider menu that was open before it.
+    s.out_len = 0;
+    s.output[0] = '\0';
     /// Type 'h' while menu is open. The keybinding intercept treats
     /// it as a filter keystroke; result must narrow to "checkout"
     /// only.
     pty_send(&s, "h");
-    pty_drain(&s, 500);
+    pty_expect(&s, "checkout", 5000);
+    pty_drain(&s, 300);
 
     if (!strstr(s.output, "checkout")) {
         fprintf(stderr,

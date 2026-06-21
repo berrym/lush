@@ -97,12 +97,12 @@ static int run_test(const char *lush_path) {
     pty_drain(&s, 1000);
     pty_wait(&s, 5000);
 
-    /// Brief grace period so the SIGHUP to the bg process group has
-    /// time to actually terminate the sleep. The kill(0) probe is the
-    /// real assertion.
-    pty_sleep_ms(500);
+    /// Poll until the SIGHUP cascade has actually terminated the bg sleep,
+    /// rather than probing once after a fixed grace period: on a loaded
+    /// runner the cascade can take longer than any single wait.
+    int gone = pty_wait_pid_gone((pid_t)bgpid, 5000);
 
-    if (kill((pid_t)bgpid, 0) == 0) {
+    if (!gone) {
         /// Still alive: SIGHUP didn't cascade. Clean up the sleep so
         /// it doesn't outlive the test, then fail.
         kill((pid_t)bgpid, SIGKILL);
