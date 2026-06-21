@@ -34,6 +34,17 @@
 TEST(tokenizer_new_simple) {
     tokenizer_t *tok = tokenizer_new("echo hello");
     ASSERT_NOT_NULL(tok, "tokenizer_new should return non-NULL");
+
+    /// The tokenizer splits the input into the two expected words.
+    token_t *token = tokenizer_current(tok);
+    ASSERT_EQ(token->type, TOK_WORD, "first token should be a word");
+    ASSERT_STR_EQ(token->text, "echo", "first token text");
+
+    tokenizer_advance(tok);
+    token = tokenizer_current(tok);
+    ASSERT_EQ(token->type, TOK_WORD, "second token should be a word");
+    ASSERT_STR_EQ(token->text, "hello", "second token text");
+
     tokenizer_free(tok);
 }
 
@@ -49,15 +60,10 @@ TEST(tokenizer_new_empty) {
 }
 
 TEST(tokenizer_new_null) {
+    /// A NULL input is rejected outright: the constructor returns NULL rather
+    /// than a usable-but-empty tokenizer.
     tokenizer_t *tok = tokenizer_new(NULL);
-    /// Should handle NULL gracefully - either return NULL or empty tokenizer
-    if (tok != NULL) {
-        token_t *token = tokenizer_current(tok);
-        if (token != NULL) {
-            ASSERT_EQ(token->type, TOK_EOF, "NULL input should yield EOF");
-        }
-        tokenizer_free(tok);
-    }
+    ASSERT_NULL(tok, "NULL input should return NULL");
 }
 
 /* ============================================================================
@@ -113,8 +119,10 @@ TEST(tokenize_single_quoted_string) {
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_STRING, "Should be STRING token");
-    /// String content may or may not include quotes depending on implementation
-    ASSERT_NOT_NULL(token->text, "Token text should not be NULL");
+    /// Single quotes are literal: the surrounding quotes are stripped and the
+    /// inner text is preserved verbatim.
+    ASSERT_STR_EQ(token->text, "hello world",
+                  "single-quoted text with quotes stripped");
 
     tokenizer_free(tok);
 }
@@ -126,7 +134,9 @@ TEST(tokenize_double_quoted_string) {
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_EXPANDABLE_STRING,
               "Should be EXPANDABLE_STRING");
-    ASSERT_NOT_NULL(token->text, "Token text should not be NULL");
+    /// Double quotes are stripped too, leaving the inner (expandable) text.
+    ASSERT_STR_EQ(token->text, "hello world",
+                  "double-quoted text with quotes stripped");
 
     tokenizer_free(tok);
 }
@@ -136,9 +146,8 @@ TEST(tokenize_number) {
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
 
     token_t *token = tokenizer_current(tok);
-    /// Numbers might be recognized as WORD or NUMBER depending on context
-    ASSERT(token->type == TOK_NUMBER || token->type == TOK_WORD,
-           "Should be NUMBER or WORD token");
+    /// A bare integer literal is recognized as a NUMBER token, not a word.
+    ASSERT_EQ(token->type, TOK_NUMBER, "42 should be a NUMBER token");
     ASSERT_STR_EQ(token->text, "42", "Number text mismatch");
 
     tokenizer_free(tok);
@@ -602,17 +611,24 @@ TEST(tokenizer_disable_keywords) {
 
     tokenizer_free(tok);
 
-    /// Test that enable_keywords flag exists and can be set
-    tok = tokenizer_new("echo");
+    /// Disabling keyword recognition reclassifies a keyword as a plain word.
+    /// "if" tokenizes as TOK_IF by default; after disabling keywords and
+    /// refreshing the buffered tokens, the same input is a TOK_WORD.
+    tok = tokenizer_new("if");
     ASSERT_NOT_NULL(tok, "tokenizer_new failed");
+    ASSERT_EQ(tokenizer_current(tok)->type, TOK_IF,
+              "if is a keyword while recognition is enabled");
 
-    /// Verify the flag can be toggled without crashing
     tokenizer_enable_keywords(tok, false);
-    tokenizer_enable_keywords(tok, true);
+    tokenizer_refresh_current_and_lookahead(tok);
+    ASSERT_EQ(tokenizer_current(tok)->type, TOK_WORD,
+              "if becomes a plain word once keywords are disabled");
 
-    /// Current token should still be valid
-    token = tokenizer_current(tok);
-    ASSERT_EQ(token->type, TOK_WORD, "echo should be WORD");
+    /// Re-enabling and refreshing restores keyword recognition.
+    tokenizer_enable_keywords(tok, true);
+    tokenizer_refresh_current_and_lookahead(tok);
+    ASSERT_EQ(tokenizer_current(tok)->type, TOK_IF,
+              "if is recognized as a keyword again once re-enabled");
 
     tokenizer_free(tok);
 }
