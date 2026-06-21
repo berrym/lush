@@ -51,13 +51,14 @@ static int run_test(const char *lush_path) {
     /// Give the shell a moment to settle through init.
     pty_drain(&s, 500);
 
-    /// Send SIGHUP. drain_ms generous so the logout script's echo
-    /// reaches us through the PTY before the slave closes; exit_ms
-    /// also generous in case logout scripts do real work.
-    pty_sighup_and_wait(&s, /*drain_ms=*/1500, /*exit_ms=*/5000);
+    /// Send SIGHUP, then wait specifically for the logout marker to reach us
+    /// through the PTY rather than draining a fixed window: the script's echo
+    /// can be delayed on a loaded runner. Then reap the exited shell.
+    kill(s.pid, SIGHUP);
+    pty_expect(&s, LOGOUT_MARKER, 5000);
+    pty_wait(&s, 5000);
 
-    /// Final drain in case anything is still buffered (rare; the
-    /// drain-during-sighup-wait should already have everything).
+    /// Final drain in case anything is still buffered.
     pty_drain(&s, 200);
 
     /// Assertion 1: lush actually exited (not still running, not

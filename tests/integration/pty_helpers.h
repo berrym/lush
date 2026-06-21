@@ -405,6 +405,74 @@ static inline void pty_drain(pty_session_t *session, int timeout_ms) {
     }
 }
 
+/// Read into the session buffer until @p needle appears in the accumulated
+/// output, or @p timeout_ms elapses with the needle still absent. Returns 1
+/// if the needle was found, 0 on timeout (or buffer full / slave closed).
+///
+/// Prefer this over pty_drain when a test waits for specific output: pty_drain
+/// returns after a fixed idle gap, which races with delayed or bursty shell
+/// output on a loaded CI runner (shell startup, config load, menu render can
+/// each arrive more than the gap apart). pty_expect waits for the thing the
+/// assertion needs, with a generous overall budget, so it returns immediately
+/// on a fast machine and tolerates a slow one -- robust on every platform.
+static inline int pty_expect(pty_session_t *session, const char *needle,
+                             int timeout_ms) {
+    if (session->output && strstr(session->output, needle)) {
+        return 1;
+    }
+    int elapsed = 0;
+    const int slice_ms = 50;
+    while (elapsed < timeout_ms && session->out_len + 1 < session->out_cap) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(session->master_fd, &rfds);
+        struct timeval tv = {.tv_sec = 0, .tv_usec = slice_ms * 1000};
+        int r = select(session->master_fd + 1, &rfds, NULL, NULL, &tv);
+        if (r < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return 0;
+        }
+        if (r == 0) {
+            elapsed += slice_ms;
+            continue;
+        }
+        ssize_t n = read(session->master_fd, session->output + session->out_len,
+                         session->out_cap - session->out_len - 1);
+        if (n <= 0) {
+            return 0; /// Slave closed or read error
+        }
+        session->out_len += (size_t)n;
+        session->output[session->out_len] = '\0';
+        if (strstr(session->output, needle)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/// Poll kill(pid, 0) until the process is gone (ESRCH) or @p timeout_ms
+/// elapses. Returns 1 if the process is gone, 0 if still alive at timeout.
+///
+/// Prefer this over a fixed sleep before a single kill(pid, 0) probe: a
+/// signal cascade (e.g. SIGHUP reaching a background job) can take longer
+/// than any fixed grace period on a loaded CI runner, so a one-shot probe
+/// races with the process actually terminating. Polling returns as soon as
+/// the process is gone and tolerates a slow machine up to the budget.
+static inline int pty_wait_pid_gone(pid_t pid, int timeout_ms) {
+    int elapsed = 0;
+    const int slice_ms = 50;
+    while (elapsed < timeout_ms) {
+        if (kill(pid, 0) != 0 && errno == ESRCH) {
+            return 1;
+        }
+        pty_sleep_ms(slice_ms);
+        elapsed += slice_ms;
+    }
+    return kill(pid, 0) != 0 && errno == ESRCH;
+}
+
 /// Wait for the child to exit. Returns waitpid status (also stashed
 /// in session->exit_status). Does NOT close master_fd -- caller may
 /// want to drain remaining output first.
