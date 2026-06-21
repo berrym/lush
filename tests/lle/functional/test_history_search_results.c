@@ -752,7 +752,7 @@ void test_search_performance_large_history(void) {
 
 int main(void) {
     printf("=======================================================\n");
-    printf("  LLE HISTORY SEARCH ENGINE - PHASE 3 DAY 8 TESTS\n");
+    printf("  LLE HISTORY SEARCH ENGINE TESTS\n");
     printf("=======================================================\n");
 
     printf("\n--- SEARCH RESULT MANAGEMENT ---\n");

@@ -585,7 +585,7 @@ void test_operations_without_init(void) {
 
 int main(void) {
     printf("=======================================================\n");
-    printf("  LLE INTERACTIVE SEARCH - PHASE 3 DAY 9 TESTS\n");
+    printf("  LLE INTERACTIVE SEARCH TESTS\n");
     printf("=======================================================\n");
 
     printf("\n--- SESSION INITIALIZATION ---\n");

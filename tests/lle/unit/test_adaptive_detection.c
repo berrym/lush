@@ -9,7 +9,7 @@
 /**
  * test_adaptive_detection.c - Adaptive Terminal Detection Tests
  *
- * Tests for Spec 26 Phase 1: Core Detection System
+ * Tests for Spec 26: Core Detection System
  *
  * Date: 2025-11-02
  */
@@ -170,7 +170,7 @@ TEST(utility_functions) {
  */
 
 int main(void) {
-    printf("=== Adaptive Terminal Detection Tests (Spec 26 Phase 1) ===\n");
+    printf("=== Adaptive Terminal Detection Tests (Spec 26) ===\n");
     RUN_TEST(signature_database);
     RUN_TEST(basic_detection);
     RUN_TEST(optimized_detection);

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # =============================================================================
-# PHASE 2: EXTENDED TEST [[ ]] TESTS
+# EXTENDED TEST [[ ]] TESTS
 # =============================================================================
 #
-# Tests Phase 2 extended language features including:
+# Tests extended language features including:
 # - Extended test [[ ]] syntax
 # - String comparisons (==, !=, <, >)
 # - Pattern matching with glob patterns
@@ -24,7 +24,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LUSH="${1:-$PROJECT_DIR/build/lush}"
-TEST_DIR="/tmp/lush_phase2_test_$$"
+TEST_DIR="/tmp/lush__test_$$"
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -663,7 +663,7 @@ test_edge_cases() {
 # MAIN
 # =============================================================================
 main() {
-    print_header "PHASE 2: EXTENDED TEST [[ ]] TESTS"
+    print_header "EXTENDED TEST [[ ]] TESTS"
     echo "Testing shell: $LUSH"
     echo "Started at: $(date)"
 
@@ -687,14 +687,14 @@ main() {
     test_edge_cases
 
     # Results summary
-    print_header "PHASE 2 TEST RESULTS"
+    print_header "TEST RESULTS"
 
     echo -e "${BLUE}Total Tests:${NC} $TOTAL_TESTS"
     echo -e "${GREEN}Passed:${NC} $PASSED_TESTS"
     echo -e "${RED}Failed:${NC} $FAILED_TESTS"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}ALL PHASE 2 TESTS PASSED!${NC}"
+        echo -e "\n${GREEN}ALL TESTS PASSED!${NC}"
         echo -e "${GREEN}Extended Test [[ ]] implementation is complete!${NC}"
         exit_code=0
     else
@@ -702,21 +702,21 @@ main() {
         echo -e "\n${YELLOW}Pass Rate: ${pass_rate}%${NC}"
 
         if [[ $pass_rate -ge 90 ]]; then
-            echo -e "${GREEN}EXCELLENT${NC} - Phase 2 nearly complete"
+            echo -e "${GREEN}EXCELLENT${NC} - nearly complete"
             exit_code=0
         elif [[ $pass_rate -ge 80 ]]; then
-            echo -e "${YELLOW}GOOD${NC} - Most Phase 2 features working"
+            echo -e "${YELLOW}GOOD${NC} - Most features working"
             exit_code=0
         elif [[ $pass_rate -ge 70 ]]; then
-            echo -e "${YELLOW}FAIR${NC} - Some Phase 2 features need work"
+            echo -e "${YELLOW}FAIR${NC} - Some features need work"
             exit_code=1
         else
-            echo -e "${RED}NEEDS WORK${NC} - Phase 2 implementation incomplete"
+            echo -e "${RED}NEEDS WORK${NC} - implementation incomplete"
             exit_code=2
         fi
     fi
 
-    echo -e "\n${CYAN}Phase 2 Features Tested:${NC}"
+    echo -e "\n${CYAN}Features Tested:${NC}"
     echo "- String equality (==, !=)"
     echo "- Lexicographic comparisons (<, >)"
     echo "- Pattern matching with glob wildcards (*, ?, [...])"

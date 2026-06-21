@@ -39,7 +39,7 @@ count_bytes() {
     echo -n "$str" | wc -c
 }
 
-echo_info "Phase 1 UTF-8/Grapheme Manual Testing Helper"
+echo_info "UTF-8/Grapheme Manual Testing Helper"
 echo_info "=============================================="
 echo ""
 

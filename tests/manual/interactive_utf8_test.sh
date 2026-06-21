@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo -e "${BLUE}=========================================="
-echo "Phase 1 UTF-8 Interactive Test"
+echo "UTF-8 Interactive Test"
 echo -e "==========================================${NC}"
 echo ""
 echo "This script will show you test strings that you can:"

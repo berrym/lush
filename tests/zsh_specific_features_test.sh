@@ -1,6 +1,6 @@
 #!/bin/bash
-# Phase 7 Complete Test Suite
-# Tests all Phase 7 Zsh-specific features:
+# Zsh-specific features test suite
+# Tests the zsh-specific features:
 # - Anonymous functions () { }
 # - Glob qualifiers *(.), *(/)
 # - Hook functions (precmd, preexec, chpwd)
@@ -74,7 +74,7 @@ cleanup_test_dir() {
 }
 
 echo "========================================"
-echo "Phase 7: Complete Test Suite"
+echo "Complete Test Suite"
 echo "========================================"
 echo "Testing: Anonymous Functions, Glob Qualifiers,"
 echo "         Hook Functions, Plugin System"
@@ -377,8 +377,8 @@ else
     skip "Plugin feature in Lush mode" "Check shell_mode.c manually"
 fi
 
-# Test 28: Feature matrix includes all Phase 7 features
-echo "Test 28: Feature matrix includes Phase 7 features"
+# Test 28: Feature matrix includes all zsh-specific features
+echo "Test 28: Feature matrix includes zsh-specific features"
 FEATURES_FOUND=0
 for feature in GLOB_QUALIFIERS HOOK_FUNCTIONS PLUGIN_SYSTEM ANONYMOUS_FUNCTIONS; do
     if grep -q "FEATURE_$feature" "$PROJECT_ROOT/include/shell_mode.h" 2>/dev/null; then
@@ -386,9 +386,9 @@ for feature in GLOB_QUALIFIERS HOOK_FUNCTIONS PLUGIN_SYSTEM ANONYMOUS_FUNCTIONS;
     fi
 done
 if [ $FEATURES_FOUND -ge 4 ]; then
-    pass "All Phase 7 features in shell_mode.h ($FEATURES_FOUND/4)"
+    pass "All zsh-specific features in shell_mode.h ($FEATURES_FOUND/4)"
 else
-    fail "All Phase 7 features should be defined" "4 features" "$FEATURES_FOUND found"
+    fail "All zsh-specific features should be defined" "4 features" "$FEATURES_FOUND found"
 fi
 
 # ============================================================================
@@ -397,7 +397,7 @@ fi
 
 echo ""
 echo "========================================"
-echo "Phase 7 Complete Test Results"
+echo "Test Results"
 echo "========================================"
 echo -e "Passed:  ${GREEN}$PASSED${NC}"
 echo -e "Failed:  ${RED}$FAILED${NC}"

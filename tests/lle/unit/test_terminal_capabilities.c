@@ -9,7 +9,7 @@
 /*
  * test_terminal_capabilities.c - Unit tests for terminal capability detection
  *
- * Tests Spec 02 Phase 1: Terminal Capability Detection
+ * Tests Spec 02: Terminal Capability Detection
  *
  * Test Categories:
  * 1. Terminal type detection

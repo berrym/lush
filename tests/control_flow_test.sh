@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 5: Control Flow Extensions Tests
+# Control Flow Extensions Tests
 # Tests case fall-through (;&), case continue (;;&), select loop, and time keyword
 
 LUSH="${LUSH:-./build/lush}"
@@ -54,7 +54,7 @@ run_test_contains() {
 }
 
 echo "============================================="
-echo "Phase 5: Control Flow Extensions Tests"
+echo "Control Flow Extensions Tests"
 echo "============================================="
 echo
 
@@ -336,7 +336,7 @@ inner b"
 # =============================================
 echo
 echo "============================================="
-echo "Phase 5 Test Summary"
+echo "Test Summary"
 echo "============================================="
 echo -e "Passed: ${GREEN}$PASSED${NC}"
 echo -e "Failed: ${RED}$FAILED${NC}"

@@ -7,7 +7,7 @@
  */
 
 /**
- * Unit tests for LLE Prompt Expansion Engine (Spec 28 Phase 1)
+ * Unit tests for LLE Prompt Expansion Engine (Spec 28)
  *
  * Tests the unified two-pass expansion:
  *   Pass 1: Template engine (${...} segments)
