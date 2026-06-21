@@ -9,7 +9,7 @@
  * - Memory pressure scenarios
  * - Error recovery under stress
  *
- * Week 8: Production Validation
+ * Production Validation
  */
 
 /// macOS compatibility: Enable full POSIX + BSD extensions for rusage
@@ -547,7 +547,7 @@ int main(void) {
     printf(
         "#          LLE Display Integration - Stress Tests               #\n");
     printf(
-        "#                  Week 8: Production Validation                #\n");
+        "#                     Production Validation                     #\n");
     printf(
         "#                                                               #\n");
     printf(
