@@ -12,9 +12,11 @@
 #include "lle/prompt/template.h"
 #include "lle/prompt/theme.h"
 
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "test_framework.h"
 
@@ -50,6 +52,14 @@
 static lle_prompt_composer_t g_composer;
 static lle_segment_registry_t g_segments;
 static lle_theme_registry_t g_themes;
+
+/// Records whether the probe segment's invalidate hook was dispatched, so
+/// composer_invalidate_caches can prove it reaches each registered segment.
+static bool g_probe_invalidate_called;
+static void probe_segment_invalidate(lle_prompt_segment_t *self) {
+    (void)self;
+    g_probe_invalidate_called = true;
+}
 
 static void setup_composer(void) {
     memset(&g_composer, 0, sizeof(g_composer));
@@ -181,7 +191,13 @@ TEST(composer_render_template_with_segment) {
                                                        output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    ASSERT(strlen(output) > 0);
+
+    /// The user segment renders the current account name (getpwuid of the
+    /// real uid). Compute the same value and assert the template expanded
+    /// to it rather than to some placeholder or empty string.
+    struct passwd *pw = getpwuid(getuid());
+    const char *expected = pw ? pw->pw_name : "user";
+    ASSERT_STR_EQ(output, expected);
 
     teardown_composer();
 }
@@ -246,9 +262,24 @@ TEST(composer_refresh_directory) {
 TEST(composer_invalidate_caches) {
     setup_composer();
 
-    /// Should not crash
+    /// Register a probe segment whose invalidate hook records that it ran.
+    /// invalidate_caches must dispatch to every registered segment's hook,
+    /// so after the call the probe must have been invoked -- proving the
+    /// call propagates rather than silently doing nothing.
+    lle_prompt_segment_t *probe =
+        lle_segment_create("probe", "invalidate probe", LLE_SEG_CAP_CACHEABLE);
+    ASSERT_NOT_NULL(probe);
+    probe->invalidate_cache = probe_segment_invalidate;
+    ASSERT_EQ(lle_segment_registry_register(&g_segments, probe), LLE_SUCCESS);
+
+    g_probe_invalidate_called = false;
     lle_composer_invalidate_caches(&g_composer);
+    ASSERT_TRUE(g_probe_invalidate_called);
+
+    /// NULL composer is a safe no-op (must not crash or set the flag).
+    g_probe_invalidate_called = false;
     lle_composer_invalidate_caches(NULL);
+    ASSERT_FALSE(g_probe_invalidate_called);
 
     teardown_composer();
 }
@@ -382,14 +413,17 @@ TEST(composer_multiple_themes) {
 TEST(composer_segment_visibility) {
     setup_composer();
 
-    /// Git segment should not be visible outside git repo (usually)
+    /// The conditional ${?git:IN_GIT:NOT_GIT} selects a branch based on
+    /// whether the git segment is visible. Which branch wins is
+    /// environment-dependent (inside a git work tree or not), but the
+    /// conditional must resolve to exactly one of the two declared branch
+    /// strings -- not an empty string, the unexpanded template, or a mix.
     char output[256];
     lle_result_t result = lle_composer_render_template(
         &g_composer, "${?git:IN_GIT:NOT_GIT}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /// Result depends on whether we're in a git repo
-    ASSERT(strlen(output) > 0);
+    ASSERT(strcmp(output, "IN_GIT") == 0 || strcmp(output, "NOT_GIT") == 0);
 
     teardown_composer();
 }

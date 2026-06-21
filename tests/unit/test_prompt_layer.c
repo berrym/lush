@@ -940,10 +940,11 @@ static int test_force_render_no_content(void) {
 
     prompt_layer_init(layer, events);
 
-    /// Force render with no content
+    /// Forcing a render before any content is set has no raw content to
+    /// render, so it reports an invalid-state error rather than rendering
+    /// an empty prompt.
     prompt_layer_error_t result = prompt_layer_force_render(layer);
-    /// May succeed with empty render or return error
-    (void)result;
+    ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_STATE);
 
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
