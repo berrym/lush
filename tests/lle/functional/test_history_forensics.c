@@ -316,13 +316,15 @@ void test_dedup_statistics(void) {
     result = lle_history_entry_create(&dup1, "command1", NULL);
     lle_history_entry_t *found = NULL;
     result = lle_history_dedup_check(dedup, dup1, &found);
+    ASSERT_EQ(result, LLE_SUCCESS, "Dedup check should succeed");
+    ASSERT_NOT_NULL(found, "Re-issued command1 is detected as a duplicate");
 
     /// Get statistics
     lle_history_dedup_stats_t stats;
     result = lle_history_dedup_get_stats(dedup, &stats);
     ASSERT_EQ(result, LLE_SUCCESS, "Get stats should succeed");
-    ASSERT_TRUE(stats.duplicates_detected > 0,
-                "Should have detected duplicates");
+    ASSERT_EQ(stats.duplicates_detected, 1,
+              "Exactly one duplicate was detected");
 
     /// Cleanup
     lle_history_entry_destroy(dup1, NULL);
@@ -477,30 +479,32 @@ void test_multiline_line_analysis(void) {
 void test_forensics_and_dedup_integration(void) {
     TEST_START("Forensics + Dedup Integration");
 
-    /// Create history core with dedup DISABLED for debugging
+    /// Dedup enabled -- the realistic configuration.
     lle_history_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_entries = 1000;
-    config.ignore_duplicates = false; /// DISABLE dedup to isolate issue
+    config.ignore_duplicates = true;
 
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, &config);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
-    /// Skip dedup engine check since it's disabled
 
-    /// Add SINGLE entry with forensics
+    /// Add an entry, then add the same command again with dedup enabled.
     uint64_t id1 = 0;
     result = lle_history_add_entry(core, "test command", 0, &id1);
-    ASSERT_EQ(result, LLE_SUCCESS, "Add should succeed");
+    ASSERT_EQ(result, LLE_SUCCESS, "First add should succeed");
 
-    /// Get entry and verify forensics captured
+    uint64_t id2 = 0;
+    result = lle_history_add_entry(core, "test command", 0, &id2);
+    ASSERT_EQ(result, LLE_SUCCESS,
+              "Duplicate add should succeed with dedup on");
+
+    /// The original entry is retrievable and carries captured forensics.
     lle_history_entry_t *entry = NULL;
     result = lle_history_get_entry_by_id(core, id1, &entry);
     ASSERT_EQ(result, LLE_SUCCESS, "Get should succeed");
     ASSERT_NOT_NULL(entry, "Entry should exist");
     ASSERT_TRUE(entry->process_id > 0, "Forensics should be captured");
-
-    /// SKIP adding duplicate to isolate the bug
 
     /// Cleanup
     lle_history_core_destroy(core);
@@ -588,10 +592,12 @@ void test_all_forensics_features_together(void) {
     ASSERT_NOT_NULL(entry->original_multiline, "Original preserved");
     ASSERT_NOT_NULL(core->dedup_engine, "Dedup engine exists");
 
-    /// Test duplicate handling
+    /// Adding the same multiline command again succeeds and yields a fresh
+    /// id (dedup does not reject the add).
     uint64_t id2 = 0;
     result = lle_history_add_entry(core, multiline, 0, &id2);
-    /// Should be handled by dedup
+    ASSERT_EQ(result, LLE_SUCCESS, "Duplicate add should succeed");
+    ASSERT_TRUE(id2 != 0, "Duplicate add assigns an id");
 
     /// Cleanup
     lle_history_core_destroy(core);

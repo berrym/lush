@@ -628,7 +628,7 @@ void test_result_max_limit(void) {
     ASSERT_NOT_NULL(results, "Search should return results");
 
     size_t count = lle_history_search_results_get_count(results);
-    ASSERT_TRUE(count <= 5, "Should not exceed max results limit");
+    ASSERT_EQ(count, 5, "20 matching entries cap at the requested limit of 5");
 
     lle_history_search_results_destroy(results);
     lle_history_core_destroy(core);
@@ -690,15 +690,15 @@ void test_search_empty_query(void) {
 
     lle_history_add_entry(core, "ls -la", 0, NULL);
 
-    /// Empty query
+    /// An empty substring query matches every entry, so the single stored
+    /// command is returned.
     lle_history_search_results_t *results =
         lle_history_search_substring(core, "", 10);
+    ASSERT_NOT_NULL(results, "Empty query should return a results container");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Empty query matches all entries");
 
-    /// Should either match all or none, but not crash
-    if (results) {
-        lle_history_search_results_destroy(results);
-    }
-
+    lle_history_search_results_destroy(results);
     lle_history_core_destroy(core);
 
     TEST_PASS();
