@@ -72,6 +72,16 @@
         ASSERT((node)->type == (expected_type), "Wrong node type");            \
     } while (0)
 
+/// Parse a single statement and return its AST root. The caller owns the node
+/// (free_node_tree) and the parser (parser_free via *out_parser). Used by the
+/// tests that assert on the parse result, not merely that parsing succeeds.
+static node_t *parse_stmt(const char *input, parser_t **out_parser) {
+    parser_t *p = parser_new(input);
+    node_t *n = parser_parse(p);
+    *out_parser = p;
+    return n;
+}
+
 /* ============================================================================
  * EMPTY COMMAND LISTS IN CASE STATEMENTS
  * Issue #19: Empty case arms caused parse failure
@@ -334,14 +344,39 @@ TEST(comment_after_redirect) {
 }
 
 TEST(comment_in_pipeline) {
-    /// Comment in pipeline (tricky - should be part of first command)
-    ASSERT_PARSES("echo a # comment\necho b | cat");
+    /// The comment terminates the first command: `echo a` keeps only "a", and
+    /// the comment text does not leak in as a further argument.
+    parser_t *p;
+    node_t *n = parse_stmt("echo a # comment\necho b | cat", &p);
+    ASSERT_NOT_NULL(n, "parse should succeed");
+    ASSERT_NODE_TYPE(n, NODE_COMMAND);
+    ASSERT_STR_EQ(n->val.str, "echo", "first command is echo");
+    ASSERT_NOT_NULL(n->first_child, "echo has an argument");
+    ASSERT_STR_EQ(n->first_child->val.str, "a", "sole argument is 'a'");
+    ASSERT(n->first_child->next_sibling == NULL,
+           "comment contributes no further arguments");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 TEST(hash_in_string_not_comment) {
-    /// Hash inside string is not a comment
-    ASSERT_PARSES("echo \"hello # world\"");
-    ASSERT_PARSES("echo 'hello # world'");
+    /// A '#' inside a quoted string is literal, so "hello # world" is one
+    /// argument rather than a command plus a comment.
+    parser_t *p;
+    node_t *n = parse_stmt("echo \"hello # world\"", &p);
+    ASSERT_NOT_NULL(n, "double-quoted parse should succeed");
+    ASSERT_NODE_TYPE(n, NODE_COMMAND);
+    ASSERT_STR_EQ(n->first_child->val.str, "hello # world",
+                  "double-quoted argument keeps the hash");
+    free_node_tree(n);
+    parser_free(p);
+
+    n = parse_stmt("echo 'hello # world'", &p);
+    ASSERT_NOT_NULL(n, "single-quoted parse should succeed");
+    ASSERT_STR_EQ(n->first_child->val.str, "hello # world",
+                  "single-quoted argument keeps the hash");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 /* ============================================================================
@@ -355,14 +390,50 @@ TEST(heredoc_simple) {
 }
 
 TEST(heredoc_quoted_delimiter) {
-    /// Quoted delimiter (no expansion)
-    ASSERT_PARSES("cat <<'EOF'\n$VAR\nEOF");
-    ASSERT_PARSES("cat <<\"EOF\"\nhello\nEOF");
+    /// A quoted delimiter suppresses expansion: the heredoc node records the
+    /// expand flag as "0" (versus "1" for an unquoted delimiter), and the body
+    /// keeps $VAR verbatim.
+    parser_t *p;
+    node_t *n = parse_stmt("cat <<'EOF'\n$VAR\nEOF", &p);
+    ASSERT_NOT_NULL(n, "single-quoted heredoc parses");
+    node_t *heredoc = n->first_child;
+    ASSERT_NOT_NULL(heredoc, "command has a heredoc redirection");
+    ASSERT_NODE_TYPE(heredoc, NODE_REDIR_HEREDOC);
+    ASSERT_STR_EQ(heredoc->val.str, "EOF", "delimiter is EOF");
+    node_t *body = heredoc->first_child;
+    ASSERT_NOT_NULL(body, "heredoc has a body");
+    ASSERT_STR_EQ(body->val.str, "$VAR\n", "body keeps $VAR verbatim");
+    ASSERT_NOT_NULL(body->next_sibling, "heredoc records the expand flag");
+    ASSERT_STR_EQ(body->next_sibling->val.str, "0",
+                  "quoted delimiter disables expansion");
+    free_node_tree(n);
+    parser_free(p);
+
+    /// A double-quoted delimiter is also quoted: expansion stays disabled.
+    n = parse_stmt("cat <<\"EOF\"\nhello\nEOF", &p);
+    ASSERT_NOT_NULL(n, "double-quoted heredoc parses");
+    heredoc = n->first_child;
+    ASSERT_NODE_TYPE(heredoc, NODE_REDIR_HEREDOC);
+    ASSERT_STR_EQ(heredoc->first_child->next_sibling->val.str, "0",
+                  "double-quoted delimiter also disables expansion");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 TEST(heredoc_with_tab_strip) {
-    /// Tab-stripping heredoc
-    ASSERT_PARSES("cat <<-EOF\n\thello\n\tEOF");
+    /// `<<-` records the strip variant in the node type and removes the
+    /// leading tab from the body.
+    parser_t *p;
+    node_t *n = parse_stmt("cat <<-EOF\n\thello\n\tEOF", &p);
+    ASSERT_NOT_NULL(n, "parse should succeed");
+    node_t *heredoc = n->first_child;
+    ASSERT_NOT_NULL(heredoc, "command has a heredoc redirection");
+    ASSERT_NODE_TYPE(heredoc, NODE_REDIR_HEREDOC_STRIP);
+    node_t *body = heredoc->first_child;
+    ASSERT_NOT_NULL(body, "heredoc has a body");
+    ASSERT_STR_EQ(body->val.str, "hello\n", "leading tab stripped from body");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 TEST(heredoc_empty_content) {
@@ -442,8 +513,16 @@ TEST(nested_command_substitution_quotes) {
 }
 
 TEST(dollar_in_single_quotes) {
-    /// Dollar sign in single quotes (literal)
-    ASSERT_PARSES("echo '$VAR'");
+    /// Single quotes are literal, so $VAR is kept as text, not a variable.
+    parser_t *p;
+    node_t *n = parse_stmt("echo '$VAR'", &p);
+    ASSERT_NOT_NULL(n, "parse should succeed");
+    ASSERT_NODE_TYPE(n, NODE_COMMAND);
+    ASSERT_NOT_NULL(n->first_child, "echo has an argument");
+    ASSERT_STR_EQ(n->first_child->val.str, "$VAR",
+                  "single-quoted $VAR stays literal");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 TEST(backslash_in_double_quotes) {
@@ -755,8 +834,15 @@ TEST(function_posix_style) {
 }
 
 TEST(function_ksh_style) {
-    /// ksh/bash function syntax
-    ASSERT_PARSES("function foo { echo foo; }");
+    /// ksh/bash `function name { ... }` parses as a function definition named
+    /// for the function, not as a command invocation of `function`.
+    parser_t *p;
+    node_t *n = parse_stmt("function foo { echo foo; }", &p);
+    ASSERT_NOT_NULL(n, "parse should succeed");
+    ASSERT_NODE_TYPE(n, NODE_FUNCTION);
+    ASSERT_STR_EQ(n->val.str, "foo", "function is named foo");
+    free_node_tree(n);
+    parser_free(p);
 }
 
 TEST(function_with_local) {
