@@ -237,10 +237,20 @@ void test_performance_10k_entries(void) {
     for (int i = 0; i < 10000; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_id(core, ids[i], &entry);
-        if (result != LLE_SUCCESS) {
+        if (result != LLE_SUCCESS || entry == NULL) {
             lle_history_core_destroy(core);
             FAIL("Failed ID retrieval");
         }
+    }
+
+    /// Retrieval is not just fast but correct: a known id returns the entry
+    /// whose command was stored under it.
+    lle_history_entry_t *spot = NULL;
+    if (lle_history_get_entry_by_id(core, ids[42], &spot) != LLE_SUCCESS ||
+        spot == NULL || spot->command == NULL ||
+        strcmp(spot->command, "perf_cmd_42") != 0) {
+        lle_history_core_destroy(core);
+        FAIL("ID retrieval returned the wrong entry");
     }
 
     uint64_t end_id = get_time_us();
@@ -353,6 +363,13 @@ void test_memory_efficiency(void) {
     printf("  Total entries: %zu\n", stats->total_entries);
     printf("  Active entries: %zu\n", stats->active_entries);
     printf("  Add operations: %lu\n", (unsigned long)stats->add_count);
+
+    /// Every unique command was stored and counted.
+    if (stats->total_entries != 10000 || stats->active_entries != 10000 ||
+        stats->add_count != 10000) {
+        lle_history_core_destroy(core);
+        FAIL("Statistics do not reflect the 10000 added entries");
+    }
 
     /// Estimate memory usage
     /// Rough estimate: entry struct + command string + overhead
