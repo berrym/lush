@@ -71,6 +71,20 @@ static const node_t *tree_find_type(const node_t *root, node_type_t type) {
     return NULL;
 }
 
+/// Assert the AST contains a redirection of `type` whose target filename
+/// (the first child of the redirection node) equals `target`. Used by the
+/// redirection tests to verify the parsed target, not merely that a
+/// redirection node of the right kind exists.
+static void assert_redir_target(const node_t *ast, node_type_t type,
+                                const char *target) {
+    const node_t *r = tree_find_type(ast, type);
+    ASSERT_NOT_NULL(r, "redirection node present");
+    ASSERT_NOT_NULL(r->first_child, "redirection has a target node");
+    ASSERT_NOT_NULL(r->first_child->val.str, "target node carries a string");
+    ASSERT_STR_EQ(r->first_child->val.str, target,
+                  "redirection target filename matches");
+}
+
 /// Test framework macros
 
 /* ============================================================================
@@ -114,6 +128,12 @@ TEST(parse_simple_command) {
     ASSERT(ast->type == NODE_COMMAND || ast->type == NODE_COMMAND_LIST,
            "Root should be command or command list");
 
+    /// The command word is the node's value; a bare "echo" has no arguments.
+    const node_t *cmd = tree_find_type(ast, NODE_COMMAND);
+    ASSERT_NOT_NULL(cmd, "command node present");
+    ASSERT_STR_EQ(cmd->val.str, "echo", "command word should be echo");
+    ASSERT_EQ(cmd->children, 0, "bare command has no argument children");
+
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -126,6 +146,18 @@ TEST(parse_command_with_args) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
+    /// The two arguments hang off the command node as ordered children.
+    const node_t *cmd = tree_find_type(ast, NODE_COMMAND);
+    ASSERT_NOT_NULL(cmd, "command node present");
+    ASSERT_STR_EQ(cmd->val.str, "echo", "command word should be echo");
+    ASSERT_EQ(cmd->children, 2, "two arguments parsed");
+    ASSERT_NOT_NULL(cmd->first_child, "first argument node present");
+    ASSERT_STR_EQ(cmd->first_child->val.str, "hello",
+                  "first argument is hello");
+    ASSERT_NOT_NULL(cmd->first_child->next_sibling, "second argument present");
+    ASSERT_STR_EQ(cmd->first_child->next_sibling->val.str, "world",
+                  "second argument is world");
+
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -137,6 +169,18 @@ TEST(parse_command_with_quoted_args) {
     node_t *ast = parser_parse(parser);
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
+
+    /// Each quoted phrase is a single argument: the space inside the quotes
+    /// must not split it, so there are exactly two arguments and the quotes
+    /// are stripped from the stored values.
+    const node_t *cmd = tree_find_type(ast, NODE_COMMAND);
+    ASSERT_NOT_NULL(cmd, "command node present");
+    ASSERT_STR_EQ(cmd->val.str, "echo", "command word should be echo");
+    ASSERT_EQ(cmd->children, 2, "two quoted phrases parse as two arguments");
+    ASSERT_STR_EQ(cmd->first_child->val.str, "hello world",
+                  "single-quoted phrase kept intact, quotes stripped");
+    ASSERT_STR_EQ(cmd->first_child->next_sibling->val.str, "foo bar",
+                  "double-quoted phrase kept intact, quotes stripped");
 
     free_node_tree(ast);
     parser_free(parser);
@@ -157,6 +201,9 @@ TEST(parse_simple_pipe) {
 
     /// Should have a PIPE or PIPELINE node somewhere in tree
     ASSERT(tree_has_type(ast, NODE_PIPE), "pipe should parse to a NODE_PIPE");
+    /// A two-stage pipeline connects exactly two commands.
+    ASSERT_EQ(tree_count_type(ast, NODE_COMMAND), 2,
+              "two-stage pipeline has two commands");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -217,8 +264,13 @@ TEST(parse_logical_and) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    ASSERT(tree_has_type(ast, NODE_LOGICAL_AND),
-           "&& should parse to a NODE_LOGICAL_AND");
+    const node_t *op = tree_find_type(ast, NODE_LOGICAL_AND);
+    ASSERT_NOT_NULL(op, "&& should parse to a NODE_LOGICAL_AND");
+    /// The operator joins exactly two operands; left is `test`, right is `cat`.
+    ASSERT_EQ(op->children, 2, "&& has two operands");
+    ASSERT_STR_EQ(op->first_child->val.str, "test", "left operand is test");
+    ASSERT_STR_EQ(op->first_child->next_sibling->val.str, "cat",
+                  "right operand is cat");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -231,8 +283,13 @@ TEST(parse_logical_or) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    ASSERT(tree_has_type(ast, NODE_LOGICAL_OR),
-           "|| should parse to a NODE_LOGICAL_OR");
+    const node_t *op = tree_find_type(ast, NODE_LOGICAL_OR);
+    ASSERT_NOT_NULL(op, "|| should parse to a NODE_LOGICAL_OR");
+    /// Two operands; left is `test`, right is `echo`.
+    ASSERT_EQ(op->children, 2, "|| has two operands");
+    ASSERT_STR_EQ(op->first_child->val.str, "test", "left operand is test");
+    ASSERT_STR_EQ(op->first_child->next_sibling->val.str, "echo",
+                  "right operand is echo");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -245,8 +302,13 @@ TEST(parse_background) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    ASSERT(tree_has_type(ast, NODE_BACKGROUND),
-           "& should parse to a NODE_BACKGROUND");
+    const node_t *bg = tree_find_type(ast, NODE_BACKGROUND);
+    ASSERT_NOT_NULL(bg, "& should parse to a NODE_BACKGROUND");
+    /// The backgrounded job is its single command child.
+    ASSERT_EQ(bg->children, 1, "background wraps one job");
+    ASSERT_EQ(bg->first_child->type, NODE_COMMAND, "job is a command");
+    ASSERT_STR_EQ(bg->first_child->val.str, "sleep",
+                  "backgrounded command is sleep");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -266,6 +328,7 @@ TEST(parse_redirect_in) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_IN),
            "< should attach a NODE_REDIR_IN");
+    assert_redir_target(ast, NODE_REDIR_IN, "file.txt");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -280,6 +343,7 @@ TEST(parse_redirect_out) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_OUT),
            "> should attach a NODE_REDIR_OUT");
+    assert_redir_target(ast, NODE_REDIR_OUT, "output.txt");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -294,6 +358,7 @@ TEST(parse_redirect_append) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_APPEND),
            ">> should attach a NODE_REDIR_APPEND (not a truncate)");
+    assert_redir_target(ast, NODE_REDIR_APPEND, "log.txt");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -308,6 +373,7 @@ TEST(parse_redirect_stderr) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_ERR),
            "2> should attach a NODE_REDIR_ERR");
+    assert_redir_target(ast, NODE_REDIR_ERR, "/dev/null");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -322,6 +388,7 @@ TEST(parse_redirect_both) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_BOTH),
            "&> should attach a NODE_REDIR_BOTH");
+    assert_redir_target(ast, NODE_REDIR_BOTH, "output.txt");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -334,8 +401,15 @@ TEST(parse_heredoc) {
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
 
-    ASSERT(tree_has_type(ast, NODE_REDIR_HEREDOC),
-           "<< should attach a NODE_REDIR_HEREDOC");
+    const node_t *hd = tree_find_type(ast, NODE_REDIR_HEREDOC);
+    ASSERT_NOT_NULL(hd, "<< should attach a NODE_REDIR_HEREDOC");
+    /// A heredoc stores its delimiter as the node value and the body line(s)
+    /// as children, unlike a file redirection where the child is the filename.
+    ASSERT_STR_EQ(hd->val.str, "EOF", "heredoc delimiter is EOF");
+    ASSERT_NOT_NULL(hd->first_child, "heredoc body present");
+    /// The body line retains its terminating newline.
+    ASSERT_STR_EQ(hd->first_child->val.str, "hello\n",
+                  "heredoc body line is hello");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -350,6 +424,8 @@ TEST(parse_herestring) {
 
     ASSERT(tree_has_type(ast, NODE_REDIR_HERESTRING),
            "<<< should attach a NODE_REDIR_HERESTRING");
+    /// The here-string body is the quoted phrase with quotes stripped.
+    assert_redir_target(ast, NODE_REDIR_HERESTRING, "hello world");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -366,6 +442,10 @@ TEST(parse_multiple_redirects) {
                tree_has_type(ast, NODE_REDIR_OUT) &&
                tree_has_type(ast, NODE_REDIR_ERR),
            "all three redirections should be attached");
+    /// Each redirection keeps its own target; they must not be conflated.
+    assert_redir_target(ast, NODE_REDIR_IN, "in.txt");
+    assert_redir_target(ast, NODE_REDIR_OUT, "out.txt");
+    assert_redir_target(ast, NODE_REDIR_ERR, "err.txt");
     free_node_tree(ast);
     parser_free(parser);
 }
