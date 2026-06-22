@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
  * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
@@ -33,6 +34,33 @@ static void setup_aliases(void) { init_aliases(); }
 
 static void teardown_aliases(void) { free_aliases(); }
 
+/// Capture writes to a file descriptor (stdout or stderr) so output-producing
+/// functions can be asserted on. Works at the fd level, so it catches printf,
+/// fprintf(stderr), and the pager's direct writes alike.
+typedef struct {
+    int target_fd;
+    int saved_fd;
+    FILE *tmp;
+} fd_capture_t;
+
+static fd_capture_t capture_begin(int fd) {
+    fd_capture_t c = {.target_fd = fd, .saved_fd = -1, .tmp = tmpfile()};
+    fflush(NULL);
+    c.saved_fd = dup(fd);
+    dup2(fileno(c.tmp), fd);
+    return c;
+}
+
+static void capture_end(fd_capture_t *c, char *buf, size_t size) {
+    fflush(NULL);
+    dup2(c->saved_fd, c->target_fd);
+    close(c->saved_fd);
+    rewind(c->tmp);
+    size_t n = fread(buf, 1, size - 1, c->tmp);
+    buf[n] = '\0';
+    fclose(c->tmp);
+}
+
 /* ============================================================================
  * INITIALIZATION TESTS
  * ============================================================================
@@ -45,15 +73,21 @@ TEST(init_aliases_basic) {
 }
 
 TEST(free_aliases_null) {
-    /// Should not crash if called before init
+    /// Calling free before init must be a safe no-op that leaves the table
+    /// NULL.
     free_aliases();
+    ASSERT_NULL(aliases, "alias table is NULL before init / after free");
 }
 
 TEST(init_free_cycle) {
     for (int i = 0; i < 3; i++) {
         init_aliases();
+        ASSERT_NOT_NULL(aliases, "init creates the table each cycle");
         set_alias("test", "value");
+        ASSERT_STR_EQ(lookup_alias("test"), "value",
+                      "alias set takes effect within the cycle");
         free_aliases();
+        ASSERT_NULL(aliases, "free clears the table each cycle");
     }
 }
 
@@ -93,17 +127,15 @@ TEST(valid_alias_name_empty) {
 }
 
 TEST(valid_alias_name_with_dash) {
-    /// Dashes may or may not be valid depending on implementation
-    bool result = valid_alias_name("my-alias");
-    /// Just ensure it doesn't crash
-    (void)result;
+    /// '-' is an accepted alias-name character, so a dashed name is valid.
+    ASSERT(valid_alias_name("my-alias"), "dashed name is valid");
 }
 
 TEST(valid_alias_name_with_space) {
-    /// Note: valid_alias_name stops at whitespace and validates up to that
-    /// point, so "my alias" is considered valid (as "my") by the implementation
-    bool result = valid_alias_name("my alias");
-    (void)result; /// Just ensure it doesn't crash
+    /// valid_alias_name validates up to the first whitespace, so "my alias"
+    /// is accepted on the strength of its leading word "my".
+    ASSERT(valid_alias_name("my alias"),
+           "name validated up to whitespace is valid");
 }
 
 TEST(valid_alias_name_with_equals) {
@@ -200,15 +232,21 @@ TEST(set_multiple_aliases) {
 TEST(print_aliases_empty) {
     setup_aliases();
 
-    /// Should not crash
-    FILE *old_stdout = stdout;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stdout = null_out;
-        print_aliases();
-        fclose(null_out);
-        stdout = old_stdout;
+    /// init_aliases seeds example aliases; clear them to exercise the
+    /// genuinely-empty print path. (A non-empty buffer here also flags any
+    /// newly-seeded default that this list does not account for.)
+    const char *seeded[] = {"..", "...", "l", "la", "ll", "ls"};
+    for (size_t i = 0; i < sizeof(seeded) / sizeof(seeded[0]); i++) {
+        unset_alias(seeded[i]);
     }
+
+    char buf[256];
+    fd_capture_t cap = capture_begin(STDOUT_FILENO);
+    print_aliases();
+    capture_end(&cap, buf, sizeof(buf));
+
+    /// With no aliases defined, no alias lines are printed.
+    ASSERT(strstr(buf, "alias ") == NULL, "empty table prints no alias lines");
 
     teardown_aliases();
 }
@@ -219,14 +257,14 @@ TEST(print_aliases_with_content) {
     set_alias("ll", "ls -l");
     set_alias("la", "ls -a");
 
-    FILE *old_stdout = stdout;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stdout = null_out;
-        print_aliases();
-        fclose(null_out);
-        stdout = old_stdout;
-    }
+    char buf[512];
+    fd_capture_t cap = capture_begin(STDOUT_FILENO);
+    print_aliases();
+    capture_end(&cap, buf, sizeof(buf));
+
+    /// Each alias prints in `alias name='value'` form (order unspecified).
+    ASSERT(strstr(buf, "alias ll='ls -l'") != NULL, "ll alias printed");
+    ASSERT(strstr(buf, "alias la='ls -a'") != NULL, "la alias printed");
 
     teardown_aliases();
 }
@@ -447,6 +485,8 @@ TEST(expand_alias_with_shell_operators_pipe) {
     set_alias("ll", "ls -l");
     char *expanded = expand_alias_with_shell_operators("ll | grep foo");
     ASSERT_NOT_NULL(expanded, "Expansion with pipe should succeed");
+    ASSERT_STR_EQ(expanded, "ls -l | grep foo",
+                  "first word expands; pipe and the rest are preserved");
     free(expanded);
 
     teardown_aliases();
@@ -458,6 +498,8 @@ TEST(expand_alias_with_shell_operators_in_value) {
     set_alias("lsgrep", "ls | grep");
     char *expanded = expand_alias_with_shell_operators("lsgrep foo");
     ASSERT_NOT_NULL(expanded, "Alias with operators should expand");
+    ASSERT_STR_EQ(expanded, "ls | grep foo",
+                  "operators inside the alias value are preserved");
     free(expanded);
 
     teardown_aliases();
@@ -469,27 +511,24 @@ TEST(expand_alias_with_shell_operators_in_value) {
  */
 
 TEST(alias_usage) {
-    /// Should not crash
-    FILE *old_stdout = stdout;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stdout = null_out;
-        alias_usage();
-        fclose(null_out);
-        stdout = old_stdout;
-    }
+    /// Usage text goes to stderr; capture it and assert the synopsis line.
+    char buf[512];
+    fd_capture_t cap = capture_begin(STDERR_FILENO);
+    alias_usage();
+    capture_end(&cap, buf, sizeof(buf));
+
+    ASSERT(strstr(buf, "usage: alias") != NULL,
+           "alias usage prints its synopsis to stderr");
 }
 
 TEST(unalias_usage) {
-    /// Should not crash
-    FILE *old_stdout = stdout;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stdout = null_out;
-        unalias_usage();
-        fclose(null_out);
-        stdout = old_stdout;
-    }
+    char buf[512];
+    fd_capture_t cap = capture_begin(STDERR_FILENO);
+    unalias_usage();
+    capture_end(&cap, buf, sizeof(buf));
+
+    ASSERT(strstr(buf, "usage: unalias") != NULL,
+           "unalias usage prints its synopsis to stderr");
 }
 
 /* ============================================================================
