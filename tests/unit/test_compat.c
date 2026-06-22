@@ -26,6 +26,27 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
+/// Capture what a compat debug-print routine writes to stderr. Redirects the
+/// stderr stream to a temp file, runs body, then restores and reads it back
+/// into out (NUL-terminated). Uses the same stderr-reassignment the discard
+/// path already relies on.
+#define CAPTURE_STDERR(out, bufsize, body)                                     \
+    do {                                                                       \
+        FILE *_old = stderr;                                                   \
+        FILE *_tmp = tmpfile();                                                \
+        (out)[0] = '\0';                                                       \
+        if (_tmp) {                                                            \
+            stderr = _tmp;                                                     \
+            body;                                                              \
+            fflush(_tmp);                                                      \
+            rewind(_tmp);                                                      \
+            size_t _r = fread((out), 1, (bufsize) - 1, _tmp);                  \
+            (out)[_r] = '\0';                                                  \
+            stderr = _old;                                                     \
+            fclose(_tmp);                                                      \
+        }                                                                      \
+    } while (0)
+
 /// Test framework macros
 
 /* ============================================================================
@@ -41,15 +62,20 @@ TEST(compat_init_basic) {
 
 TEST(compat_init_cleanup_cycle) {
     for (int i = 0; i < 3; i++) {
-        int result = compat_init(NULL);
+        int result = compat_init(LUSH_COMPAT_DATA_DIR);
         ASSERT_EQ(result, 0, "compat_init should succeed");
+        ASSERT(compat_get_entry_count() > 0, "init loads the database");
         compat_cleanup();
+        ASSERT_EQ(compat_get_entry_count(), 0u,
+                  "cleanup releases all loaded entries");
     }
 }
 
 TEST(compat_cleanup_without_init) {
-    /// Should not crash
+    /// Cleanup before any init is safe and leaves an empty database.
     compat_cleanup();
+    ASSERT_EQ(compat_get_entry_count(), 0u,
+              "uninitialized database has no entries");
 }
 
 TEST(compat_reload) {
@@ -70,23 +96,22 @@ TEST(compat_reload) {
 
 TEST(compat_category_name_builtin) {
     const char *name = compat_category_name(COMPAT_CATEGORY_BUILTIN);
-    ASSERT_NOT_NULL(name, "Category name should not be NULL");
-    ASSERT(strlen(name) > 0, "Category name should not be empty");
+    ASSERT_STR_EQ(name, "builtin", "category name mismatch");
 }
 
 TEST(compat_category_name_expansion) {
     const char *name = compat_category_name(COMPAT_CATEGORY_EXPANSION);
-    ASSERT_NOT_NULL(name, "Category name should not be NULL");
+    ASSERT_STR_EQ(name, "expansion", "category name mismatch");
 }
 
 TEST(compat_category_name_quoting) {
     const char *name = compat_category_name(COMPAT_CATEGORY_QUOTING);
-    ASSERT_NOT_NULL(name, "Category name should not be NULL");
+    ASSERT_STR_EQ(name, "quoting", "category name mismatch");
 }
 
 TEST(compat_category_name_syntax) {
     const char *name = compat_category_name(COMPAT_CATEGORY_SYNTAX);
-    ASSERT_NOT_NULL(name, "Category name should not be NULL");
+    ASSERT_STR_EQ(name, "syntax", "category name mismatch");
 }
 
 TEST(compat_category_parse_valid) {
@@ -111,17 +136,17 @@ TEST(compat_category_parse_invalid) {
 
 TEST(compat_severity_name_info) {
     const char *name = compat_severity_name(COMPAT_SEVERITY_INFO);
-    ASSERT_NOT_NULL(name, "Severity name should not be NULL");
+    ASSERT_STR_EQ(name, "info", "severity name mismatch");
 }
 
 TEST(compat_severity_name_warning) {
     const char *name = compat_severity_name(COMPAT_SEVERITY_WARNING);
-    ASSERT_NOT_NULL(name, "Severity name should not be NULL");
+    ASSERT_STR_EQ(name, "warning", "severity name mismatch");
 }
 
 TEST(compat_severity_name_error) {
     const char *name = compat_severity_name(COMPAT_SEVERITY_ERROR);
-    ASSERT_NOT_NULL(name, "Severity name should not be NULL");
+    ASSERT_STR_EQ(name, "error", "severity name mismatch");
 }
 
 TEST(compat_severity_parse_valid) {
@@ -154,22 +179,22 @@ TEST(compat_severity_parse_invalid) {
 
 TEST(compat_fix_type_name_none) {
     const char *name = compat_fix_type_name(FIX_TYPE_NONE);
-    ASSERT_NOT_NULL(name, "Fix type name should not be NULL");
+    ASSERT_STR_EQ(name, "none", "fix type name mismatch");
 }
 
 TEST(compat_fix_type_name_safe) {
     const char *name = compat_fix_type_name(FIX_TYPE_SAFE);
-    ASSERT_NOT_NULL(name, "Fix type name should not be NULL");
+    ASSERT_STR_EQ(name, "safe", "fix type name mismatch");
 }
 
 TEST(compat_fix_type_name_unsafe) {
     const char *name = compat_fix_type_name(FIX_TYPE_UNSAFE);
-    ASSERT_NOT_NULL(name, "Fix type name should not be NULL");
+    ASSERT_STR_EQ(name, "unsafe", "fix type name mismatch");
 }
 
 TEST(compat_fix_type_name_manual) {
     const char *name = compat_fix_type_name(FIX_TYPE_MANUAL);
-    ASSERT_NOT_NULL(name, "Fix type name should not be NULL");
+    ASSERT_STR_EQ(name, "manual", "fix type name mismatch");
 }
 
 TEST(compat_fix_type_parse_valid) {
@@ -226,9 +251,8 @@ TEST(compat_set_get_target) {
 TEST(compat_get_target_default) {
     compat_init(NULL);
 
-    const char *target = compat_get_target();
-    ASSERT_NOT_NULL(target, "Target should not be NULL");
-    /// Default is typically "posix"
+    /// The default target is posix until compat_set_target changes it.
+    ASSERT_STR_EQ(compat_get_target(), "posix", "default target is posix");
 
     compat_cleanup();
 }
@@ -289,23 +313,33 @@ TEST(compat_get_entry_nonexistent) {
 }
 
 TEST(compat_get_by_category) {
-    compat_init(NULL);
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
-    const compat_entry_t *entries[10];
-    size_t count = compat_get_by_category(COMPAT_CATEGORY_BUILTIN, entries, 10);
-    /// May have entries or not
-    ASSERT(count <= 10, "Should not exceed max");
+    const compat_entry_t *entries[512];
+    size_t count =
+        compat_get_by_category(COMPAT_CATEGORY_QUOTING, entries, 512);
+    ASSERT(count > 0, "the quoting category has entries");
+    ASSERT(count <= compat_get_entry_count(), "subset cannot exceed the whole");
+    /// Every returned entry is actually in the requested category.
+    for (size_t i = 0; i < count; i++) {
+        ASSERT_EQ(entries[i]->category, COMPAT_CATEGORY_QUOTING,
+                  "category filter returned a foreign entry");
+    }
 
     compat_cleanup();
 }
 
 TEST(compat_get_by_feature) {
-    compat_init(NULL);
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
-    const compat_entry_t *entries[10];
-    size_t count = compat_get_by_feature("echo", entries, 10);
-    /// May have entries or not
-    ASSERT(count <= 10, "Should not exceed max");
+    const compat_entry_t *entries[64];
+    size_t count = compat_get_by_feature("arrays", entries, 64);
+    ASSERT(count > 0, "the arrays feature is catalogued");
+    /// Every returned entry advertises the requested feature.
+    for (size_t i = 0; i < count; i++) {
+        ASSERT_STR_EQ(entries[i]->feature, "arrays",
+                      "feature filter returned a foreign entry");
+    }
 
     compat_cleanup();
 }
@@ -383,24 +417,36 @@ TEST(compat_is_portable_null_result) {
 }
 
 TEST(compat_check_line) {
-    compat_init(NULL);
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
-    compat_result_t results[10];
-    size_t count =
-        compat_check_line("echo -e 'hello\\n'", SHELL_MODE_POSIX, results, 10);
-    /// May find issues or not depending on database
-    ASSERT(count <= 10, "Should not exceed max results");
+    /// A bash array expansion is not portable to POSIX sh, so it is flagged;
+    /// a plain command is clean.
+    compat_result_t results[16];
+    size_t flagged =
+        compat_check_line("echo ${arr[@]}", SHELL_MODE_POSIX, results, 16);
+    ASSERT(flagged > 0, "array expansion is flagged under POSIX");
+
+    size_t clean =
+        compat_check_line("echo hello", SHELL_MODE_POSIX, results, 16);
+    ASSERT_EQ(clean, 0u, "a portable line raises no issues");
 
     compat_cleanup();
 }
 
 TEST(compat_check_script) {
-    compat_init(NULL);
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
-    const char *script = "#!/bin/sh\necho hello\nls -la\n";
-    compat_result_t results[10];
-    size_t count = compat_check_script(script, SHELL_MODE_POSIX, results, 10);
-    ASSERT(count <= 10, "Should not exceed max results");
+    /// A script using bash arrays is flagged under POSIX; a portable script
+    /// raises nothing.
+    compat_result_t results[16];
+    size_t flagged =
+        compat_check_script("#!/bin/bash\narr=(a b c)\necho ${arr[@]}\n",
+                            SHELL_MODE_POSIX, results, 16);
+    ASSERT(flagged > 0, "a bash script is flagged under POSIX");
+
+    size_t clean = compat_check_script("#!/bin/sh\necho hello\n",
+                                       SHELL_MODE_POSIX, results, 16);
+    ASSERT_EQ(clean, 0u, "a portable script raises no issues");
 
     compat_cleanup();
 }
@@ -431,9 +477,9 @@ TEST(compat_effective_severity_strict) {
 
     compat_set_strict(true);
     compat_severity_t sev = compat_effective_severity(&entry);
-    /// In strict mode, warnings may be elevated to errors
-    ASSERT(sev >= COMPAT_SEVERITY_WARNING,
-           "Severity should be at least warning");
+    /// Strict mode elevates a warning to an error.
+    ASSERT_EQ(sev, COMPAT_SEVERITY_ERROR,
+              "strict mode elevates warnings to errors");
 
     compat_set_strict(false);
     compat_cleanup();
@@ -483,6 +529,10 @@ TEST(compat_format_result) {
     int len = compat_format_result(&result, buffer, sizeof(buffer));
     ASSERT(len >= 0, "Format should succeed");
     ASSERT((size_t)len < sizeof(buffer), "Should not overflow buffer");
+    /// With no offending entry the result formats as the portable message.
+    ASSERT_STR_EQ(buffer, "No compatibility issues found",
+                  "portable result formats as the no-issues message");
+    ASSERT_EQ((size_t)len, strlen(buffer), "length matches written bytes");
 
     compat_cleanup();
 }
@@ -493,17 +543,17 @@ TEST(compat_format_result) {
  */
 
 TEST(compat_debug_print_stats) {
-    compat_init(NULL);
+    compat_init(LUSH_COMPAT_DATA_DIR);
 
-    /// Should not crash - output goes to stderr
-    FILE *old_stderr = stderr;
-    FILE *null_err = fopen("/dev/null", "w");
-    if (null_err) {
-        stderr = null_err;
-        compat_debug_print_stats();
-        fclose(null_err);
-        stderr = old_stderr;
-    }
+    char out[2048];
+    CAPTURE_STDERR(out, sizeof(out), compat_debug_print_stats());
+
+    /// Stats report the live entry count and the per-category breakdown.
+    char expected_total[64];
+    snprintf(expected_total, sizeof(expected_total), "Total entries: %zu",
+             compat_get_entry_count());
+    ASSERT(strstr(out, expected_total) != NULL, "stats report the entry count");
+    ASSERT(strstr(out, "builtin:") != NULL, "stats list the builtin category");
 
     compat_cleanup();
 }
@@ -516,14 +566,14 @@ TEST(compat_debug_print_entry) {
                             .feature = "test",
                             .description = "Test entry"};
 
-    FILE *old_stderr = stderr;
-    FILE *null_err = fopen("/dev/null", "w");
-    if (null_err) {
-        stderr = null_err;
-        compat_debug_print_entry(&entry);
-        fclose(null_err);
-        stderr = old_stderr;
-    }
+    char out[2048];
+    CAPTURE_STDERR(out, sizeof(out), compat_debug_print_entry(&entry));
+
+    /// The dump reflects the entry's own fields.
+    ASSERT(strstr(out, "Entry: test_entry") != NULL, "dump shows the id");
+    ASSERT(strstr(out, "Feature: test") != NULL, "dump shows the feature");
+    ASSERT(strstr(out, "Description: Test entry") != NULL,
+           "dump shows the description");
 
     compat_cleanup();
 }
