@@ -62,6 +62,32 @@ static debug_context_t *create_test_context(void) {
     return ctx;
 }
 
+/// Like create_test_context but routes debug_output to a tmpfile so the text
+/// the debugger emits can be read back and asserted, rather than discarded to
+/// /dev/null.
+static debug_context_t *create_captured_context(void) {
+    debug_context_t *ctx = create_test_context();
+    if (ctx) {
+        if (ctx->debug_output) {
+            fclose(ctx->debug_output);
+        }
+        ctx->debug_output = tmpfile();
+    }
+    return ctx;
+}
+
+/// Read everything written to a captured context's debug_output into buf.
+static void read_captured(debug_context_t *ctx, char *buf, size_t cap) {
+    buf[0] = '\0';
+    if (!ctx || !ctx->debug_output) {
+        return;
+    }
+    fflush(ctx->debug_output);
+    rewind(ctx->debug_output);
+    size_t n = fread(buf, 1, cap - 1, ctx->debug_output);
+    buf[n] = '\0';
+}
+
 /// Helper to free a debug context
 static void free_test_context(debug_context_t *ctx) {
     if (ctx) {
@@ -123,7 +149,10 @@ static int test_add_breakpoint_simple(void) {
     ASSERT_NOT_NULL(ctx);
 
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
-    ASSERT(id > 0);
+    /// The first breakpoint in a fresh context gets id 1 (next_breakpoint_id
+    /// starts at 1), so the exact id is knowable, not merely "positive".
+    ASSERT_EQ(id, 1);
+    ASSERT_EQ(ctx->next_breakpoint_id, 2);
     ASSERT_NOT_NULL(ctx->breakpoints);
     ASSERT_EQ(ctx->breakpoints->id, id);
     ASSERT_STR_EQ(ctx->breakpoints->file, "test.sh");
@@ -141,7 +170,7 @@ static int test_add_breakpoint_with_condition(void) {
     ASSERT_NOT_NULL(ctx);
 
     int id = debug_add_breakpoint(ctx, "script.sh", 25, "$i == 5");
-    ASSERT(id > 0);
+    ASSERT_EQ(id, 1);
     ASSERT_NOT_NULL(ctx->breakpoints);
     ASSERT_NOT_NULL(ctx->breakpoints->condition);
     ASSERT_STR_EQ(ctx->breakpoints->condition, "$i == 5");
@@ -158,12 +187,11 @@ static int test_add_multiple_breakpoints(void) {
     int id2 = debug_add_breakpoint(ctx, "file2.sh", 20, NULL);
     int id3 = debug_add_breakpoint(ctx, "file1.sh", 30, NULL);
 
-    ASSERT(id1 > 0);
-    ASSERT(id2 > 0);
-    ASSERT(id3 > 0);
-    ASSERT(id1 != id2);
-    ASSERT(id2 != id3);
-    ASSERT(id1 != id3);
+    /// IDs are assigned sequentially from 1, which both proves uniqueness and
+    /// catches a regression where the counter fails to advance or resets.
+    ASSERT_EQ(id1, 1);
+    ASSERT_EQ(id2, 2);
+    ASSERT_EQ(id3, 3);
 
     /// Breakpoints are added to head of list, so most recent is first
     ASSERT_NOT_NULL(ctx->breakpoints);
@@ -458,37 +486,49 @@ static int test_list_breakpoints_null_context(void) {
 }
 
 static int test_list_breakpoints_disabled_context(void) {
-    debug_context_t *ctx = create_test_context();
+    debug_context_t *ctx = create_captured_context();
     ASSERT_NOT_NULL(ctx);
     ctx->enabled = false;
 
-    /// Should not crash, just return early
+    /// A disabled context returns early and emits nothing.
     debug_list_breakpoints(ctx);
+    char buf[1024];
+    read_captured(ctx, buf, sizeof(buf));
+    ASSERT_EQ(strlen(buf), 0);
 
     free_test_context(ctx);
     return 1;
 }
 
 static int test_list_breakpoints_empty(void) {
-    debug_context_t *ctx = create_test_context();
+    debug_context_t *ctx = create_captured_context();
     ASSERT_NOT_NULL(ctx);
 
-    /// Should not crash with no breakpoints
+    /// With no breakpoints the listing says so explicitly.
     debug_list_breakpoints(ctx);
+    char buf[1024];
+    read_captured(ctx, buf, sizeof(buf));
+    ASSERT(strstr(buf, "No breakpoints set") != NULL);
 
     free_test_context(ctx);
     return 1;
 }
 
 static int test_list_breakpoints_with_entries(void) {
-    debug_context_t *ctx = create_test_context();
+    debug_context_t *ctx = create_captured_context();
     ASSERT_NOT_NULL(ctx);
 
     debug_add_breakpoint(ctx, "file1.sh", 10, NULL);
     debug_add_breakpoint(ctx, "file2.sh", 20, "$x == 5");
 
-    /// Should not crash, output goes to /dev/null
+    /// Each breakpoint is listed with its id, file:line, enabled state, hit
+    /// count, and (when present) its condition.
     debug_list_breakpoints(ctx);
+    char buf[1024];
+    read_captured(ctx, buf, sizeof(buf));
+    ASSERT(strstr(buf, "1: file1.sh:10 enabled (hits: 0)") != NULL);
+    ASSERT(strstr(buf, "2: file2.sh:20 enabled (hits: 0)") != NULL);
+    ASSERT(strstr(buf, "Condition: $x == 5") != NULL);
 
     free_test_context(ctx);
     return 1;
@@ -822,7 +862,8 @@ static int test_continue_clears_step_mode(void) {
  * ============================================================ */
 
 static int test_handle_user_input_null_context(void) {
-    debug_handle_user_input(NULL, "continue");
+    /// A NULL context is rejected: the handler reports "do not resume".
+    ASSERT(debug_handle_user_input(NULL, "continue") == false);
     return 1;
 }
 
@@ -830,7 +871,8 @@ static int test_handle_user_input_null_input(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    debug_handle_user_input(ctx, NULL);
+    /// A NULL command is rejected the same way.
+    ASSERT(debug_handle_user_input(ctx, NULL) == false);
 
     free_test_context(ctx);
     return 1;
@@ -1381,21 +1423,33 @@ static int test_print_help_null_context(void) {
 }
 
 static int test_print_help_disabled_context(void) {
-    debug_context_t *ctx = create_test_context();
+    debug_context_t *ctx = create_captured_context();
     ASSERT_NOT_NULL(ctx);
     ctx->enabled = false;
 
+    /// Disabled context emits no help.
     debug_print_help(ctx);
+    char buf[4096];
+    read_captured(ctx, buf, sizeof(buf));
+    ASSERT_EQ(strlen(buf), 0);
 
     free_test_context(ctx);
     return 1;
 }
 
 static int test_print_help_enabled_context(void) {
-    debug_context_t *ctx = create_test_context();
+    debug_context_t *ctx = create_captured_context();
     ASSERT_NOT_NULL(ctx);
 
+    /// The help listing documents the core interactive commands.
     debug_print_help(ctx);
+    char buf[4096];
+    read_captured(ctx, buf, sizeof(buf));
+    ASSERT(strstr(buf, "continue") != NULL);
+    ASSERT(strstr(buf, "step") != NULL);
+    ASSERT(strstr(buf, "backtrace") != NULL);
+    ASSERT(strstr(buf, "help") != NULL);
+    ASSERT(strstr(buf, "quit") != NULL);
 
     free_test_context(ctx);
     return 1;
