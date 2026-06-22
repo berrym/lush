@@ -348,14 +348,15 @@ static void test_contains_case_sensitive_strict(void) {
 static void test_contains_nfc_equivalence(void) {
     TEST("NFC-equivalent forms match under contains");
     /// Decomposed cafe (cafe + COMBINING ACUTE U+0301) versus
-    /// precomposed cafe (U+00E9). Searching for "afe" in either
-    /// form should succeed once NFC normalization runs.
+    /// precomposed cafe (U+00E9). The needle "afe-acute" spans the codepoint
+    /// that differs between the two forms, so a match only succeeds once NFC
+    /// normalization runs -- an ASCII-only needle would match trivially.
     const char *precomposed = "caf\xC3\xA9";
     const char *decomposed = "cafe\xCC\x81";
-    ASSERT_TRUE(lle_unicode_contains_z("af", precomposed, NULL),
-                "af contained in precomposed cafe");
-    ASSERT_TRUE(lle_unicode_contains_z("af", decomposed, NULL),
-                "af contained in decomposed cafe");
+    ASSERT_TRUE(lle_unicode_contains_z("af\xC3\xA9", precomposed, NULL),
+                "afe-acute contained in precomposed cafe");
+    ASSERT_TRUE(lle_unicode_contains_z("af\xC3\xA9", decomposed, NULL),
+                "afe-acute contained in decomposed cafe after NFC");
     PASS();
 }
 
@@ -471,9 +472,17 @@ static void test_nfc_alloc_long_unicode_input(void) {
     input[len] = '\0';
     char *got = lle_unicode_normalize_nfc_alloc(input);
     ASSERT_TRUE(got != NULL, "alloc succeeded for long input");
-    /// Each "cafe<combining-acute> " (7 bytes) becomes "café " (6 bytes)
-    /// after NFC; expect a shorter result.
-    ASSERT_TRUE(strlen(got) < len, "NFC output is shorter than NFD input");
+    /// Each "cafe<combining-acute> " (7 bytes) becomes the precomposed
+    /// "cafe-acute " (6 bytes) after NFC, so the result is the precomposed
+    /// run repeated forty times -- not merely shorter.
+    char expected[512];
+    size_t elen = 0;
+    for (int i = 0; i < 40; i++) {
+        memcpy(expected + elen, "caf\xC3\xA9 ", 6);
+        elen += 6;
+    }
+    expected[elen] = '\0';
+    ASSERT_TRUE(strcmp(got, expected) == 0, "NFC output matches expected NFC");
     free(got);
     PASS();
 }

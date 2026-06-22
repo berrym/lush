@@ -310,8 +310,18 @@ TEST(parse_mixed_template) {
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
     ASSERT(parsed->valid);
-    /// Should have: segment, literal, conditional, literal, end
-    ASSERT(parsed->token_count >= 4);
+    /// segment, literal, conditional, literal, end -- in that order.
+    ASSERT_EQ(parsed->token_count, 5);
+    lle_template_token_t *t = parsed->head;
+    ASSERT_EQ(t->type, LLE_TOKEN_SEGMENT);
+    t = t->next;
+    ASSERT_EQ(t->type, LLE_TOKEN_LITERAL);
+    t = t->next;
+    ASSERT_EQ(t->type, LLE_TOKEN_CONDITIONAL);
+    t = t->next;
+    ASSERT_EQ(t->type, LLE_TOKEN_LITERAL);
+    t = t->next;
+    ASSERT_EQ(t->type, LLE_TOKEN_END);
     lle_template_free(parsed);
     PASS();
 }

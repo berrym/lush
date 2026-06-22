@@ -562,9 +562,13 @@ TEST(special_var_dollar) {
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /// Verify it's a non-negative number (0 is valid in test context if not
-    /// initialized)
-    ASSERT(atoi(result) >= 0, "$$ should be a non-negative number");
+    /// $$ expands to the shell PID. The unit harness does not initialize
+    /// shell_pid to getpid(), but the result must still be a non-empty run of
+    /// decimal digits -- never the literal "$$" nor an empty string.
+    ASSERT(result[0] != '\0', "$$ should not expand to empty");
+    for (const char *p = result; *p; p++) {
+        ASSERT(*p >= '0' && *p <= '9', "$$ should expand to digits only");
+    }
     free(result);
 
     teardown_executor(exec);

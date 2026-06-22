@@ -512,6 +512,14 @@ TEST(parse_inline_table_with_strings) {
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.values[0].type, TOML_VALUE_TABLE);
+    /// Both entries parse with their typed values in declaration order.
+    ASSERT_EQ(ctx.values[0].data.table.count, 2);
+    ASSERT_EQ(strcmp(ctx.values[0].data.table.entries[0].key, "fg"), 0);
+    ASSERT_EQ(
+        strcmp(ctx.values[0].data.table.entries[0].value->data.string, "red"),
+        0);
+    ASSERT_EQ(strcmp(ctx.values[0].data.table.entries[1].key, "bold"), 0);
+    ASSERT_EQ(ctx.values[0].data.table.entries[1].value->data.boolean, true);
 
     toml_value_free(&ctx.values[0]);
     toml_parser_cleanup(&parser);

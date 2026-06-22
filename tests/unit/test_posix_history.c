@@ -650,11 +650,33 @@ TEST(load_with_append) {
 /// ============================================================================
 
 TEST(get_default_editor) {
+    /// Preserve the ambient editor environment, then drive both branches:
+    /// $EDITOR (after $FCEDIT) is honored when set, otherwise the POSIX
+    /// default "vi" is returned.
+    char *saved_editor = getenv("EDITOR");
+    char *saved_fcedit = getenv("FCEDIT");
+    char *editor_copy = saved_editor ? strdup(saved_editor) : NULL;
+    char *fcedit_copy = saved_fcedit ? strdup(saved_fcedit) : NULL;
+
+    unsetenv("FCEDIT");
+    setenv("EDITOR", "nano", 1);
     char *editor = posix_history_get_default_editor();
-    ASSERT_NOT_NULL(editor, "Should return an editor");
-    /// Should be either from environment or default "vi"
-    ASSERT(strlen(editor) > 0, "Editor should have content");
+    ASSERT_STR_EQ(editor, "nano", "EDITOR should be used when set");
     free(editor);
+
+    unsetenv("EDITOR");
+    editor = posix_history_get_default_editor();
+    ASSERT_STR_EQ(editor, "vi", "absent EDITOR/FCEDIT falls back to vi");
+    free(editor);
+
+    if (editor_copy) {
+        setenv("EDITOR", editor_copy, 1);
+        free(editor_copy);
+    }
+    if (fcedit_copy) {
+        setenv("FCEDIT", fcedit_copy, 1);
+        free(fcedit_copy);
+    }
 }
 
 TEST(create_temp_file) {
