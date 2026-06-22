@@ -15,7 +15,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "display/command_layer.h"
 #include "display/composition_engine.h"
+#include "display/layer_events.h"
+#include "display/prompt_layer.h"
 #include "test_framework.h"
 
 /* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
@@ -39,6 +42,35 @@
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /// Test framework macros
+
+/// Build a fully initialized composition engine over real prompt and command
+/// layers populated with content (compose requires ready layers). The engine
+/// takes ownership of both layers after init, so callers tear down with
+/// composition_engine_destroy(engine) followed by
+/// layer_events_destroy(*events); the layers must not be freed separately.
+/// Returns NULL on any setup failure.
+static composition_engine_t *
+make_initialized_engine(layer_event_system_t **out_events) {
+    layer_event_system_t *events = layer_events_create(NULL);
+    if (!events || layer_events_init(events) != LAYER_EVENTS_SUCCESS)
+        return NULL;
+    prompt_layer_t *prompt = prompt_layer_create();
+    command_layer_t *command = command_layer_create();
+    if (!prompt || !command)
+        return NULL;
+    prompt_layer_init(prompt, events);
+    command_layer_init(command, events);
+    prompt_layer_set_content(prompt, "$ ");
+    command_layer_set_command(command, "echo hello", 10);
+    composition_engine_t *engine = composition_engine_create();
+    if (!engine)
+        return NULL;
+    if (composition_engine_init(engine, prompt, command, events) !=
+        COMPOSITION_ENGINE_SUCCESS)
+        return NULL;
+    *out_events = events;
+    return engine;
+}
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -217,13 +249,6 @@ static int test_strategy_string_unknown(void) {
  * CREATE/DESTROY TESTS
  * ============================================================ */
 
-static int test_create_returns_valid_engine(void) {
-    composition_engine_t *engine = composition_engine_create();
-    ASSERT_NOT_NULL(engine);
-    composition_engine_destroy(engine);
-    return 1;
-}
-
 static int test_create_initializes_defaults(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
@@ -245,8 +270,13 @@ static int test_create_initializes_version_string(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /// Version string should be set
-    ASSERT(strlen(engine->version_string) > 0);
+    /// Version string is "MAJOR.MINOR.PATCH" built from the engine's version
+    /// constants, not arbitrary non-empty text.
+    char expected[32];
+    snprintf(expected, sizeof(expected), "%d.%d.%d",
+             COMPOSITION_ENGINE_VERSION_MAJOR, COMPOSITION_ENGINE_VERSION_MINOR,
+             COMPOSITION_ENGINE_VERSION_PATCH);
+    ASSERT_STR_EQ(engine->version_string, expected);
 
     composition_engine_destroy(engine);
     return 1;
@@ -258,13 +288,21 @@ static int test_destroy_null_engine(void) {
     return 1;
 }
 
-static int test_destroy_cleans_up_resources(void) {
-    composition_engine_t *engine = composition_engine_create();
+static int test_cleanup_releases_initialized_engine(void) {
+    layer_event_system_t *events = NULL;
+    composition_engine_t *engine = make_initialized_engine(&events);
     ASSERT_NOT_NULL(engine);
+    ASSERT_EQ(composition_engine_is_initialized(engine), true);
 
-    /// Destroy should clean up
+    /// Cleanup releases the owned prompt and command layers and clears the
+    /// initialized flag; this is the only test that drives the owned-layer
+    /// release path (the others tear down uninitialized engines).
+    composition_engine_error_t result = composition_engine_cleanup(engine);
+    ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
+    ASSERT_EQ(composition_engine_is_initialized(engine), false);
+
     composition_engine_destroy(engine);
-    /// If we get here without crash, success
+    layer_events_destroy(events);
     return 1;
 }
 
@@ -886,17 +924,31 @@ static int test_compose_with_cursor_not_initialized(void) {
 }
 
 static int test_compose_with_cursor_invalid_width(void) {
-    composition_engine_t *engine = composition_engine_create();
+    layer_event_system_t *events = NULL;
+    composition_engine_t *engine = make_initialized_engine(&events);
     ASSERT_NOT_NULL(engine);
 
-    /// Invalid width should use fallback of 80
     composition_with_cursor_t result_buf;
+
+    /// A negative width falls back to the standard 80 columns.
     composition_engine_error_t result =
         composition_engine_compose_with_cursor(engine, 0, -1, &result_buf);
-    /// Should return NOT_INITIALIZED since engine not initialized
-    ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
+    ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
+    ASSERT_EQ(result_buf.terminal_width, (size_t)80);
+
+    /// Zero is likewise non-positive and falls back to 80.
+    result = composition_engine_compose_with_cursor(engine, 0, 0, &result_buf);
+    ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
+    ASSERT_EQ(result_buf.terminal_width, (size_t)80);
+
+    /// A valid width is used as-is rather than overridden.
+    result =
+        composition_engine_compose_with_cursor(engine, 0, 120, &result_buf);
+    ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
+    ASSERT_EQ(result_buf.terminal_width, (size_t)120);
 
     composition_engine_destroy(engine);
+    layer_events_destroy(events);
     return 1;
 }
 
@@ -1072,11 +1124,10 @@ int main(void) {
     RUN_TEST(strategy_string_unknown);
 
     printf("\n=== Create/Destroy Tests ===\n");
-    RUN_TEST(create_returns_valid_engine);
     RUN_TEST(create_initializes_defaults);
     RUN_TEST(create_initializes_version_string);
     RUN_TEST(destroy_null_engine);
-    RUN_TEST(destroy_cleans_up_resources);
+    RUN_TEST(cleanup_releases_initialized_engine);
 
     printf("\n=== Initialization Tests ===\n");
     RUN_TEST(init_null_engine);
