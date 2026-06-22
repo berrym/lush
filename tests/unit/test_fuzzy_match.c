@@ -378,29 +378,45 @@ TEST(string_length_empty) {
  */
 
 TEST(options_default) {
-    ASSERT_FALSE(FUZZY_MATCH_DEFAULT.case_sensitive,
-                 "default should be case insensitive");
-    ASSERT_TRUE(FUZZY_MATCH_DEFAULT.unicode_normalize,
-                "default should normalize unicode");
-    ASSERT_TRUE(FUZZY_MATCH_DEFAULT.use_damerau,
-                "default should use Damerau-Levenshtein");
+    /// Case-insensitive: an all-caps and lowercase spelling have zero edit
+    /// distance under the default preset.
+    ASSERT_EQ(
+        fuzzy_levenshtein_distance("HELLO", "hello", &FUZZY_MATCH_DEFAULT), 0,
+        "default folds case");
+    /// Normalizes unicode: the NFC and NFD spellings of "cafe-acute" are equal.
+    ASSERT_EQ(fuzzy_levenshtein_distance("caf\xC3\xA9", "cafe\xCC\x81",
+                                         &FUZZY_MATCH_DEFAULT),
+              0, "default normalizes unicode");
+    /// Uses Damerau: a transposition costs one edit, so a transposed pair
+    /// scores higher than under the non-Damerau strict preset.
+    ASSERT_TRUE(fuzzy_match_score("teh", "the", &FUZZY_MATCH_DEFAULT) >
+                    fuzzy_match_score("teh", "the", &FUZZY_MATCH_STRICT),
+                "default rewards transpositions via Damerau");
 }
 
 TEST(options_strict) {
-    ASSERT_TRUE(FUZZY_MATCH_STRICT.case_sensitive,
-                "strict should be case sensitive");
-    ASSERT_FALSE(FUZZY_MATCH_STRICT.unicode_normalize,
-                 "strict should not normalize unicode");
-    ASSERT_FALSE(FUZZY_MATCH_STRICT.use_damerau,
-                 "strict should not use Damerau");
+    /// Case-sensitive: only the differing-case letter counts as an edit.
+    ASSERT_EQ(fuzzy_levenshtein_distance("Hello", "hello", &FUZZY_MATCH_STRICT),
+              1, "strict counts case differences");
+    /// Does not normalize unicode: NFC vs NFD "cafe-acute" are unequal.
+    ASSERT_TRUE(fuzzy_levenshtein_distance("caf\xC3\xA9", "cafe\xCC\x81",
+                                           &FUZZY_MATCH_STRICT) > 0,
+                "strict does not normalize unicode");
+    /// Plain Levenshtein: a transposed pair scores no better than it does
+    /// under the Damerau default.
+    ASSERT_TRUE(fuzzy_match_score("teh", "the", &FUZZY_MATCH_STRICT) <
+                    fuzzy_match_score("teh", "the", &FUZZY_MATCH_DEFAULT),
+                "strict does not reward transpositions");
 }
 
 TEST(options_fast) {
-    ASSERT_FALSE(FUZZY_MATCH_FAST.case_sensitive,
-                 "fast should be case insensitive");
-    ASSERT_FALSE(FUZZY_MATCH_FAST.unicode_normalize,
-                 "fast should not normalize unicode");
-    ASSERT_FALSE(FUZZY_MATCH_FAST.use_damerau, "fast should not use Damerau");
+    /// Case-insensitive like the default.
+    ASSERT_EQ(fuzzy_levenshtein_distance("HELLO", "hello", &FUZZY_MATCH_FAST),
+              0, "fast folds case");
+    /// Skips unicode normalization: NFC vs NFD "cafe-acute" are unequal.
+    ASSERT_TRUE(fuzzy_levenshtein_distance("caf\xC3\xA9", "cafe\xCC\x81",
+                                           &FUZZY_MATCH_FAST) > 0,
+                "fast does not normalize unicode");
 }
 
 /* ============================================================================
@@ -429,8 +445,10 @@ TEST(completion_exact_match_perfect) {
 TEST(completion_case_insensitive_default) {
     /// Default options are case-insensitive; the same input scored
     /// against uppercase candidate should match.
-    int s = fuzzy_completion_score("gco", "GIT CHECKOUT", NULL);
-    ASSERT_TRUE(s > 0, "case-insensitive default scores a real match");
+    int upper = fuzzy_completion_score("gco", "GIT CHECKOUT", NULL);
+    int lower = fuzzy_completion_score("gco", "git checkout", NULL);
+    ASSERT_TRUE(upper > 0, "case-insensitive default scores a real match");
+    ASSERT_EQ(upper, lower, "case is folded, not merely tolerated");
 }
 
 TEST(completion_non_subsequence_returns_zero) {
