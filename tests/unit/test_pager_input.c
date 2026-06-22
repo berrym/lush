@@ -278,21 +278,26 @@ TEST(loop_sets_active_flag_while_running) {
 TEST(loop_quit_via_esc_exits) {
     pager_layer_t p;
     mk_pager(&p);
-    int keys[] = {KEY_ESC};
-    scripted_source_t src = {keys, 1, 0};
+    /// Esc must map to QUIT and exit the loop before the trailing 'j'
+    /// (LINE_DOWN) is read; if Esc were ignored, 'j' would scroll top_line
+    /// to 1 before the source's natural EOF ended the loop.
+    int keys[] = {KEY_ESC, 'j'};
+    scripted_source_t src = {keys, 2, 0};
     pager_run_input_loop(&p, scripted_read, &src);
-    /// Loop should have exited cleanly on the Esc -> QUIT mapping
     ASSERT(!lle_in_pager(), "active flag cleared");
+    ASSERT_EQ(p.top_line, (size_t)0, "Esc quit before 'j' could scroll");
     pager_layer_destroy(&p);
 }
 
 TEST(loop_quit_via_ctrl_c_exits) {
     pager_layer_t p;
     mk_pager(&p);
-    int keys[] = {KEY_CTRL_C};
-    scripted_source_t src = {keys, 1, 0};
+    /// Ctrl-C must map to QUIT and exit before the trailing 'j' scrolls.
+    int keys[] = {KEY_CTRL_C, 'j'};
+    scripted_source_t src = {keys, 2, 0};
     pager_run_input_loop(&p, scripted_read, &src);
     ASSERT(!lle_in_pager(), "active flag cleared after Ctrl-C exit");
+    ASSERT_EQ(p.top_line, (size_t)0, "Ctrl-C quit before 'j' could scroll");
     pager_layer_destroy(&p);
 }
 

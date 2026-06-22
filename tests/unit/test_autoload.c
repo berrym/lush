@@ -109,6 +109,11 @@ TEST(resolve_via_fpath_defines_function) {
            "resolve succeeds via FPATH");
     ASSERT(!autoload_is_declared("greet"), "removed from registry on success");
 
+    /// Resolution defines the function in the live table, so invoking it now
+    /// runs its body and returns success rather than command-not-found.
+    ASSERT(executor_execute_command_line(executor, "greet", 1) == 0,
+           "resolved function is callable");
+
     executor_free(executor);
 
     /// Cleanup
