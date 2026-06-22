@@ -5,13 +5,13 @@
  * Verifies that the prompt composer implementation conforms to
  * Spec 25 requirements for template/segment/theme integration.
  *
- * Test Phases:
- * 1. Composer Lifecycle - Init, cleanup, configuration
- * 2. Template Integration - Segment rendering via templates
- * 3. Theme Integration - Color and symbol application
- * 4. Context Management - Exit code, duration, directory tracking
- * 5. Render Output - PS1, PS2, RPROMPT generation
- * 6. Error Handling - Invalid inputs, edge cases
+ * Coverage areas:
+ * - Composer Lifecycle - Init, cleanup, configuration
+ * - Template Integration - Segment rendering via templates
+ * - Theme Integration - Color and symbol application
+ * - Context Management - Exit code, duration, directory tracking
+ * - Render Output - PS1, PS2, RPROMPT generation
+ * - Error Handling - Invalid inputs, edge cases
  */
 
 #include "lle/error_handling.h"
@@ -20,9 +20,11 @@
 #include "lle/prompt/template.h"
 #include "lle/prompt/theme.h"
 
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* ========================================================================== */
 /// Test Infrastructure
@@ -71,6 +73,22 @@ static int tests_passed = 0;
 static lle_prompt_composer_t g_composer;
 static lle_segment_registry_t g_segments;
 static lle_theme_registry_t g_themes;
+
+/// Records that invalidate dispatch reached a registered segment. The builtin
+/// segment invalidate hooks are no-ops, so registering a probe segment is the
+/// only way to observe that lle_composer_invalidate_caches fans out.
+static bool g_invalidate_dispatched;
+static void probe_segment_invalidate(lle_prompt_segment_t *self) {
+    (void)self;
+    g_invalidate_dispatched = true;
+}
+
+/// Compute the username the user segment renders: getpwuid, falling back to
+/// "user" exactly as lle_prompt_context_init does.
+static const char *expected_username(void) {
+    struct passwd *pw = getpwuid(getuid());
+    return pw ? pw->pw_name : "user";
+}
 
 static void setup_full_composer(void) {
     memset(&g_composer, 0, sizeof(g_composer));
@@ -173,7 +191,10 @@ TEST(spec25_composer_renders_segment_tokens) {
                                                        output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    ASSERT(strlen(output) > 0);
+    /// The user segment renders ctx->username verbatim (no color), which the
+    /// context initializes from getpwuid.
+    ASSERT_STR_EQ(g_composer.context.username, expected_username());
+    ASSERT_STR_EQ(output, expected_username());
 
     teardown_full_composer();
 }
@@ -187,7 +208,10 @@ TEST(spec25_composer_renders_directory_segment) {
         &g_composer, "${directory}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    ASSERT(strlen(output) > 0);
+    /// The directory segment renders the tracked cwd_display, theme-colored.
+    /// The display path therefore appears verbatim inside the colored output.
+    ASSERT(strlen(g_composer.context.cwd_display) > 0);
+    ASSERT(strstr(output, g_composer.context.cwd_display) != NULL);
 
     teardown_full_composer();
 }
@@ -229,7 +253,11 @@ TEST(spec25_composer_renders_multiple_segments) {
         &g_composer, "${user}@${host}:${directory}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    ASSERT(strlen(output) > 0);
+    /// Each token expands to its real segment value, joined by the literal
+    /// separators: the username, hostname, and directory all appear.
+    ASSERT(strstr(output, g_composer.context.username) != NULL);
+    ASSERT(strstr(output, g_composer.context.hostname) != NULL);
+    ASSERT(strstr(output, g_composer.context.cwd_display) != NULL);
     ASSERT(strstr(output, "@") != NULL);
     ASSERT(strstr(output, ":") != NULL);
 
@@ -300,8 +328,13 @@ TEST(spec25_composer_color_rendering) {
         &g_composer, "${primary:colored}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /// Should contain "colored" and ANSI escape sequences
-    ASSERT(strstr(output, "colored") != NULL);
+    /// The color token wraps the text in the theme's primary color: the literal
+    /// text survives and an ANSI escape is emitted ahead of it.
+    char *text = strstr(output, "colored");
+    ASSERT(text != NULL);
+    char *esc = strstr(output, "\033[");
+    ASSERT(esc != NULL);
+    ASSERT(esc < text);
 
     teardown_full_composer();
 }
@@ -353,8 +386,16 @@ TEST(spec25_composer_refreshes_directory) {
 TEST(spec25_composer_invalidates_caches) {
     setup_full_composer();
 
-    /// Should not crash and should invalidate segment caches
+    /// Register a probe segment whose invalidate hook records the dispatch,
+    /// then confirm invalidation fans out to every registered segment.
+    lle_prompt_segment_t *probe = lle_segment_create("probe", "probe", 0);
+    ASSERT_NOT_NULL(probe);
+    probe->invalidate_cache = probe_segment_invalidate;
+    ASSERT_EQ(lle_segment_registry_register(&g_segments, probe), LLE_SUCCESS);
+
+    g_invalidate_dispatched = false;
     lle_composer_invalidate_caches(&g_composer);
+    ASSERT_TRUE(g_invalidate_dispatched);
 
     teardown_full_composer();
 }
