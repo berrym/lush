@@ -53,8 +53,12 @@ TEST(init_rejects_null) {
 
 TEST(cleanup_tolerates_null) {
     lle_utf8_index_cleanup(NULL); /// must not crash
-    /// If we got here, the cleanup did not crash.
-    ASSERT_TRUE(1, "cleanup(NULL) did not crash");
+    /// A real index still initializes and cleans up afterward, confirming the
+    /// NULL call left the library state intact.
+    lle_utf8_index_t idx;
+    ASSERT_EQ(lle_utf8_index_init(&idx), LLE_SUCCESS,
+              "init succeeds after cleanup(NULL)");
+    lle_utf8_index_cleanup(&idx);
 }
 
 TEST(is_valid_returns_false_on_null) {
@@ -403,7 +407,14 @@ TEST(invalidate_marks_index_invalid) {
 
 TEST(invalidate_tolerates_null) {
     lle_utf8_index_invalidate(NULL); /// must not crash
-    ASSERT_TRUE(1, "invalidate(NULL) did not crash");
+    /// A real index can still be built and invalidated afterward.
+    lle_utf8_index_t idx;
+    ASSERT_EQ(lle_utf8_index_init(&idx), LLE_SUCCESS,
+              "init succeeds after invalidate(NULL)");
+    ASSERT_EQ(lle_utf8_index_rebuild(&idx, "abc", 3), LLE_SUCCESS,
+              "rebuild works after invalidate(NULL)");
+    lle_utf8_index_invalidate(&idx);
+    lle_utf8_index_cleanup(&idx);
 }
 
 TEST(rebuild_after_invalidate_restores_validity) {
