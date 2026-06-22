@@ -21,12 +21,57 @@
 
 #include "lle/terminal_abstraction.h"
 #include "test_framework.h"
+#include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+/* ============================================================================
+ * PSEUDO-TERMINAL SETUP
+ *
+ * The terminal interface drives raw mode against STDIN_FILENO. Under the test
+ * runner stdin is a pipe, so every raw-mode test below would otherwise skip
+ * (isatty is false) and verify nothing. Replacing stdin with a pseudo-terminal
+ * makes isatty true and gives the tests a real, controllable tty whose termios
+ * flags can be inspected deterministically on both Linux and macOS.
+ * posix_openpt is enabled by the project-wide _XOPEN_SOURCE=700.
+ * ============================================================================
+ */
+
+static int g_pty_master = -1;
+static int g_pty_slave = -1;
+
+static bool setup_pty_stdin(void) {
+    g_pty_master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (g_pty_master < 0) {
+        return false;
+    }
+    if (grantpt(g_pty_master) != 0 || unlockpt(g_pty_master) != 0) {
+        return false;
+    }
+    const char *name = ptsname(g_pty_master);
+    if (!name) {
+        return false;
+    }
+    g_pty_slave = open(name, O_RDWR | O_NOCTTY);
+    if (g_pty_slave < 0) {
+        return false;
+    }
+    return dup2(g_pty_slave, STDIN_FILENO) == STDIN_FILENO;
+}
+
+static void teardown_pty_stdin(void) {
+    if (g_pty_slave >= 0) {
+        close(g_pty_slave);
+    }
+    if (g_pty_master >= 0) {
+        close(g_pty_master);
+    }
+}
 
 /* ============================================================================
  * INTERFACE INITIALIZATION AND CLEANUP TESTS
@@ -56,17 +101,23 @@ TEST(interface_destroy_null) {
     lle_unix_interface_destroy(NULL);
 }
 
-TEST(interface_double_destroy) {
+TEST(interface_reinit_after_destroy) {
+    /// Destroying an interface must leave the process able to create another
+    /// one: destroy restores and releases its own state without poisoning the
+    /// shared terminal. (A second destroy of the *same* pointer is a
+    /// use-after-free and is intentionally not exercised; NULL safety is
+    /// covered by interface_destroy_null.)
     lle_unix_interface_t *interface = NULL;
-    lle_result_t result = lle_unix_interface_init(&interface);
-    ASSERT(result == LLE_SUCCESS);
-
-    /// First destroy
+    ASSERT(lle_unix_interface_init(&interface) == LLE_SUCCESS);
+    int first_fd = interface->terminal_fd;
     lle_unix_interface_destroy(interface);
 
-    /// Second destroy on same pointer is undefined, but we test that
-    /// destroying NULL doesn't crash
-    lle_unix_interface_destroy(NULL);
+    lle_unix_interface_t *again = NULL;
+    ASSERT(lle_unix_interface_init(&again) == LLE_SUCCESS);
+    ASSERT(again != NULL);
+    ASSERT(again->terminal_fd == first_fd);
+    ASSERT(again->raw_mode_active == false);
+    lle_unix_interface_destroy(again);
 }
 
 TEST(interface_preserves_terminal_fd) {
@@ -148,17 +199,30 @@ TEST(raw_mode_idempotent_enter) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Enter raw mode twice
+    /// Capture the original (canonical) terminal settings.
+    struct termios original;
+    ASSERT(tcgetattr(STDIN_FILENO, &original) == 0);
+
+    /// Enter raw mode twice. The second enter is a no-op while already active,
+    /// so it must not re-save the now-raw settings as the restore baseline.
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
+    ASSERT(interface->raw_mode_active == true);
 
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == true);
 
-    /// Exit once should restore
+    /// A single exit fully restores the original canonical/echo flags; if the
+    /// redundant enter had corrupted the baseline, ICANON/ECHO would stay off.
     result = lle_unix_interface_exit_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
+    ASSERT(interface->raw_mode_active == false);
+
+    struct termios restored;
+    ASSERT(tcgetattr(STDIN_FILENO, &restored) == 0);
+    ASSERT((restored.c_lflag & ICANON) == (original.c_lflag & ICANON));
+    ASSERT((restored.c_lflag & ECHO) == (original.c_lflag & ECHO));
 
     lle_unix_interface_destroy(interface);
 }
@@ -421,11 +485,17 @@ int main(void) {
     printf("Running Terminal State Management Tests (Spec 02)\n");
     printf("============================================================\n\n");
 
+    /// Give the raw-mode tests a real tty on stdin; if the platform refuses a
+    /// pseudo-terminal the tests fall back to skipping via their isatty guards.
+    if (!setup_pty_stdin()) {
+        printf("NOTE: pseudo-terminal unavailable; raw-mode tests will skip\n");
+    }
+
     printf("Interface Initialization Tests:\n");
     RUN_TEST(interface_init_basic);
     RUN_TEST(interface_init_null_parameter);
     RUN_TEST(interface_destroy_null);
-    RUN_TEST(interface_double_destroy);
+    RUN_TEST(interface_reinit_after_destroy);
     RUN_TEST(interface_preserves_terminal_fd);
 
     printf("\nRaw Mode Tests:\n");
@@ -448,5 +518,6 @@ int main(void) {
     RUN_TEST(multiple_interfaces);
     RUN_TEST(full_lifecycle);
 
+    teardown_pty_stdin();
     return TEST_RESULT();
 }
