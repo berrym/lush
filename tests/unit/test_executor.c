@@ -1962,9 +1962,15 @@ TEST(pipeline_simple) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /// Simple pipeline - echo piped to cat
-    run_result_t r = run_shell_with_executor(exec, "true | true");
+    /// Data must flow through the pipe: grep only succeeds if it sees the
+    /// text echo wrote upstream.
+    run_result_t r =
+        run_shell_with_executor(exec, "echo hello | grep -q hello");
     ASSERT_EXIT_STATUS(r, 0);
+    /// The piped content matters: a non-matching pattern makes grep exit 1.
+    run_result_t r2 =
+        run_shell_with_executor(exec, "echo hello | grep -q absent");
+    ASSERT_EXIT_STATUS(r2, 1);
 
     executor_free(exec);
 }
@@ -1984,8 +1990,9 @@ TEST(pipeline_three_commands) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /// Three-stage pipeline
-    run_result_t r = run_shell_with_executor(exec, "true | true | true");
+    /// Data flows through all three stages onto grep.
+    run_result_t r =
+        run_shell_with_executor(exec, "echo hello | cat | grep -q hello");
     ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
@@ -2315,7 +2322,11 @@ TEST(array_indexed_assignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(exec, "arr=(one two three)");
+    /// Each element is individually addressable by index after assignment;
+    /// the && chain only reaches exit 0 if all three indices resolve.
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(one two three); [ \"${arr[0]}\" = one ] && "
+              "[ \"${arr[1]}\" = two ] && [ \"${arr[2]}\" = three ]");
     ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
@@ -2378,9 +2389,13 @@ TEST(command_substitution_syntax) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /// Verify command substitution parses and executes without error
-    run_result_t r = run_shell_with_executor(exec, "X=$(true)");
+    /// Command substitution captures the inner command's stdout into X.
+    run_result_t r = run_shell_with_executor(exec, "X=$(echo hello)");
     ASSERT_EXIT_STATUS(r, 0);
+
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_STR_EQ(x, "hello", "$(...) captures the inner command output");
+    free(x);
 
     executor_free(exec);
 }
@@ -2423,10 +2438,14 @@ TEST(special_var_dollar_dollar) {
 
     char *pid = symtable_get_var(exec->symtable, "PID");
     ASSERT_NOT_NULL(pid, "$$ should be set");
-    /// PID should be set - could be 0 in test environment or actual PID
-    /// Just verify it's a valid number
-    int pid_val = atoi(pid);
-    ASSERT(pid_val >= 0, "$$ should be non-negative");
+    /// $$ must expand to a decimal PID, not the literal "$$" or an empty
+    /// string. (The harness leaves shell_pid at its 0 default since lush.c's
+    /// main does not run, so the value itself is "0" here; the contract being
+    /// guarded is that the expansion produced digits.)
+    ASSERT(pid[0] != '\0', "$$ expands to a non-empty value");
+    for (const char *p = pid; *p; p++) {
+        ASSERT(*p >= '0' && *p <= '9', "$$ expands to decimal digits only");
+    }
     free(pid);
 
     executor_free(exec);
@@ -2535,11 +2554,10 @@ TEST(here_string) {
     ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
-    /// cat outputs with trailing newline, command substitution may preserve it
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /// Check that result starts with "hello" (may have trailing newline)
-    ASSERT(strncmp(result, "hello", 5) == 0,
-           "Here string should provide 'hello'");
+    /// The here-string feeds "hello\n" to cat; command substitution strips the
+    /// trailing newline, so RESULT is exactly "hello".
+    ASSERT_STR_EQ(result, "hello", "here string delivers 'hello' to cat");
     free(result);
 
     executor_free(exec);
