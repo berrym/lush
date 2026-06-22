@@ -411,7 +411,8 @@ TEST(builtin_git_segment) {
     ASSERT_STR_EQ(output.content, "(seg_test_branch)");
 
     snprintf(cmd, sizeof(cmd), "rm -rf '%s'", dir);
-    (void)system(cmd);
+    int cleanup_rc = system(cmd); /// best-effort cleanup of the temp repo
+    (void)cleanup_rc;
     lle_segment_free(seg);
     PASS();
 }
