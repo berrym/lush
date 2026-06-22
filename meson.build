@@ -859,6 +859,19 @@ endif
          timeout: 60)
   endif
 
+  # Spec 03 Compliance Test (Cursor Manager)
+  # Drives the cursor manager over a real UTF-8, multi-line buffer.
+  if fs.exists('tests/lle/compliance/spec_03_cursor_manager_test.c')
+    test_spec03_cursor_manager = executable('spec_03_cursor_manager_test',
+                                        ['tests/lle/compliance/spec_03_cursor_manager_test.c',
+                                         'tests/lle/functional/display_test_stubs.c'],
+                                        include_directories: inc,
+                                        dependencies: [lle_dep, display_dep])
+    test('Spec 03 Cursor Manager Compliance', test_spec03_cursor_manager,
+         suite: 'lle-compliance',
+         timeout: 60)
+  endif
+
   # Spec 26 Compliance Test (Adaptive Terminal Integration)
   # Validates compliance with Spec 26 Phases 1-2 requirements
   if fs.exists('tests/lle/compliance/spec_26_adaptive_terminal_compliance.c')
