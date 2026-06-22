@@ -477,7 +477,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Event System Unit Tests (Spec 04 Phase 1)
+  # Event System Unit Tests (Spec 04)
   # Tests core event system infrastructure: lifecycle, events, queues, handlers
   test_event_system = executable(
     'test_event_system',
@@ -490,7 +490,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Event System Phase 2 Tests (Spec 04 Phase 2A-2D)
+  # Event Filter and Timer Tests (Spec 04)
   # Tests filters, timers, enhanced stats, and priority queues
   test_event_filters_timers = executable('test_event_filters_timers',
                                  ['tests/lle/unit/test_event_filters_timers.c',
@@ -502,7 +502,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Terminal Capabilities Unit Tests (Spec 02 Phase 1)
+  # Terminal Capabilities Unit Tests (Spec 02)
   test_terminal_capabilities = executable('test_terminal_capabilities',
                                           'tests/lle/unit/test_terminal_capabilities.c',
                                           include_directories: [inc, include_directories('tests')],
@@ -512,7 +512,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Terminal State Management Unit Tests (Spec 02 Phase 2)
+  # Terminal State Management Unit Tests (Spec 02)
   test_terminal_state = executable('test_terminal_state',
                                    'tests/lle/unit/test_terminal_state.c',
                                    include_directories: [inc, include_directories('tests')],
@@ -522,7 +522,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Terminal Event Reading Unit Tests (Spec 02 Phase 3)
+  # Terminal Event Reading Unit Tests (Spec 02)
   test_terminal_event_reading = executable('test_terminal_event_reading',
                                           'tests/lle/unit/test_terminal_event_reading.c',
                                           include_directories: [inc, include_directories('tests')],
@@ -593,7 +593,7 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
-  # Prompt Expansion Unit Tests (Spec 28 Phase 1)
+  # Prompt Expansion Unit Tests (Spec 28)
   # Tests unified bash/zsh/LLE prompt expansion engine
   test_prompt_expansion = executable(
     'test_prompt_expansion',
@@ -681,7 +681,7 @@ endif
 # LLE History System Tests (Spec 09)
 # ============================================================================
 
-  # History Core Functional Tests (Phase 1 Day 1)
+  # History Core Functional Tests
   # Tests basic history operations: add, get, search, navigate
   if fs.exists('tests/lle/functional/test_history_core.c')
     test_history_core = executable('test_history_core',
@@ -694,7 +694,7 @@ endif
          timeout: 30)
   endif
 
-  # History Indexing Functional Tests (Phase 1 Day 2)
+  # History Indexing Functional Tests
   # Tests command indexing, prefix search, full-text search
   if fs.exists('tests/lle/functional/test_history_indexing.c')
     test_history_indexing = executable('test_history_indexing',
@@ -707,7 +707,7 @@ endif
          timeout: 30)
   endif
 
-  # History Persistence Functional Tests (Phase 1 Day 3)
+  # History Persistence Functional Tests
   # Tests file I/O, format conversion, import/export
   if fs.exists('tests/lle/functional/test_history_persistence.c')
     test_history_persistence = executable('test_history_persistence',
@@ -720,7 +720,7 @@ endif
          timeout: 30)
   endif
 
-  # History Phase 1 Integration Tests
+  # History Integration Tests
   # Tests integration between core, indexing, and persistence
   if fs.exists('tests/lle/integration/test_history_integration.c')
     test_history_integration = executable('test_history_integration',
@@ -733,7 +733,7 @@ endif
          timeout: 60)
   endif
 
-  # History Phase 3 Day 8 Tests - Search Engine
+  # History Search Engine Tests
   # Tests exact, prefix, substring, and fuzzy search functionality
   if fs.exists('tests/lle/functional/test_history_search_results.c')
     test_history_search_results = executable('test_history_search_results',
@@ -896,8 +896,8 @@ endif
          timeout: 60)
   endif
 
-  # History Phase 4 Complete Tests
-  # Tests Phase 4 features: forensics, deduplication, multiline
+  # History Forensics Tests
+  # Tests forensics, deduplication, multiline
   # NOTE: Includes input_continuation.c for multiline support
   if fs.exists('tests/lle/functional/test_history_forensics.c')
     test_history_forensics = executable('test_history_forensics',
@@ -1055,7 +1055,7 @@ endif
          timeout: 30)
   endif
 
-  # Completion Types Unit Tests (Spec 12 Phase 1)
+  # Completion Types Unit Tests (Spec 12)
   # Tests type classification, item/result management, sorting
   if fs.exists('tests/lle/unit/test_completion_types.c')
     test_completion_types = executable('test_completion_types',
@@ -1207,7 +1207,7 @@ endif
          timeout: 30)
   endif
 
-  # Adaptive Terminal Detection Unit Tests (Spec 26 Phase 1)
+  # Adaptive Terminal Detection Unit Tests (Spec 26)
   # Tests detection system, signature matching, capability probing
   if fs.exists('tests/lle/unit/test_adaptive_detection.c')
     test_adaptive_detection = executable('test_adaptive_detection',
@@ -1219,7 +1219,7 @@ endif
          timeout: 30)
   endif
 
-  # Adaptive Terminal Controllers Unit Tests (Spec 26 Phase 2)
+  # Adaptive Terminal Controllers Unit Tests (Spec 26)
   # Tests all four controllers: native, enhanced, minimal, multiplexer
   if fs.exists('tests/lle/unit/test_adaptive_controllers.c')
     test_adaptive_controllers = executable('test_adaptive_controllers',
@@ -1231,7 +1231,7 @@ endif
          timeout: 30)
   endif
 
-  # Adaptive Terminal Fallback Unit Tests (Spec 26 Phase 3)
+  # Adaptive Terminal Fallback Unit Tests (Spec 26)
   # Tests graceful degradation and fallback hierarchy
   if fs.exists('tests/lle/unit/test_adaptive_fallback.c')
     test_adaptive_fallback = executable('test_adaptive_fallback',
@@ -1266,7 +1266,7 @@ endif
 # NOTE: For manual LLE testing, use the main lush binary
 
 # ============================================================================
-# LLE Completion Menu Renderer Unit Tests (Spec 12 Phase 5.1)
+# LLE Completion Menu Renderer Unit Tests (Spec 12)
 # Tests menu rendering, column layout, category headers, item formatting
 if fs.exists('tests/unit/test_completion_menu_renderer.c')
   test_completion_menu_renderer = executable('test_completion_menu_renderer',
@@ -1279,7 +1279,7 @@ if fs.exists('tests/unit/test_completion_menu_renderer.c')
 endif
 
 # ============================================================================
-# Shell Mode Unit Tests (Phase 0: Extended Language Support)
+# Shell Mode Unit Tests (Extended Language Support)
 # Tests multi-mode architecture, feature matrix, overrides, shebang detection
 if fs.exists('tests/unit/test_shell_mode.c')
   test_shell_mode = executable('test_shell_mode',
@@ -1968,7 +1968,7 @@ if fs.exists('tests/unit/test_fixer.c')
        timeout: 30)
 endif
 
-# Phase 4: Continuation Prompt Tests
+# Continuation Prompt Tests
 # ============================================================================
 
 # ============================================================================
