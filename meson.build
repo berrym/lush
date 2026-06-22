@@ -873,7 +873,7 @@ endif
   endif
 
   # Spec 26 Compliance Test (Adaptive Terminal Integration)
-  # Validates compliance with Spec 26 Phases 1-2 requirements
+  # Validates the adaptive terminal detection and controller APIs
   if fs.exists('tests/lle/compliance/spec_26_adaptive_terminal_compliance.c')
     test_spec26_compliance = executable('spec_26_compliance',
                                         'tests/lle/compliance/spec_26_adaptive_terminal_compliance.c',
