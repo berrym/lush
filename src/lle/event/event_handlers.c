@@ -14,10 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/// Forward declaration for filter apply function (from event_filter.c)
-extern lle_filter_result_t lle_event_filter_apply(lle_event_system_t *system,
-                                                  lle_event_t *event);
-
 /**
  * @brief Register an event handler for a specific event type
  * @param system The event system to register with

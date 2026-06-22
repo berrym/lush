@@ -1102,6 +1102,20 @@ lle_result_t lle_event_filter_enable(lle_event_system_t *system,
 lle_result_t lle_event_filter_disable(lle_event_system_t *system,
                                       const char *name);
 
+/**
+ * @brief Run every enabled filter over an event, in registration order
+ * @param system Event system
+ * @param event Event to filter
+ * @return LLE_FILTER_PASS if all filters pass (or none are registered),
+ *         LLE_FILTER_BLOCK as soon as a filter blocks, LLE_FILTER_ERROR on a
+ *         NULL system or event
+ *
+ * Updates per-filter and system-wide statistics as a side effect. Invoked by
+ * the dispatch path; exposed here so callers and tests do not redeclare it.
+ */
+lle_filter_result_t lle_event_filter_apply(lle_event_system_t *system,
+                                           lle_event_t *event);
+
 /*
  * Get filter statistics
  */

@@ -176,14 +176,97 @@ TEST(filter_statistics) {
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Get stats
-    uint64_t filtered = 0, passed = 0, blocked = 0, transformed = 0,
-             errored = 0;
+    /// A freshly added filter has processed nothing: every counter is 0.
+    uint64_t filtered = 1, passed = 1, blocked = 1, transformed = 1,
+             errored = 1;
     result =
         lle_event_filter_get_stats(system, "test_filter", &filtered, &passed,
                                    &blocked, &transformed, &errored);
     ASSERT(result == LLE_SUCCESS);
-    /// Stats start at 0
+    ASSERT(filtered == 0);
+    ASSERT(passed == 0);
+    ASSERT(blocked == 0);
+    ASSERT(transformed == 0);
+    ASSERT(errored == 0);
+
+    /// Querying an unknown filter is an error.
+    result =
+        lle_event_filter_get_stats(system, "nonexistent", &filtered, &passed,
+                                   &blocked, &transformed, &errored);
+    ASSERT(result != LLE_SUCCESS);
+
+    lle_event_system_destroy(system);
+}
+
+TEST(filter_apply_passes_event) {
+    lle_event_system_t *system = NULL;
+    lle_result_t result = lle_event_system_init(&system, mock_pool);
+    ASSERT(result == LLE_SUCCESS);
+    result = lle_event_filter_system_init(system);
+    ASSERT(result == LLE_SUCCESS);
+
+    result = lle_event_filter_add(system, "passer", test_filter_pass, NULL);
+    ASSERT(result == LLE_SUCCESS);
+
+    lle_event_t *event = NULL;
+    result = lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
+    ASSERT(result == LLE_SUCCESS);
+
+    /// Applying the filter must invoke the callback and let the event through.
+    filter_call_count = 0;
+    lle_filter_result_t fr = lle_event_filter_apply(system, event);
+    ASSERT(fr == LLE_FILTER_PASS);
+    ASSERT(filter_call_count == 1);
+
+    /// The pass is reflected in the filter's statistics.
+    uint64_t filtered = 0, passed = 0, blocked = 0, transformed = 0,
+             errored = 0;
+    result = lle_event_filter_get_stats(system, "passer", &filtered, &passed,
+                                        &blocked, &transformed, &errored);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(filtered == 1);
+    ASSERT(passed == 1);
+    ASSERT(blocked == 0);
+
+    lle_event_system_destroy(system);
+}
+
+TEST(filter_apply_blocks_event) {
+    lle_event_system_t *system = NULL;
+    lle_result_t result = lle_event_system_init(&system, mock_pool);
+    ASSERT(result == LLE_SUCCESS);
+    result = lle_event_filter_system_init(system);
+    ASSERT(result == LLE_SUCCESS);
+
+    result = lle_event_filter_add(system, "blocker", test_filter_block, NULL);
+    ASSERT(result == LLE_SUCCESS);
+
+    lle_event_t *event = NULL;
+    result = lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
+    ASSERT(result == LLE_SUCCESS);
+
+    /// A blocking filter stops the event and records a block.
+    filter_call_count = 0;
+    lle_filter_result_t fr = lle_event_filter_apply(system, event);
+    ASSERT(fr == LLE_FILTER_BLOCK);
+    ASSERT(filter_call_count == 1);
+
+    uint64_t filtered = 0, passed = 0, blocked = 0, transformed = 0,
+             errored = 0;
+    result = lle_event_filter_get_stats(system, "blocker", &filtered, &passed,
+                                        &blocked, &transformed, &errored);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(blocked == 1);
+    ASSERT(passed == 0);
+
+    /// A disabled filter is skipped: the event passes and the callback is not
+    /// invoked again.
+    result = lle_event_filter_disable(system, "blocker");
+    ASSERT(result == LLE_SUCCESS);
+    filter_call_count = 0;
+    fr = lle_event_filter_apply(system, event);
+    ASSERT(fr == LLE_FILTER_PASS);
+    ASSERT(filter_call_count == 0);
 
     lle_event_system_destroy(system);
 }
@@ -526,6 +609,8 @@ int main(void) {
     RUN_TEST(filter_enable_disable);
     RUN_TEST(filter_multiple_filters);
     RUN_TEST(filter_statistics);
+    RUN_TEST(filter_apply_passes_event);
+    RUN_TEST(filter_apply_blocks_event);
 
     printf("\nTimer System Tests:\n");
     RUN_TEST(timer_system_init);
