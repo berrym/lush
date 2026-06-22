@@ -186,10 +186,31 @@ TEST(compdef_enum_visits_all_bindings) {
 
 TEST(bin_compdef_no_args_returns_zero) {
     setup_bindings();
+    compdef_set("git", "_git");
+
+    /// No-args compdef lists every binding to stdout; capture it and confirm
+    /// the bound definition is printed, not merely that the call returns 0.
     char a0[] = "compdef";
     char *argv[] = {a0};
-    int rc = bin_compdef(1, argv);
-    ASSERT_EQ(rc, 0, "compdef with no args returns 0 (lists, empty here)");
+    FILE *old_stdout = stdout;
+    FILE *tmp = tmpfile();
+    char out[256] = "";
+    int rc;
+    if (tmp) {
+        stdout = tmp;
+        rc = bin_compdef(1, argv);
+        fflush(tmp);
+        rewind(tmp);
+        size_t n = fread(out, 1, sizeof(out) - 1, tmp);
+        out[n] = '\0';
+        stdout = old_stdout;
+        fclose(tmp);
+    } else {
+        rc = bin_compdef(1, argv);
+    }
+    ASSERT_EQ(rc, 0, "compdef with no args returns 0");
+    ASSERT(strstr(out, "compdef _git git") != NULL,
+           "no-args compdef lists the bound completion");
     teardown_bindings();
 }
 
