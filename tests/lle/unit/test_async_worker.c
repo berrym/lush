@@ -270,14 +270,38 @@ TEST(git_status_detects_repo) {
     lle_async_worker_submit(worker, req);
     wait_for_response(5000);
 
+    /// Copy the response fields out under the lock, then release it before
+    /// asserting: a failing assertion longjmps out of the test, so holding the
+    /// mutex across it would deadlock the worker shutdown below.
     pthread_mutex_lock(&callback_mutex);
-    /// Assuming tests run from lush git repo
-    ASSERT_TRUE(last_response.data.git_status.is_git_repo,
-                "Should detect git repo");
-    ASSERT_TRUE(strlen(last_response.data.git_status.branch) > 0 ||
-                    last_response.data.git_status.is_detached,
-                "Should have branch or be detached");
+    bool is_repo = last_response.data.git_status.is_git_repo;
+    bool is_detached = last_response.data.git_status.is_detached;
+    char detected_branch[256];
+    snprintf(detected_branch, sizeof(detected_branch), "%s",
+             last_response.data.git_status.branch);
     pthread_mutex_unlock(&callback_mutex);
+
+    ASSERT_TRUE(is_repo, "Should detect git repo");
+
+    /// The detected branch matches what git itself reports, using the same
+    /// query the worker uses ("branch --show-current" is empty when detached).
+    char expected_branch[256] = "";
+    char gitcmd[PATH_MAX + 64];
+    snprintf(gitcmd, sizeof(gitcmd),
+             "git -C '%s' branch --show-current 2>/dev/null", cwd);
+    FILE *gp = popen(gitcmd, "r");
+    if (gp) {
+        if (fgets(expected_branch, sizeof(expected_branch), gp)) {
+            expected_branch[strcspn(expected_branch, "\n")] = '\0';
+        }
+        pclose(gp);
+    }
+    if (expected_branch[0] != '\0') {
+        ASSERT_TRUE(strcmp(detected_branch, expected_branch) == 0,
+                    "detected branch matches git's reported branch");
+    } else {
+        ASSERT_TRUE(is_detached, "an empty branch means detached HEAD");
+    }
 
     lle_async_worker_shutdown(worker);
     lle_async_worker_wait(worker);
