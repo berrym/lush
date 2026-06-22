@@ -225,8 +225,10 @@ TEST(powerline_render_has_bg_colors) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "/tmp");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
-                         output, sizeof(output));
+    lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
+    ASSERT_EQ(r, LLE_SUCCESS);
 
     /// Background colors use ESC[48;5;Nm (256-color) or ESC[48;2;R;G;Bm (true)
     ASSERT_TRUE(contains(output, "\033[48;5;") ||
@@ -255,15 +257,18 @@ TEST(powerline_render_separator_count) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
-                         output, sizeof(output));
+    lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
+    ASSERT_EQ(r, LLE_SUCCESS);
 
     /// Count left-arrow separators (U+E0B0 = 0xEE 0x82 0xB0)
     int sep_count = count_occurrences(output, "\xee\x82\xb0");
 
-    /// With N visible segments, there should be exactly N separators
-    /// (N-1 between segments + 1 trailing)
-    ASSERT(sep_count >= 2); /// At least user + directory = 2 separators
+    /// Only user + directory render content here (no git repo, no exit
+    /// status), so two visible segments yield exactly two separators:
+    /// one between the segments and one trailing.
+    ASSERT_EQ(sep_count, 2);
 
     teardown();
 }
@@ -282,8 +287,10 @@ TEST(powerline_render_segment_content_present) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~/code");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
-                         output, sizeof(output));
+    lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
+    ASSERT_EQ(r, LLE_SUCCESS);
 
     /// Segment content should be embedded in the output
     ASSERT_TRUE(contains(output, "alice"));
@@ -307,19 +314,24 @@ TEST(powerline_strips_segment_ansi) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~/project");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
-                         output, sizeof(output));
+    lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
+    ASSERT_EQ(r, LLE_SUCCESS);
 
     /// Segment renderers embed colors like ESC[38;5;33m (path_normal) and
     /// ESC[0m (reset) in their content. The powerline renderer must strip
     /// these to prevent them from clobbering the powerline bg/fg colors.
     ///
     /// After stripping, the only resets should be from the powerline renderer
-    /// itself (at segment boundaries), not mid-segment. Count resets and
-    /// verify there aren't too many. With N visible segments, the renderer
-    /// produces at most N+1 resets (final separator uses 2).
+    /// itself (at segment boundaries), not mid-segment. Each segment renderer
+    /// embeds its own ESC[0m (segment.c), which strip_ansi removes before
+    /// powerline applies its own colors. With the two embedded resets
+    /// stripped, only the powerline renderer's own two resets remain; a
+    /// stripping regression would let the segment resets leak through and
+    /// push this count up.
     int reset_count = count_occurrences(output, "\033[0m");
-    ASSERT(reset_count <= 6); /// Reasonable upper bound for 2-3 segments
+    ASSERT_EQ(reset_count, 2);
 
     /// The directory segment normally embeds ESC[38;5;33m for path_normal
     /// color. In powerline mode this must NOT appear inside the content
