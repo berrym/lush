@@ -100,18 +100,25 @@ void add_child_node(node_t *parent, node_t *child) {
  * @param val String value to set (will be duplicated)
  */
 void set_node_val_str(node_t *node, char *val) {
-    node->val_type = VAL_STR;
-
-    if (!val) {
-        node->val.str = NULL;
-    } else {
-        char *val2 = strdup(val);
+    /// The node owns its string value (free_node_tree frees it). Duplicate the
+    /// new value first, then release any previous owned string, so replacing a
+    /// value does not leak and so the call is safe even if val aliases the
+    /// node's current string.
+    char *val2 = NULL;
+    if (val) {
+        val2 = strdup(val);
         if (!val2) {
             error_return("set_node_val_str");
             return;
         }
-        node->val.str = val2;
     }
+
+    if (node->val_type == VAL_STR && node->val.str) {
+        free(node->val.str);
+    }
+
+    node->val_type = VAL_STR;
+    node->val.str = val2;
 }
 
 /**
