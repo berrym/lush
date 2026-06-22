@@ -461,10 +461,17 @@ TEST(cursor_at_whitespace_yields_empty_word) {
 }
 
 TEST(free_handles_null) {
-    /// Smoke test that the free function accepts NULL safely.
+    /// lle_word_context_free is a pool-backed near-no-op; it must accept both
+    /// NULL and a live context without crashing, and must leave the pool
+    /// intact so a subsequent analyze still succeeds.
     lle_word_context_free(NULL);
-    /// If we got here, no crash. Pass.
-    ASSERT(1 == 1);
+    const char *buf = "echo hi";
+    ANALYZE(buf, strlen(buf), ctx);
+    lle_word_context_free(ctx);
+    lle_word_context_t *ctx2 = NULL;
+    ASSERT(lle_word_context_analyze(buf, strlen(buf), POOL, &ctx2) ==
+           LLE_SUCCESS);
+    ASSERT(ctx2 != NULL);
 }
 
 /* ============================================================================
@@ -744,8 +751,12 @@ TEST(for_without_in_keyword_falls_back_to_argument) {
     /// keyword sequence is broken, fall back to argument completion.
     const char *buf = "for x mal";
     ANALYZE(buf, strlen(buf), ctx);
-    /// No FOR_IN_LIST — sequence broken.
-    ASSERT(ctx->context_type != LLE_CONTEXT_FOR_IN_LIST);
+    /// The broken keyword sequence reverts to treating `for` as an ordinary
+    /// command whose third word is an argument.
+    ASSERT(ctx->context_type == LLE_CONTEXT_ARGUMENT);
+    ASSERT(ctx->command_name != NULL);
+    ASSERT(strcmp(ctx->command_name, "for") == 0);
+    ASSERT(ctx->arg_index == 1);
 }
 
 TEST(case_pattern_after_case_x_in) {
@@ -796,16 +807,20 @@ TEST(heredoc_introducing_line_is_not_heredoc_body) {
     /// walker has not entered the body).
     const char *buf = "cat <<EOF";
     ANALYZE(buf, strlen(buf), ctx);
-    ASSERT(ctx->context_type != LLE_CONTEXT_HEREDOC_BODY);
+    /// Still the introducing line: the cursor is at an argument of `cat`,
+    /// not inside the (not-yet-started) heredoc body.
+    ASSERT(ctx->context_type == LLE_CONTEXT_ARGUMENT);
+    ASSERT(ctx->command_name != NULL);
+    ASSERT(strcmp(ctx->command_name, "cat") == 0);
 }
 
 TEST(here_string_is_not_heredoc) {
-    /// cat <<<value|  — `<<<` is a here-string operator, not a heredoc.
-    /// The cursor after `value` is in argument position; no body
-    /// tracking should be active.
+    /// cat <<<value|  — `<<<` is a here-string operator, not a heredoc. The
+    /// analyzer treats `<<<` like the other redirect operators, so the word
+    /// after it is the redirect target; no heredoc body tracking is active.
     const char *buf = "cat <<<value";
     ANALYZE(buf, strlen(buf), ctx);
-    ASSERT(ctx->context_type != LLE_CONTEXT_HEREDOC_BODY);
+    ASSERT(ctx->context_type == LLE_CONTEXT_REDIRECT_TARGET);
 }
 
 /* ============================================================================
