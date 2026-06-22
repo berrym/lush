@@ -16,9 +16,12 @@
 #include "lle/prompt/segment.h"
 #include "test_framework.h"
 
+#include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* Wrap older 2-arg / no-arg ASSERT forms over the shared framework so
  * the test bodies don't need editing. PASS() is now a no-op. */
@@ -377,11 +380,39 @@ TEST(builtin_git_segment) {
     ASSERT(seg->capabilities & LLE_SEG_CAP_ASYNC);
     ASSERT(seg->capabilities & LLE_SEG_CAP_CACHEABLE);
 
-    /// Initialize
     if (seg->init) {
         ASSERT_EQ(seg->init(seg), LLE_SUCCESS);
     }
 
+    /// Render against a throwaway repo on a known branch so the synchronous
+    /// git fetch produces deterministic output wherever the test runs.
+    char dir[] = "/tmp/lush_seg_git_XXXXXX";
+    ASSERT(mkdtemp(dir) != NULL);
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd),
+             "cd '%s' && git init -q && git checkout -q -b seg_test_branch && "
+             "git -c user.email=t@example.com -c user.name=t commit -q "
+             "--allow-empty -m init",
+             dir);
+    ASSERT(system(cmd) == 0);
+
+    char saved_cwd[PATH_MAX];
+    ASSERT(getcwd(saved_cwd, sizeof(saved_cwd)) != NULL);
+    ASSERT(chdir(dir) == 0);
+    lle_prompt_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    lle_segment_output_t output = {0};
+    lle_result_t result = seg->render(seg, &ctx, NULL, &output);
+    /// Restore the working directory before asserting so a failure cannot leave
+    /// the test process inside the temporary repo.
+    ASSERT(chdir(saved_cwd) == 0);
+
+    ASSERT_EQ(result, LLE_SUCCESS);
+    ASSERT_STR_EQ(output.content, "(seg_test_branch)");
+
+    snprintf(cmd, sizeof(cmd), "rm -rf '%s'", dir);
+    int cleanup_rc = system(cmd); /// best-effort cleanup of the temp repo
+    (void)cleanup_rc;
     lle_segment_free(seg);
     PASS();
 }
@@ -405,14 +436,28 @@ TEST(register_builtins) {
     PASS();
 }
 
+static bool g_probe_invalidated = false;
+static void probe_invalidate_hook(lle_prompt_segment_t *self) {
+    (void)self;
+    g_probe_invalidated = true;
+}
+
 TEST(invalidate_all_caches) {
     lle_segment_registry_t registry;
     lle_segment_registry_init(&registry);
-
     lle_segment_register_builtins(&registry);
 
-    /// Should not crash
+    /// Register a probe segment whose invalidate hook records that it ran.
+    lle_prompt_segment_t *probe =
+        lle_segment_create("probe", "cache probe", LLE_SEG_CAP_CACHEABLE);
+    ASSERT(probe != NULL);
+    probe->invalidate_cache = probe_invalidate_hook;
+    ASSERT_EQ(lle_segment_registry_register(&registry, probe), LLE_SUCCESS);
+
+    /// invalidate_all dispatches to every registered segment's invalidate hook.
+    g_probe_invalidated = false;
     lle_segment_registry_invalidate_all(&registry);
+    ASSERT(g_probe_invalidated);
 
     lle_segment_registry_cleanup(&registry);
     PASS();
