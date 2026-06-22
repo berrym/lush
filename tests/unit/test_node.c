@@ -153,9 +153,8 @@ TEST(set_node_val_str_basic) {
     node_t *node = new_node(NODE_VAR);
     ASSERT_NOT_NULL(node, "Node creation failed");
 
-    /// set_node_val_str takes ownership of the string
-    char *value = strdup("test_value");
-    set_node_val_str(node, value);
+    /// set_node_val_str copies the string; pass a borrowed literal.
+    set_node_val_str(node, "test_value");
 
     ASSERT_EQ(node->val_type, VAL_STR, "Value type should be VAL_STR");
     ASSERT_STR_EQ(node->val.str, "test_value", "String value mismatch");
@@ -166,8 +165,8 @@ TEST(set_node_val_str_basic) {
 TEST(set_node_val_str_overwrite) {
     node_t *node = new_node(NODE_VAR);
 
-    set_node_val_str(node, strdup("first"));
-    set_node_val_str(node, strdup("second"));
+    set_node_val_str(node, "first");
+    set_node_val_str(node, "second");
 
     ASSERT_STR_EQ(node->val.str, "second", "Value should be overwritten");
 
@@ -186,9 +185,9 @@ TEST(pipeline_structure) {
     node_t *cmd2 = new_node(NODE_COMMAND);
     node_t *cmd3 = new_node(NODE_COMMAND);
 
-    set_node_val_str(cmd1, strdup("cmd1"));
-    set_node_val_str(cmd2, strdup("cmd2"));
-    set_node_val_str(cmd3, strdup("cmd3"));
+    set_node_val_str(cmd1, "cmd1");
+    set_node_val_str(cmd2, "cmd2");
+    set_node_val_str(cmd3, "cmd3");
 
     add_child_node(pipeline, cmd1);
     add_child_node(pipeline, cmd2);
@@ -234,7 +233,7 @@ TEST(for_loop_structure) {
     node_t *list = new_node(NODE_COMMAND); /// Word list
     node_t *body = new_node(NODE_COMMAND);
 
-    set_node_val_str(var, strdup("i"));
+    set_node_val_str(var, "i");
 
     add_child_node(for_node, var);
     add_child_node(for_node, list);
@@ -256,9 +255,9 @@ TEST(command_with_redirections) {
     node_t *arg2 = new_node(NODE_STRING_LITERAL);
     node_t *redir = new_node(NODE_REDIR_OUT);
 
-    set_node_val_str(arg1, strdup("echo"));
-    set_node_val_str(arg2, strdup("hello"));
-    set_node_val_str(redir, strdup("output.txt"));
+    set_node_val_str(arg1, "echo");
+    set_node_val_str(arg2, "hello");
+    set_node_val_str(redir, "output.txt");
 
     add_child_node(cmd, arg1);
     add_child_node(cmd, arg2);
@@ -283,15 +282,18 @@ TEST(free_node_tree_null) {
 
 TEST(free_node_tree_single) {
     node_t *node = new_node(NODE_COMMAND);
+    ASSERT_NOT_NULL(node, "node creation failed");
+    ASSERT_EQ(node->type, NODE_COMMAND, "node type mismatch");
     free_node_tree(node);
-    /// Memory freed successfully if no crash
 }
 
 TEST(free_node_tree_with_value) {
     node_t *node = new_node(NODE_VAR);
-    set_node_val_str(node, strdup("test_string"));
-    free_node_tree(node);
-    /// String should be freed along with node
+    ASSERT_NOT_NULL(node, "node creation failed");
+    set_node_val_str(node, "test_string");
+    ASSERT_EQ(node->val_type, VAL_STR, "value type should be string");
+    ASSERT_STR_EQ(node->val.str, "test_string", "stored value mismatch");
+    free_node_tree(node); /// frees the node and its owned string copy
 }
 
 TEST(free_node_tree_deep) {
@@ -305,6 +307,17 @@ TEST(free_node_tree_deep) {
         current = child;
     }
 
+    /// Verify the 10-deep chain was actually built before freeing: each level
+    /// has one child of type NODE_COMMAND, and the chain ends at depth 10.
+    node_t *walk = root;
+    for (int i = 0; i < 10; i++) {
+        ASSERT_NOT_NULL(walk->first_child, "missing child in deep chain");
+        ASSERT_EQ(walk->first_child->type, NODE_COMMAND,
+                  "deep child type mismatch");
+        walk = walk->first_child;
+    }
+    ASSERT(walk->first_child == NULL, "chain should end at depth 10");
+
     free_node_tree(root); /// Should free all 11 nodes
 }
 
@@ -316,7 +329,7 @@ TEST(free_node_tree_wide) {
         node_t *child = new_node(NODE_COMMAND);
         char buf[16];
         snprintf(buf, sizeof(buf), "cmd%d", i);
-        set_node_val_str(child, strdup(buf));
+        set_node_val_str(child, buf);
         add_child_node(root, child);
     }
 
@@ -350,6 +363,9 @@ TEST(array_nodes) {
     ASSERT_NOT_NULL(array_lit, "ARRAY_LITERAL creation failed");
     ASSERT_NOT_NULL(array_acc, "ARRAY_ACCESS creation failed");
     ASSERT_NOT_NULL(array_assign, "ARRAY_ASSIGN creation failed");
+    ASSERT_EQ(array_lit->type, NODE_ARRAY_LITERAL, "Type mismatch");
+    ASSERT_EQ(array_acc->type, NODE_ARRAY_ACCESS, "Type mismatch");
+    ASSERT_EQ(array_assign->type, NODE_ARRAY_ASSIGN, "Type mismatch");
 
     free_node_tree(array_lit);
     free_node_tree(array_acc);
