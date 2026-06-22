@@ -368,13 +368,15 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         lle_result_t res;
 
         if (is_relative) {
-            /// !-n means n commands back (0 = most recent)
-            if (number < 0) {
+            /// !-n is the command n entries back, where !-1 is the most recent
+            /// (matching bash, in which !-1 is equivalent to !!). Reverse index
+            /// 0 is the most recent entry, so !-n maps to reverse index n-1.
+            if (number < 1) {
                 /// Error - details in return code
                 return LLE_ERROR_INVALID_PARAMETER;
             }
-            res =
-                lle_history_bridge_get_by_reverse_index((size_t)number, &entry);
+            res = lle_history_bridge_get_by_reverse_index((size_t)(number - 1),
+                                                          &entry);
         } else {
             /// !n means entry ID n
             res = lle_history_bridge_get_by_number((uint64_t)number, &entry);

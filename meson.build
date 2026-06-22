@@ -746,6 +746,18 @@ endif
          timeout: 60)
   endif
 
+  if fs.exists('tests/lle/functional/test_history_expansion.c')
+    test_history_expansion = executable('test_history_expansion',
+                                        ['tests/lle/functional/test_history_expansion.c',
+                                         'tests/lle/functional/test_memory_mock.c',
+                                         'src/posix_history.c'],
+                                        include_directories: inc,
+                                        dependencies: [lle_dep])
+    test('LLE History Expansion', test_history_expansion,
+         suite: 'lle-functional',
+         timeout: 60)
+  endif
+
   # Interactive History Search Tests
   # Tests Ctrl+R style reverse incremental search functionality
   if fs.exists('tests/lle/functional/test_history_interactive_search.c')
