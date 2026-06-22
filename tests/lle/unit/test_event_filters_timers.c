@@ -124,14 +124,26 @@ TEST(filter_enable_disable) {
         lle_event_filter_add(system, "test_filter", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Disable filter
+    lle_event_t *event = NULL;
+    result = lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
+    ASSERT(result == LLE_SUCCESS);
+
+    /// A disabled filter is skipped during dispatch: the callback does not
+    /// run and the event passes through.
     result = lle_event_filter_disable(system, "test_filter");
     ASSERT(result == LLE_SUCCESS);
+    filter_call_count = 0;
+    ASSERT(lle_event_filter_apply(system, event) == LLE_FILTER_PASS);
+    ASSERT(filter_call_count == 0);
 
-    /// Enable filter
+    /// Re-enabling restores it: the callback runs once on the next dispatch.
     result = lle_event_filter_enable(system, "test_filter");
     ASSERT(result == LLE_SUCCESS);
+    filter_call_count = 0;
+    ASSERT(lle_event_filter_apply(system, event) == LLE_FILTER_PASS);
+    ASSERT(filter_call_count == 1);
 
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -153,14 +165,28 @@ TEST(filter_multiple_filters) {
     result = lle_event_filter_add(system, "filter3", test_filter_pass, NULL);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Remove middle filter
-    result = lle_event_filter_remove(system, "filter2");
+    lle_event_t *event = NULL;
+    result = lle_event_create(system, LLE_EVENT_KEY_PRESS, NULL, 0, &event);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Verify others still exist by trying to add duplicates
+    /// With the blocker in the middle, dispatch runs filter1 then filter2,
+    /// which blocks and short-circuits before filter3 -- two callbacks, BLOCK.
+    filter_call_count = 0;
+    ASSERT(lle_event_filter_apply(system, event) == LLE_FILTER_BLOCK);
+    ASSERT(filter_call_count == 2);
+
+    /// Removing the blocker lets both passers run and the event through.
+    result = lle_event_filter_remove(system, "filter2");
+    ASSERT(result == LLE_SUCCESS);
+    filter_call_count = 0;
+    ASSERT(lle_event_filter_apply(system, event) == LLE_FILTER_PASS);
+    ASSERT(filter_call_count == 2);
+
+    /// The remaining filters still exist: re-adding one is rejected.
     result = lle_event_filter_add(system, "filter1", test_filter_pass, NULL);
     ASSERT(result != LLE_SUCCESS); /// Should fail - already exists
 
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -228,6 +254,7 @@ TEST(filter_apply_passes_event) {
     ASSERT(passed == 1);
     ASSERT(blocked == 0);
 
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -268,6 +295,7 @@ TEST(filter_apply_blocks_event) {
     ASSERT(fr == LLE_FILTER_PASS);
     ASSERT(filter_call_count == 0);
 
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -316,6 +344,7 @@ TEST(timer_oneshot_add_cancel) {
     result = lle_event_timer_cancel(system, 99999);
     ASSERT(result != LLE_SUCCESS);
 
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -340,6 +369,7 @@ TEST(timer_repeating_add) {
     ASSERT(timer_id > 0);
 
     lle_event_timer_cancel(system, timer_id);
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -368,6 +398,7 @@ TEST(timer_enable_disable) {
     ASSERT(result == LLE_SUCCESS);
 
     lle_event_timer_cancel(system, timer_id);
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -398,6 +429,7 @@ TEST(timer_get_info) {
     ASSERT(fire_count == 0);
 
     lle_event_timer_cancel(system, timer_id);
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -419,14 +451,21 @@ TEST(timer_process_callable) {
     ASSERT(result == LLE_SUCCESS);
 
     uint64_t timer_id = 0;
-    result = lle_event_timer_add_oneshot(system, event, 1000000, &timer_id);
+    /// A 1ms one-shot fires after a short sleep past its deadline.
+    result = lle_event_timer_add_oneshot(system, event, 1000, &timer_id);
     ASSERT(result == LLE_SUCCESS);
 
-    /// Process timers - none should fire yet
+    usleep(10000); /// 10ms, comfortably past the 1ms deadline
     result = lle_event_timer_process(system);
     ASSERT(result == LLE_SUCCESS);
 
-    lle_event_timer_cancel(system, timer_id);
+    /// Processing past the deadline fires the timer exactly once.
+    uint64_t created = 0, fired = 0, cancelled = 0;
+    result = lle_event_timer_get_stats(system, &created, &fired, &cancelled);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(fired == 1);
+
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -459,6 +498,7 @@ TEST(timer_statistics) {
     ASSERT(created == 1);
 
     lle_event_timer_cancel(system, timer_id);
+    lle_event_destroy(system, event);
     lle_event_system_destroy(system);
 }
 
@@ -511,6 +551,9 @@ TEST(enhanced_stats_all_types) {
     size_t num_types = 0;
     result = lle_event_enhanced_stats_get_all_types(system, &stats, &num_types);
     ASSERT(result == LLE_SUCCESS);
+    ASSERT(stats != NULL);
+    /// A freshly initialized system has tracked no event types yet.
+    ASSERT(num_types == 0);
 
     lle_event_system_destroy(system);
 }
@@ -528,6 +571,9 @@ TEST(enhanced_stats_cycles) {
     result = lle_event_enhanced_stats_get_cycles(
         system, &total_cycles, &total_time, &min_time, &max_time);
     ASSERT(result == LLE_SUCCESS);
+    /// A fresh system has run no processing cycles, so the totals are zero.
+    ASSERT(total_cycles == 0);
+    ASSERT(total_time == 0);
 
     lle_event_system_destroy(system);
 }
