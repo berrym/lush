@@ -26,6 +26,7 @@
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/memory_management.h"
+#include "posix_history.h"
 
 /// Test harness
 static int tests_run = 0;
@@ -66,24 +67,29 @@ static int tests_failed = 0;
  * ============================================================================
  */
 
-static lle_memory_pool_t *g_pool = NULL;
 static lle_history_core_t *g_core = NULL;
+static posix_history_manager_t *g_posix = NULL;
+
+/// The expansion engine resolves history references through the bridge, which
+/// forwards allocations to lle_pool_alloc; the test mock satisfies those with
+/// malloc, so a non-NULL sentinel pool is sufficient (same pattern as the other
+/// mock-linked LLE unit tests).
+static lle_memory_pool_t *const MOCK_POOL = (lle_memory_pool_t *)1;
 
 static void setup(void) {
-    /// Initialize memory management
-    lle_result_t result = lle_memory_init();
+    lle_result_t result = lle_history_core_create(&g_core, NULL, NULL);
     ASSERT_SUCCESS(result);
 
-    /// Create history core
-    result = lle_history_core_create(&g_core, NULL, NULL);
-    ASSERT_SUCCESS(result);
-
-    /// Initialize expansion system
+    /// Initialize expansion system.
     result = lle_history_expansion_init(g_core);
     ASSERT_SUCCESS(result);
 
-    /// Initialize bridge for testing
-    result = lle_history_bridge_init(g_core, NULL, NULL);
+    /// The bridge links the LLE history core to a POSIX history manager, which
+    /// the expansion engine reads when resolving !! / !n / !string. Entries
+    /// added to the core sync through to it.
+    g_posix = posix_history_create(1000);
+    ASSERT(g_posix != NULL);
+    result = lle_history_bridge_init(g_core, g_posix, MOCK_POOL);
     ASSERT_SUCCESS(result);
 }
 
@@ -94,8 +100,10 @@ static void teardown(void) {
         lle_history_core_destroy(g_core);
         g_core = NULL;
     }
-
-    lle_memory_cleanup();
+    if (g_posix) {
+        posix_history_destroy(g_posix);
+        g_posix = NULL;
+    }
 }
 
 /* ============================================================================
@@ -202,11 +210,11 @@ TEST(test_relative_expansion) {
     ASSERT_STR_EQ(expanded, "echo hello");
     lle_pool_free(expanded);
 
-    /// Expand !-3 - should get 3rd from last
+    /// Expand !-3 - three commands back (echo hello, make all, make clean).
     result = lle_history_expand_line("!-3", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
-    ASSERT_STR_EQ(expanded, "make all");
+    ASSERT_STR_EQ(expanded, "make clean");
     lle_pool_free(expanded);
 
     teardown();
