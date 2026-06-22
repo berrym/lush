@@ -850,12 +850,33 @@ TEST(log_with_valid_context) {
     lush_plugin_t plugin = {.def = &def};
     lush_plugin_context_t ctx = {.plugin = &plugin};
 
-    /// Should not crash - output goes to stderr
-    lush_plugin_log(&ctx, 0, "Debug message %d", 42);
-    lush_plugin_log(&ctx, 1, "Info message");
-    lush_plugin_log(&ctx, 2, "Warning message");
-    lush_plugin_log(&ctx, 3, "Error message");
-    lush_plugin_log(&ctx, 99, "Unknown level message");
+    /// Capture stderr to verify each line carries the plugin name, the level
+    /// tag for that level, and the expanded format arguments.
+    FILE *old_stderr = stderr;
+    FILE *tmp = tmpfile();
+    char out[1024] = "";
+    if (tmp) {
+        stderr = tmp;
+        lush_plugin_log(&ctx, 0, "Debug %d", 42);
+        lush_plugin_log(&ctx, 2, "Warning %d", 7);
+        lush_plugin_log(&ctx, 3, "Error here");
+        lush_plugin_log(&ctx, 99, "Mystery");
+        fflush(tmp);
+        rewind(tmp);
+        size_t n = fread(out, 1, sizeof(out) - 1, tmp);
+        out[n] = '\0';
+        stderr = old_stderr;
+        fclose(tmp);
+    }
+
+    ASSERT_TRUE(strstr(out, "[test_plugin][DEBUG] Debug 42") != NULL,
+                "debug line carries name, level, and formatted args");
+    ASSERT_TRUE(strstr(out, "[test_plugin][WARN] Warning 7") != NULL,
+                "warn level maps to WARN");
+    ASSERT_TRUE(strstr(out, "[test_plugin][ERROR] Error here") != NULL,
+                "error level maps to ERROR");
+    ASSERT_TRUE(strstr(out, "[test_plugin][LOG] Mystery") != NULL,
+                "unknown level maps to LOG");
 }
 
 /* ============================================================================

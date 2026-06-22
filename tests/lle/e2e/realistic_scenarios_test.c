@@ -368,6 +368,14 @@ TEST(scenario_cursor_navigation_editing) {
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 13);
     ASSERT_SUCCESS(result, "Move cursor to position 13");
 
+    /// The cursor actually lands at byte 13 on the single command line, not
+    /// merely that the move call reported success.
+    lle_cursor_position_t pos;
+    result = lle_cursor_manager_get_position(cursor_mgr, &pos);
+    ASSERT_SUCCESS(result, "Read cursor position");
+    ASSERT_EQ(pos.byte_offset, 13, "cursor sits at byte 13");
+    ASSERT_EQ(pos.line_number, 0, "cursor stays on the first line");
+
     /// Delete "test" (4 bytes)
     result = lle_change_tracker_begin_sequence(tracker, "delete test", &seq);
     ASSERT_SUCCESS(result, "Begin delete");
