@@ -12,6 +12,7 @@
 #include "symtable.h"
 
 #include "test_framework.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,8 +134,19 @@ TEST(trace_node_with_timing) {
     debug_trace_node(ctx, node, "script.sh", 3);
     char buf[1024];
     read_debug_output(ctx, buf, sizeof(buf));
-    ASSERT_TRUE(strstr(buf, "TRACE:") != NULL, "node trace should be emitted");
-    ASSERT_TRUE(strstr(buf, "Time:") != NULL, "timing should be shown");
+    /// The trace line carries the exact "file:line - " prefix, not just the
+    /// bare "TRACE:" label.
+    ASSERT_TRUE(strstr(buf, "TRACE: script.sh:3 - ") != NULL,
+                "trace line carries the exact file:line prefix");
+    /// With show_timing on, the Time: line must carry a formatted value
+    /// (a digit followed by a unit suffix), not merely the literal label.
+    const char *t = strstr(buf, "Time: ");
+    ASSERT_NOT_NULL(t, "timing line present");
+    t += strlen("Time: ");
+    ASSERT_TRUE(isdigit((unsigned char)t[0]),
+                "timing value begins with a digit");
+    ASSERT_TRUE(strchr(t, 's') != NULL,
+                "timing value carries an s-unit suffix");
     ASSERT_EQ(ctx->total_commands, before + 1,
               "command count should increment");
     free_node_tree(node);
@@ -204,10 +216,11 @@ TEST(trace_command_with_args) {
     debug_trace_command(ctx, "grep", argv, 3);
     char buf[1024];
     read_debug_output(ctx, buf, sizeof(buf));
-    ASSERT_TRUE(strstr(buf, "COMMAND: grep") != NULL,
-                "command should be traced");
-    ASSERT_TRUE(strstr(buf, "'-i'") != NULL && strstr(buf, "'pattern'") != NULL,
-                "arguments should be traced");
+    /// Assert the exact rendered line rather than that the pieces appear
+    /// somewhere independently: name, "with args:" separator, and quoted args
+    /// in order must form one contiguous string.
+    ASSERT_TRUE(strstr(buf, "COMMAND: grep with args: '-i' 'pattern'") != NULL,
+                "command and args render in the documented format");
     debug_cleanup(ctx);
 }
 
@@ -262,11 +275,9 @@ TEST(trace_builtin_with_args) {
     debug_trace_builtin(ctx, "export", argv, 3);
     char buf[1024];
     read_debug_output(ctx, buf, sizeof(buf));
-    ASSERT_TRUE(strstr(buf, "BUILTIN: export") != NULL,
-                "builtin should be traced");
-    ASSERT_TRUE(strstr(buf, "'PATH=/x'") != NULL &&
-                    strstr(buf, "'HOME=/y'") != NULL,
-                "builtin arguments should be traced");
+    ASSERT_TRUE(strstr(buf, "BUILTIN: export with args: 'PATH=/x' 'HOME=/y'") !=
+                    NULL,
+                "builtin and args render in the documented format");
     debug_cleanup(ctx);
 }
 
@@ -308,10 +319,9 @@ TEST(trace_function_with_args) {
     debug_trace_function_call(ctx, "myfunc", argv, 3);
     char buf[1024];
     read_debug_output(ctx, buf, sizeof(buf));
-    ASSERT_TRUE(strstr(buf, "FUNCTION: myfunc") != NULL,
-                "function should be traced");
-    ASSERT_TRUE(strstr(buf, "'alpha'") != NULL && strstr(buf, "'beta'") != NULL,
-                "function arguments should be traced");
+    ASSERT_TRUE(strstr(buf, "FUNCTION: myfunc with args: 'alpha' 'beta'") !=
+                    NULL,
+                "function and args render in the documented format");
     debug_cleanup(ctx);
 }
 
@@ -537,9 +547,24 @@ TEST(show_stack_with_frames) {
     read_debug_output(ctx, buf, sizeof(buf));
     ASSERT_TRUE(strstr(buf, "Call Stack") != NULL,
                 "stack header should render");
-    ASSERT_TRUE(strstr(buf, "main") != NULL && strstr(buf, "helper") != NULL &&
-                    strstr(buf, "worker") != NULL,
-                "all pushed frames should appear in the listing");
+    /// Frames render innermost-first with descending depth numbers and each
+    /// frame's own call site, so presence alone is too weak: assert the depth
+    /// label and file:line of every frame.
+    const char *worker = strstr(buf, "#3: worker");
+    const char *helper = strstr(buf, "#2: helper");
+    const char *main_f = strstr(buf, "#1: main");
+    ASSERT_NOT_NULL(worker, "innermost frame is #3 worker");
+    ASSERT_NOT_NULL(helper, "middle frame is #2 helper");
+    ASSERT_NOT_NULL(main_f, "outermost frame is #1 main");
+    ASSERT_TRUE(strstr(worker, "at lib.sh:5") != NULL,
+                "worker frame shows its lib.sh:5 call site");
+    ASSERT_TRUE(strstr(helper, "at script.sh:10") != NULL,
+                "helper frame shows its script.sh:10 call site");
+    ASSERT_TRUE(strstr(main_f, "at script.sh:1") != NULL,
+                "main frame shows its script.sh:1 call site");
+    /// Innermost frame is listed before the outer frames.
+    ASSERT_TRUE(worker < helper && helper < main_f,
+                "frames are listed innermost-first");
     debug_cleanup(ctx);
 }
 
