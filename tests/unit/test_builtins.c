@@ -289,15 +289,22 @@ TEST(cd_to_tmp) {
     executor_t *exec = setup_executor();
     char *original_dir = getcwd(NULL, 0);
 
+    /// Resolve what the OS reports as the cwd for /tmp (macOS resolves the
+    /// /tmp symlink to /private/tmp), so the builtin's result can be compared
+    /// exactly rather than by a "tmp" substring that also matches /tmpfoo.
+    ASSERT_EQ(chdir("/tmp"), 0, "chdir /tmp to resolve canonical path");
+    char *canonical_tmp = getcwd(NULL, 0);
+    ASSERT_NOT_NULL(canonical_tmp, "resolve canonical /tmp");
+    ASSERT_EQ(chdir(original_dir), 0, "restore before exercising builtin");
+
     int status = executor_execute_command_line(exec, "cd /tmp", 1);
     ASSERT_EQ(status, 0, "cd /tmp should succeed");
 
-    /// Verify we're in /tmp
     char *current = getcwd(NULL, 0);
     ASSERT_NOT_NULL(current, "getcwd should work");
-    /// /tmp might be a symlink to /private/tmp on macOS
-    ASSERT(strstr(current, "tmp") != NULL, "Should be in tmp directory");
+    ASSERT_STR_EQ(current, canonical_tmp, "cd lands in the resolved /tmp");
     free(current);
+    free(canonical_tmp);
 
     /// Return to original directory
     ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
@@ -330,6 +337,13 @@ TEST(cd_dash_oldpwd) {
     executor_t *exec = setup_executor();
     char *original_dir = getcwd(NULL, 0);
 
+    /// Resolve canonical /tmp (see cd_to_tmp) so the OLDPWD return target can
+    /// be compared exactly.
+    ASSERT_EQ(chdir("/tmp"), 0, "chdir /tmp to resolve canonical path");
+    char *canonical_tmp = getcwd(NULL, 0);
+    ASSERT_NOT_NULL(canonical_tmp, "resolve canonical /tmp");
+    ASSERT_EQ(chdir(original_dir), 0, "restore before exercising builtin");
+
     /// Go to /tmp first, then to /var - this sets OLDPWD to /tmp
     executor_execute_command_line(exec, "cd /tmp", 1);
     executor_execute_command_line(exec, "cd /var", 1);
@@ -338,10 +352,11 @@ TEST(cd_dash_oldpwd) {
     int status = executor_execute_command_line(exec, "cd -", 1);
     ASSERT_EQ(status, 0, "cd - should succeed");
 
-    /// Verify we're back in tmp (might be /private/tmp on macOS)
+    /// We must be back in the exact resolved /tmp, proving OLDPWD was honored.
     char *current = getcwd(NULL, 0);
-    ASSERT(strstr(current, "tmp") != NULL, "cd - should go to OLDPWD");
+    ASSERT_STR_EQ(current, canonical_tmp, "cd - returns to OLDPWD (/tmp)");
     free(current);
+    free(canonical_tmp);
 
     /// Restore
     ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
@@ -571,6 +586,13 @@ TEST(shift_default) {
     ASSERT_EQ(status, 0, "shift should succeed when params available");
 
     teardown_executor(exec);
+
+    /// Exit status alone does not prove the parameters moved. Verify the
+    /// observable effect: after one shift, $1 becomes the former $2, $2 the
+    /// former $3, and $# drops by one.
+    run_result_t r = run_shell("set -- a b c\nshift\necho \"$1 $2 $#\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "b c 2\n");
 }
 
 TEST(shift_explicit_count) {
@@ -582,6 +604,12 @@ TEST(shift_explicit_count) {
     ASSERT_EQ(status, 0, "shift 2 should succeed");
 
     teardown_executor(exec);
+
+    /// After shifting two, $1/$2 are the former $3/$4 and $# drops by two.
+    run_result_t r =
+        run_shell("set -- a b c d e\nshift 2\necho \"$1 $2 $#\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "c d 3\n");
 }
 
 TEST(shift_overshift_errors) {

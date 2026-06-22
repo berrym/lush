@@ -681,7 +681,8 @@ TEST(layer_events_get_pending_count) {
                                 LAYER_EVENT_PRIORITY_NORMAL);
 
     uint32_t new_count = layer_events_get_pending_count(events);
-    ASSERT(new_count >= count, "Count should not decrease");
+    /// The two publishes above each enqueue exactly one pending event.
+    ASSERT_EQ(new_count, count + 2, "two publishes add two pending events");
 
     layer_events_destroy(events);
 }
@@ -864,6 +865,8 @@ TEST(command_layer_completion_menu_content) {
 
     const char *content = command_layer_get_menu_content(layer);
     ASSERT_NOT_NULL(content, "Menu content should be returned");
+    /// The stored menu text round-trips verbatim.
+    ASSERT_STR_EQ(content, menu_text, "menu content round-trips unchanged");
 
     destroy_initialized_layer(layer, events);
 }
