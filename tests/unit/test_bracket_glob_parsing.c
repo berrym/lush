@@ -52,11 +52,14 @@ TEST(echo_leading_bracket_range_glob_expands) {
 }
 
 TEST(true_leading_bracket_arg_does_not_terminate) {
-    /// true [5].txt: before #154 fix this emitted E1127 (the parser
-    /// routed `[5].txt` to the `[` test builtin). After: argv[1] is
-    /// the glob-expanded "5.txt" and true returns 0.
+    /// true [5].txt: before #154 the parser routed the leading `[5].txt`
+    /// to the `[` test builtin and emitted E1127. After the fix it is an
+    /// ordinary glob-expanded argument, so the command runs cleanly with
+    /// no diagnostic on stderr. (echo_leading_bracket_glob_expands covers
+    /// the expanded value; this covers a non-echo command not misparsing.)
     run_result_t r = run_shell_subprocess(BRACKET_TEST_PREAMBLE "true [5].txt");
     ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDERR_EQ(r, "");
 }
 
 TEST(assignment_rhs_leading_bracket_is_literal) {

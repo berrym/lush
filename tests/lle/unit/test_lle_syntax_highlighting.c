@@ -975,11 +975,15 @@ TEST(ansi_render) {
     lle_syntax_highlight(h, "echo hello", 10);
     char output[1024];
     int len = lle_syntax_render_ansi(h, "echo hello", output, sizeof(output));
-    if (len > 0 && strlen(output) > 0) {
+    /// The rendered output carries ANSI color escapes and preserves the
+    /// literal command text rather than being a bare copy or empty.
+    if (len > 0 && (size_t)len == strlen(output) &&
+        strstr(output, "\x1b[") != NULL && strstr(output, "echo") != NULL &&
+        strstr(output, "hello") != NULL) {
         printf("(rendered %d bytes) ", len);
         TEST_PASS();
     } else {
-        TEST_FAIL("render returned no output");
+        TEST_FAIL("render missing ANSI escapes or literal text");
     }
 
     lle_syntax_highlighter_destroy(h);

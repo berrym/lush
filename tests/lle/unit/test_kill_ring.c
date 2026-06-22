@@ -683,11 +683,13 @@ TEST(concurrent_adds) {
         pthread_join(threads[i], NULL);
     }
 
-    /// Verify ring has entries (may be less than total due to overflow)
+    /// 4 threads x 10 adds = 40 entries, well under the 128-slot capacity, so
+    /// a thread-safe ring loses none of them.
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
-    ASSERT(count > 0, "No entries after concurrent adds");
+    ASSERT(count == (size_t)(num_threads * iterations),
+           "concurrent adds must not lose entries");
 
     lle_kill_ring_destroy(ring);
 }

@@ -624,10 +624,10 @@ TEST(event_type_name_returns_valid) {
     const char *name2 = lle_event_type_name(LLE_EVENT_BUFFER_CHANGED);
     const char *name3 = lle_event_type_name(LLE_EVENT_SYSTEM_ERROR);
 
-    ASSERT_NOT_NULL(name1, "Should return valid name");
-    ASSERT_NOT_NULL(name2, "Should return valid name");
-    ASSERT_NOT_NULL(name3, "Should return valid name");
-    ASSERT_TRUE(strlen(name1) > 0, "Name should not be empty");
+    ASSERT_EQ(strcmp(name1, "KEY_PRESS"), 0, "KEY_PRESS name mismatch");
+    ASSERT_EQ(strcmp(name2, "BUFFER_CHANGED"), 0,
+              "BUFFER_CHANGED name mismatch");
+    ASSERT_EQ(strcmp(name3, "SYSTEM_ERROR"), 0, "SYSTEM_ERROR name mismatch");
 }
 
 TEST(event_type_name_unknown) {

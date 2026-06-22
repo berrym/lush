@@ -137,6 +137,10 @@ TEST(parse_ctrl_meta_key) {
     ASSERT(result == LLE_SUCCESS, "Parse 'C-M-x' failed");
     ASSERT(key.ctrl, "Ctrl not set");
     ASSERT(key.alt, "Alt not set");
+    /// A control-modified lowercase letter resolves to its uppercase
+    /// codepoint and is an ordinary (non-special) key.
+    ASSERT(key.codepoint == 'X', "C-M-x codepoint incorrect");
+    ASSERT(!key.is_special, "C-M-x should not be a special key");
 }
 
 TEST(parse_special_keys) {

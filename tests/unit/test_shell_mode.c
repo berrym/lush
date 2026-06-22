@@ -294,16 +294,13 @@ TEST(feature_reset_all) {
  */
 
 TEST(feature_names) {
-    /// Check some feature names are defined
-    const char *name = shell_feature_name(FEATURE_INDEXED_ARRAYS);
-    ASSERT(name != NULL, "Feature name should not be NULL");
-    ASSERT(strlen(name) > 0, "Feature name should not be empty");
-
-    name = shell_feature_name(FEATURE_EXTENDED_TEST);
-    ASSERT(name != NULL, "EXTENDED_TEST name should not be NULL");
-
-    name = shell_feature_name(FEATURE_PROCESS_SUBSTITUTION);
-    ASSERT(name != NULL, "PROCESS_SUBSTITUTION name should not be NULL");
+    /// Each feature maps to its exact canonical name string.
+    ASSERT_STR_EQ(shell_feature_name(FEATURE_INDEXED_ARRAYS), "indexed_arrays",
+                  "INDEXED_ARRAYS name mismatch");
+    ASSERT_STR_EQ(shell_feature_name(FEATURE_EXTENDED_TEST), "extended_test",
+                  "EXTENDED_TEST name mismatch");
+    ASSERT_STR_EQ(shell_feature_name(FEATURE_PROCESS_SUBSTITUTION),
+                  "process_substitution", "PROCESS_SUBSTITUTION name mismatch");
 }
 
 TEST(feature_parse) {
