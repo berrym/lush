@@ -1075,6 +1075,20 @@ endif
          timeout: 30)
   endif
 
+  # History Fault Reporting End-to-End Tests (Spec 16)
+  # Validates a corrupt history entry and asserts the converted LLE_FAULT site
+  # reports through the router to a recording sink.
+  if fs.exists('tests/lle/unit/test_history_fault_reporting.c')
+    test_history_fault_reporting = executable(
+      'test_history_fault_reporting',
+      'tests/lle/unit/test_history_fault_reporting.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE History Fault Reporting', test_history_fault_reporting,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Theme Parser Unit Tests
   # Tests the TOML-subset parser (init/parse/reset/error reporting),
   # value helpers, and the color-spec parser.

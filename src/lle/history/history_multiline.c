@@ -246,7 +246,8 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
     /// Store original multiline format
     entry->original_multiline = lle_pool_strdup(original_multiline);
     if (!entry->original_multiline) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history multiline allocation failed");
     }
 
     /// Flatten the command into the main command field (for searching, etc.)
@@ -268,7 +269,8 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
     if (!entry->command) {
         lle_pool_free(entry->original_multiline);
         entry->original_multiline = NULL;
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history multiline allocation failed");
     }
 
     entry->command_length = strlen(flattened);
@@ -440,7 +442,8 @@ lle_history_analyze_multiline_lines(const char *command,
         lle_pool_alloc(sizeof(lle_history_multiline_line_t) * count);
 
     if (!line_array) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history multiline allocation failed");
     }
 
     /// Parse lines

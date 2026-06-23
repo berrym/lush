@@ -45,7 +45,8 @@ lle_result_t lle_history_config_create_default(lle_history_config_t **config,
     /// Allocate configuration
     lle_history_config_t *cfg = lle_pool_alloc(sizeof(lle_history_config_t));
     if (!cfg) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
 
     /// Set defaults
@@ -140,7 +141,8 @@ lle_result_t lle_history_entry_create(lle_history_entry_t **entry,
     /// Allocate entry
     lle_history_entry_t *e = lle_pool_alloc(sizeof(lle_history_entry_t));
     if (!e) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
 
     /// Initialize entry
@@ -150,7 +152,8 @@ lle_result_t lle_history_entry_create(lle_history_entry_t **entry,
     e->command = lle_pool_alloc(cmd_len + 1);
     if (!e->command) {
         lle_pool_free(e);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
     memcpy(e->command, command, cmd_len + 1);
     e->command_length = cmd_len;
@@ -255,17 +258,20 @@ lle_result_t lle_history_validate_entry(const lle_history_entry_t *entry) {
 
     /// Validate command
     if (!entry->command || entry->command_length == 0) {
-        return LLE_ERROR_STATE_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_STATE_CORRUPTION, "history",
+                         "history entry has no command");
     }
 
     /// Validate command length matches
     if (strlen(entry->command) != entry->command_length) {
-        return LLE_ERROR_STATE_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_STATE_CORRUPTION, "history",
+                         "history entry command length mismatch");
     }
 
     /// Validate state
     if (entry->state > LLE_HISTORY_STATE_CORRUPTED) {
-        return LLE_ERROR_STATE_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_STATE_CORRUPTION, "history",
+                         "history entry state invalid");
     }
 
     return LLE_SUCCESS;
@@ -295,7 +301,8 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
     /// Allocate core structure
     lle_history_core_t *c = lle_pool_alloc(sizeof(lle_history_core_t));
     if (!c) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
     memset(c, 0, sizeof(lle_history_core_t));
 
@@ -308,7 +315,8 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
         c->config = lle_pool_alloc(sizeof(lle_history_config_t));
         if (!c->config) {
             lle_pool_free(c);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                             "history core allocation failed");
         }
         memcpy(c->config, config, sizeof(lle_history_config_t));
 
@@ -336,7 +344,8 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
     if (!c->entries) {
         lle_history_config_destroy(c->config, memory_pool);
         lle_pool_free(c);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
     memset(c->entries, 0, sizeof(lle_history_entry_t *) * initial_cap);
 
@@ -496,7 +505,8 @@ lle_result_t lle_history_expand_capacity(lle_history_core_t *core) {
     lle_history_entry_t **new_entries =
         lle_pool_alloc(sizeof(lle_history_entry_t *) * new_capacity);
     if (!new_entries) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history core allocation failed");
     }
 
     /// Copy existing entries

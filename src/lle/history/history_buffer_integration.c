@@ -78,7 +78,8 @@ static lle_result_t init_stub_component(void **component,
 
     void *comp = lle_pool_alloc(size);
     if (!comp) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer integration allocation failed");
     }
 
     memset(comp, 0, size);
@@ -109,7 +110,8 @@ lle_result_t lle_history_buffer_integration_create(
     /// Allocate integration system
     integ = lle_pool_alloc(sizeof(lle_history_buffer_integration_t));
     if (!integ) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer integration allocation failed");
     }
 
     memset(integ, 0, sizeof(lle_history_buffer_integration_t));
@@ -123,7 +125,8 @@ lle_result_t lle_history_buffer_integration_create(
     integ->config = lle_pool_alloc(sizeof(lle_integration_config_t));
     if (!integ->config) {
         lle_pool_free(integ);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer integration allocation failed");
     }
     memcpy(integ->config, &DEFAULT_CONFIG, sizeof(lle_integration_config_t));
 
@@ -132,7 +135,8 @@ lle_result_t lle_history_buffer_integration_create(
     if (!integ->current_state) {
         lle_pool_free(integ->config);
         lle_pool_free(integ);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer integration allocation failed");
     }
     memset(integ->current_state, 0, sizeof(lle_integration_state_t));
     integ->current_state->state = LLE_INTEGRATION_UNINITIALIZED;

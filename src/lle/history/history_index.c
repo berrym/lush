@@ -45,7 +45,8 @@ lle_result_t lle_history_index_create(ht_u64ptr_t **index,
     ht_u64ptr_t *ht = ht_u64ptr_create(
         &(ht_u64_options_t){.initial_capacity = initial_capacity});
     if (!ht) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history index allocation failed");
     }
 
     *index = ht;

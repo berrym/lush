@@ -134,7 +134,8 @@ lle_result_t lle_history_events_init(lle_event_system_t *event_system,
     g_event_state = (lle_history_event_state_t *)lle_pool_alloc(
         sizeof(lle_history_event_state_t));
     if (!g_event_state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     memset(g_event_state, 0, sizeof(lle_history_event_state_t));
@@ -205,7 +206,8 @@ lle_result_t lle_history_emit_entry_added(uint64_t entry_id,
         (lle_history_entry_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_entry_event_data_t));
     if (!event_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     event_data->entry_id = entry_id;
@@ -266,7 +268,8 @@ lle_result_t lle_history_emit_entry_accessed(uint64_t entry_id,
         (lle_history_entry_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_entry_event_data_t));
     if (!event_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     event_data->entry_id = entry_id;
@@ -324,7 +327,8 @@ lle_result_t lle_history_emit_history_loaded(const char *file_path,
         (lle_history_file_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_file_event_data_t));
     if (!event_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     event_data->file_path = file_path; /// Read-only reference
@@ -381,7 +385,8 @@ lle_result_t lle_history_emit_history_saved(const char *file_path,
         (lle_history_file_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_file_event_data_t));
     if (!event_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     event_data->file_path = file_path;
@@ -436,7 +441,8 @@ lle_result_t lle_history_emit_history_search(const char *search_query,
         (lle_history_search_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_search_event_data_t));
     if (!event_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history event allocation failed");
     }
 
     event_data->search_query = search_query;

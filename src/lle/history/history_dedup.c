@@ -264,7 +264,8 @@ lle_result_t lle_history_dedup_create(lle_history_dedup_engine_t **dedup,
     lle_history_dedup_engine_t *engine =
         lle_pool_alloc(sizeof(lle_history_dedup_engine_t));
     if (!engine) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history dedup allocation failed");
     }
 
     /// Initialize engine

@@ -77,7 +77,8 @@ lle_result_t lle_history_buffer_bridge_create(
     lle_history_buffer_bridge_t *new_bridge =
         lle_pool_alloc(sizeof(lle_history_buffer_bridge_t));
     if (!new_bridge) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer bridge allocation failed");
     }
 
     new_bridge->memory_pool = memory_pool;
@@ -136,7 +137,8 @@ lle_history_buffer_bridge_get_buffer_text(lle_history_buffer_bridge_t *bridge,
     /// Allocate and copy
     char *text_copy = lle_pool_alloc(text_len + 1);
     if (!text_copy) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer bridge allocation failed");
     }
 
     memcpy(text_copy, buffer_text, text_len);
@@ -369,7 +371,8 @@ static lle_result_t get_history_entry_text(lle_history_core_t *history,
     size_t cmd_len = strlen(entry->command);
     char *text_copy = lle_pool_alloc(cmd_len + 1);
     if (!text_copy) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history buffer bridge allocation failed");
     }
 
     memcpy(text_copy, entry->command, cmd_len);
