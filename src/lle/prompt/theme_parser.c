@@ -266,7 +266,8 @@ lle_result_t lle_theme_parser_parse(lle_theme_parser_t *parser,
         case TOML_ERROR_INVALID_PARAMETER:
             return LLE_ERROR_INVALID_PARAMETER;
         case TOML_ERROR_OUT_OF_MEMORY:
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                             "theme parser allocation failed");
         case TOML_ERROR_CALLBACK_ABORT:
             /// Callback aborted - preserve error from callback
             return LLE_ERROR_INVALID_FORMAT;

@@ -44,19 +44,19 @@ static lle_result_t read_file_contents(const char *filepath, char **content,
                                        size_t *content_len) {
     FILE *fp = fopen(filepath, "r");
     if (!fp) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     /// Get file size
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     long file_size = ftell(fp);
     if (file_size < 0) {
         fclose(fp);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     if ((size_t)file_size > LLE_THEME_FILE_MAX_SIZE) {
@@ -66,14 +66,15 @@ static lle_result_t read_file_contents(const char *filepath, char **content,
 
     if (fseek(fp, 0, SEEK_SET) != 0) {
         fclose(fp);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     /// Allocate buffer
     char *buffer = malloc((size_t)file_size + 1);
     if (!buffer) {
         fclose(fp);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                         "theme loader allocation failed");
     }
 
     /// Read file
@@ -82,7 +83,7 @@ static lle_result_t read_file_contents(const char *filepath, char **content,
 
     if (bytes_read != (size_t)file_size) {
         free(buffer);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     buffer[bytes_read] = '\0';
@@ -1148,7 +1149,8 @@ lle_result_t lle_theme_export_to_file(const lle_theme_t *theme,
     /// Generate TOML content
     char *buffer = malloc(LLE_THEME_FILE_MAX_SIZE);
     if (!buffer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                         "theme loader allocation failed");
     }
 
     size_t content_len =
@@ -1162,7 +1164,7 @@ lle_result_t lle_theme_export_to_file(const lle_theme_t *theme,
     FILE *fp = fopen(filepath, "w");
     if (!fp) {
         free(buffer);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     size_t written = fwrite(buffer, 1, content_len, fp);
@@ -1170,7 +1172,7 @@ lle_result_t lle_theme_export_to_file(const lle_theme_t *theme,
     free(buffer);
 
     if (written != content_len) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "prompt", "theme file IO error");
     }
 
     return LLE_SUCCESS;
@@ -1287,7 +1289,8 @@ lle_result_t lle_theme_batch_result_init(lle_theme_batch_result_t *result,
     if (capacity > 0) {
         result->results = calloc(capacity, sizeof(lle_theme_load_result_t));
         if (!result->results) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                             "theme loader allocation failed");
         }
         result->results_capacity = capacity;
     }

@@ -397,7 +397,8 @@ lle_result_t lle_template_parse(const char *template_str,
 
     lle_parsed_template_t *tmpl = calloc(1, sizeof(*tmpl));
     if (!tmpl) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                         "prompt template allocation failed");
     }
 
     snprintf(tmpl->original, sizeof(tmpl->original), "%s", template_str);
