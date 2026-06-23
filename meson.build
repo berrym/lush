@@ -1047,6 +1047,20 @@ endif
          timeout: 30)
   endif
 
+  # Terminal Fault Reporting End-to-End Tests (Spec 16)
+  # Drives a real tcsetattr failure (raw mode on a non-tty) and asserts the
+  # converted LLE_FAULT site reports through the router to a recording sink.
+  if fs.exists('tests/lle/unit/test_terminal_fault_reporting.c')
+    test_terminal_fault_reporting = executable(
+      'test_terminal_fault_reporting',
+      'tests/lle/unit/test_terminal_fault_reporting.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Terminal Fault Reporting', test_terminal_fault_reporting,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Theme Parser Unit Tests
   # Tests the TOML-subset parser (init/parse/reset/error reporting),
   # value helpers, and the color-spec parser.
