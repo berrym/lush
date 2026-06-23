@@ -95,7 +95,8 @@ static lle_result_t rb_grow(render_buf_t *rb, size_t need,
     /// Required capacity = current length + bytes to add + 1 NUL.
     /// Detect overflow before computing the sum.
     if (need > SIZE_MAX - 1 - rb->len)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion splicer allocation failed");
     size_t required = rb->len + need + 1;
     if (required <= rb->cap)
         return LLE_SUCCESS;
@@ -103,12 +104,14 @@ static lle_result_t rb_grow(render_buf_t *rb, size_t need,
     size_t new_cap = rb->cap ? rb->cap : 32;
     while (new_cap < required) {
         if (new_cap > SIZE_MAX / 2)
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion splicer allocation failed");
         new_cap *= 2;
     }
     char *new_buf = lle_pool_alloc(new_cap);
     if (!new_buf)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion splicer allocation failed");
     if (rb->buf != NULL && rb->len > 0) {
         memcpy(new_buf, rb->buf, rb->len);
     }

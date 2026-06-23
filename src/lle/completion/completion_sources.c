@@ -125,7 +125,8 @@ lle_result_t lle_completion_source_aliases(lle_memory_pool_t *pool,
 
     ht_enum_t *iter = ht_strstr_enum_create(aliases);
     if (!iter)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion source allocation failed");
 
     const char *alias_name = NULL;
     const char *alias_value = NULL;
@@ -163,7 +164,8 @@ lle_result_t lle_completion_source_commands(lle_memory_pool_t *pool,
 
     char *path = strdup(path_env);
     if (!path)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion source allocation failed");
 
     lle_result_t final_result = LLE_SUCCESS;
     char *dir = strtok(path, ":");

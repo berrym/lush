@@ -282,7 +282,8 @@ lle_result_t lle_source_manager_create(lle_memory_pool_t *pool,
 
     lle_source_manager_t *manager = lle_pool_alloc(sizeof(*manager));
     if (!manager)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion source manager allocation failed");
 
     manager->num_sources = 0;
     manager->pool = pool;
@@ -371,7 +372,8 @@ lle_source_manager_register(lle_source_manager_t *manager,
 
     lle_completion_source_t *source = lle_pool_alloc(sizeof(*source));
     if (!source)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion source manager allocation failed");
 
     source->type = type;
     source->name = name;

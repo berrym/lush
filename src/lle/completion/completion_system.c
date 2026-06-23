@@ -31,7 +31,8 @@ lle_completion_system_create(lle_memory_pool_t *pool,
 
     lle_completion_system_t *system = lle_pool_alloc(sizeof(*system));
     if (!system) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion system allocation failed");
     }
 
     /// Create source manager

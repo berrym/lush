@@ -319,7 +319,8 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
     size_t line_capacity = 64;
     char **lines = malloc(line_capacity * sizeof(char *));
     if (!lines) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion config allocation failed");
     }
 
     size_t line_count = 0;
@@ -340,7 +341,8 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
                             free(lines[i]);
                         }
                         free(lines);
-                        return LLE_ERROR_OUT_OF_MEMORY;
+                        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                                         "completion config allocation failed");
                     }
                     lines = new_lines;
                 }
@@ -351,7 +353,8 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
                         free(lines[i]);
                     }
                     free(lines);
-                    return LLE_ERROR_OUT_OF_MEMORY;
+                    return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                                     "completion config allocation failed");
                 }
                 line_count++;
             }
@@ -370,7 +373,8 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
                     free(lines[i]);
                 }
                 free(lines);
-                return LLE_ERROR_OUT_OF_MEMORY;
+                return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                                 "completion config allocation failed");
             }
             lines = new_lines;
         }
@@ -381,7 +385,8 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
                 free(lines[i]);
             }
             free(lines);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion config allocation failed");
         }
         line_count++;
     }

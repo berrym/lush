@@ -83,7 +83,8 @@ calculate_category_positions(lle_completion_menu_state_t *state) {
     state->category_positions =
         (size_t *)lle_pool_alloc(sizeof(size_t) * cat_count);
     if (!state->category_positions) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion menu allocation failed");
     }
 
     /// Fill category positions
@@ -126,7 +127,8 @@ lle_result_t lle_completion_menu_state_create(
         (lle_completion_menu_state_t *)lle_pool_alloc(
             sizeof(lle_completion_menu_state_t));
     if (!new_state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion menu allocation failed");
     }
 
     /// Initialize state
@@ -287,7 +289,8 @@ lle_completion_menu_apply_filter(lle_completion_menu_state_t *state) {
         /// Combined prefix exceeds our scratch buffer; refuse to
         /// narrow rather than truncate (truncation would silently
         /// admit candidates that don't match the actual input).
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion menu allocation failed");
     }
 
     /// Lazily allocate the filtered_result container and items array
@@ -298,7 +301,8 @@ lle_completion_menu_apply_filter(lle_completion_menu_state_t *state) {
         state->filtered_result = (lle_completion_result_t *)lle_pool_alloc(
             sizeof(lle_completion_result_t));
         if (!state->filtered_result) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion menu allocation failed");
         }
         memset(state->filtered_result, 0, sizeof(lle_completion_result_t));
         size_t cap = state->unfiltered_result->count;
@@ -308,7 +312,8 @@ lle_completion_menu_apply_filter(lle_completion_menu_state_t *state) {
         state->filtered_result->items = (lle_completion_item_t *)lle_pool_alloc(
             cap * sizeof(lle_completion_item_t));
         if (!state->filtered_result->items) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion menu allocation failed");
         }
         state->filtered_result->capacity = cap;
     }
@@ -357,7 +362,8 @@ lle_completion_menu_append_filter_char(lle_completion_menu_state_t *state,
         }
         char *new_buf = (char *)lle_pool_alloc(new_cap);
         if (!new_buf) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion menu allocation failed");
         }
         if (state->filter_len) {
             memcpy(new_buf, state->filter_string, state->filter_len);
