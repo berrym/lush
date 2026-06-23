@@ -222,7 +222,8 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
     }
 
     if (new_manager == NULL) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding allocation failed");
     }
 
     memset(new_manager, 0, sizeof(lle_keybinding_manager_t));
@@ -241,7 +242,8 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
         } else {
             free(new_manager);
         }
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding allocation failed");
     }
 
     *manager = new_manager;
@@ -499,7 +501,8 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
     }
 
     if (entry == NULL) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding allocation failed");
     }
 
     /// Initialize action as simple type
@@ -542,7 +545,8 @@ lle_result_t lle_keybinding_manager_bind_context(
     }
 
     if (entry == NULL) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding allocation failed");
     }
 
     /// Initialize action as context-aware type
@@ -1132,7 +1136,8 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
     }
 
     if (bindings == NULL) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding allocation failed");
     }
 
     /// Enumerate the bindings table and copy each entry into the output array.

@@ -1554,7 +1554,8 @@ lle_result_t lle_transpose_chars(lle_editor_t *editor) {
     if (!g1_copy || !g2_copy) {
         free(g1_copy);
         free(g2_copy);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding action allocation failed");
     }
 
     /// Copy graphemes
@@ -1664,7 +1665,8 @@ lle_result_t lle_transpose_words(lle_editor_t *editor) {
     if (!word1 || !word2) {
         free(word1);
         free(word2);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding action allocation failed");
     }
 
     /// Delete word2 first (higher position), then word1
@@ -1754,7 +1756,8 @@ static lle_result_t transform_word_case(lle_editor_t *editor, size_t word_start,
     size_t max_new_len = word_len * 4; /// UTF-8 max 4 bytes per codepoint
     char *new_word = malloc(max_new_len + 1);
     if (!new_word) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "keybinding action allocation failed");
     }
 
     size_t new_pos = 0;
