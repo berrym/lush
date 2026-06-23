@@ -231,7 +231,8 @@ lle_result_t lle_shell_integration_init(void) {
     /// 64KB initial size, grows as needed.
     lle_arena_t *session_arena = lle_arena_create(NULL, "session", 64 * 1024);
     if (!session_arena) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "lle",
+                         "shell integration allocation failed");
     }
 
     /// Allocate integration structure from session arena
@@ -239,7 +240,8 @@ lle_result_t lle_shell_integration_init(void) {
         lle_arena_calloc(session_arena, 1, sizeof(lle_shell_integration_t));
     if (!integ) {
         lle_arena_destroy(session_arena);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "lle",
+                         "shell integration allocation failed");
     }
 
     integ->session_arena = session_arena;
@@ -563,7 +565,8 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     /// Allocate prompt composer
     integ->prompt_composer = calloc(1, sizeof(lle_prompt_composer_t));
     if (!integ->prompt_composer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "lle",
+                         "shell integration allocation failed");
     }
 
     /// Initialize the composer with segment and theme registries

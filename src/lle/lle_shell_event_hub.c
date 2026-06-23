@@ -93,7 +93,8 @@ lle_result_t lle_shell_event_hub_create(lle_shell_event_hub_t **hub_out) {
 
     lle_shell_event_hub_t *hub = calloc(1, sizeof(lle_shell_event_hub_t));
     if (!hub) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event hub allocation failed");
     }
 
     /// Initialize handler counts

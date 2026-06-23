@@ -55,18 +55,21 @@ lle_result_t lle_async_worker_init(lle_async_worker_t **worker,
 
     lle_async_worker_t *w = calloc(1, sizeof(*w));
     if (!w) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "async",
+                         "async worker allocation failed");
     }
 
     if (pthread_mutex_init(&w->queue_mutex, NULL) != 0) {
         free(w);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "async",
+                         "async worker setup failed");
     }
 
     if (pthread_cond_init(&w->queue_cond, NULL) != 0) {
         pthread_mutex_destroy(&w->queue_mutex);
         free(w);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "async",
+                         "async worker setup failed");
     }
 
     w->on_complete = on_complete;
@@ -105,7 +108,8 @@ lle_result_t lle_async_worker_start(lle_async_worker_t *worker) {
         pthread_mutex_lock(&worker->queue_mutex);
         worker->running = false;
         pthread_mutex_unlock(&worker->queue_mutex);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "async",
+                         "async worker setup failed");
     }
 
     return LLE_SUCCESS;

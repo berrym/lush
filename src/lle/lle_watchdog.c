@@ -102,7 +102,8 @@ lle_result_t lle_watchdog_init(void) {
     sigemptyset(&sa.sa_mask);
 
     if (sigaction(SIGALRM, &sa, &g_old_sigalrm_action) < 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "watchdog",
+                         "watchdog sigaction failed");
     }
 
     g_initialized = true;

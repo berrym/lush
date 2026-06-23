@@ -65,7 +65,8 @@ lle_result_t lle_editor_create(lle_editor_t **editor,
     /// Allocate editor structure
     lle_editor_t *ed = (lle_editor_t *)lle_pool_alloc(sizeof(lle_editor_t));
     if (!ed) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "editor",
+                         "editor allocation failed");
     }
 
     /// Zero-initialize entire structure
