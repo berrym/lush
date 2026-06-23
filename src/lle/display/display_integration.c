@@ -66,7 +66,8 @@ lle_display_integration_init(lle_display_integration_t **integration,
     lle_display_integration_t *integ =
         calloc(1, sizeof(lle_display_integration_t));
     if (!integ) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display integration allocation failed");
     }
 
     /// Store Lush display controller reference
@@ -110,7 +111,8 @@ lle_display_integration_init(lle_display_integration_t **integration,
         lle_display_bridge_cleanup(integ->display_bridge);
         pthread_rwlock_destroy(&integ->integration_lock);
         free(integ);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display integration allocation failed");
     }
 
     /// Allocate display config
@@ -121,7 +123,8 @@ lle_display_integration_init(lle_display_integration_t **integration,
         lle_display_bridge_cleanup(integ->display_bridge);
         pthread_rwlock_destroy(&integ->integration_lock);
         free(integ);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display integration allocation failed");
     }
 
     /// Set default config
@@ -138,7 +141,8 @@ lle_display_integration_init(lle_display_integration_t **integration,
         lle_display_bridge_cleanup(integ->display_bridge);
         pthread_rwlock_destroy(&integ->integration_lock);
         free(integ);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display integration allocation failed");
     }
 
     /// Set as global singleton
