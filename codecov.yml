@@ -1,0 +1,14 @@
+# Codecov configuration.
+#
+# The patch status is informational: it reports diff coverage in pull-request
+# comments but does not block merges. A large share of new code is defensive
+# error-path instrumentation -- allocation, syscall, and corruption faults --
+# that cannot be exercised by unit tests without a fault-injection framework,
+# so a strict per-diff coverage gate would block legitimate error-handling
+# work. The project status remains a blocking gate on overall coverage, and
+# the patch percentage stays visible in PR comments as a signal.
+coverage:
+  status:
+    patch:
+      default:
+        informational: true
