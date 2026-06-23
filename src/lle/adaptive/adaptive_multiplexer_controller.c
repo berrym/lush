@@ -192,7 +192,8 @@ lle_result_t lle_multiplexer_adapter_create(lle_multiplexer_adapter_t **adapter,
     lle_multiplexer_adapter_t *adapt =
         calloc(1, sizeof(lle_multiplexer_adapter_t));
     if (!adapt) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive multiplexer controller allocation failed");
     }
 
     adapt->type = type;
@@ -265,7 +266,9 @@ lle_multiplexer_adapter_wrap_sequence(lle_multiplexer_adapter_t *adapter,
         // No wrapping needed
         *wrapped = strdup(sequence);
         if (!*wrapped) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(
+                LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                "adaptive multiplexer controller allocation failed");
         }
         *wrapped_len = seq_len;
         return LLE_SUCCESS;
@@ -290,7 +293,8 @@ lle_multiplexer_adapter_wrap_sequence(lle_multiplexer_adapter_t *adapter,
     size_t total_len = prefix_len + doubled_len + suffix_len;
     char *result = malloc(total_len + 1);
     if (!result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive multiplexer controller allocation failed");
     }
 
     // Build wrapped sequence
@@ -382,7 +386,8 @@ lle_initialize_multiplexer_controller(lle_adaptive_context_t *context,
     lle_multiplexer_controller_t *mux =
         calloc(1, sizeof(lle_multiplexer_controller_t));
     if (!mux) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive multiplexer controller allocation failed");
     }
 
     // Detect multiplexer type

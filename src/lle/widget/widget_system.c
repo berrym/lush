@@ -70,7 +70,8 @@ lle_result_t lle_widget_registry_init(lle_widget_registry_t **registry,
     // Allocate registry structure
     lle_widget_registry_t *reg = lle_pool_alloc(sizeof(lle_widget_registry_t));
     if (!reg) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget allocation failed");
     }
 
     memset(reg, 0, sizeof(lle_widget_registry_t));
@@ -84,7 +85,8 @@ lle_result_t lle_widget_registry_init(lle_widget_registry_t **registry,
                                              .initial_capacity = 16});
     if (!reg->widgets) {
         lle_pool_free(reg);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget allocation failed");
     }
 
     // Initialize state
@@ -158,7 +160,8 @@ lle_result_t lle_widget_register(lle_widget_registry_t *registry,
     // Allocate widget structure
     lle_widget_t *widget = lle_pool_alloc(sizeof(lle_widget_t));
     if (!widget) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget allocation failed");
     }
 
     memset(widget, 0, sizeof(lle_widget_t));
@@ -167,7 +170,8 @@ lle_result_t lle_widget_register(lle_widget_registry_t *registry,
     widget->name = pool_strdup(registry->memory_pool, name);
     if (!widget->name) {
         lle_pool_free(widget);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget allocation failed");
     }
 
     // Initialize widget fields

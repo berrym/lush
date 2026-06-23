@@ -99,7 +99,8 @@ lle_edit_session_manager_create(lle_edit_session_manager_t **manager,
     lle_edit_session_manager_t *new_manager =
         lle_pool_alloc(sizeof(lle_edit_session_manager_t));
     if (!new_manager) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     memset(new_manager, 0, sizeof(lle_edit_session_manager_t));
@@ -118,7 +119,8 @@ lle_edit_session_manager_create(lle_edit_session_manager_t **manager,
     new_manager->sessions = lle_pool_alloc(new_manager->config.max_sessions *
                                            sizeof(lle_edit_session_t *));
     if (!new_manager->sessions) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     memset(new_manager->sessions, 0,
@@ -196,7 +198,8 @@ lle_edit_session_manager_start_session(lle_edit_session_manager_t *manager,
     // Create new session
     lle_edit_session_t *new_session = create_edit_session(manager, entry_index);
     if (!new_session) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     // Add to sessions array
@@ -257,7 +260,8 @@ lle_result_t lle_edit_session_manager_record_operation(
     // Allocate operation record
     lle_edit_operation_t *op = lle_pool_alloc(sizeof(lle_edit_operation_t));
     if (!op) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     memcpy(op, operation, sizeof(lle_edit_operation_t));
@@ -267,7 +271,8 @@ lle_result_t lle_edit_session_manager_record_operation(
     if (operation->text && operation->text_length > 0) {
         op->text = lle_pool_alloc(operation->text_length + 1);
         if (!op->text) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                             "multiline edit session allocation failed");
         }
         memcpy(op->text, operation->text, operation->text_length);
         op->text[operation->text_length] = '\0';
@@ -309,7 +314,8 @@ lle_edit_session_manager_update_text(lle_edit_session_manager_t *manager,
     // Allocate new text buffer
     char *text_copy = lle_pool_alloc(new_length + 1);
     if (!text_copy) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     memcpy(text_copy, new_text, new_length);
@@ -536,7 +542,8 @@ static lle_result_t get_entry_text(lle_history_core_t *history, size_t index,
     size_t cmd_len = strlen(entry->command);
     char *text_copy = lle_pool_alloc(cmd_len + 1);
     if (!text_copy) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit session allocation failed");
     }
 
     memcpy(text_copy, entry->command, cmd_len);

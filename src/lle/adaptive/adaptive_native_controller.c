@@ -311,7 +311,8 @@ static lle_result_t lle_native_buffer_append(lle_native_controller_t *native,
         }
         char *new_buffer = realloc(native->output_buffer, new_capacity);
         if (!new_buffer) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                             "adaptive native controller allocation failed");
         }
         native->output_buffer = new_buffer;
         native->buffer_capacity = new_capacity;
@@ -606,14 +607,16 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
     lle_native_controller_t *native =
         calloc(1, sizeof(lle_native_controller_t));
     if (!native) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     // Create terminal state
     native->terminal_state = lle_terminal_state_create();
     if (!native->terminal_state) {
         free(native);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     // Create capabilities structure
@@ -621,7 +624,8 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
     if (!native->capabilities) {
         lle_terminal_state_destroy(native->terminal_state);
         free(native);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     // Configure capabilities from detection
@@ -660,7 +664,8 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         free(native->capabilities);
         lle_terminal_state_destroy(native->terminal_state);
         free(native);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     // Create performance statistics
@@ -670,7 +675,8 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         free(native->capabilities);
         lle_terminal_state_destroy(native->terminal_state);
         free(native);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     native->memory_pool = memory_pool;
@@ -745,7 +751,10 @@ lle_result_t lle_native_read_line(lle_native_controller_t *native,
     char buffer[4096];
     if (!fgets(buffer, sizeof(buffer), stdin)) {
         if (feof(stdin)) {
-            return LLE_ERROR_OUT_OF_MEMORY; // EOF treated as error
+            return LLE_FAULT(
+                LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                "adaptive native controller allocation failed"); // EOF treated
+                                                                 // as error
         }
         return LLE_ERROR_INPUT_PARSING;
     }
@@ -758,7 +767,8 @@ lle_result_t lle_native_read_line(lle_native_controller_t *native,
 
     *line = strdup(buffer);
     if (!*line) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive native controller allocation failed");
     }
 
     return LLE_SUCCESS;
