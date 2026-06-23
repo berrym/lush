@@ -848,36 +848,6 @@ typedef struct lle_error_counter_snapshot {
 } lle_error_counter_snapshot_t;
 
 /**
- * @brief Initialize the global error reporting system
- *
- * Allocates and configures the process-wide reporting singleton. Idempotent:
- * a second call while already initialized is a no-op returning LLE_SUCCESS.
- * The reporting channels (log file, system log, callback) default to
- * disabled; the singleton accumulates statistics and owns the reporting
- * mutex. Safe to leave uninitialized: reporting falls back to the
- * always-available atomic counters.
- *
- * @return LLE_SUCCESS, or LLE_ERROR_OUT_OF_MEMORY if allocation fails
- */
-lle_result_t lle_error_reporting_system_init(void);
-
-/**
- * @brief Tear down the global error reporting system
- *
- * Closes any open log file, destroys the reporting mutex, frees the
- * singleton, and resets the initialized state. Idempotent: safe to call when
- * never initialized or already torn down.
- */
-void lle_error_reporting_system_shutdown(void);
-
-/**
- * @brief Query whether the error reporting system is initialized
- * @return true if lle_error_reporting_system_init has run and not been torn
- * down
- */
-bool lle_error_reporting_system_is_initialized(void);
-
-/**
  * @brief Copy the live error counters into a caller-provided snapshot
  * @param out Destination snapshot; ignored if NULL
  */
