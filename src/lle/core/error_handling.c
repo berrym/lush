@@ -1013,6 +1013,68 @@ void lle_error_get_counter_snapshot(lle_error_counter_snapshot_t *out) {
         &g_error_atomic_counters.concurrent_errors, memory_order_acquire);
 }
 
+/// Fault channel sinks, installed by the shell at startup. NULL until then;
+/// the router stays silent (no per-test stubs needed for standalone liblle).
+static lle_fault_sink_t g_user_fault_sink = NULL;
+static lle_fault_sink_t g_dev_fault_sink = NULL;
+
+/// Faults at or above this severity reach the user-visible channel; below it
+/// they are developer-diagnostic only. Major maps to the shell's ERROR level.
+#define LLE_FAULT_USER_THRESHOLD LLE_SEVERITY_MAJOR
+
+void lle_fault_set_user_sink(lle_fault_sink_t fn) { g_user_fault_sink = fn; }
+
+void lle_fault_set_dev_sink(lle_fault_sink_t fn) { g_dev_fault_sink = fn; }
+
+lle_fault_disposition_t lle_handle_fault_lifecycle(const lle_fault_t *fault) {
+    if (!fault) {
+        return LLE_FAULT_SURFACED;
+    }
+
+    /// Account: bump the always-available atomic counters. Mirrors the
+    /// existing lle_report_error accounting: critical counts truly-critical
+    /// faults; the major user-channel threshold is a separate concern below.
+    atomic_fetch_add_explicit(&g_error_atomic_counters.total_errors_handled, 1,
+                              memory_order_relaxed);
+    if (fault->severity >= LLE_SEVERITY_CRITICAL) {
+        atomic_fetch_add_explicit(
+            &g_error_atomic_counters.critical_errors_count, 1,
+            memory_order_relaxed);
+    } else if (fault->severity <= LLE_SEVERITY_WARNING) {
+        atomic_fetch_add_explicit(&g_error_atomic_counters.warnings_count, 1,
+                                  memory_order_relaxed);
+    }
+
+    /// Route: the developer channel sees every fault; the user channel sees
+    /// only faults the user can act on. Future recovery/degradation strategies
+    /// will be consulted here, before surfacing, and may return a different
+    /// disposition.
+    if (g_dev_fault_sink) {
+        g_dev_fault_sink(fault);
+    }
+    if (fault->severity >= LLE_FAULT_USER_THRESHOLD && g_user_fault_sink) {
+        g_user_fault_sink(fault);
+    }
+
+    return LLE_FAULT_SURFACED;
+}
+
+lle_result_t lle_fault_report(lle_result_t code, const char *component,
+                              const char *detail, const char *function,
+                              const char *file, int line) {
+    lle_fault_t fault = {
+        .code = code,
+        .severity = lle_determine_error_severity(code, NULL),
+        .component = component,
+        .detail = detail,
+        .function = function,
+        .file = file,
+        .line = line,
+    };
+    lle_handle_fault_lifecycle(&fault);
+    return code;
+}
+
 lle_result_t lle_report_error(const lle_error_context_t *context) {
     if (!context) {
         return LLE_ERROR_INVALID_PARAMETER;
