@@ -123,7 +123,8 @@ lle_result_t lle_change_tracker_init(lle_change_tracker_t **tracker,
     lle_change_tracker_t *t =
         (lle_change_tracker_t *)lle_pool_alloc(sizeof(lle_change_tracker_t));
     if (!t) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "change tracker allocation failed");
     }
 
     /// Initialize all fields
@@ -210,7 +211,8 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
     lle_change_sequence_t *seq =
         (lle_change_sequence_t *)lle_pool_alloc(sizeof(lle_change_sequence_t));
     if (!seq) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "change sequence allocation failed");
     }
 
     /// Initialize sequence
@@ -311,7 +313,8 @@ lle_result_t lle_change_tracker_begin_operation(
     lle_change_operation_t *op = (lle_change_operation_t *)lle_pool_alloc(
         sizeof(lle_change_operation_t));
     if (!op) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "change operation allocation failed");
     }
 
     /// Initialize operation
@@ -360,7 +363,8 @@ lle_change_tracker_save_deleted_text(lle_change_operation_t *operation,
     /// Allocate and copy deleted text
     operation->deleted_text = (char *)lle_pool_alloc(deleted_length + 1);
     if (!operation->deleted_text) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "deleted-text allocation failed");
     }
 
     memcpy(operation->deleted_text, deleted_text, deleted_length);
@@ -381,7 +385,8 @@ lle_change_tracker_save_inserted_text(lle_change_operation_t *operation,
     /// Allocate and copy inserted text
     operation->inserted_text = (char *)lle_pool_alloc(inserted_length + 1);
     if (!operation->inserted_text) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "inserted-text allocation failed");
     }
 
     memcpy(operation->inserted_text, inserted_text, inserted_length);

@@ -35,7 +35,8 @@ lle_result_t lle_buffer_validator_init(lle_buffer_validator_t **validator) {
     /// Allocate validator structure
     lle_buffer_validator_t *val = calloc(1, sizeof(lle_buffer_validator_t));
     if (!val) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "buffer validator allocation failed");
     }
 
     /// Initialize with all validations enabled by default
@@ -97,7 +98,8 @@ lle_result_t lle_buffer_validate_utf8(lle_buffer_t *buffer,
     if (!lle_utf8_is_valid(buffer->data, buffer->length)) {
         validator->validation_failures++;
         validator->corruption_detections++;
-        return LLE_ERROR_INVALID_ENCODING;
+        return LLE_FAULT(LLE_ERROR_INVALID_ENCODING, "buffer",
+                         "buffer data failed UTF-8 validation");
     }
 
     return LLE_SUCCESS;
@@ -154,7 +156,8 @@ lle_buffer_validate_line_structure(lle_buffer_t *buffer,
                 prev_line->start_offset + prev_line->length) {
                 validator->validation_failures++;
                 validator->corruption_detections++;
-                return LLE_ERROR_MEMORY_CORRUPTION;
+                return LLE_FAULT(LLE_ERROR_MEMORY_CORRUPTION, "buffer",
+                                 "line structure overlaps");
             }
         }
     }
@@ -202,7 +205,8 @@ lle_buffer_validate_cursor_position(lle_buffer_t *buffer,
         if (buffer->cursor.buffer_version > buffer->modification_count) {
             validator->validation_failures++;
             validator->corruption_detections++;
-            return LLE_ERROR_STATE_CORRUPTION;
+            return LLE_FAULT(LLE_ERROR_STATE_CORRUPTION, "buffer",
+                             "cursor version ahead of buffer");
         }
     }
 
@@ -318,7 +322,8 @@ lle_result_t lle_buffer_validate_complete(lle_buffer_t *buffer,
         validator->last_validation_result = LLE_ERROR_MEMORY_CORRUPTION;
         validator->last_validation_time =
             lle_get_current_time_microseconds() - start_time;
-        return LLE_ERROR_MEMORY_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_MEMORY_CORRUPTION, "buffer",
+                         "buffer not null-terminated");
     }
 
     /// Step 4: Validate line structure

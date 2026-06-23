@@ -211,7 +211,8 @@ static lle_result_t codepoint_index_to_byte_offset(lle_buffer_t *buffer,
         int seq_len =
             lle_utf8_sequence_length((unsigned char)buffer->data[offset]);
         if (seq_len <= 0) {
-            return LLE_ERROR_INVALID_ENCODING;
+            return LLE_FAULT(LLE_ERROR_INVALID_ENCODING, "buffer",
+                             "buffer data has invalid encoding");
         }
 
         offset += seq_len;
@@ -237,7 +238,8 @@ lle_result_t lle_cursor_manager_init(lle_cursor_manager_t **manager,
     lle_cursor_manager_t *mgr =
         (lle_cursor_manager_t *)lle_pool_alloc(sizeof(lle_cursor_manager_t));
     if (!mgr) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "cursor manager allocation failed");
     }
 
     /// Initialize all fields
@@ -386,7 +388,7 @@ lle_result_t lle_cursor_manager_move_by_graphemes(lle_cursor_manager_t *manager,
     }
 
     /// Convert back to byte offset
-    size_t target_byte_offset;
+    size_t target_byte_offset = 0;
     lle_result_t result = grapheme_index_to_byte_offset(
         manager->buffer, (size_t)target_grapheme, &target_byte_offset);
 
@@ -417,7 +419,7 @@ lle_cursor_manager_move_by_codepoints(lle_cursor_manager_t *manager,
     }
 
     /// Convert back to byte offset
-    size_t target_byte_offset;
+    size_t target_byte_offset = 0;
     lle_result_t result = codepoint_index_to_byte_offset(
         manager->buffer, (size_t)target_codepoint, &target_byte_offset);
 

@@ -103,7 +103,8 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
     /// Allocate buffer structure
     lle_buffer_t *buf = (lle_buffer_t *)lle_pool_alloc(sizeof(lle_buffer_t));
     if (!buf) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "buffer allocation failed");
     }
 
     /// Zero-initialize entire structure
@@ -113,7 +114,8 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
     buf->data = (char *)lle_pool_alloc(capacity);
     if (!buf->data) {
         lle_pool_free(buf);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                         "buffer data allocation failed");
     }
 
     /// Initialize buffer metadata
@@ -474,21 +476,24 @@ lle_result_t lle_buffer_validate(lle_buffer_t *buffer) {
         buffer->capacity > LLE_BUFFER_MAX_CAPACITY) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
-        return LLE_ERROR_MEMORY_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_MEMORY_CORRUPTION, "buffer",
+                         "buffer capacity out of range");
     }
 
     /// Validate length <= capacity
     if (buffer->length > buffer->capacity) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
-        return LLE_ERROR_MEMORY_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_MEMORY_CORRUPTION, "buffer",
+                         "buffer length exceeds capacity");
     }
 
     /// Validate used <= length
     if (buffer->used > buffer->length) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
-        return LLE_ERROR_MEMORY_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_MEMORY_CORRUPTION, "buffer",
+                         "buffer used exceeds length");
     }
 
     /// Validate memory pool reference
@@ -552,7 +557,8 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
         /// Reallocate buffer
         char *new_data = (char *)lle_pool_alloc(new_capacity);
         if (!new_data) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                             "buffer growth allocation failed");
         }
 
         memcpy(new_data, buffer->data, buffer->length);
@@ -786,7 +792,8 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         /// Reallocate buffer
         char *new_data = (char *)lle_pool_alloc(new_capacity);
         if (!new_data) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "buffer",
+                             "buffer growth allocation failed");
         }
 
         memcpy(new_data, buffer->data, buffer->length);
