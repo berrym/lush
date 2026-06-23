@@ -668,9 +668,12 @@ lle_result_t lle_render_buffer_content(lle_render_controller_t *controller,
             controller->metrics->full_renders;
     }
 
-    /// Update global min/max render times
-    if (render_time_ns < controller->metrics->min_render_time_ns ||
-        controller->metrics->min_render_time_ns == 0) {
+    /// Update global min/max render times. min starts at UINT64_MAX, so the
+    /// first render seeds it; later renders keep the true minimum. A render
+    /// faster than the clock resolution legitimately measures 0 ns, which is a
+    /// valid minimum and must not be treated as "unset".
+    if (controller->metrics->total_renders == 1 ||
+        render_time_ns < controller->metrics->min_render_time_ns) {
         controller->metrics->min_render_time_ns = render_time_ns;
     }
     if (render_time_ns > controller->metrics->max_render_time_ns) {

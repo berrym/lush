@@ -443,13 +443,17 @@ TEST(render_buffer_content_success) {
     ASSERT_TRUE(memcmp(output->content, "Hello, World!", 13) == 0,
                 "Output content should match buffer");
 
-    /// Verify metrics were updated
+    /// Verify metrics were updated. The absolute render time is not asserted:
+    /// a render faster than the clock resolution legitimately measures 0 ns, so
+    /// the invariants are that min was seeded away from its UINT64_MAX sentinel
+    /// and that max is no less than min.
     ASSERT_EQ(controller->metrics->total_renders, 1,
               "Total renders should be 1");
-    ASSERT_TRUE(controller->metrics->min_render_time_ns > 0,
-                "Min render time should be tracked");
-    ASSERT_TRUE(controller->metrics->max_render_time_ns > 0,
-                "Max render time should be tracked");
+    ASSERT_TRUE(controller->metrics->min_render_time_ns != UINT64_MAX,
+                "Min render time should be seeded from its sentinel");
+    ASSERT_TRUE(controller->metrics->max_render_time_ns >=
+                    controller->metrics->min_render_time_ns,
+                "Max render time should be no less than min");
 
     /// Cleanup
     lle_render_output_free(output);
