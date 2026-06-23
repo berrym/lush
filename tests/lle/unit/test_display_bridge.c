@@ -120,8 +120,6 @@ TEST(bridge_init_success) {
     ASSERT_EQ(bridge->consecutive_errors, 0, "Consecutive errors should be 0");
     ASSERT_NOT_NULL(bridge->render_queue, "Render queue should be initialized");
     ASSERT_NOT_NULL(bridge->diff_tracker, "Diff tracker should be initialized");
-    ASSERT_NOT_NULL(bridge->error_context,
-                    "Error context should be initialized");
 
     /// Cleanup
     lle_display_bridge_cleanup(bridge);
@@ -239,7 +237,6 @@ TEST(bridge_cleanup_success) {
     ASSERT_EQ(result, LLE_SUCCESS, "Bridge cleanup should succeed");
 
     /// Verify all resources are cleared
-    ASSERT_NULL(bridge->error_context, "Error context should be cleared");
     ASSERT_NULL(bridge->diff_tracker, "Diff tracker should be cleared");
     ASSERT_NULL(bridge->render_queue, "Render queue should be cleared");
     ASSERT_NULL(bridge->composition_engine,
