@@ -330,7 +330,7 @@ const char *lle_generate_technical_details(lle_result_t error_code) {
 }
 
 /// @brief Get human-readable error name from error code
-static const char *lle_error_code_to_string(lle_result_t error_code) {
+const char *lle_error_code_to_string(lle_result_t error_code) {
     switch (error_code) {
     case LLE_SUCCESS:
         return "LLE_SUCCESS";

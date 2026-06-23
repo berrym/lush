@@ -1015,6 +1015,38 @@ endif
          timeout: 30)
   endif
 
+  # Fault-to-Shell-Error Mapping Unit Tests (Spec 16)
+  # Tests the pure lle_result_t -> shell_error_code_t and severity mapping used
+  # by the LLE fault user sink. Links only the mapping translation unit.
+  if fs.exists('tests/lle/unit/test_fault_shell_map.c')
+    test_fault_shell_map = executable(
+      'test_fault_shell_map',
+      'tests/lle/unit/test_fault_shell_map.c',
+      'src/lle/lle_fault_shell_map.c',
+      include_directories: [inc, include_directories('tests')])
+    test('LLE Fault Shell Map', test_fault_shell_map,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
+  # Fault Shell Bridge End-to-End Tests (Spec 16)
+  # Drives a real fault through the registered bridge and captures stderr to
+  # assert the user channel renders through the shell structured-error display
+  # and that severity gating holds. Links the real shell_error renderer
+  # (display_dep); stubs only debug_trace_printf.
+  if fs.exists('tests/lle/unit/test_fault_shell_bridge.c')
+    test_fault_shell_bridge = executable(
+      'test_fault_shell_bridge',
+      'tests/lle/unit/test_fault_shell_bridge.c',
+      'src/lle/lle_shell_error_bridge.c',
+      'src/lle/lle_fault_shell_map.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep, display_dep])
+    test('LLE Fault Shell Bridge', test_fault_shell_bridge,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Theme Parser Unit Tests
   # Tests the TOML-subset parser (init/parse/reset/error reporting),
   # value helpers, and the color-spec parser.

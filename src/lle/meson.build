@@ -239,6 +239,8 @@ lle_sources += files(
 lle_shell_sources = files(
   'lle_shell_integration.c',
   'lle_shell_hooks.c',
+  'lle_fault_shell_map.c',
+  'lle_shell_error_bridge.c',
 )
 
 # ============================================================================
