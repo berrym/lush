@@ -158,7 +158,8 @@ lle_result_t lle_kill_ring_create(lle_kill_ring_t **ring, size_t max_entries,
     }
 
     if (new_ring == NULL) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "kill ring allocation failed");
     }
 
     /// Allocate entries array
@@ -176,7 +177,8 @@ lle_result_t lle_kill_ring_create(lle_kill_ring_t **ring, size_t max_entries,
         } else {
             free(new_ring);
         }
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "kill ring allocation failed");
     }
 
     /// Initialize entries
@@ -200,7 +202,8 @@ lle_result_t lle_kill_ring_create(lle_kill_ring_t **ring, size_t max_entries,
             free(new_ring->entries);
             free(new_ring);
         }
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "keybinding",
+                         "kill ring mutex init failed");
     }
 
     *ring = new_ring;
@@ -282,7 +285,8 @@ lle_result_t lle_kill_ring_add(lle_kill_ring_t *ring, const char *text,
 
         if (new_text == NULL) {
             pthread_mutex_unlock(&ring->lock);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                             "kill ring allocation failed");
         }
 
         /// Copy old text + new text
@@ -313,7 +317,8 @@ lle_result_t lle_kill_ring_add(lle_kill_ring_t *ring, const char *text,
         entry->text = kill_ring_strdup(ring, text, text_len);
         if (entry->text == NULL) {
             pthread_mutex_unlock(&ring->lock);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                             "kill ring allocation failed");
         }
 
         entry->length = text_len;
@@ -362,7 +367,8 @@ lle_result_t lle_kill_ring_prepend(lle_kill_ring_t *ring, const char *text) {
 
     if (new_text == NULL) {
         pthread_mutex_unlock(&ring->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "keybinding",
+                         "kill ring allocation failed");
     }
 
     /// Copy new text + old text
@@ -467,7 +473,8 @@ lle_result_t lle_kill_ring_yank_pop(lle_kill_ring_t *ring,
     /// Should always find one if count > 0
     if (!ring->entries[ring->yank_position].allocated) {
         pthread_mutex_unlock(&ring->lock);
-        return LLE_ERROR_STATE_CORRUPTION;
+        return LLE_FAULT(LLE_ERROR_STATE_CORRUPTION, "keybinding",
+                         "kill ring entry not allocated");
     }
 
     *text_out = ring->entries[ring->yank_position].text;

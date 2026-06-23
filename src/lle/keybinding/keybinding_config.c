@@ -387,7 +387,8 @@ lle_result_t lle_keybinding_get_user_config_path(char *buffer,
     /// Fall back to ~/.config/lush/
     const char *home = get_home_dir();
     if (!home) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "keybinding",
+                         "no home directory for keybinding config");
     }
 
     int written = snprintf(buffer, buffer_size, "%s/.config/lush/%s", home,
@@ -636,7 +637,8 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         result->status = LLE_ERROR_SYSTEM_CALL;
         snprintf(result->error_msg, sizeof(result->error_msg),
                  "Failed to read file: %s", strerror(errno));
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "keybinding",
+                         "keybinding config read failed");
     }
 
     /// Parse content
