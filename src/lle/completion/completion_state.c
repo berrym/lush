@@ -38,14 +38,16 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
 
     lle_completion_state_t *state = lle_pool_alloc(sizeof(*state));
     if (!state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion state allocation failed");
     }
 
     /// Copy buffer snapshot
     size_t buf_len = strlen(buffer);
     state->buffer_snapshot = lle_pool_alloc(buf_len + 1);
     if (!state->buffer_snapshot) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion state allocation failed");
     }
     memcpy(state->buffer_snapshot, buffer, buf_len + 1);
 
@@ -54,14 +56,16 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
         size_t word_len = strlen(context->dequoted_filename_prefix);
         state->original_word = lle_pool_alloc(word_len + 1);
         if (!state->original_word) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion state allocation failed");
         }
         memcpy(state->original_word, context->dequoted_filename_prefix,
                word_len + 1);
     } else {
         state->original_word = lle_pool_alloc(1);
         if (!state->original_word) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion state allocation failed");
         }
         state->original_word[0] = '\0';
     }

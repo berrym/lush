@@ -798,7 +798,8 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
     size_t span = end - start;
     char *raw = lle_pool_alloc(span + 1);
     if (!raw)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "word context allocation failed");
 
     /// Dequoting state machine (mirrors walker_advance_one but accumulating
     /// literal bytes).
@@ -897,7 +898,8 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
     size_t nfc_cap = (out_pos * 4) + 16;
     char *nfc = lle_pool_alloc(nfc_cap);
     if (!nfc)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "word context allocation failed");
 
     size_t nfc_len = 0;
     int rc = lle_unicode_normalize_nfc(raw, out_pos, nfc, nfc_cap, &nfc_len);
@@ -1599,7 +1601,8 @@ lle_result_t lle_word_context_analyze(const char *buffer,
     /// Allocate output struct.
     lle_word_context_t *ctx = lle_pool_alloc(sizeof(*ctx));
     if (!ctx)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "word context allocation failed");
     memset(ctx, 0, sizeof(*ctx));
     ctx->pool = pool;
 
@@ -1682,7 +1685,8 @@ lle_result_t lle_word_context_analyze(const char *buffer,
             w.current_command_word_end - w.current_command_word_start;
         char *cn = lle_pool_alloc(cn_len + 1);
         if (!cn)
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "word context allocation failed");
         memcpy(cn, buffer + w.current_command_word_start, cn_len);
         cn[cn_len] = '\0';
         ctx->command_name = cn;
@@ -1699,7 +1703,8 @@ lle_result_t lle_word_context_analyze(const char *buffer,
         char **args =
             lle_pool_alloc(sizeof(char *) * (size_t)w.arg_capture_count);
         if (!args)
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "word context allocation failed");
         size_t valid = 0;
         for (size_t i = 0; i < w.arg_capture_count; i++) {
             char *arg_text = NULL;

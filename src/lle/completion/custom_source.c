@@ -234,7 +234,8 @@ lle_completion_register_source(const lle_custom_completion_source_t *source) {
     entry->name_copy = strdup(source->name);
     if (!entry->name_copy) {
         pthread_mutex_unlock(&g_custom_registry.mutex);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "custom source allocation failed");
     }
 
     if (source->description) {
@@ -242,7 +243,8 @@ lle_completion_register_source(const lle_custom_completion_source_t *source) {
         if (!entry->description_copy) {
             free(entry->name_copy);
             pthread_mutex_unlock(&g_custom_registry.mutex);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "custom source allocation failed");
         }
     } else {
         entry->description_copy = NULL;
@@ -453,7 +455,8 @@ lle_result_t lle_completion_add_item(lle_completion_result_t *result,
     if (result->memory_pool) {
         char *text_copy = lle_pool_alloc(strlen(text) + 1);
         if (!text_copy) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "custom source allocation failed");
         }
         strcpy(text_copy, text);
         item->text = text_copy;
@@ -526,7 +529,8 @@ lle_result_t lle_completion_add_typed_item(lle_completion_result_t *result,
     if (result->memory_pool) {
         char *text_copy = lle_pool_alloc(strlen(text) + 1);
         if (!text_copy) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "custom source allocation failed");
         }
         strcpy(text_copy, text);
         item->text = text_copy;

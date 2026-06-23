@@ -219,14 +219,16 @@ lle_result_t lle_completion_item_create_with_description(
     lle_completion_item_t *new_item =
         (lle_completion_item_t *)lle_pool_alloc(sizeof(lle_completion_item_t));
     if (!new_item) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion type allocation failed");
     }
 
     /// Duplicate text
     new_item->text = lle_strdup_pool(text);
     if (!new_item->text) {
         lle_pool_free(new_item);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion type allocation failed");
     }
     new_item->owns_text = true;
 
@@ -236,7 +238,8 @@ lle_result_t lle_completion_item_create_with_description(
         if (!new_item->suffix) {
             lle_pool_free(new_item->text);
             lle_pool_free(new_item);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion type allocation failed");
         }
         new_item->owns_suffix = true;
     } else {
@@ -331,7 +334,8 @@ lle_result_t lle_completion_result_create(lle_memory_pool_t *memory_pool,
         (lle_completion_result_t *)lle_pool_alloc(
             sizeof(lle_completion_result_t));
     if (!new_result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion type allocation failed");
     }
 
     /// Allocate items array
@@ -339,7 +343,8 @@ lle_result_t lle_completion_result_create(lle_memory_pool_t *memory_pool,
         sizeof(lle_completion_item_t) * initial_capacity);
     if (!new_result->items) {
         lle_pool_free(new_result);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                         "completion type allocation failed");
     }
 
     new_result->count = 0;
@@ -382,7 +387,8 @@ lle_result_t lle_completion_result_add_item(lle_completion_result_t *result,
             (lle_completion_item_t *)lle_pool_alloc(
                 sizeof(lle_completion_item_t) * new_capacity);
         if (!new_items) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "completion",
+                             "completion type allocation failed");
         }
 
         /// Copy existing items
