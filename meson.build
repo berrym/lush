@@ -1000,6 +1000,21 @@ endif
          timeout: 30)
   endif
 
+  # Fault Router Unit Tests (Spec 16)
+  # Tests the in-liblle fault router, the lifecycle dispatch seam, the two
+  # registration sinks, and severity-based counter accounting, using recording
+  # sinks (no shell dependency).
+  if fs.exists('tests/lle/unit/test_fault_router.c')
+    test_fault_router = executable(
+      'test_fault_router',
+      'tests/lle/unit/test_fault_router.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Fault Router', test_fault_router,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Theme Parser Unit Tests
   # Tests the TOML-subset parser (init/parse/reset/error reporting),
   # value helpers, and the color-spec parser.

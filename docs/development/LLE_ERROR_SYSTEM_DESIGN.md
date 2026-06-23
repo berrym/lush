@@ -166,12 +166,54 @@ Category A/B sites are left exactly as they are.
   is configured, which by default it is not.
 
 The current unconditional `lle_report_error_to_console` user-facing behavior
-is removed; that format becomes the body of the developer-channel line.
+is retired (its only callers are the two dead recovery handlers removed in
+stage 7); the developer channel replaces it.
+
+### Crossing the liblle boundary (registration sinks)
+
+The router lives in `error_handling.c`, which compiles into **liblle.a** — a
+library that links standalone and must not hard-depend on shell symbols. But
+both output channels are shell-side: `shell_error_create` /
+`shell_error_display` live in the lush executable (`src/shell_error.c`), and
+`debug_trace_printf` / `g_debug_context` live in `src/debug/debug_core.c`,
+also executable-side. liblle therefore cannot call either directly.
+
+The boundary is crossed with **registration sinks**, not weak symbols (weak
+symbols are a non-portable GNU extension; this codebase is strict portable
+C11). liblle exposes two function-pointer sinks that default to no-op:
+
+```c
+/// A single fault, captured at the report site. Plain fields only — no
+/// shell types — so liblle stays decoupled from the shell renderer.
+typedef struct lle_fault {
+    lle_result_t code;
+    lle_error_severity_t severity;
+    const char *component;   /// e.g. "history", "terminal"
+    const char *detail;      /// short human phrase, e.g. "index alloc"
+    const char *function;
+    const char *file;
+    int line;
+} lle_fault_t;
+
+typedef void (*lle_fault_sink_t)(const lle_fault_t *fault);
+
+void lle_fault_set_user_sink(lle_fault_sink_t fn);   /// shell installs the renderer
+void lle_fault_set_dev_sink(lle_fault_sink_t fn);    /// shell installs the trace sink
+```
+
+The shell installs strong implementations at startup (a new bridge file in
+`lle_shell_sources`, executable-side): the user sink maps the `lle_fault_t`
+to a `shell_error_t` and calls `shell_error_display`; the dev sink calls
+`debug_trace_printf`. When liblle is used standalone (unit tests), no sink is
+registered and the router is silent — no per-test stubs required, which is the
+decoupling this codebase already favors for liblle/shell bridging. The
+`lle_result_t -> shell_error_code_t` mapping therefore lives on the **shell
+side**, inside the user sink, not in liblle.
 
 ### Error-code bridge
 
-A focused mapping module (`lle_error_to_shell_error`) translates LLE result
-ranges to shell codes and severity. Representative rows:
+The shell-side user sink maps LLE result ranges to shell codes and severity.
+Representative rows:
 
 | LLE range / code | Shell code | Shell severity |
 |---|---|---|
@@ -361,15 +403,23 @@ Earlier stages deliver value without the later ones.
    dead recovery handlers (`lle_handle_buffer_error`,
    `lle_handle_event_system_error`, removed in stage 7), so nothing prints
    today. Ships the guarded singleton and restores lifecycle reachability.
-2. **The fault helper + the shell bridge + the lifecycle seam.** Add
-   `LLE_FAULT` / `lle_fault_report`, the `lle_error_to_shell_error` mapping
-   module, the two-channel router, and the `lle_handle_fault_lifecycle` seam
-   (§5) that the router calls — today a no-op default returning
-   `LLE_FAULT_SURFACED`. Also re-point the LLE-native console reporter into
-   the developer channel here, as part of introducing the router (still
-   behavior-neutral for users, since real call sites arrive in stage 3). No
-   call sites converted yet; unit-test the router, the mapping, and that the
-   seam is invoked exactly once per fault.
+2a. **The router + lifecycle seam + sinks, in liblle.** Add `LLE_FAULT` /
+   `lle_fault_report`, the `lle_fault_t` struct, the two registration sinks
+   (`lle_fault_set_user_sink` / `_set_dev_sink`, default no-op), and the
+   `lle_handle_fault_lifecycle` seam (§5) — today a no-op default returning
+   `LLE_FAULT_SURFACED` after bumping counters and invoking whichever sinks
+   are registered (dev always; user when severity is high). No shell
+   dependency; no call sites converted. Unit-test in isolation with a
+   recording test sink: assert the seam fires once per fault, the dev sink
+   sees every fault, the user sink sees only high-severity faults, and
+   counters increment exactly once.
+
+2b. **The shell bridge.** Add the executable-side bridge
+   (`lle_shell_sources`): the `lle_result_t -> shell_error_code_t` + severity
+   mapping, a user sink that renders via `shell_error_display`, a dev sink
+   that calls `debug_trace_printf`, and registration at startup from
+   `lle_shell_integration_init`. Prove a synthesized high-severity fault
+   renders one shell-style error to the user.
 3. **Wire the high-density subsystem first: terminal.** Convert the ~7 C/E
    sites (`tcsetattr`, `sigaction`, `select`, `read`, OOM). Prove a real
    terminal fault renders one shell-style error to the user.

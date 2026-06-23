@@ -883,6 +883,95 @@ bool lle_error_reporting_system_is_initialized(void);
  */
 void lle_error_get_counter_snapshot(lle_error_counter_snapshot_t *out);
 
+/// Fault Router and Lifecycle Seam
+
+/**
+ * @brief A single fault captured at the report site
+ *
+ * Plain fields only -- no shell types -- so the router stays decoupled from
+ * the shell's structured-error renderer. The shell-side sinks (registered via
+ * lle_fault_set_user_sink / _set_dev_sink) translate this into whatever the
+ * user and developer channels need.
+ */
+typedef struct lle_fault {
+    lle_result_t code;             ///< The LLE result code that was raised
+    lle_error_severity_t severity; ///< Severity derived from the code
+    const char *component;         ///< Subsystem name, e.g. "history"
+    const char *detail;            ///< Short human phrase, e.g. "index alloc"
+    const char *function;          ///< Function where the fault was raised
+    const char *file;              ///< Source file
+    int line;                      ///< Source line
+} lle_fault_t;
+
+/**
+ * @brief Disposition of a fault after the lifecycle dispatch
+ *
+ * Today the dispatch only ever surfaces. The reserved values mark where the
+ * future recovery/degradation milestone will return without reshaping the
+ * call path or any LLE_FAULT() site.
+ */
+typedef enum lle_fault_disposition {
+    LLE_FAULT_SURFACED, ///< Reported through the channels (the only path today)
+    LLE_FAULT_RECOVERED, ///< Reserved: a future strategy handled it
+    LLE_FAULT_DEGRADED,  ///< Reserved: a future strategy reduced functionality
+} lle_fault_disposition_t;
+
+/**
+ * @brief Output adapter for a fault channel
+ *
+ * Installed by the shell to bridge faults to the user-visible renderer or the
+ * developer trace channel. The router owns the lle_fault_t; sinks must not
+ * retain the pointer beyond the call.
+ */
+typedef void (*lle_fault_sink_t)(const lle_fault_t *fault);
+
+/**
+ * @brief Install the user-visible fault sink (shell structured-error renderer)
+ * @param fn Sink callback, or NULL to detach
+ */
+void lle_fault_set_user_sink(lle_fault_sink_t fn);
+
+/**
+ * @brief Install the developer-diagnostic fault sink (trace channel)
+ * @param fn Sink callback, or NULL to detach
+ */
+void lle_fault_set_dev_sink(lle_fault_sink_t fn);
+
+/**
+ * @brief Dispatch a fault through the lifecycle: account, then route
+ *
+ * Bumps the atomic counters, invokes the developer sink for every fault, and
+ * the user sink for faults at or above major severity. The single seam where
+ * the future recovery/degradation milestone will be wired.
+ *
+ * @param fault The fault to dispatch (must be non-NULL)
+ * @return The disposition; today always LLE_FAULT_SURFACED
+ */
+lle_fault_disposition_t lle_handle_fault_lifecycle(const lle_fault_t *fault);
+
+/**
+ * @brief Report a genuine fault and return its code unchanged
+ *
+ * Builds an lle_fault_t (deriving severity from the code) and dispatches it
+ * through lle_handle_fault_lifecycle. Returns @p code so call sites remain a
+ * single expression. Use the LLE_FAULT macro rather than calling directly.
+ *
+ * @return @p code, unchanged
+ */
+lle_result_t lle_fault_report(lle_result_t code, const char *component,
+                              const char *detail, const char *function,
+                              const char *file, int line);
+
+/**
+ * @brief Report a genuine fault at the current source location
+ *
+ * Use only at genuine-fault sites (allocation/corruption/syscall failures),
+ * not at validation guards or expected-not-found returns.
+ */
+#define LLE_FAULT(code, component, detail)                                     \
+    lle_fault_report((code), (component), (detail), __func__, __FILE__,        \
+                     __LINE__)
+
 /// Recovery Strategy
 /**
  * @brief Select the best recovery strategy for an error context
