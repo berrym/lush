@@ -18,6 +18,7 @@
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/arena.h"
 #include "lle/display_integration.h"
+#include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/lle_editor.h"
 #include "lle/lle_readline.h"
@@ -257,6 +258,11 @@ lle_result_t lle_shell_integration_init(void) {
     }
     integ->init_state.event_hub_initialized = true;
 
+    /// Step 4.6: Initialize the error reporting system before the editor so a
+    /// failing editor creation can already report through it. Non-fatal: if
+    /// init fails, faults still reach the always-available atomic counters.
+    lle_error_reporting_system_init();
+
     /// Step 4.5: Initialize shell hook function bridge
     /// This registers handlers that call user-defined hook functions
     /// (precmd, preexec, chpwd) when shell events fire.
@@ -362,6 +368,10 @@ void lle_shell_integration_shutdown(void) {
 
     /// Cleanup shell hook function bridge
     lle_shell_hooks_cleanup();
+
+    /// Tear down the error reporting system after the editor (so editor
+    /// teardown can still report) and before the event hub.
+    lle_error_reporting_system_shutdown();
 
     /// Destroy event hub
     if (integ->event_hub) {
