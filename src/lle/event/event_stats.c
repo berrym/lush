@@ -44,7 +44,8 @@ lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system) {
     lle_event_enhanced_stats_t *stats =
         lle_pool_alloc(sizeof(lle_event_enhanced_stats_t));
     if (!stats) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event stats allocation failed");
     }
 
     memset(stats, 0, sizeof(lle_event_enhanced_stats_t));
@@ -55,7 +56,8 @@ lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system) {
                                        stats->type_stats_capacity);
     if (!stats->type_stats) {
         lle_pool_free(stats);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event stats allocation failed");
     }
 
     memset(stats->type_stats, 0,

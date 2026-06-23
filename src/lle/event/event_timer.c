@@ -64,7 +64,8 @@ static lle_result_t insert_timer_sorted(lle_timer_system_t *ts,
         lle_timer_event_t **new_array =
             realloc(ts->timers, new_capacity * sizeof(lle_timer_event_t *));
         if (!new_array) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event timer allocation failed");
         }
         ts->timers = new_array;
         ts->timer_capacity = new_capacity;
@@ -142,14 +143,16 @@ lle_result_t lle_event_timer_system_init(lle_event_system_t *system) {
     /// Allocate timer system
     lle_timer_system_t *ts = calloc(1, sizeof(lle_timer_system_t));
     if (!ts) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     /// Allocate timer array
     ts->timers = calloc(TIMER_INITIAL_CAPACITY, sizeof(lle_timer_event_t *));
     if (!ts->timers) {
         free(ts);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     ts->timer_count = 0;
@@ -163,7 +166,8 @@ lle_result_t lle_event_timer_system_init(lle_event_system_t *system) {
     if (pthread_mutex_init(&ts->timer_mutex, NULL) != 0) {
         free(ts->timers);
         free(ts);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "event",
+                         "timer mutex init failed");
     }
 
     system->timer_system = ts;
@@ -236,14 +240,16 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
     /// Allocate timer
     lle_timer_event_t *timer = calloc(1, sizeof(lle_timer_event_t));
     if (!timer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     /// Clone the event (deep copy)
     timer->event = calloc(1, sizeof(lle_event_t));
     if (!timer->event) {
         free(timer);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     /// Copy event structure
@@ -255,7 +261,8 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
         if (!timer->event->data) {
             free(timer->event);
             free(timer);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event timer allocation failed");
         }
         memcpy(timer->event->data, event->data, event->data_size);
     } else {
@@ -332,14 +339,16 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
     /// Allocate timer
     lle_timer_event_t *timer = calloc(1, sizeof(lle_timer_event_t));
     if (!timer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     /// Clone the event (deep copy)
     timer->event = calloc(1, sizeof(lle_event_t));
     if (!timer->event) {
         free(timer);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event timer allocation failed");
     }
 
     /// Copy event structure
@@ -351,7 +360,8 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
         if (!timer->event->data) {
             free(timer->event);
             free(timer);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event timer allocation failed");
         }
         memcpy(timer->event->data, event->data, event->data_size);
     } else {

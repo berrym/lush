@@ -43,7 +43,8 @@ lle_result_t lle_event_handler_register(lle_event_system_t *system,
 
         if (!new_handlers) {
             pthread_mutex_unlock(&system->system_mutex);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event handler allocation failed");
         }
 
         /// Copy existing handlers
@@ -61,7 +62,8 @@ lle_result_t lle_event_handler_register(lle_event_system_t *system,
     lle_event_handler_t *h = lle_pool_alloc(sizeof(lle_event_handler_t));
     if (!h) {
         pthread_mutex_unlock(&system->system_mutex);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event handler allocation failed");
     }
 
     /// Initialize handler
