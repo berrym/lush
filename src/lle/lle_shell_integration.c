@@ -259,11 +259,6 @@ lle_result_t lle_shell_integration_init(void) {
     }
     integ->init_state.event_hub_initialized = true;
 
-    /// Step 4.6: Initialize the error reporting system before the editor so a
-    /// failing editor creation can already report through it. Non-fatal: if
-    /// init fails, faults still reach the always-available atomic counters.
-    lle_error_reporting_system_init();
-
     /// Install the fault sinks so LLE faults render through the shell's
     /// structured-error display (user channel) and the debug trace channel
     /// (developer channel), rather than being dropped.
@@ -375,11 +370,9 @@ void lle_shell_integration_shutdown(void) {
     /// Cleanup shell hook function bridge
     lle_shell_hooks_cleanup();
 
-    /// Detach the fault sinks and tear down the error reporting system after
-    /// the editor (so editor teardown can still report) and before the event
-    /// hub.
+    /// Detach the fault sinks after the editor (so editor teardown can still
+    /// report) and before the event hub.
     lle_shell_error_bridge_shutdown();
-    lle_error_reporting_system_shutdown();
 
     /// Destroy event hub
     if (integ->event_hub) {

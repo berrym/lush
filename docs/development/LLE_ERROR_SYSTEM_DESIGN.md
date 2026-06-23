@@ -315,6 +315,18 @@ The unused struct typedefs are pruned alongside the old context/report path:
   plus the single lifecycle seam covers their intent without a parallel
   dispatch layer.
 
+**Removed (implementations, declarations, and the singleton):** the
+recovery/degradation/state-machine/circuit-breaker/handler scaffolding and the
+old context/report path are deleted from `error_handling.c` and the header, and
+the vestigial `g_error_reporting_system` singleton (its only remaining role was
+a lifecycle shell once the reporters were gone) is removed along with its
+init/shutdown/is_initialized functions and the shell-integration wiring. The
+live error path is the fault router and its registered sinks; faults are
+accounted in the always-available atomic counters. **Kept (still live):**
+`lle_error_context_t` is used by `lle_determine_error_severity` and the LLE
+testing framework, so it and the component-error enums remain; the unused
+scaffolding struct *typedefs* are a separate, dependency-checked cleanup.
+
 **Reject outright (not deferred, not built):**
 
 - Error-injection-as-shipped runtime config. Keep a minimal compile-time or

@@ -986,16 +986,15 @@ endif
          timeout: 30)
   endif
 
-  # Error Reporting Lifecycle Unit Tests (Spec 16)
-  # Tests the process-wide reporting singleton (init/shutdown/idempotency)
-  # and the read-only atomic counter snapshot.
-  if fs.exists('tests/lle/unit/test_error_reporting_lifecycle.c')
-    test_error_reporting_lifecycle = executable(
-      'test_error_reporting_lifecycle',
-      'tests/lle/unit/test_error_reporting_lifecycle.c',
+  # Error Counter Snapshot Unit Tests (Spec 16)
+  # Tests the read-only atomic counter snapshot the fault router accounts into.
+  if fs.exists('tests/lle/unit/test_error_counter_snapshot.c')
+    test_error_counter_snapshot = executable(
+      'test_error_counter_snapshot',
+      'tests/lle/unit/test_error_counter_snapshot.c',
       include_directories: [inc, include_directories('tests')],
       dependencies: [lle_dep])
-    test('LLE Error Reporting Lifecycle', test_error_reporting_lifecycle,
+    test('LLE Error Counter Snapshot', test_error_counter_snapshot,
          suite: 'lle-unit',
          timeout: 30)
   endif
