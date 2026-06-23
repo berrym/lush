@@ -134,7 +134,8 @@ lle_result_t lle_perf_monitor_init(lle_performance_monitor_t *monitor,
     monitor->history_ring.entries =
         calloc(monitor->history_ring.capacity, sizeof(lle_perf_statistics_t));
     if (!monitor->history_ring.entries) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "performance",
+                         "performance monitor allocation failed");
     }
 
     monitor->measurement_count = 0;
@@ -276,7 +277,8 @@ lle_result_t lle_perf_measurement_start(
 
     /// High-precision timing start
     if (clock_gettime(CLOCK_MONOTONIC, &measurement->start_time) != 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "performance",
+                         "performance clock read failed");
     }
 
     /// Increment total operations counter
@@ -311,7 +313,8 @@ lle_result_t lle_perf_measurement_end(lle_performance_monitor_t *monitor,
 
     /// High-precision timing end
     if (clock_gettime(CLOCK_MONOTONIC, &measurement->end_time) != 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "performance",
+                         "performance clock read failed");
     }
 
     /// Calculate duration
@@ -391,7 +394,8 @@ lle_result_t lle_perf_calculate_statistics(lle_performance_monitor_t *monitor,
     /// Collect duration samples for percentile calculation
     uint64_t *durations = calloc(LLE_PERF_MAX_MEASUREMENTS, sizeof(uint64_t));
     if (!durations) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "performance",
+                         "performance monitor allocation failed");
     }
 
     size_t sample_count = 0;

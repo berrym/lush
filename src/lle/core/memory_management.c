@@ -799,7 +799,8 @@ lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
     lle_memory_pool_t *pool =
         (lle_memory_pool_t *)calloc(1, sizeof(lle_memory_pool_t));
     if (!pool) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     /// Initialize pool metadata
@@ -817,7 +818,8 @@ lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
     /// Initialize mutex
     if (pthread_mutex_init(&pool->lock, NULL) != 0) {
         free(pool);
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "memory",
+                         "memory subsystem init failed");
     }
 
     /// Set creation time
@@ -1049,7 +1051,8 @@ lle_result_t lle_memory_initialize_pools(lle_memory_manager_t *manager) {
     if (!global_memory_pool || !global_memory_pool->initialized) {
         lush_pool_config_t config = lush_pool_get_default_config();
         if (lush_pool_init(&config) != LUSH_POOL_SUCCESS) {
-            return LLE_ERROR_INITIALIZATION_FAILED;
+            return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "memory",
+                             "memory subsystem init failed");
         }
     }
 
@@ -1220,7 +1223,8 @@ lle_create_specialized_pool(lle_memory_manager_t *manager,
 
     lle_memory_pool_t *pool = calloc(1, sizeof(lle_memory_pool_t));
     if (!pool)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
 
     pool->size = pool_config->initial_size;
     pool->alignment = pool_config->alignment;
@@ -1231,7 +1235,8 @@ lle_create_specialized_pool(lle_memory_manager_t *manager,
 
     if (pthread_mutex_init(&pool->lock, NULL) != 0) {
         free(pool);
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "memory",
+                         "memory subsystem init failed");
     }
 
     /// Use pool_manager subsystem
@@ -1309,7 +1314,8 @@ lle_result_t lle_integrate_with_lush_memory(lle_memory_manager_t *manager) {
     /// Step 1: Detect existing Lush memory pools
     lush_memory_pool_t *lush_pools = lush_get_memory_pools();
     if (!lush_pools) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "memory",
+                         "memory subsystem sync init failed");
     }
 
     /// Step 2: Analyze Lush memory configuration
@@ -1683,13 +1689,15 @@ lle_result_t lle_expand_pool_memory(lle_memory_pool_t *pool,
     size_t new_size = pool->size + additional_size;
     if (new_size > pool->max_size) {
         pthread_mutex_unlock(&pool->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     void *new_region = realloc(pool->memory_region, new_size);
     if (!new_region) {
         pthread_mutex_unlock(&pool->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     pool->memory_region = new_region;
@@ -1718,7 +1726,8 @@ lle_result_t lle_compact_pool_memory(lle_memory_pool_t *pool,
     void *new_region = realloc(pool->memory_region, new_size);
     if (!new_region && new_size > 0) {
         pthread_mutex_unlock(&pool->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     pool->memory_region = new_region;
@@ -2085,7 +2094,8 @@ lle_result_t lle_perform_garbage_collection(lle_garbage_collector_t *gc) {
 ///                                  LLE_BUFFER_ALIGNMENT);
 ///
 ///     if (!buffer_mem->buffer_regions.primary_buffer) {
-///         return LLE_ERROR_OUT_OF_MEMORY;
+///         return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory", "memory pool
+///         allocation failed");
 ///     }
 ///
 ///     /// Step 2: Allocate secondary buffer (for undo operations)
@@ -2098,7 +2108,8 @@ lle_result_t lle_perform_garbage_collection(lle_garbage_collector_t *gc) {
 ///
 ///     if (!buffer_mem->buffer_regions.secondary_buffer) {
 ///         lle_pool_free(buffer_mem->buffer_regions.primary_buffer);
-///         return LLE_ERROR_OUT_OF_MEMORY;
+///         return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory", "memory pool
+///         allocation failed");
 ///     }
 ///
 ///     /// Step 3: Allocate scratch buffer
@@ -2111,7 +2122,8 @@ lle_result_t lle_perform_garbage_collection(lle_garbage_collector_t *gc) {
 ///
 ///     if (!buffer_mem->buffer_regions.scratch_buffer) {
 ///         lle_cleanup_buffer_regions(buffer_mem, config->memory_pool);
-///         return LLE_ERROR_OUT_OF_MEMORY;
+///         return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory", "memory pool
+///         allocation failed");
 ///     }
 ///
 ///     /// Step 4: Initialize UTF-8 management structures
@@ -2178,7 +2190,8 @@ lle_result_t lle_initialize_utf8_management(lle_buffer_memory_t *buffer_mem,
 
     if (!buffer_mem->utf8_management.codepoint_offsets ||
         !buffer_mem->utf8_management.grapheme_boundaries) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     buffer_mem->utf8_management.codepoint_count = 0;
@@ -2314,7 +2327,8 @@ lle_expand_line_tracking_arrays(lle_multiline_buffer_t *multiline_buffer) {
             lle_pool_free(new_offsets);
         if (new_lengths)
             lle_pool_free(new_lengths);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
     }
 
     if (multiline_buffer->line_tracking.line_offsets) {
@@ -2349,11 +2363,13 @@ lle_result_t lle_expand_primary_buffer(lle_buffer_memory_t *buffer_memory,
     size_t new_size =
         buffer_memory->buffer_regions.primary_size + additional_space;
     if (new_size > buffer_memory->resize_config.max_buffer_size)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
 
     void *new_buffer = lle_pool_alloc(new_size);
     if (!new_buffer)
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "memory",
+                         "memory pool allocation failed");
 
     if (buffer_memory->buffer_regions.primary_buffer) {
         memcpy(new_buffer, buffer_memory->buffer_regions.primary_buffer,
@@ -3344,13 +3360,15 @@ lle_result_t lle_initialize_complete_memory_integration(
     /// Step 2: Initialize synchronization primitives
     if (pthread_mutex_init(&integration->synchronization.integration_mutex,
                            NULL) != 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "memory",
+                         "memory subsystem sync init failed");
     }
 
     if (pthread_rwlock_init(&integration->synchronization.shared_memory_lock,
                             NULL) != 0) {
         pthread_mutex_destroy(&integration->synchronization.integration_mutex);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "memory",
+                         "memory subsystem sync init failed");
     }
 
     /// Initialize semaphore - platform-specific implementation
@@ -3373,7 +3391,8 @@ lle_result_t lle_initialize_complete_memory_integration(
         pthread_rwlock_destroy(
             &integration->synchronization.shared_memory_lock);
         pthread_mutex_destroy(&integration->synchronization.integration_mutex);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "memory",
+                         "memory subsystem sync init failed");
     }
 #else
     /// Linux: Use unnamed semaphores (sem_init)
@@ -3381,7 +3400,8 @@ lle_result_t lle_initialize_complete_memory_integration(
         pthread_rwlock_destroy(
             &integration->synchronization.shared_memory_lock);
         pthread_mutex_destroy(&integration->synchronization.integration_mutex);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "memory",
+                         "memory subsystem sync init failed");
     }
 #endif
 

@@ -2695,7 +2695,8 @@ static lle_result_t execute_keybinding_action(
             }
 
             /// Unknown action type - should never happen
-            return LLE_ERROR_FATAL_INTERNAL;
+            return LLE_FAULT(LLE_ERROR_FATAL_INTERNAL, "lle",
+                             "unknown readline action type");
         }
     }
 
