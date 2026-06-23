@@ -98,7 +98,8 @@ static lle_result_t bridge_alloc(lle_history_bridge_t **bridge,
     *bridge =
         (lle_history_bridge_t *)lle_pool_alloc(sizeof(lle_history_bridge_t));
     if (!*bridge) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history bridge allocation failed");
     }
 
     memset(*bridge, 0, sizeof(lle_history_bridge_t));
@@ -704,7 +705,8 @@ lle_result_t lle_history_bridge_handle_builtin(int argc, char **argv,
     size_t buffer_size = entry_count * 100 + 1024;
     char *buffer = (char *)lle_pool_alloc(buffer_size);
     if (!buffer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history bridge allocation failed");
     }
 
     buffer[0] = '\0';

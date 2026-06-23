@@ -67,7 +67,8 @@ static lle_result_t lle_history_file_lock(int fd) {
         }
 
         if (errno != EWOULDBLOCK) {
-            return LLE_ERROR_SYSTEM_CALL;
+            return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "history",
+                             "history file lock failed");
         }
 
         /// Wait before retry
@@ -91,7 +92,8 @@ static lle_result_t lle_history_file_unlock(int fd) {
     }
 
     if (flock(fd, LOCK_UN) != 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "history",
+                         "history file unlock failed");
     }
 
     return LLE_SUCCESS;
@@ -218,7 +220,8 @@ static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
             lle_pool_free(escaped_cmd);
         if (escaped_wd)
             lle_pool_free(escaped_wd);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history storage allocation failed");
     }
 
     /// Escape command and working directory
@@ -376,7 +379,8 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
         lle_history_file_unlock(fd);
         close(fd);
         pthread_rwlock_unlock(&core->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history storage allocation failed");
     }
 
     for (size_t i = 0; i < core->entry_count; i++) {
@@ -452,7 +456,8 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
     if (!line_buffer) {
         lle_history_file_unlock(fd);
         close(fd);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history storage allocation failed");
     }
 
     result = lle_history_format_entry(entry, line_buffer,
@@ -522,7 +527,8 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
     if (!line_buffer) {
         fclose(fp);
         pthread_rwlock_unlock(&core->lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history storage allocation failed");
     }
 
     size_t loaded_count = 0;

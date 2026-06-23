@@ -342,7 +342,8 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
         result->expanded_command = lle_pool_strdup(entry->command);
         if (!result->expanded_command) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                             "history expansion allocation failed");
         }
 
         return LLE_SUCCESS;
@@ -392,7 +393,8 @@ static lle_result_t expand_single_reference(const char *expansion_str,
 
         result->expanded_command = lle_pool_strdup(entry->command);
         if (!result->expanded_command) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                             "history expansion allocation failed");
         }
 
         return LLE_SUCCESS;
@@ -436,7 +438,8 @@ static lle_result_t expand_single_reference(const char *expansion_str,
         lle_history_search_results_destroy(search_results);
 
         if (!result->expanded_command) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                             "history expansion allocation failed");
         }
 
         return LLE_SUCCESS;
@@ -478,7 +481,8 @@ static lle_result_t expand_single_reference(const char *expansion_str,
     lle_history_search_results_destroy(search_results);
 
     if (!result->expanded_command) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history expansion allocation failed");
     }
 
     return LLE_SUCCESS;
