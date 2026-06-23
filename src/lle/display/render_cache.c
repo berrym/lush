@@ -120,26 +120,30 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
                         &timestamp, &last_access, &access_count, &valid);
 
     if (fields != 5) {
-        return LLE_ERROR_INVALID_FORMAT;
+        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
+                         "cache entry header malformed");
     }
 
     /// Find data start (after '|') — bounded scan limited to header size
     const char *separator = memchr(bytes, '|', serialized_size);
     if (!separator) {
-        return LLE_ERROR_INVALID_FORMAT;
+        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
+                         "cache entry missing separator");
     }
     const char *data_start = separator + 1;
     size_t header_len = (size_t)(data_start - bytes);
 
     /// Reject blobs whose payload length disagrees with the header
     if (header_len + data_size != serialized_size) {
-        return LLE_ERROR_INVALID_FORMAT;
+        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
+                         "cache entry length mismatch");
     }
 
     /// Allocate and copy data
     entry->data = lle_pool_alloc(data_size);
     if (!entry->data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
     memcpy(entry->data, data_start, data_size);
 
@@ -178,7 +182,8 @@ static lle_result_t lle_cache_policy_init(lle_display_cache_policy_t **policy,
     lle_display_cache_policy_t *p =
         lle_pool_alloc(sizeof(struct lle_cache_policy_t));
     if (!p) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
 
     memset(p, 0, sizeof(struct lle_cache_policy_t));
@@ -343,7 +348,8 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /// Step 2: Allocate cache structure
     lle_display_cache_t *c = lle_pool_alloc(sizeof(lle_display_cache_t));
     if (!c) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
     memset(c, 0, sizeof(lle_display_cache_t));
 
@@ -360,7 +366,8 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     c->cache_table = ht_u64blob_create(NULL);
     if (!c->cache_table) {
         lle_pool_free(c);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
 
     /// Step 5: Allocate cache metrics
@@ -368,7 +375,8 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     if (!c->metrics) {
         ht_u64blob_destroy(c->cache_table);
         lle_pool_free(c);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
     memset(c->metrics, 0, sizeof(lle_cache_metrics_t));
 
@@ -468,7 +476,8 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
     size_t serialized_size = 0;
     void *serialized = serialize_cache_entry(&entry, &serialized_size);
     if (!serialized) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
 
     /// Step 4: Acquire write lock
@@ -520,8 +529,10 @@ lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
         return LLE_ERROR_CACHE_MISS;
     }
 
-    /// Step 5: Deserialize entry
-    lle_cached_entry_t entry;
+    /// Step 5: Deserialize entry. Zero-initialized so the LLE_FAULT paths in
+    /// deserialize do not leave gcc unable to prove the struct is set when the
+    /// caller reads it on success.
+    lle_cached_entry_t entry = {0};
     lle_result_t result =
         deserialize_cache_entry(serialized, serialized_size, &entry);
 
@@ -599,7 +610,8 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
     cache->cache_table = ht_u64blob_create(NULL);
     if (!cache->cache_table) {
         pthread_rwlock_unlock(&cache->cache_lock);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
 
     /// Reset metrics but preserve historical data
@@ -635,7 +647,8 @@ lle_result_t lle_render_cache_init(lle_render_cache_t **cache,
     /// Step 2: Allocate render cache structure
     lle_render_cache_t *rc = lle_pool_alloc(sizeof(lle_render_cache_t));
     if (!rc) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render cache allocation failed");
     }
     memset(rc, 0, sizeof(lle_render_cache_t));
 

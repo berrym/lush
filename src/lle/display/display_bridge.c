@@ -84,7 +84,8 @@ lle_result_t lle_display_bridge_init(lle_display_bridge_t **bridge,
     /// Step 2: Allocate bridge structure from memory pool
     br = lle_pool_alloc(sizeof(lle_display_bridge_t));
     if (!br) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display bridge allocation failed");
     }
     memset(br, 0, sizeof(lle_display_bridge_t));
 
@@ -145,7 +146,8 @@ lle_result_t lle_display_bridge_init(lle_display_bridge_t **bridge,
         lle_display_diff_cleanup(br->diff_tracker);
         lle_render_queue_cleanup(br->render_queue);
         lle_pool_free(br);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display bridge allocation failed");
     }
 
     /// Step 9: Set initial timestamp
@@ -418,7 +420,8 @@ static lle_result_t lle_render_queue_init(lle_coord_queue_t **queue,
     /// Allocate queue structure
     q = lle_pool_alloc(sizeof(lle_coord_queue_t));
     if (!q) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display bridge allocation failed");
     }
     memset(q, 0, sizeof(lle_coord_queue_t));
 
@@ -429,7 +432,8 @@ static lle_result_t lle_render_queue_init(lle_coord_queue_t **queue,
     q->requests = lle_pool_alloc(sizeof(lle_render_request_t) * q->capacity);
     if (!q->requests) {
         lle_pool_free(q);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display bridge allocation failed");
     }
     memset(q->requests, 0, sizeof(lle_render_request_t) * q->capacity);
 
@@ -495,7 +499,8 @@ static lle_result_t lle_display_diff_init(lle_display_diff_t **diff_tracker,
     /// Allocate diff tracker structure
     diff = lle_pool_alloc(sizeof(lle_display_diff_t));
     if (!diff) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "display bridge allocation failed");
     }
     memset(diff, 0, sizeof(lle_display_diff_t));
 

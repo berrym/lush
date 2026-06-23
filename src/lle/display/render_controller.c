@@ -94,7 +94,8 @@ lle_result_t lle_render_controller_init(lle_render_controller_t **controller,
     /// Step 2: Allocate controller structure
     ctrl = lle_pool_alloc(sizeof(lle_render_controller_t));
     if (!ctrl) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(ctrl, 0, sizeof(lle_render_controller_t));
 
@@ -288,7 +289,8 @@ lle_buffer_renderer_init_internal(lle_buffer_renderer_t **renderer,
     /// Allocate renderer structure
     rend = lle_pool_alloc(sizeof(lle_buffer_renderer_t));
     if (!rend) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(rend, 0, sizeof(lle_buffer_renderer_t));
 
@@ -323,7 +325,8 @@ lle_cursor_renderer_init_internal(lle_cursor_renderer_t **renderer,
     /// Allocate renderer structure
     rend = lle_pool_alloc(sizeof(lle_cursor_renderer_t));
     if (!rend) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(rend, 0, sizeof(lle_cursor_renderer_t));
 
@@ -358,7 +361,8 @@ lle_frame_scheduler_init_internal(lle_frame_scheduler_t **scheduler,
     /// Allocate scheduler structure
     sched = lle_pool_alloc(sizeof(lle_frame_scheduler_t));
     if (!sched) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(sched, 0, sizeof(lle_frame_scheduler_t));
 
@@ -394,7 +398,8 @@ lle_render_cache_init_internal(lle_render_cache_t **cache,
     /// Allocate cache structure
     c = lle_pool_alloc(sizeof(lle_render_cache_t));
     if (!c) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(c, 0, sizeof(lle_render_cache_t));
 
@@ -428,7 +433,8 @@ lle_render_metrics_init_internal(lle_render_metrics_t **metrics,
     /// Allocate metrics structure
     m = lle_pool_alloc(sizeof(lle_render_metrics_t));
     if (!m) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(m, 0, sizeof(lle_render_metrics_t));
 
@@ -465,7 +471,8 @@ lle_render_config_init_internal(lle_render_config_t **config,
     /// Allocate config structure
     cfg = lle_pool_alloc(sizeof(lle_render_config_t));
     if (!cfg) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(cfg, 0, sizeof(lle_render_config_t));
 
@@ -617,7 +624,8 @@ lle_result_t lle_render_buffer_content(lle_render_controller_t *controller,
     lle_render_output_t *render_out =
         lle_pool_alloc(sizeof(lle_render_output_t));
     if (!render_out) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     memset(render_out, 0, sizeof(lle_render_output_t));
 
@@ -629,7 +637,8 @@ lle_result_t lle_render_buffer_content(lle_render_controller_t *controller,
     render_out->content = lle_pool_alloc(estimated_size);
     if (!render_out->content) {
         lle_pool_free(render_out);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render controller allocation failed");
     }
     render_out->content_capacity = estimated_size;
 

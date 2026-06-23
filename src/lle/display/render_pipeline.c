@@ -47,7 +47,8 @@ lle_pipeline_stage_preprocess(lle_render_context_t *context,
     /// Allocate output structure
     lle_render_output_t *out = lle_pool_alloc(sizeof(lle_render_output_t));
     if (!out) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(out, 0, sizeof(lle_render_output_t));
 
@@ -58,7 +59,8 @@ lle_pipeline_stage_preprocess(lle_render_context_t *context,
     out->content = lle_pool_alloc(estimated_size);
     if (!out->content) {
         lle_pool_free(out);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     out->content_capacity = estimated_size;
 
@@ -97,7 +99,8 @@ static lle_result_t lle_pipeline_stage_syntax(lle_render_context_t *context,
     /// Allocate output structure
     lle_render_output_t *out = lle_pool_alloc(sizeof(lle_render_output_t));
     if (!out) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(out, 0, sizeof(lle_render_output_t));
 
@@ -106,7 +109,8 @@ static lle_result_t lle_pipeline_stage_syntax(lle_render_context_t *context,
     out->content = lle_pool_alloc(size);
     if (!out->content) {
         lle_pool_free(out);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     out->content_capacity = size;
 
@@ -142,7 +146,8 @@ static lle_result_t lle_pipeline_stage_format(lle_render_context_t *context,
     /// Allocate output structure
     lle_render_output_t *out = lle_pool_alloc(sizeof(lle_render_output_t));
     if (!out) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(out, 0, sizeof(lle_render_output_t));
 
@@ -151,7 +156,8 @@ static lle_result_t lle_pipeline_stage_format(lle_render_context_t *context,
     out->content = lle_pool_alloc(size);
     if (!out->content) {
         lle_pool_free(out);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     out->content_capacity = size;
 
@@ -187,7 +193,8 @@ static lle_result_t lle_pipeline_stage_compose(lle_render_context_t *context,
     /// Allocate output structure
     lle_render_output_t *out = lle_pool_alloc(sizeof(lle_render_output_t));
     if (!out) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(out, 0, sizeof(lle_render_output_t));
 
@@ -197,7 +204,8 @@ static lle_result_t lle_pipeline_stage_compose(lle_render_context_t *context,
     out->content = lle_pool_alloc(size);
     if (!out->content) {
         lle_pool_free(out);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     out->content_capacity = size;
 
@@ -246,7 +254,8 @@ lle_result_t lle_render_pipeline_init(lle_render_pipeline_t **pipeline,
     /// Step 2: Allocate pipeline structure
     lle_render_pipeline_t *pipe = lle_pool_alloc(sizeof(lle_render_pipeline_t));
     if (!pipe) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(pipe, 0, sizeof(lle_render_pipeline_t));
 
@@ -263,7 +272,8 @@ lle_result_t lle_render_pipeline_init(lle_render_pipeline_t **pipeline,
         lle_pool_alloc(sizeof(lle_render_stage_t) * pipe->stage_capacity);
     if (!pipe->stages) {
         lle_pool_free(pipe);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
+                         "render pipeline allocation failed");
     }
     memset(pipe->stages, 0, sizeof(lle_render_stage_t) * pipe->stage_capacity);
 
