@@ -22,6 +22,7 @@
 #include "lle/history.h"
 #include "lle/lle_editor.h"
 #include "lle/lle_readline.h"
+#include "lle/lle_shell_error_bridge.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_hooks.h"
 #include "lle/lle_watchdog.h"
@@ -263,6 +264,11 @@ lle_result_t lle_shell_integration_init(void) {
     /// init fails, faults still reach the always-available atomic counters.
     lle_error_reporting_system_init();
 
+    /// Install the fault sinks so LLE faults render through the shell's
+    /// structured-error display (user channel) and the debug trace channel
+    /// (developer channel), rather than being dropped.
+    lle_shell_error_bridge_init();
+
     /// Step 4.5: Initialize shell hook function bridge
     /// This registers handlers that call user-defined hook functions
     /// (precmd, preexec, chpwd) when shell events fire.
@@ -369,8 +375,10 @@ void lle_shell_integration_shutdown(void) {
     /// Cleanup shell hook function bridge
     lle_shell_hooks_cleanup();
 
-    /// Tear down the error reporting system after the editor (so editor
-    /// teardown can still report) and before the event hub.
+    /// Detach the fault sinks and tear down the error reporting system after
+    /// the editor (so editor teardown can still report) and before the event
+    /// hub.
+    lle_shell_error_bridge_shutdown();
     lle_error_reporting_system_shutdown();
 
     /// Destroy event hub

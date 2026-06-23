@@ -416,10 +416,16 @@ Earlier stages deliver value without the later ones.
 
 2b. **The shell bridge.** Add the executable-side bridge
    (`lle_shell_sources`): the `lle_result_t -> shell_error_code_t` + severity
-   mapping, a user sink that renders via `shell_error_display`, a dev sink
-   that calls `debug_trace_printf`, and registration at startup from
-   `lle_shell_integration_init`. Prove a synthesized high-severity fault
-   renders one shell-style error to the user.
+   mapping in its own dependency-free translation unit, a user sink that
+   renders via `shell_error_display` (with `SOURCE_LOC_UNKNOWN`, so an internal
+   editor fault shows a clean `error[CODE]: message` rather than C source), a
+   dev sink that calls `debug_trace_printf`, and registration at startup from
+   `lle_shell_integration_init`. The mapping is unit-tested in isolation (it
+   holds the branching logic), and the live user render is proven end to end by
+   a bridge test that captures stderr while a real fault is dispatched through
+   the registered sinks: it links the real shell renderer and stubs only
+   `debug_trace_printf` (whose real home pulls in the executor). Stage 3 then
+   exercises the same path from genuine terminal faults in the running shell.
 3. **Wire the high-density subsystem first: terminal.** Convert the ~7 C/E
    sites (`tcsetattr`, `sigaction`, `select`, `read`, OOM). Prove a real
    terminal fault renders one shell-style error to the user.

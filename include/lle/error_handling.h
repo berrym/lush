@@ -1074,6 +1074,14 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
  */
 const char *lle_generate_technical_details(lle_result_t error_code);
 
+/**
+ * @brief Get the symbolic name of an error code (e.g.
+ * "LLE_ERROR_OUT_OF_MEMORY")
+ * @param error_code Error code to name
+ * @return Pointer to a static string; never NULL
+ */
+const char *lle_error_code_to_string(lle_result_t error_code);
+
 /// Performance-Critical Path
 /**
  * @brief Handle an error on the performance-critical execution path
