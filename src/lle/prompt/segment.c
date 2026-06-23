@@ -364,7 +364,8 @@ lle_result_t lle_prompt_context_refresh_directory(lle_prompt_context_t *ctx) {
     if (!getcwd(ctx->cwd, sizeof(ctx->cwd))) {
         ctx->cwd[0] = '\0';
         ctx->cwd_display[0] = '\0';
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "prompt",
+                         "segment working directory unavailable");
     }
 
     /// Create display version with ~ for home
@@ -509,7 +510,8 @@ typedef struct {
 static lle_result_t segment_directory_init(lle_prompt_segment_t *self) {
     segment_directory_state_t *state = calloc(1, sizeof(*state));
     if (!state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                         "prompt segment allocation failed");
     }
     self->state = state;
     return LLE_SUCCESS;
@@ -1236,13 +1238,15 @@ static void segment_git_async_callback(const lle_async_response_t *response,
 static lle_result_t segment_git_init(lle_prompt_segment_t *self) {
     segment_git_state_t *state = calloc(1, sizeof(*state));
     if (!state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "prompt",
+                         "prompt segment allocation failed");
     }
 
     /// Initialize mutex for async state protection
     if (pthread_mutex_init(&state->async_mutex, NULL) != 0) {
         free(state);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "prompt",
+                         "segment async mutex init failed");
     }
 
     /// Initialize async worker for background git status fetching
