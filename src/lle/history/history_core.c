@@ -400,7 +400,8 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
         lle_pool_free(c->entries);
         lle_history_config_destroy(c->config, memory_pool);
         lle_pool_free(c);
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "history",
+                         "history core lock init failed");
     }
 
     c->initialized = true;
@@ -958,7 +959,8 @@ lle_result_t lle_history_get_cwd(char *buffer, size_t size) {
     }
 
     if (getcwd(buffer, size) == NULL) {
-        return LLE_ERROR_ASSERTION_FAILED;
+        return LLE_FAULT(LLE_ERROR_ASSERTION_FAILED, "history",
+                         "history working directory unavailable");
     }
 
     return LLE_SUCCESS;

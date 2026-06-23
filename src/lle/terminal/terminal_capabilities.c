@@ -404,7 +404,8 @@ lle_capabilities_detect_environment(lle_terminal_capabilities_t **caps,
     lle_terminal_capabilities_t *c =
         calloc(1, sizeof(lle_terminal_capabilities_t));
     if (!c) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal capabilities allocation failed");
     }
 
     /// Already zeroed by calloc
@@ -417,7 +418,8 @@ lle_capabilities_detect_environment(lle_terminal_capabilities_t **caps,
     c->terminal_type = term_env ? strdup(term_env) : strdup("unknown");
     if (!c->terminal_type) {
         lle_pool_free(c);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal capabilities allocation failed");
     }
 
     const char *term_program = detect_terminal_program();
@@ -425,7 +427,8 @@ lle_capabilities_detect_environment(lle_terminal_capabilities_t **caps,
     if (!c->terminal_program) {
         free((char *)c->terminal_type);
         lle_pool_free(c);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal capabilities allocation failed");
     }
 
     /// Detect terminal type enum

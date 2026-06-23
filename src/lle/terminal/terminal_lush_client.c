@@ -45,7 +45,8 @@ lle_lush_display_client_init(lle_lush_display_client_t **client,
 
     lle_lush_display_client_t *c = calloc(1, sizeof(lle_lush_display_client_t));
     if (!c) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal client allocation failed");
     }
 
     c->display_context = display_context;

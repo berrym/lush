@@ -47,14 +47,16 @@ lle_result_t lle_command_buffer_init(lle_command_buffer_t **buffer,
 
     lle_command_buffer_t *buf = calloc(1, sizeof(lle_command_buffer_t));
     if (!buf) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal state allocation failed");
     }
 
     /// Allocate buffer data
     buf->data = calloc(initial_capacity, 1);
     if (!buf->data) {
         free(buf);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal state allocation failed");
     }
 
     buf->capacity = initial_capacity;
@@ -110,7 +112,8 @@ static lle_result_t ensure_capacity(lle_command_buffer_t *buffer,
     /// Reallocate buffer
     char *new_data = realloc(buffer->data, new_capacity);
     if (!new_data) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal state allocation failed");
     }
 
     buffer->data = new_data;
@@ -257,7 +260,8 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
     lle_internal_state_t *internal_state =
         calloc(1, sizeof(lle_internal_state_t));
     if (!internal_state) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal state allocation failed");
     }
 
     /// Initialize command buffer
@@ -275,7 +279,8 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
     if (!internal_state->display_lines) {
         lle_command_buffer_destroy(internal_state->command_buffer);
         free(internal_state);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal state allocation failed");
     }
 
     /// Allocate content for each display line
@@ -290,7 +295,8 @@ lle_result_t lle_internal_state_init(lle_internal_state_t **state,
             free(internal_state->display_lines);
             lle_command_buffer_destroy(internal_state->command_buffer);
             free(internal_state);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                             "terminal state allocation failed");
         }
         internal_state->display_lines[i].length = 0;
         internal_state->display_lines[i].contains_cursor = false;
