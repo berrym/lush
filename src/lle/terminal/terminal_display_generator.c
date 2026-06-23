@@ -48,14 +48,16 @@ lle_result_t lle_display_content_create(lle_display_content_t **content,
 
     lle_display_content_t *dc = calloc(1, sizeof(lle_display_content_t));
     if (!dc) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal display generator allocation failed");
     }
 
     /// Allocate lines array
     dc->lines = calloc(line_capacity, sizeof(lle_display_line_t));
     if (!dc->lines) {
         free(dc);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal display generator allocation failed");
     }
 
     /// Initialize each line
@@ -69,7 +71,8 @@ lle_result_t lle_display_content_create(lle_display_content_t **content,
             }
             free(dc->lines);
             free(dc);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                             "terminal display generator allocation failed");
         }
         dc->lines[i].length = 0;
         dc->lines[i].contains_cursor = false;
@@ -134,7 +137,8 @@ lle_result_t lle_display_generator_init(lle_display_generator_t **generator,
 
     lle_display_generator_t *gen = calloc(1, sizeof(lle_display_generator_t));
     if (!gen) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal display generator allocation failed");
     }
 
     gen->capabilities = caps;
@@ -203,7 +207,8 @@ static lle_result_t ensure_line_capacity(lle_display_line_t *line,
 
     char *new_content = realloc(line->content, new_capacity);
     if (!new_content) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal display generator allocation failed");
     }
 
     line->content = new_content;

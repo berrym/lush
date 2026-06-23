@@ -349,7 +349,8 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
     int fd = open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd < 0) {
         pthread_rwlock_unlock(&core->lock);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                         "history file IO error");
     }
 
     /// Acquire lock
@@ -370,7 +371,8 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
         lle_history_file_unlock(fd);
         close(fd);
         pthread_rwlock_unlock(&core->lock);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                         "history file IO error");
     }
 
     /// Write entries
@@ -403,7 +405,8 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
             lle_history_file_unlock(fd);
             close(fd);
             pthread_rwlock_unlock(&core->lock);
-            return LLE_ERROR_IO_ERROR;
+            return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                             "history file IO error");
         }
     }
 
@@ -441,7 +444,8 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
     /// Open file for appending
     int fd = open(file_path, O_WRONLY | O_CREAT | O_APPEND, 0600);
     if (fd < 0) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                         "history file IO error");
     }
 
     /// Acquire lock
@@ -473,7 +477,8 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
         lle_pool_free(line_buffer);
         lle_history_file_unlock(fd);
         close(fd);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                         "history file IO error");
     }
 
     lle_pool_free(line_buffer);
@@ -517,7 +522,8 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
     /// Open file for reading
     FILE *fp = fopen(file_path, "r");
     if (!fp) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "history",
+                         "history file IO error");
     }
 
     pthread_rwlock_wrlock(&core->lock);

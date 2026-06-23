@@ -46,7 +46,8 @@ lle_result_t lle_input_processor_init(lle_input_processor_t **processor,
 
     lle_input_processor_t *proc = calloc(1, sizeof(lle_input_processor_t));
     if (!proc) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal input allocation failed");
     }
 
     proc->capabilities = caps;
@@ -227,7 +228,8 @@ lle_input_processor_read_next_event(lle_input_processor_t *processor,
         new_event = calloc(1, sizeof(lle_input_event_t));
     }
     if (!new_event) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal input allocation failed");
     }
 
     /// Read event from Unix interface

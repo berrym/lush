@@ -396,7 +396,8 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         lle_pool_free(c->metrics);
         ht_u64blob_destroy(c->cache_table);
         lle_pool_free(c);
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "display",
+                         "render cache lock init failed");
     }
 
     /// Step 8: Return initialized cache

@@ -313,7 +313,8 @@ lle_result_t lle_render_pipeline_init(lle_render_pipeline_t **pipeline,
     if (pthread_mutex_init(&pipe->pipeline_lock, NULL) != 0) {
         lle_pool_free(pipe->stages);
         lle_pool_free(pipe);
-        return LLE_ERROR_INITIALIZATION_FAILED;
+        return LLE_FAULT(LLE_ERROR_INITIALIZATION_FAILED, "display",
+                         "pipeline mutex init failed");
     }
 
     /// Step 11: Return initialized pipeline

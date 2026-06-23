@@ -80,7 +80,8 @@ lle_display_integration_init(lle_display_integration_t **integration,
     /// Initialize integration lock
     if (pthread_rwlock_init(&integ->integration_lock, NULL) != 0) {
         free(integ);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "display",
+                         "integration lock init failed");
     }
 
     /// Initialize display bridge

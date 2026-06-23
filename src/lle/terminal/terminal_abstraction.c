@@ -51,7 +51,8 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
     /// Step 1: Allocate main structure
     abs = calloc(1, sizeof(lle_terminal_abstraction_t));
     if (!abs) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "terminal abstraction allocation failed");
     }
 
     /// Step 2: Initialize Unix interface for basic terminal access

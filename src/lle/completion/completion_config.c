@@ -241,14 +241,16 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
     /// Create pipe for reading command output
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "completion",
+                         "completion command IO failed");
     }
 
     pid_t pid = lush_fork();
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "completion",
+                         "completion command IO failed");
     }
 
     if (pid == 0) {
@@ -800,7 +802,8 @@ lle_result_t lle_completion_load_config_file(const char *path) {
     size_t content_size;
     char *content = read_file(path, &content_size);
     if (!content) {
-        return LLE_ERROR_IO_ERROR;
+        return LLE_FAULT(LLE_ERROR_IO_ERROR, "completion",
+                         "completion command IO failed");
     }
 
     pthread_mutex_lock(&g_completion_config.mutex);

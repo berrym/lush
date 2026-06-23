@@ -429,7 +429,8 @@ static lle_result_t lle_render_queue_init(lle_coord_queue_t **queue,
     if (pthread_mutex_init(&q->lock, NULL) != 0) {
         lle_pool_free(q->requests);
         lle_pool_free(q);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "display",
+                         "render queue mutex init failed");
     }
 
     *queue = q;
