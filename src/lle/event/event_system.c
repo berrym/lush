@@ -184,7 +184,8 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
     /// Allocate system structure
     lle_event_system_t *sys = lle_pool_alloc(sizeof(lle_event_system_t));
     if (!sys) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event system allocation failed");
     }
 
     memset(sys, 0, sizeof(lle_event_system_t));
@@ -214,7 +215,8 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         lle_event_queue_destroy(sys->priority_queue);
         lle_event_queue_destroy(sys->queue);
         lle_pool_free(sys);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event system allocation failed");
     }
 
     sys->handler_count = 0;
@@ -463,7 +465,8 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
     /// Allocate event structure
     lle_event_t *evt = lle_pool_alloc(sizeof(lle_event_t));
     if (!evt) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event system allocation failed");
     }
 
     memset(evt, 0, sizeof(lle_event_t));
@@ -473,7 +476,8 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
         evt->data = lle_pool_alloc(data_size);
         if (!evt->data) {
             lle_pool_free(evt);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event system allocation failed");
         }
         memcpy(evt->data, data, data_size);
         evt->data_size = data_size;

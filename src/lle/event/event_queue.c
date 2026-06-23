@@ -28,7 +28,8 @@ lle_result_t lle_event_queue_init(lle_event_queue_t **queue, size_t capacity) {
     /// Allocate queue structure
     lle_event_queue_t *q = lle_pool_alloc(sizeof(lle_event_queue_t));
     if (!q) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event queue allocation failed");
     }
 
     memset(q, 0, sizeof(lle_event_queue_t));
@@ -37,7 +38,8 @@ lle_result_t lle_event_queue_init(lle_event_queue_t **queue, size_t capacity) {
     q->events = lle_pool_alloc(sizeof(lle_event_t *) * capacity);
     if (!q->events) {
         lle_pool_free(q);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event queue allocation failed");
     }
 
     memset(q->events, 0, sizeof(lle_event_t *) * capacity);

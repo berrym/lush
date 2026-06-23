@@ -44,7 +44,8 @@ lle_result_t lle_event_filter_system_init(lle_event_system_t *system) {
     lle_event_filter_system_t *filter_sys =
         lle_pool_alloc(sizeof(lle_event_filter_system_t));
     if (!filter_sys) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event filter allocation failed");
     }
 
     memset(filter_sys, 0, sizeof(lle_event_filter_system_t));
@@ -55,7 +56,8 @@ lle_result_t lle_event_filter_system_init(lle_event_system_t *system) {
                                          filter_sys->filter_capacity);
     if (!filter_sys->filters) {
         lle_pool_free(filter_sys);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event filter allocation failed");
     }
 
     memset(filter_sys->filters, 0,
@@ -147,7 +149,8 @@ lle_result_t lle_event_filter_add(lle_event_system_t *system, const char *name,
             lle_pool_alloc(sizeof(lle_event_filter_t *) * new_capacity);
         if (!new_array) {
             pthread_mutex_unlock(&filter_sys->filter_mutex);
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                             "event filter allocation failed");
         }
 
         /// Copy existing filters
@@ -167,7 +170,8 @@ lle_result_t lle_event_filter_add(lle_event_system_t *system, const char *name,
     lle_event_filter_t *new_filter = lle_pool_alloc(sizeof(lle_event_filter_t));
     if (!new_filter) {
         pthread_mutex_unlock(&filter_sys->filter_mutex);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "event",
+                         "event filter allocation failed");
     }
 
     /// Initialize filter
