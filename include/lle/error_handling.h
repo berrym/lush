@@ -829,6 +829,60 @@ void lle_fast_report_critical_error(const lle_error_context_t *ctx);
 bool lle_should_suppress_error(lle_error_reporting_system_t *system,
                                const lle_error_context_t *context);
 
+/// Reporting System Lifecycle
+
+/**
+ * @brief Read-only snapshot of the global error counters
+ *
+ * Plain (non-atomic) copy of the live atomic counters, taken with acquire
+ * ordering. Exposes only counters that are meaningful today; recovery-time
+ * counters are reserved for the future recovery milestone and are not
+ * surfaced here.
+ */
+typedef struct lle_error_counter_snapshot {
+    uint64_t total_errors_handled;  ///< Total faults reported
+    uint64_t critical_errors_count; ///< Critical/major severity faults
+    uint64_t warnings_count;        ///< Warning/minor severity faults
+    uint32_t active_error_contexts; ///< Error contexts currently checked out
+    uint32_t concurrent_errors;     ///< Faults being processed concurrently
+} lle_error_counter_snapshot_t;
+
+/**
+ * @brief Initialize the global error reporting system
+ *
+ * Allocates and configures the process-wide reporting singleton. Idempotent:
+ * a second call while already initialized is a no-op returning LLE_SUCCESS.
+ * The reporting channels (log file, system log, callback) default to
+ * disabled; the singleton accumulates statistics and owns the reporting
+ * mutex. Safe to leave uninitialized: reporting falls back to the
+ * always-available atomic counters.
+ *
+ * @return LLE_SUCCESS, or LLE_ERROR_OUT_OF_MEMORY if allocation fails
+ */
+lle_result_t lle_error_reporting_system_init(void);
+
+/**
+ * @brief Tear down the global error reporting system
+ *
+ * Closes any open log file, destroys the reporting mutex, frees the
+ * singleton, and resets the initialized state. Idempotent: safe to call when
+ * never initialized or already torn down.
+ */
+void lle_error_reporting_system_shutdown(void);
+
+/**
+ * @brief Query whether the error reporting system is initialized
+ * @return true if lle_error_reporting_system_init has run and not been torn
+ * down
+ */
+bool lle_error_reporting_system_is_initialized(void);
+
+/**
+ * @brief Copy the live error counters into a caller-provided snapshot
+ * @param out Destination snapshot; ignored if NULL
+ */
+void lle_error_get_counter_snapshot(lle_error_counter_snapshot_t *out);
+
 /// Recovery Strategy
 /**
  * @brief Select the best recovery strategy for an error context

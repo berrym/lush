@@ -986,6 +986,20 @@ endif
          timeout: 30)
   endif
 
+  # Error Reporting Lifecycle Unit Tests (Spec 16)
+  # Tests the process-wide reporting singleton (init/shutdown/idempotency)
+  # and the read-only atomic counter snapshot.
+  if fs.exists('tests/lle/unit/test_error_reporting_lifecycle.c')
+    test_error_reporting_lifecycle = executable(
+      'test_error_reporting_lifecycle',
+      'tests/lle/unit/test_error_reporting_lifecycle.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Error Reporting Lifecycle', test_error_reporting_lifecycle,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Theme Parser Unit Tests
   # Tests the TOML-subset parser (init/parse/reset/error reporting),
   # value helpers, and the color-spec parser.

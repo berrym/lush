@@ -63,6 +63,10 @@ static lle_error_context_t g_static_error_context = {0};
 /// Global error reporting system
 static lle_error_reporting_system_t *g_error_reporting_system = NULL;
 
+/// Initialization guard for the global error reporting system. Paired with
+/// g_error_reporting_system so use-before-init and double-init are no-ops.
+static bool g_error_system_initialized = false;
+
 /// Global atomic error counters
 static lle_error_atomic_counters_t g_error_atomic_counters = {0};
 
@@ -946,6 +950,69 @@ bool lle_should_suppress_error(lle_error_reporting_system_t *system,
 /**
  * @brief Report error through all configured channels
  */
+lle_result_t lle_error_reporting_system_init(void) {
+    if (g_error_system_initialized) {
+        return LLE_SUCCESS;
+    }
+
+    lle_error_reporting_system_t *system = calloc(1, sizeof(*system));
+    if (!system) {
+        return LLE_ERROR_OUT_OF_MEMORY;
+    }
+
+    /// Reporting channels start disabled; the singleton accumulates
+    /// statistics and owns the reporting mutex. Channels are configured by
+    /// later wiring, not at construction.
+    if (pthread_mutex_init(&system->reporting_mutex, NULL) != 0) {
+        free(system);
+        return LLE_ERROR_SYSTEM_CALL;
+    }
+
+    g_error_reporting_system = system;
+    g_error_system_initialized = true;
+    return LLE_SUCCESS;
+}
+
+void lle_error_reporting_system_shutdown(void) {
+    if (!g_error_system_initialized) {
+        return;
+    }
+
+    lle_error_reporting_system_t *system = g_error_reporting_system;
+    if (system) {
+        if (system->log_file) {
+            fclose(system->log_file);
+            system->log_file = NULL;
+        }
+        pthread_mutex_destroy(&system->reporting_mutex);
+        free(system);
+    }
+
+    g_error_reporting_system = NULL;
+    g_error_system_initialized = false;
+}
+
+bool lle_error_reporting_system_is_initialized(void) {
+    return g_error_system_initialized;
+}
+
+void lle_error_get_counter_snapshot(lle_error_counter_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    out->total_errors_handled = atomic_load_explicit(
+        &g_error_atomic_counters.total_errors_handled, memory_order_acquire);
+    out->critical_errors_count = atomic_load_explicit(
+        &g_error_atomic_counters.critical_errors_count, memory_order_acquire);
+    out->warnings_count = atomic_load_explicit(
+        &g_error_atomic_counters.warnings_count, memory_order_acquire);
+    out->active_error_contexts = atomic_load_explicit(
+        &g_error_atomic_counters.active_error_contexts, memory_order_acquire);
+    out->concurrent_errors = atomic_load_explicit(
+        &g_error_atomic_counters.concurrent_errors, memory_order_acquire);
+}
+
 lle_result_t lle_report_error(const lle_error_context_t *context) {
     if (!context) {
         return LLE_ERROR_INVALID_PARAMETER;
