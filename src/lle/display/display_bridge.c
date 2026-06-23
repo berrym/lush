@@ -139,18 +139,7 @@ lle_result_t lle_display_bridge_init(lle_display_bridge_t **bridge,
         return result;
     }
 
-    /// Step 8: Initialize error context for bridge
-    br->error_context = LLE_CREATE_ERROR_CONTEXT(
-        LLE_SUCCESS, "Display Bridge initialization", "display_bridge");
-    if (!br->error_context) {
-        lle_display_diff_cleanup(br->diff_tracker);
-        lle_render_queue_cleanup(br->render_queue);
-        lle_pool_free(br);
-        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "display",
-                         "display bridge allocation failed");
-    }
-
-    /// Step 9: Set initial timestamp
+    /// Set initial timestamp
     if (clock_gettime(CLOCK_MONOTONIC, &br->last_render_time) != 0) {
         /// If CLOCK_MONOTONIC fails, use realtime as fallback
         clock_gettime(CLOCK_REALTIME, &br->last_render_time);
@@ -181,13 +170,7 @@ lle_result_t lle_display_bridge_cleanup(lle_display_bridge_t *bridge) {
 
     /// Clean up in reverse order of initialization
 
-    /// Step 1: Clean up error context
-    if (bridge->error_context) {
-        lle_error_context_destroy(bridge->error_context);
-        bridge->error_context = NULL;
-    }
-
-    /// Step 2: Clean up display diff tracker
+    /// Clean up display diff tracker
     if (bridge->diff_tracker) {
         lle_display_diff_cleanup(bridge->diff_tracker);
         bridge->diff_tracker = NULL;

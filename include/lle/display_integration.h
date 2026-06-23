@@ -220,8 +220,7 @@ struct lle_display_bridge_t {
     bool force_full_render;           ///< Force complete redraw flag
 
     /// Error handling
-    lle_error_context_t *error_context; ///< Bridge error context
-    uint32_t consecutive_errors;        ///< Error tracking for fallback
+    uint32_t consecutive_errors; ///< Error tracking for fallback
 };
 
 /* ========================================================================== */
