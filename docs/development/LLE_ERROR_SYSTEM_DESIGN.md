@@ -293,11 +293,15 @@ not the unused enum values.)
   config/env switch; writes to a file, never to the user's screen.
 - Lifecycle init/teardown and the init-guard idiom (§6).
 
-**Defer behind the seam (remove the speculative types now, build later):**
+**Defer behind the seam (REMOVED — implementations and declarations deleted):**
 The recovery and degradation logic is a future milestone reached through
-`lle_handle_fault_lifecycle`. Its Spec-16 data structures are removed now —
-we keep the door, not the half-built rooms — and redesigned fresh when the
-milestone lands, informed by real forensic data:
+`lle_handle_fault_lifecycle`. Its Spec-16 implementations and function
+declarations are removed (1029 lines: recovery strategies + scoring/selection,
+degradation controller, error state machine, circuit breakers, per-component
+handlers, runtime error injection, the forensic-log entry path, and the dead
+validation suite) — we keep the door, not the half-built rooms — and the logic
+is redesigned fresh when the milestone lands, informed by real forensic data.
+The unused struct typedefs are pruned alongside the old context/report path:
 
 - Recovery-strategy framework: `lle_recovery_strategy_t`, scoring, selection,
   `execute_strategy` callbacks. Remove the declarations; the seam reserves

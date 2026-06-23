@@ -972,69 +972,6 @@ lle_result_t lle_fault_report(lle_result_t code, const char *component,
     lle_fault_report((code), (component), (detail), __func__, __FILE__,        \
                      __LINE__)
 
-/// Recovery Strategy
-/**
- * @brief Select the best recovery strategy for an error context
- * @param error_context Error context to recover from
- * @return Selected recovery strategy on success, NULL on failure
- */
-lle_recovery_strategy_t *
-lle_select_recovery_strategy(const lle_error_context_t *error_context);
-
-/**
- * @brief Retrieve all candidate recovery strategies for a given error code
- * @param error_code Error code to look up
- * @param strategies Output pointer receiving the strategies array
- * @param strategy_count Output pointer receiving the number of strategies
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t
-lle_get_recovery_strategies_for_error(lle_result_t error_code,
-                                      lle_recovery_strategy_t **strategies,
-                                      size_t *strategy_count);
-
-/// Degradation Control
-/**
- * @brief Apply a system degradation level via the degradation controller
- * @param controller Degradation controller
- * @param target_level Degradation level to apply
- * @param reason Human-readable reason for the degradation
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
-                                   lle_degradation_level_t target_level,
-                                   const char *reason);
-
-/**
- * @brief Log a degradation event for diagnostics
- * @param level Degradation level applied
- * @param reason Human-readable reason for the degradation
- */
-void lle_log_degradation_event(lle_degradation_level_t level,
-                               const char *reason);
-
-/// Component-Specific Error Handlers
-/**
- * @brief Handle a buffer subsystem error
- * @param buffer Buffer instance the error occurred in
- * @param error Buffer-specific error code
- * @param error_context Associated error context
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
-                                     const void *error_context);
-
-/**
- * @brief Handle an event system error, updating the circuit breaker
- * @param event_system Event system instance the error occurred in
- * @param error Event-specific error code
- * @param breaker Circuit breaker tracking failure thresholds
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t
-lle_handle_event_system_error(void *event_system, lle_event_error_t error,
-                              lle_event_circuit_breaker_t *breaker);
-
 /// Memory Integration
 /**
  * @brief Initialize the dedicated memory pools used by the error subsystem
@@ -1055,17 +992,6 @@ void *lle_error_pool_alloc(size_t size);
  * @return Pointer to the duplicated string on success, NULL on failure
  */
 char *lle_error_string_pool_strdup(const char *str);
-
-/// Forensic Logging
-/**
- * @brief Create a forensic log entry capturing system state for an error
- * @param error_context Error context to capture
- * @param log_entry Output pointer receiving the new forensic log entry
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t
-lle_create_forensic_log_entry(const lle_error_context_t *error_context,
-                              lle_forensic_log_entry_t **log_entry);
 
 /**
  * @brief Generate a technical details string for an error code
@@ -1198,45 +1124,5 @@ uint64_t lle_measure_current_performance_impact(void);
  * @return true if the critical path is active, false otherwise
  */
 bool lle_is_critical_path_active(void);
-
-/// Testing and Validation
-/**
- * @brief Possibly inject a test error based on injection configuration
- * @param component Component name being tested
- * @param operation Operation name being tested
- * @return Injected error code, or LLE_SUCCESS when no injection occurs
- */
-lle_result_t lle_maybe_inject_error(const char *component,
-                                    const char *operation);
-
-#define LLE_INJECT_ERROR(component, operation)                                 \
-    do {                                                                       \
-        lle_result_t injected = lle_maybe_inject_error(component, operation);  \
-        if (injected != LLE_SUCCESS)                                           \
-            return injected;                                                   \
-    } while (0)
-
-/**
- * @brief Log an error injection event for diagnostics
- * @param component Component name where injection occurred
- * @param operation Operation name where injection occurred
- * @param error_code Injected error code
- */
-void lle_log_error_injection(const char *component, const char *operation,
-                             lle_result_t error_code);
-
-/**
- * @brief Run the full error-handling validation test suite
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t lle_run_error_handling_validation_suite(void);
-
-/**
- * @brief Run a single error-handling validation test
- * @param test Validation test definition to execute
- * @return LLE_SUCCESS or an error code on failure
- */
-lle_result_t
-lle_run_individual_validation_test(const lle_error_validation_test_t *test);
 
 #endif /// LLE_ERROR_HANDLING_H
