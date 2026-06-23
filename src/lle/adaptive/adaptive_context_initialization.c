@@ -242,14 +242,16 @@ lle_result_t lle_initialize_adaptive_context(
     // Create context
     lle_adaptive_context_t *ctx = calloc(1, sizeof(lle_adaptive_context_t));
     if (!ctx) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive context allocation failed");
     }
 
     // Clone detection result
     ctx->detection_result = malloc(sizeof(lle_terminal_detection_result_t));
     if (!ctx->detection_result) {
         free(ctx);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive context allocation failed");
     }
     memcpy(ctx->detection_result, detection_result,
            sizeof(lle_terminal_detection_result_t));
@@ -384,7 +386,8 @@ lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
         calloc(1, sizeof(lle_adaptive_interface_t));
     if (!iface) {
         lle_adaptive_context_destroy(context);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive context allocation failed");
     }
 
     iface->adaptive_context = context;

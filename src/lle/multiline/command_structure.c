@@ -42,7 +42,8 @@ lle_result_t lle_command_structure_create(lle_command_structure_t **structure,
     lle_command_structure_t *cmd_struct =
         lle_pool_alloc(sizeof(lle_command_structure_t));
     if (!cmd_struct) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "command structure allocation failed");
     }
 
     memset(cmd_struct, 0, sizeof(lle_command_structure_t));
@@ -130,7 +131,8 @@ lle_command_structure_add_keyword(lle_command_structure_t *structure,
     lle_keyword_position_t *keyword =
         lle_pool_alloc(sizeof(lle_keyword_position_t));
     if (!keyword) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "command structure allocation failed");
     }
 
     keyword->type = type;

@@ -426,7 +426,8 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
     lle_terminal_detection_result_t *detection =
         calloc(1, sizeof(lle_terminal_detection_result_t));
     if (!detection) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive terminal detection allocation failed");
     }
 
     uint64_t start_time = lle_get_current_time_microseconds();

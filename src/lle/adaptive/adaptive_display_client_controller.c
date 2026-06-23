@@ -165,7 +165,8 @@ static lle_result_t lle_render_pipeline_create(lle_render_pipeline_t **pipeline,
 
     lle_render_pipeline_t *pipe = calloc(1, sizeof(lle_render_pipeline_t));
     if (!pipe) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     pipe->color_enabled = color_enabled;
@@ -178,7 +179,8 @@ static lle_result_t lle_render_pipeline_create(lle_render_pipeline_t **pipeline,
     pipe->prompt_buffer = malloc(pipe->prompt_buffer_size);
     if (!pipe->prompt_buffer) {
         free(pipe);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     pipe->content_buffer_size = 4096;
@@ -186,7 +188,8 @@ static lle_result_t lle_render_pipeline_create(lle_render_pipeline_t **pipeline,
     if (!pipe->content_buffer) {
         free(pipe->prompt_buffer);
         free(pipe);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     pipe->current_fg_color = -1; // No color
@@ -298,7 +301,8 @@ static lle_result_t lle_render_pipeline_append_text(lle_render_pipeline_t *pipe,
         }
         char *new_buffer = realloc(pipe->content_buffer, new_size);
         if (!new_buffer) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                             "adaptive display controller allocation failed");
         }
         pipe->content_buffer = new_buffer;
         pipe->content_buffer_size = new_size;
@@ -388,7 +392,8 @@ lle_result_t lle_enhanced_input_processor_create(
     lle_enhanced_input_processor_t *proc =
         calloc(1, sizeof(lle_enhanced_input_processor_t));
     if (!proc) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     // Initialize input buffer
@@ -396,7 +401,8 @@ lle_result_t lle_enhanced_input_processor_create(
     proc->input_buffer = malloc(proc->buffer_size);
     if (!proc->input_buffer) {
         free(proc);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     // Configure based on detection
@@ -445,7 +451,9 @@ static lle_result_t lle_enhanced_input_processor_read_line(
     // Read line using standard fgets (cooked mode)
     if (!fgets(processor->input_buffer, processor->buffer_size, stdin)) {
         if (feof(stdin)) {
-            return LLE_ERROR_OUT_OF_MEMORY; // EOF
+            return LLE_FAULT(
+                LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                "adaptive display controller allocation failed"); // EOF
         }
         return LLE_ERROR_INPUT_PARSING;
     }
@@ -600,7 +608,8 @@ lle_result_t lle_display_content_generator_create(
     lle_display_content_generator_t *gen =
         calloc(1, sizeof(lle_display_content_generator_t));
     if (!gen) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     gen->supports_colors = supports_colors;
@@ -612,7 +621,8 @@ lle_result_t lle_display_content_generator_create(
     gen->generated_content = malloc(gen->content_capacity);
     if (!gen->generated_content) {
         free(gen);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     // Assign formatting functions
@@ -663,7 +673,8 @@ lle_initialize_display_client_controller(lle_adaptive_context_t *context,
     lle_display_client_controller_t *client =
         calloc(1, sizeof(lle_display_client_controller_t));
     if (!client) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     // Configure capabilities based on detection results
@@ -791,7 +802,8 @@ lle_display_client_read_line(lle_display_client_controller_t *client,
     *line = strdup(input_line);
     if (!*line) {
         client->errors_encountered++;
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive display controller allocation failed");
     }
 
     client->lines_read++;

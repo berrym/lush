@@ -48,7 +48,8 @@ lle_result_t lle_multiline_context_init(lle_multiline_context_t **ctx,
     lle_multiline_context_t *context =
         lle_pool_alloc(sizeof(lle_multiline_context_t));
     if (!context) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline manager allocation failed");
     }
 
     // Initialize fields
@@ -60,7 +61,8 @@ lle_result_t lle_multiline_context_init(lle_multiline_context_t **ctx,
         lle_pool_alloc(sizeof(continuation_state_t));
     if (!core_state) {
         lle_pool_free(context);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline manager allocation failed");
     }
 
     continuation_state_init(core_state);
@@ -392,7 +394,8 @@ lle_result_t lle_multiline_manager_init(lle_multiline_manager_t **manager,
     lle_multiline_manager_t *mgr =
         lle_pool_alloc(sizeof(lle_multiline_manager_t));
     if (!mgr) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline manager allocation failed");
     }
 
     // Initialize fields

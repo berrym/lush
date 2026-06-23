@@ -148,7 +148,8 @@ lle_formatting_engine_create(lle_formatting_engine_t **engine,
     lle_formatting_engine_t *new_engine =
         lle_pool_alloc(sizeof(lle_formatting_engine_t));
     if (!new_engine) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     new_engine->memory_pool = memory_pool;
@@ -227,7 +228,8 @@ lle_result_t lle_formatting_engine_normalize(lle_formatting_engine_t *engine,
     // Allocate output buffer
     char *output = lle_pool_alloc(command_length + 1);
     if (!output) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     size_t out_pos = 0;
@@ -367,7 +369,8 @@ lle_result_t lle_formatting_engine_format(lle_formatting_engine_t *engine,
     lle_formatted_command_t *formatted =
         lle_pool_alloc(sizeof(lle_formatted_command_t));
     if (!formatted) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     memset(formatted, 0, sizeof(lle_formatted_command_t));
@@ -434,7 +437,8 @@ static lle_result_t format_compact(lle_formatting_engine_t *engine,
     // Compact format: minimize whitespace
     char *result = lle_pool_alloc(length + 1);
     if (!result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     size_t out_pos = 0;
@@ -499,7 +503,8 @@ static lle_result_t format_readable(lle_formatting_engine_t *engine,
     size_t estimated_size = length + (length / 10); // 10% overhead estimate
     char *result = lle_pool_alloc(estimated_size);
     if (!result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     size_t out_pos = 0;
@@ -570,7 +575,8 @@ static lle_result_t format_expanded(lle_formatting_engine_t *engine,
     size_t estimated_size = length * 2; // 100% overhead estimate for expansion
     char *result = lle_pool_alloc(estimated_size);
     if (!result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline formatting allocation failed");
     }
 
     size_t out_pos = 0;

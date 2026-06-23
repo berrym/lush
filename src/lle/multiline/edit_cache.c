@@ -93,7 +93,8 @@ lle_result_t lle_edit_cache_create(lle_edit_cache_t **cache,
 
     lle_edit_cache_t *new_cache = lle_pool_alloc(sizeof(lle_edit_cache_t));
     if (!new_cache) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit cache allocation failed");
     }
 
     memset(new_cache, 0, sizeof(lle_edit_cache_t));
@@ -231,7 +232,8 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
     lle_edit_cache_entry_t *new_entry =
         lle_pool_alloc(sizeof(lle_edit_cache_entry_t));
     if (!new_entry) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit cache allocation failed");
     }
 
     memset(new_entry, 0, sizeof(lle_edit_cache_entry_t));
@@ -242,7 +244,8 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
     // Copy original text
     new_entry->original_text = lle_pool_alloc(original_length + 1);
     if (!new_entry->original_text) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline edit cache allocation failed");
     }
     memcpy(new_entry->original_text, original_text, original_length);
     new_entry->original_text[original_length] = '\0';
@@ -253,7 +256,8 @@ lle_result_t lle_edit_cache_insert(lle_edit_cache_t *cache,
         new_entry->reconstructed_text =
             lle_pool_alloc(reconstructed_length + 1);
         if (!new_entry->reconstructed_text) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                             "multiline edit cache allocation failed");
         }
         memcpy(new_entry->reconstructed_text, reconstructed_text,
                reconstructed_length);

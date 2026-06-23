@@ -48,7 +48,8 @@ lle_result_t lle_widget_hooks_manager_init(lle_widget_hooks_manager_t **manager,
     lle_widget_hooks_manager_t *mgr =
         lle_pool_alloc(sizeof(lle_widget_hooks_manager_t));
     if (!mgr) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget hook allocation failed");
     }
 
     memset(mgr, 0, sizeof(lle_widget_hooks_manager_t));
@@ -126,7 +127,8 @@ lle_result_t lle_widget_hook_register(lle_widget_hooks_manager_t *manager,
     lle_hook_registration_t *reg =
         lle_pool_alloc(sizeof(lle_hook_registration_t));
     if (!reg) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "widget",
+                         "widget hook allocation failed");
     }
 
     // Initialize registration

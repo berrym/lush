@@ -119,7 +119,8 @@ lle_structure_analyzer_create(lle_structure_analyzer_t **analyzer,
     lle_structure_analyzer_t *new_analyzer =
         lle_pool_alloc(sizeof(lle_structure_analyzer_t));
     if (!new_analyzer) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline structure allocation failed");
     }
 
     new_analyzer->memory_pool = memory_pool; // Can be NULL
@@ -236,7 +237,8 @@ lle_result_t lle_structure_analyzer_detect_keywords(
     lle_keyword_match_t *kw_array =
         lle_pool_alloc(count * sizeof(lle_keyword_match_t));
     if (!kw_array) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline structure allocation failed");
     }
 
     // Second pass: extract keywords
@@ -468,7 +470,8 @@ lle_result_t lle_structure_analyzer_calculate_indentation(
     lle_indentation_info_t *info =
         lle_pool_alloc(sizeof(lle_indentation_info_t));
     if (!info) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline structure allocation failed");
     }
 
     memset(info, 0, sizeof(lle_indentation_info_t));
@@ -489,7 +492,8 @@ lle_result_t lle_structure_analyzer_calculate_indentation(
     // Allocate line indentation array
     info->level_per_line = lle_pool_alloc(line_count * sizeof(size_t));
     if (!info->level_per_line) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline structure allocation failed");
     }
 
     // Calculate indentation for each line

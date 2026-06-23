@@ -86,7 +86,8 @@ lle_result_t lle_multiline_parser_create(lle_multiline_parser_t **parser,
     lle_multiline_parser_t *new_parser =
         lle_pool_alloc(sizeof(lle_multiline_parser_t));
     if (!new_parser) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline parser allocation failed");
     }
 
     new_parser->memory_pool = memory_pool;
@@ -198,7 +199,8 @@ lle_result_t lle_multiline_parser_split_lines(lle_multiline_parser_t *parser,
     lle_parsed_line_t **line_array =
         lle_pool_alloc(count * sizeof(lle_parsed_line_t *));
     if (!line_array) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline parser allocation failed");
     }
 
     // Split into lines
@@ -213,7 +215,8 @@ lle_result_t lle_multiline_parser_split_lines(lle_multiline_parser_t *parser,
                 parser, &command_text[line_start], line_len, line_idx);
 
             if (!line) {
-                return LLE_ERROR_OUT_OF_MEMORY;
+                return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                                 "multiline parser allocation failed");
             }
 
             line_array[line_idx] = line;
@@ -248,7 +251,8 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
     lle_multiline_parse_result_t *parse_result =
         lle_pool_alloc(sizeof(lle_multiline_parse_result_t));
     if (!parse_result) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline parser allocation failed");
     }
 
     memset(parse_result, 0, sizeof(lle_multiline_parse_result_t));

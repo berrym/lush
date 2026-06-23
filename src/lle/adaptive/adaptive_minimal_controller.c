@@ -178,7 +178,8 @@ static lle_result_t lle_text_buffer_set(lle_text_buffer_t *buffer,
         size_t new_capacity = text_len + 1;
         char *new_data = realloc(buffer->data, new_capacity);
         if (!new_data) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                             "adaptive minimal controller allocation failed");
         }
         buffer->data = new_data;
         buffer->capacity = new_capacity;
@@ -269,7 +270,8 @@ static lle_result_t lle_basic_history_add(lle_basic_history_t *history,
     // Add new entry
     history->entries[history->write_index] = strdup(entry);
     if (!history->entries[history->write_index]) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     history->write_index = (history->write_index + 1) % history->capacity;
@@ -389,14 +391,16 @@ lle_simple_input_processor_create(lle_simple_input_processor_t **processor) {
     lle_simple_input_processor_t *proc =
         calloc(1, sizeof(lle_simple_input_processor_t));
     if (!proc) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     proc->buffer_size = 4096;
     proc->input_buffer = malloc(proc->buffer_size);
     if (!proc->input_buffer) {
         free(proc);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     proc->echo_enabled = true;
@@ -436,7 +440,9 @@ lle_simple_input_processor_read_line(lle_simple_input_processor_t *processor,
 
     if (!fgets(processor->input_buffer, processor->buffer_size, stdin)) {
         if (feof(stdin)) {
-            return LLE_ERROR_OUT_OF_MEMORY; // EOF
+            return LLE_FAULT(
+                LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                "adaptive minimal controller allocation failed"); // EOF
         }
         return LLE_ERROR_INPUT_PARSING;
     }
@@ -473,14 +479,16 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
     lle_minimal_controller_t *minimal =
         calloc(1, sizeof(lle_minimal_controller_t));
     if (!minimal) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     // Initialize text buffer
     minimal->text_buffer = lle_text_buffer_create_basic();
     if (!minimal->text_buffer) {
         free(minimal);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     // Initialize history
@@ -488,7 +496,8 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
     if (!minimal->history) {
         lle_text_buffer_destroy(minimal->text_buffer);
         free(minimal);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     // Initialize completion
@@ -497,7 +506,8 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
         lle_basic_history_destroy(minimal->history);
         lle_text_buffer_destroy(minimal->text_buffer);
         free(minimal);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     // Initialize input processor
@@ -586,7 +596,8 @@ lle_result_t lle_minimal_read_line(lle_minimal_controller_t *minimal,
     // Duplicate line for caller
     *line = strdup(input_line);
     if (!*line) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "adaptive",
+                         "adaptive minimal controller allocation failed");
     }
 
     minimal->lines_read++;

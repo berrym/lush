@@ -98,7 +98,8 @@ lle_result_t lle_reconstruction_engine_create(
     lle_reconstruction_engine_t *new_engine =
         lle_pool_alloc(sizeof(lle_reconstruction_engine_t));
     if (!new_engine) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline reconstruction allocation failed");
     }
 
     new_engine->memory_pool = memory_pool;
@@ -178,7 +179,8 @@ lle_result_t lle_reconstruction_engine_normalize_whitespace(
     // Allocate output buffer (same size as input is sufficient)
     char *output = lle_pool_alloc(command_length + 1);
     if (!output) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline reconstruction allocation failed");
     }
 
     size_t out_pos = 0;
@@ -259,7 +261,8 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
         // No indentation requested, just copy
         char *output = lle_pool_alloc(original_length + 1);
         if (!output) {
-            return LLE_ERROR_OUT_OF_MEMORY;
+            return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                             "multiline reconstruction allocation failed");
         }
         memcpy(output, original_text, original_length);
         output[original_length] = '\0';
@@ -290,7 +293,8 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
     char *output = lle_pool_alloc(output_size + 1);
     if (!output) {
         lle_multiline_parser_free_result(engine->parser, parse_result);
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline reconstruction allocation failed");
     }
 
     // Apply indentation to lines
@@ -331,7 +335,8 @@ lle_result_t lle_reconstruction_engine_reconstruct(
     lle_reconstructed_command_t *recon =
         lle_pool_alloc(sizeof(lle_reconstructed_command_t));
     if (!recon) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "multiline",
+                         "multiline reconstruction allocation failed");
     }
 
     memset(recon, 0, sizeof(lle_reconstructed_command_t));
