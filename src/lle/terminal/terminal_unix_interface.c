@@ -201,7 +201,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
     sa.sa_flags = SA_RESTART; /// Restart interrupted system calls
 
     if (sigaction(SIGWINCH, &sa, &original_sigwinch) != 0) {
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
+                         "sigaction SIGWINCH failed");
     }
 
     /// SIGTSTP - suspend (Ctrl-Z)
@@ -211,7 +212,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
     sigaddset(&sa.sa_mask, SIGWINCH);
     if (sigaction(SIGTSTP, &sa, &original_sigtstp) != 0) {
         sigaction(SIGWINCH, &original_sigwinch, NULL);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
+                         "sigaction SIGTSTP failed");
     }
 
     /// SIGCONT - resume
@@ -222,7 +224,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
     if (sigaction(SIGCONT, &sa, &original_sigcont) != 0) {
         sigaction(SIGWINCH, &original_sigwinch, NULL);
         sigaction(SIGTSTP, &original_sigtstp, NULL);
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
+                         "sigaction SIGCONT failed");
     }
 
     /// NOTE: We do NOT install SIGINT/SIGTERM handlers here.
@@ -291,7 +294,8 @@ lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface) {
     /// Allocate interface structure
     lle_unix_interface_t *iface = calloc(1, sizeof(lle_unix_interface_t));
     if (!iface) {
-        return LLE_ERROR_OUT_OF_MEMORY;
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "terminal",
+                         "interface allocation failed");
     }
 
     /// Set file descriptor (using STDIN for terminal operations)
@@ -410,7 +414,8 @@ lle_unix_interface_enter_raw_mode(lle_unix_interface_t *interface) {
     /// Apply settings - TCSAFLUSH discards unread input
     if (tcsetattr(interface->terminal_fd, TCSAFLUSH, raw) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
+                         "tcsetattr raw mode failed");
     }
 
     interface->raw_mode_active = true;
@@ -437,7 +442,8 @@ lle_result_t lle_unix_interface_exit_raw_mode(lle_unix_interface_t *interface) {
     if (tcsetattr(interface->terminal_fd, TCSAFLUSH,
                   &interface->original_termios) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
+                         "tcsetattr restore failed");
     }
 
     interface->raw_mode_active = false;
@@ -706,7 +712,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         snprintf(event->data.error.error_message,
                  sizeof(event->data.error.error_message), "select() failed: %s",
                  strerror(errno));
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal", "select failed");
     }
 
     if (ready == 0) {
@@ -734,7 +740,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         snprintf(event->data.error.error_message,
                  sizeof(event->data.error.error_message), "read() failed: %s",
                  strerror(errno));
-        return LLE_ERROR_SYSTEM_CALL;
+        return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal", "read failed");
     }
 
     if (bytes_read == 0) {
