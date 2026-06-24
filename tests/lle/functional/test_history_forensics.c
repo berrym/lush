@@ -176,14 +176,14 @@ void test_forensic_usage_tracking(void) {
     lle_result_t result = lle_history_entry_create(&entry, "ls -la", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
 
-    /// Initial usage count should be 0
-    ASSERT_EQ(entry->usage_count, 0, "Initial usage count should be 0");
+    /// A recorded command counts as one use, seeding the frecency signal.
+    ASSERT_EQ(entry->usage_count, 1, "Initial usage count should be 1");
 
-    /// Increment usage
+    /// Increment usage on top of the initial use.
     for (int i = 1; i <= 5; i++) {
         result = lle_forensic_increment_usage(entry);
         ASSERT_EQ(result, LLE_SUCCESS, "Increment should succeed");
-        ASSERT_EQ(entry->usage_count, (uint32_t)i,
+        ASSERT_EQ(entry->usage_count, (uint32_t)(i + 1),
                   "Usage count should increment");
     }
 

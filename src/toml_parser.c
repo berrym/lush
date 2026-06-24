@@ -343,7 +343,11 @@ static toml_result_t parser_parse_key(toml_parser_t *parser, char *key,
     while (!PARSER_EOF(parser)) {
         char c = PARSER_PEEK(parser);
 
-        if (isalnum((unsigned char)c) || c == '_' || c == '-') {
+        /// Accept '.' as part of the key so dotted keys (finder.match) read
+        /// back as a single key string. The config registry models keys as
+        /// flat dotted paths and emits them in this form, so the callback
+        /// receives "finder.match" and composes "<section>.finder.match".
+        if (isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.') {
             if (len >= key_size - 1) {
                 return parser_set_error(parser, "Key name too long");
             }

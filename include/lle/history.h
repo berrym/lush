@@ -958,6 +958,33 @@ void lle_history_search_results_destroy(lle_history_search_results_t *results);
 void lle_history_search_results_sort(lle_history_search_results_t *results);
 
 /**
+ * Frecency score for a history entry
+ *
+ * Usage frequency weighted by a recency bucket of the time since last access
+ * (<1hr, <1day, <1wk, older). Shared by the interactive finder and
+ * autosuggestion ranking.
+ *
+ * @param entry History entry (NULL yields 0)
+ * @param now Current time in epoch seconds
+ * @return Frecency score (higher = better); only relative ordering is defined
+ */
+int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now);
+
+/**
+ * Re-rank search results by frecency
+ *
+ * Replaces each result's relevance score with the frecency score of its
+ * history entry, then sorts the container in descending order.
+ *
+ * @param results Search results to re-rank (may be NULL)
+ * @param history_core History core used to fetch entries
+ * @param now Current time in epoch seconds
+ */
+void lle_history_search_results_rerank_frecency(
+    lle_history_search_results_t *results, lle_history_core_t *history_core,
+    uint64_t now);
+
+/**
  * Get number of results
  *
  * @param results Search results
@@ -1050,6 +1077,24 @@ lle_history_search_substring(lle_history_core_t *history_core,
 lle_history_search_results_t *
 lle_history_search_fuzzy(lle_history_core_t *history_core, const char *query,
                          size_t max_results);
+
+/**
+ * Search history for commands matching a typed subsequence (fzy-style)
+ *
+ * Gates on the query being a subsequence of the command and ranks with
+ * fuzzy_completion_score positional bonuses. This is the matcher for
+ * interactive type-to-narrow finding ("gst" -> "git status"), distinct from
+ * the whole-string Levenshtein lle_history_search_fuzzy used for typo
+ * tolerance.
+ *
+ * @param history_core History core engine
+ * @param query Pattern typed by the user
+ * @param max_results Maximum results (0 = default 100)
+ * @return Search results or NULL on failure
+ */
+lle_history_search_results_t *
+lle_history_search_subsequence(lle_history_core_t *history_core,
+                               const char *query, size_t max_results);
 
 /* ============================================================================
  * INTERACTIVE SEARCH API - Ctrl+R Reverse Incremental Search

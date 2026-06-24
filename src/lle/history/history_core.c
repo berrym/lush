@@ -191,8 +191,11 @@ lle_result_t lle_history_entry_create(lle_history_entry_t **entry,
     e->terminal_name = NULL;
     e->start_time_ns = 0;
     e->end_time_ns = 0;
-    e->usage_count = 0;
-    e->last_access_time = 0;
+    /// Frecency signal: a freshly recorded command has been used once, now.
+    /// The dedup merge accumulates usage_count and refreshes last_access_time
+    /// on re-run, so frecency ranking (usage x recency bucket) is meaningful.
+    e->usage_count = 1;
+    e->last_access_time = e->timestamp;
 
     /// List pointers
     e->next = NULL;

@@ -231,10 +231,13 @@ static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
     const char *wd = entry->working_directory ? entry->working_directory : "";
     lle_escape_string(wd, escaped_wd, LLE_HISTORY_MAX_PATH_LENGTH * 2);
 
-    /// Format line
-    int written = snprintf(line, line_size, "%lu\t%s\t%d\t%s\n",
+    /// Format line. The trailing usage_count and last_access_time columns
+    /// carry the frecency signal across sessions; readers older than these
+    /// columns simply ignore them, and the parser tolerates their absence.
+    int written = snprintf(line, line_size, "%lu\t%s\t%d\t%s\t%u\t%lu\n",
                            (unsigned long)entry->timestamp, escaped_cmd,
-                           entry->exit_code, escaped_wd);
+                           entry->exit_code, escaped_wd, entry->usage_count,
+                           (unsigned long)entry->last_access_time);
 
     lle_pool_free(escaped_cmd);
     lle_pool_free(escaped_wd);
@@ -276,10 +279,12 @@ static lle_result_t lle_history_parse_line(const char *line,
     char cmd_buffer[LLE_HISTORY_MAX_COMMAND_LENGTH * 2];
     int exit_code = 0;
     char wd_buffer[LLE_HISTORY_MAX_PATH_LENGTH * 2];
+    unsigned int usage_count = 0;
+    unsigned long last_access = 0;
 
-    int parsed =
-        sscanf(line, "%lu\t%[^\t]\t%d\t%[^\n]", (unsigned long *)&timestamp,
-               cmd_buffer, &exit_code, wd_buffer);
+    int parsed = sscanf(line, "%lu\t%[^\t]\t%d\t%[^\t\n]\t%u\t%lu",
+                        (unsigned long *)&timestamp, cmd_buffer, &exit_code,
+                        wd_buffer, &usage_count, &last_access);
 
     if (parsed < 2) {
         /// Malformed line - skip it
@@ -316,6 +321,17 @@ static lle_result_t lle_history_parse_line(const char *line,
         if ((*entry)->working_directory) {
             memcpy((*entry)->working_directory, unescaped_wd, wd_len);
         }
+    }
+
+    /// Restore frecency signal. Files written with the extended format carry
+    /// both columns; legacy 4-column files seed to a single use at the record's
+    /// own timestamp so ranking still works on pre-existing history.
+    if (parsed >= 6) {
+        (*entry)->usage_count = usage_count;
+        (*entry)->last_access_time = last_access;
+    } else {
+        (*entry)->usage_count = 1;
+        (*entry)->last_access_time = timestamp;
     }
 
     return LLE_SUCCESS;
