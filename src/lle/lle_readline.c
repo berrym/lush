@@ -488,6 +488,12 @@ static void update_autosuggestion(readline_context_t *ctx) {
     lle_history_get_entry_count(history, &count);
 
     if (count == 0) {
+        /// No history to match against, but the completion fallback can still
+        /// suggest a filesystem path when configured.
+        if (config.autosuggestion_sources ==
+            AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION) {
+            autosuggestion_from_completion(ctx);
+        }
         return;
     }
 
