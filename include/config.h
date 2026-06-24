@@ -169,6 +169,20 @@ typedef enum {
 } autosuggestion_dismiss_policy_t;
 
 /**
+ * @brief History up/down navigation search mode
+ *
+ * Controls which history entries up/down arrows cycle through. `prefix` filters
+ * to entries beginning with the text typed before the cursor and keeps the
+ * cursor at that boundary (zsh history-beginning-search style) -- the lush
+ * default. `plain` browses all history with the cursor at end of line (the
+ * classic bash/readline behavior).
+ */
+typedef enum {
+    HISTORY_SEARCH_MODE_PREFIX, ///< Filter by the typed prefix (lush default)
+    HISTORY_SEARCH_MODE_PLAIN   ///< Browse all history (bash/posix/zsh default)
+} history_search_mode_t;
+
+/**
  * @brief Configuration context structure
  *
  * Tracks the current parsing context during configuration file processing.
@@ -198,6 +212,8 @@ typedef struct {
     bool history_no_dups;    ///< Ignore duplicate entries
     bool history_timestamps; ///< Record timestamps
     char *history_file;      ///< History file path
+    history_search_mode_t
+        history_search_mode; ///< Up/down navigation filter (prefix / plain)
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
@@ -567,6 +583,14 @@ bool config_validate_completion_match_mode(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_autosuggestion_dismiss_policy(const char *value);
+
+/**
+ * @brief Validate a history search mode value
+ *
+ * @param value Mode string ("prefix" or "plain")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_history_search_mode(const char *value);
 
 /**
  * @brief Validate an LLE storage mode value
