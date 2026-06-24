@@ -403,6 +403,16 @@ static void update_autosuggestion(readline_context_t *ctx) {
 
     size_t input_len = ctx->buffer->length;
 
+    /// In recency mode the first (most recent) prefix match wins -- Fish-style.
+    /// In frecency mode every prefix match is scored by usage-weighted recency
+    /// (lle_history_frecency_score, shared with the Ctrl-R finder) and the
+    /// highest scorer is suggested -- the command the user actually returns to.
+    bool rank_frecency =
+        (config.autosuggestion_rank == AUTOSUGGESTION_RANK_FRECENCY);
+    uint64_t now = (uint64_t)time(NULL);
+    const char *best_remaining = NULL;
+    int best_score = -1;
+
 /// Limit history search to prevent hangs with very large histories
 #define MAX_SUGGESTION_SEARCH_ITERATIONS 5000
     size_t iterations = 0;
@@ -413,7 +423,7 @@ static void update_autosuggestion(readline_context_t *ctx) {
          i--, iterations++) {
         /// Check watchdog every 500 iterations to allow abort on timeout
         if (iterations > 0 && (iterations % 500) == 0 && lle_watchdog_check()) {
-            return; /// Watchdog fired - abort suggestion search
+            break; /// Watchdog fired - stop scanning, use best so far
         }
 
         lle_history_entry_t *entry = NULL;
@@ -445,26 +455,46 @@ static void update_autosuggestion(readline_context_t *ctx) {
             const char *remaining = entry->command + input_len;
 
             /// Only suggest if there's something to add
-            if (*remaining) {
-                size_t remaining_len = strlen(remaining);
+            if (!*remaining) {
+                continue;
+            }
 
-                /// Ensure buffer is large enough
-                if (remaining_len + 1 > ctx->suggestion_alloc_size) {
-                    size_t new_size = remaining_len + 64;
-                    char *new_buf = realloc(ctx->current_suggestion, new_size);
-                    if (new_buf) {
-                        ctx->current_suggestion = new_buf;
-                        ctx->suggestion_alloc_size = new_size;
-                    } else {
-                        return; /// Allocation failed
-                    }
-                }
+            if (!rank_frecency) {
+                /// Recency: the first match (newest) is the answer.
+                best_remaining = remaining;
+                break;
+            }
 
-                strcpy(ctx->current_suggestion, remaining);
-                return; /// Found best match
+            /// Frecency: keep the highest-scoring candidate. The newest-first
+            /// scan means a strict-greater test leaves recency as the natural
+            /// tie-breaker. remaining points into the stable history entry, so
+            /// holding it across the scan is safe.
+            int score = lle_history_frecency_score(entry, now);
+            if (score > best_score) {
+                best_score = score;
+                best_remaining = remaining;
             }
         }
     }
+
+    if (!best_remaining) {
+        return; /// No match
+    }
+
+    /// Ensure buffer is large enough, then store the chosen suggestion.
+    size_t remaining_len = strlen(best_remaining);
+    if (remaining_len + 1 > ctx->suggestion_alloc_size) {
+        size_t new_size = remaining_len + 64;
+        char *new_buf = realloc(ctx->current_suggestion, new_size);
+        if (new_buf) {
+            ctx->current_suggestion = new_buf;
+            ctx->suggestion_alloc_size = new_size;
+        } else {
+            return; /// Allocation failed
+        }
+    }
+
+    strcpy(ctx->current_suggestion, best_remaining);
 }
 
 /**
