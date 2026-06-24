@@ -519,7 +519,13 @@ lle_result_t lle_forward_char(lle_editor_t *editor) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(editor->completion_system);
         if (menu) {
-            lle_completion_menu_move_right(menu);
+            /// First navigation out of pre-navigation commits item 0; later
+            /// presses move the selection.
+            if (menu->awaiting_navigation) {
+                menu->awaiting_navigation = false;
+            } else {
+                lle_completion_menu_move_right(menu);
+            }
 
             /// Update inline text for completion
             lle_completion_state_t *state =
@@ -569,7 +575,13 @@ lle_result_t lle_backward_char(lle_editor_t *editor) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(editor->completion_system);
         if (menu) {
-            lle_completion_menu_move_left(menu);
+            /// First navigation out of pre-navigation commits item 0; later
+            /// presses move the selection.
+            if (menu->awaiting_navigation) {
+                menu->awaiting_navigation = false;
+            } else {
+                lle_completion_menu_move_left(menu);
+            }
 
             /// Update inline text for completion
             lle_completion_state_t *state =
@@ -1013,7 +1025,13 @@ lle_result_t lle_smart_up_arrow(lle_editor_t *editor) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(editor->completion_system);
         if (menu) {
-            lle_completion_menu_move_up(menu);
+            /// First navigation out of pre-navigation commits item 0; later
+            /// presses move the selection.
+            if (menu->awaiting_navigation) {
+                menu->awaiting_navigation = false;
+            } else {
+                lle_completion_menu_move_up(menu);
+            }
 
             /// Update inline text for completion
             lle_completion_state_t *state =
@@ -1075,7 +1093,13 @@ lle_result_t lle_smart_down_arrow(lle_editor_t *editor) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(editor->completion_system);
         if (menu) {
-            lle_completion_menu_move_down(menu);
+            /// First navigation out of pre-navigation commits item 0; later
+            /// presses move the selection.
+            if (menu->awaiting_navigation) {
+                menu->awaiting_navigation = false;
+            } else {
+                lle_completion_menu_move_down(menu);
+            }
 
             /// Update inline text for completion
             lle_completion_state_t *state =
@@ -1200,10 +1224,15 @@ lle_result_t lle_backward_delete_char(lle_editor_t *editor) {
             lle_result_t pres = lle_completion_menu_pop_filter_char(menu);
             if (pres == LLE_SUCCESS && menu->result &&
                 menu->result->count > 0) {
-                lle_completion_state_t *cstate =
-                    lle_completion_system_get_state(editor->completion_system);
-                if (cstate) {
-                    update_inline_completion(editor, menu, cstate);
+                /// Pre-navigation keeps the buffer untouched; only preview the
+                /// selected candidate once the user is cycling.
+                if (!menu->awaiting_navigation) {
+                    lle_completion_state_t *cstate =
+                        lle_completion_system_get_state(
+                            editor->completion_system);
+                    if (cstate) {
+                        update_inline_completion(editor, menu, cstate);
+                    }
                 }
                 display_controller_t *dc = display_integration_get_controller();
                 if (dc) {
@@ -2370,8 +2399,14 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(editor->completion_system);
         if (menu) {
-            /// Move to next item sequentially (across columns, then next row)
-            lle_completion_menu_move_next(menu);
+            /// The first TAB out of pre-navigation commits the already-selected
+            /// item 0 (it does NOT advance, so item 0 is never skipped) and
+            /// begins cycling. Subsequent TABs advance to the next item.
+            if (menu->awaiting_navigation) {
+                menu->awaiting_navigation = false;
+            } else {
+                lle_completion_menu_move_next(menu);
+            }
 
             /// Update command line with newly selected completion (inline
             /// update)
@@ -2481,10 +2516,12 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         return replace_result;
     }
 
-    /// Multiple completions: open the menu. The completion system
-    /// already stored the state during generate, so we just preview
-    /// the first candidate inline and hand the menu to the display
-    /// controller.
+    /// Multiple completions: open the menu in pre-navigation. The menu is
+    /// created awaiting_navigation, so we hand it to the display controller
+    /// without previewing a candidate into the buffer. The command line keeps
+    /// exactly what the user typed (the menu box highlights item 0); the first
+    /// TAB commits item 0 and begins cycling, and ENTER accepts the buffer
+    /// as-is. This is what keeps a single TAB from rewriting the buffer.
     lle_completion_menu_state_t *menu =
         lle_completion_system_get_menu(editor->completion_system);
     if (!menu) {
@@ -2494,11 +2531,6 @@ lle_result_t lle_complete(lle_editor_t *editor) {
 
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
-        lle_completion_state_t *state =
-            lle_completion_system_get_state(editor->completion_system);
-        if (state) {
-            update_inline_completion(editor, menu, state);
-        }
         display_controller_set_completion_menu(dc, menu);
     }
     return LLE_SUCCESS;
@@ -2977,10 +3009,17 @@ lle_result_t lle_self_insert(lle_editor_t *editor, uint32_t codepoint) {
                 lle_completion_menu_append_filter_char(menu, codepoint);
             if (fres == LLE_SUCCESS && menu->result &&
                 menu->result->count > 0) {
-                lle_completion_state_t *cstate =
-                    lle_completion_system_get_state(editor->completion_system);
-                if (cstate) {
-                    update_inline_completion(editor, menu, cstate);
+                /// In pre-navigation the buffer stays as the user typed it; the
+                /// narrowed menu box is the only feedback. Once the user has
+                /// committed to cycling, keep previewing the selected
+                /// candidate.
+                if (!menu->awaiting_navigation) {
+                    lle_completion_state_t *cstate =
+                        lle_completion_system_get_state(
+                            editor->completion_system);
+                    if (cstate) {
+                        update_inline_completion(editor, menu, cstate);
+                    }
                 }
                 display_controller_t *dc = display_integration_get_controller();
                 if (dc) {

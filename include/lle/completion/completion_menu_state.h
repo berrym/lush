@@ -83,6 +83,20 @@ typedef struct {
     // State flags
     bool menu_active; /**< Whether menu is currently active */
 
+    /**
+     * @brief Pre-navigation: the menu is shown but the user has not yet
+     * committed to a candidate.
+     *
+     * A freshly opened menu starts in this state. The command buffer holds only
+     * what the user typed; the top candidate is offered as shadow ghost text
+     * (rendered by the display controller, never spliced into the buffer); and
+     * ENTER accepts the buffer as-is. The first TAB transitions to navigation
+     * (selected_index 0 is committed and cycling begins). This keeps a single
+     * TAB from descending past a directory boundary and keeps ENTER accepting
+     * exactly what is on the command line.
+     */
+    bool awaiting_navigation;
+
     // Configuration
     lle_completion_menu_config_t config; /**< Menu configuration */
 
