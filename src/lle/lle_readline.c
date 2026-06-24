@@ -336,7 +336,8 @@ static void end_change_sequence(readline_context_t *ctx) {
  * Fish-style autosuggestion rules:
  * - Only suggest when cursor is at end of buffer
  * - Only suggest for non-empty input (>= 2 chars)
- * - Don't suggest if input ends with space
+ * - Trailing space: suppressed only under the on_word_boundary dismiss policy;
+ *   the default on_deviation keeps suggesting through matching spaces
  * - Don't suggest in multiline mode
  * - Search history most-recent-first for best prefix match
  *
@@ -374,8 +375,15 @@ static void update_autosuggestion(readline_context_t *ctx) {
         return;
     }
 
-    /// Don't suggest if ends with space
-    if (input[ctx->buffer->length - 1] == ' ') {
+    /// Trailing-space handling depends on the dismiss policy. With the default
+    /// `on_deviation`, a space that still matches a history command keeps the
+    /// suggestion alive (the prefix search below matches through spaces), so we
+    /// do not bail here -- the ghost text persists and only a deviation clears
+    /// it. With `on_word_boundary`, a trailing space suppresses the suggestion
+    /// (the quieter legacy behavior).
+    if (config.autosuggestion_dismiss_policy ==
+            AUTOSUGGESTION_DISMISS_ON_WORD_BOUNDARY &&
+        input[ctx->buffer->length - 1] == ' ') {
         return;
     }
 
