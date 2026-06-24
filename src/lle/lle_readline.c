@@ -1401,65 +1401,79 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(ctx->editor->completion_system);
 
-        bool selected_was_directory = false;
-        if (state && menu) {
-            const lle_completion_item_t *selected =
-                lle_completion_menu_get_selected(menu);
-            if (selected) {
-                lle_completion_item_t synthetic_item = *selected;
-                if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
-                    selected->description != NULL) {
-                    synthetic_item.text = (char *)selected->description;
-                }
+        /// Pre-navigation: no candidate is selected yet, so ENTER accepts the
+        /// line the user actually typed. Discard the menu and fall through to
+        /// the normal accept-line flow (which submits the buffer).
+        if (menu && menu->awaiting_navigation) {
+            lle_completion_system_clear(ctx->editor->completion_system);
+            display_controller_t *predc = display_integration_get_controller();
+            if (predc) {
+                display_controller_clear_completion_menu(predc);
+            }
+        } else {
 
-                lle_word_context_t *splice_context = NULL;
-                lle_result_t ctx_result = lle_word_context_analyze(
-                    ctx->buffer->data, ctx->buffer->cursor.byte_offset,
-                    ctx->editor->lle_pool, &splice_context);
-                if (ctx_result == LLE_SUCCESS && splice_context) {
-                    (void)lle_splicer_apply_accept(
-                        ctx->buffer, ctx->editor->cursor_manager,
-                        splice_context, &synthetic_item, ctx->editor->lle_pool);
-                    lle_word_context_free(splice_context);
-                    selected_was_directory =
-                        (synthetic_item.type == LLE_COMPLETION_TYPE_DIRECTORY);
+            bool selected_was_directory = false;
+            if (state && menu) {
+                const lle_completion_item_t *selected =
+                    lle_completion_menu_get_selected(menu);
+                if (selected) {
+                    lle_completion_item_t synthetic_item = *selected;
+                    if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
+                        selected->description != NULL) {
+                        synthetic_item.text = (char *)selected->description;
+                    }
+
+                    lle_word_context_t *splice_context = NULL;
+                    lle_result_t ctx_result = lle_word_context_analyze(
+                        ctx->buffer->data, ctx->buffer->cursor.byte_offset,
+                        ctx->editor->lle_pool, &splice_context);
+                    if (ctx_result == LLE_SUCCESS && splice_context) {
+                        (void)lle_splicer_apply_accept(
+                            ctx->buffer, ctx->editor->cursor_manager,
+                            splice_context, &synthetic_item,
+                            ctx->editor->lle_pool);
+                        lle_word_context_free(splice_context);
+                        selected_was_directory =
+                            (synthetic_item.type ==
+                             LLE_COMPLETION_TYPE_DIRECTORY);
+                    }
                 }
             }
-        }
 
-        /// Clear the completion menu now that the selection is
-        /// finalized.
-        lle_completion_system_clear(ctx->editor->completion_system);
-        display_controller_t *dc = display_integration_get_controller();
-        if (dc) {
-            display_controller_clear_completion_menu(dc);
-        }
+            /// Clear the completion menu now that the selection is
+            /// finalized.
+            lle_completion_system_clear(ctx->editor->completion_system);
+            display_controller_t *dc = display_integration_get_controller();
+            if (dc) {
+                display_controller_clear_completion_menu(dc);
+            }
 
-        /// Directory-chain (issue #85): if the accepted item was a
-        /// directory and completion.chain_directories is on, open the
-        /// next-level menu so the directory's contents are revealed. Uses
-        /// lle_complete_directory_chain (not lle_complete) so the chain never
-        /// auto-descends past the "/" or previews a child into the buffer.
-        /// Mirrors the same gate at the TAB single-match site in
-        /// keybinding_actions.c.
-        bool chain = false;
-        (void)config_registry_get_boolean("completion.chain_directories",
-                                          &chain);
-        if (selected_was_directory && chain && ctx->editor) {
-            (void)lle_complete_directory_chain(ctx->editor);
-        }
+            /// Directory-chain (issue #85): if the accepted item was a
+            /// directory and completion.chain_directories is on, open the
+            /// next-level menu so the directory's contents are revealed. Uses
+            /// lle_complete_directory_chain (not lle_complete) so the chain
+            /// never auto-descends past the "/" or previews a child into the
+            /// buffer. Mirrors the same gate at the TAB single-match site in
+            /// keybinding_actions.c.
+            bool chain = false;
+            (void)config_registry_get_boolean("completion.chain_directories",
+                                              &chain);
+            if (selected_was_directory && chain && ctx->editor) {
+                (void)lle_complete_directory_chain(ctx->editor);
+            }
 
-        /// Directory selections leave the cursor inside an open
-        /// quote with a trailing "/" and the user generally wants to
-        /// keep typing; non-directory selections terminate the
-        /// argument with a close-quote (if needed) and a trailing
-        /// space. Either way, the user's first ENTER finalizes the
-        /// cycle but does NOT submit the line -- a second ENTER
-        /// submits the now-finalized buffer. This matches the
-        /// existing readline behavior; only the buffer-finalization
-        /// step is new.
-        refresh_display(ctx);
-        return LLE_SUCCESS;
+            /// Directory selections leave the cursor inside an open
+            /// quote with a trailing "/" and the user generally wants to
+            /// keep typing; non-directory selections terminate the
+            /// argument with a close-quote (if needed) and a trailing
+            /// space. Either way, the user's first ENTER finalizes the
+            /// cycle but does NOT submit the line -- a second ENTER
+            /// submits the now-finalized buffer. This matches the
+            /// existing readline behavior; only the buffer-finalization
+            /// step is new.
+            refresh_display(ctx);
+            return LLE_SUCCESS;
+        }
     }
 
     /// Check for incomplete input using shared continuation parser

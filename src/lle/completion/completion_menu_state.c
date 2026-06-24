@@ -140,6 +140,8 @@ lle_result_t lle_completion_menu_state_create(
     new_state->category_positions = NULL;
     new_state->category_count = 0;
     new_state->menu_active = true; /// Menu is active when created
+    new_state->awaiting_navigation =
+        true; /// Fresh menu: nothing committed until the first TAB
     new_state->memory_pool = memory_pool;
 
     /// In-menu type-to-filter state. unfiltered_result aliases the
