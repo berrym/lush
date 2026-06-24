@@ -350,18 +350,44 @@ LLE integrates with Lush's history system.
 
 ### History Expansion
 
-Standard history expansion works:
+Standard history expansion works.
+
+Event designators select a prior command:
 
 ```bash
 !!              # Last command
-!$              # Last argument of last command
-!^              # First argument of last command
-!*              # All arguments of last command
 !n              # Command number n
 !-n             # n commands ago
 !string         # Most recent command starting with string
-!?string?       # Most recent command containing string
+!?string?       # Most recent command containing string (closing ? optional)
+^old^new        # Repeat the last command, replacing old with new
 ```
+
+Word designators select words from the referenced command, written after a
+`:` separator (the `!$`, `!^`, `!*` forms are shorthands for the last
+command):
+
+```bash
+!$              # Last argument of the last command
+!^              # First argument of the last command
+!*              # All arguments of the last command
+!!:0            # The command word of the last command
+!!:2            # Word 2 of the last command
+!!:1-2          # Words 1 through 2 of the last command
+```
+
+Modifiers transform the result:
+
+```bash
+!!:p            # Print the expansion without executing it
+!!:s/old/new/   # Substitute the first occurrence of old with new
+!!:gs/old/new/  # Substitute every occurrence
+```
+
+A leading space disables expansion for that line, and a failed reference
+(`!nope`) reports `event not found` and runs nothing. With `setopt histverify`
+(`shopt -s histverify`), an expansion is loaded into the editor for review
+instead of being executed immediately.
 
 ### Multi-Line History
 

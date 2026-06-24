@@ -19,8 +19,10 @@
 #include "errors.h"
 #include "init.h"
 #include "input_continuation.h"
+#include "lle/history.h"
 #include "lle/lle_shell_integration.h"
 #include "lush.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <errno.h>
@@ -190,6 +192,13 @@ char *ln_gets(void) {
         const char *prompt;
         if (first_line) {
             prompt = NULL; /// Let readline system generate themed prompt
+
+            /// Keep history-expansion verify behavior in step with the live
+            /// feature (shopt/setopt histverify) before reading the line.
+            /// The feature matrix is the source of truth; the engine flag is
+            /// a pushed cache consulted by the readline accept path.
+            lle_history_expansion_set_verify(
+                shell_mode_allows(FEATURE_HIST_VERIFY));
         } else {
             prompt = get_continuation_prompt(&global_state);
         }

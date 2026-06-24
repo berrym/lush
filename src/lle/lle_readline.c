@@ -1092,96 +1092,83 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/// @brief Event handler for Enter key
-/// Step 6: Check for multiline continuation before completing
+/// Action the accept-line path should take after history expansion.
+typedef enum {
+    HIST_EXPAND_PROCEED,  ///< Buffer holds the command to record and execute
+    HIST_EXPAND_SUPPRESS, ///< Buffer recorded but execution suppressed (:p)
+    HIST_EXPAND_REEDIT,   ///< Expansion left in the editor for confirmation
+    HIST_EXPAND_ABORT,    ///< Expansion failed; abort without executing
+} hist_expand_action_t;
+
+/// @brief Apply history expansion to the buffer before the line is accepted
+///
+/// Expands !!, !$, ^old^new and the :p / :s modifiers in place so the history
+/// entry and the executed command are the expanded form. Echoes the expansion,
+/// prints :p results, reports failures, and honors histverify by re-rendering
+/// the expanded line for confirmation. Skipped at the debugger break-prompt,
+/// which keeps separate history, and when no expansion markers are present.
+///
+/// @param ctx Readline context (must not be NULL)
+/// @return The action the accept path should take
+static hist_expand_action_t apply_history_expansion(readline_context_t *ctx) {
+    if (lle_in_debug_prompt() || !ctx->buffer->data ||
+        !lle_history_expansion_needed(ctx->buffer->data)) {
+        return HIST_EXPAND_PROCEED;
+    }
+
+    char *expanded = NULL;
+    bool print_only = false;
+    lle_result_t res =
+        lle_history_expand_line(ctx->buffer->data, &expanded, &print_only);
+
+    if (res != LLE_SUCCESS) {
+        /// Failed expansion: report and abort. Nothing is recorded or executed
+        /// (bash: "event not found").
+        fprintf(stderr, "lush: %s: event not found\n", ctx->buffer->data);
+        return HIST_EXPAND_ABORT;
+    }
+
+    /// Load the expanded text into the buffer so the history entry and the
+    /// executed line are the expanded form.
+    lle_buffer_clear(ctx->buffer);
+    lle_buffer_insert_text(ctx->buffer, 0, expanded, strlen(expanded));
+    ctx->buffer->cursor.byte_offset = ctx->buffer->length;
+    ctx->buffer->cursor.grapheme_index = ctx->buffer->length;
+
+    if (lle_history_expansion_get_verify()) {
+        /// histverify: show the expansion in the editor for confirmation
+        /// instead of executing it. The expanded text carries no markers, so
+        /// the next Enter accepts it normally.
+        lle_pool_free(expanded);
+        refresh_display(ctx);
+        return HIST_EXPAND_REEDIT;
+    }
+
+    if (print_only) {
+        /// :p prints the expansion and records it, but does not execute.
+        printf("%s\n", expanded);
+        fflush(stdout);
+        lle_pool_free(expanded);
+        return HIST_EXPAND_SUPPRESS;
+    }
+
+    /// Echo the expanded command so the user sees what runs.
+    fprintf(stderr, "%s\n", expanded);
+    lle_pool_free(expanded);
+    return HIST_EXPAND_PROCEED;
+}
+
+/// @brief Event-handler adapter for the Enter key
+///
+/// Delegates to lle_accept_line_context, the single canonical accept-line
+/// implementation (continuation handling, completion-menu finalization,
+/// history expansion, history recording, and line submission). This adapter
+/// only bridges the (event, user_data) handler signature to the context API;
+/// it runs as the execute_keybinding_action fallback when the keybinding
+/// manager has no Enter binding.
 static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
-    readline_context_t *ctx = (readline_context_t *)user_data;
-
-    /// Check for incomplete input using shared continuation parser
-    bool incomplete =
-        is_input_incomplete(ctx->buffer->data, ctx->continuation_state);
-
-    if (incomplete) {
-        /// SAFETY CHECK: Limit maximum line count to prevent infinite loops
-        /// If the parser has a bug and always reports incomplete, this prevents
-        /// the shell from inserting newlines forever. 1000 lines is generous
-        /// for any legitimate shell command but prevents runaway input.
-        size_t line_count = 1;
-        for (const char *p = ctx->buffer->data; *p; p++) {
-            if (*p == '\n') {
-                line_count++;
-            }
-        }
-        const size_t MAX_MULTILINE_LINES = 1000;
-        if (line_count >= MAX_MULTILINE_LINES) {
-            fprintf(stderr,
-                    "\nlle: maximum line count (%zu) reached, forcing accept\n",
-                    MAX_MULTILINE_LINES);
-            incomplete = false; /// Force accept
-        }
-    }
-
-    if (incomplete) {
-        /// Input incomplete - insert newline and continue
-        lle_result_t result = lle_buffer_insert_text(
-            ctx->buffer, ctx->buffer->cursor.byte_offset, "\n", 1);
-
-        /// Synchronize cursor fields after insert
-        if (result == LLE_SUCCESS && ctx->editor &&
-            ctx->editor->cursor_manager) {
-            lle_cursor_manager_move_to_byte_offset(
-                ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
-        }
-
-        if (result == LLE_SUCCESS) {
-            refresh_display(ctx);
-        }
-
-        return result;
-    }
-
-    /// Line complete - accept entire buffer regardless of cursor position
-
-    /// Clear autosuggestion ghost text before accepting line
-    /// Without this, partial suggestions remain visible after Enter
-    display_controller_t *dc = display_integration_get_controller();
-    if (dc) {
-        display_controller_set_autosuggestion(dc, NULL);
-    }
-    if (ctx->current_suggestion) {
-        ctx->current_suggestion[0] = '\0';
-    }
-
-    /// Add to LLE history before completing. The editor's
-    /// history_system may be the shell history or, during the
-    /// debugger's break-prompt, the in-process debug history (swapped
-    /// by lle_readline_no_history); the add path is identical for both.
-    /// Persistence to ~/.lush_history is gated on NOT being at the
-    /// debug prompt -- debug commands never reach the shell history
-    /// file.
-    if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
-        ctx->buffer->data[0] != '\0') {
-        lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
-                              NULL);
-
-        if (!lle_in_debug_prompt()) {
-            const char *home = getenv("HOME");
-            if (home) {
-                char history_path[1024];
-                snprintf(history_path, sizeof(history_path), "%s/.lush_history",
-                         home);
-                lle_history_save_to_file(ctx->editor->history_system,
-                                         history_path);
-            }
-        }
-    }
-
-    *ctx->done = true;
-    *ctx->final_line =
-        ctx->buffer->data ? strdup(ctx->buffer->data) : strdup("");
-
-    return LLE_SUCCESS;
+    return lle_accept_line_context((readline_context_t *)user_data);
 }
 
 /**
@@ -1296,6 +1283,26 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         is_input_incomplete(ctx->buffer->data, ctx->continuation_state);
 
     if (incomplete) {
+        /// SAFETY CHECK: Limit maximum line count to prevent infinite loops.
+        /// If the parser has a bug and always reports incomplete, this prevents
+        /// the shell from inserting newlines forever. 1000 lines is generous
+        /// for any legitimate shell command but prevents runaway input.
+        size_t line_count = 1;
+        for (const char *p = ctx->buffer->data; *p; p++) {
+            if (*p == '\n') {
+                line_count++;
+            }
+        }
+        const size_t MAX_MULTILINE_LINES = 1000;
+        if (line_count >= MAX_MULTILINE_LINES) {
+            fprintf(stderr,
+                    "\nlle: maximum line count (%zu) reached, forcing accept\n",
+                    MAX_MULTILINE_LINES);
+            incomplete = false; /// Force accept
+        }
+    }
+
+    if (incomplete) {
         /// Input incomplete - insert newline and continue editing
         lle_result_t result = lle_buffer_insert_text(
             ctx->buffer, ctx->buffer->cursor.byte_offset, "\n", 1);
@@ -1315,6 +1322,30 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
     }
 
     /// Line complete - accept entire buffer regardless of cursor position
+
+    /// Clear autosuggestion ghost text before accepting line. Without this,
+    /// partial suggestions remain visible after Enter.
+    display_controller_t *accept_dc = display_integration_get_controller();
+    if (accept_dc) {
+        display_controller_set_autosuggestion(accept_dc, NULL);
+    }
+    if (ctx->current_suggestion) {
+        ctx->current_suggestion[0] = '\0';
+    }
+
+    /// History expansion (!!, !$, ^old^new, :p, :s) before the line is
+    /// recorded or executed. See apply_history_expansion.
+    bool suppress_execution = false;
+    hist_expand_action_t hist_action = apply_history_expansion(ctx);
+    if (hist_action == HIST_EXPAND_ABORT) {
+        *ctx->done = true;
+        *ctx->final_line = strdup("");
+        return LLE_SUCCESS;
+    }
+    if (hist_action == HIST_EXPAND_REEDIT) {
+        return LLE_SUCCESS;
+    }
+    suppress_execution = (hist_action == HIST_EXPAND_SUPPRESS);
 
     /// CRITICAL: Move buffer cursor to end before accepting
     ///
@@ -1369,8 +1400,13 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
 
     /// Signal completion to readline loop
     *ctx->done = true;
-    *ctx->final_line =
-        ctx->buffer->data ? strdup(ctx->buffer->data) : strdup("");
+    if (suppress_execution) {
+        /// :p recorded and printed the expansion; nothing is executed.
+        *ctx->final_line = strdup("");
+    } else {
+        *ctx->final_line =
+            ctx->buffer->data ? strdup(ctx->buffer->data) : strdup("");
+    }
 
     return LLE_SUCCESS;
 }

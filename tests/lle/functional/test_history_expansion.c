@@ -158,7 +158,7 @@ TEST(test_double_bang_expansion) {
     lle_result_t result;
 
     /// Expand !! - should get last command
-    result = lle_history_expand_line("!!", &expanded);
+    result = lle_history_expand_line("!!", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo hello");
@@ -180,14 +180,14 @@ TEST(test_number_expansion) {
     ASSERT(count == 7);
 
     /// Expand !1 - should get first command
-    result = lle_history_expand_line("!1", &expanded);
+    result = lle_history_expand_line("!1", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "ls -la");
     lle_pool_free(expanded);
 
     /// Expand !3 - should get third command
-    result = lle_history_expand_line("!3", &expanded);
+    result = lle_history_expand_line("!3", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "git status");
@@ -204,14 +204,14 @@ TEST(test_relative_expansion) {
     lle_result_t result;
 
     /// Expand !-1 - should get last command (same as !!)
-    result = lle_history_expand_line("!-1", &expanded);
+    result = lle_history_expand_line("!-1", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo hello");
     lle_pool_free(expanded);
 
     /// Expand !-3 - three commands back (echo hello, make all, make clean).
-    result = lle_history_expand_line("!-3", &expanded);
+    result = lle_history_expand_line("!-3", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "make clean");
@@ -228,14 +228,14 @@ TEST(test_prefix_expansion) {
     lle_result_t result;
 
     /// Expand !git - should get most recent git command
-    result = lle_history_expand_line("!git", &expanded);
+    result = lle_history_expand_line("!git", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "git commit -m 'test'");
     lle_pool_free(expanded);
 
     /// Expand !make - should get most recent make command
-    result = lle_history_expand_line("!make", &expanded);
+    result = lle_history_expand_line("!make", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "make all");
@@ -252,14 +252,14 @@ TEST(test_substring_expansion) {
     lle_result_t result;
 
     /// Expand !?status - should find git status
-    result = lle_history_expand_line("!?status", &expanded);
+    result = lle_history_expand_line("!?status", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "git status");
     lle_pool_free(expanded);
 
     /// Expand !?clean - should find make clean
-    result = lle_history_expand_line("!?clean", &expanded);
+    result = lle_history_expand_line("!?clean", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "make clean");
@@ -276,7 +276,7 @@ TEST(test_quick_substitution) {
     lle_result_t result;
 
     /// ^hello^world - should substitute in last command
-    result = lle_history_expand_line("^hello^world", &expanded);
+    result = lle_history_expand_line("^hello^world", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo world");
@@ -298,7 +298,7 @@ TEST(test_nonexistent_number) {
     lle_result_t result;
 
     /// Try to expand !999 - should fail
-    result = lle_history_expand_line("!999", &expanded);
+    result = lle_history_expand_line("!999", &expanded, NULL);
     ASSERT_ERROR(result);
     ASSERT(result == LLE_ERROR_NOT_FOUND);
 
@@ -313,7 +313,7 @@ TEST(test_nonexistent_prefix) {
     lle_result_t result;
 
     /// Try to expand !nonexistent - should fail
-    result = lle_history_expand_line("!nonexistent", &expanded);
+    result = lle_history_expand_line("!nonexistent", &expanded, NULL);
     ASSERT_ERROR(result);
     ASSERT(result == LLE_ERROR_NOT_FOUND);
 
@@ -328,7 +328,7 @@ TEST(test_empty_history) {
     lle_result_t result;
 
     /// Try !! with empty history
-    result = lle_history_expand_line("!!", &expanded);
+    result = lle_history_expand_line("!!", &expanded, NULL);
     ASSERT_ERROR(result);
 
     teardown();
@@ -342,7 +342,7 @@ TEST(test_no_expansion_needed) {
     lle_result_t result;
 
     /// Expand regular command - should return as-is
-    result = lle_history_expand_line("echo test", &expanded);
+    result = lle_history_expand_line("echo test", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo test");
@@ -367,7 +367,7 @@ TEST(test_space_disables_expansion) {
     ASSERT(lle_history_expansion_get_space_disables() == true);
 
     /// Leading space should prevent expansion
-    result = lle_history_expand_line(" !!", &expanded);
+    result = lle_history_expand_line(" !!", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, " !!"); /// Not expanded
@@ -378,7 +378,7 @@ TEST(test_space_disables_expansion) {
     ASSERT(lle_history_expansion_get_space_disables() == false);
 
     /// Now space should not prevent expansion
-    result = lle_history_expand_line(" !!", &expanded);
+    result = lle_history_expand_line(" !!", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, " echo hello"); /// Expanded with leading space
@@ -417,7 +417,7 @@ TEST(test_expansion_in_middle_of_command) {
     lle_result_t result;
 
     /// Expansion in the middle of a command
-    result = lle_history_expand_line("echo before !! after", &expanded);
+    result = lle_history_expand_line("echo before !! after", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo before echo hello after");
@@ -434,13 +434,196 @@ TEST(test_multiple_expansions) {
     lle_result_t result;
 
     /// Multiple expansions in one line
-    result = lle_history_expand_line("!git && !make", &expanded);
+    result = lle_history_expand_line("!git && !make", &expanded, NULL);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     /// Should expand both !git and !make
     ASSERT(strstr(expanded, "git commit") != NULL);
     ASSERT(strstr(expanded, "make all") != NULL);
     lle_pool_free(expanded);
+
+    teardown();
+}
+
+/* ============================================================================
+ * WORD DESIGNATOR TESTS
+ * ============================================================================
+ */
+
+/// Seed history with a multi-word last command for word-designator selection.
+static void add_word_designator_history(void) {
+    lle_history_add_entry(g_core, "deploy app prod --force", 0, NULL);
+}
+
+TEST(test_word_last_arg) {
+    setup();
+    add_word_designator_history();
+
+    char *expanded = NULL;
+    /// !$ selects the last word of the previous command.
+    lle_result_t result = lle_history_expand_line("!$", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "--force");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_word_first_arg) {
+    setup();
+    add_word_designator_history();
+
+    char *expanded = NULL;
+    /// !^ selects the first argument (word 1).
+    lle_result_t result = lle_history_expand_line("!^", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "app");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_word_all_args) {
+    setup();
+    add_word_designator_history();
+
+    char *expanded = NULL;
+    /// !* selects every argument (words 1 through last).
+    lle_result_t result = lle_history_expand_line("!*", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "app prod --force");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_word_numbered_and_range) {
+    setup();
+    add_word_designator_history();
+
+    char *expanded = NULL;
+
+    /// :0 selects the command word.
+    lle_result_t result = lle_history_expand_line("!!:0", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT_STR_EQ(expanded, "deploy");
+    lle_pool_free(expanded);
+    expanded = NULL;
+
+    /// :2 selects word 2.
+    result = lle_history_expand_line("!!:2", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT_STR_EQ(expanded, "prod");
+    lle_pool_free(expanded);
+    expanded = NULL;
+
+    /// :1-2 selects words 1 through 2.
+    result = lle_history_expand_line("!!:1-2", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT_STR_EQ(expanded, "app prod");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_word_designator_in_context) {
+    setup();
+    add_word_designator_history();
+
+    char *expanded = NULL;
+    /// A word designator splices into surrounding text.
+    lle_result_t result = lle_history_expand_line("echo !$", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT_STR_EQ(expanded, "echo --force");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+/* ============================================================================
+ * MODIFIER TESTS
+ * ============================================================================
+ */
+
+TEST(test_print_modifier) {
+    setup();
+    add_test_commands();
+
+    char *expanded = NULL;
+    bool print_only = false;
+    /// !!:p expands to the last command and flags print-only.
+    lle_result_t result =
+        lle_history_expand_line("!!:p", &expanded, &print_only);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "echo hello");
+    ASSERT(print_only == true);
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_print_modifier_not_set_without_p) {
+    setup();
+    add_test_commands();
+
+    char *expanded = NULL;
+    bool print_only = true;
+    /// Without :p the flag is cleared.
+    lle_result_t result = lle_history_expand_line("!!", &expanded, &print_only);
+    ASSERT_SUCCESS(result);
+    ASSERT(print_only == false);
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_substitute_modifier) {
+    setup();
+    add_test_commands();
+
+    char *expanded = NULL;
+    /// !!:s/hello/world/ substitutes the first occurrence.
+    lle_result_t result =
+        lle_history_expand_line("!!:s/hello/world/", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "echo world");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_global_substitute_modifier) {
+    setup();
+
+    /// Seed a last command with repeated text for global substitution.
+    lle_history_add_entry(g_core, "x x x", 0, NULL);
+
+    char *expanded = NULL;
+    /// !!:gs/x/y/ substitutes every occurrence.
+    lle_result_t result =
+        lle_history_expand_line("!!:gs/x/y/", &expanded, NULL);
+    ASSERT_SUCCESS(result);
+    ASSERT(expanded != NULL);
+    ASSERT_STR_EQ(expanded, "y y y");
+    lle_pool_free(expanded);
+
+    teardown();
+}
+
+TEST(test_substitute_missing_pattern_fails) {
+    setup();
+    add_test_commands();
+
+    char *expanded = NULL;
+    /// A :s whose pattern is absent from the command aborts the expansion.
+    lle_result_t result =
+        lle_history_expand_line("!!:s/absent/x/", &expanded, NULL);
+    ASSERT_ERROR(result);
 
     teardown();
 }
@@ -479,6 +662,20 @@ int main(void) {
     /// Complex expansion tests
     run_test_expansion_in_middle_of_command();
     run_test_multiple_expansions();
+
+    /// Word designator tests
+    run_test_word_last_arg();
+    run_test_word_first_arg();
+    run_test_word_all_args();
+    run_test_word_numbered_and_range();
+    run_test_word_designator_in_context();
+
+    /// Modifier tests
+    run_test_print_modifier();
+    run_test_print_modifier_not_set_without_p();
+    run_test_substitute_modifier();
+    run_test_global_substitute_modifier();
+    run_test_substitute_missing_pattern_fails();
 
     /// Print summary
     printf("\n================================================================="
