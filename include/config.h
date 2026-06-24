@@ -196,6 +196,22 @@ typedef enum {
 } autosuggestion_partial_accept_t;
 
 /**
+ * @brief Sources the autosuggestion draws ghost text from
+ *
+ * `history` suggests only from command history (prefix match). `history_then_
+ * completion` keeps history as the fast primary source and, only when history
+ * has no match, falls back to the completion engine's best candidate (mainly
+ * filesystem paths as you type them) -- fish-style, the lush default. The
+ * fallback runs a single completion query and never on a history hit, so the
+ * common case stays instant.
+ */
+typedef enum {
+    AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION, ///< History, then
+                                                    ///< completion
+    AUTOSUGGESTION_SOURCES_HISTORY                  ///< History only
+} autosuggestion_sources_t;
+
+/**
  * @brief History up/down navigation search mode
  *
  * Controls which history entries up/down arrows cycle through. `prefix` filters
@@ -404,6 +420,8 @@ typedef struct {
         autosuggestion_rank; ///< Which prefix match to suggest
     autosuggestion_partial_accept_t
         autosuggestion_partial_accept; ///< Ctrl+Right granularity
+    autosuggestion_sources_t
+        autosuggestion_sources; ///< History only, or history then completion
 
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
@@ -674,6 +692,14 @@ bool config_validate_autosuggestion_rank(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_autosuggestion_partial_accept(const char *value);
+
+/**
+ * @brief Validate an autosuggestion sources value
+ *
+ * @param value Sources string ("history" or "history_then_completion")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_autosuggestion_sources(const char *value);
 
 /**
  * @brief Validate a history search mode value

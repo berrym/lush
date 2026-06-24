@@ -187,6 +187,16 @@ static const config_enum_def_t autosuggestion_partial_accept_enum = {
     autosuggestion_partial_accept_mappings,
     AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT};
 
+/// Autosuggestion Sources mappings
+static const config_enum_mapping_t autosuggestion_sources_mappings[] = {
+    {"history_then_completion", AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION},
+    {                "history",                 AUTOSUGGESTION_SOURCES_HISTORY},
+    {                     NULL,                                              0}
+};
+static const config_enum_def_t autosuggestion_sources_enum = {
+    autosuggestion_sources_mappings,
+    AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION};
+
 /// History Search Mode mappings
 static const config_enum_mapping_t history_search_mode_mappings[] = {
     {"prefix", HISTORY_SEARCH_MODE_PREFIX},
@@ -563,6 +573,9 @@ static config_option_t config_options[] = {
      CONFIG_SECTION_AUTOSUGGESTION,      &config.autosuggestion_partial_accept,
      "Ctrl+Right acceptance granularity (path_segment / word)", config_validate_autosuggestion_partial_accept,
      &autosuggestion_partial_accept_enum                                                                                                              },
+    {              "autosuggestion.sources",   CONFIG_TYPE_ENUM, CONFIG_SECTION_AUTOSUGGESTION,
+     &config.autosuggestion_sources,
+     "Ghost text sources (history / history_then_completion)",        config_validate_autosuggestion_sources, &autosuggestion_sources_enum            },
 
     /// v1.3.0: Legacy enhanced display mode option removed
     /// behavior.enhanced_display_mode option removed
@@ -805,19 +818,23 @@ static const creg_section_t completion_section = {
  * -------------------------------------------------------------------------- */
 static const creg_option_t autosuggestion_options[] = {
     {"dismiss_policy",
-     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "on_deviation"},
+     CREG_VALUE_STRING,            {.type = CREG_VALUE_STRING, .data.string = "on_deviation"},
      "When to clear the ghost text: on_deviation (only on a non-matching "
      "keystroke; persists through matching spaces) or on_word_boundary "
-     "(clear at a trailing space)", true    },
+     "(clear at a trailing space)", true                  },
     {          "rank",
-     CREG_VALUE_STRING,     {.type = CREG_VALUE_STRING, .data.string = "frecency"},
+     CREG_VALUE_STRING,                {.type = CREG_VALUE_STRING, .data.string = "frecency"},
      "Which history prefix match to suggest: frecency (most used x recent) or "
-     "recency (most recent)", true          },
+     "recency (most recent)", true                        },
     {"partial_accept",
-     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "path_segment"},
+     CREG_VALUE_STRING,            {.type = CREG_VALUE_STRING, .data.string = "path_segment"},
      "Ctrl+Right granularity: path_segment (advance by directory inside a "
      "path) "
-     "or word (whole whitespace word)", true},
+     "or word (whole whitespace word)", true              },
+    {       "sources",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "history_then_completion"},
+     "Ghost text sources: history (history only) or history_then_completion "
+     "(fall back to completion when history misses)", true},
 };
 
 static const creg_section_t autosuggestion_section = {
@@ -1122,6 +1139,13 @@ static void autosuggestion_sync_to_runtime(void) {
                 ? AUTOSUGGESTION_PARTIAL_ACCEPT_WORD
                 : AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT;
     }
+    if (config_registry_get_string("autosuggestion.sources", sval,
+                                   sizeof(sval)) == CREG_SUCCESS) {
+        config.autosuggestion_sources =
+            (strcmp(sval, "history") == 0)
+                ? AUTOSUGGESTION_SOURCES_HISTORY
+                : AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION;
+    }
 }
 
 static void autosuggestion_sync_from_runtime(void) {
@@ -1139,6 +1163,11 @@ static void autosuggestion_sync_from_runtime(void) {
                                        AUTOSUGGESTION_PARTIAL_ACCEPT_WORD
                                    ? "word"
                                    : "path_segment");
+    config_registry_set_string("autosuggestion.sources",
+                               config.autosuggestion_sources ==
+                                       AUTOSUGGESTION_SOURCES_HISTORY
+                                   ? "history"
+                                   : "history_then_completion");
 }
 
 /**
@@ -1247,6 +1276,17 @@ static void config_register_per_mode_defaults(void) {
                                      &autosuggest_rank_recency);
     config_registry_set_mode_default("autosuggestion.rank", SHELL_MODE_POSIX,
                                      &autosuggest_rank_recency);
+
+    /// autosuggestion.sources: lush mixes in completion fallback (fish-style).
+    /// posix / bash / zsh stay history-only, matching the history-driven
+    /// autosuggestion plugins (zsh-autosuggestions) those users expect.
+    creg_value_t autosuggest_sources_history = creg_value_string("history");
+    config_registry_set_mode_default("autosuggestion.sources", SHELL_MODE_BASH,
+                                     &autosuggest_sources_history);
+    config_registry_set_mode_default("autosuggestion.sources", SHELL_MODE_ZSH,
+                                     &autosuggest_sources_history);
+    config_registry_set_mode_default("autosuggestion.sources", SHELL_MODE_POSIX,
+                                     &autosuggest_sources_history);
 }
 
 /**
@@ -2640,6 +2680,10 @@ void config_set_defaults(void) {
     /// Ctrl+Right advances by path segment inside a path, whole word elsewhere.
     config.autosuggestion_partial_accept =
         AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT;
+    /// History is primary; completion fills in on a miss. Per-mode table sets
+    /// history-only for posix/bash/zsh.
+    config.autosuggestion_sources =
+        AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION;
     config.display_transient_prompt =
         true; /// Transient prompts enabled by default (Spec 25 Section 12)
     config.display_theme_hot_reload = true; /// Auto-reload theme on file change
@@ -3778,6 +3822,11 @@ bool config_validate_autosuggestion_rank(const char *value) {
 
 bool config_validate_autosuggestion_partial_accept(const char *value) {
     return (strcmp(value, "path_segment") == 0 || strcmp(value, "word") == 0);
+}
+
+bool config_validate_autosuggestion_sources(const char *value) {
+    return (strcmp(value, "history") == 0 ||
+            strcmp(value, "history_then_completion") == 0);
 }
 
 bool config_validate_history_search_mode(const char *value) {
