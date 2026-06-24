@@ -310,6 +310,46 @@ TEST(sigil_only_at_word_start) {
     lle_syntax_highlighter_destroy(h);
 }
 
+/// Test: inside a case body, a `pattern)` branch command is a command, the
+/// pattern is not, and `esac` is a keyword
+TEST(case_body_command_position) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+    const char *in = "case $x in a) echo hi;; b) ls;; esac";
+
+    TEST_START("branch command after `pattern)` is a command");
+    if (is_command_token(token_type_of(h, in, "echo")))
+        TEST_PASS();
+    else
+        TEST_FAIL("branch command not recognized as a command");
+
+    TEST_START("a case pattern is not an invalid command");
+    if (token_type_of(h, in, "a") == LLE_TOKEN_ARGUMENT)
+        TEST_PASS();
+    else
+        TEST_FAIL("case pattern wrongly highlighted as a command");
+
+    TEST_START("a pattern after `;;` is not an invalid command");
+    if (token_type_of(h, in, "b") == LLE_TOKEN_ARGUMENT)
+        TEST_PASS();
+    else
+        TEST_FAIL("post-;; pattern wrongly highlighted as a command");
+
+    TEST_START("`esac` after `;;` is a keyword");
+    if (token_type_of(h, in, "esac") == LLE_TOKEN_KEYWORD)
+        TEST_PASS();
+    else
+        TEST_FAIL("`esac` not highlighted as a keyword");
+
+    TEST_START("a plain subshell close does not enter case mode");
+    if (is_command_token(token_type_of(h, "(cd /tmp); ls", "ls")))
+        TEST_PASS();
+    else
+        TEST_FAIL("subshell handling regressed");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
 /// Test: Highlighter creation
 TEST(highlighter_create) {
     TEST_START("highlighter_create");
@@ -1218,6 +1258,7 @@ int main(void) {
     RUN_TEST(recursive_unclosed_double_quote);
     RUN_TEST(for_loop_variable_and_in_keyword);
     RUN_TEST(sigil_only_at_word_start);
+    RUN_TEST(case_body_command_position);
     RUN_TEST(builtins);
     RUN_TEST(external_commands);
     RUN_TEST(invalid_commands);

@@ -1126,6 +1126,12 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
     bool in_construct_header =
         false; /// Inside a for/select/case header, before its `in` reserved
                /// word (cleared by `in` or any body keyword)
+    bool header_is_case = false; /// The current header is a `case` (vs for/
+                                 /// select), so its `in` opens a case body
+    bool in_case_body = false;   /// Between a case `in` and its `esac`: a `)`
+                                 /// starts a branch body, `;;` a new pattern
+    bool expect_case_pattern = false; /// The next word is a case pattern (or
+                                      /// `esac`), after `in` or `;;`
 
     while (pos < end) {
         /// Skip whitespace
@@ -1424,8 +1430,19 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
 
         if (c == ';') {
             pos++;
-            add_token(highlighter, LLE_TOKEN_SEMICOLON, token_start, pos);
-            expect_command = true;
+            if (pos < end && input[pos] == ';') {
+                /// `;;` terminates a case branch; the next word is the next
+                /// pattern (or `esac`), not a command.
+                pos++;
+                add_token(highlighter, LLE_TOKEN_SEMICOLON, token_start, pos);
+                expect_command = true;
+                if (in_case_body) {
+                    expect_case_pattern = true;
+                }
+            } else {
+                add_token(highlighter, LLE_TOKEN_SEMICOLON, token_start, pos);
+                expect_command = true;
+            }
             continue;
         }
 
@@ -1510,7 +1527,10 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
         if (c == ')') {
             pos++;
             add_token(highlighter, LLE_TOKEN_SUBSHELL_END, token_start, pos);
-            expect_command = false;
+            /// In a case body, `pattern)` is followed by the branch's command
+            /// list, so the next word is in command position.
+            expect_case_pattern = false;
+            expect_command = in_case_body;
             continue;
         }
 
@@ -1591,8 +1611,33 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
                 in_construct_header = false;
                 after_for_keyword = false;
                 after_case_keyword = false;
+                /// A case's `in` opens the case body, where the first pattern
+                /// (not a command) follows.
+                if (header_is_case) {
+                    in_case_body = true;
+                    expect_case_pattern = true;
+                    header_is_case = false;
+                }
                 expect_command = false;
                 add_token(highlighter, LLE_TOKEN_KEYWORD, token_start, pos);
+                continue;
+            }
+            /// Inside a case body, the word after `in`/`;;` is either `esac`
+            /// (ends the case) or a pattern -- not a command. The flag stays
+            /// set across a multi-part pattern and is cleared by the `)`.
+            if (expect_case_pattern) {
+                if (word_len == 4 &&
+                    strncmp(input + token_start, "esac", 4) == 0) {
+                    expect_case_pattern = false;
+                    in_case_body = false;
+                    expect_command = false;
+                    add_token(highlighter, LLE_TOKEN_KEYWORD, token_start, pos);
+                    continue;
+                }
+                expect_command = false;
+                add_token(highlighter,
+                          has_glob ? LLE_TOKEN_GLOB : LLE_TOKEN_ARGUMENT,
+                          token_start, pos);
                 continue;
             }
             if (after_for_keyword) {
@@ -1689,8 +1734,14 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
                                                             "case", 4) == 0) {
                             after_case_keyword = true;
                             in_construct_header = true;
+                            header_is_case = true;
+                        } else if (word_len == 4 && strncmp(input + token_start,
+                                                            "esac", 4) == 0) {
+                            in_construct_header = false;
+                            in_case_body = false;
                         } else {
                             in_construct_header = false;
+                            header_is_case = false;
                         }
                         /// Block-ending keywords (done, fi, esac, etc.) don't
                         ///                            expect a command after
