@@ -2998,10 +2998,11 @@ TEST(rt_unicode_ident_assoc_array_subscript) {
 }
 
 TEST(rt_unicode_ident_kind_sigil) {
-    /// `@café` kind sigil on a unicode-named array (lush default has
-    /// FEATURE_KIND_SIGILS on).
+    /// Bare `@café` kind sigil on a unicode-named array (lush default has
+    /// FEATURE_KIND_SIGILS on). Sigils are bare-word-only; double quotes
+    /// would suppress them (see rt_sigil_literal_in_double_quotes).
     run_result_t r = run_shell("café=(a b c)\n"
-                               "echo \"@café\"\n");
+                               "echo @café\n");
     ASSERT_STDOUT_EQ(r, "a b c\n");
 }
 
@@ -3931,11 +3932,27 @@ TEST(rt_sigil_compat_at_invalid_identifier) {
     ASSERT_STDOUT_EQ(r, "@{-1}\n");
 }
 
-TEST(rt_sigil_unset_name_empty) {
-    /// Unset name expands to empty (matches default $x behavior; set -u path
-    /// is exercised separately).
+TEST(rt_sigil_literal_in_double_quotes) {
+    /// `@` and `%` sigils are bare-word-only: double quotes suppress them
+    /// (like ~), so a quoted string is a literal. This is what keeps
+    /// printf "%s", "user@host", and "100% off" working in lush mode.
     run_result_t r = run_shell("echo \"[@undefined]\"\n");
-    ASSERT_STDOUT_EQ(r, "[]\n");
+    ASSERT_STDOUT_EQ(r, "[@undefined]\n");
+}
+
+TEST(rt_printf_percent_s_lush_mode) {
+    /// The canonical idiom must work in the default (lush) mode, not just
+    /// under mode posix: %s inside double quotes is a printf conversion, not
+    /// a map sigil.
+    run_result_t r = run_shell("mode lush\nx=hello\nprintf \"%s\\n\" \"$x\"\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_user_at_host_quoted_literal) {
+    /// `@` inside double quotes is literal -- email addresses and user@host
+    /// survive in lush mode.
+    run_result_t r = run_shell("mode lush\necho \"deploy to user@host now\"\n");
+    ASSERT_STDOUT_EQ(r, "deploy to user@host now\n");
 }
 
 TEST(rt_sigil_off_in_bash_mode) {
@@ -4853,7 +4870,9 @@ int main(void) {
     RUN_TEST(rt_sigil_pair_on_scalar_type_mismatch);
     RUN_TEST(rt_sigil_compat_user_at_host);
     RUN_TEST(rt_sigil_compat_at_invalid_identifier);
-    RUN_TEST(rt_sigil_unset_name_empty);
+    RUN_TEST(rt_sigil_literal_in_double_quotes);
+    RUN_TEST(rt_printf_percent_s_lush_mode);
+    RUN_TEST(rt_user_at_host_quoted_literal);
     RUN_TEST(rt_sigil_off_in_bash_mode);
     RUN_TEST(rt_test_o_errexit_reflects_set_e);
     RUN_TEST(rt_test_o_noop_alias_records_state);

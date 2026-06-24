@@ -208,6 +208,17 @@ structural intent of a reference is baked into the reference itself
 (`[@]` vs `[*]`), not into the syntax that happens to wrap it. This is
 §2 (pure-local reasoning) applied to expansion.
 
+This rule governs *list structure* on the `$` / `[@]` / `[*]` forms.
+It does **not** apply to the bare `@name` / `%name` kind sigils, which
+are a separate surface (§3 value kinds). Those sigils are
+bare-word-only and quote-suppressed, like `~` tilde expansion: `echo
+@arr` expands but `echo "@arr"` is the literal `@arr`, just as `~`
+expands but `"~"` does not. This keeps double-quoted strings safe for
+literal `@`/`%` text -- `printf "%s\n" "$x"`, `"user@host"`,
+`"100% off"` -- and is what keeps bare and quoted readings consistent
+with the word-start-only bare rule. See
+`docs/features/sigil-conventions.md`.
+
 ### 3.7 The `(@)` flag is redundant
 
 zsh's `(@)` parameter flag forces array context. In lush the `[@]`

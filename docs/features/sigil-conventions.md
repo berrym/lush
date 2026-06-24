@@ -44,9 +44,11 @@ presentation decision:
 
 - The sigil is the first character of the token, so a reader sees the
   presentation context at a glance.
-- Quoting is irrelevant to presentation per SEMANTICS.md §3.6. `@x`
-  and `"@x"` produce the same N-word stream. `$x` and `"$x"` produce
-  the same one-word value.
+- The `@`/`%` sigils are bare-word-only: quotes suppress them, like
+  `~` tilde expansion. `@x` fires the sigil; `"@x"` is the literal
+  text `@x`. List *presentation* remains quote-irrelevant through the
+  `$` forms -- `"${x[@]}"` is the N-word vector either way, per
+  SEMANTICS.md §3.6.
 - A user who wants element-stream semantics writes `@x`. A user who
   wants pair-stream iteration writes `%x`. There is no hidden
   joining behavior; there is no `IFS`-dependent surprise.
@@ -134,22 +136,36 @@ Worked examples:
 The strict-identifier check is the entire disambiguation logic. No
 context-sensitive parsing, no ambiguity scoring, no escape hatches.
 
-## Quoting is irrelevant to presentation
+## Sigils are bare-word-only; quotes suppress them
 
-Per SEMANTICS.md §3.6:
+A kind sigil fires only as an unquoted bare word (the disambiguation
+rule above). Inside single or double quotes, `@` and `%` are ordinary
+literal characters -- exactly like `~` tilde expansion, which also
+applies only to an unquoted leading `~`.
 
 ```bash
 arr=(one two three)
-echo @arr      # one two three  (3 words)
-echo "@arr"    # one two three  (3 words -- same)
-echo $arr      # one            (1 word, scalar context = first element)
-echo "$arr"    # one            (1 word -- same)
+echo @arr      # one two three  (3 words -- sigil fires)
+echo "@arr"    # @arr           (literal -- quotes suppress the sigil)
+echo $arr      # one            (scalar context = first element)
+echo "$arr"    # one            (same)
 ```
 
-The `"@x"` form expands inside double-quoted strings via the same
-sigil dispatcher used in bare-word context. This is the headline
-break from bash, where `"$@"` and `"$*"` differ in word-splitting
-behavior even though they look almost identical.
+This keeps double-quoted strings safe wherever `@` and `%` are
+everyday literal text: `printf "%s\n" "$x"`, `"user@host"`,
+`"100% off"`, and prompt/theme escapes like `"%m"` all pass through
+unchanged. List interpolation inside quotes uses the `$` form,
+`"${arr[@]}"`.
+
+**On SEMANTICS.md §3.6.** §3.6 ("quoting is irrelevant to
+presentation") governs *list structure*: `${arr[@]}` is a vector and
+`${arr[*]}` a joined scalar whether quoted or not. It does **not**
+make the `@`/`%` *sigil surface* fire inside quotes. The sigil is a
+bare-word reference form, and bare must agree with quoted -- `echo
+user@host` and `echo "user@host"` both yield `user@host`, so a sigil
+that expanded inside quotes (but not mid-word when bare) would itself
+break §3.6. Expanding sigils inside quotes was removed for exactly
+this reason.
 
 ## Curated defaults by mode
 

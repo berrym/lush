@@ -15881,49 +15881,15 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
     size_t i = 0;
 
     while (i < len) {
-        /// Kind sigil inside a double-quoted string: `"@x"` and `"%x"` must
-        /// produce the same result as bare `@x` / `%x` per the §3.6 rule
-        /// that quoting is irrelevant to presentation.  The check mirrors the
-        /// tokenizer: sigil at this slot AND followed by a valid identifier
-        /// AND FEATURE_KIND_SIGILS is enabled.  Splice the expanded text into
-        /// the result buffer and advance past the consumed span.
-        if ((str[i] == '@' || str[i] == '%') && i + 1 < len &&
-            shell_mode_allows(FEATURE_KIND_SIGILS) &&
-            lush_ident_match_start(str + i + 1, len - i - 1) > 0) {
-            size_t sigil_end = i + 1;
-            while (sigil_end < len) {
-                size_t n =
-                    lush_ident_match_continue(str + sigil_end, len - sigil_end);
-                if (n == 0) {
-                    break;
-                }
-                sigil_end += n;
-            }
-            size_t span = sigil_end - i;
-            char *sigil_buf = malloc(span + 1);
-            if (sigil_buf) {
-                memcpy(sigil_buf, str + i, span);
-                sigil_buf[span] = '\0';
-                char *expanded = expand_kind_sigil(executor, sigil_buf);
-                free(sigil_buf);
-                if (expanded) {
-                    size_t el = strlen(expanded);
-                    if (result_pos + el + 1 > buffer_size) {
-                        buffer_size = (result_pos + el + 1) * 2;
-                        char *nb = realloc(result, buffer_size);
-                        if (nb) {
-                            result = nb;
-                        }
-                    }
-                    memcpy(result + result_pos, expanded, el);
-                    result_pos += el;
-                    free(expanded);
-                }
-            }
-            i = sigil_end;
-            continue;
-        }
-
+        /// `@` and `%` kind sigils are bare-word-only: like `~` tilde
+        /// expansion, double quotes suppress them, so a quoted string stays a
+        /// literal -- `printf "%s\n"`, `"user@host"`, and `"100% off"` all
+        /// survive.  The tokenizer recognizes a bare sigil only at word start
+        /// (never mid-word), so expanding `@`/`%` anywhere inside quotes here
+        /// would itself violate the SEMANTICS §3.6 invariant that quoting does
+        /// not change presentation: `echo user@host` and `echo "user@host"`
+        /// must agree.  Inside quotes, list interpolation uses the `$` form,
+        /// `"${arr[@]}"`, handled below.
         if (str[i] == '$' && i + 1 < len) {
             /// NOTE: ANSI-C quoting $'...' is NOT expanded inside double quotes
             /// per POSIX/bash behavior. It's only recognized at the outer
