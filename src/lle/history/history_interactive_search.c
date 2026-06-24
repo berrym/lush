@@ -207,10 +207,18 @@ static bool perform_search(void) {
     /// Re-rank by frecency when configured. The search assigns a relevance
     /// score; frecency replaces it with usage-weighted recency so the entries
     /// a user actually returns to surface first. recency keeps the search's
-    /// own newest-first ordering.
+    /// own newest-first ordering. When directory-context is enabled, commands
+    /// recorded in the current directory get a boost (cwd passed through).
     if (config.history_finder_rank == HISTORY_FINDER_RANK_FRECENCY) {
+        char cwd[LLE_HISTORY_MAX_PATH_LENGTH];
+        const char *cwd_arg = NULL;
+        if (config.history_frecency_directory_context &&
+            lle_history_get_cwd(cwd, sizeof(cwd)) == LLE_SUCCESS) {
+            cwd_arg = cwd;
+        }
         lle_history_search_results_rerank_frecency(
-            session->results, session->history_core, (uint64_t)time(NULL));
+            session->results, session->history_core, (uint64_t)time(NULL),
+            cwd_arg);
     }
 
     /// Update statistics
