@@ -263,6 +263,17 @@ lle_result_t lle_history_previous(lle_editor_t *editor);
 lle_result_t lle_history_next(lle_editor_t *editor);
 
 /**
+ * @brief End the history navigation session and free its snapshot
+ *
+ * Called when the user edits the line, accepts it, or a new readline session
+ * begins, so the next up-arrow rebuilds the candidate list from the current
+ * line. Safe to call when no session is active.
+ *
+ * @param editor Editor instance
+ */
+void lle_history_nav_session_end(lle_editor_t *editor);
+
+/**
  * @brief Reverse incremental search (Ctrl-R)
  *
  * Interactive search backward through history

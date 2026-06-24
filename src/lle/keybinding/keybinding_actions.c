@@ -2002,146 +2002,160 @@ static uint32_t hash_command_string(const char *cmd) {
     return hash;
 }
 
-/**
- * @brief Clear the navigation seen set
- * @param editor Editor instance
- */
-static void history_nav_clear_seen(lle_editor_t *editor) {
-    if (editor) {
-        editor->history_nav_seen_count = 0;
-    }
-}
-
-/**
- * @brief Check if a command hash has been seen during navigation
- * @param editor Editor instance
- * @param hash Command hash to check
- * @return true if already seen, false otherwise
- */
-static bool history_nav_is_seen(lle_editor_t *editor, uint32_t hash) {
-    if (!editor || !editor->history_nav_seen_hashes) {
-        return false;
-    }
-
-    for (size_t i = 0; i < editor->history_nav_seen_count; i++) {
-        if (editor->history_nav_seen_hashes[i] == hash) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * @brief Add a command hash to the seen set
- * @param editor Editor instance
- * @param hash Command hash to mark as seen
- */
-static void history_nav_mark_seen(lle_editor_t *editor, uint32_t hash) {
-    if (!editor)
-        return;
-
-    /// Lazy initialization of seen hash array
-    if (!editor->history_nav_seen_hashes) {
-        editor->history_nav_seen_capacity = 64; /// Reasonable initial capacity
-        editor->history_nav_seen_hashes =
-            calloc(editor->history_nav_seen_capacity, sizeof(uint32_t));
-        if (!editor->history_nav_seen_hashes) {
-            return; /// Allocation failed, degrade gracefully
-        }
-        editor->history_nav_seen_count = 0;
-    }
-
-    /// Grow array if needed
-    if (editor->history_nav_seen_count >= editor->history_nav_seen_capacity) {
-        size_t new_capacity = editor->history_nav_seen_capacity * 2;
-        uint32_t *new_hashes = realloc(editor->history_nav_seen_hashes,
-                                       new_capacity * sizeof(uint32_t));
-        if (!new_hashes) {
-            return; /// Allocation failed, degrade gracefully
-        }
-        editor->history_nav_seen_hashes = new_hashes;
-        editor->history_nav_seen_capacity = new_capacity;
-    }
-
-    editor->history_nav_seen_hashes[editor->history_nav_seen_count++] = hash;
-}
-
 /* ============================================================================
- * NAVIGATION DISPLAY STACK HELPERS (issue #40 - symmetric navigation)
+ * HISTORY NAVIGATION SESSION
+ *
+ * One cursor over a fixed, ordered, deduped candidate list of history indices
+ * (newest first), built when navigation starts. Replaces the former
+ * navigation-position + seen-hash-set + display-stack mechanisms: a single
+ * cursor makes up and down symmetric by construction and behaves correctly
+ * under mixed up/down sequences.
  * ============================================================================
  */
 
 /**
- * @brief Clear the navigation display stack
+ * @brief End the navigation session and free its snapshot
  * @param editor Editor instance
  */
-static void history_nav_clear_display_stack(lle_editor_t *editor) {
-    if (editor) {
-        editor->history_nav_display_count = 0;
-    }
-}
-
-/**
- * @brief Push an entry index onto the display stack
- * @param editor Editor instance
- * @param index Entry index to push
- */
-static void history_nav_push_display(lle_editor_t *editor, size_t index) {
-    if (!editor)
+void lle_history_nav_session_end(lle_editor_t *editor) {
+    if (!editor) {
         return;
-
-    /// Lazy initialization of display stack
-    if (!editor->history_nav_display_stack) {
-        editor->history_nav_display_capacity = 64;
-        editor->history_nav_display_stack =
-            calloc(editor->history_nav_display_capacity, sizeof(size_t));
-        if (!editor->history_nav_display_stack) {
-            return; /// Allocation failed, degrade gracefully
-        }
-        editor->history_nav_display_count = 0;
     }
-
-    /// Grow array if needed
-    if (editor->history_nav_display_count >=
-        editor->history_nav_display_capacity) {
-        size_t new_capacity = editor->history_nav_display_capacity * 2;
-        size_t *new_stack = realloc(editor->history_nav_display_stack,
-                                    new_capacity * sizeof(size_t));
-        if (!new_stack) {
-            return; /// Allocation failed, degrade gracefully
-        }
-        editor->history_nav_display_stack = new_stack;
-        editor->history_nav_display_capacity = new_capacity;
-    }
-
-    editor->history_nav_display_stack[editor->history_nav_display_count++] =
-        index;
+    free(editor->history_nav_original);
+    editor->history_nav_original = NULL;
+    free(editor->history_nav_candidates);
+    editor->history_nav_candidates = NULL;
+    editor->history_nav_count = 0;
+    editor->history_nav_capacity = 0;
+    editor->history_nav_cursor = -1;
+    editor->history_nav_active = false;
 }
 
 /**
- * @brief Pop an entry index from the display stack
- * @param editor Editor instance
- * @param index Output for popped index
- * @return true if an index was popped, false if stack was empty
+ * @brief Append a history index to the session's candidate list
+ * @return true on success, false on allocation failure
  */
-static bool history_nav_pop_display(lle_editor_t *editor, size_t *index) {
-    if (!editor || !index || editor->history_nav_display_count == 0) {
-        return false;
+static bool nav_candidates_append(lle_editor_t *editor, size_t idx) {
+    if (editor->history_nav_count >= editor->history_nav_capacity) {
+        size_t cap = editor->history_nav_capacity
+                         ? editor->history_nav_capacity * 2
+                         : 64;
+        size_t *grown =
+            realloc(editor->history_nav_candidates, cap * sizeof(size_t));
+        if (!grown) {
+            return false;
+        }
+        editor->history_nav_candidates = grown;
+        editor->history_nav_capacity = cap;
     }
-
-    editor->history_nav_display_count--;
-    *index =
-        editor->history_nav_display_stack[editor->history_nav_display_count];
+    editor->history_nav_candidates[editor->history_nav_count++] = idx;
     return true;
 }
 
 /**
- * @brief Check if the display stack is empty
+ * @brief Build the candidate list (newest first) for a navigation session
+ *
+ * Includes active entries only. Honors the existing navigation-dedup configs:
+ * lle_dedup_navigation skips entries equal to the line being edited, and
+ * lle_dedup_navigation_unique shows each distinct command at most once. (A
+ * later change adds the history.search_mode prefix filter here.)
+ *
  * @param editor Editor instance
- * @return true if stack is empty, false otherwise
+ * @param original The line being edited when navigation started (may be NULL)
  */
-static bool history_nav_display_stack_empty(lle_editor_t *editor) {
-    return !editor || editor->history_nav_display_count == 0;
+static void nav_build_candidates(lle_editor_t *editor, const char *original) {
+    editor->history_nav_count = 0;
+    size_t entry_count = 0;
+    if (lle_history_get_entry_count(editor->history_system, &entry_count) !=
+            LLE_SUCCESS ||
+        entry_count == 0) {
+        return;
+    }
+
+    bool skip_current = config.lle_dedup_navigation;
+    bool unique_only = config.lle_dedup_navigation_unique;
+
+    /// Local seen-hash set for unique-only dedup (freed before returning).
+    uint32_t *seen = NULL;
+    size_t seen_count = 0;
+    size_t seen_cap = 0;
+
+    for (size_t i = entry_count; i > 0; i--) {
+        size_t idx = i - 1;
+        lle_history_entry_t *entry = NULL;
+        if (lle_history_get_entry_by_index(editor->history_system, idx,
+                                           &entry) != LLE_SUCCESS ||
+            !entry || !entry->command) {
+            continue;
+        }
+        if (entry->state != LLE_HISTORY_STATE_ACTIVE) {
+            continue;
+        }
+        if (skip_current && original &&
+            history_nav_strings_equal(entry->command, original)) {
+            continue; /// Don't re-offer the line already being edited
+        }
+        if (unique_only) {
+            uint32_t h = hash_command_string(entry->command);
+            bool dup = false;
+            for (size_t s = 0; s < seen_count; s++) {
+                if (seen[s] == h) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (dup) {
+                continue;
+            }
+            if (seen_count >= seen_cap) {
+                size_t nc = seen_cap ? seen_cap * 2 : 64;
+                uint32_t *g = realloc(seen, nc * sizeof(uint32_t));
+                if (g) {
+                    seen = g;
+                    seen_cap = nc;
+                }
+            }
+            if (seen_count < seen_cap) {
+                seen[seen_count++] = h;
+            }
+        }
+        if (!nav_candidates_append(editor, idx)) {
+            break;
+        }
+    }
+
+    free(seen);
+}
+
+/**
+ * @brief Load the entry at the session cursor into the buffer
+ *
+ * Cursor -1 restores the original line; 0..count-1 loads that candidate. The
+ * buffer cursor is moved to the end of the line.
+ */
+static void nav_show_cursor(lle_editor_t *editor) {
+    lle_buffer_clear(editor->buffer);
+
+    const char *text = NULL;
+    if (editor->history_nav_cursor < 0) {
+        text = editor->history_nav_original;
+    } else {
+        lle_history_entry_t *entry = NULL;
+        size_t idx = editor->history_nav_candidates[editor->history_nav_cursor];
+        if (lle_history_get_entry_by_index(editor->history_system, idx,
+                                           &entry) == LLE_SUCCESS &&
+            entry && entry->command) {
+            text = entry->command;
+        }
+    }
+
+    if (text && *text) {
+        lle_buffer_insert_text(editor->buffer, 0, text, strlen(text));
+    }
+    if (editor->cursor_manager) {
+        lle_cursor_manager_move_to_byte_offset(
+            editor->cursor_manager, editor->buffer->cursor.byte_offset);
+    }
 }
 
 /**
@@ -2154,73 +2168,21 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    size_t entry_count = 0;
-    lle_result_t result =
-        lle_history_get_entry_count(editor->history_system, &entry_count);
-    if (result != LLE_SUCCESS || entry_count == 0) {
-        return LLE_SUCCESS; /// No history
+    /// Start a session on the first up: snapshot the current line (restored
+    /// when navigation returns to the bottom) and build the candidate list.
+    if (!editor->history_nav_active) {
+        const char *cur = get_current_buffer_content(editor);
+        free(editor->history_nav_original);
+        editor->history_nav_original = strdup(cur ? cur : "");
+        nav_build_candidates(editor, editor->history_nav_original);
+        editor->history_nav_cursor = -1;
+        editor->history_nav_active = true;
     }
 
-    /// Check if navigation-time deduplication is enabled (default: true)
-    bool dedup_enabled = config.lle_dedup_navigation;
-
-    /// Check if unique-only navigation is enabled (default: true)
-    /// When enabled, each command is shown at most once per navigation session
-    bool unique_only = config.lle_dedup_navigation_unique;
-
-    /// Get current buffer content for deduplication comparison
-    const char *current_content =
-        dedup_enabled ? get_current_buffer_content(editor) : NULL;
-
-    /// Move backward in history (toward older entries), skipping duplicates if
-    /// enabled
-    while (editor->history_navigation_pos < entry_count) {
-        size_t idx = entry_count - 1 - editor->history_navigation_pos;
-        lle_history_entry_t *entry = NULL;
-        result =
-            lle_history_get_entry_by_index(editor->history_system, idx, &entry);
-
-        editor->history_navigation_pos++; /// Always advance position
-
-        if (result == LLE_SUCCESS && entry && entry->command) {
-            /// Skip deleted/archived/corrupted entries (issue #42)
-            if (entry->state != LLE_HISTORY_STATE_ACTIVE) {
-                continue; /// Skip non-active entry
-            }
-
-            /// Skip if dedup enabled and this entry matches current buffer
-            /// content
-            if (dedup_enabled && current_content &&
-                history_nav_strings_equal(entry->command, current_content)) {
-                continue; /// Skip duplicate, try next older entry
-            }
-
-            /// Skip if unique-only mode and we've already seen this command
-            if (unique_only) {
-                uint32_t cmd_hash = hash_command_string(entry->command);
-                if (history_nav_is_seen(editor, cmd_hash)) {
-                    continue; /// Already shown this command, skip it
-                }
-                /// Mark as seen for future navigation
-                history_nav_mark_seen(editor, cmd_hash);
-            }
-
-            /// Found entry to display - push onto display stack for symmetric
-            /// down navigation (issue #40)
-            history_nav_push_display(editor, idx);
-
-            lle_buffer_clear(editor->buffer);
-            lle_buffer_insert_text(editor->buffer, 0, entry->command,
-                                   strlen(entry->command));
-
-            /// CRITICAL: Sync cursor_manager after insertion moves cursor to
-            /// end
-            if (editor->cursor_manager) {
-                lle_cursor_manager_move_to_byte_offset(
-                    editor->cursor_manager, editor->buffer->cursor.byte_offset);
-            }
-            break; /// Found and displayed entry, done
-        }
+    /// Move toward older entries; stop at the oldest.
+    if ((size_t)(editor->history_nav_cursor + 1) < editor->history_nav_count) {
+        editor->history_nav_cursor++;
+        nav_show_cursor(editor);
     }
 
     return LLE_SUCCESS;
@@ -2229,8 +2191,9 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
 /**
  * @brief Navigate to next history entry (C-n, DOWN in single-line mode)
  *
- * Uses the display stack to retrace exactly the entries shown during up
- * navigation, providing symmetric behavior (issue #40).
+ * Moves the session cursor toward newer entries, exactly retracing the up
+ * path. At the bottom the original line is restored; the session stays active
+ * so a following up resumes without a rebuild.
  *
  * @param editor Editor instance
  * @return LLE_SUCCESS on success, error code on failure
@@ -2240,78 +2203,14 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /// If display stack is empty, we're already at the current line
-    if (history_nav_display_stack_empty(editor)) {
+    /// Not navigating, or already at the original line: nothing to do.
+    if (!editor->history_nav_active || editor->history_nav_cursor < 0) {
         return LLE_SUCCESS;
     }
 
-    /// Pop the current entry from display stack (the one we're currently
-    /// viewing) This removes it so the next "up" will show it again
-    size_t current_idx;
-    if (!history_nav_pop_display(editor, &current_idx)) {
-        /// Stack was empty - back to current line
-        lle_buffer_clear(editor->buffer);
-        history_nav_clear_seen(editor);
-        history_nav_clear_display_stack(editor);
-        editor->history_navigation_pos = 0;
-        return LLE_SUCCESS;
-    }
-
-    /// Also remove from seen set so it can be shown again on next up navigation
-    /// Note: We don't have a remove-from-seen function, but that's okay because
-    /// the seen set prevents showing duplicates during a single up-navigation
-    /// session. When we go down and then up again, we want to see the entry.
-    /// The simplest fix is to clear the seen set when we start going down,
-    /// but that would break if user goes up-down-up-down randomly.
-    ///
-    /// Better approach: Don't clear seen set. The entry will still be in the
-    /// seen set, but since we popped it from display stack, pressing up again
-    /// will find the NEXT unseen entry. This is actually correct behavior.
-
-    /// Check if there's another entry on the stack to display
-    if (history_nav_display_stack_empty(editor)) {
-        /// Stack is now empty - back to current line
-        lle_buffer_clear(editor->buffer);
-        history_nav_clear_seen(editor);
-        history_nav_clear_display_stack(editor);
-        editor->history_navigation_pos = 0;
-
-        /// CRITICAL: Sync cursor_manager after clearing buffer
-        if (editor->cursor_manager) {
-            lle_cursor_manager_move_to_byte_offset(
-                editor->cursor_manager, editor->buffer->cursor.byte_offset);
-        }
-        return LLE_SUCCESS;
-    }
-
-    /// Peek at the next entry on the stack (don't pop - we want to display it)
-    size_t next_idx =
-        editor
-            ->history_nav_display_stack[editor->history_nav_display_count - 1];
-
-    /// Retrieve and display the entry
-    lle_history_entry_t *entry = NULL;
-    lle_result_t result = lle_history_get_entry_by_index(editor->history_system,
-                                                         next_idx, &entry);
-
-    if (result == LLE_SUCCESS && entry && entry->command) {
-        lle_buffer_clear(editor->buffer);
-        lle_buffer_insert_text(editor->buffer, 0, entry->command,
-                               strlen(entry->command));
-
-        /// Update navigation position to match the displayed entry
-        size_t entry_count = 0;
-        lle_history_get_entry_count(editor->history_system, &entry_count);
-        if (entry_count > 0) {
-            editor->history_navigation_pos = entry_count - next_idx;
-        }
-
-        /// CRITICAL: Sync cursor_manager after insertion moves cursor to end
-        if (editor->cursor_manager) {
-            lle_cursor_manager_move_to_byte_offset(
-                editor->cursor_manager, editor->buffer->cursor.byte_offset);
-        }
-    }
+    editor
+        ->history_nav_cursor--; /// Toward newer; -1 restores the original line
+    nav_show_cursor(editor);
 
     return LLE_SUCCESS;
 }

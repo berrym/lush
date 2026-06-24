@@ -20,6 +20,7 @@
 #include "lle/display_integration.h"
 #include "lle/error_handling.h"
 #include "lle/history.h"
+#include "lle/keybinding_actions.h"
 #include "lle/lle_editor.h"
 #include "lle/lle_readline.h"
 #include "lle/lle_shell_error_bridge.h"
@@ -694,8 +695,7 @@ void lle_soft_reset(void) {
     }
 
     /// Reset history navigation
-    editor->history_navigation_pos = 0;
-    editor->history_nav_seen_count = 0;
+    lle_history_nav_session_end(editor);
 }
 
 /**

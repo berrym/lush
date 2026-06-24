@@ -19,6 +19,7 @@
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/keybinding.h"
+#include "lle/keybinding_actions.h"
 #include "lle/kill_ring.h"
 #include "lle/memory_management.h"
 #include "lle/widget_hooks.h"
@@ -232,21 +233,8 @@ lle_result_t lle_editor_destroy(lle_editor_t *editor) {
         editor->vi_state = NULL;
     }
 
-    /// Free history navigation seen hashes array
-    if (editor->history_nav_seen_hashes) {
-        free(editor->history_nav_seen_hashes);
-        editor->history_nav_seen_hashes = NULL;
-        editor->history_nav_seen_count = 0;
-        editor->history_nav_seen_capacity = 0;
-    }
-
-    /// Free history navigation display stack (issue #40 symmetric navigation)
-    if (editor->history_nav_display_stack) {
-        free(editor->history_nav_display_stack);
-        editor->history_nav_display_stack = NULL;
-        editor->history_nav_display_count = 0;
-        editor->history_nav_display_capacity = 0;
-    }
+    /// Free history navigation session snapshot
+    lle_history_nav_session_end(editor);
 
     /// Destroy keybinding manager
     if (editor->keybinding_manager) {

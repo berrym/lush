@@ -25,6 +25,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/types.h> /// ssize_t (history navigation cursor)
 
 /* ============================================================================
  * FORWARD DECLARATIONS
@@ -94,23 +95,24 @@ typedef struct lle_editor {
     lle_history_core_t *history_system; ///< Command history
     lle_history_buffer_integration_t
         *history_buffer_integration; ///< History<->buffer bridge
-    size_t history_navigation_pos; /* Current position in history navigation (0
-                                      = current line) */
-    bool history_search_active;    ///< Interactive search active
-    int history_search_direction;  ///< 1=forward, -1=reverse
+    bool history_search_active;      ///< Interactive (Ctrl-R) search active
+    int history_search_direction;    ///< 1=forward, -1=reverse
 
-    /// Unique-only navigation tracking (for lle_dedup_navigation_unique)
-    uint32_t
-        *history_nav_seen_hashes;  ///< Hash set of commands seen this session
-    size_t history_nav_seen_count; ///< Number of seen hashes
-    size_t history_nav_seen_capacity; ///< Capacity of seen hash array
-
-    /* Navigation display stack for symmetric up/down navigation (issue #40)
-     * Tracks which entries were actually displayed during up navigation
-     * so down navigation can retrace the exact same path in reverse */
-    size_t *history_nav_display_stack;   ///< Stack of displayed entry indices
-    size_t history_nav_display_count;    ///< Current stack depth
-    size_t history_nav_display_capacity; ///< Stack capacity
+    /// History navigation session (up/down browsing).
+    ///
+    /// A snapshot taken when navigation starts: one cursor over a fixed,
+    /// ordered, deduped candidate list of history indices (newest first),
+    /// replacing the former navigation-position + seen-hash-set +
+    /// display-stack trio. A single cursor makes up and down symmetric by
+    /// construction and gives correct mixed up/down behavior. The candidate
+    /// list is built per history.search_mode (prefix or plain). See
+    /// keybinding_actions.c.
+    bool history_nav_active;        ///< A navigation session is in progress
+    char *history_nav_original;     ///< User's line before nav (cursor == -1)
+    size_t *history_nav_candidates; ///< History indices, newest first (owned)
+    size_t history_nav_count;       ///< Number of candidates
+    size_t history_nav_capacity;    ///< Allocated candidate capacity
+    ssize_t history_nav_cursor; ///< -1 = original line; 0..count-1 = candidate
 
     /// Display and output
     lle_display_controller_t *display_controller; ///< Display management
