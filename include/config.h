@@ -169,6 +169,19 @@ typedef enum {
 } autosuggestion_dismiss_policy_t;
 
 /**
+ * @brief Which history prefix match to suggest as the ghost text
+ *
+ * `recency` suggests the most recent history entry starting with the typed
+ * prefix (Fish-style, the classic behavior). `frecency` suggests the prefix
+ * match with the highest frecency score (usage frequency weighted by recency)
+ * -- the command the user actually returns to, the lush default.
+ */
+typedef enum {
+    AUTOSUGGESTION_RANK_FRECENCY, ///< Highest frecency prefix match (lush)
+    AUTOSUGGESTION_RANK_RECENCY   ///< Most recent prefix match (others)
+} autosuggestion_rank_t;
+
+/**
  * @brief History up/down navigation search mode
  *
  * Controls which history entries up/down arrows cycle through. `prefix` filters
@@ -371,6 +384,8 @@ typedef struct {
     /// Autosuggestion settings
     autosuggestion_dismiss_policy_t
         autosuggestion_dismiss_policy; ///< When to clear the ghost text
+    autosuggestion_rank_t
+        autosuggestion_rank; ///< Which prefix match to suggest
 
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
@@ -625,6 +640,14 @@ bool config_validate_completion_match_mode(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_autosuggestion_dismiss_policy(const char *value);
+
+/**
+ * @brief Validate an autosuggestion rank value
+ *
+ * @param value Rank string ("frecency" or "recency")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_autosuggestion_rank(const char *value);
 
 /**
  * @brief Validate a history search mode value
