@@ -64,17 +64,18 @@ typedef enum {
  * Enumerates the different sections in configuration files.
  */
 typedef enum {
-    CONFIG_SECTION_NONE,       ///< No section (default)
-    CONFIG_SECTION_HISTORY,    ///< History settings
-    CONFIG_SECTION_COMPLETION, ///< Completion settings
-    CONFIG_SECTION_PROMPT,     ///< Prompt settings
-    CONFIG_SECTION_BEHAVIOR,   ///< Behavior settings
-    CONFIG_SECTION_ALIASES,    ///< Alias definitions
-    CONFIG_SECTION_KEYS,       ///< Key binding settings
-    CONFIG_SECTION_NETWORK,    ///< Network settings
-    CONFIG_SECTION_SCRIPTS,    ///< Script settings
-    CONFIG_SECTION_SHELL,      ///< Shell options
-    CONFIG_SECTION_DISPLAY     ///< Display settings
+    CONFIG_SECTION_NONE,          ///< No section (default)
+    CONFIG_SECTION_HISTORY,       ///< History settings
+    CONFIG_SECTION_COMPLETION,    ///< Completion settings
+    CONFIG_SECTION_PROMPT,        ///< Prompt settings
+    CONFIG_SECTION_BEHAVIOR,      ///< Behavior settings
+    CONFIG_SECTION_ALIASES,       ///< Alias definitions
+    CONFIG_SECTION_KEYS,          ///< Key binding settings
+    CONFIG_SECTION_NETWORK,       ///< Network settings
+    CONFIG_SECTION_SCRIPTS,       ///< Script settings
+    CONFIG_SECTION_SHELL,         ///< Shell options
+    CONFIG_SECTION_DISPLAY,       ///< Display settings
+    CONFIG_SECTION_AUTOSUGGESTION ///< Autosuggestion settings
 } config_section_t;
 
 /**
@@ -150,6 +151,22 @@ typedef enum {
     COMPLETION_MATCH_SUBSTRING, ///< NFC substring containment
     COMPLETION_MATCH_FUZZY      ///< fzy-style scoring (default in lush)
 } completion_match_mode_t;
+
+/**
+ * @brief Autosuggestion dismiss policy
+ *
+ * Controls when the autosuggestion ghost text is cleared while typing.
+ * `on_deviation` keeps the suggestion alive as long as each keystroke (spaces
+ * included) still matches it, clearing only on a deviation -- the intuitive
+ * default. `on_word_boundary` clears the suggestion whenever the buffer ends at
+ * a word boundary (a trailing space), the quieter legacy behavior.
+ */
+typedef enum {
+    AUTOSUGGESTION_DISMISS_ON_DEVIATION,    ///< Clear only on a non-matching
+                                            ///< keystroke (lush default)
+    AUTOSUGGESTION_DISMISS_ON_WORD_BOUNDARY ///< Clear at a trailing-space word
+                                            ///< boundary
+} autosuggestion_dismiss_policy_t;
 
 /**
  * @brief Configuration context structure
@@ -292,6 +309,10 @@ typedef struct {
     bool display_lle_pager_enabled;     ///< Master switch for pagination
     int display_lle_pager_min_lines;    ///< Threshold rows; 0 = terminal_rows
     bool display_lle_pager_wrap_search; ///< Wrap to top on search no-match
+
+    /// Autosuggestion settings
+    autosuggestion_dismiss_policy_t
+        autosuggestion_dismiss_policy; ///< When to clear the ghost text
 
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
@@ -538,6 +559,14 @@ bool config_validate_lle_arrow_mode(const char *value);
  * @return true if valid match mode, false otherwise
  */
 bool config_validate_completion_match_mode(const char *value);
+
+/**
+ * @brief Validate an autosuggestion dismiss policy value
+ *
+ * @param value Policy string ("on_deviation" or "on_word_boundary")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_autosuggestion_dismiss_policy(const char *value);
 
 /**
  * @brief Validate an LLE storage mode value
