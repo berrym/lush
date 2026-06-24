@@ -488,6 +488,12 @@ static void update_autosuggestion(readline_context_t *ctx) {
     lle_history_get_entry_count(history, &count);
 
     if (count == 0) {
+        /// No history to match against, but the completion fallback can still
+        /// suggest a filesystem path when configured.
+        if (config.autosuggestion_sources ==
+            AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION) {
+            autosuggestion_from_completion(ctx);
+        }
         return;
     }
 
@@ -1430,15 +1436,17 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         }
 
         /// Directory-chain (issue #85): if the accepted item was a
-        /// directory and completion.chain_directories is on, re-trigger
-        /// completion at the new cursor position so the next-level menu
-        /// opens immediately. Mirrors the same gate at the TAB
-        /// single-match site in keybinding_actions.c.
+        /// directory and completion.chain_directories is on, open the
+        /// next-level menu so the directory's contents are revealed. Uses
+        /// lle_complete_directory_chain (not lle_complete) so the chain never
+        /// auto-descends past the "/" or previews a child into the buffer.
+        /// Mirrors the same gate at the TAB single-match site in
+        /// keybinding_actions.c.
         bool chain = false;
         (void)config_registry_get_boolean("completion.chain_directories",
                                           &chain);
         if (selected_was_directory && chain && ctx->editor) {
-            (void)lle_complete(ctx->editor);
+            (void)lle_complete_directory_chain(ctx->editor);
         }
 
         /// Directory selections leave the cursor inside an open

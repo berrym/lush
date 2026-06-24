@@ -469,6 +469,20 @@ lle_result_t lle_smart_down_arrow_context(struct readline_context *ctx);
 lle_result_t lle_complete(lle_editor_t *editor);
 
 /**
+ * @brief Open the next-level completion menu after a directory was completed
+ *
+ * Used by the directory chain (completion.chain_directories): completing into a
+ * directory reveals its contents fish-style, but unlike lle_complete this never
+ * auto-accepts a single match and never previews a candidate into the buffer.
+ * The buffer stays at the directory boundary; the user picks the next level
+ * explicitly. This is what stops a single TAB from descending past the "/".
+ *
+ * @param editor Editor instance
+ * @return LLE_SUCCESS or error code
+ */
+lle_result_t lle_complete_directory_chain(lle_editor_t *editor);
+
+/**
  * @brief List possible completions (Meta-?)
  *
  * Shows all possible completions for current word

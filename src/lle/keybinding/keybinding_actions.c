@@ -2455,19 +2455,19 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         lle_word_context_free(splice_context);
 
         /// Directory-chain (issue #85): if the accepted item was a
-        /// directory and completion.chain_directories is on, recurse
-        /// into lle_complete() instead of clearing. This re-triggers
-        /// completion at the new cursor position (after the inserted
-        /// "/") so the next-level menu opens immediately, fish-style.
-        /// The buffer + cursor are already updated by the splice, so
-        /// re-entry is clean.
+        /// directory and completion.chain_directories is on, open the
+        /// next-level menu at the new cursor position (after the inserted
+        /// "/") so the directory's contents are revealed fish-style. This
+        /// uses lle_complete_directory_chain rather than lle_complete so a
+        /// single TAB never auto-accepts a lone child or previews one into
+        /// the buffer -- the buffer stays at the directory boundary.
         bool chain = false;
         (void)config_registry_get_boolean("completion.chain_directories",
                                           &chain);
         if (replace_result == LLE_SUCCESS && chain &&
             synthetic_item.type == LLE_COMPLETION_TYPE_DIRECTORY) {
             lle_completion_system_clear(editor->completion_system);
-            return lle_complete(editor);
+            return lle_complete_directory_chain(editor);
         }
 
         /// Single-match path consumed the active completion state;
@@ -2501,6 +2501,46 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         }
         display_controller_set_completion_menu(dc, menu);
     }
+    return LLE_SUCCESS;
+}
+
+lle_result_t lle_complete_directory_chain(lle_editor_t *editor) {
+    if (!editor || !editor->buffer || !editor->completion_system ||
+        !editor->cursor_manager) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    /// Start a fresh session at the position after the inserted "/".
+    lle_completion_system_clear(editor->completion_system);
+
+    lle_cursor_position_t cursor_info;
+    lle_cursor_manager_get_position(editor->cursor_manager, &cursor_info);
+
+    lle_completion_result_t *result = NULL;
+    if (lle_completion_system_generate(
+            editor->completion_system, editor->buffer->data,
+            cursor_info.byte_offset, &result) != LLE_SUCCESS ||
+        !result || result->count == 0) {
+        lle_completion_system_clear(editor->completion_system);
+        return LLE_SUCCESS;
+    }
+
+    /// Open the menu listing the directory's contents. Deliberately no
+    /// single-match auto-accept and no inline preview, even when the directory
+    /// holds exactly one entry: the buffer stays at the directory boundary so a
+    /// single TAB never descends past the "/". The user picks the next level.
+    lle_completion_menu_state_t *menu =
+        lle_completion_system_get_menu(editor->completion_system);
+    if (!menu) {
+        lle_completion_system_clear(editor->completion_system);
+        return LLE_SUCCESS;
+    }
+
+    display_controller_t *dc = display_integration_get_controller();
+    if (dc) {
+        display_controller_set_completion_menu(dc, menu);
+    }
+
     return LLE_SUCCESS;
 }
 
