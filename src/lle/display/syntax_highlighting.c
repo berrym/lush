@@ -299,8 +299,13 @@ static bool is_word_char(char c) {
         return true; /// Any non-ASCII byte is part of a word
     }
 
+    /// `%` and `@` are word characters so a mid-word `%`/`@` (e.g. `+%s`,
+    /// `user@host`) is absorbed into the surrounding word. The kind-sigil
+    /// handler runs before the word scanner, so a word-start `%map`/`@arr` is
+    /// still recognized as a sigil -- matching the executor's bare-word-only
+    /// sigil semantics, where a mid-word `%`/`@` is literal.
     return isalnum(uc) || c == '_' || c == '-' || c == '.' || c == '/' ||
-           c == '~' || c == '+' || c == '@' || c == ':' || c == '=';
+           c == '~' || c == '+' || c == '@' || c == '%' || c == ':' || c == '=';
 }
 
 /**
