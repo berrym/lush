@@ -931,22 +931,201 @@ static int add_token(lle_syntax_highlighter_t *h, lle_syntax_token_type_t type,
  * @param input_len Length of input in bytes
  * @return Number of tokens generated, or -1 on error
  */
-int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
-                         const char *input, size_t input_len) {
-    if (!highlighter || !input)
-        return -1;
+/// Forward declaration: highlight_range and highlight_dquote_interior are
+/// mutually recursive (a double-quoted string may contain `$(...)`, which is a
+/// command list).
+static void highlight_range(lle_syntax_highlighter_t *highlighter,
+                            const char *input, size_t start, size_t end,
+                            bool expect_command);
 
-    highlighter->token_count = 0;
+/// @brief Does a `$` at `pos` begin an expansion active inside double quotes?
+///
+/// True for `${...}`, `$(...)`, `$name`, and the special `$?`/`$@`/`$1`...
+/// forms within [pos, end). Used both to drive interior highlighting and to
+/// decide whether a quoted string needs splitting at all.
+static bool dquote_is_expansion_at(const char *input, size_t pos, size_t end) {
+    if (input[pos] != '$' || pos + 1 >= end) {
+        return false;
+    }
+    char next = input[pos + 1];
+    return next == '{' || next == '(' ||
+           lush_ident_match_start(input + pos + 1, end - pos - 1) > 0 ||
+           next == '?' || next == '#' || next == '@' || next == '*' ||
+           next == '$' || next == '!' || next == '-' || next == '_' ||
+           (next >= '0' && next <= '9');
+}
 
-    size_t pos = 0;
-    bool expect_command = true; /// Next word is a command
+/// @brief Whether [start, end) contains any double-quote-active expansion
+///
+/// A plain string with no expansion is rendered as one span (no redundant color
+/// escapes); only strings that interpolate are split into segments.
+static bool dquote_has_expansion(const char *input, size_t start, size_t end) {
+    size_t pos = start;
+    while (pos < end) {
+        if (input[pos] == '\\' && pos + 1 < end) {
+            pos += 2;
+            continue;
+        }
+        if (dquote_is_expansion_at(input, pos, end)) {
+            return true;
+        }
+        pos++;
+    }
+    return false;
+}
+
+/// @brief Highlight the interior of a double-quoted string [start, end)
+///
+/// Emits LLE_TOKEN_STRING_DOUBLE for literal runs and recurses into the
+/// $-expansions active inside double quotes -- `$name`, `${...}`, `$(...)`,
+/// `$((...))`, and the special `$?`/`$@`/`$1`... forms -- so an interpolated
+/// variable is colored distinctly from the surrounding string. A backslash
+/// escapes the next byte (kept part of the literal run).
+static void highlight_dquote_interior(lle_syntax_highlighter_t *highlighter,
+                                      const char *input, size_t start,
+                                      size_t end) {
+    size_t pos = start;
+    size_t lit_start = start; /// start of the current literal run
+
+    while (pos < end) {
+        char ch = input[pos];
+
+        /// Backslash escapes the next byte inside double quotes.
+        if (ch == '\\' && pos + 1 < end) {
+            pos += 2;
+            continue;
+        }
+
+        if (ch == '$' && pos + 1 < end) {
+            char next = input[pos + 1];
+
+            if (dquote_is_expansion_at(input, pos, end)) {
+                /// Flush the literal run accumulated before this `$`.
+                if (pos > lit_start) {
+                    add_token(highlighter, LLE_TOKEN_STRING_DOUBLE, lit_start,
+                              pos);
+                }
+                size_t dollar_start = pos;
+
+                if (next == '(' && pos + 2 < end && input[pos + 2] == '(') {
+                    /// $((...)) arithmetic
+                    pos += 3;
+                    int depth = 1;
+                    while (pos < end && depth > 0) {
+                        if (pos + 1 < end && input[pos] == '(' &&
+                            input[pos + 1] == '(') {
+                            depth++;
+                            pos++;
+                        } else if (pos + 1 < end && input[pos] == ')' &&
+                                   input[pos + 1] == ')') {
+                            depth--;
+                            pos++;
+                        }
+                        pos++;
+                    }
+                    add_token(highlighter, LLE_TOKEN_ARITHMETIC, dollar_start,
+                              pos);
+                } else if (next == '(') {
+                    /// $(...) command sub: $( opener, recurse, ) closer
+                    pos += 2;
+                    add_token(highlighter, LLE_TOKEN_VARIABLE, dollar_start,
+                              pos);
+                    size_t inner = pos;
+                    int depth = 1;
+                    while (pos < end && depth > 0) {
+                        if (input[pos] == '(') {
+                            depth++;
+                        } else if (input[pos] == ')') {
+                            depth--;
+                            if (depth == 0) {
+                                break;
+                            }
+                        }
+                        pos++;
+                    }
+                    if (pos > inner) {
+                        highlight_range(highlighter, input, inner, pos, true);
+                    }
+                    if (pos < end && input[pos] == ')') {
+                        size_t cs = pos;
+                        pos++;
+                        add_token(highlighter, LLE_TOKEN_VARIABLE, cs, pos);
+                    }
+                } else if (next == '{') {
+                    /// ${...}
+                    pos += 2;
+                    int depth = 1;
+                    while (pos < end && depth > 0) {
+                        if (input[pos] == '{') {
+                            depth++;
+                        } else if (input[pos] == '}') {
+                            depth--;
+                        }
+                        pos++;
+                    }
+                    add_token(highlighter, LLE_TOKEN_VARIABLE, dollar_start,
+                              pos);
+                } else if (next == '?' || next == '#' || next == '@' ||
+                           next == '*' || next == '$' || next == '!' ||
+                           next == '-' || next == '_' ||
+                           (next >= '0' && next <= '9')) {
+                    /// special $X
+                    pos += 2;
+                    add_token(highlighter, LLE_TOKEN_VARIABLE_SPECIAL,
+                              dollar_start, pos);
+                } else {
+                    /// $name
+                    pos++;
+                    while (pos < end) {
+                        size_t n =
+                            lush_ident_match_continue(input + pos, end - pos);
+                        if (n == 0) {
+                            break;
+                        }
+                        pos += n;
+                    }
+                    add_token(highlighter, LLE_TOKEN_VARIABLE, dollar_start,
+                              pos);
+                }
+
+                lit_start = pos;
+                continue;
+            }
+        }
+
+        pos++;
+    }
+
+    /// Flush the trailing literal run.
+    if (pos > lit_start) {
+        add_token(highlighter, LLE_TOKEN_STRING_DOUBLE, lit_start, pos);
+    }
+}
+
+/// @brief Tokenize the byte range [start, end) of `input` in command context
+///
+/// Appends tokens to the highlighter's flat token list. Re-entrant: the
+/// `$(...)`, backtick, and double-quote handlers recurse into this (or the
+/// string-interior scanner) so nested commands, variables, and expansions get
+/// their own token types instead of one flat span. `input` is the whole shared
+/// buffer; only [start, end) is scanned. `expect_command` seeds whether the
+/// first word is in command position (true for a fresh command list).
+static void highlight_range(lle_syntax_highlighter_t *highlighter,
+                            const char *input, size_t start, size_t end,
+                            bool expect_command) {
+    size_t pos = start;
     bool after_function_keyword =
-        false; /// Previous token was 'function' keyword
+        false;                       /// Previous token was 'function' keyword
+    bool after_for_keyword = false;  /// Previous keyword was 'for'/'select'
+    bool after_case_keyword = false; /// Previous keyword was 'case'
+    bool in_construct_header =
+        false; /// Inside a for/select/case header, before its `in` reserved
+               /// word (cleared by `in` or any body keyword)
 
-    while (pos < input_len) {
+    while (pos < end) {
         /// Skip whitespace
         size_t ws_start = pos;
-        pos = skip_whitespace(input, pos, input_len);
+        pos = skip_whitespace(input, pos, end);
         if (pos > ws_start) {
             add_token(highlighter, LLE_TOKEN_WHITESPACE, ws_start, pos);
             /// Check if whitespace contained a newline - new line = new command
@@ -957,7 +1136,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 }
             }
         }
-        if (pos >= input_len)
+        if (pos >= end)
             break;
 
         char c = input[pos];
@@ -965,7 +1144,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 
         /// Comment
         if (c == '#') {
-            while (pos < input_len && input[pos] != '\n')
+            while (pos < end && input[pos] != '\n')
                 pos++;
             add_token(highlighter, LLE_TOKEN_COMMENT, token_start, pos);
             continue;
@@ -974,12 +1153,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         /// Single-quoted string
         if (c == '\'') {
             pos++;
-            while (pos < input_len && input[pos] != '\'')
+            while (pos < end && input[pos] != '\'')
                 pos++;
-            if (pos < input_len)
+            if (pos < end)
                 pos++; /// Skip closing quote
             add_token(highlighter,
-                      pos <= input_len && input[pos - 1] == '\''
+                      pos <= end && input[pos - 1] == '\''
                           ? LLE_TOKEN_STRING_SINGLE
                           : LLE_TOKEN_UNCLOSED_STRING,
                       token_start, pos);
@@ -987,36 +1166,64 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        /// Double-quoted string
+        /// Double-quoted string: emit the opening quote, highlight the interior
+        /// (literal runs plus interpolated $-expansions), then the closing
+        /// quote -- so an interpolated $var is colored distinctly from the
+        /// string. An unterminated quote is one error span (as before).
         if (c == '"') {
-            pos++;
-            while (pos < input_len && input[pos] != '"') {
-                if (input[pos] == '\\' && pos + 1 < input_len)
-                    pos++;
-                pos++;
+            size_t scan = pos + 1;
+            while (scan < end && input[scan] != '"') {
+                if (input[scan] == '\\' && scan + 1 < end)
+                    scan++;
+                scan++;
             }
-            if (pos < input_len)
-                pos++; /// Skip closing quote
-            add_token(highlighter,
-                      pos <= input_len && input[pos - 1] == '"'
-                          ? LLE_TOKEN_STRING_DOUBLE
-                          : LLE_TOKEN_UNCLOSED_STRING,
-                      token_start, pos);
+            if (scan < end && input[scan] == '"') {
+                if (dquote_has_expansion(input, token_start + 1, scan)) {
+                    /// Interpolated: split into opener, interior segments, and
+                    /// closer so the $-expansions are colored distinctly.
+                    add_token(highlighter, LLE_TOKEN_STRING_DOUBLE, token_start,
+                              token_start + 1);
+                    highlight_dquote_interior(highlighter, input,
+                                              token_start + 1, scan);
+                    add_token(highlighter, LLE_TOKEN_STRING_DOUBLE, scan,
+                              scan + 1);
+                } else {
+                    /// Plain string: a single span (no redundant color
+                    /// escapes).
+                    add_token(highlighter, LLE_TOKEN_STRING_DOUBLE, token_start,
+                              scan + 1);
+                }
+                pos = scan + 1;
+            } else {
+                add_token(highlighter, LLE_TOKEN_UNCLOSED_STRING, token_start,
+                          end);
+                pos = end;
+            }
             expect_command = false;
             continue;
         }
 
-        /// Backtick command substitution
+        /// Backtick command substitution: emit the opening backtick, recurse
+        /// into the interior as a command list, then the closing backtick, so
+        /// the inner command and arguments are highlighted.
         if (c == '`') {
-            pos++;
-            while (pos < input_len && input[pos] != '`') {
-                if (input[pos] == '\\' && pos + 1 < input_len)
+            pos++; /// consume opening backtick
+            add_token(highlighter, LLE_TOKEN_STRING_BACKTICK, token_start, pos);
+            size_t interior_start = pos;
+            while (pos < end && input[pos] != '`') {
+                if (input[pos] == '\\' && pos + 1 < end)
                     pos++;
                 pos++;
             }
-            if (pos < input_len)
+            if (pos > interior_start) {
+                highlight_range(highlighter, input, interior_start, pos, true);
+            }
+            if (pos < end && input[pos] == '`') {
+                size_t close_start = pos;
                 pos++;
-            add_token(highlighter, LLE_TOKEN_STRING_BACKTICK, token_start, pos);
+                add_token(highlighter, LLE_TOKEN_STRING_BACKTICK, close_start,
+                          pos);
+            }
             expect_command = false;
             continue;
         }
@@ -1025,12 +1232,11 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         /// variable when the post-sigil span is a valid identifier.  Other
         /// uses of `@` and `%` (mid-word, extglob `@(...)`, git refs `@{-1}`,
         /// job specs `%1`) fail the identifier check and fall through.
-        if ((c == '@' || c == '%') && pos + 1 < input_len &&
-            lush_ident_match_start(input + pos + 1, input_len - pos - 1) > 0) {
+        if ((c == '@' || c == '%') && pos + 1 < end &&
+            lush_ident_match_start(input + pos + 1, end - pos - 1) > 0) {
             pos++;
-            while (pos < input_len) {
-                size_t n =
-                    lush_ident_match_continue(input + pos, input_len - pos);
+            while (pos < end) {
+                size_t n = lush_ident_match_continue(input + pos, end - pos);
                 if (n == 0) {
                     break;
                 }
@@ -1044,24 +1250,24 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         /// Variable and $-prefixed constructs
         if (c == '$') {
             pos++;
-            if (pos < input_len) {
+            if (pos < end) {
                 char next = input[pos];
                 lle_syntax_token_type_t vtype = LLE_TOKEN_VARIABLE;
 
                 /// ANSI-C quoting: $'...'
                 if (next == '\'') {
                     pos++; /// Skip opening quote
-                    while (pos < input_len && input[pos] != '\'') {
+                    while (pos < end && input[pos] != '\'') {
                         /// Handle escape sequences in ANSI-C strings
-                        if (input[pos] == '\\' && pos + 1 < input_len) {
+                        if (input[pos] == '\\' && pos + 1 < end) {
                             pos++;
                         }
                         pos++;
                     }
-                    if (pos < input_len)
+                    if (pos < end)
                         pos++; /// Skip closing quote
                     add_token(highlighter,
-                              pos <= input_len && input[pos - 1] == '\''
+                              pos <= end && input[pos - 1] == '\''
                                   ? LLE_TOKEN_STRING_ANSIC
                                   : LLE_TOKEN_UNCLOSED_STRING,
                               token_start, pos);
@@ -1069,16 +1275,16 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     continue;
                 }
                 /// Arithmetic expansion: $((...))
-                else if (next == '(' && pos + 1 < input_len &&
+                else if (next == '(' && pos + 1 < end &&
                          input[pos + 1] == '(') {
                     pos += 2; /// Skip ((
                     int depth = 1;
-                    while (pos < input_len && depth > 0) {
-                        if (pos + 1 < input_len && input[pos] == '(' &&
+                    while (pos < end && depth > 0) {
+                        if (pos + 1 < end && input[pos] == '(' &&
                             input[pos + 1] == '(') {
                             depth++;
                             pos++;
-                        } else if (pos + 1 < input_len && input[pos] == ')' &&
+                        } else if (pos + 1 < end && input[pos] == ')' &&
                                    input[pos + 1] == ')') {
                             depth--;
                             pos++;
@@ -1105,7 +1311,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     size_t var_name_start = pos;
                     /// Scan to find end of variable name (before : or } or
                     /// other modifier)
-                    while (pos < input_len && input[pos] != '}' &&
+                    while (pos < end && input[pos] != '}' &&
                            input[pos] != ':' && input[pos] != '#' &&
                            input[pos] != '%' && input[pos] != '/' &&
                            input[pos] != '[') {
@@ -1120,7 +1326,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     }
                     /// Continue to closing brace
                     int depth = 1;
-                    while (pos < input_len && depth > 0) {
+                    while (pos < end && depth > 0) {
                         if (input[pos] == '{')
                             depth++;
                         else if (input[pos] == '}')
@@ -1128,25 +1334,45 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         pos++;
                     }
                 }
-                /// $(...) command substitution
+                /// $(...) command substitution: emit the `$(` opener, recurse
+                /// into the interior as a command list so the inner command and
+                /// its arguments are highlighted, then emit the `)` closer.
                 else if (next == '(') {
+                    pos++; /// consume '(' -- token_start..pos spans "$("
+                    add_token(highlighter, LLE_TOKEN_VARIABLE, token_start,
+                              pos);
+                    size_t interior_start = pos;
                     int depth = 1;
-                    pos++;
-                    while (pos < input_len && depth > 0) {
-                        if (input[pos] == '(')
+                    while (pos < end && depth > 0) {
+                        if (input[pos] == '(') {
                             depth++;
-                        else if (input[pos] == ')')
+                        } else if (input[pos] == ')') {
                             depth--;
+                            if (depth == 0) {
+                                break; /// stop AT the closing paren
+                            }
+                        }
                         pos++;
                     }
+                    if (pos > interior_start) {
+                        highlight_range(highlighter, input, interior_start, pos,
+                                        true);
+                    }
+                    if (pos < end && input[pos] == ')') {
+                        size_t close_start = pos;
+                        pos++;
+                        add_token(highlighter, LLE_TOKEN_VARIABLE, close_start,
+                                  pos);
+                    }
+                    expect_command = false;
+                    continue;
                 }
                 /// Simple $VAR
-                else if (lush_ident_match_start(input + pos, input_len - pos) >
-                         0) {
+                else if (lush_ident_match_start(input + pos, end - pos) > 0) {
                     size_t var_name_start = pos;
-                    while (pos < input_len) {
-                        size_t n = lush_ident_match_continue(input + pos,
-                                                             input_len - pos);
+                    while (pos < end) {
+                        size_t n =
+                            lush_ident_match_continue(input + pos, end - pos);
                         if (n == 0) {
                             break;
                         }
@@ -1169,7 +1395,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         /// Operators
         if (c == '|') {
             pos++;
-            if (pos < input_len && input[pos] == '|') {
+            if (pos < end && input[pos] == '|') {
                 pos++;
                 add_token(highlighter, LLE_TOKEN_OR, token_start, pos);
             } else {
@@ -1181,7 +1407,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 
         if (c == '&') {
             pos++;
-            if (pos < input_len && input[pos] == '&') {
+            if (pos < end && input[pos] == '&') {
                 pos++;
                 add_token(highlighter, LLE_TOKEN_AND, token_start, pos);
                 expect_command = true;
@@ -1204,7 +1430,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             /// tokenization continue for the contents. This enables proper
             /// syntax highlighting of commands inside process substitutions
             /// like: cat <(cat <(echo nested))
-            if (pos + 1 < input_len && input[pos + 1] == '(') {
+            if (pos + 1 < end && input[pos + 1] == '(') {
                 lle_syntax_token_type_t pstype =
                     (c == '<') ? LLE_TOKEN_PROCSUB_IN : LLE_TOKEN_PROCSUB_OUT;
                 pos += 2; /// Skip <( or >(
@@ -1215,7 +1441,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             }
 
             /// Here-string: <<<
-            if (c == '<' && pos + 2 < input_len && input[pos + 1] == '<' &&
+            if (c == '<' && pos + 2 < end && input[pos + 1] == '<' &&
                 input[pos + 2] == '<') {
                 pos += 3; /// Skip <<<
                 add_token(highlighter, LLE_TOKEN_HERESTRING, token_start, pos);
@@ -1224,11 +1450,11 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             }
 
             /// Here-document: << or <<- (with optional quoting of delimiter)
-            if (c == '<' && pos + 1 < input_len && input[pos + 1] == '<' &&
-                (pos + 2 >= input_len || input[pos + 2] != '<')) {
+            if (c == '<' && pos + 1 < end && input[pos + 1] == '<' &&
+                (pos + 2 >= end || input[pos + 2] != '<')) {
                 pos += 2; /// Skip <<
                 /// Check for <<- (strip leading tabs)
-                if (pos < input_len && input[pos] == '-') {
+                if (pos < end && input[pos] == '-') {
                     pos++;
                 }
                 add_token(highlighter, LLE_TOKEN_HEREDOC_OP, token_start, pos);
@@ -1239,8 +1465,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 
             /// Regular redirect: >, >>, <, >&, <&, etc.
             pos++;
-            while (pos < input_len && (input[pos] == '>' || input[pos] == '&' ||
-                                       isdigit((unsigned char)input[pos]))) {
+            while (pos < end && (input[pos] == '>' || input[pos] == '&' ||
+                                 isdigit((unsigned char)input[pos]))) {
                 pos++;
             }
             add_token(highlighter, LLE_TOKEN_REDIRECT, token_start, pos);
@@ -1250,15 +1476,15 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 
         if (c == '(') {
             /// Arithmetic command: (( expr ))
-            if (pos + 1 < input_len && input[pos + 1] == '(') {
+            if (pos + 1 < end && input[pos + 1] == '(') {
                 pos += 2; /// Skip ((
                 int depth = 1;
-                while (pos < input_len && depth > 0) {
-                    if (pos + 1 < input_len && input[pos] == '(' &&
+                while (pos < end && depth > 0) {
+                    if (pos + 1 < end && input[pos] == '(' &&
                         input[pos + 1] == '(') {
                         depth++;
                         pos++;
-                    } else if (pos + 1 < input_len && input[pos] == ')' &&
+                    } else if (pos + 1 < end && input[pos] == ')' &&
                                input[pos + 1] == ')') {
                         depth--;
                         pos++;
@@ -1298,7 +1524,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         }
 
         /// Glob qualifier: *(.) *(/) *(@) - must check before extglob
-        if (is_glob_qualifier(input, pos, input_len)) {
+        if (is_glob_qualifier(input, pos, end)) {
             pos += 4; /// Skip *(X)
             add_token(highlighter, LLE_TOKEN_GLOB_QUAL, token_start, pos);
             expect_command = false;
@@ -1306,10 +1532,10 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         }
 
         /// Extended glob: ?(pat), *(pat), +(pat), @(pat), !(pat)
-        if (is_extglob_start(input, pos, input_len)) {
+        if (is_extglob_start(input, pos, end)) {
             pos += 2; /// Skip ?( or *( etc.
             int depth = 1;
-            while (pos < input_len && depth > 0) {
+            while (pos < end && depth > 0) {
                 if (input[pos] == '(')
                     depth++;
                 else if (input[pos] == ')')
@@ -1327,9 +1553,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             bool has_glob = false;
             bool has_slash = false;
 
-            while (pos < input_len) {
+            while (pos < end) {
                 char ch = input[pos];
-                if (ch == '\\' && pos + 1 < input_len) {
+                if (ch == '\\' && pos + 1 < end) {
                     pos += 2;
                     continue;
                 }
@@ -1352,6 +1578,34 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             /// Determine token type
             lle_syntax_token_type_t type;
 
+            /// for/select/case headers: `in` is the reserved word, and the
+            /// for/select loop variable / case subject are bindings, not
+            /// commands -- color them so they don't read as invalid commands.
+            if (in_construct_header && word_len == 2 &&
+                strncmp(input + token_start, "in", 2) == 0) {
+                in_construct_header = false;
+                after_for_keyword = false;
+                after_case_keyword = false;
+                expect_command = false;
+                add_token(highlighter, LLE_TOKEN_KEYWORD, token_start, pos);
+                continue;
+            }
+            if (after_for_keyword) {
+                /// The loop variable reads like the `$i` that later uses it.
+                after_for_keyword = false;
+                expect_command = false;
+                add_token(highlighter, LLE_TOKEN_VARIABLE, token_start, pos);
+                continue;
+            }
+            if (after_case_keyword) {
+                /// A bare-word case subject (a `$x`/string subject is colored
+                /// by its own handler); either way it is not a command.
+                after_case_keyword = false;
+                expect_command = false;
+                add_token(highlighter, LLE_TOKEN_ARGUMENT, token_start, pos);
+                continue;
+            }
+
             if (expect_command) {
                 /// Extract word for checking
                 char word[256];
@@ -1372,13 +1626,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 else {
                     size_t lookahead = pos;
                     /// Skip optional whitespace between name and ()
-                    while (lookahead < input_len &&
+                    while (lookahead < end &&
                            isspace((unsigned char)input[lookahead])) {
                         lookahead++;
                     }
                     /// Check for ()
                     bool is_posix_func_def = false;
-                    if (lookahead + 1 < input_len && input[lookahead] == '(' &&
+                    if (lookahead + 1 < end && input[lookahead] == '(' &&
                         input[lookahead + 1] == ')') {
                         is_posix_func_def = true;
                     }
@@ -1415,6 +1669,23 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         if (word_len == 8 &&
                             strncmp(input + token_start, "function", 8) == 0) {
                             after_function_keyword = true;
+                        }
+                        /// for/select/case headers contain the `in` reserved
+                        /// word; for/select also bind a loop variable, and case
+                        /// takes a subject word. Any other keyword (do, then,
+                        /// {, ...) ends a header.
+                        if ((word_len == 3 &&
+                             strncmp(input + token_start, "for", 3) == 0) ||
+                            (word_len == 6 &&
+                             strncmp(input + token_start, "select", 6) == 0)) {
+                            after_for_keyword = true;
+                            in_construct_header = true;
+                        } else if (word_len == 4 && strncmp(input + token_start,
+                                                            "case", 4) == 0) {
+                            after_case_keyword = true;
+                            in_construct_header = true;
+                        } else {
+                            in_construct_header = false;
                         }
                         /// Block-ending keywords (done, fi, esac, etc.) don't
                         ///                            expect a command after
@@ -1478,6 +1749,21 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         pos++;
         add_token(highlighter, LLE_TOKEN_UNKNOWN, token_start, pos);
     }
+}
+
+/// @brief Highlight `input` (length `input_len`) and color the result
+///
+/// Entry point: tokenizes the whole input via highlight_range (which recurses
+/// into command substitutions, backticks, and double-quoted strings) and then
+/// assigns each token its color by type. Returns the token count, or -1 on a
+/// NULL argument.
+int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
+                         const char *input, size_t input_len) {
+    if (!highlighter || !input)
+        return -1;
+
+    highlighter->token_count = 0;
+    highlight_range(highlighter, input, 0, input_len, /*expect_command=*/true);
 
     /// Apply colors to tokens
     for (size_t i = 0; i < highlighter->token_count; i++) {
