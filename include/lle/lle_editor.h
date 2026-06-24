@@ -109,6 +109,8 @@ typedef struct lle_editor {
     /// keybinding_actions.c.
     bool history_nav_active;        ///< A navigation session is in progress
     char *history_nav_original;     ///< User's line before nav (cursor == -1)
+    size_t history_nav_prefix_len;  ///< Bytes before the cursor at nav start;
+                                    ///< the prefix filter in prefix search mode
     size_t *history_nav_candidates; ///< History indices, newest first (owned)
     size_t history_nav_count;       ///< Number of candidates
     size_t history_nav_capacity;    ///< Allocated candidate capacity

@@ -2075,6 +2075,14 @@ static void nav_build_candidates(lle_editor_t *editor, const char *original) {
     bool skip_current = config.lle_dedup_navigation;
     bool unique_only = config.lle_dedup_navigation_unique;
 
+    /// Prefix search mode: keep only entries beginning with the text typed
+    /// before the cursor when navigation started (history.search_mode). An
+    /// empty prefix matches everything, so an up-arrow on a blank line browses
+    /// all history -- the same as plain mode.
+    bool prefix_mode =
+        (config.history_search_mode == HISTORY_SEARCH_MODE_PREFIX);
+    size_t prefix_len = editor->history_nav_prefix_len;
+
     /// Local seen-hash set for unique-only dedup (freed before returning).
     uint32_t *seen = NULL;
     size_t seen_count = 0;
@@ -2090,6 +2098,11 @@ static void nav_build_candidates(lle_editor_t *editor, const char *original) {
         }
         if (entry->state != LLE_HISTORY_STATE_ACTIVE) {
             continue;
+        }
+        if (prefix_mode && prefix_len > 0 && original &&
+            !lle_unicode_is_prefix(original, prefix_len, entry->command,
+                                   strlen(entry->command), NULL)) {
+            continue; /// Doesn't match the typed prefix
         }
         if (skip_current && original &&
             history_nav_strings_equal(entry->command, original)) {
@@ -2130,8 +2143,10 @@ static void nav_build_candidates(lle_editor_t *editor, const char *original) {
 /**
  * @brief Load the entry at the session cursor into the buffer
  *
- * Cursor -1 restores the original line; 0..count-1 loads that candidate. The
- * buffer cursor is moved to the end of the line.
+ * Cursor -1 restores the original line; 0..count-1 loads that candidate. In
+ * prefix search mode the buffer cursor is kept at the typed prefix boundary
+ * (zsh history-beginning-search style, Option A) so the user can immediately
+ * edit the rest of the recalled command; otherwise it sits at end of line.
  */
 static void nav_show_cursor(lle_editor_t *editor) {
     lle_buffer_clear(editor->buffer);
@@ -2152,9 +2167,23 @@ static void nav_show_cursor(lle_editor_t *editor) {
     if (text && *text) {
         lle_buffer_insert_text(editor->buffer, 0, text, strlen(text));
     }
+
+    /// End of line, except in prefix search mode keep the cursor at the typed
+    /// prefix boundary so editing resumes where the user left off.
+    size_t target = editor->buffer->length;
+    if (config.history_search_mode == HISTORY_SEARCH_MODE_PREFIX &&
+        editor->history_nav_prefix_len > 0 &&
+        editor->history_nav_prefix_len <= editor->buffer->length) {
+        target = editor->history_nav_prefix_len;
+    }
+
     if (editor->cursor_manager) {
-        lle_cursor_manager_move_to_byte_offset(
-            editor->cursor_manager, editor->buffer->cursor.byte_offset);
+        lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, target);
+        editor->buffer->cursor = editor->cursor_manager->position;
+    } else {
+        editor->buffer->cursor.byte_offset = target;
+        editor->buffer->cursor.codepoint_index = target;
+        editor->buffer->cursor.grapheme_index = target;
     }
 }
 
@@ -2174,6 +2203,9 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
         const char *cur = get_current_buffer_content(editor);
         free(editor->history_nav_original);
         editor->history_nav_original = strdup(cur ? cur : "");
+        /// The text before the cursor is the prefix filter (and, in prefix
+        /// mode, where the cursor is kept on each recalled candidate).
+        editor->history_nav_prefix_len = editor->buffer->cursor.byte_offset;
         nav_build_candidates(editor, editor->history_nav_original);
         editor->history_nav_cursor = -1;
         editor->history_nav_active = true;
