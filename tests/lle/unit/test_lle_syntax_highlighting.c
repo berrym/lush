@@ -91,6 +91,198 @@ get_first_command_type(lle_syntax_highlighter_t *h, const char *input) {
     return LLE_TOKEN_UNKNOWN;
 }
 
+/// Test helper: type of the first token whose exact text equals `text`, or
+/// LLE_TOKEN_UNKNOWN if none matches.
+static lle_syntax_token_type_t token_type_of(lle_syntax_highlighter_t *h,
+                                             const char *input,
+                                             const char *text) {
+    lle_syntax_highlight(h, input, strlen(input));
+    size_t count;
+    const lle_syntax_token_t *tokens = lle_syntax_get_tokens(h, &count);
+    size_t tlen = strlen(text);
+    for (size_t i = 0; i < count; i++) {
+        size_t len = tokens[i].end - tokens[i].start;
+        if (len == tlen && strncmp(input + tokens[i].start, text, tlen) == 0) {
+            return tokens[i].type;
+        }
+    }
+    return LLE_TOKEN_UNKNOWN;
+}
+
+/// Test helper: type of the LAST token whose exact text equals `text`.
+static lle_syntax_token_type_t token_type_of_last(lle_syntax_highlighter_t *h,
+                                                  const char *input,
+                                                  const char *text) {
+    lle_syntax_highlight(h, input, strlen(input));
+    size_t count;
+    const lle_syntax_token_t *tokens = lle_syntax_get_tokens(h, &count);
+    size_t tlen = strlen(text);
+    lle_syntax_token_type_t found = LLE_TOKEN_UNKNOWN;
+    for (size_t i = 0; i < count; i++) {
+        size_t len = tokens[i].end - tokens[i].start;
+        if (len == tlen && strncmp(input + tokens[i].start, text, tlen) == 0) {
+            found = tokens[i].type;
+        }
+    }
+    return found;
+}
+
+/// Any of the command classifications (validity depends on PATH/builtins).
+static int is_command_token(lle_syntax_token_type_t t) {
+    return t == LLE_TOKEN_COMMAND_VALID || t == LLE_TOKEN_COMMAND_INVALID ||
+           t == LLE_TOKEN_COMMAND_BUILTIN || t == LLE_TOKEN_COMMAND_FUNCTION;
+}
+
+/// Test: $(...) command substitution highlights its interior as a command list
+TEST(recursive_command_substitution) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+    const char *in = "echo $(seq 1 9)";
+
+    TEST_START("$() interior: seq is a command");
+    if (is_command_token(token_type_of(h, in, "seq")))
+        TEST_PASS();
+    else
+        TEST_FAIL("seq inside $() not highlighted as a command");
+
+    TEST_START("$() interior: numeric argument is a number");
+    if (token_type_of(h, in, "1") == LLE_TOKEN_NUMBER)
+        TEST_PASS();
+    else
+        TEST_FAIL("number inside $() not highlighted as a number");
+
+    TEST_START("$() delimiter $( is a variable/expansion token");
+    if (token_type_of(h, in, "$(") == LLE_TOKEN_VARIABLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("$( opener not tokenized");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/// Test: a $var interpolated inside double quotes is its own variable token
+TEST(recursive_double_quote_variable) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+    const char *in = "echo \"value $i end\"";
+
+    TEST_START("\"...$i...\": $i is a variable");
+    if (token_type_of(h, in, "$i") == LLE_TOKEN_VARIABLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("$i inside double quotes not highlighted as a variable");
+
+    TEST_START("\"...\": the quote is a string token");
+    if (token_type_of(h, in, "\"") == LLE_TOKEN_STRING_DOUBLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("double-quote delimiter not a string token");
+
+    TEST_START("\"...$i...\": literal run is a string token");
+    if (token_type_of(h, in, " end") == LLE_TOKEN_STRING_DOUBLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("literal run inside double quotes not a string token");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/// Test: backtick substitution highlights its interior as a command list
+TEST(recursive_backtick) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+    const char *in = "echo `date`";
+
+    TEST_START("backtick interior: date is a command");
+    if (is_command_token(token_type_of(h, in, "date")))
+        TEST_PASS();
+    else
+        TEST_FAIL("command inside backticks not highlighted as a command");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/// Test: an unterminated double quote is still one error span
+TEST(recursive_unclosed_double_quote) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+    const char *in = "echo \"oops $x";
+
+    TEST_START("unterminated quote is one unclosed-string span");
+    if (token_type_of(h, in, "\"oops $x") == LLE_TOKEN_UNCLOSED_STRING)
+        TEST_PASS();
+    else
+        TEST_FAIL("unterminated double quote not a single unclosed span");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/// Test: the for/select loop variable is a variable (not a failed command),
+/// and the following `in` is a keyword
+TEST(for_loop_variable_and_in_keyword) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    TEST_START("for loop variable is a variable, not CMD_INVALID");
+    if (token_type_of(h, "for i in 1 2 3; do echo x; done", "i") ==
+        LLE_TOKEN_VARIABLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("for loop variable not highlighted as a variable");
+
+    TEST_START("`in` after a loop variable is a keyword");
+    if (token_type_of(h, "for i in 1 2 3; do echo x; done", "in") ==
+        LLE_TOKEN_KEYWORD)
+        TEST_PASS();
+    else
+        TEST_FAIL("`in` after loop variable not a keyword");
+
+    TEST_START("select loop variable is a variable");
+    if (token_type_of(h, "select opt in a b c; do break; done", "opt") ==
+        LLE_TOKEN_VARIABLE)
+        TEST_PASS();
+    else
+        TEST_FAIL("select loop variable not a variable");
+
+    TEST_START("`in` as a plain argument is not a keyword");
+    if (token_type_of(h, "echo in the middle", "in") == LLE_TOKEN_ARGUMENT)
+        TEST_PASS();
+    else
+        TEST_FAIL("plain `in` argument wrongly highlighted as keyword");
+
+    TEST_START("`in` in a case header is a keyword");
+    if (token_type_of(h, "case word in a) echo;; esac", "in") ==
+        LLE_TOKEN_KEYWORD)
+        TEST_PASS();
+    else
+        TEST_FAIL("`in` in case header not a keyword");
+
+    TEST_START("a bare case subject is an argument, not an invalid command");
+    if (token_type_of(h, "case word in a) echo;; esac", "word") ==
+        LLE_TOKEN_ARGUMENT)
+        TEST_PASS();
+    else
+        TEST_FAIL("bare case subject wrongly highlighted as a command");
+
+    /// In `for i in 1; do cd in; done` the header `in` is a keyword and the
+    /// body `in` is a plain argument -- the header state must not leak.
+    TEST_START("header `in` is a keyword");
+    if (token_type_of(h, "for i in 1; do cd in; done", "in") ==
+        LLE_TOKEN_KEYWORD)
+        TEST_PASS();
+    else
+        TEST_FAIL("header `in` not a keyword");
+
+    TEST_START("body `in` is an argument (no header-state leak)");
+    if (token_type_of_last(h, "for i in 1; do cd in; done", "in") ==
+        LLE_TOKEN_ARGUMENT)
+        TEST_PASS();
+    else
+        TEST_FAIL("header state leaked into the loop body");
+
+    lle_syntax_highlighter_destroy(h);
+}
+
 /// Test: Highlighter creation
 TEST(highlighter_create) {
     TEST_START("highlighter_create");
@@ -993,6 +1185,11 @@ int main(void) {
     printf("=== LLE Syntax Highlighting Unit Tests ===\n\n");
 
     RUN_TEST(highlighter_create);
+    RUN_TEST(recursive_command_substitution);
+    RUN_TEST(recursive_double_quote_variable);
+    RUN_TEST(recursive_backtick);
+    RUN_TEST(recursive_unclosed_double_quote);
+    RUN_TEST(for_loop_variable_and_in_keyword);
     RUN_TEST(builtins);
     RUN_TEST(external_commands);
     RUN_TEST(invalid_commands);
