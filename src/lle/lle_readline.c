@@ -945,10 +945,8 @@ static lle_result_t handle_character_input(lle_event_t *event,
 
     /// CRITICAL: Reset history navigation when user types a character
     /// This follows bash/readline behavior: typing exits history mode
-    if (ctx->editor && ctx->editor->history_navigation_pos > 0) {
-        ctx->editor->history_navigation_pos = 0;
-        /// Clear the seen set for unique-only navigation mode
-        ctx->editor->history_nav_seen_count = 0;
+    if (ctx->editor && ctx->editor->history_nav_active) {
+        lle_history_nav_session_end(ctx->editor);
     }
 
     /// Re-enable autosuggestion if it was suppressed (e.g., by Ctrl+G)
@@ -1017,9 +1015,8 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
 
     /// CRITICAL FIX: Reset history navigation when user backspaces
     /// This follows bash/readline behavior: editing exits history mode
-    if (ctx->editor && ctx->editor->history_navigation_pos > 0) {
-        ctx->editor->history_navigation_pos = 0;
-        ctx->editor->history_nav_seen_count = 0;
+    if (ctx->editor && ctx->editor->history_nav_active) {
+        lle_history_nav_session_end(ctx->editor);
     }
 
     /// CRITICAL FIX: Clear completion menu on backspace
@@ -2961,11 +2958,9 @@ char *lle_readline(const char *prompt) {
             editor_to_use->cursor_manager->buffer = buffer;
         }
 
-        /// CRITICAL: Reset history navigation position for new readline session
+        /// CRITICAL: Reset history navigation for new readline session
         /// Each readline() call starts fresh - not in history navigation mode
-        editor_to_use->history_navigation_pos = 0;
-        /// Clear the seen set for unique-only navigation mode
-        editor_to_use->history_nav_seen_count = 0;
+        lle_history_nav_session_end(editor_to_use);
     }
 
     /// === STEP 6.6: Create keybinding manager and load Emacs preset ===
@@ -3097,9 +3092,7 @@ char *lle_readline(const char *prompt) {
         editor_to_use->eof_requested = false;
 
         /// Category 2: History navigation state
-        editor_to_use->history_navigation_pos = 0;
-        editor_to_use->history_nav_seen_count = 0;
-        /// Note: history_nav_seen_hashes array is reused, just reset count
+        lle_history_nav_session_end(editor_to_use);
 
         /// Category 3: Interactive search state
         editor_to_use->history_search_active = false;
