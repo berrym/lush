@@ -65,7 +65,9 @@
 #include "input_continuation.h"
 #include "lle/arena.h" /// Hierarchical arena allocator
 #include "lle/buffer_management.h"
+#include "lle/completion/completion_sources.h" /// Filesystem source for ghost text
 #include "lle/completion/completion_system.h" /// Completion system for menu visibility
+#include "lle/completion/completion_types.h" /// Completion result create/free
 #include "lle/completion/splicer.h"
 #include "lle/completion/word_context.h"
 #include "lle/display_integration.h" /// Spec 08: Complete display integration
@@ -328,6 +330,94 @@ static void end_change_sequence(readline_context_t *ctx) {
 }
 
 /**
+ * @brief Draw ghost text from the completion engine (history-miss fallback)
+ *
+ * When history yields no suggestion, the fish-style fallback asks the
+ * completion engine for the best candidate at the cursor -- mainly filesystem
+ * paths as they are typed. The candidate's splice is computed without mutating
+ * the buffer; the portion beyond what is already typed becomes the suggestion,
+ * but only when the candidate literally extends the typed text (so accepting
+ * the ghost reproduces exactly what completion would insert).
+ *
+ * Runs only on a history miss and only when a non-empty word is under the
+ * cursor, so the common (history hit) path stays instant.
+ *
+ * @param ctx Readline context
+ * @return true if a suggestion was produced
+ */
+static bool autosuggestion_from_completion(readline_context_t *ctx) {
+    if (!ctx || !ctx->editor || !ctx->buffer || !ctx->buffer->data) {
+        return false;
+    }
+
+    lle_editor_t *editor = ctx->editor;
+    const char *buf = ctx->buffer->data;
+    size_t cursor = ctx->buffer->cursor.byte_offset;
+
+    lle_word_context_t *wctx = NULL;
+    if (lle_word_context_analyze(buf, cursor, editor->lle_pool, &wctx) !=
+            LLE_SUCCESS ||
+        !wctx) {
+        return false;
+    }
+
+    /// Restrict the fallback to filesystem paths in argument / redirect
+    /// position and to a non-empty word. This keeps ghost generation
+    /// side-effect-free (no command, programmable-compdef, or network sources
+    /// run during typing) and cheap (one directory read), and never touches
+    /// the completion system's menu state.
+    bool path_context = (wctx->context_type == LLE_CONTEXT_ARGUMENT ||
+                         wctx->context_type == LLE_CONTEXT_REDIRECT_TARGET);
+    if (!path_context || wctx->word_start >= cursor) {
+        lle_word_context_free(wctx);
+        return false;
+    }
+
+    bool produced = false;
+    lle_completion_result_t *result = NULL;
+    if (lle_completion_result_create(editor->lle_pool, 16, &result) ==
+            LLE_SUCCESS &&
+        result) {
+        lle_completion_source_files(editor->lle_pool, wctx, result);
+        if (result->count > 0) {
+            lle_splicer_splice_t splice = {0};
+            if (lle_splicer_compute(wctx, &result->items[0], true,
+                                    editor->lle_pool, &splice) == LLE_SUCCESS &&
+                splice.insert_text && splice.delete_start <= cursor) {
+                /// The candidate replaces buf[delete_start..cursor]. Suggest
+                /// only the suffix past what is already typed, and only when
+                /// the insert literally extends it.
+                size_t typed = cursor - splice.delete_start;
+                if (splice.insert_length > typed &&
+                    memcmp(splice.insert_text, buf + splice.delete_start,
+                           typed) == 0) {
+                    size_t rlen = splice.insert_length - typed;
+                    if (rlen + 1 > ctx->suggestion_alloc_size) {
+                        char *nb = realloc(ctx->current_suggestion, rlen + 64);
+                        if (nb) {
+                            ctx->current_suggestion = nb;
+                            ctx->suggestion_alloc_size = rlen + 64;
+                        } else {
+                            rlen = 0;
+                        }
+                    }
+                    if (rlen > 0) {
+                        memcpy(ctx->current_suggestion,
+                               splice.insert_text + typed, rlen);
+                        ctx->current_suggestion[rlen] = '\0';
+                        produced = true;
+                    }
+                }
+            }
+        }
+        lle_completion_result_free(result);
+    }
+
+    lle_word_context_free(wctx);
+    return produced;
+}
+
+/**
  * @brief Update autosuggestion based on current buffer content
  *
  * Searches LLE history for prefix matches and stores the suggestion
@@ -487,7 +577,12 @@ static void update_autosuggestion(readline_context_t *ctx) {
     }
 
     if (!best_remaining) {
-        return; /// No match
+        /// History miss: fall back to the completion engine when configured.
+        if (config.autosuggestion_sources ==
+            AUTOSUGGESTION_SOURCES_HISTORY_THEN_COMPLETION) {
+            autosuggestion_from_completion(ctx);
+        }
+        return; /// No history match
     }
 
     /// Ensure buffer is large enough, then store the chosen suggestion.
