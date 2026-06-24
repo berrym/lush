@@ -674,15 +674,20 @@ lle_result_t lle_end_of_line_or_accept_suggestion(readline_context_t *ctx) {
 }
 
 /**
- * @brief Find next word boundary in suggestion text
+ * @brief Find next acceptance boundary in suggestion text
  *
- * Finds the end of the next word in the suggestion, used for partial
- * acceptance with Ctrl+Right.
+ * Finds how many bytes of the next unit to accept for partial acceptance with
+ * Ctrl+Right. With path_segment, a token containing '/' is accepted up to the
+ * next separator (inclusive) so a path is taken one directory at a time;
+ * otherwise a whole whitespace-delimited word (plus one trailing space) is
+ * taken.
  *
  * @param suggestion The suggestion text to search
- * @return Byte offset to end of next word (including trailing space if any)
+ * @param path_segment Stop at the next '/' inside a path token
+ * @return Byte offset to the end of the next unit
  */
-static size_t find_next_word_boundary_in_suggestion(const char *suggestion) {
+static size_t find_next_word_boundary_in_suggestion(const char *suggestion,
+                                                    bool path_segment) {
     if (!suggestion || !*suggestion) {
         return 0;
     }
@@ -693,6 +698,36 @@ static size_t find_next_word_boundary_in_suggestion(const char *suggestion) {
     while (suggestion[pos] &&
            (suggestion[pos] == ' ' || suggestion[pos] == '\t')) {
         pos++;
+    }
+
+    /// Path-segment granularity: when the upcoming token contains a '/',
+    /// advance to the next '/' (inclusive) instead of consuming the whole word,
+    /// so a long path is accepted one directory at a time (fish forward-word
+    /// style).
+    if (path_segment) {
+        bool has_slash = false;
+        for (size_t look = pos; suggestion[look] && suggestion[look] != ' ' &&
+                                suggestion[look] != '\t';
+             look++) {
+            if (suggestion[look] == '/') {
+                has_slash = true;
+                break;
+            }
+        }
+        if (has_slash) {
+            size_t scan = pos;
+            if (suggestion[scan] == '/') {
+                scan++; /// step over a leading separator
+            }
+            while (suggestion[scan] && suggestion[scan] != '/' &&
+                   suggestion[scan] != ' ' && suggestion[scan] != '\t') {
+                scan++;
+            }
+            if (suggestion[scan] == '/') {
+                scan++; /// include the trailing separator
+            }
+            return scan;
+        }
     }
 
     /// Find end of word (non-whitespace characters)
@@ -723,9 +758,11 @@ static bool accept_partial_autosuggestion(readline_context_t *ctx) {
         return false;
     }
 
-    /// Find next word boundary
-    size_t word_len =
-        find_next_word_boundary_in_suggestion(ctx->current_suggestion);
+    /// Find next acceptance boundary (path segment or whole word per config)
+    bool path_segment = (config.autosuggestion_partial_accept ==
+                         AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT);
+    size_t word_len = find_next_word_boundary_in_suggestion(
+        ctx->current_suggestion, path_segment);
     if (word_len == 0) {
         return false;
     }
