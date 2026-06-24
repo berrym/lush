@@ -177,6 +177,16 @@ static const config_enum_mapping_t autosuggestion_rank_mappings[] = {
 static const config_enum_def_t autosuggestion_rank_enum = {
     autosuggestion_rank_mappings, AUTOSUGGESTION_RANK_FRECENCY};
 
+/// Autosuggestion Partial-Accept mappings
+static const config_enum_mapping_t autosuggestion_partial_accept_mappings[] = {
+    {"path_segment", AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT},
+    {        "word",         AUTOSUGGESTION_PARTIAL_ACCEPT_WORD},
+    {          NULL,                                          0}  /// Sentinel
+};
+static const config_enum_def_t autosuggestion_partial_accept_enum = {
+    autosuggestion_partial_accept_mappings,
+    AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT};
+
 /// History Search Mode mappings
 static const config_enum_mapping_t history_search_mode_mappings[] = {
     {"prefix", HISTORY_SEARCH_MODE_PREFIX},
@@ -549,6 +559,10 @@ static config_option_t config_options[] = {
     {                 "autosuggestion.rank",   CONFIG_TYPE_ENUM, CONFIG_SECTION_AUTOSUGGESTION,
      &config.autosuggestion_rank,
      "Which history prefix match to suggest (frecency / recency)",           config_validate_autosuggestion_rank,    &autosuggestion_rank_enum        },
+    {       "autosuggestion.partial_accept",   CONFIG_TYPE_ENUM,
+     CONFIG_SECTION_AUTOSUGGESTION,      &config.autosuggestion_partial_accept,
+     "Ctrl+Right acceptance granularity (path_segment / word)", config_validate_autosuggestion_partial_accept,
+     &autosuggestion_partial_accept_enum                                                                                                              },
 
     /// v1.3.0: Legacy enhanced display mode option removed
     /// behavior.enhanced_display_mode option removed
@@ -794,11 +808,16 @@ static const creg_option_t autosuggestion_options[] = {
      CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "on_deviation"},
      "When to clear the ghost text: on_deviation (only on a non-matching "
      "keystroke; persists through matching spaces) or on_word_boundary "
-     "(clear at a trailing space)", true},
+     "(clear at a trailing space)", true    },
     {          "rank",
      CREG_VALUE_STRING,     {.type = CREG_VALUE_STRING, .data.string = "frecency"},
      "Which history prefix match to suggest: frecency (most used x recent) or "
-     "recency (most recent)", true      },
+     "recency (most recent)", true          },
+    {"partial_accept",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "path_segment"},
+     "Ctrl+Right granularity: path_segment (advance by directory inside a "
+     "path) "
+     "or word (whole whitespace word)", true},
 };
 
 static const creg_section_t autosuggestion_section = {
@@ -1096,6 +1115,13 @@ static void autosuggestion_sync_to_runtime(void) {
                                          ? AUTOSUGGESTION_RANK_RECENCY
                                          : AUTOSUGGESTION_RANK_FRECENCY;
     }
+    if (config_registry_get_string("autosuggestion.partial_accept", sval,
+                                   sizeof(sval)) == CREG_SUCCESS) {
+        config.autosuggestion_partial_accept =
+            (strcmp(sval, "word") == 0)
+                ? AUTOSUGGESTION_PARTIAL_ACCEPT_WORD
+                : AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT;
+    }
 }
 
 static void autosuggestion_sync_from_runtime(void) {
@@ -1108,6 +1134,11 @@ static void autosuggestion_sync_from_runtime(void) {
         "autosuggestion.rank",
         config.autosuggestion_rank == AUTOSUGGESTION_RANK_RECENCY ? "recency"
                                                                   : "frecency");
+    config_registry_set_string("autosuggestion.partial_accept",
+                               config.autosuggestion_partial_accept ==
+                                       AUTOSUGGESTION_PARTIAL_ACCEPT_WORD
+                                   ? "word"
+                                   : "path_segment");
 }
 
 /**
@@ -2606,6 +2637,9 @@ void config_set_defaults(void) {
     /// Suggest the most-frecent prefix match; per-mode table sets recency for
     /// posix/bash/zsh.
     config.autosuggestion_rank = AUTOSUGGESTION_RANK_FRECENCY;
+    /// Ctrl+Right advances by path segment inside a path, whole word elsewhere.
+    config.autosuggestion_partial_accept =
+        AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT;
     config.display_transient_prompt =
         true; /// Transient prompts enabled by default (Spec 25 Section 12)
     config.display_theme_hot_reload = true; /// Auto-reload theme on file change
@@ -3740,6 +3774,10 @@ bool config_validate_autosuggestion_dismiss_policy(const char *value) {
 
 bool config_validate_autosuggestion_rank(const char *value) {
     return (strcmp(value, "frecency") == 0 || strcmp(value, "recency") == 0);
+}
+
+bool config_validate_autosuggestion_partial_accept(const char *value) {
+    return (strcmp(value, "path_segment") == 0 || strcmp(value, "word") == 0);
 }
 
 bool config_validate_history_search_mode(const char *value) {

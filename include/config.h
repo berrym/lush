@@ -182,6 +182,20 @@ typedef enum {
 } autosuggestion_rank_t;
 
 /**
+ * @brief Granularity of partial autosuggestion acceptance (Ctrl+Right)
+ *
+ * `path_segment` accepts up to the next `/` inside a path token and the whole
+ * whitespace word elsewhere -- so a long path is accepted directory by
+ * directory (matching fish's forward-word, the default). `word` always accepts
+ * a whole whitespace-delimited word at a time.
+ */
+typedef enum {
+    AUTOSUGGESTION_PARTIAL_ACCEPT_PATH_SEGMENT, ///< Path segment / word
+                                                ///< (default)
+    AUTOSUGGESTION_PARTIAL_ACCEPT_WORD          ///< Always whole word
+} autosuggestion_partial_accept_t;
+
+/**
  * @brief History up/down navigation search mode
  *
  * Controls which history entries up/down arrows cycle through. `prefix` filters
@@ -388,6 +402,8 @@ typedef struct {
         autosuggestion_dismiss_policy; ///< When to clear the ghost text
     autosuggestion_rank_t
         autosuggestion_rank; ///< Which prefix match to suggest
+    autosuggestion_partial_accept_t
+        autosuggestion_partial_accept; ///< Ctrl+Right granularity
 
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
@@ -650,6 +666,14 @@ bool config_validate_autosuggestion_dismiss_policy(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_autosuggestion_rank(const char *value);
+
+/**
+ * @brief Validate an autosuggestion partial-accept value
+ *
+ * @param value Granularity string ("path_segment" or "word")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_autosuggestion_partial_accept(const char *value);
 
 /**
  * @brief Validate a history search mode value
