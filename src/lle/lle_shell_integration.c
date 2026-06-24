@@ -476,6 +476,16 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
         if (bridge_result != LLE_SUCCESS) {
             /// Non-fatal - history builtin won't work but shell continues
         }
+
+        /// Initialize history expansion (!!, !$, ^old^new, :p, :s). The engine
+        /// resolves references against this live history core through the
+        /// bridge initialized above.
+        lle_result_t expansion_result =
+            lle_history_expansion_init(integ->editor->history_system);
+        if (expansion_result != LLE_SUCCESS) {
+            /// Non-fatal - history expansion is unavailable but the shell
+            /// continues; lle_readline guards on lle_history_expansion_needed.
+        }
     }
 
     return LLE_SUCCESS;
@@ -486,6 +496,10 @@ static void destroy_editor(lle_shell_integration_t *integ) {
     if (!integ || !integ->editor) {
         return;
     }
+
+    /// Clear the expansion engine's reference before the history core it
+    /// points at is freed with the editor.
+    lle_history_expansion_shutdown();
 
     lle_editor_destroy(integ->editor);
     integ->editor = NULL;

@@ -422,8 +422,10 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_HISTAPPEND] = true,         /// Preserve history
             [FEATURE_INC_APPEND_HISTORY] = true, /// Better crash recovery
             [FEATURE_SHARE_HISTORY] = false,     /// Can be confusing, opt-in
-            [FEATURE_HIST_VERIFY] = false,       /// Slows workflow, opt-in
-            [FEATURE_CHECKJOBS] = true, /// Prevents accidental job loss
+            [FEATURE_HIST_VERIFY] = false, /// Off: expansions are echoed before
+                                           /// running, so the confirm-Enter is
+                                           /// opt-in (matches bash/zsh)
+            [FEATURE_CHECKJOBS] = true,    /// Prevents accidental job loss
 
             /// Function Enhancements - full support
             [FEATURE_NAMEREF] = true,
