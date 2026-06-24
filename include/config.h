@@ -183,6 +183,42 @@ typedef enum {
 } history_search_mode_t;
 
 /**
+ * @brief Interactive history finder (Ctrl-R) matching strategy
+ *
+ * `fuzzy` matches the query characters in order with gaps (the lush default);
+ * `substring` requires a contiguous match (classic reverse-i-search);
+ * `prefix` matches only at the start of the command.
+ */
+typedef enum {
+    HISTORY_FINDER_MATCH_FUZZY,     ///< Subsequence match (lush default)
+    HISTORY_FINDER_MATCH_SUBSTRING, ///< Contiguous match (bash/posix/zsh)
+    HISTORY_FINDER_MATCH_PREFIX     ///< Match at command start only
+} history_finder_match_t;
+
+/**
+ * @brief Interactive history finder ranking strategy
+ *
+ * `frecency` orders matches by usage frequency weighted by recency (the lush
+ * default); `recency` orders strictly by most-recent-first (classic behavior).
+ */
+typedef enum {
+    HISTORY_FINDER_RANK_FRECENCY, ///< Frequency x recency (lush default)
+    HISTORY_FINDER_RANK_RECENCY   ///< Most recent first (bash/posix/zsh)
+} history_finder_rank_t;
+
+/**
+ * @brief Interactive history finder presentation
+ *
+ * `incremental` is the in-line reverse-i-search prompt. `picker` is reserved
+ * for a future full-screen multi-line selector; until it ships, selecting it
+ * falls back to the incremental finder.
+ */
+typedef enum {
+    HISTORY_FINDER_DISPLAY_INCREMENTAL, ///< In-line reverse-i-search (default)
+    HISTORY_FINDER_DISPLAY_PICKER       ///< Reserved; falls back to incremental
+} history_finder_display_t;
+
+/**
  * @brief Configuration context structure
  *
  * Tracks the current parsing context during configuration file processing.
@@ -214,6 +250,12 @@ typedef struct {
     char *history_file;      ///< History file path
     history_search_mode_t
         history_search_mode; ///< Up/down navigation filter (prefix / plain)
+    history_finder_match_t
+        history_finder_match; ///< Ctrl-R matching (fuzzy / substring / prefix)
+    history_finder_rank_t
+        history_finder_rank; ///< Ctrl-R ranking (frecency / recency)
+    history_finder_display_t
+        history_finder_display; ///< Ctrl-R presentation (incremental / picker)
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
@@ -591,6 +633,30 @@ bool config_validate_autosuggestion_dismiss_policy(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_history_search_mode(const char *value);
+
+/**
+ * @brief Validate a history finder match value
+ *
+ * @param value Match string ("fuzzy", "substring", or "prefix")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_history_finder_match(const char *value);
+
+/**
+ * @brief Validate a history finder rank value
+ *
+ * @param value Rank string ("frecency" or "recency")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_history_finder_rank(const char *value);
+
+/**
+ * @brief Validate a history finder display value
+ *
+ * @param value Display string ("incremental" or "picker")
+ * @return true if valid, false otherwise
+ */
+bool config_validate_history_finder_display(const char *value);
 
 /**
  * @brief Validate an LLE storage mode value

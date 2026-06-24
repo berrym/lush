@@ -20,6 +20,7 @@
  * API verified from include/lle/history.h on 2025-11-02
  */
 
+#include "config.h"
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include <assert.h>
@@ -28,6 +29,16 @@
 #include <string.h>
 
 /// Test memory mock provided by test_memory_mock.c
+
+/// The interactive finder reads its match/rank strategy from the global config
+/// (config.history_finder_match / _rank). Provide one defaulted to the classic
+/// substring + recency behavior the bulk of the suite asserts; the finder
+/// strategy tests below flip these fields and restore them.
+config_values_t config = {
+    .history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING,
+    .history_finder_rank = HISTORY_FINDER_RANK_RECENCY,
+    .history_finder_display = HISTORY_FINDER_DISPLAY_INCREMENTAL,
+};
 
 /// Test result tracking
 static int tests_run = 0;
@@ -579,6 +590,136 @@ void test_operations_without_init(void) {
 }
 
 /* ============================================================================
+ * FINDER STRATEGY TESTS
+ * ============================================================================
+ */
+
+void test_finder_subsequence_match(void) {
+    TEST_START("Interactive Search - Subsequence (fuzzy) Match");
+    config.history_finder_match = HISTORY_FINDER_MATCH_FUZZY;
+    config.history_finder_rank = HISTORY_FINDER_RANK_RECENCY;
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL);
+
+    lle_history_interactive_search_init(core, "", 0);
+    /// "gts" is a subsequence of "git status" but not a substring; only the
+    /// fzy subsequence matcher (fuzzy mode) finds it.
+    lle_history_interactive_search_update_query('g');
+    lle_history_interactive_search_update_query('t');
+    lle_history_interactive_search_update_query('s');
+
+    const char *match = lle_history_interactive_search_get_current_command();
+    ASSERT_NOT_NULL(match, "subsequence query should match");
+    ASSERT_TRUE(match && strcmp(match, "git status") == 0,
+                "fuzzy mode matches gts -> git status");
+
+    lle_history_interactive_search_cancel();
+    config.history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING;
+    lle_history_core_destroy(core);
+    TEST_PASS();
+}
+
+void test_finder_substring_rejects_non_substring(void) {
+    TEST_START("Interactive Search - Substring Rejects Non-Substring");
+    config.history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING;
+    config.history_finder_rank = HISTORY_FINDER_RANK_RECENCY;
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL);
+
+    lle_history_interactive_search_init(core, "", 0);
+    /// The control for the subsequence test: "gts" is not contiguous, so
+    /// substring matching finds nothing.
+    lle_history_interactive_search_update_query('g');
+    lle_history_interactive_search_update_query('t');
+    lle_history_interactive_search_update_query('s');
+
+    ASSERT_EQ(lle_history_interactive_search_get_state(),
+              LLE_SEARCH_STATE_NO_RESULTS,
+              "substring mode does not match a non-contiguous query");
+
+    lle_history_interactive_search_cancel();
+    lle_history_core_destroy(core);
+    TEST_PASS();
+}
+
+void test_finder_frecency_rank(void) {
+    TEST_START("Interactive Search - Frecency Ranking");
+    config.history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING;
+    config.history_finder_rank = HISTORY_FINDER_RANK_FRECENCY;
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL); /// index 0
+    lle_history_add_entry(core, "git commit", 0, NULL); /// index 1
+    lle_history_add_entry(core, "git push", 0, NULL);   /// index 2, most recent
+
+    /// Make "git status" the most frequently used command.
+    lle_history_entry_t *frequent = NULL;
+    lle_history_get_entry_by_index(core, 0, &frequent);
+    ASSERT_NOT_NULL(frequent, "should fetch the first entry");
+    ASSERT_TRUE(frequent && strcmp(frequent->command, "git status") == 0,
+                "index 0 is git status");
+    if (frequent) {
+        frequent->usage_count = 100;
+    }
+
+    lle_history_interactive_search_init(core, "", 0);
+    lle_history_interactive_search_update_query('g');
+    lle_history_interactive_search_update_query('i');
+    lle_history_interactive_search_update_query('t');
+
+    /// Frecency surfaces the frequently-used entry first, ahead of the most
+    /// recent one that plain recency would rank first.
+    const char *top = lle_history_interactive_search_get_current_command();
+    ASSERT_NOT_NULL(top, "should have a match");
+    ASSERT_TRUE(top && strcmp(top, "git status") == 0,
+                "frecency surfaces the frequently used command first");
+
+    lle_history_interactive_search_cancel();
+    config.history_finder_rank = HISTORY_FINDER_RANK_RECENCY;
+    lle_history_core_destroy(core);
+    TEST_PASS();
+}
+
+void test_finder_recency_rank_is_most_recent_first(void) {
+    TEST_START("Interactive Search - Recency Ranking");
+    config.history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING;
+    config.history_finder_rank = HISTORY_FINDER_RANK_RECENCY;
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL);
+    lle_history_add_entry(core, "git commit", 0, NULL);
+    lle_history_add_entry(core, "git push", 0, NULL); /// most recent
+
+    /// Even with a high usage_count, recency mode ignores frequency and keeps
+    /// the most recent match first -- the control for the frecency test.
+    lle_history_entry_t *frequent = NULL;
+    lle_history_get_entry_by_index(core, 0, &frequent);
+    if (frequent) {
+        frequent->usage_count = 100;
+    }
+
+    lle_history_interactive_search_init(core, "", 0);
+    lle_history_interactive_search_update_query('g');
+    lle_history_interactive_search_update_query('i');
+    lle_history_interactive_search_update_query('t');
+
+    const char *top = lle_history_interactive_search_get_current_command();
+    ASSERT_NOT_NULL(top, "should have a match");
+    ASSERT_TRUE(top && strcmp(top, "git push") == 0,
+                "recency surfaces the most recent command first");
+
+    lle_history_interactive_search_cancel();
+    lle_history_core_destroy(core);
+    TEST_PASS();
+}
+
+/* ============================================================================
  * MAIN TEST RUNNER
  * ============================================================================
  */
@@ -618,6 +759,12 @@ int main(void) {
     printf("\n--- EDGE CASES ---\n");
     test_multiple_sessions();
     test_operations_without_init();
+
+    printf("\n--- FINDER STRATEGIES ---\n");
+    test_finder_subsequence_match();
+    test_finder_substring_rejects_non_substring();
+    test_finder_frecency_rank();
+    test_finder_recency_rank_is_most_recent_first();
 
     printf("\n=======================================================\n");
     printf("  TEST RESULTS\n");

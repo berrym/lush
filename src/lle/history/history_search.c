@@ -404,6 +404,67 @@ void lle_history_search_results_sort(lle_history_search_results_t *results) {
 }
 
 /*
+ * Frecency score for a history entry: usage frequency weighted by a recency
+ * bucket of the time since last access (Mozilla/atuin style). The buckets are
+ * <1hr x4, <1day x2, <1wk x1, older x0.5; the integer multipliers below are
+ * those weights scaled by two (8/4/2/1) so the score stays integral while
+ * preserving the 4:2:1:0.5 ratio. Only relative ordering matters because the
+ * caller overwrites each result's score with this value before re-sorting.
+ *
+ * Shared with autosuggestion ranking; keep it free of search-container state.
+ */
+int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now) {
+    if (!entry) {
+        return 0;
+    }
+
+    uint32_t usage = entry->usage_count > 0 ? entry->usage_count : 1;
+    uint64_t last = entry->last_access_time;
+    uint64_t age = now > last ? now - last : 0;
+
+    int weight;
+    if (age < 3600ULL) {
+        weight = 8; /// within the hour
+    } else if (age < 86400ULL) {
+        weight = 4; /// within the day
+    } else if (age < 604800ULL) {
+        weight = 2; /// within the week
+    } else {
+        weight = 1; /// older
+    }
+
+    return (int)usage * weight;
+}
+
+/*
+ * Re-score search results by frecency and re-sort. Each result's relevance
+ * score is replaced with the frecency score of its history entry, then the
+ * container is sorted descending. Results whose entry can no longer be fetched
+ * keep their existing score. `now` is the current time in epoch seconds.
+ */
+void lle_history_search_results_rerank_frecency(
+    lle_history_search_results_t *results, lle_history_core_t *history_core,
+    uint64_t now) {
+    if (!results || !history_core || results->count == 0) {
+        return;
+    }
+
+    for (size_t i = 0; i < results->count; i++) {
+        lle_history_entry_t *entry = NULL;
+        if (lle_history_get_entry_by_index(history_core,
+                                           results->results[i].entry_index,
+                                           &entry) == LLE_SUCCESS &&
+            entry) {
+            results->results[i].score = lle_history_frecency_score(entry, now);
+        }
+    }
+
+    /// Scores changed underneath the sorted flag; force a re-sort.
+    results->sorted = false;
+    lle_history_search_results_sort(results);
+}
+
+/*
  * Microseconds elapsed since `start` on CLOCK_MONOTONIC, floored at 1.
  * A completed search always took a non-zero amount of wall time at this
  * metric's microsecond resolution; on a fast machine a small search can
@@ -584,6 +645,79 @@ lle_history_search_prefix(lle_history_core_t *history_core, const char *prefix,
     lle_history_search_results_sort(results);
 
     /// Record search time
+    results->search_time_us = search_elapsed_us(&start_time);
+
+    return results;
+}
+
+/**
+ * @brief Search history for commands matching a typed subsequence (fzy-style)
+ *
+ * Unlike lle_history_search_fuzzy (whole-string Levenshtein, for typo-tolerant
+ * "did you mean" matching), this gates on the query being a subsequence of the
+ * command and ranks with fuzzy_completion_score's positional bonuses -- the
+ * right behavior for "type a few characters, narrow the list" interactive
+ * finding. "gst" matches "git status", "gco" matches "git checkout".
+ *
+ * @param history_core History core engine (must not be NULL)
+ * @param query Pattern typed by the user (must not be NULL)
+ * @param max_results Maximum results to return (0 = default of 100)
+ * @return Search results container, or NULL on failure or invalid parameters
+ */
+lle_history_search_results_t *
+lle_history_search_subsequence(lle_history_core_t *history_core,
+                               const char *query, size_t max_results) {
+    if (!history_core || !query) {
+        return NULL;
+    }
+
+    struct timespec start_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+    lle_history_search_results_t *results =
+        lle_history_search_results_create(max_results);
+    if (!results) {
+        return NULL;
+    }
+
+    results->query = lle_pool_strdup(query);
+    results->search_type = LLE_SEARCH_TYPE_FUZZY;
+
+    size_t total_entries = 0;
+    if (lle_history_get_entry_count(history_core, &total_entries) !=
+        LLE_SUCCESS) {
+        lle_history_search_results_destroy(results);
+        return NULL;
+    }
+
+    fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
+    opts.case_sensitive = false;
+
+    /// Walk newest-first so equal-scoring matches keep recency order.
+    for (size_t i = total_entries; i > 0; i--) {
+        size_t index = i - 1;
+
+        lle_history_entry_t *entry = NULL;
+        if (lle_history_get_entry_by_index(history_core, index, &entry) !=
+                LLE_SUCCESS ||
+            !entry || !entry->command) {
+            continue;
+        }
+
+        /// Subsequence gate + fzy ranking; 0 means not a subsequence.
+        int score = fuzzy_completion_score(query, entry->command, &opts);
+        if (score > 0) {
+            add_search_result(results, entry->entry_id, index, entry->command,
+                              entry->timestamp, score, 0,
+                              LLE_SEARCH_TYPE_FUZZY);
+
+            if (results->count >= results->capacity) {
+                break;
+            }
+        }
+    }
+
+    lle_history_search_results_sort(results);
     results->search_time_us = search_elapsed_us(&start_time);
 
     return results;

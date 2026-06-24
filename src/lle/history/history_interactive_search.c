@@ -21,6 +21,7 @@
  * - Other keys exit search and process the key
  */
 
+#include "config.h" /// finder match/rank strategy (config.history_finder_*)
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/memory_management.h"
@@ -29,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ============================================================================
  * CONSTANTS AND MACROS
@@ -177,15 +179,38 @@ static bool perform_search(void) {
         return false;
     }
 
-    /// Perform substring search (most useful for interactive search)
-    session->results = lle_history_search_substring(
-        session->history_core, session->query, 100 /// max results
-    );
+    /// Match according to the configured finder strategy. fuzzy is the lush
+    /// default; substring is the classic reverse-i-search (and the curated
+    /// default under bash/zsh/posix); prefix matches only at the command start.
+    switch (config.history_finder_match) {
+    case HISTORY_FINDER_MATCH_FUZZY:
+        session->results = lle_history_search_subsequence(session->history_core,
+                                                          session->query, 100);
+        break;
+    case HISTORY_FINDER_MATCH_PREFIX:
+        session->results = lle_history_search_prefix(session->history_core,
+                                                     session->query, 100);
+        break;
+    case HISTORY_FINDER_MATCH_SUBSTRING:
+    default:
+        session->results = lle_history_search_substring(session->history_core,
+                                                        session->query, 100);
+        break;
+    }
 
     if (!session->results) {
         session->state = LLE_SEARCH_STATE_FAILED;
         update_prompt_string();
         return false;
+    }
+
+    /// Re-rank by frecency when configured. The search assigns a relevance
+    /// score; frecency replaces it with usage-weighted recency so the entries
+    /// a user actually returns to surface first. recency keeps the search's
+    /// own newest-first ordering.
+    if (config.history_finder_rank == HISTORY_FINDER_RANK_FRECENCY) {
+        lle_history_search_results_rerank_frecency(
+            session->results, session->history_core, (uint64_t)time(NULL));
     }
 
     /// Update statistics
