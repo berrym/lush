@@ -1242,14 +1242,21 @@ bool lle_history_expansion_needed(const char *command);
  * - !?string - Most recent command containing string
  * - ^old^new - Quick substitution in last command
  *
+ * Word designators (!$, !^, !*, :n, :n-m) and modifiers (:p print-only,
+ * :s/old/new/ and :gs/old/new/ substitution) are applied after the event
+ * designator is resolved.
+ *
  * The expanded result is allocated using the memory pool and must be
  * freed by the caller using lle_pool_free().
  *
  * @param command Original command with history references
  * @param expanded Output pointer for expanded command (caller must free)
+ * @param print_only Optional output set true when a :p modifier requests that
+ * the expansion be printed but not executed (may be NULL)
  * @return LLE_SUCCESS or error code
  */
-lle_result_t lle_history_expand_line(const char *command, char **expanded);
+lle_result_t lle_history_expand_line(const char *command, char **expanded,
+                                     bool *print_only);
 
 /**
  * Set whether leading space disables expansion

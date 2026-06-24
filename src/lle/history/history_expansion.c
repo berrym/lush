@@ -4,20 +4,36 @@
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Implements bash-compatible history expansion for the LLE history system:
- * - !! - Repeat last command
- * - !n - Repeat command number n
- * - !-n - Repeat command n positions back
- * - !string - Repeat most recent command starting with string
- * - !?string - Repeat most recent command containing string
- * - ^old^new - Quick substitution in last command
+ * Implements bash-compatible history expansion for the LLE history system.
+ *
+ * Event designators (select a prior command):
+ * - !!        Repeat last command
+ * - !n        Repeat command number n
+ * - !-n       Repeat command n entries back
+ * - !string   Most recent command starting with string
+ * - !?string? Most recent command containing string (closing ? optional)
+ * - ^old^new  Quick substitution in the last command
+ *
+ * Word designators (select words from the referenced command, optionally
+ * after a ':' separator; the standalone forms imply the last command):
+ * - !$ / :$   Last word
+ * - !^ / :^   First argument (word 1)
+ * - !* / :*   All arguments (words 1 through last)
+ * - :0        The command word
+ * - :n        Word n
+ * - :n-m      Words n through m (n- selects through the next-to-last word,
+ *             n* selects through the last word)
+ *
+ * Modifiers (transform the selected text):
+ * - :p             Print the expansion without executing it
+ * - :s/old/new/    Substitute the first occurrence of old with new
+ * - :gs/old/new/   Substitute every occurrence
  *
  * Behavior (matches bash):
  * - Expansion occurs before command execution
- * - Failed expansion prints error and aborts command
- * - Space prefix disables expansion (configurable)
- * - :p modifier prints without executing
- * - :s/old/new/ performs substitution
+ * - A failed expansion reports an error and aborts the command
+ * - A leading space disables expansion (configurable)
+ * - Expansion does not occur inside quotes
  */
 
 #include "lle/error_handling.h"
@@ -37,39 +53,14 @@
  */
 
 #define EXPANSION_MAX_LENGTH 4096
-#define EXPANSION_MAX_DEPTH 10 /// Prevent infinite recursion
+#define EXPANSION_MAX_DEPTH 10  /// Prevent infinite recursion
+#define EXPANSION_MAX_WORDS 256 /// Words tracked for word designators
+#define EXPANSION_PATTERN_MAX 256
 
 /* ============================================================================
  * TYPE DEFINITIONS
  * ============================================================================
  */
-
-/**
- * Expansion type
- */
-typedef enum {
-    EXPANSION_TYPE_NONE,      ///< No expansion
-    EXPANSION_TYPE_LAST,      ///< !!
-    EXPANSION_TYPE_NUMBER,    ///< !n
-    EXPANSION_TYPE_RELATIVE,  ///< !-n
-    EXPANSION_TYPE_PREFIX,    ///< !string
-    EXPANSION_TYPE_SUBSTRING, ///< !?string
-    EXPANSION_TYPE_QUICK_SUB  /// ^old^new
-} lle_expansion_type_t;
-
-/**
- * Expansion result
- */
-typedef struct {
-    lle_expansion_type_t type; ///< Type of expansion
-    char *expanded_command;    ///< Expanded command text
-    size_t expansion_start;    ///< Start position in original
-    size_t expansion_end;      ///< End position in original
-    bool print_only;           ///< :p modifier - print only
-    bool needs_substitution;   ///< :s modifier present
-    char *sub_old;             ///< Substitution old pattern
-    char *sub_new;             ///< Substitution new pattern
-} lle_expansion_result_t;
 
 /**
  * Expansion context
@@ -218,12 +209,13 @@ static bool parse_history_number(const char *str, int64_t *number,
 }
 
 /**
- * @brief Extract string argument from expansion (for !string and !?string)
+ * @brief Extract a prefix-search string from a !string expansion
  *
- * Extracts the search string from a history expansion, stopping at
- * whitespace, special characters, or command terminators.
+ * Copies characters until whitespace, a command terminator, or the ':'
+ * modifier separator, so a trailing word designator or modifier is left
+ * for the caller to parse.
  *
- * @param str String after ! or !? (must not be NULL)
+ * @param str String after the leading ! (must not be NULL)
  * @param output Output buffer for extracted string (must not be NULL)
  * @param max_len Maximum length of output buffer in bytes
  * @return Number of characters consumed, or 0 on error or empty result
@@ -236,10 +228,11 @@ static size_t extract_expansion_string(const char *str, char *output,
 
     size_t i = 0;
     while (str[i] != '\0' && i < max_len - 1) {
-        /// Stop at whitespace, special chars, or command terminators
-        if (isspace(str[i]) || str[i] == ';' || str[i] == '|' ||
+        /// Stop at whitespace, command terminators, or the ':' modifier
+        /// separator (so word designators and modifiers can follow).
+        if (isspace((unsigned char)str[i]) || str[i] == ';' || str[i] == '|' ||
             str[i] == '&' || str[i] == '>' || str[i] == '<' || str[i] == '(' ||
-            str[i] == ')' || str[i] == '\n') {
+            str[i] == ')' || str[i] == ':' || str[i] == '\n') {
             break;
         }
         output[i] = str[i];
@@ -272,7 +265,9 @@ static bool perform_quick_substitution(const char *last_command,
         return false;
     }
 
-    /// Find the old pattern in the last command
+    /// Find the old pattern in the last command. A byte-level search is
+    /// correct for UTF-8: a valid multibyte needle only matches at code-point
+    /// boundaries of a valid multibyte haystack.
     const char *match_pos = strstr(last_command, old_pattern);
     if (!match_pos) {
         /// Pattern not found - substitution fails
@@ -307,184 +302,467 @@ static bool perform_quick_substitution(const char *last_command,
 }
 
 /**
- * @brief Expand a single history reference
+ * @brief Split a command into whitespace-delimited words
  *
- * Handles !!, !n, !-n, !?string, and !string expansion types.
- * Populates result with the expanded command and metadata.
+ * Records the start and length of each word for word-designator selection.
+ * Splitting is on ASCII whitespace, matching bash word designators.
  *
- * @param expansion_str The expansion string (without leading !) (must not be
- * NULL)
- * @param result Output for expansion result (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
- * invalid, LLE_ERROR_NOT_FOUND if referenced entry not found,
- * LLE_ERROR_OUT_OF_MEMORY on allocation failure
+ * @param cmd Command text (must not be NULL)
+ * @param starts Output array of word start pointers (size >= max)
+ * @param lens Output array of word byte lengths (size >= max)
+ * @param max Maximum number of words to record
+ * @return Number of words recorded
  */
-static lle_result_t expand_single_reference(const char *expansion_str,
-                                            lle_expansion_result_t *result) {
-    if (!expansion_str || !result || !g_expansion_ctx.history_core) {
+static size_t split_into_words(const char *cmd, const char **starts,
+                               size_t *lens, size_t max) {
+    size_t count = 0;
+    const char *p = cmd;
+    while (*p && count < max) {
+        while (*p && isspace((unsigned char)*p)) {
+            p++;
+        }
+        if (!*p) {
+            break;
+        }
+        const char *start = p;
+        while (*p && !isspace((unsigned char)*p)) {
+            p++;
+        }
+        starts[count] = start;
+        lens[count] = (size_t)(p - start);
+        count++;
+    }
+    return count;
+}
+
+/**
+ * @brief Apply a word designator to a referenced command
+ *
+ * Selects ^, $, *, a single word n, or a range (n-m, n-, n*) and writes the
+ * space-joined selection to out.
+ *
+ * @param cmd Referenced command text (must not be NULL)
+ * @param spec Designator characters (must not be NULL)
+ * @param out Output buffer for the selection (must not be NULL)
+ * @param out_sz Size of the output buffer in bytes
+ * @param consumed Output - designator characters consumed (must not be NULL)
+ * @return true on success, false on a malformed designator or overflow
+ */
+static bool select_word_range(const char *cmd, const char *spec, char *out,
+                              size_t out_sz, size_t *consumed) {
+    const char *starts[EXPANSION_MAX_WORDS];
+    size_t lens[EXPANSION_MAX_WORDS];
+    size_t nwords = split_into_words(cmd, starts, lens, EXPANSION_MAX_WORDS);
+    if (nwords == 0) {
+        return false;
+    }
+
+    size_t last = nwords - 1;
+    size_t first_sel;
+    size_t last_sel;
+    size_t used = 0;
+
+    char c = spec[0];
+    if (c == '^') {
+        first_sel = 1;
+        last_sel = 1;
+        used = 1;
+    } else if (c == '$') {
+        first_sel = last;
+        last_sel = last;
+        used = 1;
+    } else if (c == '*') {
+        first_sel = 1;
+        last_sel = last;
+        used = 1;
+    } else if (isdigit((unsigned char)c)) {
+        char *end;
+        long n = strtol(spec, &end, 10);
+        used = (size_t)(end - spec);
+        first_sel = (size_t)n;
+        last_sel = (size_t)n;
+        if (*end == '-') {
+            used++; /// consume '-'
+            const char *q = end + 1;
+            if (isdigit((unsigned char)*q)) {
+                char *end2;
+                long m = strtol(q, &end2, 10);
+                used += (size_t)(end2 - q);
+                last_sel = (size_t)m;
+            } else {
+                /// n- selects through the next-to-last word
+                last_sel = (last > 0) ? last - 1 : 0;
+            }
+        } else if (*end == '*') {
+            used++; /// consume '*'
+            last_sel = last;
+        }
+    } else {
+        return false; /// not a word designator
+    }
+
+    /// A '*' selection that exceeds the available words yields an empty
+    /// string (bash: !* with no arguments expands to nothing); other
+    /// out-of-range selections are an error.
+    if (first_sel > last) {
+        if (c == '*') {
+            out[0] = '\0';
+            *consumed = used;
+            return true;
+        }
+        return false;
+    }
+    if (last_sel > last) {
+        last_sel = last;
+    }
+    if (last_sel < first_sel) {
+        out[0] = '\0';
+        *consumed = used;
+        return true;
+    }
+
+    size_t pos = 0;
+    for (size_t w = first_sel; w <= last_sel; w++) {
+        if (w > first_sel) {
+            if (pos + 1 >= out_sz) {
+                return false;
+            }
+            out[pos++] = ' ';
+        }
+        if (pos + lens[w] >= out_sz) {
+            return false;
+        }
+        memcpy(out + pos, starts[w], lens[w]);
+        pos += lens[w];
+    }
+    out[pos] = '\0';
+    *consumed = used;
+    return true;
+}
+
+/**
+ * @brief Apply a :s substitution to text in place
+ *
+ * Replaces the first occurrence of old_pat with new_pat, or every occurrence
+ * when global is set.
+ *
+ * @param text Text to transform in place (must not be NULL)
+ * @param text_sz Size of the text buffer in bytes
+ * @param old_pat Pattern to replace (must not be NULL, must be non-empty)
+ * @param new_pat Replacement text (must not be NULL)
+ * @param global true to replace all occurrences
+ * @return true on success, false if old_pat is empty, not found, or overflow
+ */
+static bool apply_substitution(char *text, size_t text_sz, const char *old_pat,
+                               const char *new_pat, bool global) {
+    if (!old_pat[0]) {
+        return false;
+    }
+
+    char buf[EXPANSION_MAX_LENGTH];
+    size_t bp = 0;
+    size_t old_len = strlen(old_pat);
+    size_t new_len = strlen(new_pat);
+    const char *p = text;
+    bool did = false;
+
+    while (*p) {
+        if ((!did || global) && strncmp(p, old_pat, old_len) == 0) {
+            if (bp + new_len >= sizeof(buf)) {
+                return false;
+            }
+            memcpy(buf + bp, new_pat, new_len);
+            bp += new_len;
+            p += old_len;
+            did = true;
+        } else {
+            if (bp + 1 >= sizeof(buf)) {
+                return false;
+            }
+            buf[bp++] = *p++;
+        }
+    }
+
+    if (!did) {
+        return false; /// pattern not found
+    }
+
+    buf[bp] = '\0';
+    if (bp + 1 > text_sz) {
+        return false;
+    }
+    memcpy(text, buf, bp + 1);
+    return true;
+}
+
+/**
+ * @brief Resolve an event designator to the referenced command text
+ *
+ * Handles !!, !n, !-n, !?string?, !string, and the implicit last-command
+ * forms (!$, !^, !*, !:...). The returned command is pool-allocated and the
+ * caller frees it with lle_pool_free().
+ *
+ * @param spec Text after the leading ! (must not be NULL)
+ * @param out_cmd Output for the referenced command text (must not be NULL)
+ * @param consumed Output - event-designator characters consumed, excluding the
+ * leading ! (must not be NULL)
+ * @return LLE_SUCCESS, LLE_ERROR_INVALID_PARAMETER, LLE_ERROR_NOT_FOUND, or
+ * LLE_ERROR_OUT_OF_MEMORY
+ */
+static lle_result_t resolve_event_command(const char *spec, char **out_cmd,
+                                          size_t *consumed) {
+    *out_cmd = NULL;
+    *consumed = 0;
+
+    if (!spec || !g_expansion_ctx.history_core) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    memset(result, 0, sizeof(lle_expansion_result_t));
-
-    /// Handle !! (repeat last command)
-    if (expansion_str[0] == '!') {
-        result->type = EXPANSION_TYPE_LAST;
-        result->expansion_end = 2; /// !! is 2 characters
-
+    /// !! and the implicit last-command forms (!$, !^, !*, !:...)
+    if (spec[0] == '!' || spec[0] == '$' || spec[0] == '^' || spec[0] == '*' ||
+        spec[0] == ':') {
         lle_history_entry_t *entry = NULL;
         lle_result_t res = lle_history_bridge_get_by_reverse_index(0, &entry);
-
         if (res != LLE_SUCCESS || !entry) {
-            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
-
-        result->expanded_command = lle_pool_strdup(entry->command);
-        if (!result->expanded_command) {
+        *out_cmd = lle_pool_strdup(entry->command);
+        if (!*out_cmd) {
             return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
                              "history expansion allocation failed");
         }
-
+        *consumed = (spec[0] == '!') ? 1 : 0;
         return LLE_SUCCESS;
     }
 
-    /// Handle !n or !-n (number reference)
-    if (isdigit(expansion_str[0]) || expansion_str[0] == '-') {
+    /// !n or !-n (number reference)
+    if (isdigit((unsigned char)spec[0]) || spec[0] == '-') {
         int64_t number;
         bool is_relative;
-        size_t consumed;
-
-        if (!parse_history_number(expansion_str, &number, &is_relative,
-                                  &consumed)) {
-            /// Error - details in return code
+        size_t used;
+        if (!parse_history_number(spec, &number, &is_relative, &used)) {
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
-        result->type =
-            is_relative ? EXPANSION_TYPE_RELATIVE : EXPANSION_TYPE_NUMBER;
-        result->expansion_end = consumed + 1; /// +1 for the !
-
         lle_history_entry_t *entry = NULL;
         lle_result_t res;
-
         if (is_relative) {
             /// !-n is the command n entries back, where !-1 is the most recent
             /// (matching bash, in which !-1 is equivalent to !!). Reverse index
             /// 0 is the most recent entry, so !-n maps to reverse index n-1.
             if (number < 1) {
-                /// Error - details in return code
                 return LLE_ERROR_INVALID_PARAMETER;
             }
             res = lle_history_bridge_get_by_reverse_index((size_t)(number - 1),
                                                           &entry);
         } else {
-            /// !n means entry ID n
             res = lle_history_bridge_get_by_number((uint64_t)number, &entry);
         }
 
         if (res != LLE_SUCCESS || !entry) {
-            char err[128];
-            snprintf(err, sizeof(err), "!%s%" PRId64 ": event not found",
-                     is_relative ? "-" : "", number);
-            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
-
-        result->expanded_command = lle_pool_strdup(entry->command);
-        if (!result->expanded_command) {
+        *out_cmd = lle_pool_strdup(entry->command);
+        if (!*out_cmd) {
             return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
                              "history expansion allocation failed");
         }
-
+        *consumed = used;
         return LLE_SUCCESS;
     }
 
-    /// Handle !?string (substring search)
-    if (expansion_str[0] == '?') {
-        result->type = EXPANSION_TYPE_SUBSTRING;
-
-        char search_str[256];
-        size_t consumed = extract_expansion_string(
-            expansion_str + 1, search_str, sizeof(search_str));
-
-        if (consumed == 0) {
-            /// Error - details in return code
+    /// !?string? (substring search, closing ? optional)
+    if (spec[0] == '?') {
+        char search[EXPANSION_PATTERN_MAX];
+        size_t i = 0;
+        const char *q = spec + 1;
+        while (*q && *q != '?' && !isspace((unsigned char)*q) &&
+               i < sizeof(search) - 1) {
+            search[i++] = *q++;
+        }
+        search[i] = '\0';
+        if (i == 0) {
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
-        result->expansion_end = consumed + 2; /// +1 for !, +1 for ?
+        size_t total = 1 + i; /// '?' + string
+        if (*q == '?') {
+            total++; /// optional closing '?'
+        }
 
-        /// Search for command containing string
-        lle_history_search_results_t *search_results =
-            lle_history_search_substring(g_expansion_ctx.history_core,
-                                         search_str, 1);
-
-        if (!search_results ||
-            lle_history_search_results_get_count(search_results) == 0) {
-            if (search_results) {
-                lle_history_search_results_destroy(search_results);
+        lle_history_search_results_t *results = lle_history_search_substring(
+            g_expansion_ctx.history_core, search, 1);
+        if (!results || lle_history_search_results_get_count(results) == 0) {
+            if (results) {
+                lle_history_search_results_destroy(results);
             }
-            char err[256];
-            snprintf(err, sizeof(err), "!?%.230s: event not found", search_str);
-            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
-        const lle_search_result_t *first_result =
-            lle_history_search_results_get(search_results, 0);
-        result->expanded_command = lle_pool_strdup(first_result->command);
-
-        lle_history_search_results_destroy(search_results);
-
-        if (!result->expanded_command) {
+        const lle_search_result_t *first =
+            lle_history_search_results_get(results, 0);
+        *out_cmd = lle_pool_strdup(first->command);
+        lle_history_search_results_destroy(results);
+        if (!*out_cmd) {
             return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
                              "history expansion allocation failed");
         }
-
+        *consumed = total;
         return LLE_SUCCESS;
     }
 
-    /// Handle !string (prefix search)
-    result->type = EXPANSION_TYPE_PREFIX;
-
-    char search_str[256];
-    size_t consumed =
-        extract_expansion_string(expansion_str, search_str, sizeof(search_str));
-
-    if (consumed == 0) {
-        /// Error - details in return code
+    /// !string (prefix search)
+    char search[EXPANSION_PATTERN_MAX];
+    size_t used = extract_expansion_string(spec, search, sizeof(search));
+    if (used == 0) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    result->expansion_end = consumed + 1; /// +1 for !
-
-    /// Search for most recent command starting with string
-    lle_history_search_results_t *search_results =
-        lle_history_search_prefix(g_expansion_ctx.history_core, search_str, 1);
-
-    if (!search_results ||
-        lle_history_search_results_get_count(search_results) == 0) {
-        if (search_results) {
-            lle_history_search_results_destroy(search_results);
+    lle_history_search_results_t *results =
+        lle_history_search_prefix(g_expansion_ctx.history_core, search, 1);
+    if (!results || lle_history_search_results_get_count(results) == 0) {
+        if (results) {
+            lle_history_search_results_destroy(results);
         }
-        char err[256];
-        snprintf(err, sizeof(err), "!%.235s: event not found", search_str);
-        /// Error - details in return code
         return LLE_ERROR_NOT_FOUND;
     }
 
-    const lle_search_result_t *first_result =
-        lle_history_search_results_get(search_results, 0);
-    result->expanded_command = lle_pool_strdup(first_result->command);
-
-    lle_history_search_results_destroy(search_results);
-
-    if (!result->expanded_command) {
+    const lle_search_result_t *first =
+        lle_history_search_results_get(results, 0);
+    *out_cmd = lle_pool_strdup(first->command);
+    lle_history_search_results_destroy(results);
+    if (!*out_cmd) {
         return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
                          "history expansion allocation failed");
     }
+    *consumed = used;
+    return LLE_SUCCESS;
+}
 
+/**
+ * @brief Expand one history reference starting just past its leading !
+ *
+ * Resolves the event designator, applies an optional word designator and any
+ * trailing modifiers (:p, :s, :gs), and returns the pool-allocated result.
+ *
+ * @param after_bang Text immediately after the ! (must not be NULL)
+ * @param out Output for the expanded text (must not be NULL, caller frees)
+ * @param consumed Output - characters consumed including the leading ! (must
+ * not be NULL)
+ * @param print_only Optional output - set true if a :p modifier is present
+ * @return LLE_SUCCESS or an error code (NOT_FOUND, INVALID_PARAMETER,
+ * BUFFER_OVERFLOW, OUT_OF_MEMORY)
+ */
+static lle_result_t expand_one(const char *after_bang, char **out,
+                               size_t *consumed, bool *print_only) {
+    char *event_cmd = NULL;
+    size_t event_consumed = 0;
+    lle_result_t res =
+        resolve_event_command(after_bang, &event_cmd, &event_consumed);
+    if (res != LLE_SUCCESS) {
+        return res;
+    }
+
+    char text[EXPANSION_MAX_LENGTH];
+    if (strlen(event_cmd) >= sizeof(text)) {
+        lle_pool_free(event_cmd);
+        return LLE_ERROR_BUFFER_OVERFLOW;
+    }
+    strcpy(text, event_cmd);
+
+    const char *p = after_bang + event_consumed;
+
+    /// Optional word designator: ':<wd>' or a bare $ ^ * (standalone forms).
+    if (*p == ':' && (p[1] == '^' || p[1] == '$' || p[1] == '*' ||
+                      isdigit((unsigned char)p[1]))) {
+        char sel[EXPANSION_MAX_LENGTH];
+        size_t wc = 0;
+        if (!select_word_range(event_cmd, p + 1, sel, sizeof(sel), &wc)) {
+            lle_pool_free(event_cmd);
+            return LLE_ERROR_INVALID_PARAMETER;
+        }
+        strcpy(text, sel);
+        p += 1 + wc;
+    } else if (*p == '^' || *p == '$' || *p == '*') {
+        char sel[EXPANSION_MAX_LENGTH];
+        size_t wc = 0;
+        if (!select_word_range(event_cmd, p, sel, sizeof(sel), &wc)) {
+            lle_pool_free(event_cmd);
+            return LLE_ERROR_INVALID_PARAMETER;
+        }
+        strcpy(text, sel);
+        p += wc;
+    }
+
+    /// Optional modifiers: zero or more ':x'
+    while (*p == ':') {
+        char m = p[1];
+        bool global = false;
+        const char *mp = p + 1;
+
+        if (m == 'p') {
+            if (print_only) {
+                *print_only = true;
+            }
+            p += 2;
+            continue;
+        }
+
+        if (m == 'g' && mp[1] == 's') {
+            global = true;
+            mp++;
+            m = 's';
+        }
+
+        if (m == 's') {
+            const char *q = mp + 1;
+            char delim = *q;
+            if (!delim) {
+                lle_pool_free(event_cmd);
+                return LLE_ERROR_INVALID_PARAMETER;
+            }
+            q++;
+
+            char old_pat[EXPANSION_PATTERN_MAX] = {0};
+            char new_pat[EXPANSION_PATTERN_MAX] = {0};
+            size_t i = 0;
+            while (*q && *q != delim && i < sizeof(old_pat) - 1) {
+                old_pat[i++] = *q++;
+            }
+            if (*q != delim) {
+                lle_pool_free(event_cmd);
+                return LLE_ERROR_INVALID_PARAMETER;
+            }
+            q++;
+            i = 0;
+            while (*q && *q != delim && i < sizeof(new_pat) - 1) {
+                new_pat[i++] = *q++;
+            }
+            if (*q == delim) {
+                q++; /// optional trailing delimiter
+            }
+
+            if (!apply_substitution(text, sizeof(text), old_pat, new_pat,
+                                    global)) {
+                lle_pool_free(event_cmd);
+                return LLE_ERROR_INVALID_PARAMETER;
+            }
+            p = q;
+            continue;
+        }
+
+        /// Unknown modifier: leave it for literal copy by the caller.
+        break;
+    }
+
+    lle_pool_free(event_cmd);
+
+    *out = lle_pool_strdup(text);
+    if (!*out) {
+        return LLE_FAULT(LLE_ERROR_OUT_OF_MEMORY, "history",
+                         "history expansion allocation failed");
+    }
+    *consumed = 1 + (size_t)(p - after_bang);
     return LLE_SUCCESS;
 }
 
@@ -545,7 +823,8 @@ bool lle_history_expansion_needed(const char *command) {
     }
 
     /// Check for space prefix disabling expansion
-    if (g_expansion_ctx.space_disables_expansion && isspace(command[0])) {
+    if (g_expansion_ctx.space_disables_expansion &&
+        isspace((unsigned char)command[0])) {
         return false;
     }
 
@@ -561,12 +840,15 @@ bool lle_history_expansion_needed(const char *command) {
 /**
  * @brief Expand history references in a command line
  *
- * Expands all history references (!!, !n, !-n, !string, ^old^new, etc.) in the
- * command. The result must be freed by the caller using lle_pool_free().
+ * Expands all history references (!!, !n, !-n, !string, !$, ^old^new, etc.)
+ * in the command, applying any word designators and :p / :s modifiers. The
+ * result must be freed by the caller using lle_pool_free().
  *
  * @param command Original command with history references (must not be NULL)
  * @param expanded Output pointer for expanded command (allocated, caller must
  * free) (must not be NULL)
+ * @param print_only Optional output - set true when a :p modifier requests
+ * that the expansion be printed but not executed (may be NULL)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
  * invalid, LLE_ERROR_NOT_INITIALIZED if expansion system not initialized,
  *         LLE_ERROR_INVALID_STATE if recursion depth exceeded,
@@ -574,9 +856,14 @@ bool lle_history_expansion_needed(const char *command) {
  *         LLE_ERROR_BUFFER_OVERFLOW if expanded command too long,
  *         LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
-lle_result_t lle_history_expand_line(const char *command, char **expanded) {
+lle_result_t lle_history_expand_line(const char *command, char **expanded,
+                                     bool *print_only) {
     if (!command || !expanded) {
         return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    if (print_only) {
+        *print_only = false;
     }
 
     if (!g_expansion_ctx.history_core) {
@@ -587,7 +874,6 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
 
     /// Check for recursion depth
     if (g_expansion_ctx.recursion_depth >= EXPANSION_MAX_DEPTH) {
-        /// Error - details in return code
         return LLE_ERROR_INVALID_STATE;
     }
 
@@ -599,10 +885,9 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
 
     /// Handle quick substitution (^old^new)
     if (command[0] == '^') {
-        /// Parse ^old^new format
         const char *p = command + 1;
-        char old_pattern[256] = {0};
-        char new_pattern[256] = {0};
+        char old_pattern[EXPANSION_PATTERN_MAX] = {0};
+        char new_pattern[EXPANSION_PATTERN_MAX] = {0};
 
         /// Extract old pattern
         size_t i = 0;
@@ -611,7 +896,6 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
         }
 
         if (*p != '^') {
-            /// Error - details in return code
             return LLE_ERROR_INVALID_PARAMETER;
         }
 
@@ -630,7 +914,6 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
             lle_history_bridge_get_by_reverse_index(0, &last_entry);
 
         if (res != LLE_SUCCESS || !last_entry) {
-            /// Error - details in return code
             return LLE_ERROR_NOT_FOUND;
         }
 
@@ -661,7 +944,6 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
             size_t remaining = cmd_len - cmd_pos;
             if (result_pos + remaining >= EXPANSION_MAX_LENGTH) {
                 g_expansion_ctx.recursion_depth--;
-                /// Error - details in return code
                 return LLE_ERROR_BUFFER_OVERFLOW;
             }
             memcpy(result + result_pos, command + cmd_pos, remaining);
@@ -677,9 +959,10 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
         }
 
         /// Process the expansion
-        lle_expansion_result_t exp_result;
-        lle_result_t res =
-            expand_single_reference(command + cmd_pos + 1, &exp_result);
+        char *expanded_text = NULL;
+        size_t consumed = 0;
+        lle_result_t res = expand_one(command + cmd_pos + 1, &expanded_text,
+                                      &consumed, print_only);
 
         if (res != LLE_SUCCESS) {
             g_expansion_ctx.recursion_depth--;
@@ -687,19 +970,18 @@ lle_result_t lle_history_expand_line(const char *command, char **expanded) {
         }
 
         /// Copy expanded text
-        size_t expanded_len = strlen(exp_result.expanded_command);
+        size_t expanded_len = strlen(expanded_text);
         if (result_pos + expanded_len >= EXPANSION_MAX_LENGTH) {
-            lle_pool_free(exp_result.expanded_command);
+            lle_pool_free(expanded_text);
             g_expansion_ctx.recursion_depth--;
-            /// Error - details in return code
             return LLE_ERROR_BUFFER_OVERFLOW;
         }
 
-        memcpy(result + result_pos, exp_result.expanded_command, expanded_len);
+        memcpy(result + result_pos, expanded_text, expanded_len);
         result_pos += expanded_len;
-        cmd_pos += exp_result.expansion_end;
+        cmd_pos += consumed;
 
-        lle_pool_free(exp_result.expanded_command);
+        lle_pool_free(expanded_text);
     }
 
     result[result_pos] = '\0';
