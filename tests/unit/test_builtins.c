@@ -515,31 +515,31 @@ TEST(echo_no_escapes) {
  */
 
 TEST(printf_string) {
-    run_result_t r = run_shell("mode posix\nprintf \"%s\" hello\n");
+    run_result_t r = run_shell("mode lush\nprintf \"%s\" hello\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "hello");
 }
 
 TEST(printf_integer) {
-    run_result_t r = run_shell("mode posix\nprintf \"%d\" 42\n");
+    run_result_t r = run_shell("mode lush\nprintf \"%d\" 42\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "42");
 }
 
 TEST(printf_hex) {
-    run_result_t r = run_shell("mode posix\nprintf \"%x\" 255\n");
+    run_result_t r = run_shell("mode lush\nprintf \"%x\" 255\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "ff");
 }
 
 TEST(printf_width) {
-    run_result_t r = run_shell("mode posix\nprintf \"[%10s]\" hi\n");
+    run_result_t r = run_shell("mode lush\nprintf \"[%10s]\" hi\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "[        hi]");
 }
 
 TEST(printf_escape_newline) {
-    run_result_t r = run_shell("mode posix\nprintf \"a\\nb\"\n");
+    run_result_t r = run_shell("mode lush\nprintf \"a\\nb\"\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "a\nb");
 }
