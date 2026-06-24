@@ -719,6 +719,54 @@ void test_finder_recency_rank_is_most_recent_first(void) {
     TEST_PASS();
 }
 
+void test_frecency_directory_context_boost(void) {
+    TEST_START("Frecency - Directory Context Boost");
+
+    /// Two equally-recent entries; the remote one is used more often.
+    lle_history_entry_t *local = NULL;
+    lle_history_entry_t *remote = NULL;
+    lle_history_entry_create(&local, "git status", NULL);
+    lle_history_entry_create(&remote, "git stash", NULL);
+    ASSERT_NOT_NULL(local, "local entry created");
+    ASSERT_NOT_NULL(remote, "remote entry created");
+
+    uint64_t now = (uint64_t)time(NULL);
+    local->usage_count = 2;
+    local->last_access_time = now;
+    remote->usage_count = 3;
+    remote->last_access_time = now;
+
+    /// Both entries record the real cwd at creation; truncate the remote one so
+    /// the two working directories differ. The local entry's directory is then
+    /// the "current" directory for scoring.
+    size_t rlen =
+        remote->working_directory ? strlen(remote->working_directory) : 0;
+    if (rlen > 2) {
+        remote->working_directory[rlen / 2] = '\0';
+    }
+    const char *cwd = local->working_directory;
+
+    /// Without directory context, frequency wins: remote (3) beats local (2).
+    int local_plain = lle_history_frecency_score(local, now, NULL);
+    int remote_plain = lle_history_frecency_score(remote, now, NULL);
+    ASSERT_TRUE(remote_plain > local_plain,
+                "without cwd boost the more-frequent command scores higher");
+
+    /// With directory context, the local command's x2 boost overcomes the
+    /// frequency gap and outranks the remote one.
+    int local_boost = lle_history_frecency_score(local, now, cwd);
+    int remote_boost = lle_history_frecency_score(remote, now, cwd);
+    ASSERT_TRUE(
+        remote_boost == remote_plain,
+        "remote command is not in the current dir, so it is not boosted");
+    ASSERT_TRUE(local_boost > remote_boost,
+                "the current-directory command outranks the more-frequent one");
+
+    lle_history_entry_destroy(local, NULL);
+    lle_history_entry_destroy(remote, NULL);
+    TEST_PASS();
+}
+
 /* ============================================================================
  * MAIN TEST RUNNER
  * ============================================================================
@@ -765,6 +813,7 @@ int main(void) {
     test_finder_substring_rejects_non_substring();
     test_finder_frecency_rank();
     test_finder_recency_rank_is_most_recent_first();
+    test_frecency_directory_context_boost();
 
     printf("\n=======================================================\n");
     printf("  TEST RESULTS\n");

@@ -269,6 +269,8 @@ typedef struct {
         history_finder_rank; ///< Ctrl-R ranking (frecency / recency)
     history_finder_display_t
         history_finder_display; ///< Ctrl-R presentation (incremental / picker)
+    bool history_frecency_directory_context; ///< Boost frecency for commands
+                                             ///< recorded in the current dir
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode

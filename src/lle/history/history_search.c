@@ -411,9 +411,14 @@ void lle_history_search_results_sort(lle_history_search_results_t *results) {
  * preserving the 4:2:1:0.5 ratio. Only relative ordering matters because the
  * caller overwrites each result's score with this value before re-sorting.
  *
+ * When cwd is non-NULL, an entry recorded in that directory gets a x2
+ * directory-context boost -- a moderate edge for commands you run here that
+ * frequency or recency can still override. Pass NULL to disable the boost.
+ *
  * Shared with autosuggestion ranking; keep it free of search-container state.
  */
-int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now) {
+int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now,
+                               const char *cwd) {
     if (!entry) {
         return 0;
     }
@@ -433,18 +438,27 @@ int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now) {
         weight = 1; /// older
     }
 
-    return (int)usage * weight;
+    int score = (int)usage * weight;
+
+    /// Directory-context boost: prefer commands recorded in the current dir.
+    if (cwd && entry->working_directory &&
+        lle_unicode_strings_equal(entry->working_directory, cwd, NULL)) {
+        score *= 2;
+    }
+
+    return score;
 }
 
 /*
  * Re-score search results by frecency and re-sort. Each result's relevance
  * score is replaced with the frecency score of its history entry, then the
  * container is sorted descending. Results whose entry can no longer be fetched
- * keep their existing score. `now` is the current time in epoch seconds.
+ * keep their existing score. `now` is the current time in epoch seconds; `cwd`
+ * (or NULL) is forwarded to the scorer for directory-context weighting.
  */
 void lle_history_search_results_rerank_frecency(
     lle_history_search_results_t *results, lle_history_core_t *history_core,
-    uint64_t now) {
+    uint64_t now, const char *cwd) {
     if (!results || !history_core || results->count == 0) {
         return;
     }
@@ -455,7 +469,8 @@ void lle_history_search_results_rerank_frecency(
                                            results->results[i].entry_index,
                                            &entry) == LLE_SUCCESS &&
             entry) {
-            results->results[i].score = lle_history_frecency_score(entry, now);
+            results->results[i].score =
+                lle_history_frecency_score(entry, now, cwd);
         }
     }
 

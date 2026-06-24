@@ -966,9 +966,12 @@ void lle_history_search_results_sort(lle_history_search_results_t *results);
  *
  * @param entry History entry (NULL yields 0)
  * @param now Current time in epoch seconds
+ * @param cwd Current working directory for a x2 directory-context boost when
+ *            the entry was recorded there, or NULL to disable the boost
  * @return Frecency score (higher = better); only relative ordering is defined
  */
-int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now);
+int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now,
+                               const char *cwd);
 
 /**
  * Re-rank search results by frecency
@@ -979,10 +982,11 @@ int lle_history_frecency_score(const lle_history_entry_t *entry, uint64_t now);
  * @param results Search results to re-rank (may be NULL)
  * @param history_core History core used to fetch entries
  * @param now Current time in epoch seconds
+ * @param cwd Current working directory for directory-context weighting, or NULL
  */
 void lle_history_search_results_rerank_frecency(
     lle_history_search_results_t *results, lle_history_core_t *history_core,
-    uint64_t now);
+    uint64_t now, const char *cwd);
 
 /**
  * Get number of results

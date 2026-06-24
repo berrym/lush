@@ -413,6 +413,15 @@ static void update_autosuggestion(readline_context_t *ctx) {
     const char *best_remaining = NULL;
     int best_score = -1;
 
+    /// Fetch the cwd once for directory-context weighting (commands recorded in
+    /// the current directory score higher). NULL disables the boost.
+    char cwd[LLE_HISTORY_MAX_PATH_LENGTH];
+    const char *cwd_arg = NULL;
+    if (rank_frecency && config.history_frecency_directory_context &&
+        lle_history_get_cwd(cwd, sizeof(cwd)) == LLE_SUCCESS) {
+        cwd_arg = cwd;
+    }
+
 /// Limit history search to prevent hangs with very large histories
 #define MAX_SUGGESTION_SEARCH_ITERATIONS 5000
     size_t iterations = 0;
@@ -469,7 +478,7 @@ static void update_autosuggestion(readline_context_t *ctx) {
             /// scan means a strict-greater test leaves recency as the natural
             /// tie-breaker. remaining points into the stable history entry, so
             /// holding it across the scan is safe.
-            int score = lle_history_frecency_score(entry, now);
+            int score = lle_history_frecency_score(entry, now, cwd_arg);
             if (score > best_score) {
                 best_score = score;
                 best_remaining = remaining;
