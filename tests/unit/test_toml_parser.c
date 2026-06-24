@@ -1013,6 +1013,48 @@ TEST(parse_key_with_hyphen) {
     toml_parser_cleanup(&parser);
 }
 
+TEST(parse_dotted_key) {
+    /// Dotted keys round-trip the config registry's flat dotted paths: the
+    /// registry emits "finder.match = ..." under a section and must read it
+    /// back as the single key "finder.match".
+    toml_parser_t parser;
+    test_ctx_t ctx = {0};
+
+    toml_parser_init(&parser, "finder.match = \"prefix\"");
+    toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
+
+    ASSERT_EQ(result, TOML_SUCCESS);
+    ASSERT_EQ(ctx.count, 1);
+    ASSERT_STR_EQ(ctx.keys[0], "finder.match");
+    ASSERT_STR_EQ(ctx.values[0].data.string, "prefix");
+
+    free_test_ctx(&ctx);
+    toml_parser_cleanup(&parser);
+}
+
+TEST(parse_dotted_key_in_section) {
+    /// Under a section, a dotted key composes the full path the same way the
+    /// registry's load callback does: section "history" + key "finder.match".
+    toml_parser_t parser;
+    test_ctx_t ctx = {0};
+
+    const char *input = "[history]\n"
+                        "finder.match = \"fuzzy\"\n"
+                        "search_mode = \"plain\"";
+
+    toml_parser_init(&parser, input);
+    toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
+
+    ASSERT_EQ(result, TOML_SUCCESS);
+    ASSERT_EQ(ctx.count, 2);
+    ASSERT_STR_EQ(ctx.sections[0], "history");
+    ASSERT_STR_EQ(ctx.keys[0], "finder.match");
+    ASSERT_STR_EQ(ctx.keys[1], "search_mode");
+
+    free_test_ctx(&ctx);
+    toml_parser_cleanup(&parser);
+}
+
 TEST(parse_trailing_comma_array) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
@@ -1117,6 +1159,8 @@ int main(void) {
     RUN_TEST(parse_whitespace_only);
     RUN_TEST(parse_key_with_underscore);
     RUN_TEST(parse_key_with_hyphen);
+    RUN_TEST(parse_dotted_key);
+    RUN_TEST(parse_dotted_key_in_section);
     RUN_TEST(parse_trailing_comma_array);
 
     return TEST_RESULT();
