@@ -75,6 +75,15 @@ void test_save_and_load(void) {
         }
     }
 
+    /// Stamp a distinct frecency signal on one entry to prove the usage_count
+    /// and last_access_time columns survive the save/load round trip.
+    lle_history_entry_t *stamped = NULL;
+    lle_history_get_entry_by_index(core, 4, &stamped);
+    if (stamped) {
+        stamped->usage_count = 7;
+        stamped->last_access_time = 1234567890ULL;
+    }
+
     /// Save to file
     result = lle_history_save_to_file(core, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
@@ -130,6 +139,13 @@ void test_save_and_load(void) {
             lle_history_core_destroy(core);
             unlink(TEST_HISTORY_FILE);
             FAIL("Exit code doesn't match");
+        }
+
+        if (i == 4 && (entry->usage_count != 7 ||
+                       entry->last_access_time != 1234567890ULL)) {
+            lle_history_core_destroy(core);
+            unlink(TEST_HISTORY_FILE);
+            FAIL("Frecency signal didn't survive save/load");
         }
     }
 

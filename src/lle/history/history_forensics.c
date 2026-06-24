@@ -189,8 +189,10 @@ lle_forensic_apply_to_entry(lle_history_entry_t *entry,
     entry->end_time_ns = 0; /// Will be set by mark_end
     entry->duration_ms = 0;
 
-    /// Initialize usage tracking
-    entry->usage_count = 0;
+    /// Initialize usage tracking. usage_count starts at 1 (recorded == used
+    /// once); the dedup merge sums it across re-runs so frecency reflects real
+    /// frequency. last_access_time seeds to the capture time.
+    entry->usage_count = 1;
     entry->last_access_time =
         context->timestamp_ns / 1000000000ULL; /// Convert to seconds
 
