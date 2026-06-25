@@ -62,6 +62,9 @@ extern "C" {
 /** @brief Maximum number of registered per-mode default overrides */
 #define CREG_MODE_DEFAULTS_MAX 64
 
+/** @brief Maximum number of registered runtime bindings */
+#define CREG_BINDINGS_MAX 256
+
 /* ============================================================================
  * VALUE TYPES
  * ============================================================================
@@ -305,6 +308,65 @@ creg_result_t config_registry_set_boolean(const char *key, bool value);
  * @brief Get a boolean value
  */
 creg_result_t config_registry_get_boolean(const char *key, bool *out);
+
+/* ============================================================================
+ * RUNTIME BINDINGS (the keystone)
+ *
+ * A binding ties a registered key to a runtime cell (the real lvalue the engine
+ * reads, e.g. &config.history_size). Once bound, EVERY change to the key from
+ * ANY surface (config builtin, TOML load, mode preset) is written through to
+ * the cell automatically -- the registry is the single writer and the cell is a
+ * passive, always-current cache. This REPLACES the hand-written
+ * sync_to_runtime / sync_from_runtime hooks and the whole class of "phantom
+ * sync" bugs they caused: binding an UNREGISTERED key fails loudly
+ * (CREG_ERROR_NOT_FOUND) instead of silently no-opping. Hot paths keep reading
+ * the plain cell; the registry writes it once per change, never per read.
+ * ============================================================================
+ */
+
+/**
+ * @brief Generic enum mapping for an enum-as-string binding
+ *
+ * Decoupled from the engine's enum typedefs so the registry layer needs no
+ * knowledge of config.h. Terminated by a {NULL, 0} sentinel.
+ */
+typedef struct {
+    const char *name; ///< Registry string value (e.g. "fuzzy")
+    int64_t value;    ///< Engine enum value it maps to
+} creg_enum_pair_t;
+
+/**
+ * @brief Bind a boolean key to a runtime bool cell.
+ * @return CREG_SUCCESS, or CREG_ERROR_NOT_FOUND if the key is not registered.
+ */
+creg_result_t config_registry_bind_boolean(const char *key, bool *cell);
+
+/**
+ * @brief Bind an integer key to a runtime int cell.
+ */
+creg_result_t config_registry_bind_integer(const char *key, int *cell);
+
+/**
+ * @brief Bind a string key to a fixed-size runtime char buffer.
+ */
+creg_result_t config_registry_bind_string(const char *key, char *cell,
+                                          size_t cell_size);
+
+/**
+ * @brief Bind an enum-as-string key to a runtime int (enum) cell.
+ *
+ * The registry stores the value as a string; on each change the matching
+ * pair's int value is written to the cell (mapping done once, here, instead
+ * of a strcmp ladder in a sync hook). Unmatched strings write @p fallback.
+ *
+ * @param key      Registered key
+ * @param cell     Address of the engine enum (read as int)
+ * @param pairs    NULL-name-terminated mapping table
+ * @param fallback Value written when the string matches no pair
+ */
+creg_result_t config_registry_bind_enum(const char *key, int *cell,
+                                        const creg_enum_pair_t *pairs,
+                                        int64_t fallback);
 
 /* ============================================================================
  * CHANGE NOTIFICATION

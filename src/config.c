@@ -663,8 +663,7 @@ static const int num_config_options =
  */
 
 /// Forward declarations for sync hooks
-static void history_sync_to_runtime(void);
-static void history_sync_from_runtime(void);
+static void history_bind_runtime(void);
 static void shell_sync_to_runtime(void);
 static void shell_sync_from_runtime(void);
 static void display_sync_to_runtime(void);
@@ -719,8 +718,10 @@ static const creg_section_t history_section = {
     .option_count = sizeof(history_options) / sizeof(creg_option_t),
     .on_load = NULL,
     .on_save = NULL,
-    .sync_to_runtime = history_sync_to_runtime,
-    .sync_from_runtime = history_sync_from_runtime,
+    /// history.* is bound (history_bind_runtime); no sync hooks -- the registry
+    /// write-throughs the runtime cells directly. This is the keystone proof.
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
 };
 
 /* ----------------------------------------------------------------------------
@@ -942,87 +943,58 @@ static const creg_section_t lle_section = {
  * -------------------------------------------------------------------------- */
 
 /// @brief Sync history config from registry to runtime
-static void history_sync_to_runtime(void) {
-    bool bval;
-    int64_t ival;
+/// history.* enum-as-string mappings (registry string <-> engine enum). The
+/// registry write-throughs the matched int once, on change -- this is what the
+/// deleted history_sync_to_runtime's strcmp ladders used to do per sync call.
+static const creg_enum_pair_t history_search_mode_pairs[] = {
+    {"prefix", HISTORY_SEARCH_MODE_PREFIX},
+    { "plain",  HISTORY_SEARCH_MODE_PLAIN},
+    {    NULL,                          0},
+};
+static const creg_enum_pair_t history_finder_match_pairs[] = {
+    {    "fuzzy",     HISTORY_FINDER_MATCH_FUZZY},
+    {"substring", HISTORY_FINDER_MATCH_SUBSTRING},
+    {   "prefix",    HISTORY_FINDER_MATCH_PREFIX},
+    {       NULL,                              0},
+};
+static const creg_enum_pair_t history_finder_rank_pairs[] = {
+    {"frecency", HISTORY_FINDER_RANK_FRECENCY},
+    { "recency",  HISTORY_FINDER_RANK_RECENCY},
+    {      NULL,                            0},
+};
+static const creg_enum_pair_t history_finder_display_pairs[] = {
+    {"incremental", HISTORY_FINDER_DISPLAY_INCREMENTAL},
+    {     "picker",      HISTORY_FINDER_DISPLAY_PICKER},
+    {         NULL,                                  0},
+};
 
-    if (config_registry_get_boolean("history.enabled", &bval) == CREG_SUCCESS) {
-        config.history_enabled = bval;
-    }
-    if (config_registry_get_integer("history.size", &ival) == CREG_SUCCESS) {
-        config.history_size = (int)ival;
-    }
-    if (config_registry_get_boolean("history.no_dups", &bval) == CREG_SUCCESS) {
-        config.history_no_dups = bval;
-    }
-    if (config_registry_get_boolean("history.timestamps", &bval) ==
-        CREG_SUCCESS) {
-        config.history_timestamps = bval;
-    }
-    char sval[CREG_VALUE_STRING_MAX];
-    if (config_registry_get_string("history.search_mode", sval, sizeof(sval)) ==
-        CREG_SUCCESS) {
-        config.history_search_mode = (strcmp(sval, "plain") == 0)
-                                         ? HISTORY_SEARCH_MODE_PLAIN
-                                         : HISTORY_SEARCH_MODE_PREFIX;
-    }
-    if (config_registry_get_string("history.finder.match", sval,
-                                   sizeof(sval)) == CREG_SUCCESS) {
-        if (strcmp(sval, "substring") == 0) {
-            config.history_finder_match = HISTORY_FINDER_MATCH_SUBSTRING;
-        } else if (strcmp(sval, "prefix") == 0) {
-            config.history_finder_match = HISTORY_FINDER_MATCH_PREFIX;
-        } else {
-            config.history_finder_match = HISTORY_FINDER_MATCH_FUZZY;
-        }
-    }
-    if (config_registry_get_string("history.finder.rank", sval, sizeof(sval)) ==
-        CREG_SUCCESS) {
-        config.history_finder_rank = (strcmp(sval, "recency") == 0)
-                                         ? HISTORY_FINDER_RANK_RECENCY
-                                         : HISTORY_FINDER_RANK_FRECENCY;
-    }
-    if (config_registry_get_string("history.finder.display", sval,
-                                   sizeof(sval)) == CREG_SUCCESS) {
-        config.history_finder_display =
-            (strcmp(sval, "picker") == 0) ? HISTORY_FINDER_DISPLAY_PICKER
-                                          : HISTORY_FINDER_DISPLAY_INCREMENTAL;
-    }
-    if (config_registry_get_boolean("history.frecency.directory_context",
-                                    &bval) == CREG_SUCCESS) {
-        config.history_frecency_directory_context = bval;
-    }
-}
-
-/// @brief Sync history config from runtime to registry
-static void history_sync_from_runtime(void) {
-    config_registry_set_boolean("history.enabled", config.history_enabled);
-    config_registry_set_integer("history.size", config.history_size);
-    config_registry_set_boolean("history.no_dups", config.history_no_dups);
-    config_registry_set_boolean("history.timestamps",
-                                config.history_timestamps);
-    config_registry_set_string(
-        "history.search_mode",
-        config.history_search_mode == HISTORY_SEARCH_MODE_PLAIN ? "plain"
-                                                                : "prefix");
-    const char *match_str = "fuzzy";
-    if (config.history_finder_match == HISTORY_FINDER_MATCH_SUBSTRING) {
-        match_str = "substring";
-    } else if (config.history_finder_match == HISTORY_FINDER_MATCH_PREFIX) {
-        match_str = "prefix";
-    }
-    config_registry_set_string("history.finder.match", match_str);
-    config_registry_set_string(
-        "history.finder.rank",
-        config.history_finder_rank == HISTORY_FINDER_RANK_RECENCY ? "recency"
-                                                                  : "frecency");
-    config_registry_set_string("history.finder.display",
-                               config.history_finder_display ==
-                                       HISTORY_FINDER_DISPLAY_PICKER
-                                   ? "picker"
-                                   : "incremental");
-    config_registry_set_boolean("history.frecency.directory_context",
-                                config.history_frecency_directory_context);
+/// @brief Bind the history.* keys to their runtime cells (the keystone).
+///
+/// Replaces history_sync_to_runtime AND history_sync_from_runtime. After this
+/// runs (once, at registration) the registry write-throughs config.history_* on
+/// every change from any surface; there is nothing left to "call after a
+/// change". Binding an unregistered key would fail loudly, so a typo can no
+/// longer silently no-op the way the old sync hooks did.
+static void history_bind_runtime(void) {
+    config_registry_bind_boolean("history.enabled", &config.history_enabled);
+    config_registry_bind_integer("history.size", &config.history_size);
+    config_registry_bind_boolean("history.no_dups", &config.history_no_dups);
+    config_registry_bind_boolean("history.timestamps",
+                                 &config.history_timestamps);
+    config_registry_bind_enum(
+        "history.search_mode", (int *)&config.history_search_mode,
+        history_search_mode_pairs, HISTORY_SEARCH_MODE_PREFIX);
+    config_registry_bind_enum(
+        "history.finder.match", (int *)&config.history_finder_match,
+        history_finder_match_pairs, HISTORY_FINDER_MATCH_FUZZY);
+    config_registry_bind_enum(
+        "history.finder.rank", (int *)&config.history_finder_rank,
+        history_finder_rank_pairs, HISTORY_FINDER_RANK_FRECENCY);
+    config_registry_bind_enum(
+        "history.finder.display", (int *)&config.history_finder_display,
+        history_finder_display_pairs, HISTORY_FINDER_DISPLAY_INCREMENTAL);
+    config_registry_bind_boolean("history.frecency.directory_context",
+                                 &config.history_frecency_directory_context);
 }
 
 /// @brief Sync shell options from registry to runtime
@@ -1358,6 +1330,11 @@ static void config_register_sections(void) {
     config_registry_register_section(&behavior_section);
     config_registry_register_section(&autosuggestion_section);
     config_registry_register_section(&lle_section);
+
+    /// Bind history.* to its runtime cells now that the section is registered.
+    /// From here, every history change (mode preset, TOML load, config set)
+    /// write-throughs to config.history_* with no sync hook -- the keystone.
+    history_bind_runtime();
 }
 
 /**

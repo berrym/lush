@@ -92,6 +92,33 @@ typedef struct {
 } mode_default_t;
 
 /**
+ * @brief Runtime binding kinds (the cell's storage shape)
+ */
+typedef enum {
+    CREG_BIND_BOOL,
+    CREG_BIND_INT,
+    CREG_BIND_STRING,
+    CREG_BIND_ENUM_INT ///< registry string mapped onto an engine enum (int)
+} creg_bind_kind_t;
+
+/**
+ * @brief A binding from a registered key to a runtime cell
+ *
+ * On every change to the key the cell is written through (see apply_binding).
+ * This is the typed, declarative replacement for the per-section
+ * sync_to_runtime / sync_from_runtime hooks.
+ */
+typedef struct {
+    char key[CREG_KEY_MAX];
+    creg_bind_kind_t kind;
+    void *cell;                    ///< the real runtime lvalue
+    size_t cell_size;              ///< for STRING: buffer capacity
+    const creg_enum_pair_t *pairs; ///< for ENUM_INT: string->int mapping
+    int64_t fallback;              ///< for ENUM_INT: value when unmatched
+    bool active;
+} binding_t;
+
+/**
  * @brief Global registry state
  */
 typedef struct {
@@ -102,6 +129,8 @@ typedef struct {
     size_t subscriber_count;
     mode_default_t mode_defaults[CREG_MODE_DEFAULTS_MAX];
     size_t mode_default_count;
+    binding_t bindings[CREG_BINDINGS_MAX];
+    size_t binding_count;
 } registry_state_t;
 
 static registry_state_t g_registry = {0};
@@ -236,6 +265,51 @@ static void notify_change(const char *key, const creg_value_t *old_value,
     in_notify = false;
 }
 
+/// Write a single binding's runtime cell from a registry value.
+static void apply_binding(const binding_t *b, const creg_value_t *v) {
+    switch (b->kind) {
+    case CREG_BIND_BOOL:
+        if (v->type == CREG_VALUE_BOOLEAN) {
+            *(bool *)b->cell = v->data.boolean;
+        }
+        break;
+    case CREG_BIND_INT:
+        if (v->type == CREG_VALUE_INTEGER) {
+            *(int *)b->cell = (int)v->data.integer;
+        }
+        break;
+    case CREG_BIND_STRING:
+        if (v->type == CREG_VALUE_STRING && b->cell && b->cell_size > 0) {
+            snprintf((char *)b->cell, b->cell_size, "%s", v->data.string);
+        }
+        break;
+    case CREG_BIND_ENUM_INT:
+        if (v->type == CREG_VALUE_STRING && b->pairs) {
+            int64_t mapped = b->fallback;
+            for (const creg_enum_pair_t *p = b->pairs; p->name; p++) {
+                if (unicode_streq(p->name, v->data.string)) {
+                    mapped = p->value;
+                    break;
+                }
+            }
+            *(int *)b->cell = (int)mapped;
+        }
+        break;
+    }
+}
+
+/// Write through every binding registered for a key. Called from the single
+/// writer (config_registry_set) on every change, so bound cells stay current
+/// with no per-section sync hook.
+static void apply_bindings_for_key(const char *key, const creg_value_t *v) {
+    for (size_t i = 0; i < g_registry.binding_count; i++) {
+        binding_t *b = &g_registry.bindings[i];
+        if (b->active && unicode_streq(b->key, key)) {
+            apply_binding(b, v);
+        }
+    }
+}
+
 /* ============================================================================
  * Registry Lifecycle
  * ============================================================================
@@ -352,7 +426,9 @@ creg_result_t config_registry_set(const char *key, const creg_value_t *value) {
     /// Update value
     opt->value = *value;
 
-    /// Notify subscribers
+    /// Write through to bound runtime cells (the single-writer contract), then
+    /// notify subscribers so they observe an already-synced runtime.
+    apply_bindings_for_key(key, value);
     notify_change(key, &old_value, value);
 
     return CREG_SUCCESS;
@@ -459,6 +535,61 @@ creg_result_t config_registry_get_boolean(const char *key, bool *out) {
 
     *out = v.data.boolean;
     return CREG_SUCCESS;
+}
+
+/* ============================================================================
+ * Runtime Bindings
+ * ============================================================================
+ */
+
+/// Register a binding and immediately sync the cell to the key's current value.
+/// Binding an unregistered key fails loudly -- this is what converts the old
+/// "phantom sync" (silent no-op on a forgotten key) into a hard error.
+static creg_result_t add_binding(const char *key, creg_bind_kind_t kind,
+                                 void *cell, size_t cell_size,
+                                 const creg_enum_pair_t *pairs,
+                                 int64_t fallback) {
+    if (!g_registry.initialized || !key || !cell) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    if (g_registry.binding_count >= CREG_BINDINGS_MAX) {
+        return CREG_ERROR_OPTION_FULL;
+    }
+    binding_t *b = &g_registry.bindings[g_registry.binding_count++];
+    snprintf(b->key, sizeof(b->key), "%s", key);
+    b->kind = kind;
+    b->cell = cell;
+    b->cell_size = cell_size;
+    b->pairs = pairs;
+    b->fallback = fallback;
+    b->active = true;
+
+    /// Initial sync: the cell takes the key's current effective value now.
+    apply_binding(b, &opt->value);
+    return CREG_SUCCESS;
+}
+
+creg_result_t config_registry_bind_boolean(const char *key, bool *cell) {
+    return add_binding(key, CREG_BIND_BOOL, cell, 0, NULL, 0);
+}
+
+creg_result_t config_registry_bind_integer(const char *key, int *cell) {
+    return add_binding(key, CREG_BIND_INT, cell, 0, NULL, 0);
+}
+
+creg_result_t config_registry_bind_string(const char *key, char *cell,
+                                          size_t cell_size) {
+    return add_binding(key, CREG_BIND_STRING, cell, cell_size, NULL, 0);
+}
+
+creg_result_t config_registry_bind_enum(const char *key, int *cell,
+                                        const creg_enum_pair_t *pairs,
+                                        int64_t fallback) {
+    return add_binding(key, CREG_BIND_ENUM_INT, cell, 0, pairs, fallback);
 }
 
 /* ============================================================================
