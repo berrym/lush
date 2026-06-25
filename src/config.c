@@ -4776,6 +4776,9 @@ void config_show_all(void) {
     printf("\n[display]\n");
     config_show_section(CONFIG_SECTION_DISPLAY);
 
+    printf("\n[autosuggestion]\n");
+    config_show_section(CONFIG_SECTION_AUTOSUGGESTION);
+
     printf("\n[network]\n");
     config_show_section(CONFIG_SECTION_NETWORK);
 
