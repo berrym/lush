@@ -618,6 +618,20 @@ static bool has_autosuggestion(readline_context_t *ctx) {
     if (!ctx)
         return false;
 
+    /// A visible completion menu owns the inline area. The history ghost is
+    /// suppressed while a menu is up (the display clears it), and the menu's
+    /// shadow candidate is committed through menu navigation, not through the
+    /// autosuggestion-accept handlers. So there is no autosuggestion to accept
+    /// while a menu is open: every "move-or-accept-suggestion" key (RIGHT, END,
+    /// Ctrl-E, Ctrl-F, forward-word/partial-accept) gates on this, so reporting
+    /// false here keeps them from splicing the suppressed history suggestion --
+    /// or the shadow text -- into the buffer underneath the menu. The menu's
+    /// own navigation keys are unaffected (they do not consult this).
+    if (ctx->editor && ctx->editor->completion_system &&
+        lle_completion_system_is_menu_visible(ctx->editor->completion_system)) {
+        return false;
+    }
+
     /// Check local suggestion buffer
     if (ctx->current_suggestion && ctx->current_suggestion[0] != '\0') {
         return true;
