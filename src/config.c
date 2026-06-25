@@ -2494,6 +2494,15 @@ int config_init(void) {
     /// the right preset.
     config_registry_apply_mode_defaults(shell_mode_get());
 
+    /// Push the freshly-applied per-mode defaults into the runtime struct now,
+    /// before the user-config-file existence checks below. On a fresh install
+    /// with no lushrc the user-config load path (which is what otherwise runs
+    /// sync_to_runtime) never executes, so without this the active mode's
+    /// curated defaults -- lush's completion.match_mode=fuzzy,
+    /// history.search_mode=prefix, etc. -- would never reach the struct the
+    /// engine reads. User config, if present, layers on top via a later sync.
+    config_registry_sync_to_runtime();
+
     /// Get XDG directory path
     char xdg_dir[CONFIG_PATH_MAX];
     if (config_get_xdg_dir(xdg_dir, sizeof(xdg_dir)) == 0) {

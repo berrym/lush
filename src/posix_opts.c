@@ -43,9 +43,9 @@ shell_options_t shell_opts = {0};
  *
  * Canonical entry point for switching the active shell mode. Performs a
  * full re-seed: sets the active mode, drops per-feature overrides,
- * updates the legacy posix_mode mirror, and persists the canonical mode
- * label to the central registry. Per-mode registry default re-seeding is
- * layered on top of this in commit 4 of the configuration cleanup.
+ * updates the legacy posix_mode mirror, persists the canonical mode label
+ * to the central registry, re-seeds the registered per-mode defaults, and
+ * syncs them into the runtime struct so mode-aware options take effect.
  *
  * @param mode New mode preset to apply
  * @return true on success, false if mode change is disallowed (strict
@@ -75,6 +75,13 @@ bool apply_mode_preset(shell_mode_t mode) {
         /// semantic: mid-session mode changes overwrite user tweaks to
         /// mode-aware options (picking a preset means asking for it).
         config_registry_apply_mode_defaults(mode);
+
+        /// Push the re-seeded defaults into the runtime struct and apply
+        /// them, so mode-aware options (completion.match_mode,
+        /// history.search_mode, ...) change with the mode rather than
+        /// stranding the previous mode's value in the struct the engine reads.
+        config_registry_sync_to_runtime();
+        config_apply_settings();
     }
 
     return true;
