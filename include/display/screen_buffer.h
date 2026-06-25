@@ -420,6 +420,28 @@ int screen_buffer_add_text_rows(screen_buffer_t *buffer, int start_row,
                                 const char *text);
 
 /**
+ * Account for autosuggestion ghost text in the virtual screen geometry.
+ *
+ * Unlike menu/notification rows (which begin on a fresh line below the
+ * command), the ghost is drawn INLINE starting at command_end_col on the
+ * command's last row, then wraps. Only the wrap overflow adds rows. This
+ * records that overflow in ghost_text_lines and extends num_rows so
+ * screen_buffer_get_rows_below_cursor() and the redraw cleanup account for the
+ * ghost uniformly with every other overlay -- replacing the ad-hoc
+ * ghost_text_extra_rows the display controller used to compute by hand.
+ *
+ * Call it every render (pass NULL/empty suggestion to clear) so
+ * ghost_text_lines never goes stale. The cursor position is NOT modified.
+ *
+ * @param buffer Screen buffer to modify (uses command_end_col)
+ * @param suggestion Ghost text, or NULL/"" for none
+ * @param terminal_width Terminal width in columns
+ * @return Number of wrap rows added (0 if the ghost fits on the command's row)
+ */
+int screen_buffer_add_ghost_text(screen_buffer_t *buffer,
+                                 const char *suggestion, int terminal_width);
+
+/**
  * Get total display rows including any added text rows
  *
  * Returns buffer->num_rows which includes command + menu rows.

@@ -613,6 +613,23 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
+    /// Account for autosuggestion ghost text in the virtual screen geometry,
+    /// the same way menu/notification rows are tracked. The ghost is drawn
+    /// inline after the command (Step 4a) and may wrap past the terminal edge;
+    /// recording its wrap rows in screen_buffer (ghost_text_lines + num_rows)
+    /// lets the cursor math (Step 5) and the prior-frame cleanup (Step 2)
+    /// handle it uniformly with every other overlay -- no hand-rolled
+    /// side-calc. Same gate as the ghost render at Step 4a (single-line, no
+    /// menu).
+    const char *ghost_suggestion = NULL;
+    if (controller->autosuggestions_enabled &&
+        controller->autosuggestions_layer &&
+        !controller->completion_menu_visible && !is_multiline) {
+        ghost_suggestion = autosuggestions_layer_get_current_suggestion(
+            controller->autosuggestions_layer);
+    }
+    screen_buffer_add_ghost_text(&desired_screen, ghost_suggestion, term_width);
+
     /// PROMPT-ONCE ARCHITECTURE per MODERN_EDITOR_WRAPPING_RESEARCH.md
     ///
     /// This implements the proven approach used by Replxx, Fish, and ZLE:
@@ -898,43 +915,17 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     int cursor_row = desired_screen.cursor_row;
     int cursor_col = desired_screen.cursor_col;
 
-    /// Calculate extra rows added by ghost text (autosuggestion)
-    /// Ghost text may wrap to additional lines beyond the command text.
-    /// TODO: Add ghost text to screen_buffer for unified tracking.
-    int ghost_text_extra_rows = 0;
-    if (controller->autosuggestions_enabled &&
-        controller->autosuggestions_layer &&
-        !controller->completion_menu_visible && !is_multiline) {
-
-        const char *suggestion = autosuggestions_layer_get_current_suggestion(
-            controller->autosuggestions_layer);
-
-        if (suggestion && *suggestion) {
-            size_t suggestion_width =
-                lle_utf8_string_width(suggestion, strlen(suggestion));
-            int command_end_col = desired_screen.command_end_col;
-            int total_cols_needed = command_end_col + (int)suggestion_width;
-
-            if (total_cols_needed > term_width) {
-                ghost_text_extra_rows = (total_cols_needed - 1) / term_width;
-            }
-        }
-    }
-
     /// Calculate rows to move up using screen_buffer's tracked state.
     ///
-    /// screen_buffer_get_rows_below_cursor() returns: (num_rows - 1) -
-    /// cursor_row This accounts for menu rows AND notification rows that were
-    /// added via screen_buffer_add_text_rows(). We still need to add
-    /// ghost_text_extra_rows since those aren't in screen_buffer yet.
-    int rows_to_move_up = screen_buffer_get_rows_below_cursor(&desired_screen) +
-                          ghost_text_extra_rows;
+    /// screen_buffer_get_rows_below_cursor() returns (num_rows - 1) -
+    /// cursor_row, which now accounts for command, menu, notification AND ghost
+    /// rows -- ghost wrap rows were folded into num_rows by
+    /// screen_buffer_add_ghost_text() above, so no separate addend is needed.
+    int rows_to_move_up = screen_buffer_get_rows_below_cursor(&desired_screen);
 
-    DC_DEBUG("Step5: cursor=(%d,%d), num_rows=%d, rows_below=%d, ghost=%d, "
-             "total_up=%d",
+    DC_DEBUG("Step5: cursor=(%d,%d), num_rows=%d, ghost_lines=%d, total_up=%d",
              cursor_row, cursor_col, desired_screen.num_rows,
-             screen_buffer_get_rows_below_cursor(&desired_screen),
-             ghost_text_extra_rows, rows_to_move_up);
+             desired_screen.ghost_text_lines, rows_to_move_up);
 
     if (rows_to_move_up > 0) {
         char up_seq[16];
@@ -960,17 +951,11 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     screen_buffer_copy(&current_screen, &desired_screen);
     prompt_rendered = true;
 
-    /// Track where the terminal display actually ends (including ghost
-    /// text/menu/notification) This is needed by Step 2 on the next render to
-    /// move up the correct amount.
-    ///
-    /// With menu AND notification rows now tracked in screen_buffer:
-    /// - (num_rows - 1) gives the last row index in the buffer (includes menu
-    ///   and notification)
-    /// - ghost_text_extra_rows adds any additional wrapping from
-    /// autosuggestions
-    last_terminal_end_row =
-        (desired_screen.num_rows - 1) + ghost_text_extra_rows;
+    /// Track where the terminal display actually ends. num_rows now includes
+    /// command + menu + notification + ghost wrap rows (all tracked in
+    /// screen_buffer), so (num_rows - 1) is the last displayed row index. Step
+    /// 2 of the next render uses this to clear all prior overlay rows.
+    last_terminal_end_row = (desired_screen.num_rows - 1);
 
     /// NOTE: fsync() was causing input timeouts after cursor positioning -
     /// removed stdout is line-buffered by default and terminal I/O doesn't need
