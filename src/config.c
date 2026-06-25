@@ -323,11 +323,8 @@ static config_option_t config_options[] = {
      NULL                                                                                                                             },
 
     /// Behavior settings
-    {                    "behavior.auto_cd",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.auto_cd,                       "Auto-cd to directories",            config_validate_bool,                     NULL       },
-    {           "behavior.spell_correction",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.spell_correction,              "Enable command spell correction",
-     config_validate_bool,                     NULL                                                                                   },
+    /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
+    /// migrated to the CREG registry (bound + layered).
     {"behavior.autocorrect_max_suggestions",    CONFIG_TYPE_INT,
      CONFIG_SECTION_BEHAVIOR,      &config.autocorrect_max_suggestions,
      "Maximum auto-correction suggestions (1-5)",             config_validate_int,                     NULL                           },
@@ -349,9 +346,6 @@ static config_option_t config_options[] = {
     { "behavior.autocorrect_case_sensitive",   CONFIG_TYPE_BOOL,
      CONFIG_SECTION_BEHAVIOR,       &config.autocorrect_case_sensitive,
      "Case-sensitive auto-correction",            config_validate_bool,                     NULL                                      },
-    {               "behavior.confirm_exit",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.confirm_exit,                       "Confirm before exiting",            config_validate_bool,
-     NULL                                                                                                                             },
     {                  "behavior.tab_width",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
      &config.tab_width,                        "Tab width for display",             config_validate_int,                     NULL     },
     {             "behavior.no_word_expand",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
@@ -554,8 +548,7 @@ static void shell_sync_from_runtime(void);
 static void display_sync_to_runtime(void);
 static void display_sync_from_runtime(void);
 static void completion_bind_runtime(void);
-static void behavior_sync_to_runtime(void);
-static void behavior_sync_from_runtime(void);
+static void behavior_bind_runtime(void);
 static void autosuggestion_bind_runtime(void);
 static void lle_sync_to_runtime(void);
 static void lle_sync_from_runtime(void);
@@ -779,8 +772,9 @@ static const creg_section_t behavior_section = {
     .option_count = sizeof(behavior_options) / sizeof(creg_option_t),
     .on_load = NULL,
     .on_save = NULL,
-    .sync_to_runtime = behavior_sync_to_runtime,
-    .sync_from_runtime = behavior_sync_from_runtime,
+    /// Bound (behavior_bind_runtime); no sync hooks.
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
 };
 
 /* ----------------------------------------------------------------------------
@@ -1018,29 +1012,14 @@ static void completion_bind_runtime(void) {
 /// @brief Sync completion config from runtime to registry
 
 /// @brief Sync behavior config from registry to runtime
-static void behavior_sync_to_runtime(void) {
-    bool bval;
-
-    if (config_registry_get_boolean("behavior.auto_cd", &bval) ==
-        CREG_SUCCESS) {
-        config.auto_cd = bval;
-    }
-    if (config_registry_get_boolean("behavior.spell_correction", &bval) ==
-        CREG_SUCCESS) {
-        config.spell_correction = bval;
-    }
-    if (config_registry_get_boolean("behavior.confirm_exit", &bval) ==
-        CREG_SUCCESS) {
-        config.confirm_exit = bval;
-    }
-}
-
-/// @brief Sync behavior config from runtime to registry
-static void behavior_sync_from_runtime(void) {
-    config_registry_set_boolean("behavior.auto_cd", config.auto_cd);
-    config_registry_set_boolean("behavior.spell_correction",
-                                config.spell_correction);
-    config_registry_set_boolean("behavior.confirm_exit", config.confirm_exit);
+/// @brief Bind the registry-backed behavior.* keys (replaces behavior_sync_*).
+/// Only the three keys with a CREG section entry are bound; the many other
+/// behavior.* keys still live only in the legacy table and migrate later.
+static void behavior_bind_runtime(void) {
+    config_registry_bind_boolean("behavior.auto_cd", &config.auto_cd);
+    config_registry_bind_boolean("behavior.spell_correction",
+                                 &config.spell_correction);
+    config_registry_bind_boolean("behavior.confirm_exit", &config.confirm_exit);
 }
 
 /// @brief Sync LLE history-dedup config from registry to runtime
@@ -1189,6 +1168,7 @@ static void config_register_sections(void) {
     history_bind_runtime();
     autosuggestion_bind_runtime();
     completion_bind_runtime();
+    behavior_bind_runtime();
 }
 
 /**
