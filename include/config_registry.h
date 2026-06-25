@@ -95,6 +95,43 @@ typedef struct creg_value {
 } creg_value_t;
 
 /* ============================================================================
+ * CONFIGURATION LAYERS (precedence + provenance)
+ * ============================================================================
+ */
+
+/**
+ * @brief Configuration value layers, lowest to highest precedence
+ *
+ * Each option holds an independent value per layer; the EFFECTIVE value is the
+ * highest-precedence present layer. Writes route to a layer by their source
+ * (schema default, mode preset, config file, interactive set), which makes
+ * precedence explicit, provenance free ("where did this value come from"), and
+ * structurally prevents a mode preset from clobbering an interactive tweak.
+ */
+typedef enum creg_layer {
+    CREG_LAYER_DEFAULT = 0, ///< Schema default (always present)
+    CREG_LAYER_MODE,        ///< Active shell-mode preset
+    CREG_LAYER_SYSTEM,      ///< System lushrc.toml (reserved)
+    CREG_LAYER_USER,        ///< User lushrc.toml
+    CREG_LAYER_SESSION,     ///< Interactive config set / setopt
+    CREG_LAYER_COUNT
+} creg_layer_t;
+
+/** @brief Per-layer view of one option (for inspection / provenance) */
+typedef struct {
+    bool present;       ///< Whether this layer holds a value
+    creg_value_t value; ///< The layer's value (valid when present)
+    char origin[64];    ///< Human origin, e.g. "lushrc.toml", "mode:bash"
+} creg_layer_view_t;
+
+/** @brief Full inspection of one option across all layers */
+typedef struct {
+    creg_value_t effective; ///< Resolved effective value
+    creg_layer_t winning;   ///< Layer the effective came from
+    creg_layer_view_t layers[CREG_LAYER_COUNT]; ///< Every layer's state
+} creg_inspect_t;
+
+/* ============================================================================
  * OPTION DEFINITION
  * ============================================================================
  */
@@ -267,6 +304,24 @@ creg_result_t config_registry_get(const char *key, creg_value_t *value);
  * @return true if key exists, false otherwise
  */
 bool config_registry_exists(const char *key);
+
+/**
+ * @brief Inspect an option across all layers (effective + provenance)
+ *
+ * Fills @p out with the effective value, the winning layer, and each layer's
+ * present/value/origin -- the data behind `config explain` (the shadowed stack
+ * that answers "what is this, and where did it come from").
+ *
+ * @param key Full key path
+ * @param out Output inspection (caller provides storage)
+ * @return CREG_SUCCESS, or CREG_ERROR_NOT_FOUND if the key is unregistered
+ */
+creg_result_t config_registry_inspect(const char *key, creg_inspect_t *out);
+
+/**
+ * @brief Human-readable name of a layer (e.g. "session", "mode", "default")
+ */
+const char *config_registry_layer_name(creg_layer_t layer);
 
 /* ============================================================================
  * TYPED VALUE ACCESS (CONVENIENCE)

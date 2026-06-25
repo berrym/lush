@@ -51,9 +51,10 @@ static inline bool unicode_streq(const char *s1, const char *s2) {
  * @brief Stored option value with metadata
  */
 typedef struct {
-    char key[CREG_KEY_MAX];          ///< Full key path
-    creg_value_t value;              ///< Current value
-    creg_value_t default_val;        ///< Default value
+    char key[CREG_KEY_MAX]; ///< Full key path
+    /// One value per layer; effective = highest present (resolve_effective).
+    /// slots[CREG_LAYER_DEFAULT] is always present after registration.
+    creg_layer_view_t slots[CREG_LAYER_COUNT];
     const creg_option_t *option_def; ///< Pointer to option definition
     bool persisted;                  ///< Should be saved to file
 } stored_option_t;
@@ -213,6 +214,43 @@ static stored_option_t *find_option(const char *key) {
     return NULL;
 }
 
+/// Resolve an option's effective value: the highest-precedence present layer.
+/// slots[DEFAULT] is always present after registration, so this never returns
+/// NULL for a registered option. Reports the winning layer when @p winning is
+/// non-NULL.
+static const creg_value_t *resolve_effective(const stored_option_t *opt,
+                                             creg_layer_t *winning) {
+    for (int layer = CREG_LAYER_COUNT - 1; layer >= 0; layer--) {
+        if (opt->slots[layer].present) {
+            if (winning) {
+                *winning = (creg_layer_t)layer;
+            }
+            return &opt->slots[layer].value;
+        }
+    }
+    if (winning) {
+        *winning = CREG_LAYER_DEFAULT;
+    }
+    return &opt->slots[CREG_LAYER_DEFAULT].value;
+}
+
+const char *config_registry_layer_name(creg_layer_t layer) {
+    switch (layer) {
+    case CREG_LAYER_DEFAULT:
+        return "default";
+    case CREG_LAYER_MODE:
+        return "mode";
+    case CREG_LAYER_SYSTEM:
+        return "system";
+    case CREG_LAYER_USER:
+        return "user-toml";
+    case CREG_LAYER_SESSION:
+        return "session";
+    default:
+        return "?";
+    }
+}
+
 /**
  * @brief Check if a key matches a subscriber pattern
  *
@@ -310,6 +348,41 @@ static void apply_bindings_for_key(const char *key, const creg_value_t *v) {
     }
 }
 
+/// The single write funnel: place @p value in @p layer of @p key, recompute the
+/// effective value, and -- only if it actually changed -- write through bound
+/// cells and notify subscribers. Every set path (interactive set, mode preset,
+/// TOML load, default registration) routes here with its own layer, which is
+/// what makes a mode preset unable to clobber an interactive tweak: each lands
+/// in a different slot and the highest present wins.
+static creg_result_t set_in_layer(const char *key, const creg_value_t *value,
+                                  creg_layer_t layer, const char *origin) {
+    if (!key || !value || layer >= CREG_LAYER_COUNT) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    if (opt->option_def && opt->option_def->type != CREG_VALUE_NONE &&
+        opt->option_def->type != value->type) {
+        return CREG_ERROR_TYPE_MISMATCH;
+    }
+
+    creg_value_t old_eff = *resolve_effective(opt, NULL);
+
+    opt->slots[layer].present = true;
+    opt->slots[layer].value = *value;
+    snprintf(opt->slots[layer].origin, sizeof(opt->slots[layer].origin), "%s",
+             origin ? origin : config_registry_layer_name(layer));
+
+    creg_value_t new_eff = *resolve_effective(opt, NULL);
+    if (!creg_value_equal(&old_eff, &new_eff)) {
+        apply_bindings_for_key(key, &new_eff);
+        notify_change(key, &old_eff, &new_eff);
+    }
+    return CREG_SUCCESS;
+}
+
 /* ============================================================================
  * Registry Lifecycle
  * ============================================================================
@@ -373,8 +446,10 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
         snprintf(stored->key, sizeof(stored->key), "%s.%s", section->name,
                  opt->name);
 
-        stored->value = opt->default_val;
-        stored->default_val = opt->default_val;
+        stored->slots[CREG_LAYER_DEFAULT].present = true;
+        stored->slots[CREG_LAYER_DEFAULT].value = opt->default_val;
+        snprintf(stored->slots[CREG_LAYER_DEFAULT].origin,
+                 sizeof(stored->slots[CREG_LAYER_DEFAULT].origin), "default");
         stored->option_def = opt;
         stored->persisted = opt->persisted;
 
@@ -396,42 +471,12 @@ const creg_section_t *config_registry_get_section(const char *name) {
  */
 
 creg_result_t config_registry_set(const char *key, const creg_value_t *value) {
-    if (!key || !value) {
-        return CREG_ERROR_INVALID_PARAM;
-    }
-
     if (!g_registry.initialized) {
         return CREG_ERROR_INVALID_PARAM;
     }
-
-    stored_option_t *opt = find_option(key);
-    if (!opt) {
-        return CREG_ERROR_NOT_FOUND;
-    }
-
-    /// Check type compatibility (allow setting any type if option accepts it)
-    if (opt->option_def && opt->option_def->type != CREG_VALUE_NONE &&
-        opt->option_def->type != value->type) {
-        return CREG_ERROR_TYPE_MISMATCH;
-    }
-
-    /// Check if value actually changed
-    if (creg_value_equal(&opt->value, value)) {
-        return CREG_SUCCESS; /// No change
-    }
-
-    /// Store old value for notification
-    creg_value_t old_value = opt->value;
-
-    /// Update value
-    opt->value = *value;
-
-    /// Write through to bound runtime cells (the single-writer contract), then
-    /// notify subscribers so they observe an already-synced runtime.
-    apply_bindings_for_key(key, value);
-    notify_change(key, &old_value, value);
-
-    return CREG_SUCCESS;
+    /// An interactive / runtime set lands in the SESSION layer -- the highest
+    /// precedence, so it shadows mode presets and the config file until saved.
+    return set_in_layer(key, value, CREG_LAYER_SESSION, "config set (session)");
 }
 
 creg_result_t config_registry_get(const char *key, creg_value_t *value) {
@@ -448,12 +493,32 @@ creg_result_t config_registry_get(const char *key, creg_value_t *value) {
         return CREG_ERROR_NOT_FOUND;
     }
 
-    *value = opt->value;
+    *value = *resolve_effective(opt, NULL);
     return CREG_SUCCESS;
 }
 
 bool config_registry_exists(const char *key) {
     return find_option(key) != NULL;
+}
+
+creg_result_t config_registry_inspect(const char *key, creg_inspect_t *out) {
+    if (!key || !out) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    if (!g_registry.initialized) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    creg_layer_t winning = CREG_LAYER_DEFAULT;
+    out->effective = *resolve_effective(opt, &winning);
+    out->winning = winning;
+    for (int layer = 0; layer < CREG_LAYER_COUNT; layer++) {
+        out->layers[layer] = opt->slots[layer];
+    }
+    return CREG_SUCCESS;
 }
 
 /* ============================================================================
@@ -569,7 +634,7 @@ static creg_result_t add_binding(const char *key, creg_bind_kind_t kind,
     b->active = true;
 
     /// Initial sync: the cell takes the key's current effective value now.
-    apply_binding(b, &opt->value);
+    apply_binding(b, resolve_effective(opt, NULL));
     return CREG_SUCCESS;
 }
 
@@ -698,8 +763,11 @@ static toml_result_t load_callback(const char *section, const char *key,
         return TOML_SUCCESS;
     }
 
-    /// Try to set the value (ignore errors for unknown keys)
-    creg_result_t result = config_registry_set(full_key, &config_val);
+    /// A config-file value lands in the USER layer: above mode presets and the
+    /// schema default, below an interactive (SESSION) tweak. (ignore errors for
+    /// unknown keys.)
+    creg_result_t result =
+        set_in_layer(full_key, &config_val, CREG_LAYER_USER, "lushrc.toml");
     if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND) {
         ctx->result = result;
         snprintf(ctx->error_msg, sizeof(ctx->error_msg), "Error setting '%s'",
@@ -815,8 +883,11 @@ creg_result_t config_registry_save(const char *path) {
                 continue;
             }
 
-            /// Skip options with default values (sparse format)
-            if (creg_value_equal(&opt->value, &opt->default_val)) {
+            /// Persist the effective value, but only when it differs from the
+            /// schema default (sparse file: a config save records the user's
+            /// actual choices, not the whole schema).
+            const creg_value_t *eff = resolve_effective(opt, NULL);
+            if (creg_value_equal(eff, &opt->slots[CREG_LAYER_DEFAULT].value)) {
                 continue;
             }
 
@@ -831,22 +902,20 @@ creg_result_t config_registry_save(const char *path) {
             const char *option_name = dot ? dot + 1 : opt->key;
 
             /// Write value based on type
-            switch (opt->value.type) {
+            switch (eff->type) {
             case CREG_VALUE_STRING:
-                fprintf(file, "%s = \"%s\"\n", option_name,
-                        opt->value.data.string);
+                fprintf(file, "%s = \"%s\"\n", option_name, eff->data.string);
                 break;
             case CREG_VALUE_INTEGER:
                 fprintf(file, "%s = %lld\n", option_name,
-                        (long long)opt->value.data.integer);
+                        (long long)eff->data.integer);
                 break;
             case CREG_VALUE_BOOLEAN:
                 fprintf(file, "%s = %s\n", option_name,
-                        opt->value.data.boolean ? "true" : "false");
+                        eff->data.boolean ? "true" : "false");
                 break;
             case CREG_VALUE_FLOAT:
-                fprintf(file, "%s = %g\n", option_name,
-                        opt->value.data.floating);
+                fprintf(file, "%s = %g\n", option_name, eff->data.floating);
                 break;
             default:
                 break;
@@ -888,21 +957,30 @@ void config_registry_sync_from_runtime(void) {
  * ============================================================================
  */
 
+/// Clear one layer of an option and re-resolve: if the effective value changes
+/// (the cleared layer was winning), write through bindings and notify. Used by
+/// reset to drop a layer so the value falls through to the one beneath it.
+static void clear_layer(stored_option_t *opt, creg_layer_t layer) {
+    if (layer == CREG_LAYER_DEFAULT || !opt->slots[layer].present) {
+        return;
+    }
+    creg_value_t old_eff = *resolve_effective(opt, NULL);
+    opt->slots[layer].present = false;
+    creg_value_t new_eff = *resolve_effective(opt, NULL);
+    if (!creg_value_equal(&old_eff, &new_eff)) {
+        apply_bindings_for_key(opt->key, &new_eff);
+        notify_change(opt->key, &old_eff, &new_eff);
+    }
+}
+
 creg_result_t config_registry_reset(const char *key) {
     stored_option_t *opt = find_option(key);
     if (!opt) {
         return CREG_ERROR_NOT_FOUND;
     }
-
-    /// Restore default value
-    creg_value_t old_value = opt->value;
-    opt->value = opt->default_val;
-
-    /// Notify if changed
-    if (!creg_value_equal(&old_value, &opt->value)) {
-        notify_change(key, &old_value, &opt->value);
-    }
-
+    /// Reset drops the interactive (SESSION) layer; the value falls through to
+    /// the config file / mode preset / default beneath it.
+    clear_layer(opt, CREG_LAYER_SESSION);
     return CREG_SUCCESS;
 }
 
@@ -913,13 +991,7 @@ creg_result_t config_registry_reset_section(const char *section_name) {
     }
 
     for (size_t i = 0; i < section->option_count; i++) {
-        stored_option_t *opt = &section->options[i];
-        creg_value_t old_value = opt->value;
-        opt->value = opt->default_val;
-
-        if (!creg_value_equal(&old_value, &opt->value)) {
-            notify_change(opt->key, &old_value, &opt->value);
-        }
+        clear_layer(&section->options[i], CREG_LAYER_SESSION);
     }
 
     return CREG_SUCCESS;
@@ -990,15 +1062,26 @@ creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode) {
         return CREG_SUCCESS; /// nothing to do
     }
 
+    /// Drop the previous mode's overlay first: a mode switch replaces the MODE
+    /// layer wholesale, so any key the previous mode set but this one does not
+    /// falls back to the layer beneath. Keys with a SESSION/USER value above
+    /// MODE are untouched -- that is the clobber fix: an interactive tweak sits
+    /// above MODE and survives the switch.
+    for (size_t s = 0; s < g_registry.section_count; s++) {
+        registered_section_t *reg = &g_registry.sections[s];
+        for (size_t o = 0; o < reg->option_count; o++) {
+            clear_layer(&reg->options[o], CREG_LAYER_MODE);
+        }
+    }
+
     for (size_t i = 0; i < g_registry.mode_default_count; i++) {
         const mode_default_t *md = &g_registry.mode_defaults[i];
         if (!md->active || md->mode != mode) {
             continue;
         }
-        /// Best-effort apply; a single failure should not abort the
-        /// whole walk. The error case is rare (e.g. type mismatch
-        /// caught at registration time), but defensive.
-        (void)config_registry_set(md->key, &md->value);
+        /// Best-effort apply into the MODE layer; a single failure should not
+        /// abort the whole walk.
+        (void)set_in_layer(md->key, &md->value, CREG_LAYER_MODE, "mode preset");
     }
     return CREG_SUCCESS;
 }
@@ -1014,7 +1097,7 @@ creg_result_t config_registry_get_default(const char *key,
         return CREG_ERROR_NOT_FOUND;
     }
 
-    *value = opt->default_val;
+    *value = opt->slots[CREG_LAYER_DEFAULT].value;
     return CREG_SUCCESS;
 }
 
@@ -1024,7 +1107,10 @@ bool config_registry_is_default(const char *key) {
         return false;
     }
 
-    return creg_value_equal(&opt->value, &opt->default_val);
+    /// "Is default" means the effective value resolves to the default layer's
+    /// value -- no higher layer is overriding it.
+    return creg_value_equal(resolve_effective(opt, NULL),
+                            &opt->slots[CREG_LAYER_DEFAULT].value);
 }
 
 /* ============================================================================
