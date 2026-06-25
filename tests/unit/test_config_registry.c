@@ -710,13 +710,16 @@ TEST(mode_default_applies_for_registered_mode) {
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
     ASSERT(got == true);
 
-    /// Apply LUSH defaults: errexit has no per-mode default for LUSH, so
-    /// the value persists from the prior apply.
+    /// Apply LUSH defaults: a mode switch re-seeds the MODE layer wholesale, so
+    /// errexit -- which POSIX set but LUSH does not override -- drops its POSIX
+    /// MODE value and falls back to the schema default (false). This clean
+    /// re-seed is exactly what lets a SESSION tweak survive a mode switch while
+    /// a stale mode preset does not linger.
     ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_LUSH),
               CREG_SUCCESS);
-    got = false;
+    got = true;
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
-    ASSERT(got == true); /// unchanged because LUSH has no override
+    ASSERT(got == false); /// MODE layer cleared, falls back to default
 }
 
 TEST(mode_default_replaces_prior_value_for_same_mode) {
