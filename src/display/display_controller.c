@@ -619,12 +619,19 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     /// recording its wrap rows in screen_buffer (ghost_text_lines + num_rows)
     /// lets the cursor math (Step 5) and the prior-frame cleanup (Step 2)
     /// handle it uniformly with every other overlay -- no hand-rolled
-    /// side-calc. Same gate as the ghost render at Step 4a (single-line, no
-    /// menu).
+    /// side-calc.
+    ///
+    /// The ghost shows when no menu is visible, OR when a menu is visible but
+    /// its top candidate is being offered as a pre-navigation shadow ghost
+    /// (menu_shadow_active) -- the one case the ghost-XOR-menu precedence is
+    /// lifted. This must match the ghost render gate at Step 4a exactly so the
+    /// wrap rows recorded here are the bytes actually drawn.
     const char *ghost_suggestion = NULL;
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
-        !controller->completion_menu_visible && !is_multiline) {
+        (!controller->completion_menu_visible ||
+         controller->menu_shadow_active) &&
+        !is_multiline) {
         ghost_suggestion = autosuggestions_layer_get_current_suggestion(
             controller->autosuggestions_layer);
     }
@@ -859,7 +866,10 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     ///
     /// Conditions for showing ghost text:
     /// 1. Autosuggestions enabled and layer available
-    /// 2. No completion menu visible (menu takes precedence)
+    /// 2. No completion menu visible -- OR a menu is visible and its top
+    ///    candidate is the pre-navigation shadow ghost (menu_shadow_active),
+    ///    the one case ghost-over-menu is permitted. The shadow is drawn here
+    ///    inline; the menu box follows on a fresh line at Step 4b.
     /// 3. Not multiline input (simplifies initial implementation)
     /// 4. Cursor is at end of command (checked by autosuggestions_layer)
     ///
@@ -867,7 +877,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     /// Cursor positioning (Step 5) will move cursor back to correct position.
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
-        !controller->completion_menu_visible && !is_multiline) {
+        (!controller->completion_menu_visible ||
+         controller->menu_shadow_active) &&
+        !is_multiline) {
 
         const char *suggestion = autosuggestions_layer_get_current_suggestion(
             controller->autosuggestions_layer);
@@ -2703,6 +2715,10 @@ display_controller_clear_completion_menu(display_controller_t *controller) {
 
     controller->active_completion_menu = NULL;
     controller->completion_menu_visible = false;
+    /// The shadow ghost only exists alongside an open menu; closing the menu
+    /// retires it so a stale flag cannot relax the ghost guards on a later
+    /// menu-less frame before the next refresh recomputes it.
+    controller->menu_shadow_active = false;
 
     DC_DEBUG("Completion menu cleared");
 
@@ -2787,6 +2803,32 @@ void display_controller_set_autosuggestion(display_controller_t *controller,
     /// Set the suggestion directly (or clear if NULL/empty)
     autosuggestions_layer_set_suggestion(controller->autosuggestions_layer,
                                          suggestion);
+}
+
+void display_controller_set_menu_shadow(display_controller_t *controller,
+                                        const char *suggestion) {
+
+    if (!controller || !controller->autosuggestions_layer) {
+        return;
+    }
+
+    /// The autosuggestions layer is shared with the history ghost, which
+    /// set_autosuggestion populates immediately before this call each refresh.
+    /// A non-empty shadow OVERRIDES that with the menu's highlighted candidate
+    /// and raises menu_shadow_active, telling the geometry (Step 3) and render
+    /// (Step 4a) to draw it inline over the open menu. A NULL/empty shadow only
+    /// retires the flag -- it must NOT clear the layer, or it would wipe the
+    /// history ghost set_autosuggestion just set on every menu-less refresh.
+    /// set_autosuggestion already owns clearing the layer (it clears under menu
+    /// precedence and sets the history ghost otherwise), so the layer content
+    /// is correct in either branch.
+    if (suggestion && suggestion[0] != '\0') {
+        controller->menu_shadow_active = true;
+        autosuggestions_layer_set_suggestion(controller->autosuggestions_layer,
+                                             suggestion);
+    } else {
+        controller->menu_shadow_active = false;
+    }
 }
 
 const char *

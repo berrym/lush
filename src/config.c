@@ -786,17 +786,21 @@ static const creg_section_t display_section = {
 static const creg_option_t completion_options[] = {
     {          "enabled",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable tab completion", true            },
+     "Enable tab completion", true                      },
     {            "fuzzy",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable fuzzy matching", true            },
+     "Enable fuzzy matching", true                      },
     {   "case_sensitive",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Case-sensitive completion", true        },
+     "Case-sensitive completion", true                  },
     {"chain_directories",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Re-trigger completion after accepting a directory (per-mode "
-     "default: lush=true, others=false)", true},
+     "default: lush=true, others=false)", true          },
+    {"menu_shadow_ghost",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Show an open menu's highlighted candidate inline as a shadow ghost "
+     "(per-mode default: lush=true, others=false)", true},
 };
 
 static const creg_section_t completion_section = {
@@ -1217,6 +1221,19 @@ static void config_register_per_mode_defaults(void) {
     config_registry_set_mode_default("completion.chain_directories",
                                      SHELL_MODE_ZSH, &bool_false);
     config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_POSIX, &bool_false);
+
+    /// completion.menu_shadow_ghost: lush curates the fish/zsh-autosuggest
+    /// style inline shadow of the menu's top candidate as a discoverability
+    /// default that pairs with pre-navigation menus; bash/zsh/posix show the
+    /// menu box alone, matching the readline/zle menus script users expect.
+    config_registry_set_mode_default("completion.menu_shadow_ghost",
+                                     SHELL_MODE_LUSH, &bool_true);
+    config_registry_set_mode_default("completion.menu_shadow_ghost",
+                                     SHELL_MODE_BASH, &bool_false);
+    config_registry_set_mode_default("completion.menu_shadow_ghost",
+                                     SHELL_MODE_ZSH, &bool_false);
+    config_registry_set_mode_default("completion.menu_shadow_ghost",
                                      SHELL_MODE_POSIX, &bool_false);
 
     /// completion.match_mode: lush curates fuzzy (fzy-style

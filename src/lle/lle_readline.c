@@ -418,6 +418,104 @@ static bool autosuggestion_from_completion(readline_context_t *ctx) {
 }
 
 /**
+ * @brief Offer the open menu's top candidate as an inline shadow ghost
+ *
+ * When a completion menu is open in pre-navigation, the command line still
+ * holds exactly what the user typed; its highlighted candidate is shown inline
+ * after the command as a faint shadow ghost (the same display layer as the
+ * history autosuggestion) while the menu box lists the alternatives below, so a
+ * single Right/accept solidifies it. Outside pre-navigation -- once a candidate
+ * is committed to the buffer, or with no menu -- the shadow is cleared.
+ *
+ * Recomputed from the menu's current selection on every refresh, so it tracks
+ * menu open, filter narrowing, the first navigation that leaves pre-navigation,
+ * and close, with no per-keybinding wiring. The candidate's remainder past what
+ * is already typed is computed exactly like autosuggestion_from_completion (the
+ * splicer in accept phase), so the shadow reproduces what accepting the item
+ * would insert (close-quote, trailing space, directory "/"). Gated by
+ * completion.menu_shadow_ghost (lush-curated on; bash/zsh/posix off).
+ *
+ * @param ctx Readline context
+ * @param dc Display controller (sole owner of the shadow state)
+ */
+static void update_menu_shadow(readline_context_t *ctx,
+                               display_controller_t *dc) {
+    if (!ctx || !ctx->editor || !ctx->buffer || !ctx->buffer->data || !dc) {
+        return;
+    }
+
+    bool enabled = false;
+    (void)config_registry_get_boolean("completion.menu_shadow_ghost", &enabled);
+    if (!enabled) {
+        display_controller_set_menu_shadow(dc, NULL);
+        return;
+    }
+
+    lle_editor_t *editor = ctx->editor;
+    lle_completion_system_t *cs = editor->completion_system;
+    if (!cs || !lle_completion_system_is_menu_visible(cs)) {
+        display_controller_set_menu_shadow(dc, NULL);
+        return;
+    }
+
+    /// Shadow only in pre-navigation, and only with the cursor at the end of
+    /// the buffer (the ghost is drawn inline after the command at Step 4a). In
+    /// selection mode the candidate already lives in the buffer.
+    lle_completion_menu_state_t *menu = lle_completion_system_get_menu(cs);
+    lle_completion_state_t *state = lle_completion_system_get_state(cs);
+    size_t cursor = ctx->buffer->cursor.byte_offset;
+    if (!menu || !menu->awaiting_navigation || !state || !state->results ||
+        menu->selected_index >= state->results->count ||
+        cursor != ctx->buffer->length) {
+        display_controller_set_menu_shadow(dc, NULL);
+        return;
+    }
+
+    /// External commands shadowing a builtin/alias carry their PATH-resolved
+    /// path in description; the engine splices that, mirroring the preview
+    /// path.
+    const lle_completion_item_t *top =
+        &state->results->items[menu->selected_index];
+    lle_completion_item_t synthetic = *top;
+    if (top->type == LLE_COMPLETION_TYPE_COMMAND && top->description) {
+        synthetic.text = (char *)top->description;
+    }
+
+    const char *buf = ctx->buffer->data;
+    lle_word_context_t *wctx = NULL;
+    if (lle_word_context_analyze(buf, cursor, editor->lle_pool, &wctx) !=
+            LLE_SUCCESS ||
+        !wctx) {
+        display_controller_set_menu_shadow(dc, NULL);
+        return;
+    }
+
+    char *shadow = NULL;
+    lle_splicer_splice_t splice = {0};
+    if (lle_splicer_compute(wctx, &synthetic, true, editor->lle_pool,
+                            &splice) == LLE_SUCCESS &&
+        splice.insert_text && splice.delete_start <= cursor) {
+        /// The candidate replaces buf[delete_start..cursor]; show only the
+        /// suffix past what is typed, and only when it literally extends it.
+        size_t typed = cursor - splice.delete_start;
+        if (splice.insert_length > typed &&
+            memcmp(splice.insert_text, buf + splice.delete_start, typed) == 0) {
+            size_t rlen = splice.insert_length - typed;
+            shadow = malloc(rlen + 1);
+            if (shadow) {
+                memcpy(shadow, splice.insert_text + typed, rlen);
+                shadow[rlen] = '\0';
+            }
+        }
+    }
+
+    /// set_menu_shadow copies the string; the transient buffer is freed here.
+    display_controller_set_menu_shadow(dc, shadow);
+    free(shadow);
+    lle_word_context_free(wctx);
+}
+
+/**
  * @brief Update autosuggestion based on current buffer content
  *
  * Searches LLE history for prefix matches and stores the suggestion
@@ -1069,6 +1167,12 @@ static void refresh_display(readline_context_t *ctx) {
 
         /// Pass suggestion to display controller for rendering
         display_controller_set_autosuggestion(dc, ctx->current_suggestion);
+
+        /// When a completion menu is open in pre-navigation, overlay its top
+        /// candidate as an inline shadow ghost. Runs after set_autosuggestion
+        /// (which suppresses the history ghost while a menu is up) and before
+        /// the render below, so the shadow owns the layer at draw time.
+        update_menu_shadow(ctx, dc);
     }
 
     /// Get the global Spec 08 display integration instance
