@@ -185,6 +185,37 @@ int screen_buffer_add_text_rows(screen_buffer_t *buffer, int start_row,
     return rows_added;
 }
 
+int screen_buffer_add_ghost_text(screen_buffer_t *buffer,
+                                 const char *suggestion, int terminal_width) {
+    if (!buffer) {
+        return 0;
+    }
+
+    /// Recomputed every render; reset first so a prior frame's ghost never
+    /// lingers when there is no suggestion now.
+    buffer->ghost_text_lines = 0;
+
+    if (!suggestion || !*suggestion || terminal_width <= 0) {
+        buffer->total_display_rows = buffer->num_rows;
+        return 0;
+    }
+
+    /// The ghost begins inline at command_end_col on the command's last row.
+    /// Only the columns past the terminal edge wrap to new rows. This mirrors
+    /// the formula the display controller previously computed by hand.
+    int width = (int)lle_utf8_string_width(suggestion, strlen(suggestion));
+    int total_cols = buffer->command_end_col + width;
+    int extra = 0;
+    if (total_cols > terminal_width) {
+        extra = (total_cols - 1) / terminal_width;
+    }
+
+    buffer->ghost_text_lines = extra;
+    buffer->num_rows += extra;
+    buffer->total_display_rows = buffer->num_rows;
+    return extra;
+}
+
 /**
  * @brief Get total display rows including any added text rows
  * @param buffer Screen buffer to query
