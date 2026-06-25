@@ -215,6 +215,7 @@ meson test -C build -v test_history_phase1
 - `docs/PHILOSOPHY.md` - Founding principles governing day-to-day design decisions (identity vs polyglot, surface separation, architectural correctness over expediency, debugger-keeps-pace rule §7)
 - `docs/SEMANTICS.md` - Engine spec: value model (Scalar / List / Map), scoping discipline, no implicit list-to-string coercion, the engine-vs-preset distinction
 - `docs/CONFIGURATION.md` - The four configuration surfaces (`mode`, `set`, `setopt`/`shopt`, `config`) -- authoritative reference replacing the prior SHELL_MODES / CONFIG_SYSTEM / SHELL_OPTIONS docs
+- `docs/development/CONFIG_NERVOUS_SYSTEM.md` - North-star vision + proven architecture for CREG as the central configuration nervous system (schema-first, reactive bindings, layered precedence + provenance); the strangler-migration roadmap. Read before changing the config registry
 - `docs/BUILTIN_COMMANDS.md` - Complete builtin reference (~60 commands; canonical inventory)
 - `docs/DEBUGGER_GUIDE.md` - Integrated debugger: (lush-debug) prompt, breakpoints, kind-aware inspection, depth-aware stepping, `debug analyze` predictive type warnings
 - `docs/development/ARCHITECTURE-SYNTAX-BRIDGING.md` - Syntax bridging design
