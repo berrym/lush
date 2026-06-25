@@ -797,22 +797,29 @@ static const creg_section_t display_section = {
  * -------------------------------------------------------------------------- */
 static const creg_option_t completion_options[] = {
     {          "enabled",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable tab completion", true                      },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable tab completion", true                                   },
     {            "fuzzy",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable fuzzy matching", true                      },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable fuzzy matching", true                                   },
     {   "case_sensitive",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Case-sensitive completion", true                  },
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Case-sensitive completion", true                               },
     {"chain_directories",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Re-trigger completion after accepting a directory (per-mode "
-     "default: lush=true, others=false)", true          },
+     "default: lush=true, others=false)", true                       },
     {"menu_shadow_ghost",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Show an open menu's highlighted candidate inline as a shadow ghost "
-     "(per-mode default: lush=true, others=false)", true},
+     "(per-mode default: lush=true, others=false)", true             },
+    {       "match_mode",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "prefix"},
+     "Completion match predicate: prefix, substring, or fuzzy (per-mode "
+     "default: lush=fuzzy, others=prefix)", true                     },
+    {        "threshold",
+     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 60},
+     "Minimum fuzzy match score to accept a completion (0-100)", true},
 };
 
 static const creg_section_t completion_section = {
@@ -1093,10 +1100,27 @@ static void completion_sync_to_runtime(void) {
         CREG_SUCCESS) {
         config.completion_case_sensitive = bval;
     }
-    /// completion.match_mode is an ENUM whose registry storage points
-    /// directly at config.completion_match_mode (see registration
-    /// block); no manual sync needed -- the registry writes the
-    /// enum value through the storage pointer on load / set.
+    /// completion.match_mode is carried in the registry as a string (the CREG
+    /// value model has no enum type); translate it onto the enum the engine
+    /// reads. This is what attaches the per-mode default (lush=fuzzy) -- it was
+    /// silently lost while the key went unregistered.
+    char sval[CREG_VALUE_STRING_MAX];
+    if (config_registry_get_string("completion.match_mode", sval,
+                                   sizeof(sval)) == CREG_SUCCESS) {
+        for (const config_enum_mapping_t *m = completion_match_mode_mappings;
+             m->name; m++) {
+            if (strcmp(m->name, sval) == 0) {
+                config.completion_match_mode =
+                    (completion_match_mode_t)m->value;
+                break;
+            }
+        }
+    }
+    int64_t ival;
+    if (config_registry_get_integer("completion.threshold", &ival) ==
+        CREG_SUCCESS) {
+        config.completion_threshold = (int)ival;
+    }
 }
 
 /// @brief Sync completion config from runtime to registry
@@ -1105,6 +1129,17 @@ static void completion_sync_from_runtime(void) {
                                 config.completion_enabled);
     config_registry_set_boolean("completion.case_sensitive",
                                 config.completion_case_sensitive);
+    const char *match_name = "prefix";
+    for (const config_enum_mapping_t *m = completion_match_mode_mappings;
+         m->name; m++) {
+        if (m->value == (int)config.completion_match_mode) {
+            match_name = m->name;
+            break;
+        }
+    }
+    config_registry_set_string("completion.match_mode", match_name);
+    config_registry_set_integer("completion.threshold",
+                                config.completion_threshold);
 }
 
 /// @brief Sync behavior config from registry to runtime
