@@ -675,6 +675,8 @@ static void behavior_sync_to_runtime(void);
 static void behavior_sync_from_runtime(void);
 static void autosuggestion_sync_to_runtime(void);
 static void autosuggestion_sync_from_runtime(void);
+static void lle_sync_to_runtime(void);
+static void lle_sync_from_runtime(void);
 
 /* ----------------------------------------------------------------------------
  * History Section Options
@@ -893,6 +895,46 @@ static const creg_section_t behavior_section = {
     .on_save = NULL,
     .sync_to_runtime = behavior_sync_to_runtime,
     .sync_from_runtime = behavior_sync_from_runtime,
+};
+
+/* ----------------------------------------------------------------------------
+ * LLE Section Options (history deduplication, written by display lle history)
+ *
+ * The two enums (scope, strategy) are carried as strings here -- the CREG value
+ * model has no enum type -- and translated onto the engine enums in the sync
+ * hooks via the shared mapping tables. Registering them is what lets the
+ * display lle history builtin's config_registry_set calls succeed and these
+ * settings round-trip through lushrc.toml.
+ * -------------------------------------------------------------------------- */
+static const creg_option_t lle_options[] = {
+    {   "enable_deduplication",
+     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Deduplicate history entries", true                                           },
+    {            "dedup_scope",
+     CREG_VALUE_STRING,     {.type = CREG_VALUE_STRING, .data.string = "session"},
+     "Dedup scope: none, session, recent, or global", true                         },
+    {         "dedup_strategy",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "keep-recent"},
+     "Dedup strategy: ignore, keep-recent, keep-frequent, merge, or keep-all", true},
+    {       "dedup_navigation",
+     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Skip duplicates while navigating history", true                              },
+    {"dedup_navigation_unique",
+     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Show only unique entries during navigation", true                            },
+    {"dedup_unicode_normalize",
+     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Apply Unicode NFC normalization before comparing entries", true              },
+};
+
+static const creg_section_t lle_section = {
+    .name = "lle",
+    .options = lle_options,
+    .option_count = sizeof(lle_options) / sizeof(creg_option_t),
+    .on_load = NULL,
+    .on_save = NULL,
+    .sync_to_runtime = lle_sync_to_runtime,
+    .sync_from_runtime = lle_sync_from_runtime,
 };
 
 /* ----------------------------------------------------------------------------
@@ -1168,6 +1210,82 @@ static void behavior_sync_from_runtime(void) {
     config_registry_set_boolean("behavior.confirm_exit", config.confirm_exit);
 }
 
+/// @brief Sync LLE history-dedup config from registry to runtime
+static void lle_sync_to_runtime(void) {
+    bool bval;
+    char sval[CREG_VALUE_STRING_MAX];
+
+    if (config_registry_get_boolean("lle.enable_deduplication", &bval) ==
+        CREG_SUCCESS) {
+        config.lle_enable_deduplication = bval;
+    }
+    if (config_registry_get_string("lle.dedup_scope", sval, sizeof(sval)) ==
+        CREG_SUCCESS) {
+        for (const config_enum_mapping_t *m = lle_dedup_scope_mappings; m->name;
+             m++) {
+            if (strcmp(m->name, sval) == 0) {
+                config.lle_dedup_scope = (lle_dedup_scope_t)m->value;
+                break;
+            }
+        }
+    }
+    if (config_registry_get_string("lle.dedup_strategy", sval, sizeof(sval)) ==
+        CREG_SUCCESS) {
+        for (const config_enum_mapping_t *m = lle_dedup_strategy_mappings;
+             m->name; m++) {
+            if (strcmp(m->name, sval) == 0) {
+                config.lle_dedup_strategy = (lle_dedup_strategy_t)m->value;
+                break;
+            }
+        }
+    }
+    if (config_registry_get_boolean("lle.dedup_navigation", &bval) ==
+        CREG_SUCCESS) {
+        config.lle_dedup_navigation = bval;
+    }
+    if (config_registry_get_boolean("lle.dedup_navigation_unique", &bval) ==
+        CREG_SUCCESS) {
+        config.lle_dedup_navigation_unique = bval;
+    }
+    if (config_registry_get_boolean("lle.dedup_unicode_normalize", &bval) ==
+        CREG_SUCCESS) {
+        config.lle_dedup_unicode_normalize = bval;
+    }
+}
+
+/// @brief Sync LLE history-dedup config from runtime to registry
+static void lle_sync_from_runtime(void) {
+    config_registry_set_boolean("lle.enable_deduplication",
+                                config.lle_enable_deduplication);
+
+    const char *scope_name = "session";
+    for (const config_enum_mapping_t *m = lle_dedup_scope_mappings; m->name;
+         m++) {
+        if (m->value == (int)config.lle_dedup_scope) {
+            scope_name = m->name;
+            break;
+        }
+    }
+    config_registry_set_string("lle.dedup_scope", scope_name);
+
+    const char *strategy_name = "keep-recent";
+    for (const config_enum_mapping_t *m = lle_dedup_strategy_mappings; m->name;
+         m++) {
+        if (m->value == (int)config.lle_dedup_strategy) {
+            strategy_name = m->name;
+            break;
+        }
+    }
+    config_registry_set_string("lle.dedup_strategy", strategy_name);
+
+    config_registry_set_boolean("lle.dedup_navigation",
+                                config.lle_dedup_navigation);
+    config_registry_set_boolean("lle.dedup_navigation_unique",
+                                config.lle_dedup_navigation_unique);
+    config_registry_set_boolean("lle.dedup_unicode_normalize",
+                                config.lle_dedup_unicode_normalize);
+}
+
 static void autosuggestion_sync_to_runtime(void) {
     char sval[CREG_VALUE_STRING_MAX];
     if (config_registry_get_string("autosuggestion.dismiss_policy", sval,
@@ -1239,6 +1357,7 @@ static void config_register_sections(void) {
     config_registry_register_section(&completion_section);
     config_registry_register_section(&behavior_section);
     config_registry_register_section(&autosuggestion_section);
+    config_registry_register_section(&lle_section);
 }
 
 /**
