@@ -756,18 +756,30 @@ static const creg_section_t shell_section = {
  * Display Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t display_options[] = {
-    {"syntax_highlighting",
+    {  "syntax_highlighting",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable syntax highlighting", true       },
-    {    "autosuggestions",
+     "Enable syntax highlighting", true                            },
+    {      "autosuggestions",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable Fish-style autosuggestions", true},
-    {   "transient_prompt",
+     "Enable Fish-style autosuggestions", true                     },
+    {     "transient_prompt",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Enable transient prompts", true         },
-    { "optimization_level",
+     "Enable transient prompts", true                              },
+    {   "optimization_level",
      CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 2},
-     "Display optimization level (0-4)", true },
+     "Display optimization level (0-4)", true                      },
+    {     "theme_hot_reload",
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Auto-reload theme when its file changes on disk", true       },
+    {    "lle.pager.enabled",
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Master switch for the LLE pager", true                       },
+    {  "lle.pager.min_lines",
+     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 0},
+     "Pager threshold in visual rows (0 = use terminal rows)", true},
+    {"lle.pager.wrap_search",
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Wrap pager search to top on no-match (less-style)", true     },
 };
 
 static const creg_section_t display_section = {
