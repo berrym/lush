@@ -346,36 +346,15 @@ static config_option_t config_options[] = {
     { "behavior.autocorrect_case_sensitive",   CONFIG_TYPE_BOOL,
      CONFIG_SECTION_BEHAVIOR,       &config.autocorrect_case_sensitive,
      "Case-sensitive auto-correction",            config_validate_bool,                     NULL                                      },
-    {                  "behavior.tab_width",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
-     &config.tab_width,                        "Tab width for display",             config_validate_int,                     NULL     },
     {             "behavior.no_word_expand",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
      &config.no_word_expand,          "Disable word expansion and globbing",
      config_validate_bool,                     NULL                                                                                   },
     {             "behavior.multiline_mode",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
      &config.multiline_mode,                "Enable multiline editing mode",
      config_validate_bool,                     NULL                                                                                   },
-    {        "behavior.brace_expansion_max",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
-     &config.brace_expansion_max,
-     "Max brace expansion result count (0 = unbounded)",             config_validate_int,
-     NULL                                                                                                                             },
-    {          "behavior.regex_pattern_max",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
-     &config.regex_pattern_max,
-     "Max regex pattern length before rejection (0 = unbounded). Bounds "
-     "compile time on pathological patterns fed to platform regcomp from "
-     "[[ =~ ]] and extglob translation paths.",             config_validate_int,                     NULL                             },
-    { "behavior.path_negative_cache_ttl_ms",    CONFIG_TYPE_INT,
-     CONFIG_SECTION_BEHAVIOR,       &config.path_negative_cache_ttl_ms,
-     "TTL in milliseconds for negative PATH-search cache. Bounds the "
-     "syscall cost of repeated lookups of a missing command in tight "
-     "loops to O(1) instead of O(PATH_dirs). Short enough that newly "
-     "installed binaries appear quickly. (0 = disabled)",             config_validate_int,                     NULL                   },
-    {        "behavior.loop_failure_streak",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
-     &config.loop_failure_streak,
-     "Consecutive non-zero body iterations before runaway-loop trip (0 = "
-     "disable)",             config_validate_int,                     NULL                                                            },
-    {       "behavior.loop_failure_seconds",    CONFIG_TYPE_INT,   CONFIG_SECTION_BEHAVIOR,
-     &config.loop_failure_seconds,
-     "Min wall-clock seconds streak must last before tripping",             config_validate_int,                     NULL             },
+    /// behavior limits (tab_width, brace_expansion_max, regex_pattern_max,
+    /// path_negative_cache_ttl_ms, loop_failure_streak/seconds) are migrated to
+    /// the CREG registry (bound + layered).
 
     /// Color settings
     {               "behavior.color_scheme", CONFIG_TYPE_STRING,   CONFIG_SECTION_BEHAVIOR,
@@ -755,15 +734,34 @@ static const creg_section_t autosuggestion_section = {
  * Behavior Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t behavior_options[] = {
-    {         "auto_cd",
+    {                   "auto_cd",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Auto-cd to directories", true },
-    {"spell_correction",
+     "Auto-cd to directories", true                                               },
+    {          "spell_correction",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable spell correction", true},
-    {    "confirm_exit",
+     "Enable spell correction", true                                              },
+    {              "confirm_exit",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Confirm before exit", true    },
+     "Confirm before exit", true                                                  },
+    {                 "tab_width",
+     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 4},
+     "Tab width for display", true                                                },
+    {       "brace_expansion_max",
+     CREG_VALUE_INTEGER, {.type = CREG_VALUE_INTEGER, .data.integer = 65536},
+     "Max brace expansion result count (0 = unbounded)", true                     },
+    {         "regex_pattern_max",
+     CREG_VALUE_INTEGER,  {.type = CREG_VALUE_INTEGER, .data.integer = 1024},
+     "Max regex pattern length before rejection (0 = unbounded)", true            },
+    {"path_negative_cache_ttl_ms",
+     CREG_VALUE_INTEGER,  {.type = CREG_VALUE_INTEGER, .data.integer = 1000},
+     "TTL in milliseconds for the negative PATH-search cache (0 = disabled)", true},
+    {       "loop_failure_streak",
+     CREG_VALUE_INTEGER,  {.type = CREG_VALUE_INTEGER, .data.integer = 1000},
+     "Consecutive non-zero loop iterations before runaway-loop trip (0 = "
+     "disable)", true                                                             },
+    {      "loop_failure_seconds",
+     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 5},
+     "Min wall-clock seconds the streak must last before tripping", true          },
 };
 
 static const creg_section_t behavior_section = {
@@ -1020,6 +1018,20 @@ static void behavior_bind_runtime(void) {
     config_registry_bind_boolean("behavior.spell_correction",
                                  &config.spell_correction);
     config_registry_bind_boolean("behavior.confirm_exit", &config.confirm_exit);
+    /// Limits migrated into CREG from the legacy table. tab_width is read in
+    /// display hot paths -- its cell stays the plain config.tab_width int, the
+    /// registry just becomes its sole writer.
+    config_registry_bind_integer("behavior.tab_width", &config.tab_width);
+    config_registry_bind_integer("behavior.brace_expansion_max",
+                                 &config.brace_expansion_max);
+    config_registry_bind_integer("behavior.regex_pattern_max",
+                                 &config.regex_pattern_max);
+    config_registry_bind_integer("behavior.path_negative_cache_ttl_ms",
+                                 &config.path_negative_cache_ttl_ms);
+    config_registry_bind_integer("behavior.loop_failure_streak",
+                                 &config.loop_failure_streak);
+    config_registry_bind_integer("behavior.loop_failure_seconds",
+                                 &config.loop_failure_seconds);
 }
 
 /// @brief Sync LLE history-dedup config from registry to runtime
