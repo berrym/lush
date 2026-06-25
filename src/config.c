@@ -4793,6 +4793,71 @@ void config_show_all(void) {
  *
  * @param section Section to display
  */
+/// Map a legacy section enum to its CREG registry section name (NULL if the
+/// section has no registry counterpart).
+static const char *registry_section_for(config_section_t section) {
+    switch (section) {
+    case CONFIG_SECTION_HISTORY:
+        return "history";
+    case CONFIG_SECTION_SHELL:
+        return "shell";
+    case CONFIG_SECTION_DISPLAY:
+        return "display";
+    case CONFIG_SECTION_COMPLETION:
+        return "completion";
+    case CONFIG_SECTION_BEHAVIOR:
+        return "behavior";
+    case CONFIG_SECTION_AUTOSUGGESTION:
+        return "autosuggestion";
+    default:
+        return NULL;
+    }
+}
+
+/// Whether a full dotted key is present in the legacy config_options[] table.
+static bool legacy_has_option(const char *full_key) {
+    for (int i = 0; i < num_config_options; i++) {
+        if (strcmp(config_options[i].name, full_key) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// Print the CREG registry keys for a section that the legacy loop did not
+/// already show (the migrated keys), with their effective values. This keeps
+/// `config show` complete after a section migrates off the legacy table --
+/// discoverability must not regress as the registry takes over.
+static void config_show_registry_section(config_section_t section) {
+    const char *reg_name = registry_section_for(section);
+    if (!reg_name) {
+        return;
+    }
+    const creg_section_t *reg = config_registry_get_section(reg_name);
+    if (!reg) {
+        return;
+    }
+    for (size_t i = 0; i < reg->option_count; i++) {
+        char full_key[CREG_KEY_MAX];
+        snprintf(full_key, sizeof(full_key), "%s.%s", reg_name,
+                 reg->options[i].name);
+        if (legacy_has_option(full_key)) {
+            continue; /// already shown by the legacy loop
+        }
+        creg_value_t v;
+        if (config_registry_get(full_key, &v) != CREG_SUCCESS) {
+            continue;
+        }
+        char text[CREG_VALUE_STRING_MAX];
+        config_value_text(&v, text, sizeof(text));
+        printf("  %s = %s", reg->options[i].name, text);
+        if (reg->options[i].help) {
+            printf("  # %s", reg->options[i].help);
+        }
+        printf("\n");
+    }
+}
+
 void config_show_section(config_section_t section) {
     for (int i = 0; i < num_config_options; i++) {
         config_option_t *opt = &config_options[i];
@@ -4842,6 +4907,10 @@ void config_show_section(config_section_t section) {
             printf("  # %s\n", opt->description);
         }
     }
+
+    /// Then the registry keys this section's migration moved off the legacy
+    /// table, so migrated keys stay visible in `config show`.
+    config_show_registry_section(section);
 }
 
 /**
