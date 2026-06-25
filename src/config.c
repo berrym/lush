@@ -4188,7 +4188,9 @@ static void config_value_text(const creg_value_t *v, char *out, size_t n) {
         snprintf(out, n, "%g", v->data.floating);
         break;
     default:
-        snprintf(out, n, "");
+        if (n > 0) {
+            out[0] = '\0';
+        }
         break;
     }
 }
