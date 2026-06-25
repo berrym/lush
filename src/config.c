@@ -4225,6 +4225,54 @@ void builtin_config(int argc, char **argv) {
 }
 
 /**
+ * @brief Parse a textual boolean for the config builtin
+ *
+ * Accepts true/1/on/yes and false/0/off/no (case-sensitive, the spelling the
+ * builtin has always documented). Returns false if the text is not a
+ * recognized boolean so callers can report an error.
+ *
+ * @param value Text to parse
+ * @param out   Receives the parsed boolean on success
+ * @return true if recognized, false otherwise
+ */
+static bool config_parse_bool_text(const char *value, bool *out) {
+    if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
+        strcmp(value, "on") == 0 || strcmp(value, "yes") == 0) {
+        *out = true;
+        return true;
+    }
+    if (strcmp(value, "false") == 0 || strcmp(value, "0") == 0 ||
+        strcmp(value, "off") == 0 || strcmp(value, "no") == 0) {
+        *out = false;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Print a CREG registry value in the config builtin's textual form
+ */
+static void config_print_registry_value(const creg_value_t *v) {
+    switch (v->type) {
+    case CREG_VALUE_BOOLEAN:
+        printf("%s\n", v->data.boolean ? "true" : "false");
+        break;
+    case CREG_VALUE_INTEGER:
+        printf("%lld\n", (long long)v->data.integer);
+        break;
+    case CREG_VALUE_STRING:
+        printf("%s\n", v->data.string);
+        break;
+    case CREG_VALUE_FLOAT:
+        printf("%g\n", v->data.floating);
+        break;
+    case CREG_VALUE_NONE:
+        printf("\n");
+        break;
+    }
+}
+
+/**
  * @brief Get and print a single configuration value
  *
  * Looks up the configuration key and prints its current value.
@@ -4307,6 +4355,18 @@ void config_get_value(const char *key) {
             }
             return;
         }
+    }
+
+    /// Not in the legacy table: consult the CREG registry, the central source
+    /// of truth for TOML round-trip, per-mode defaults, and subsystem code.
+    /// This is what makes registry-only keys (e.g.
+    /// completion.chain_directories, completion.menu_shadow_ghost) readable
+    /// from the config builtin instead of reporting "Unknown configuration
+    /// key".
+    creg_value_t rv;
+    if (config_registry_get(key, &rv) == CREG_SUCCESS) {
+        config_print_registry_value(&rv);
+        return;
     }
 
     /// Check for legacy option name
@@ -4493,6 +4553,64 @@ void config_set_value(const char *key, const char *value) {
             config_apply_settings();
             return;
         }
+    }
+
+    /// Not in the legacy table: route through the CREG registry so
+    /// registry-only keys are settable. Probe the key to learn its declared
+    /// type, parse the text against it, set through the registry (which fires
+    /// change notification), then mirror into the runtime struct and apply --
+    /// the same path a TOML load takes.
+    creg_value_t probe;
+    if (config_registry_get(key, &probe) == CREG_SUCCESS) {
+        creg_value_t nv;
+        nv.type = probe.type;
+        switch (probe.type) {
+        case CREG_VALUE_BOOLEAN:
+            if (!config_parse_bool_text(value, &nv.data.boolean)) {
+                printf("Invalid boolean value: %s (use "
+                       "true/false/on/off/yes/no)\n",
+                       value);
+                return;
+            }
+            break;
+        case CREG_VALUE_INTEGER: {
+            char *end = NULL;
+            errno = 0;
+            long long parsed = strtoll(value, &end, 10);
+            if (end == value || *end != '\0' || errno != 0) {
+                printf("Invalid integer value: %s\n", value);
+                return;
+            }
+            nv.data.integer = (int64_t)parsed;
+            break;
+        }
+        case CREG_VALUE_FLOAT: {
+            char *end = NULL;
+            errno = 0;
+            double parsed = strtod(value, &end);
+            if (end == value || *end != '\0' || errno != 0) {
+                printf("Invalid number value: %s\n", value);
+                return;
+            }
+            nv.data.floating = parsed;
+            break;
+        }
+        case CREG_VALUE_STRING:
+            snprintf(nv.data.string, sizeof(nv.data.string), "%s", value);
+            break;
+        case CREG_VALUE_NONE:
+            printf("Cannot set %s: key has no value type\n", key);
+            return;
+        }
+
+        if (config_registry_set(key, &nv) != CREG_SUCCESS) {
+            printf("Failed to set %s\n", key);
+            return;
+        }
+        config_registry_sync_to_runtime();
+        config_apply_settings();
+        printf("Set %s = %s\n", key, value);
+        return;
     }
 
     /// Check for legacy option name
