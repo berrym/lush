@@ -280,6 +280,10 @@ typedef struct {
     autosuggestions_layer_t
         *autosuggestions_layer;   /// Autosuggestions layer (NULL if disabled)
     bool autosuggestions_enabled; /// Whether autosuggestions are active
+    bool menu_shadow_active; /// A completion menu's highlighted candidate is
+                             /// being shown inline as a shadow ghost
+                             /// (pre-navigation); lifts menu-precedence
+                             /// suppression of the ghost for this case only
 
     /// Notification integration (transient hints below command line)
     /// We store a COPY of the notification, not a pointer, because the source
@@ -626,6 +630,24 @@ void display_controller_update_autosuggestion(display_controller_t *controller,
  */
 void display_controller_set_autosuggestion(display_controller_t *controller,
                                            const char *suggestion);
+
+/**
+ * Set the completion-menu shadow ghost (pre-navigation top candidate).
+ *
+ * When a completion menu is open in pre-navigation, the command line still
+ * holds exactly what the user typed; its highlighted candidate is offered
+ * inline after the command as a faint shadow ghost while the menu box lists
+ * the alternatives below. This routes that candidate through the same
+ * autosuggestions layer and screen-buffer geometry as the history ghost, but
+ * lifts the menu-precedence suppression (the ghost-XOR-menu guards) for the
+ * shadow case only.
+ *
+ * @param controller The display controller
+ * @param suggestion Remainder text to show inline, or NULL/empty to clear the
+ *                   shadow and restore plain menu-precedence behavior
+ */
+void display_controller_set_menu_shadow(display_controller_t *controller,
+                                        const char *suggestion);
 
 /**
  * Get current autosuggestion text.
