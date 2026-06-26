@@ -281,8 +281,8 @@ becomes the sole store.
   re-execution. The config-vs-code boundary (§6) frames this: their *config* is
   data, their *behavior* is code.
 - **Theme persistence key** — `display.lle.theme` (parallel to
-  `display.lle.pager.*`), with the dead legacy `prompt.theme*` family left
-  retired rather than reused.
+  `display.lle.pager.*`); the dead legacy `prompt.*`/`prompt.theme*` family was
+  removed rather than reused.
 - **Reset granularity** — a `config reset [key|section|all]` surface, and whether
   a distinct `display lle defaults` exists alongside the editor-recovery
   `display lle reset`.

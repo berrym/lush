@@ -67,7 +67,6 @@ typedef enum {
     CONFIG_SECTION_NONE,          ///< No section (default)
     CONFIG_SECTION_HISTORY,       ///< History settings
     CONFIG_SECTION_COMPLETION,    ///< Completion settings
-    CONFIG_SECTION_PROMPT,        ///< Prompt settings
     CONFIG_SECTION_BEHAVIOR,      ///< Behavior settings
     CONFIG_SECTION_ALIASES,       ///< Alias definitions
     CONFIG_SECTION_KEYS,          ///< Key binding settings
@@ -310,28 +309,6 @@ typedef struct {
     bool completion_case_sensitive; ///< Case-sensitive completion
     bool completion_show_all;       ///< Show all completions
     bool hints_enabled;             ///< Enable inline hints
-
-    /// Prompt settings
-    bool use_theme_prompt;   ///< Use theme system for prompts
-    char *prompt_theme;      ///< Theme name
-    bool git_prompt_enabled; ///< Enable git info in prompt
-    int git_cache_timeout;   ///< Git info cache timeout (seconds)
-    char *prompt_format;     ///< Custom prompt format string
-
-    /// Theme settings
-    char *theme_name;                  ///< Active theme name
-    bool theme_auto_detect_colors;     ///< Auto-detect color support
-    bool theme_fallback_basic;         ///< Fall back to basic theme
-    char *theme_corporate_company;     ///< Company name for corporate theme
-    char *theme_corporate_department;  ///< Department for corporate theme
-    char *theme_corporate_project;     ///< Project for corporate theme
-    char *theme_corporate_environment; ///< Environment for corporate theme
-    bool theme_show_company;           ///< Show company in prompt
-    bool theme_show_department;        ///< Show department in prompt
-    bool theme_show_right_prompt;      ///< Enable right-side prompt
-    bool theme_enable_animations;      ///< Enable prompt animations
-    bool theme_enable_icons;           ///< Enable Unicode icons
-    int theme_color_support_override;  ///< Override detected color support
 
     /// Behavior settings
     bool auto_cd;            ///< Auto-cd to directories

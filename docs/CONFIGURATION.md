@@ -293,7 +293,6 @@ set` for the same keys:
 
 ```sh
 display lle autosuggestions on    # equivalent to: config set display.autosuggestions true
-display lle theme set dark        # equivalent to: config set prompt.theme_name "dark"
 display lle completion chain_directories on
                                   # equivalent to: config set completion.chain_directories true
 history ...                       # sugar over history.* keys
@@ -372,10 +371,6 @@ transient_prompt = false
 [history]
 enabled = true
 size = 10000
-
-[prompt]
-theme_name = "dark"
-git_enabled = true
 ```
 
 There is also a sibling shell-script file `~/.config/lush/lushrc` that's

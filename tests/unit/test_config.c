@@ -345,11 +345,11 @@ TEST(config_set_get_string) {
     config_init();
 
     /// Set and get a string value
-    int result = config_set_string("prompt.theme", "test_theme");
+    int result = config_set_string("lle.history_file", "/tmp/test_history");
     ASSERT_EQ(result, 0, "config_set_string should succeed");
 
-    const char *value = config_get_string("prompt.theme", "default");
-    ASSERT_STR_EQ(value, "test_theme",
+    const char *value = config_get_string("lle.history_file", "default");
+    ASSERT_STR_EQ(value, "/tmp/test_history",
                   "config_get_string should return set value");
 }
 
@@ -545,13 +545,6 @@ TEST(config_parse_section_completion) {
     ASSERT_EQ(result, 0, "parsing 'completion' section should succeed");
     ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_COMPLETION,
               "the completion section should be selected");
-}
-
-TEST(config_parse_section_prompt) {
-    int result = config_parse_section("prompt");
-    ASSERT_EQ(result, 0, "parsing 'prompt' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_PROMPT,
-              "the prompt section should be selected");
 }
 
 TEST(config_parse_section_behavior) {
@@ -792,7 +785,6 @@ int main(void) {
     printf("\n=== Section Parsing Tests ===\n");
     RUN_TEST(config_parse_section_history);
     RUN_TEST(config_parse_section_completion);
-    RUN_TEST(config_parse_section_prompt);
     RUN_TEST(config_parse_section_behavior);
     RUN_TEST(config_parse_section_aliases);
     RUN_TEST(config_parse_section_network);
