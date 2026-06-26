@@ -2840,6 +2840,19 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          timeout: 30)
   endif
 
+  # PTY-driven autosuggestion-toggle end-to-end test
+  if fs.exists('tests/integration/test_pty_autosuggestions.c')
+    test_pty_autosuggestions = executable(
+      'test_pty_autosuggestions',
+      ['tests/integration/test_pty_autosuggestions.c'],
+      dependencies: libutil_dep)
+    test('PTY autosuggestions toggle',
+         test_pty_autosuggestions,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 90)
+  endif
+
   # L11 (SIGHUP variant): logout script fires on SIGHUP-induced exit.
   if fs.exists('tests/integration/test_pty_sighup_logout.c')
     test_pty_logout = executable('test_pty_sighup_logout',

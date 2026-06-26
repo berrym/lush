@@ -528,37 +528,6 @@ const char *display_integration_get_version(void);
  */
 bool display_integration_check_compatibility(const char *shell_version);
 
-/**
- * Update autosuggestions using layered display system.
- * Replaces direct terminal control with coordinated layer display.
- *
- * @param line_buffer Current readline buffer
- * @param cursor_pos Current cursor position
- * @param line_end End of line position
- * @return true on success, false on failure
- */
-bool display_integration_update_autosuggestions(const char *line_buffer,
-                                                int cursor_pos, int line_end);
-
-/**
- * Clear autosuggestions display using layered system.
- *
- * @return true on success, false on failure
- */
-bool display_integration_clear_autosuggestions(void);
-
-/**
- * Initialize autosuggestions layer integration.
- *
- * @return true on success, false on failure
- */
-bool display_integration_init_autosuggestions(void);
-
-/**
- * Cleanup autosuggestions layer integration.
- */
-void display_integration_cleanup_autosuggestions(void);
-
 /* ============================================================================
  * PERFORMANCE MONITORING
  * ============================================================================
