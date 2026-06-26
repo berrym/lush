@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0-prerelease]
 
 ### Removed
+- Configuration keys `completion.show_all`, `completion.hints`,
+  `network.ssh_completion`, `network.cache_ssh_hosts`,
+  `network.cache_timeout_minutes`, `network.max_completion_hosts`, and
+  `scripts.execution`, along with the now-empty `[network]` and `[scripts]`
+  configuration sections -- part of retiring config.c's legacy layer in favor of
+  the single CREG configuration store. Six were phantom: `completion.show_all`
+  and the four `network.*` keys had no runtime consumer (SSH host completion and
+  its caching run unconditionally in the completion source), and
+  `completion.hints` was read only by an unimplemented no-op. `scripts.execution`
+  gated execution of the startup/login/logout scripts (`/etc/profile`,
+  `~/.profile`, `~/.lushrc`, `~/.lush_login`, `~/.lush_logout`), but only as a
+  persistent config-file key -- the wrong surface for that control, whose real
+  use cases (debugging a broken rc, a clean or sandboxed invocation) want a
+  launch-time flag, as in bash (`--norc`, `--noprofile`) and zsh (`-f`,
+  `--no-globalrcs`). The key and its `config_should_execute_scripts` gate are
+  removed; startup scripts run unconditionally, as they already did by default.
+  A command-line `--norc` / `--noprofile` flag is the correct surface and is a
+  separate future feature. BREAKING: an rc file or `config set` still using any
+  of these key names, or the `[network]` / `[scripts]` section headers, no
+  longer takes effect.
 - `return_value` builtin and the associated `__LUSH_RETURN__` stdout-marker
   scanner inside command substitution. The builtin was an early sketch
   of returning a typed value from a shell function; the typed-function

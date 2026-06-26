@@ -284,7 +284,6 @@ Current top-level sections:
 | `display` | Display layer toggles (syntax highlighting, autosuggestions, transient prompt, ...) |
 | `behavior` | General shell behavior (auto_cd, spell correction, autocorrect tuning, ...) |
 | `prompt` | Prompt theme, format, git integration |
-| `network` | SSH host cache, completion source policies |
 
 ### Subsystem-builtin sugar
 

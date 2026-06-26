@@ -15,7 +15,6 @@ completion_enabled = true
 fuzzy_completion = true
 completion_threshold = 70
 completion_case_sensitive = false
-completion_show_all = false
 
 # Prompt and Theme Configuration
 [prompt]
@@ -63,20 +62,6 @@ autocorrect_learn_history = true
 autocorrect_builtins = true
 autocorrect_external = true
 autocorrect_case_sensitive = false
-
-# Network Configuration
-[network]
-ssh_completion_enabled = true
-cloud_discovery_enabled = false
-cache_ssh_hosts = true
-cache_timeout_minutes = 5
-show_remote_context = true
-auto_detect_cloud = true
-max_completion_hosts = 50
-
-# Script Execution Control
-[scripts]
-script_execution = true
 
 # Aliases - Define command shortcuts
 [aliases]
