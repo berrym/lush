@@ -1173,6 +1173,21 @@ static void config_register_per_mode_defaults(void) {
                                      &autosuggest_sources_history);
     config_registry_set_mode_default("autosuggestion.sources", SHELL_MODE_POSIX,
                                      &autosuggest_sources_history);
+
+    /// display.transient_prompt: lush curates transient prompts on -- after a
+    /// command runs, its prompt collapses to a compact form so elaborate
+    /// prompts do not litter the scrollback and the active prompt is the one
+    /// that stands out. posix / bash / zsh inherit off: neither bash nor a
+    /// vanilla zsh has transient prompts (zsh users opt in via plugins such as
+    /// powerlevel10k), so the compat modes mirror those shells' scrollback.
+    config_registry_set_mode_default("display.transient_prompt",
+                                     SHELL_MODE_LUSH, &bool_true);
+    config_registry_set_mode_default("display.transient_prompt",
+                                     SHELL_MODE_BASH, &bool_false);
+    config_registry_set_mode_default("display.transient_prompt", SHELL_MODE_ZSH,
+                                     &bool_false);
+    config_registry_set_mode_default("display.transient_prompt",
+                                     SHELL_MODE_POSIX, &bool_false);
 }
 
 /**
