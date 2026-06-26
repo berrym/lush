@@ -142,12 +142,9 @@ static config_option_t config_options[] = {
     /// Completion settings
     /// completion.{enabled,match_mode,threshold,case_sensitive} are migrated to
     /// the CREG registry (bound + layered); they resolve through the registry,
-    /// not this legacy table. (show_all and hints remain legacy-only.)
-    {          "completion.show_all", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.completion_show_all,"Show all completions",config_validate_bool,
-     NULL                                                                                                        },
-    {             "completion.hints", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.hints_enabled,                  "Enable input hints",         config_validate_bool,             NULL},
+    /// not this legacy table. completion.show_all was a phantom key (no runtime
+    /// consumer) and completion.hints' only reader was an unimplemented no-op;
+    /// both are removed.
 
     /// Behavior settings
     /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
@@ -158,19 +155,11 @@ static config_option_t config_options[] = {
     /// path_negative_cache_ttl_ms, loop_failure_streak/seconds) are migrated to
     /// the CREG registry (bound + layered).
 
-    /// Network settings
-    {       "network.ssh_completion", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.ssh_completion_enabled,          "Enable SSH host completion",
-     config_validate_bool,             NULL                                                                      },
-    {      "network.cache_ssh_hosts", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.cache_ssh_hosts,     "Cache SSH hosts for performance",
-     config_validate_bool,             NULL                                                                      },
-    {"network.cache_timeout_minutes",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
-     &config.cache_timeout_minutes,   "SSH host cache timeout in minutes",
-     config_validate_int,             NULL                                                                       },
-    { "network.max_completion_hosts",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
-     &config.max_completion_hosts, "Maximum hosts to show in completion",
-     config_validate_int,             NULL                                                                       },
+    /// network.* (ssh_completion + SSH host caching) was a phantom section:
+    /// the keys had no runtime consumer. SSH host completion and its caching
+    /// run unconditionally in the ssh_hosts completion source; the legacy
+    /// keys are removed. A future user-configurable SSH-completion toggle is a
+    /// separate feature, not a revived phantom key.
 
     /// Display system settings
     /// v1.3.0: Layered display is now the exclusive system - no configuration
@@ -186,72 +175,74 @@ static config_option_t config_options[] = {
     /// v1.3.0: Legacy enhanced display mode option removed
     /// behavior.enhanced_display_mode option removed
 
-    /// Script execution control
-    {            "scripts.execution", CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
-     &config.script_execution,             "Enable script execution",         config_validate_bool,
-     NULL                                                                                                        },
+    /// scripts.execution gated execution of the startup/login/logout scripts,
+    /// but only as a persistent config-file key -- the wrong surface for that
+    /// control (the real use cases want a launch-time flag). The key and its
+    /// config_should_execute_scripts gate are removed; startup scripts run
+    /// unconditionally as before. A command-line --norc / --noprofile flag is
+    /// the correct surface and is a separate future feature.
 
     /// Shell options integration - all 24 POSIX options with shell.* namespace
     /// These map directly to existing shell_opts flags for perfect
     /// compatibility
-    {                "shell.errexit", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit on command failure (set -e)", config_validate_shell_option,             NULL                          },
-    {                 "shell.xtrace", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Trace command execution (set -x)", config_validate_shell_option,             NULL                          },
-    {                 "shell.noexec", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Syntax check only (set -n)", config_validate_shell_option,             NULL                                },
-    {                "shell.nounset", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Error on unset variables (set -u)", config_validate_shell_option,             NULL                         },
-    {                "shell.verbose", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Print input lines (set -v)", config_validate_shell_option,             NULL                                },
-    {                 "shell.noglob", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Disable pathname expansion (set -f)", config_validate_shell_option,             NULL                       },
-    {                "shell.hashall", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Command hashing (set -h)", config_validate_shell_option,             NULL                                  },
-    {                "shell.monitor", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Job control (set -m)", config_validate_shell_option,             NULL                                      },
-    {              "shell.allexport", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Auto export variables (set -a)", config_validate_shell_option,             NULL                            },
-    {              "shell.noclobber", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent file overwrite (set -C)", config_validate_shell_option,             NULL                           },
-    {                 "shell.onecmd", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit after one command (set -t)", config_validate_shell_option,             NULL                           },
-    {                 "shell.notify", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Async job notification (set -b)", config_validate_shell_option,             NULL                           },
-    {              "shell.ignoreeof", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {             "shell.errexit", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,NULL,
+     "Exit on command failure (set -e)",config_validate_shell_option,NULL                                                                                        },
+    {              "shell.xtrace", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Trace command execution (set -x)", config_validate_shell_option,             NULL                  },
+    {              "shell.noexec", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Syntax check only (set -n)", config_validate_shell_option,             NULL                        },
+    {             "shell.nounset", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Error on unset variables (set -u)", config_validate_shell_option,             NULL                 },
+    {             "shell.verbose", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Print input lines (set -v)", config_validate_shell_option,             NULL                        },
+    {              "shell.noglob", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Disable pathname expansion (set -f)", config_validate_shell_option,             NULL               },
+    {             "shell.hashall", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Command hashing (set -h)", config_validate_shell_option,             NULL                          },
+    {             "shell.monitor", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Job control (set -m)", config_validate_shell_option,             NULL                              },
+    {           "shell.allexport", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Auto export variables (set -a)", config_validate_shell_option,             NULL                    },
+    {           "shell.noclobber", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Prevent file overwrite (set -C)", config_validate_shell_option,             NULL                   },
+    {              "shell.onecmd", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Exit after one command (set -t)", config_validate_shell_option,             NULL                   },
+    {              "shell.notify", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Async job notification (set -b)", config_validate_shell_option,             NULL                   },
+    {           "shell.ignoreeof", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
      "Prevent exit on EOF (set -o ignoreeof)", config_validate_shell_option,
-     NULL                                                                                                        },
-    {                  "shell.nolog", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent function history logging (set -o nolog)", config_validate_shell_option,             NULL           },
-    {                  "shell.emacs", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Emacs-style editing (set -o emacs)", config_validate_shell_option,             NULL                        },
-    {                     "shell.vi", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Vi-style editing (set -o vi)", config_validate_shell_option,             NULL                              },
-    {                  "shell.posix", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     NULL                                                                                                },
+    {               "shell.nolog", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Prevent function history logging (set -o nolog)", config_validate_shell_option,             NULL   },
+    {               "shell.emacs", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Emacs-style editing (set -o emacs)", config_validate_shell_option,             NULL                },
+    {                  "shell.vi", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Vi-style editing (set -o vi)", config_validate_shell_option,             NULL                      },
+    {               "shell.posix", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
      "Strict POSIX compliance (set -o posix)", config_validate_shell_option,
-     NULL                                                                                                        },
-    {               "shell.pipefail", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Pipeline failure detection (set -o pipefail)", config_validate_shell_option,             NULL              },
-    {             "shell.histexpand", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     NULL                                                                                                },
+    {            "shell.pipefail", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Pipeline failure detection (set -o pipefail)", config_validate_shell_option,             NULL      },
+    {          "shell.histexpand", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
      "History expansion (set -o histexpand)", config_validate_shell_option,
-     NULL                                                                                                        },
-    {                "shell.history", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     NULL                                                                                                },
+    {             "shell.history", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
      "Command history recording (set -o history)", config_validate_shell_option,
-     NULL                                                                                                        },
-    {   "shell.interactive-comments", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Interactive comments (set -o interactive-comments)", config_validate_shell_option,             NULL        },
-    {               "shell.physical", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     NULL                                                                                                },
+    {"shell.interactive-comments", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Interactive comments (set -o interactive-comments)", config_validate_shell_option,             NULL},
+    {            "shell.physical", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
      "Physical directory paths (set -o physical)", config_validate_shell_option,
-     NULL                                                                                                        },
-    {             "shell.privileged", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Restricted shell security (set -o privileged)", config_validate_shell_option,             NULL             },
+     NULL                                                                                                },
+    {          "shell.privileged", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
+     "Restricted shell security (set -o privileged)", config_validate_shell_option,             NULL     },
 
     /// Shell mode settings (Extended Language Support)
-    {                   "shell.mode", CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
-     "Shell compatibility mode (posix, bash, zsh, lush)",   config_validate_shell_mode, &shell_mode_enum         },
-    {            "shell.mode_strict", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
-     &config.shell_mode_strict,       "Disallow runtime mode changes",
-     config_validate_bool,             NULL                                                                      },
+    {                "shell.mode", CONFIG_TYPE_ENUM, CONFIG_SECTION_SHELL, &config.shell_mode,
+     "Shell compatibility mode (posix, bash, zsh, lush)",   config_validate_shell_mode, &shell_mode_enum },
+    {         "shell.mode_strict", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,
+     &config.shell_mode_strict,      "Disallow runtime mode changes",
+     config_validate_bool,             NULL                                                              },
 };
 
 static const int num_config_options =
@@ -1146,8 +1137,6 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {      "completion_match_mode",                "completion.match_mode"},
     {       "completion_threshold",                 "completion.threshold"},
     {  "completion_case_sensitive",            "completion.case_sensitive"},
-    {        "completion_show_all",                  "completion.show_all"},
-    {              "hints_enabled",                     "completion.hints"},
 
     /// Behavior options
     {                    "auto_cd",                     "behavior.auto_cd"},
@@ -1167,15 +1156,6 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {        "loop_failure_streak",         "behavior.loop_failure_streak"},
     {       "loop_failure_seconds",        "behavior.loop_failure_seconds"},
     {       "display_optimization",           "display.optimization_level"},
-
-    /// Network options
-    {     "ssh_completion_enabled",               "network.ssh_completion"},
-    {            "cache_ssh_hosts",              "network.cache_ssh_hosts"},
-    {      "cache_timeout_minutes",        "network.cache_timeout_minutes"},
-    {       "max_completion_hosts",         "network.max_completion_hosts"},
-
-    /// Scripts options
-    {           "script_execution",                    "scripts.execution"},
 
     {                         NULL,                                   NULL}
 };
@@ -1352,22 +1332,6 @@ bool config_get_shell_option(const char *option_name) {
 #define LOGIN_SCRIPT_FILE ".lush_login"
 #define RC_SCRIPT_FILE ".lushrc"
 #define LOGOUT_SCRIPT_FILE ".lush_logout"
-
-/**
- * @brief Check if script execution is enabled
- *
- * @return True if script execution is enabled in configuration
- */
-bool config_should_execute_scripts(void) { return config.script_execution; }
-
-/**
- * @brief Enable or disable script execution
- *
- * @param enabled True to enable script execution, false to disable
- */
-void config_set_script_execution(bool enabled) {
-    config.script_execution = enabled;
-}
 
 /**
  * @brief Get the path to the profile script file
@@ -1614,10 +1578,6 @@ int config_execute_script_file(const char *path) {
  * @return 0 on success, -1 if any script fails (non-fatal, continues execution)
  */
 int config_execute_system_profile(void) {
-    if (!config_should_execute_scripts()) {
-        return 0;
-    }
-
     int result = 0;
 
     /// 1. Source /etc/lushrc if it exists (lush-specific system config)
@@ -1668,15 +1628,11 @@ int config_execute_system_profile(void) {
 /**
  * @brief Execute startup scripts for interactive shells
  *
- * Executes ~/.lushrc if it exists and script execution is enabled.
+ * Executes ~/.lushrc if it exists.
  *
  * @return 0 on success, -1 if any script fails
  */
 int config_execute_startup_scripts(void) {
-    if (!config_should_execute_scripts()) {
-        return 0;
-    }
-
     int result = 0;
 
     /// Execute .lushrc if it exists (lush-specific RC script)
@@ -1694,16 +1650,11 @@ int config_execute_startup_scripts(void) {
 /**
  * @brief Execute login scripts for login shells
  *
- * Executes ~/.profile and ~/.lush_login if they exist
- * and script execution is enabled.
+ * Executes ~/.profile and ~/.lush_login if they exist.
  *
  * @return 0 on success, -1 if any script fails
  */
 int config_execute_login_scripts(void) {
-    if (!config_should_execute_scripts()) {
-        return 0;
-    }
-
     int result = 0;
 
     /// Execute .profile if it exists (POSIX standard)
@@ -1737,15 +1688,11 @@ int config_execute_login_scripts(void) {
 /**
  * @brief Execute logout scripts when shell exits
  *
- * Executes ~/.lush_logout if it exists and script execution is enabled.
+ * Executes ~/.lush_logout if it exists.
  *
  * @return 0 on success, -1 if script fails
  */
 int config_execute_logout_scripts(void) {
-    if (!config_should_execute_scripts()) {
-        return 0;
-    }
-
     int result = 0;
 
     /// Execute .lush_logout if it exists
@@ -1867,12 +1814,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Case sensitive completion\n"
     "completion.case_sensitive = false\n"
     "\n"
-    "# Show all completions\n"
-    "completion.show_all = false\n"
-    "\n"
-    "# Enable input hints\n"
-    "completion.hints = false\n"
-    "\n"
     "# "
     "=========================================================================="
     "==\n"
@@ -1937,26 +1878,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "# "
     "=========================================================================="
     "==\n"
-    "# NETWORK SETTINGS\n"
-    "# "
-    "=========================================================================="
-    "==\n"
-    "\n"
-    "# Enable SSH host completion\n"
-    "network.ssh_completion = true\n"
-    "\n"
-    "# Cache SSH hosts for performance\n"
-    "network.cache_ssh_hosts = true\n"
-    "\n"
-    "# SSH host cache timeout in minutes\n"
-    "network.cache_timeout_minutes = 5\n"
-    "\n"
-    "# Maximum hosts to show in completion\n"
-    "network.max_completion_hosts = 50\n"
-    "\n"
-    "# "
-    "=========================================================================="
-    "==\n"
     "# DISPLAY SETTINGS\n"
     "# "
     "=========================================================================="
@@ -1973,17 +1894,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "\n"
     "# LLE pager: wrap search to top on no-match (less-style)\n"
     "display.lle.pager.wrap_search = true\n"
-    "\n"
-    "# "
-    "=========================================================================="
-    "==\n"
-    "# SCRIPT SETTINGS\n"
-    "# "
-    "=========================================================================="
-    "==\n"
-    "\n"
-    "# Enable script execution\n"
-    "scripts.execution = true\n"
     "\n"
     "# "
     "=========================================================================="
@@ -2210,8 +2120,6 @@ void config_set_defaults(void) {
     config.completion_match_mode = COMPLETION_MATCH_PREFIX;
     config.completion_threshold = 60;
     config.completion_case_sensitive = false;
-    config.completion_show_all = false;
-    config.hints_enabled = false;
 
     /// Behavior defaults
     config.auto_cd = false;
@@ -2232,12 +2140,6 @@ void config_set_defaults(void) {
     config.autocorrect_builtins = true;
     config.autocorrect_external = true;
     config.autocorrect_case_sensitive = false;
-
-    /// Network defaults
-    config.ssh_completion_enabled = true;
-    config.cache_ssh_hosts = true;
-    config.cache_timeout_minutes = 5;
-    config.max_completion_hosts = 50;
 
     /// Display defaults
     /// v1.3.0: Layered display is now the exclusive system - no configuration
@@ -2279,9 +2181,6 @@ void config_set_defaults(void) {
     config.display_lle_pager_enabled = true;
     config.display_lle_pager_min_lines = 0;
     config.display_lle_pager_wrap_search = true;
-
-    /// Script execution defaults
-    config.script_execution = true;
 
     /// Shell mode defaults: config.shell_mode is owned by
     /// apply_mode_preset() (called at startup before config_init from
@@ -2999,10 +2898,6 @@ int config_parse_section(const char *section_name) {
         current_section = CONFIG_SECTION_ALIASES;
     } else if (strcmp(section_name, "keys") == 0) {
         current_section = CONFIG_SECTION_KEYS;
-    } else if (strcmp(section_name, "network") == 0) {
-        current_section = CONFIG_SECTION_NETWORK;
-    } else if (strcmp(section_name, "scripts") == 0) {
-        current_section = CONFIG_SECTION_SCRIPTS;
     } else {
         shell_error_t *err = shell_error_create(
             SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_WARNING,
@@ -3197,14 +3092,6 @@ void config_apply_settings(void) {
 
     /// Apply history settings
     /// History deduplication is handled automatically by readline integration
-
-    /// Apply hints system settings
-    if (config.hints_enabled) {
-        /// Hints are handled differently in readline integration
-        /// TODO: Implement hints system for readline if needed
-    } else {
-        /// Hints disabled - no action needed for readline integration
-    }
 
     /// Apply other settings as needed
     symtable_set_global_int("AUTO_CD", config.auto_cd);
@@ -3754,10 +3641,6 @@ void builtin_config(int argc, char **argv) {
                 section = CONFIG_SECTION_BEHAVIOR;
             } else if (strcmp(argv[2], "display") == 0) {
                 section = CONFIG_SECTION_DISPLAY;
-            } else if (strcmp(argv[2], "network") == 0) {
-                section = CONFIG_SECTION_NETWORK;
-            } else if (strcmp(argv[2], "scripts") == 0) {
-                section = CONFIG_SECTION_SCRIPTS;
             } else if (strcmp(argv[2], "shell") == 0) {
                 section = CONFIG_SECTION_SHELL;
             }
@@ -4248,14 +4131,6 @@ void config_set_value(const char *key, const char *value) {
         return;
     }
 
-    /// Check for common typos and provide helpful suggestions
-    if (strcmp(key, "hints_enable") == 0) {
-        printf("Unknown configuration key: %s\n", key);
-        printf("Did you mean 'completion.hints'?\n");
-        printf("Try: config set completion.hints %s\n", value);
-        return;
-    }
-
     printf("Unknown configuration key: %s\n", key);
 }
 
@@ -4284,12 +4159,6 @@ void config_show_all(void) {
 
     printf("\n[autosuggestion]\n");
     config_show_section(CONFIG_SECTION_AUTOSUGGESTION);
-
-    printf("\n[network]\n");
-    config_show_section(CONFIG_SECTION_NETWORK);
-
-    printf("\n[scripts]\n");
-    config_show_section(CONFIG_SECTION_SCRIPTS);
 
     printf("\n[shell]\n");
     config_show_section(CONFIG_SECTION_SHELL);

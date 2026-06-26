@@ -181,13 +181,6 @@ else
     show_result "Configuration system" "FAIL" "Config command not working"
 fi
 
-# Test hints system
-if "$LUSH_BINARY" -c "config get hints_enabled" 2>/dev/null | grep -q "true"; then
-    show_result "Hints system" "PASS" "Hints enabled and configurable"
-else
-    show_result "Hints system" "WARN" "Hints may not be properly configured"
-fi
-
 # Test completion system
 if "$LUSH_BINARY" -c "config get completion_enabled" 2>/dev/null | grep -q "true"; then
     show_result "Completion system" "PASS" "Completion enabled and configurable"

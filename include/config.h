@@ -70,8 +70,6 @@ typedef enum {
     CONFIG_SECTION_BEHAVIOR,       ///< Behavior settings
     CONFIG_SECTION_ALIASES,        ///< Alias definitions
     CONFIG_SECTION_KEYS,           ///< Key binding settings
-    CONFIG_SECTION_NETWORK,        ///< Network settings
-    CONFIG_SECTION_SCRIPTS,        ///< Script settings
     CONFIG_SECTION_SHELL,          ///< Shell options
     CONFIG_SECTION_DISPLAY,        ///< Display settings
     CONFIG_SECTION_AUTOSUGGESTION, ///< Autosuggestion settings
@@ -307,8 +305,6 @@ typedef struct {
     completion_match_mode_t completion_match_mode; ///< Match predicate
     int completion_threshold;                      ///< Minimum match score
     bool completion_case_sensitive; ///< Case-sensitive completion
-    bool completion_show_all;       ///< Show all completions
-    bool hints_enabled;             ///< Enable inline hints
 
     /// Behavior settings
     bool auto_cd;            ///< Auto-cd to directories
@@ -365,15 +361,6 @@ typedef struct {
         autosuggestion_partial_accept; ///< Ctrl+Right granularity
     autosuggestion_sources_t
         autosuggestion_sources; ///< History only, or history then completion
-
-    /// Network settings
-    bool ssh_completion_enabled; ///< Enable SSH host completion
-    bool cache_ssh_hosts;        ///< Cache SSH hosts
-    int cache_timeout_minutes;   ///< Cache timeout in minutes
-    int max_completion_hosts;    ///< Maximum hosts for completion
-
-    /// Script execution control
-    bool script_execution; ///< Enable script execution
 
     /// Shell mode settings (Extended Language Support)
     int shell_mode;         ///< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush
@@ -904,20 +891,6 @@ int config_execute_logout_scripts(void);
  * @return 0 on success, non-zero on error
  */
 int config_execute_script_file(const char *path);
-
-/**
- * @brief Check if script execution is enabled
- *
- * @return true if script execution is enabled, false otherwise
- */
-bool config_should_execute_scripts(void);
-
-/**
- * @brief Enable or disable script execution
- *
- * @param enabled Whether to enable script execution
- */
-void config_set_script_execution(bool enabled);
 
 /* ============================================================================
  * Traditional Shell Script File Detection

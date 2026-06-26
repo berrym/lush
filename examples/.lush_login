@@ -44,8 +44,6 @@ if [ -n "$PS1" ]; then
 
     # Enable advanced features for login shells
     config set completion_enabled true
-    config set fuzzy_completion true
-    config set completion_show_all true
     config set spell_correction true
     config set autocorrect_interactive true
 fi

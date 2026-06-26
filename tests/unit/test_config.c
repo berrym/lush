@@ -658,20 +658,6 @@ TEST(config_parse_section_aliases) {
               "the aliases section should be selected");
 }
 
-TEST(config_parse_section_network) {
-    int result = config_parse_section("network");
-    ASSERT_EQ(result, 0, "parsing 'network' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_NETWORK,
-              "the network section should be selected");
-}
-
-TEST(config_parse_section_scripts) {
-    int result = config_parse_section("scripts");
-    ASSERT_EQ(result, 0, "parsing 'scripts' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_SCRIPTS,
-              "the scripts section should be selected");
-}
-
 TEST(config_parse_section_keys) {
     int result = config_parse_section("keys");
     ASSERT_EQ(result, 0, "parsing 'keys' section should succeed");
@@ -717,28 +703,6 @@ TEST(config_parse_line_section_header) {
     ASSERT_EQ(result, 0, "section header should be parsed successfully");
     ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_HISTORY,
               "the [history] header should select the history section");
-}
-
-/* ============================================================================
- * SCRIPT EXECUTION CONTROL TESTS
- * ============================================================================
- */
-
-TEST(config_script_execution_control) {
-    config_init();
-
-    /// Enable script execution
-    config_set_script_execution(true);
-    ASSERT_TRUE(config_should_execute_scripts(),
-                "scripts should be executable when enabled");
-
-    /// Disable script execution
-    config_set_script_execution(false);
-    ASSERT_FALSE(config_should_execute_scripts(),
-                 "scripts should not be executable when disabled");
-
-    /// Re-enable
-    config_set_script_execution(true);
 }
 
 /* ============================================================================
@@ -888,8 +852,6 @@ int main(void) {
     RUN_TEST(config_parse_section_completion);
     RUN_TEST(config_parse_section_behavior);
     RUN_TEST(config_parse_section_aliases);
-    RUN_TEST(config_parse_section_network);
-    RUN_TEST(config_parse_section_scripts);
     RUN_TEST(config_parse_section_keys);
     RUN_TEST(config_parse_section_invalid);
 
@@ -902,7 +864,6 @@ int main(void) {
 
     /// Script execution control
     printf("\n=== Script Execution Control Tests ===\n");
-    RUN_TEST(config_script_execution_control);
 
     /// Error handling
     printf("\n=== Error Handling Tests ===\n");
