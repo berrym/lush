@@ -542,6 +542,16 @@ static void update_autosuggestion(readline_context_t *ctx) {
         return;
     }
 
+    /// Autosuggestions disabled by configuration. The suggestion was cleared
+    /// above, so returning here leaves ctx->current_suggestion empty and the
+    /// next display_controller_set_autosuggestion() push renders no ghost. This
+    /// is the single gate for the feature: config set display.autosuggestions,
+    /// display lle autosuggestions on|off, and a lushrc display.autosuggestions
+    /// value all resolve to this field.
+    if (!config.display_autosuggestions) {
+        return;
+    }
+
     /// Check if autosuggestion regeneration is suppressed (e.g., during Ctrl+G
     /// clear)
     if (ctx->suppress_autosuggestion) {
@@ -715,6 +725,14 @@ static void update_autosuggestion(readline_context_t *ctx) {
 static bool has_autosuggestion(readline_context_t *ctx) {
     if (!ctx)
         return false;
+
+    /// Autosuggestions disabled by configuration: no suggestion is acceptable,
+    /// whatever the local buffer or the display controller still hold. Every
+    /// move-or-accept-suggestion key (RIGHT, END, Ctrl-E, Ctrl-F, forward-word,
+    /// partial-accept) gates on this, so the toggle suppresses acceptance.
+    if (!config.display_autosuggestions) {
+        return false;
+    }
 
     /// A visible completion menu owns the inline area. The history ghost is
     /// suppressed while a menu is up (the display clears it), and the menu's
@@ -1023,6 +1041,12 @@ static void refresh_display_keep_suggestion(readline_context_t *ctx) {
     /// Pass existing suggestion to display controller (don't regenerate)
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
+        /// Keep the controller's render/accept gate in step with the config
+        /// toggle: when off, the compositor (dc_render) and get_autosuggestion
+        /// both short-circuit on autosuggestions_enabled, so no ghost is drawn
+        /// and no stale controller-held suggestion can be spliced in.
+        display_controller_set_autosuggestions_enabled(
+            dc, config.display_autosuggestions);
         display_controller_set_autosuggestion(dc, ctx->current_suggestion);
     }
 
@@ -1162,6 +1186,11 @@ static void refresh_display(readline_context_t *ctx) {
     /// history) and pass it directly to display_controller for rendering.
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
+        /// Keep the controller's render/accept gate in step with the config
+        /// toggle (see refresh_display_keep_suggestion).
+        display_controller_set_autosuggestions_enabled(
+            dc, config.display_autosuggestions);
+
         /// Generate suggestion from LLE history
         update_autosuggestion(ctx);
 
