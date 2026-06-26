@@ -8,6 +8,7 @@
 
 #include "builtins.h"
 #include "builtins/display.h"
+#include "config.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/prompt/composer.h"
 #include "lle/prompt/theme.h"
@@ -81,26 +82,18 @@ int display_lle_theme(int argc, char **argv) {
         }
 
         const char *theme_name = argv[2];
-        /// Use lle_composer_set_theme to properly clear cached templates
-        lle_result_t result = lle_composer_set_theme(
-            g_lle_integration->prompt_composer, theme_name);
+        /// Switch the active theme and refresh PS1/PS2 (shared with the
+        /// display.lle.theme config subscriber so every surface applies a
+        /// theme identically).
+        lle_result_t result = lle_shell_apply_prompt_theme(theme_name);
 
         if (result == LLE_SUCCESS) {
-            // Sync PS1/PS2 from the new theme
-            const lle_theme_t *new_theme =
-                lle_composer_get_theme(g_lle_integration->prompt_composer);
-            if (new_theme) {
-                if (new_theme->layout.style != LLE_PROMPT_STYLE_POWERLINE) {
-                    // Plain themes: write template to PS1
-                    if (strlen(new_theme->layout.ps1_format) > 0) {
-                        symtable_set_global("PS1",
-                                            new_theme->layout.ps1_format);
-                    }
-                }
-                if (strlen(new_theme->layout.ps2_format) > 0) {
-                    symtable_set_global("PS2", new_theme->layout.ps2_format);
-                }
-            }
+            /// Record the choice in the config registry (SESSION layer) so it
+            /// shows up in `config show`; `config save` writes it to
+            /// lushrc.toml so it survives a restart. The registry write
+            /// notifies the theme subscriber, which no-ops since the theme is
+            /// already active.
+            config_set_string("display.lle.theme", theme_name);
             printf("LLE theme set to '%s'\n", theme_name);
             return 0;
         } else if (result == LLE_ERROR_NOT_FOUND) {

@@ -2852,6 +2852,18 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          timeout: 90)
   endif
 
+  if fs.exists('tests/integration/test_pty_theme_persistence.c')
+    test_pty_theme = executable(
+      'test_pty_theme_persistence',
+      ['tests/integration/test_pty_theme_persistence.c'],
+      dependencies: libutil_dep)
+    test('PTY theme persistence',
+         test_pty_theme,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 90)
+  endif
+
   # L11 (SIGHUP variant): logout script fires on SIGHUP-induced exit.
   if fs.exists('tests/integration/test_pty_sighup_logout.c')
     test_pty_logout = executable('test_pty_sighup_logout',

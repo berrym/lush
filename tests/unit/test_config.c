@@ -353,6 +353,24 @@ TEST(config_set_get_string) {
                   "config_get_string should return set value");
 }
 
+TEST(config_display_lle_theme_persists) {
+    config_init();
+
+    /// display.lle.theme is a registry-backed string-pointer key: setting it
+    /// through the config API write-throughs the owned char* cell and the value
+    /// round-trips, which is what lets a theme choice persist to TOML and be
+    /// restored at startup. (The runtime application to the prompt composer is
+    /// covered by the PTY theme-persistence test.)
+    int result = config_set_string("display.lle.theme", "two-line");
+    ASSERT_EQ(result, 0, "config_set_string should reach the registry key");
+
+    ASSERT_STR_EQ(config_get_string("display.lle.theme", ""), "two-line",
+                  "config_get_string should return the persisted theme");
+    ASSERT_TRUE(config.display_lle_theme != NULL &&
+                    strcmp(config.display_lle_theme, "two-line") == 0,
+                "the binding should write through to the owned char* cell");
+}
+
 TEST(config_display_newline_before_prompt_bound) {
     config_init();
 
@@ -819,6 +837,7 @@ int main(void) {
     RUN_TEST(config_set_get_bool);
     RUN_TEST(config_set_get_int);
     RUN_TEST(config_set_get_string);
+    RUN_TEST(config_display_lle_theme_persists);
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_get_bool_default);
