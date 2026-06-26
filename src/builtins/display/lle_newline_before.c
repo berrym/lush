@@ -11,7 +11,6 @@
 #include "config.h"
 #include "config_registry.h"
 #include "lle/lle_shell_integration.h"
-#include "lle/prompt/composer.h"
 
 int display_lle_newline_before(int argc, char **argv) {
     // Control newline before prompt for visual separation
@@ -28,18 +27,18 @@ int display_lle_newline_before(int argc, char **argv) {
     const char *state = argv[1];
     if (strcmp(state, "on") == 0) {
         config.display_newline_before_prompt = true;
-        if (g_lle_integration && g_lle_integration->prompt_composer) {
-            g_lle_integration->prompt_composer->config.newline_before_prompt =
-                true;
+        if (config_registry_is_initialized()) {
+            config_registry_set_boolean("display.newline_before_prompt", true);
         }
+        lle_shell_integration_sync_prompt_config();
         printf("Newline before prompt enabled\n");
         return 0;
     } else if (strcmp(state, "off") == 0) {
         config.display_newline_before_prompt = false;
-        if (g_lle_integration && g_lle_integration->prompt_composer) {
-            g_lle_integration->prompt_composer->config.newline_before_prompt =
-                false;
+        if (config_registry_is_initialized()) {
+            config_registry_set_boolean("display.newline_before_prompt", false);
         }
+        lle_shell_integration_sync_prompt_config();
         printf("Newline before prompt disabled\n");
         return 0;
     } else {

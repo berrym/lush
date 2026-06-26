@@ -353,6 +353,26 @@ TEST(config_set_get_string) {
                   "config_get_string should return set value");
 }
 
+TEST(config_display_newline_before_prompt_bound) {
+    config_init();
+
+    /// display.newline_before_prompt is a registered, bound display key: a set
+    /// through the config API resolves to the key and write-throughs to the
+    /// global config struct field that the prompt composer reads. (Regression
+    /// guard: before registration the key was struct-only and config get/set
+    /// could not reach it.)
+    int result = config_set_bool("display.newline_before_prompt", false);
+    ASSERT_EQ(result, 0, "config_set_bool should succeed for a registered key");
+    ASSERT_FALSE(config_get_bool("display.newline_before_prompt", true),
+                 "config_get_bool should return the set value");
+    ASSERT_FALSE(config.display_newline_before_prompt,
+                 "the binding should write through to the config struct field");
+
+    config_set_bool("display.newline_before_prompt", true);
+    ASSERT_TRUE(config.display_newline_before_prompt,
+                "re-enabling should write through too");
+}
+
 TEST(config_get_bool_default) {
     config_init();
 
@@ -763,6 +783,7 @@ int main(void) {
     RUN_TEST(config_set_get_bool);
     RUN_TEST(config_set_get_int);
     RUN_TEST(config_set_get_string);
+    RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
     RUN_TEST(config_get_string_default);
