@@ -50,14 +50,25 @@ static int run_test(const char *lush_path) {
         return 1;
     }
 
-    /// Wait for the BGPID line to appear.
-    int waited = 0;
-    while (waited < 3000 && pty_extract_long_after(&s, "BGPID:") < 0) {
-        pty_drain(&s, 100);
-        waited += 100;
+    /// Wait for the bg job's $! to be printed, then capture it. Block on
+    /// pty_expect (wait for the specific output) rather than a fixed
+    /// pty_drain window: the $! print can lag behind shell init and config
+    /// load on a loaded runner, and a fixed idle gap races with that bursty
+    /// output. strstr matches the result line, not the syntax-highlighted
+    /// echo of the typed command (the highlight splits the "BGPID:" token, so
+    /// the echoed command never matches).
+    long bgpid = -1;
+    if (pty_expect(&s, "BGPID:", 5000)) {
+        /// The pid digits can arrive in a read after the "BGPID:" prefix;
+        /// pty_extract_long_after parses only a complete number, so poll
+        /// briefly until the whole token has landed.
+        for (int waited = 0; bgpid <= 0 && waited < 1000; waited += 50) {
+            bgpid = pty_extract_long_after(&s, "BGPID:");
+            if (bgpid <= 0) {
+                pty_drain(&s, 50);
+            }
+        }
     }
-
-    long bgpid = pty_extract_long_after(&s, "BGPID:");
     if (bgpid <= 0) {
         pty_fail(TEST,
                  "did not capture BGPID from lush output (got %ld bytes)\n"

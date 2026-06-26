@@ -220,4 +220,20 @@ bool sighup_was_received(void);
  */
 int send_sighup_to_jobs(void);
 
+/**
+ * @brief Restore SIGHUP to its default disposition in a background-job child.
+ *
+ * A background job is started by forking the shell; the child runs the
+ * command in-process and does not necessarily exec, so it inherits the
+ * interactive shell's caught SIGHUP handler (sighup_handler, which only
+ * records a flag). That inherited handler would swallow the SIGHUP that a
+ * login shell delivers to its background jobs on exit -- via
+ * send_sighup_to_jobs() for job-controlled jobs, or the kernel's
+ * controlling-terminal hangup for untracked ones -- leaving the job alive.
+ * Resetting SIG_DFL in the child makes the job terminate on hangup as POSIX
+ * login shells require. Called in the child of executor_execute_background
+ * before the command runs.
+ */
+void reset_background_job_signals(void);
+
 #endif
