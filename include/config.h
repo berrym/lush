@@ -64,17 +64,18 @@ typedef enum {
  * Enumerates the different sections in configuration files.
  */
 typedef enum {
-    CONFIG_SECTION_NONE,          ///< No section (default)
-    CONFIG_SECTION_HISTORY,       ///< History settings
-    CONFIG_SECTION_COMPLETION,    ///< Completion settings
-    CONFIG_SECTION_BEHAVIOR,      ///< Behavior settings
-    CONFIG_SECTION_ALIASES,       ///< Alias definitions
-    CONFIG_SECTION_KEYS,          ///< Key binding settings
-    CONFIG_SECTION_NETWORK,       ///< Network settings
-    CONFIG_SECTION_SCRIPTS,       ///< Script settings
-    CONFIG_SECTION_SHELL,         ///< Shell options
-    CONFIG_SECTION_DISPLAY,       ///< Display settings
-    CONFIG_SECTION_AUTOSUGGESTION ///< Autosuggestion settings
+    CONFIG_SECTION_NONE,           ///< No section (default)
+    CONFIG_SECTION_HISTORY,        ///< History settings
+    CONFIG_SECTION_COMPLETION,     ///< Completion settings
+    CONFIG_SECTION_BEHAVIOR,       ///< Behavior settings
+    CONFIG_SECTION_ALIASES,        ///< Alias definitions
+    CONFIG_SECTION_KEYS,           ///< Key binding settings
+    CONFIG_SECTION_NETWORK,        ///< Network settings
+    CONFIG_SECTION_SCRIPTS,        ///< Script settings
+    CONFIG_SECTION_SHELL,          ///< Shell options
+    CONFIG_SECTION_DISPLAY,        ///< Display settings
+    CONFIG_SECTION_AUTOSUGGESTION, ///< Autosuggestion settings
+    CONFIG_SECTION_LLE             ///< LLE history/editor settings
 } config_section_t;
 
 /**

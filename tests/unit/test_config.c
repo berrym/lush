@@ -373,6 +373,42 @@ TEST(config_display_newline_before_prompt_bound) {
                 "re-enabling should write through too");
 }
 
+TEST(config_show_lists_migrated_lle_section) {
+    config_init();
+
+    /// The lle.* keys migrated off the legacy config_options[] table into the
+    /// registry "lle" section. `config show` must still enumerate them through
+    /// the registry, or the migration silently drops them from discovery.
+    /// Capture the section output and assert the registry-backed keys appear.
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0, "pipe should succeed");
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    dup2(pipefd[1], STDOUT_FILENO);
+    close(pipefd[1]);
+
+    config_show_section(CONFIG_SECTION_LLE);
+    fflush(stdout);
+
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+
+    char buf[4096];
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    close(pipefd[0]);
+    ASSERT_TRUE(n > 0, "config show should produce output for the lle section");
+    buf[n > 0 ? n : 0] = '\0';
+
+    ASSERT_TRUE(strstr(buf, "dedup_scope") != NULL,
+                "config show lle should list the dedup_scope key");
+    ASSERT_TRUE(strstr(buf, "arrow_key_mode") != NULL,
+                "config show lle should list the arrow_key_mode key");
+    ASSERT_TRUE(strstr(buf, "cache_size") != NULL,
+                "config show lle should list the cache_size key");
+    ASSERT_TRUE(strstr(buf, "history_file") != NULL,
+                "config show lle should list the history_file key");
+}
+
 TEST(config_get_bool_default) {
     config_init();
 
@@ -784,6 +820,7 @@ int main(void) {
     RUN_TEST(config_set_get_int);
     RUN_TEST(config_set_get_string);
     RUN_TEST(config_display_newline_before_prompt_bound);
+    RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
     RUN_TEST(config_get_string_default);

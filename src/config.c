@@ -91,39 +91,9 @@ typedef struct config_option {
 /// ENUM MAPPING DEFINITIONS
 /// ============================================================================
 
-/// LLE Arrow Key Mode mappings
-static const config_enum_mapping_t lle_arrow_mode_mappings[] = {
-    {  "context-aware",   LLE_ARROW_MODE_CONTEXT_AWARE},
-    {        "classic",         LLE_ARROW_MODE_CLASSIC},
-    { "always-history",  LLE_ARROW_MODE_ALWAYS_HISTORY},
-    {"multiline-first", LLE_ARROW_MODE_MULTILINE_FIRST},
-    {             NULL,                              0}  /// Sentinel
-};
-static const config_enum_def_t lle_arrow_mode_enum = {
-    lle_arrow_mode_mappings, LLE_ARROW_MODE_CONTEXT_AWARE};
-
-/// LLE Dedup Scope mappings
-static const config_enum_mapping_t lle_dedup_scope_mappings[] = {
-    {   "none",    LLE_DEDUP_SCOPE_NONE},
-    {"session", LLE_DEDUP_SCOPE_SESSION},
-    { "recent",  LLE_DEDUP_SCOPE_RECENT},
-    { "global",  LLE_DEDUP_SCOPE_GLOBAL},
-    {     NULL,                       0}  /// Sentinel
-};
-static const config_enum_def_t lle_dedup_scope_enum = {lle_dedup_scope_mappings,
-                                                       LLE_DEDUP_SCOPE_SESSION};
-
-/// LLE Dedup Strategy mappings
-static const config_enum_mapping_t lle_dedup_strategy_mappings[] = {
-    {       "ignore",        LLE_DEDUP_STRATEGY_IGNORE},
-    {  "keep-recent",   LLE_DEDUP_STRATEGY_KEEP_RECENT},
-    {"keep-frequent", LLE_DEDUP_STRATEGY_KEEP_FREQUENT},
-    {        "merge",         LLE_DEDUP_STRATEGY_MERGE},
-    {     "keep-all",      LLE_DEDUP_STRATEGY_KEEP_ALL},
-    {           NULL,                                0}  /// Sentinel
-};
-static const config_enum_def_t lle_dedup_strategy_enum = {
-    lle_dedup_strategy_mappings, LLE_DEDUP_STRATEGY_KEEP_RECENT};
+/// The LLE arrow-mode and dedup scope/strategy enum string<->int maps moved to
+/// creg_enum_pair_t tables next to lle_bind_runtime when the section migrated
+/// to registry bindings.
 
 /// Shell Mode mappings (Extended Language Support)
 static const config_enum_mapping_t shell_mode_mappings[] = {
@@ -163,52 +133,21 @@ static config_option_t config_options[] = {
     /// longer in this legacy table -- which is what lets an interactive
     /// `config set` land in the SESSION layer and survive a mode switch.
 
-    /// LLE History Configuration
-    {            "lle.arrow_key_mode",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
-     &config.lle_arrow_key_mode,"Arrow key behavior mode",
-     config_validate_lle_arrow_mode,&lle_arrow_mode_enum                                                                                                          },
-    {              "lle.history_file", CONFIG_TYPE_STRING,    CONFIG_SECTION_HISTORY,
-     &config.lle_history_file,                     "LLE history file path",          config_validate_string,
-     NULL                                                                                                                          },
-    {  "lle.enable_forensic_tracking",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_enable_forensic_tracking,
-     "Track metadata (timestamps, exit codes, cwd)",            config_validate_bool,
-     NULL                                                                                                                          },
-    {      "lle.enable_deduplication",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_enable_deduplication,              "Enable history deduplication",
-     config_validate_bool,                     NULL                                                                                },
-    {               "lle.dedup_scope",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
-     &config.lle_dedup_scope,                       "Deduplication scope",
-     config_validate_lle_dedup_scope,    &lle_dedup_scope_enum                                                                     },
-    {            "lle.dedup_strategy",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
-     &config.lle_dedup_strategy,                    "Deduplication strategy",
-     config_validate_lle_dedup_strategy, &lle_dedup_strategy_enum                                                                  },
-    {          "lle.dedup_navigation",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_dedup_navigation, "Skip duplicates during history navigation",
-     config_validate_bool,                     NULL                                                                                },
-    {   "lle.dedup_navigation_unique",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_dedup_navigation_unique,
-     "Show only unique entries during navigation session",            config_validate_bool,
-     NULL                                                                                                                          },
-    {   "lle.dedup_unicode_normalize",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_dedup_unicode_normalize,
-     "Use Unicode NFC normalization for dedup comparison",            config_validate_bool,
-     NULL                                                                                                                          },
-    {      "lle.enable_history_cache",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_enable_history_cache,    "Enable history caching for performance",
-     config_validate_bool,                     NULL                                                                                },
-    {                "lle.cache_size",    CONFIG_TYPE_INT,    CONFIG_SECTION_HISTORY,
-     &config.lle_cache_size,                        "History cache size",             config_validate_int,                     NULL},
+    /// LLE history/editor configuration (lle.*) is migrated to the CREG
+    /// registry: bound to its runtime cells via lle_bind_runtime and layered
+    /// (default/mode/user/session). The config builtin reaches these keys
+    /// through the registry fallback, so they are no longer in this legacy
+    /// table.
 
     /// Completion settings
     /// completion.{enabled,match_mode,threshold,case_sensitive} are migrated to
     /// the CREG registry (bound + layered); they resolve through the registry,
     /// not this legacy table. (show_all and hints remain legacy-only.)
     {           "completion.show_all",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.completion_show_all,                      "Show all completions",            config_validate_bool,
-     NULL                                                                                                                          },
+     &config.completion_show_all,"Show all completions",config_validate_bool,
+     NULL                                                                                                           },
     {              "completion.hints",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.hints_enabled,                        "Enable input hints",            config_validate_bool,                     NULL },
+     &config.hints_enabled,                  "Enable input hints",            config_validate_bool,             NULL},
 
     /// Behavior settings
     /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
@@ -221,17 +160,17 @@ static config_option_t config_options[] = {
 
     /// Network settings
     {        "network.ssh_completion",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.ssh_completion_enabled,                "Enable SSH host completion",
-     config_validate_bool,                     NULL                                                                                },
+     &config.ssh_completion_enabled,          "Enable SSH host completion",
+     config_validate_bool,             NULL                                                                         },
     {       "network.cache_ssh_hosts",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.cache_ssh_hosts,           "Cache SSH hosts for performance",
-     config_validate_bool,                     NULL                                                                                },
+     &config.cache_ssh_hosts,     "Cache SSH hosts for performance",
+     config_validate_bool,             NULL                                                                         },
     { "network.cache_timeout_minutes",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
-     &config.cache_timeout_minutes,         "SSH host cache timeout in minutes",
-     config_validate_int,                     NULL                                                                                 },
+     &config.cache_timeout_minutes,   "SSH host cache timeout in minutes",
+     config_validate_int,             NULL                                                                          },
     {  "network.max_completion_hosts",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
-     &config.max_completion_hosts,       "Maximum hosts to show in completion",
-     config_validate_int,                     NULL                                                                                 },
+     &config.max_completion_hosts, "Maximum hosts to show in completion",
+     config_validate_int,             NULL                                                                          },
 
     /// Display system settings
     /// v1.3.0: Layered display is now the exclusive system - no configuration
@@ -244,11 +183,11 @@ static config_option_t config_options[] = {
     /// legacy-only for now.
     {"display.performance_monitoring",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
      &config.display_performance_monitoring,
-     "Enable display performance monitoring",            config_validate_bool,                     NULL                            },
+     "Enable display performance monitoring",            config_validate_bool,             NULL                     },
     {       "display.ambiguous_width", CONFIG_TYPE_STRING,    CONFIG_SECTION_DISPLAY,
      &config.display_ambiguous_width,
      "East Asian Ambiguous-class display width: \"narrow\" (default) or "
-     "\"wide\"", config_validate_ambiguous_width,                     NULL                                                         },
+     "\"wide\"", config_validate_ambiguous_width,             NULL                                                  },
 
     /// Autosuggestion settings
     /// autosuggestion.* is migrated to the CREG registry (bound + layered); its
@@ -259,70 +198,70 @@ static config_option_t config_options[] = {
 
     /// Script execution control
     {             "scripts.execution",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
-     &config.script_execution,                   "Enable script execution",            config_validate_bool,
-     NULL                                                                                                                          },
+     &config.script_execution,             "Enable script execution",            config_validate_bool,
+     NULL                                                                                                           },
 
     /// Shell options integration - all 24 POSIX options with shell.* namespace
     /// These map directly to existing shell_opts flags for perfect
     /// compatibility
     {                 "shell.errexit",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit on command failure (set -e)",    config_validate_shell_option,                     NULL                                 },
+     "Exit on command failure (set -e)",    config_validate_shell_option,             NULL                          },
     {                  "shell.xtrace",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Trace command execution (set -x)",    config_validate_shell_option,                     NULL                                 },
+     "Trace command execution (set -x)",    config_validate_shell_option,             NULL                          },
     {                  "shell.noexec",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Syntax check only (set -n)",    config_validate_shell_option,                     NULL                                       },
+     "Syntax check only (set -n)",    config_validate_shell_option,             NULL                                },
     {                 "shell.nounset",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Error on unset variables (set -u)",    config_validate_shell_option,                     NULL                                },
+     "Error on unset variables (set -u)",    config_validate_shell_option,             NULL                         },
     {                 "shell.verbose",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Print input lines (set -v)",    config_validate_shell_option,                     NULL                                       },
+     "Print input lines (set -v)",    config_validate_shell_option,             NULL                                },
     {                  "shell.noglob",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Disable pathname expansion (set -f)",    config_validate_shell_option,                     NULL                              },
+     "Disable pathname expansion (set -f)",    config_validate_shell_option,             NULL                       },
     {                 "shell.hashall",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Command hashing (set -h)",    config_validate_shell_option,                     NULL                                         },
+     "Command hashing (set -h)",    config_validate_shell_option,             NULL                                  },
     {                 "shell.monitor",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Job control (set -m)",    config_validate_shell_option,                     NULL                                             },
+     "Job control (set -m)",    config_validate_shell_option,             NULL                                      },
     {               "shell.allexport",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Auto export variables (set -a)",    config_validate_shell_option,                     NULL                                   },
+     "Auto export variables (set -a)",    config_validate_shell_option,             NULL                            },
     {               "shell.noclobber",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent file overwrite (set -C)",    config_validate_shell_option,                     NULL                                  },
+     "Prevent file overwrite (set -C)",    config_validate_shell_option,             NULL                           },
     {                  "shell.onecmd",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit after one command (set -t)",    config_validate_shell_option,                     NULL                                  },
+     "Exit after one command (set -t)",    config_validate_shell_option,             NULL                           },
     {                  "shell.notify",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Async job notification (set -b)",    config_validate_shell_option,                     NULL                                  },
+     "Async job notification (set -b)",    config_validate_shell_option,             NULL                           },
     {               "shell.ignoreeof",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Prevent exit on EOF (set -o ignoreeof)",    config_validate_shell_option,
-     NULL                                                                                                                          },
+     NULL                                                                                                           },
     {                   "shell.nolog",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent function history logging (set -o nolog)",    config_validate_shell_option,                     NULL                  },
+     "Prevent function history logging (set -o nolog)",    config_validate_shell_option,             NULL           },
     {                   "shell.emacs",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Emacs-style editing (set -o emacs)",    config_validate_shell_option,                     NULL                               },
+     "Emacs-style editing (set -o emacs)",    config_validate_shell_option,             NULL                        },
     {                      "shell.vi",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Vi-style editing (set -o vi)",    config_validate_shell_option,                     NULL                                     },
+     "Vi-style editing (set -o vi)",    config_validate_shell_option,             NULL                              },
     {                   "shell.posix",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Strict POSIX compliance (set -o posix)",    config_validate_shell_option,
-     NULL                                                                                                                          },
+     NULL                                                                                                           },
     {                "shell.pipefail",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Pipeline failure detection (set -o pipefail)",    config_validate_shell_option,                     NULL                     },
+     "Pipeline failure detection (set -o pipefail)",    config_validate_shell_option,             NULL              },
     {              "shell.histexpand",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "History expansion (set -o histexpand)",    config_validate_shell_option,
-     NULL                                                                                                                          },
+     NULL                                                                                                           },
     {                 "shell.history",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Command history recording (set -o history)",    config_validate_shell_option,
-     NULL                                                                                                                          },
+     NULL                                                                                                           },
     {    "shell.interactive-comments",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Interactive comments (set -o interactive-comments)",    config_validate_shell_option,                     NULL               },
+     "Interactive comments (set -o interactive-comments)",    config_validate_shell_option,             NULL        },
     {                "shell.physical",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Physical directory paths (set -o physical)",    config_validate_shell_option,
-     NULL                                                                                                                          },
+     NULL                                                                                                           },
     {              "shell.privileged",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Restricted shell security (set -o privileged)",    config_validate_shell_option,                     NULL                    },
+     "Restricted shell security (set -o privileged)",    config_validate_shell_option,             NULL             },
 
     /// Shell mode settings (Extended Language Support)
     {                    "shell.mode",   CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
-     "Shell compatibility mode (posix, bash, zsh, lush)",      config_validate_shell_mode,         &shell_mode_enum                },
+     "Shell compatibility mode (posix, bash, zsh, lush)",      config_validate_shell_mode, &shell_mode_enum         },
     {             "shell.mode_strict",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
-     &config.shell_mode_strict,             "Disallow runtime mode changes",
-     config_validate_bool,                     NULL                                                                                },
+     &config.shell_mode_strict,       "Disallow runtime mode changes",
+     config_validate_bool,             NULL                                                                         },
 };
 
 static const int num_config_options =
@@ -347,8 +286,7 @@ static void display_bind_runtime(void);
 static void completion_bind_runtime(void);
 static void behavior_bind_runtime(void);
 static void autosuggestion_bind_runtime(void);
-static void lle_sync_to_runtime(void);
-static void lle_sync_from_runtime(void);
+static void lle_bind_runtime(void);
 
 /* ----------------------------------------------------------------------------
  * History Section Options
@@ -627,24 +565,40 @@ static const creg_section_t behavior_section = {
  * settings round-trip through lushrc.toml.
  * -------------------------------------------------------------------------- */
 static const creg_option_t lle_options[] = {
-    {   "enable_deduplication",
-     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+    {    "enable_deduplication",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Deduplicate history entries", true                                           },
-    {            "dedup_scope",
-     CREG_VALUE_STRING,     {.type = CREG_VALUE_STRING, .data.string = "session"},
+    {             "dedup_scope",
+     CREG_VALUE_STRING,       {.type = CREG_VALUE_STRING, .data.string = "session"},
      "Dedup scope: none, session, recent, or global", true                         },
-    {         "dedup_strategy",
-     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "keep-recent"},
+    {          "dedup_strategy",
+     CREG_VALUE_STRING,   {.type = CREG_VALUE_STRING, .data.string = "keep-recent"},
      "Dedup strategy: ignore, keep-recent, keep-frequent, merge, or keep-all", true},
-    {       "dedup_navigation",
-     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+    {        "dedup_navigation",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Skip duplicates while navigating history", true                              },
-    {"dedup_navigation_unique",
-     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+    { "dedup_navigation_unique",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Show only unique entries during navigation", true                            },
-    {"dedup_unicode_normalize",
-     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+    { "dedup_unicode_normalize",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Apply Unicode NFC normalization before comparing entries", true              },
+    {          "arrow_key_mode",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "context-aware"},
+     "Arrow key behavior: context-aware, classic, always-history, or "
+     "multiline-first", true                                                       },
+    {            "history_file",
+     CREG_VALUE_STRING,              {.type = CREG_VALUE_STRING, .data.string = ""},
+     "History file path (empty uses the default ~/.lush_history)", true            },
+    {"enable_forensic_tracking",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Track metadata (timestamps, exit codes, cwd) with history entries", true     },
+    {    "enable_history_cache",
+     CREG_VALUE_BOOLEAN,          {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Cache history for faster lookups", true                                      },
+    {              "cache_size",
+     CREG_VALUE_INTEGER,           {.type = CREG_VALUE_INTEGER, .data.integer = 100},
+     "History cache size", true                                                    },
 };
 
 static const creg_section_t lle_section = {
@@ -653,8 +607,9 @@ static const creg_section_t lle_section = {
     .option_count = sizeof(lle_options) / sizeof(creg_option_t),
     .on_load = NULL,
     .on_save = NULL,
-    .sync_to_runtime = lle_sync_to_runtime,
-    .sync_from_runtime = lle_sync_from_runtime,
+    /// Bound (lle_bind_runtime); no sync hooks.
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
 };
 
 /* ----------------------------------------------------------------------------
@@ -859,80 +814,62 @@ static void behavior_bind_runtime(void) {
                                  &config.autocorrect_case_sensitive);
 }
 
-/// @brief Sync LLE history-dedup config from registry to runtime
-static void lle_sync_to_runtime(void) {
-    bool bval;
-    char sval[CREG_VALUE_STRING_MAX];
+/// lle.* enum-as-string mappings (registry string <-> engine enum), applied by
+/// the bindings on change. Replace the deleted lle_sync_*'s strcmp ladders and
+/// the legacy config_enum_def_t/config_enum_mapping_t tables.
+static const creg_enum_pair_t lle_arrow_mode_pairs[] = {
+    {  "context-aware",   LLE_ARROW_MODE_CONTEXT_AWARE},
+    {        "classic",         LLE_ARROW_MODE_CLASSIC},
+    { "always-history",  LLE_ARROW_MODE_ALWAYS_HISTORY},
+    {"multiline-first", LLE_ARROW_MODE_MULTILINE_FIRST},
+    {             NULL,                              0},
+};
+static const creg_enum_pair_t lle_dedup_scope_pairs[] = {
+    {   "none",    LLE_DEDUP_SCOPE_NONE},
+    {"session", LLE_DEDUP_SCOPE_SESSION},
+    { "recent",  LLE_DEDUP_SCOPE_RECENT},
+    { "global",  LLE_DEDUP_SCOPE_GLOBAL},
+    {     NULL,                       0},
+};
+static const creg_enum_pair_t lle_dedup_strategy_pairs[] = {
+    {       "ignore",        LLE_DEDUP_STRATEGY_IGNORE},
+    {  "keep-recent",   LLE_DEDUP_STRATEGY_KEEP_RECENT},
+    {"keep-frequent", LLE_DEDUP_STRATEGY_KEEP_FREQUENT},
+    {        "merge",         LLE_DEDUP_STRATEGY_MERGE},
+    {     "keep-all",      LLE_DEDUP_STRATEGY_KEEP_ALL},
+    {           NULL,                                0},
+};
 
-    if (config_registry_get_boolean("lle.enable_deduplication", &bval) ==
-        CREG_SUCCESS) {
-        config.lle_enable_deduplication = bval;
-    }
-    if (config_registry_get_string("lle.dedup_scope", sval, sizeof(sval)) ==
-        CREG_SUCCESS) {
-        for (const config_enum_mapping_t *m = lle_dedup_scope_mappings; m->name;
-             m++) {
-            if (strcmp(m->name, sval) == 0) {
-                config.lle_dedup_scope = (lle_dedup_scope_t)m->value;
-                break;
-            }
-        }
-    }
-    if (config_registry_get_string("lle.dedup_strategy", sval, sizeof(sval)) ==
-        CREG_SUCCESS) {
-        for (const config_enum_mapping_t *m = lle_dedup_strategy_mappings;
-             m->name; m++) {
-            if (strcmp(m->name, sval) == 0) {
-                config.lle_dedup_strategy = (lle_dedup_strategy_t)m->value;
-                break;
-            }
-        }
-    }
-    if (config_registry_get_boolean("lle.dedup_navigation", &bval) ==
-        CREG_SUCCESS) {
-        config.lle_dedup_navigation = bval;
-    }
-    if (config_registry_get_boolean("lle.dedup_navigation_unique", &bval) ==
-        CREG_SUCCESS) {
-        config.lle_dedup_navigation_unique = bval;
-    }
-    if (config_registry_get_boolean("lle.dedup_unicode_normalize", &bval) ==
-        CREG_SUCCESS) {
-        config.lle_dedup_unicode_normalize = bval;
-    }
-}
-
-/// @brief Sync LLE history-dedup config from runtime to registry
-static void lle_sync_from_runtime(void) {
-    config_registry_set_boolean("lle.enable_deduplication",
-                                config.lle_enable_deduplication);
-
-    const char *scope_name = "session";
-    for (const config_enum_mapping_t *m = lle_dedup_scope_mappings; m->name;
-         m++) {
-        if (m->value == (int)config.lle_dedup_scope) {
-            scope_name = m->name;
-            break;
-        }
-    }
-    config_registry_set_string("lle.dedup_scope", scope_name);
-
-    const char *strategy_name = "keep-recent";
-    for (const config_enum_mapping_t *m = lle_dedup_strategy_mappings; m->name;
-         m++) {
-        if (m->value == (int)config.lle_dedup_strategy) {
-            strategy_name = m->name;
-            break;
-        }
-    }
-    config_registry_set_string("lle.dedup_strategy", strategy_name);
-
-    config_registry_set_boolean("lle.dedup_navigation",
-                                config.lle_dedup_navigation);
-    config_registry_set_boolean("lle.dedup_navigation_unique",
-                                config.lle_dedup_navigation_unique);
-    config_registry_set_boolean("lle.dedup_unicode_normalize",
-                                config.lle_dedup_unicode_normalize);
+/// @brief Bind the lle.* keys to their runtime cells (the keystone).
+///
+/// Replaces lle_sync_to_runtime and lle_sync_from_runtime. After this runs the
+/// registry write-throughs config.lle_* on every change from any surface;
+/// history_file uses the owned-pointer binding (the field is a char *, NULL
+/// when unset).
+static void lle_bind_runtime(void) {
+    config_registry_bind_boolean("lle.enable_deduplication",
+                                 &config.lle_enable_deduplication);
+    config_registry_bind_enum("lle.dedup_scope", (int *)&config.lle_dedup_scope,
+                              lle_dedup_scope_pairs, LLE_DEDUP_SCOPE_SESSION);
+    config_registry_bind_enum(
+        "lle.dedup_strategy", (int *)&config.lle_dedup_strategy,
+        lle_dedup_strategy_pairs, LLE_DEDUP_STRATEGY_KEEP_RECENT);
+    config_registry_bind_boolean("lle.dedup_navigation",
+                                 &config.lle_dedup_navigation);
+    config_registry_bind_boolean("lle.dedup_navigation_unique",
+                                 &config.lle_dedup_navigation_unique);
+    config_registry_bind_boolean("lle.dedup_unicode_normalize",
+                                 &config.lle_dedup_unicode_normalize);
+    config_registry_bind_enum(
+        "lle.arrow_key_mode", (int *)&config.lle_arrow_key_mode,
+        lle_arrow_mode_pairs, LLE_ARROW_MODE_CONTEXT_AWARE);
+    config_registry_bind_string_ptr("lle.history_file",
+                                    &config.lle_history_file);
+    config_registry_bind_boolean("lle.enable_forensic_tracking",
+                                 &config.lle_enable_forensic_tracking);
+    config_registry_bind_boolean("lle.enable_history_cache",
+                                 &config.lle_enable_history_cache);
+    config_registry_bind_integer("lle.cache_size", &config.lle_cache_size);
 }
 
 /// autosuggestion.* enum-as-string mappings (registry string <-> engine enum),
@@ -1007,6 +944,7 @@ static void config_register_sections(void) {
     completion_bind_runtime();
     behavior_bind_runtime();
     display_bind_runtime();
+    lle_bind_runtime();
 }
 
 /**
@@ -2270,6 +2208,10 @@ void config_set_defaults(void) {
 
     /// LLE History defaults
     config.lle_arrow_key_mode = LLE_ARROW_MODE_CONTEXT_AWARE;
+    /// lle.history_file is owned by its string-pointer binding; release any
+    /// prior value before re-defaulting so a re-init (config reload) does not
+    /// orphan it. free(NULL) is safe on first init.
+    free(config.lle_history_file);
     config.lle_history_file = NULL; /// Will default to ~/.lush_history
     config.lle_enable_forensic_tracking = true;
     config.lle_enable_deduplication = true;
@@ -3611,6 +3553,12 @@ int config_set_string(const char *key, const char *value) {
             return 0;
         }
     }
+    /// Not in the legacy table: route to the registry, where migrated keys
+    /// (e.g. lle.history_file) live. An empty value clears to "unset".
+    if (config_registry_is_initialized() &&
+        config_registry_set_string(key, value ? value : "") == CREG_SUCCESS) {
+        return 0;
+    }
     return -1; /// Key not found
 }
 
@@ -3679,6 +3627,15 @@ const char *config_get_string(const char *key, const char *default_value) {
                 return value ? value : default_value;
             }
             break;
+        }
+    }
+    /// Registry fallback for migrated string keys. The returned pointer is
+    /// borrowed and valid until the next config_get_string call; an empty
+    /// (unset) value falls through to the caller's default.
+    if (config_registry_is_initialized()) {
+        static char buf[CREG_VALUE_STRING_MAX];
+        if (config_registry_get_string(key, buf, sizeof(buf)) == CREG_SUCCESS) {
+            return buf[0] != '\0' ? buf : default_value;
         }
     }
     return default_value;
@@ -3807,6 +3764,8 @@ void builtin_config(int argc, char **argv) {
             config_section_t section = CONFIG_SECTION_NONE;
             if (strcmp(argv[2], "history") == 0) {
                 section = CONFIG_SECTION_HISTORY;
+            } else if (strcmp(argv[2], "lle") == 0) {
+                section = CONFIG_SECTION_LLE;
             } else if (strcmp(argv[2], "completion") == 0) {
                 section = CONFIG_SECTION_COMPLETION;
             } else if (strcmp(argv[2], "behavior") == 0) {
@@ -4329,6 +4288,9 @@ void config_show_all(void) {
     printf("[history]\n");
     config_show_section(CONFIG_SECTION_HISTORY);
 
+    printf("\n[lle]\n");
+    config_show_section(CONFIG_SECTION_LLE);
+
     printf("\n[completion]\n");
     config_show_section(CONFIG_SECTION_COMPLETION);
 
@@ -4374,6 +4336,8 @@ static const char *registry_section_for(config_section_t section) {
         return "behavior";
     case CONFIG_SECTION_AUTOSUGGESTION:
         return "autosuggestion";
+    case CONFIG_SECTION_LLE:
+        return "lle";
     default:
         return NULL;
     }
@@ -4487,6 +4451,13 @@ void config_show_section(config_section_t section) {
 void config_cleanup(void) {
     /// Clean up config registry
     config_registry_cleanup();
+
+    /// lle.history_file is owned by its string-pointer binding (strdup on
+    /// change); release the final value.
+    if (config.lle_history_file) {
+        free(config.lle_history_file);
+        config.lle_history_file = NULL;
+    }
 
     if (config_ctx.user_config_path) {
         free(config_ctx.user_config_path);
