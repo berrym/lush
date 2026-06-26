@@ -98,8 +98,9 @@ typedef struct {
 typedef enum {
     CREG_BIND_BOOL,
     CREG_BIND_INT,
-    CREG_BIND_STRING,
-    CREG_BIND_ENUM_INT ///< registry string mapped onto an engine enum (int)
+    CREG_BIND_STRING,     ///< fixed-size char buffer (cell_size bytes)
+    CREG_BIND_STRING_PTR, ///< owned `char *` cell (registry frees/copies)
+    CREG_BIND_ENUM_INT    ///< registry string mapped onto an engine enum (int)
 } creg_bind_kind_t;
 
 /**
@@ -319,6 +320,16 @@ static void apply_binding(const binding_t *b, const creg_value_t *v) {
     case CREG_BIND_STRING:
         if (v->type == CREG_VALUE_STRING && b->cell && b->cell_size > 0) {
             snprintf((char *)b->cell, b->cell_size, "%s", v->data.string);
+        }
+        break;
+    case CREG_BIND_STRING_PTR:
+        if (v->type == CREG_VALUE_STRING) {
+            char **pp = (char **)b->cell;
+            char *prev = *pp;
+            /// Empty string == unset: leave the cell NULL so the engine falls
+            /// back to its own default rather than to a literal "".
+            *pp = (v->data.string[0] != '\0') ? strdup(v->data.string) : NULL;
+            free(prev);
         }
         break;
     case CREG_BIND_ENUM_INT:
@@ -649,6 +660,10 @@ creg_result_t config_registry_bind_integer(const char *key, int *cell) {
 creg_result_t config_registry_bind_string(const char *key, char *cell,
                                           size_t cell_size) {
     return add_binding(key, CREG_BIND_STRING, cell, cell_size, NULL, 0);
+}
+
+creg_result_t config_registry_bind_string_ptr(const char *key, char **cell) {
+    return add_binding(key, CREG_BIND_STRING_PTR, cell, 0, NULL, 0);
 }
 
 creg_result_t config_registry_bind_enum(const char *key, int *cell,

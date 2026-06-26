@@ -408,6 +408,16 @@ creg_result_t config_registry_bind_string(const char *key, char *cell,
                                           size_t cell_size);
 
 /**
+ * @brief Bind a string key to an owned `char *` runtime cell.
+ *
+ * For runtime fields that hold a heap-allocated string pointer rather than a
+ * fixed buffer. The registry owns the pointed-to memory: on each change it
+ * frees the previous string and stores a fresh copy. An empty registry value
+ * maps to a NULL cell, so "unset" round-trips as the engine's own default.
+ */
+creg_result_t config_registry_bind_string_ptr(const char *key, char **cell);
+
+/**
  * @brief Bind an enum-as-string key to a runtime int (enum) cell.
  *
  * The registry stores the value as a string; on each change the matching
