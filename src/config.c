@@ -166,43 +166,43 @@ static config_option_t config_options[] = {
     /// LLE History Configuration
     {            "lle.arrow_key_mode",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
      &config.lle_arrow_key_mode,"Arrow key behavior mode",
-     config_validate_lle_arrow_mode,&lle_arrow_mode_enum                                                                                                           },
+     config_validate_lle_arrow_mode,&lle_arrow_mode_enum                                                                                                          },
     {  "lle.enable_multiline_editing",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_enable_multiline_editing,
      "Enable editing of recalled multiline commands",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {              "lle.history_file", CONFIG_TYPE_STRING,    CONFIG_SECTION_HISTORY,
      &config.lle_history_file,                     "LLE history file path",          config_validate_string,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {  "lle.enable_forensic_tracking",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_enable_forensic_tracking,
      "Track metadata (timestamps, exit codes, cwd)",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {      "lle.enable_deduplication",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_enable_deduplication,              "Enable history deduplication",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
     {               "lle.dedup_scope",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
      &config.lle_dedup_scope,                       "Deduplication scope",
-     config_validate_lle_dedup_scope,    &lle_dedup_scope_enum                                                                      },
+     config_validate_lle_dedup_scope,    &lle_dedup_scope_enum                                                                     },
     {            "lle.dedup_strategy",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
      &config.lle_dedup_strategy,                    "Deduplication strategy",
-     config_validate_lle_dedup_strategy, &lle_dedup_strategy_enum                                                                   },
+     config_validate_lle_dedup_strategy, &lle_dedup_strategy_enum                                                                  },
     {          "lle.dedup_navigation",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_dedup_navigation, "Skip duplicates during history navigation",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
     {   "lle.dedup_navigation_unique",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_dedup_navigation_unique,
      "Show only unique entries during navigation session",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {   "lle.dedup_unicode_normalize",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_dedup_unicode_normalize,
      "Use Unicode NFC normalization for dedup comparison",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {      "lle.enable_history_cache",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
      &config.lle_enable_history_cache,    "Enable history caching for performance",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
     {                "lle.cache_size",    CONFIG_TYPE_INT,    CONFIG_SECTION_HISTORY,
-     &config.lle_cache_size,                        "History cache size",             config_validate_int,                     NULL },
+     &config.lle_cache_size,                        "History cache size",             config_validate_int,                     NULL},
 
     /// Completion settings
     /// completion.{enabled,match_mode,threshold,case_sensitive} are migrated to
@@ -210,9 +210,9 @@ static config_option_t config_options[] = {
     /// not this legacy table. (show_all and hints remain legacy-only.)
     {           "completion.show_all",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
      &config.completion_show_all,                      "Show all completions",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {              "completion.hints",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.hints_enabled,                        "Enable input hints",            config_validate_bool,                     NULL  },
+     &config.hints_enabled,                        "Enable input hints",            config_validate_bool,                     NULL },
 
     /// Behavior settings
     /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
@@ -226,54 +226,33 @@ static config_option_t config_options[] = {
     /// Network settings
     {        "network.ssh_completion",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.ssh_completion_enabled,                "Enable SSH host completion",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
     {       "network.cache_ssh_hosts",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.cache_ssh_hosts,           "Cache SSH hosts for performance",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
     { "network.cache_timeout_minutes",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.cache_timeout_minutes,         "SSH host cache timeout in minutes",
-     config_validate_int,                     NULL                                                                                  },
+     config_validate_int,                     NULL                                                                                 },
     {  "network.max_completion_hosts",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.max_completion_hosts,       "Maximum hosts to show in completion",
-     config_validate_int,                     NULL                                                                                  },
+     config_validate_int,                     NULL                                                                                 },
 
     /// Display system settings
     /// v1.3.0: Layered display is now the exclusive system - no configuration
     /// needed
     /// display.system_mode and display.layered_display options removed
-    {   "display.syntax_highlighting",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_syntax_highlighting,                "Enable syntax highlighting",
-     config_validate_bool,                     NULL                                                                                 },
-    {       "display.autosuggestions",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_autosuggestions,         "Enable Fish-style autosuggestions",
-     config_validate_bool,                     NULL                                                                                 },
-    {      "display.transient_prompt",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_transient_prompt,
-     "Enable transient prompts (simplify previous prompts in scrollback)",            config_validate_bool,                     NULL},
-    {      "display.theme_hot_reload",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_theme_hot_reload,
-     "Auto-reload theme when its file changes on disk",            config_validate_bool,
-     NULL                                                                                                                           },
+    /// display.{syntax_highlighting,autosuggestions,transient_prompt,
+    /// theme_hot_reload,optimization_level,lle.pager.*} are migrated to the
+    /// CREG registry (bound + layered); they resolve through the registry, not
+    /// this legacy table. performance_monitoring and ambiguous_width remain
+    /// legacy-only for now.
     {"display.performance_monitoring",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
      &config.display_performance_monitoring,
-     "Enable display performance monitoring",            config_validate_bool,                     NULL                             },
-    {    "display.optimization_level",    CONFIG_TYPE_INT,    CONFIG_SECTION_DISPLAY,
-     &config.display_optimization_level,          "Display optimization level (0-4)",
-     config_validate_optimization_level,                     NULL                                                                   },
+     "Enable display performance monitoring",            config_validate_bool,                     NULL                            },
     {       "display.ambiguous_width", CONFIG_TYPE_STRING,    CONFIG_SECTION_DISPLAY,
      &config.display_ambiguous_width,
      "East Asian Ambiguous-class display width: \"narrow\" (default) or "
-     "\"wide\"", config_validate_ambiguous_width,                     NULL                                                          },
-    {     "display.lle.pager.enabled",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_lle_pager_enabled,
-     "Master switch for the LLE pager (lle_pager_present)",            config_validate_bool,                     NULL               },
-    {   "display.lle.pager.min_lines",    CONFIG_TYPE_INT,    CONFIG_SECTION_DISPLAY,
-     &config.display_lle_pager_min_lines,
-     "Pager threshold in visual rows (0 = use terminal rows)",             config_validate_int,                     NULL            },
-    { "display.lle.pager.wrap_search",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_lle_pager_wrap_search,
-     "Wrap pager search to top on no-match (less-style)",            config_validate_bool,
-     NULL                                                                                                                           },
+     "\"wide\"", config_validate_ambiguous_width,                     NULL                                                         },
 
     /// Autosuggestion settings
     /// autosuggestion.* is migrated to the CREG registry (bound + layered); its
@@ -285,69 +264,69 @@ static config_option_t config_options[] = {
     /// Script execution control
     {             "scripts.execution",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
      &config.script_execution,                   "Enable script execution",            config_validate_bool,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
 
     /// Shell options integration - all 24 POSIX options with shell.* namespace
     /// These map directly to existing shell_opts flags for perfect
     /// compatibility
     {                 "shell.errexit",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit on command failure (set -e)",    config_validate_shell_option,                     NULL                                  },
+     "Exit on command failure (set -e)",    config_validate_shell_option,                     NULL                                 },
     {                  "shell.xtrace",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Trace command execution (set -x)",    config_validate_shell_option,                     NULL                                  },
+     "Trace command execution (set -x)",    config_validate_shell_option,                     NULL                                 },
     {                  "shell.noexec",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Syntax check only (set -n)",    config_validate_shell_option,                     NULL                                        },
+     "Syntax check only (set -n)",    config_validate_shell_option,                     NULL                                       },
     {                 "shell.nounset",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Error on unset variables (set -u)",    config_validate_shell_option,                     NULL                                 },
+     "Error on unset variables (set -u)",    config_validate_shell_option,                     NULL                                },
     {                 "shell.verbose",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Print input lines (set -v)",    config_validate_shell_option,                     NULL                                        },
+     "Print input lines (set -v)",    config_validate_shell_option,                     NULL                                       },
     {                  "shell.noglob",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Disable pathname expansion (set -f)",    config_validate_shell_option,                     NULL                               },
+     "Disable pathname expansion (set -f)",    config_validate_shell_option,                     NULL                              },
     {                 "shell.hashall",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Command hashing (set -h)",    config_validate_shell_option,                     NULL                                          },
+     "Command hashing (set -h)",    config_validate_shell_option,                     NULL                                         },
     {                 "shell.monitor",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Job control (set -m)",    config_validate_shell_option,                     NULL                                              },
+     "Job control (set -m)",    config_validate_shell_option,                     NULL                                             },
     {               "shell.allexport",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Auto export variables (set -a)",    config_validate_shell_option,                     NULL                                    },
+     "Auto export variables (set -a)",    config_validate_shell_option,                     NULL                                   },
     {               "shell.noclobber",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent file overwrite (set -C)",    config_validate_shell_option,                     NULL                                   },
+     "Prevent file overwrite (set -C)",    config_validate_shell_option,                     NULL                                  },
     {                  "shell.onecmd",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit after one command (set -t)",    config_validate_shell_option,                     NULL                                   },
+     "Exit after one command (set -t)",    config_validate_shell_option,                     NULL                                  },
     {                  "shell.notify",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Async job notification (set -b)",    config_validate_shell_option,                     NULL                                   },
+     "Async job notification (set -b)",    config_validate_shell_option,                     NULL                                  },
     {               "shell.ignoreeof",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Prevent exit on EOF (set -o ignoreeof)",    config_validate_shell_option,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {                   "shell.nolog",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent function history logging (set -o nolog)",    config_validate_shell_option,                     NULL                   },
+     "Prevent function history logging (set -o nolog)",    config_validate_shell_option,                     NULL                  },
     {                   "shell.emacs",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Emacs-style editing (set -o emacs)",    config_validate_shell_option,                     NULL                                },
+     "Emacs-style editing (set -o emacs)",    config_validate_shell_option,                     NULL                               },
     {                      "shell.vi",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Vi-style editing (set -o vi)",    config_validate_shell_option,                     NULL                                      },
+     "Vi-style editing (set -o vi)",    config_validate_shell_option,                     NULL                                     },
     {                   "shell.posix",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Strict POSIX compliance (set -o posix)",    config_validate_shell_option,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {                "shell.pipefail",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Pipeline failure detection (set -o pipefail)",    config_validate_shell_option,                     NULL                      },
+     "Pipeline failure detection (set -o pipefail)",    config_validate_shell_option,                     NULL                     },
     {              "shell.histexpand",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "History expansion (set -o histexpand)",    config_validate_shell_option,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {                 "shell.history",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Command history recording (set -o history)",    config_validate_shell_option,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {    "shell.interactive-comments",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Interactive comments (set -o interactive-comments)",    config_validate_shell_option,                     NULL                },
+     "Interactive comments (set -o interactive-comments)",    config_validate_shell_option,                     NULL               },
     {                "shell.physical",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Physical directory paths (set -o physical)",    config_validate_shell_option,
-     NULL                                                                                                                           },
+     NULL                                                                                                                          },
     {              "shell.privileged",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Restricted shell security (set -o privileged)",    config_validate_shell_option,                     NULL                     },
+     "Restricted shell security (set -o privileged)",    config_validate_shell_option,                     NULL                    },
 
     /// Shell mode settings (Extended Language Support)
     {                    "shell.mode",   CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
-     "Shell compatibility mode (posix, bash, zsh, lush)",      config_validate_shell_mode,         &shell_mode_enum                 },
+     "Shell compatibility mode (posix, bash, zsh, lush)",      config_validate_shell_mode,         &shell_mode_enum                },
     {             "shell.mode_strict",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
      &config.shell_mode_strict,             "Disallow runtime mode changes",
-     config_validate_bool,                     NULL                                                                                 },
+     config_validate_bool,                     NULL                                                                                },
 };
 
 static const int num_config_options =
@@ -368,8 +347,7 @@ static const int num_config_options =
 static void history_bind_runtime(void);
 static void shell_sync_to_runtime(void);
 static void shell_sync_from_runtime(void);
-static void display_sync_to_runtime(void);
-static void display_sync_from_runtime(void);
+static void display_bind_runtime(void);
 static void completion_bind_runtime(void);
 static void behavior_bind_runtime(void);
 static void autosuggestion_bind_runtime(void);
@@ -490,8 +468,8 @@ static const creg_section_t display_section = {
     .option_count = sizeof(display_options) / sizeof(creg_option_t),
     .on_load = NULL,
     .on_save = NULL,
-    .sync_to_runtime = display_sync_to_runtime,
-    .sync_from_runtime = display_sync_from_runtime,
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
 };
 
 /* ----------------------------------------------------------------------------
@@ -786,62 +764,28 @@ static void shell_sync_from_runtime(void) {
 }
 
 /// @brief Sync display config from registry to runtime
-static void display_sync_to_runtime(void) {
-    bool bval;
-    int64_t ival;
-
-    if (config_registry_get_boolean("display.syntax_highlighting", &bval) ==
-        CREG_SUCCESS) {
-        config.display_syntax_highlighting = bval;
-    }
-    if (config_registry_get_boolean("display.autosuggestions", &bval) ==
-        CREG_SUCCESS) {
-        config.display_autosuggestions = bval;
-    }
-    if (config_registry_get_boolean("display.transient_prompt", &bval) ==
-        CREG_SUCCESS) {
-        config.display_transient_prompt = bval;
-    }
-    if (config_registry_get_boolean("display.theme_hot_reload", &bval) ==
-        CREG_SUCCESS) {
-        config.display_theme_hot_reload = bval;
-    }
-    if (config_registry_get_integer("display.optimization_level", &ival) ==
-        CREG_SUCCESS) {
-        config.display_optimization_level = (int)ival;
-    }
-    if (config_registry_get_boolean("display.lle.pager.enabled", &bval) ==
-        CREG_SUCCESS) {
-        config.display_lle_pager_enabled = bval;
-    }
-    if (config_registry_get_integer("display.lle.pager.min_lines", &ival) ==
-        CREG_SUCCESS) {
-        config.display_lle_pager_min_lines = (int)ival;
-    }
-    if (config_registry_get_boolean("display.lle.pager.wrap_search", &bval) ==
-        CREG_SUCCESS) {
-        config.display_lle_pager_wrap_search = bval;
-    }
-}
-
-/// @brief Sync display config from runtime to registry
-static void display_sync_from_runtime(void) {
-    config_registry_set_boolean("display.syntax_highlighting",
-                                config.display_syntax_highlighting);
-    config_registry_set_boolean("display.autosuggestions",
-                                config.display_autosuggestions);
-    config_registry_set_boolean("display.transient_prompt",
-                                config.display_transient_prompt);
-    config_registry_set_boolean("display.theme_hot_reload",
-                                config.display_theme_hot_reload);
-    config_registry_set_integer("display.optimization_level",
-                                config.display_optimization_level);
-    config_registry_set_boolean("display.lle.pager.enabled",
-                                config.display_lle_pager_enabled);
-    config_registry_set_integer("display.lle.pager.min_lines",
-                                config.display_lle_pager_min_lines);
-    config_registry_set_boolean("display.lle.pager.wrap_search",
-                                config.display_lle_pager_wrap_search);
+/// @brief Bind display config keys to their runtime cells.
+/// The registry is the sole writer: config_registry_set write-throughs to the
+/// struct field, so config set / TOML / per-mode defaults and the display
+/// builtins (which route their on/off through config_registry_set) all keep
+/// the struct in step without hand-written sync hooks.
+static void display_bind_runtime(void) {
+    config_registry_bind_boolean("display.syntax_highlighting",
+                                 &config.display_syntax_highlighting);
+    config_registry_bind_boolean("display.autosuggestions",
+                                 &config.display_autosuggestions);
+    config_registry_bind_boolean("display.transient_prompt",
+                                 &config.display_transient_prompt);
+    config_registry_bind_boolean("display.theme_hot_reload",
+                                 &config.display_theme_hot_reload);
+    config_registry_bind_integer("display.optimization_level",
+                                 &config.display_optimization_level);
+    config_registry_bind_boolean("display.lle.pager.enabled",
+                                 &config.display_lle_pager_enabled);
+    config_registry_bind_integer("display.lle.pager.min_lines",
+                                 &config.display_lle_pager_min_lines);
+    config_registry_bind_boolean("display.lle.pager.wrap_search",
+                                 &config.display_lle_pager_wrap_search);
 }
 
 /// @brief Sync completion config from registry to runtime
@@ -1061,6 +1005,7 @@ static void config_register_sections(void) {
     autosuggestion_bind_runtime();
     completion_bind_runtime();
     behavior_bind_runtime();
+    display_bind_runtime();
 }
 
 /**
