@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   form (`fn name(...) -> kind { ... }` with `let result = name(args)`
   capture) supersedes it. Retired before the call/return surface of the
   typed form lands so there is only one path to a structured return value.
+- Configuration keys `display.performance_monitoring` and `completion.fuzzy`,
+  part of retiring config.c's legacy layer in favor of the single CREG
+  configuration store. No functionality is lost: `display.performance_monitoring`
+  was a phantom key with no runtime consumer (display performance instrumentation
+  is internal and unconditional, so the key never controlled anything), and the
+  fuzzy-completion behavior `completion.fuzzy` named lives on under
+  `completion.match_mode` (`prefix`/`substring`/`fuzzy`) -- the
+  backward-compatibility shim that auto-translated `completion.fuzzy` is removed.
+  BREAKING: an rc file or `config set` still using these key names no longer
+  takes effect; use `completion.match_mode = "fuzzy"` in place of
+  `completion.fuzzy = true`.
 
 ### Added
 

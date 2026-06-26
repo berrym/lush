@@ -339,15 +339,14 @@ typedef struct {
     bool autocorrect_case_sensitive; ///< Case-sensitive matching
 
     /// Display system settings
-    bool display_syntax_highlighting;    ///< Enable syntax highlighting
-    bool display_autosuggestions;        ///< Enable autosuggestions
-    bool display_transient_prompt;       ///< Enable transient prompts
-    bool display_theme_hot_reload;       ///< Auto-reload theme on file change
-    bool display_newline_before_prompt;  ///< Print newline before prompt
-    bool display_performance_monitoring; ///< Enable performance monitoring
-    int display_optimization_level;      ///< Optimization level (0-4)
-    char *display_ambiguous_width;       ///< East Asian Ambiguous width
-                                         ///< policy: "narrow" or "wide"
+    bool display_syntax_highlighting;   ///< Enable syntax highlighting
+    bool display_autosuggestions;       ///< Enable autosuggestions
+    bool display_transient_prompt;      ///< Enable transient prompts
+    bool display_theme_hot_reload;      ///< Auto-reload theme on file change
+    bool display_newline_before_prompt; ///< Print newline before prompt
+    int display_optimization_level;     ///< Optimization level (0-4)
+    char *display_ambiguous_width;      ///< East Asian Ambiguous width
+                                        ///< policy: "narrow" or "wide"
     char *display_lle_theme;    ///< Persisted LLE prompt theme name (NULL/empty
                                 ///< uses the composer's default theme)
     bool enhanced_display_mode; ///< Legacy display setting (deprecated)

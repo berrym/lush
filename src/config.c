@@ -143,10 +143,10 @@ static config_option_t config_options[] = {
     /// completion.{enabled,match_mode,threshold,case_sensitive} are migrated to
     /// the CREG registry (bound + layered); they resolve through the registry,
     /// not this legacy table. (show_all and hints remain legacy-only.)
-    {           "completion.show_all", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
+    {          "completion.show_all", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
      &config.completion_show_all,"Show all completions",config_validate_bool,
      NULL                                                                                                        },
-    {              "completion.hints", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
+    {             "completion.hints", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
      &config.hints_enabled,                  "Enable input hints",         config_validate_bool,             NULL},
 
     /// Behavior settings
@@ -159,31 +159,25 @@ static config_option_t config_options[] = {
     /// the CREG registry (bound + layered).
 
     /// Network settings
-    {        "network.ssh_completion", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
+    {       "network.ssh_completion", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.ssh_completion_enabled,          "Enable SSH host completion",
      config_validate_bool,             NULL                                                                      },
-    {       "network.cache_ssh_hosts", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
+    {      "network.cache_ssh_hosts", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.cache_ssh_hosts,     "Cache SSH hosts for performance",
      config_validate_bool,             NULL                                                                      },
-    { "network.cache_timeout_minutes",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
+    {"network.cache_timeout_minutes",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.cache_timeout_minutes,   "SSH host cache timeout in minutes",
      config_validate_int,             NULL                                                                       },
-    {  "network.max_completion_hosts",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
+    { "network.max_completion_hosts",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.max_completion_hosts, "Maximum hosts to show in completion",
      config_validate_int,             NULL                                                                       },
 
     /// Display system settings
     /// v1.3.0: Layered display is now the exclusive system - no configuration
     /// needed
-    /// display.system_mode and display.layered_display options removed
-    /// display.{syntax_highlighting,autosuggestions,transient_prompt,
-    /// theme_hot_reload,optimization_level,lle.pager.*,ambiguous_width} are
-    /// migrated to the CREG registry (bound + layered); they resolve through
-    /// the registry, not this legacy table. performance_monitoring remains
-    /// legacy-only for now.
-    {"display.performance_monitoring", CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
-     &config.display_performance_monitoring,
-     "Enable display performance monitoring",         config_validate_bool,             NULL                     },
+    /// display.system_mode and display.layered_display options removed.
+    /// The display.* keys are all migrated to the CREG registry (bound +
+    /// layered); they resolve through the registry, not this legacy table.
 
     /// Autosuggestion settings
     /// autosuggestion.* is migrated to the CREG registry (bound + layered); its
@@ -193,69 +187,69 @@ static config_option_t config_options[] = {
     /// behavior.enhanced_display_mode option removed
 
     /// Script execution control
-    {             "scripts.execution", CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
+    {            "scripts.execution", CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
      &config.script_execution,             "Enable script execution",         config_validate_bool,
      NULL                                                                                                        },
 
     /// Shell options integration - all 24 POSIX options with shell.* namespace
     /// These map directly to existing shell_opts flags for perfect
     /// compatibility
-    {                 "shell.errexit", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.errexit", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Exit on command failure (set -e)", config_validate_shell_option,             NULL                          },
-    {                  "shell.xtrace", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                 "shell.xtrace", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Trace command execution (set -x)", config_validate_shell_option,             NULL                          },
-    {                  "shell.noexec", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                 "shell.noexec", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Syntax check only (set -n)", config_validate_shell_option,             NULL                                },
-    {                 "shell.nounset", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.nounset", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Error on unset variables (set -u)", config_validate_shell_option,             NULL                         },
-    {                 "shell.verbose", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.verbose", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Print input lines (set -v)", config_validate_shell_option,             NULL                                },
-    {                  "shell.noglob", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                 "shell.noglob", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Disable pathname expansion (set -f)", config_validate_shell_option,             NULL                       },
-    {                 "shell.hashall", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.hashall", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Command hashing (set -h)", config_validate_shell_option,             NULL                                  },
-    {                 "shell.monitor", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.monitor", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Job control (set -m)", config_validate_shell_option,             NULL                                      },
-    {               "shell.allexport", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {              "shell.allexport", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Auto export variables (set -a)", config_validate_shell_option,             NULL                            },
-    {               "shell.noclobber", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {              "shell.noclobber", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Prevent file overwrite (set -C)", config_validate_shell_option,             NULL                           },
-    {                  "shell.onecmd", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                 "shell.onecmd", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Exit after one command (set -t)", config_validate_shell_option,             NULL                           },
-    {                  "shell.notify", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                 "shell.notify", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Async job notification (set -b)", config_validate_shell_option,             NULL                           },
-    {               "shell.ignoreeof", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {              "shell.ignoreeof", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Prevent exit on EOF (set -o ignoreeof)", config_validate_shell_option,
      NULL                                                                                                        },
-    {                   "shell.nolog", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                  "shell.nolog", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Prevent function history logging (set -o nolog)", config_validate_shell_option,             NULL           },
-    {                   "shell.emacs", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                  "shell.emacs", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Emacs-style editing (set -o emacs)", config_validate_shell_option,             NULL                        },
-    {                      "shell.vi", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                     "shell.vi", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Vi-style editing (set -o vi)", config_validate_shell_option,             NULL                              },
-    {                   "shell.posix", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                  "shell.posix", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Strict POSIX compliance (set -o posix)", config_validate_shell_option,
      NULL                                                                                                        },
-    {                "shell.pipefail", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {               "shell.pipefail", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Pipeline failure detection (set -o pipefail)", config_validate_shell_option,             NULL              },
-    {              "shell.histexpand", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {             "shell.histexpand", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "History expansion (set -o histexpand)", config_validate_shell_option,
      NULL                                                                                                        },
-    {                 "shell.history", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {                "shell.history", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Command history recording (set -o history)", config_validate_shell_option,
      NULL                                                                                                        },
-    {    "shell.interactive-comments", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {   "shell.interactive-comments", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Interactive comments (set -o interactive-comments)", config_validate_shell_option,             NULL        },
-    {                "shell.physical", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {               "shell.physical", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Physical directory paths (set -o physical)", config_validate_shell_option,
      NULL                                                                                                        },
-    {              "shell.privileged", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+    {             "shell.privileged", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
      "Restricted shell security (set -o privileged)", config_validate_shell_option,             NULL             },
 
     /// Shell mode settings (Extended Language Support)
-    {                    "shell.mode", CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
+    {                   "shell.mode", CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
      "Shell compatibility mode (posix, bash, zsh, lush)",   config_validate_shell_mode, &shell_mode_enum         },
-    {             "shell.mode_strict", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
+    {            "shell.mode_strict", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
      &config.shell_mode_strict,       "Disallow runtime mode changes",
      config_validate_bool,             NULL                                                                      },
 };
@@ -418,9 +412,6 @@ static const creg_option_t completion_options[] = {
     {          "enabled",
      CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Enable tab completion", true                                   },
-    {            "fuzzy",
-     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable fuzzy matching", true                                   },
     {   "case_sensitive",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Case-sensitive completion", true                               },
@@ -764,8 +755,7 @@ static const creg_enum_pair_t completion_match_mode_pairs[] = {
 /// @brief Bind the struct-backed completion.* keys (replaces
 /// completion_sync_*). completion.chain_directories and
 /// completion.menu_shadow_ghost are read straight from the registry (no runtime
-/// cell) and need no binding; completion.fuzzy is a dead legacy shim superseded
-/// by match_mode.
+/// cell) and need no binding.
 static void completion_bind_runtime(void) {
     config_registry_bind_boolean("completion.enabled",
                                  &config.completion_enabled);
@@ -1102,18 +1092,6 @@ static bool config_handle_legacy_key(const char *key, const char *value
         return true;
     }
 
-    /// Legacy completion.fuzzy BOOL replaced by completion.match_mode
-    /// ENUM. Translate truthy -> fuzzy, falsy -> prefix so existing
-    /// rc files keep working without warnings.
-    if (strcmp(key, "completion.fuzzy") == 0) {
-        bool truthy =
-            value && (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
-                      strcmp(value, "on") == 0 || strcmp(value, "yes") == 0);
-        creg_value_t v = creg_value_string(truthy ? "fuzzy" : "prefix");
-        config_registry_set("completion.match_mode", &v);
-        return true;
-    }
-
     /// Legacy display configuration keys
     if (strcmp(key, "behavior.enhanced_display_mode") == 0) {
         /// Legacy key - replaced by layered display system
@@ -1139,7 +1117,6 @@ static bool config_handle_legacy_key(const char *key, const char *value
         if (strcmp(display_key, "syntax_highlighting") == 0 ||
             strcmp(display_key, "autosuggestions") == 0 ||
             strcmp(display_key, "transient_prompt") == 0 ||
-            strcmp(display_key, "performance_monitoring") == 0 ||
             strcmp(display_key, "optimization_level") == 0) {
             return false;
         }
@@ -1189,7 +1166,6 @@ static legacy_option_mapping_t legacy_mappings[] = {
     { "path_negative_cache_ttl_ms",  "behavior.path_negative_cache_ttl_ms"},
     {        "loop_failure_streak",         "behavior.loop_failure_streak"},
     {       "loop_failure_seconds",        "behavior.loop_failure_seconds"},
-    {        "display_performance",       "display.performance_monitoring"},
     {       "display_optimization",           "display.optimization_level"},
 
     /// Network options
@@ -1986,9 +1962,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "=========================================================================="
     "==\n"
     "\n"
-    "# Enable display performance monitoring\n"
-    "display.performance_monitoring = false\n"
-    "\n"
     "# Display optimization level (0-4)\n"
     "display.optimization_level = 0\n"
     "\n"
@@ -2289,7 +2262,6 @@ void config_set_defaults(void) {
     config.display_theme_hot_reload = true; /// Auto-reload theme on file change
     config.display_newline_before_prompt =
         true; /// Visual separation before prompt (default on)
-    config.display_performance_monitoring = false;
     config.display_optimization_level = 0;
     /// East Asian Ambiguous-width policy. Default "narrow" matches
     /// traditional wcwidth behavior and what most modern terminals
