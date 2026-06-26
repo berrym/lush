@@ -451,6 +451,9 @@ static const creg_option_t display_options[] = {
     {     "theme_hot_reload",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Auto-reload theme when its file changes on disk", true       },
+    {"newline_before_prompt",
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Print a blank line before each prompt", true                 },
     {    "lle.pager.enabled",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Master switch for the LLE pager", true                       },
@@ -778,6 +781,8 @@ static void display_bind_runtime(void) {
                                  &config.display_transient_prompt);
     config_registry_bind_boolean("display.theme_hot_reload",
                                  &config.display_theme_hot_reload);
+    config_registry_bind_boolean("display.newline_before_prompt",
+                                 &config.display_newline_before_prompt);
     config_registry_bind_integer("display.optimization_level",
                                  &config.display_optimization_level);
     config_registry_bind_boolean("display.lle.pager.enabled",
@@ -3267,7 +3272,12 @@ void config_apply_settings(void) {
     symtable_set_global_int("COMPLETION_THRESHOLD",
                             config.completion_threshold);
 
-    /// Apply prompt settings (handled by LLE prompt composer)
+    /// Push prompt-composer settings (transient, newline-before) from the
+    /// global config into the LLE composer's own copy. config_apply_settings
+    /// runs on every `config set`, so this is what lets a config-set take
+    /// effect at the next prompt rather than only after a restart (the composer
+    /// is otherwise seeded only at integration init).
+    lle_shell_integration_sync_prompt_config();
 
     /// Apply history settings
     /// History deduplication is handled automatically by readline integration

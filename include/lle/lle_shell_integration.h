@@ -123,6 +123,17 @@ typedef struct lle_shell_integration {
  */
 extern lle_shell_integration_t *g_lle_integration;
 
+/**
+ * @brief Push prompt-composer settings from the global config into the active
+ * composer's own copy (transient prompt, newline-before-prompt).
+ *
+ * The composer keeps its own copy of these flags, seeded at integration init.
+ * config_apply_settings calls this on every `config set` so a configuration
+ * change takes effect at the next prompt rather than only after a restart.
+ * A no-op when LLE is not active.
+ */
+void lle_shell_integration_sync_prompt_config(void);
+
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
  * ============================================================================

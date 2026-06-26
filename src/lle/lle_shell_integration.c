@@ -641,6 +641,15 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     return LLE_SUCCESS;
 }
 
+void lle_shell_integration_sync_prompt_config(void) {
+    if (g_lle_integration && g_lle_integration->prompt_composer) {
+        g_lle_integration->prompt_composer->config.enable_transient =
+            config.display_transient_prompt;
+        g_lle_integration->prompt_composer->config.newline_before_prompt =
+            config.display_newline_before_prompt;
+    }
+}
+
 /**
  * @brief Destroy the prompt composer
  *
