@@ -16567,7 +16567,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         }
 
         if (pid == 0) {
-            /// Child process - execute the command
+            /// Background child: a controlling-terminal hangup must terminate
+            /// it, so drop the inherited interactive SIGHUP handler that would
+            /// otherwise swallow it.
+            reset_background_job_signals();
             int result = execute_node(executor, command->first_child);
             fflush(stdout);
             fflush(stderr);
@@ -16598,6 +16601,11 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     if (pid == 0) {
         /// Child process - create new process group
         setpgid(0, 0);
+
+        /// A login shell's exit-time SIGHUP cascade (send_sighup_to_jobs)
+        /// must terminate this job; drop the inherited interactive SIGHUP
+        /// handler that would otherwise swallow it.
+        reset_background_job_signals();
 
         /// Execute the command
         int result = execute_node(executor, command->first_child);

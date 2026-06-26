@@ -180,6 +180,16 @@ int send_sighup_to_jobs(void) {
     return count;
 }
 
+void reset_background_job_signals(void) {
+    /// A background-job child inherits the interactive shell's SIGHUP
+    /// handler (which only sets a flag). Restore the default so a login
+    /// shell's exit-time SIGHUP -- whether sent by send_sighup_to_jobs() or
+    /// by the controlling terminal's hangup -- terminates the job instead of
+    /// being swallowed. The real command, once it execs, gets SIG_DFL anyway;
+    /// this covers the in-process subshell wrapper that never execs.
+    set_signal_handler(SIGHUP, SIG_DFL);
+}
+
 /**
  * @brief Initialize default signal handlers
  *
