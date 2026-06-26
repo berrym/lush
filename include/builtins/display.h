@@ -29,7 +29,6 @@ int display_lle_syntax(int argc, char **argv);
 int display_lle_transient(int argc, char **argv);
 int display_lle_hot_reload(int argc, char **argv);
 int display_lle_newline_before(int argc, char **argv);
-int display_lle_multiline(int argc, char **argv);
 int display_lle_diagnostics(int argc, char **argv);
 int display_lle_reset(int argc, char **argv);
 int display_lle_theme(int argc, char **argv);

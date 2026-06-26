@@ -450,7 +450,6 @@ int bin_display(int argc, char **argv) {
             printf("  hot-reload on|off       - Control theme hot-reload\n");
             printf(
                 "  newline-before on|off   - Control newline before prompt\n");
-            printf("  multiline on|off        - Control multiline editing\n");
             printf("  theme [list|set <name>] - Control LLE prompt theme\n");
             printf("\nReset Commands (recovery):\n");
             printf(
@@ -514,8 +513,6 @@ int bin_display(int argc, char **argv) {
             return display_lle_hot_reload(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "newline-before") == 0) {
             return display_lle_newline_before(argc - 2, argv + 2);
-        } else if (strcmp(lle_cmd, "multiline") == 0) {
-            return display_lle_multiline(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "diagnostics") == 0) {
             return display_lle_diagnostics(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "reset") == 0) {

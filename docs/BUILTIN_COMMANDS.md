@@ -794,7 +794,6 @@ display lle syntax on|off
 display lle transient on|off
 display lle hot-reload on|off
 display lle newline-before on|off
-display lle multiline on|off
 
 # Theme + completion
 display lle theme [list|set <name>|export]

@@ -290,7 +290,6 @@ typedef struct {
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
-    bool lle_enable_multiline_editing;       ///< Enable multiline editing
     char *lle_history_file;                  ///< LLE history file path
     bool lle_enable_forensic_tracking;       ///< Enable forensic tracking
     bool lle_enable_deduplication;           ///< Enable deduplication

@@ -167,10 +167,6 @@ static config_option_t config_options[] = {
     {            "lle.arrow_key_mode",   CONFIG_TYPE_ENUM,    CONFIG_SECTION_HISTORY,
      &config.lle_arrow_key_mode,"Arrow key behavior mode",
      config_validate_lle_arrow_mode,&lle_arrow_mode_enum                                                                                                          },
-    {  "lle.enable_multiline_editing",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_HISTORY,
-     &config.lle_enable_multiline_editing,
-     "Enable editing of recalled multiline commands",            config_validate_bool,
-     NULL                                                                                                                          },
     {              "lle.history_file", CONFIG_TYPE_STRING,    CONFIG_SECTION_HISTORY,
      &config.lle_history_file,                     "LLE history file path",          config_validate_string,
      NULL                                                                                                                          },
@@ -1890,9 +1886,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "#   multiline-first - Prioritize multiline navigation\n"
     "lle.arrow_key_mode = context-aware\n"
     "\n"
-    "# Enable editing of recalled multiline commands\n"
-    "lle.enable_multiline_editing = true\n"
-    "\n"
     "# LLE history file path (default: ~/.lush_history)\n"
     "# lle.history_file = ~/.lush_history\n"
     "\n"
@@ -2277,7 +2270,6 @@ void config_set_defaults(void) {
 
     /// LLE History defaults
     config.lle_arrow_key_mode = LLE_ARROW_MODE_CONTEXT_AWARE;
-    config.lle_enable_multiline_editing = true;
     config.lle_history_file = NULL; /// Will default to ~/.lush_history
     config.lle_enable_forensic_tracking = true;
     config.lle_enable_deduplication = true;

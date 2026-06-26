@@ -24,8 +24,6 @@ int display_lle_status(int argc, char **argv) {
     printf("  Editor: %s\n", editor ? "initialized" : "not initialized");
 
     printf("\nLLE Features:\n");
-    printf("  Multi-line editing: %s\n",
-           config.lle_enable_multiline_editing ? "enabled" : "disabled");
     printf("  History deduplication: %s\n",
            config.lle_enable_deduplication ? "enabled" : "disabled");
     printf("  Forensic tracking: %s\n",

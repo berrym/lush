@@ -242,7 +242,6 @@ display lle theme <name>    # Change syntax highlighting theme
 display lle autosuggestions on|off
 display lle completion on|off  
 display lle syntax on|off   # Syntax highlighting
-display lle multiline on|off
 display lle history-dedup on|off
 display lle config          # Show all LLE config values
 display lle reset           # Reset to defaults
