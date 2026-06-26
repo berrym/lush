@@ -81,8 +81,6 @@ int display_lle_diagnostics(int argc, char **argv) {
            config.lle_enable_multiline_editing ? "enabled" : "disabled");
     printf("  History deduplication: %s\n",
            config.lle_enable_deduplication ? "enabled" : "disabled");
-    printf("  Interactive search: %s\n",
-           config.lle_enable_interactive_search ? "enabled" : "disabled");
 
     printf("\nHealth: ");
     if (!editor) {

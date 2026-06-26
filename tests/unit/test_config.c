@@ -193,27 +193,6 @@ TEST(validate_completion_match_mode_invalid) {
 }
 
 /* ============================================================================
- * LLE STORAGE MODE VALIDATION TESTS
- * ============================================================================
- */
-
-TEST(validate_lle_storage_mode_valid) {
-    ASSERT_TRUE(config_validate_lle_storage_mode("lle-only"),
-                "lle-only should be valid");
-    ASSERT_TRUE(config_validate_lle_storage_mode("bash-only"),
-                "bash-only should be valid");
-    ASSERT_TRUE(config_validate_lle_storage_mode("dual"),
-                "dual should be valid");
-    ASSERT_TRUE(config_validate_lle_storage_mode("readline-compat"),
-                "readline-compat should be valid");
-}
-
-TEST(validate_lle_storage_mode_invalid) {
-    ASSERT_FALSE(config_validate_lle_storage_mode("invalid"),
-                 "invalid mode should be rejected");
-}
-
-/* ============================================================================
  * LLE DEDUP SCOPE VALIDATION TESTS
  * ============================================================================
  */
@@ -770,11 +749,6 @@ int main(void) {
     RUN_TEST(validate_lle_arrow_mode_invalid);
     RUN_TEST(validate_completion_match_mode_valid);
     RUN_TEST(validate_completion_match_mode_invalid);
-
-    /// LLE storage mode validation
-    printf("\n=== LLE Storage Mode Validation Tests ===\n");
-    RUN_TEST(validate_lle_storage_mode_valid);
-    RUN_TEST(validate_lle_storage_mode_invalid);
 
     /// LLE dedup scope validation
     printf("\n=== LLE Dedup Scope Validation Tests ===\n");

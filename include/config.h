@@ -92,18 +92,6 @@ typedef enum {
 } lle_arrow_key_mode_t;
 
 /**
- * @brief LLE History storage modes
- *
- * Controls how history is stored on disk.
- */
-typedef enum {
-    LLE_STORAGE_MODE_LLE_ONLY,       ///< Store only in LLE format
-    LLE_STORAGE_MODE_BASH_ONLY,      ///< Store only in bash format
-    LLE_STORAGE_MODE_DUAL,           ///< Store in both formats (recommended)
-    LLE_STORAGE_MODE_READLINE_COMPAT ///< Use GNU Readline's storage
-} lle_history_storage_mode_t;
-
-/**
  * @brief LLE History deduplication scope
  *
  * Controls the scope of duplicate detection.
@@ -290,7 +278,6 @@ typedef struct {
     int history_size;        ///< Maximum history entries
     bool history_no_dups;    ///< Ignore duplicate entries
     bool history_timestamps; ///< Record timestamps
-    char *history_file;      ///< History file path
     history_search_mode_t
         history_search_mode; ///< Up/down navigation filter (prefix / plain)
     history_finder_match_t
@@ -304,29 +291,17 @@ typedef struct {
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
-    bool lle_enable_multiline_navigation;    ///< Enable multiline navigation
-    bool lle_wrap_history_navigation;        ///< Wrap at history ends
-    bool lle_save_line_on_history_nav;       ///< Save line when navigating
-    bool lle_preserve_multiline_structure;   ///< Preserve multiline structure
     bool lle_enable_multiline_editing;       ///< Enable multiline editing
-    bool lle_show_multiline_indicators;      ///< Show multiline indicators
-    bool lle_enable_interactive_search;      ///< Enable interactive search
-    bool lle_search_fuzzy_matching;          ///< Enable fuzzy search matching
-    bool lle_search_case_sensitive;          ///< Case-sensitive search
-    lle_history_storage_mode_t lle_storage_mode; ///< History storage mode
-    char *lle_history_file;                      ///< LLE history file path
-    bool lle_sync_with_readline;                 ///< Sync with readline history
-    bool lle_export_to_bash_history;             ///< Export to bash history
-    bool lle_enable_forensic_tracking;           ///< Enable forensic tracking
-    bool lle_enable_deduplication;               ///< Enable deduplication
-    lle_dedup_scope_t lle_dedup_scope;           ///< Deduplication scope
-    lle_dedup_strategy_t lle_dedup_strategy;     ///< Deduplication strategy
-    bool lle_dedup_navigation;         ///< Skip duplicates during navigation
-    bool lle_dedup_navigation_unique;  ///< Show only unique entries
-    bool lle_dedup_unicode_normalize;  ///< Use Unicode NFC normalization
-    bool lle_enable_history_cache;     ///< Enable history cache
-    int lle_cache_size;                ///< Cache size
-    bool lle_readline_compatible_mode; ///< Readline compatibility mode
+    char *lle_history_file;                  ///< LLE history file path
+    bool lle_enable_forensic_tracking;       ///< Enable forensic tracking
+    bool lle_enable_deduplication;           ///< Enable deduplication
+    lle_dedup_scope_t lle_dedup_scope;       ///< Deduplication scope
+    lle_dedup_strategy_t lle_dedup_strategy; ///< Deduplication strategy
+    bool lle_dedup_navigation;        ///< Skip duplicates during navigation
+    bool lle_dedup_navigation_unique; ///< Show only unique entries
+    bool lle_dedup_unicode_normalize; ///< Use Unicode NFC normalization
+    bool lle_enable_history_cache;    ///< Enable history cache
+    int lle_cache_size;               ///< Cache size
 
     /// Completion settings
     bool completion_enabled;                       ///< Enable tab completion
@@ -732,14 +707,6 @@ bool config_validate_history_finder_rank(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_history_finder_display(const char *value);
-
-/**
- * @brief Validate an LLE storage mode value
- *
- * @param value Storage mode string to validate
- * @return true if valid storage mode, false otherwise
- */
-bool config_validate_lle_storage_mode(const char *value);
 
 /**
  * @brief Validate an LLE dedup scope value
