@@ -1256,6 +1256,27 @@ endif
          env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
   endif
 
+  # display lle completion behavior-knob verb tests
+  if fs.exists('tests/unit/test_display_completion.c')
+    test_display_completion_sources = []
+    foreach s : src
+      if not s.endswith('lush.c')
+        test_display_completion_sources += s
+      endif
+    endforeach
+    test_display_completion = executable('test_display_completion',
+                                'tests/unit/test_display_completion.c',
+                                'tests/unit/test_executor_stubs.c',
+                                test_display_completion_sources + lle_shell_sources,
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep, libm])
+    test('Display Completion Verbs', test_display_completion,
+         suite: 'unit',
+         timeout: 30,
+         depends: [lush_exe],
+         env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
+  endif
+
   # Word-Context Analyzer Tests
   # Exercises lle_word_context_analyze across quote/escape state, word
   # boundaries respecting quote state, filename_portion_start computation,

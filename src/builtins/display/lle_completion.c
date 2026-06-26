@@ -204,6 +204,118 @@ int display_lle_completion(int argc, char **argv) {
         config_set_value("completion.match_mode", mode);
         return 0;
 
+    } else if (strcmp(comp_subcmd, "enabled") == 0) {
+        /// completion.enabled: master switch for tab completion.
+        if (argc < 3) {
+            bool cur = true;
+            if (config_registry_get_boolean("completion.enabled", &cur) !=
+                CREG_SUCCESS) {
+                cur = true;
+            }
+            printf("enabled: %s\n", cur ? "on" : "off");
+            printf("Usage: display lle completion enabled <on|off>\n");
+            return 0;
+        }
+        const char *state = argv[2];
+        if (strcmp(state, "on") == 0) {
+            config_registry_set_boolean("completion.enabled", true);
+            printf("completion enabled\n");
+            return 0;
+        } else if (strcmp(state, "off") == 0) {
+            config_registry_set_boolean("completion.enabled", false);
+            printf("completion disabled\n");
+            return 0;
+        }
+        fprintf(stderr,
+                "display lle completion enabled: invalid value '%s' "
+                "(use on|off)\n",
+                state);
+        return 1;
+
+    } else if (strcmp(comp_subcmd, "case_sensitive") == 0) {
+        /// completion.case_sensitive: match candidates case-sensitively.
+        if (argc < 3) {
+            bool cur = false;
+            if (config_registry_get_boolean("completion.case_sensitive",
+                                            &cur) != CREG_SUCCESS) {
+                cur = false;
+            }
+            printf("case_sensitive: %s\n", cur ? "on" : "off");
+            printf("Usage: display lle completion case_sensitive <on|off>\n");
+            return 0;
+        }
+        const char *state = argv[2];
+        if (strcmp(state, "on") == 0) {
+            config_registry_set_boolean("completion.case_sensitive", true);
+            printf("case_sensitive enabled\n");
+            return 0;
+        } else if (strcmp(state, "off") == 0) {
+            config_registry_set_boolean("completion.case_sensitive", false);
+            printf("case_sensitive disabled\n");
+            return 0;
+        }
+        fprintf(stderr,
+                "display lle completion case_sensitive: invalid value '%s' "
+                "(use on|off)\n",
+                state);
+        return 1;
+
+    } else if (strcmp(comp_subcmd, "menu_shadow_ghost") == 0) {
+        /// completion.menu_shadow_ghost: render the open menu's highlighted
+        /// candidate inline as a faint shadow ghost.
+        if (argc < 3) {
+            bool cur = false;
+            if (config_registry_get_boolean("completion.menu_shadow_ghost",
+                                            &cur) != CREG_SUCCESS) {
+                cur = false;
+            }
+            printf("menu_shadow_ghost: %s\n", cur ? "on" : "off");
+            printf("Usage: display lle completion menu_shadow_ghost "
+                   "<on|off>\n");
+            return 0;
+        }
+        const char *state = argv[2];
+        if (strcmp(state, "on") == 0) {
+            config_registry_set_boolean("completion.menu_shadow_ghost", true);
+            printf("menu_shadow_ghost enabled\n");
+            return 0;
+        } else if (strcmp(state, "off") == 0) {
+            config_registry_set_boolean("completion.menu_shadow_ghost", false);
+            printf("menu_shadow_ghost disabled\n");
+            return 0;
+        }
+        fprintf(stderr,
+                "display lle completion menu_shadow_ghost: invalid value "
+                "'%s' (use on|off)\n",
+                state);
+        return 1;
+
+    } else if (strcmp(comp_subcmd, "threshold") == 0) {
+        /// completion.threshold: minimum fuzzy match score (0-100) a
+        /// candidate must reach to be offered.
+        if (argc < 3) {
+            int64_t cur = 60;
+            if (config_registry_get_integer("completion.threshold", &cur) !=
+                CREG_SUCCESS) {
+                cur = 60;
+            }
+            printf("threshold: %lld\n", (long long)cur);
+            printf("Usage: display lle completion threshold <0-100>\n");
+            return 0;
+        }
+        char *end = NULL;
+        long val = strtol(argv[2], &end, 10);
+        if (argv[2][0] == '\0' || *end != '\0' || val < 0 || val > 100) {
+            fprintf(stderr,
+                    "display lle completion threshold: invalid value '%s' "
+                    "(use an integer 0-100)\n",
+                    argv[2]);
+            return 1;
+        }
+        config_registry_set_integer("completion.threshold", (int)val);
+        printf("threshold set to %ld\n", val);
+        return 0;
+
     } else if (strcmp(comp_subcmd, "help") == 0 ||
                strcmp(comp_subcmd, "--help") == 0) {
         printf("LLE Completion Subsystem\n");
@@ -216,6 +328,14 @@ int display_lle_completion(int argc, char **argv) {
                "completion after directory accept\n");
         printf("  match_mode <prefix|substring|fuzzy>     - Set the filter "
                "predicate\n");
+        printf("  enabled <on|off>                        - Master switch for "
+               "tab completion\n");
+        printf("  case_sensitive <on|off>                 - Match candidates "
+               "case-sensitively\n");
+        printf("  threshold <0-100>                       - Minimum fuzzy "
+               "match score\n");
+        printf("  menu_shadow_ghost <on|off>              - Inline shadow "
+               "ghost of the menu's top candidate\n");
         printf("  help                                    - Show this help "
                "message\n");
         return 0;
@@ -223,8 +343,10 @@ int display_lle_completion(int argc, char **argv) {
     } else {
         fprintf(stderr, "display lle completion: Unknown subcommand '%s'\n",
                 comp_subcmd);
-        fprintf(stderr, "Usage: display lle completion "
-                        "<sources|chain_directories|match_mode|help>\n");
+        fprintf(stderr,
+                "Usage: display lle completion <sources|chain_directories|"
+                "match_mode|enabled|case_sensitive|threshold|"
+                "menu_shadow_ghost|help>\n");
         return 1;
     }
 }

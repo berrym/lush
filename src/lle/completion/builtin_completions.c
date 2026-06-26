@@ -249,6 +249,13 @@ static const lle_builtin_subcommand_t lle_onoff_vals[] = {
     {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
+/// completion.match_mode values
+static const lle_builtin_subcommand_t lle_completion_match_mode_vals[] = {
+    {   "prefix", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"substring", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "fuzzy", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+};
+
 /// display lle history subcommands
 static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
     {    "status",                              NULL,0,NULL, 0,LLE_BUILTIN_ARG_NONE             },
@@ -281,6 +288,20 @@ static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
     {"chain_directories",                         lle_onoff_vals,
      sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
      LLE_BUILTIN_ARG_NONE                                                                         },
+    {       "match_mode",         lle_completion_match_mode_vals,
+     sizeof(lle_completion_match_mode_vals) /
+     sizeof(lle_completion_match_mode_vals[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                                },
+    {          "enabled",                         lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE                                                                         },
+    {   "case_sensitive",                         lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE                                                                         },
+    {"menu_shadow_ghost",                         lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE                                                                         },
+    {        "threshold",                                   NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {             "help",                                   NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
