@@ -81,7 +81,7 @@ A wave-time heuristic when sweeping a `.c` file: every `/** */` block above a no
 | `tests/lle/integration/` | 7 | 2668 | 244 | 0 | 23 | 11 | 4 | 2 | **261** |
 | `src/lle/event/` | 6 | 3024 | 221 | 0 | 72 | 4 | 4 | 0 | **229** |
 | `src/lle/widget/` | 3 | 1354 | 67 | 0 | 35 | 30 | 4 | 0 | **101** |
-| `src/builtins/display/` | 17 | 2715 | 73 | 0 | 24 | 5 | 8 | 0 | **86** |
+| `src/builtins/display/` | 16 | 2676 | 72 | 0 | 23 | 5 | 8 | 0 | **85** |
 | `tests/fuzz/` | 5 | 1380 | 60 | 9 | 11 | 2 | 15 | 0 | **86** |
 | `tests/manual/` | 4 | 661 | 76 | 0 | 1 | 0 | 0 | 4 | **80** |
 | `tests/lle/stress/` | 2 | 1048 | 73 | 0 | 2 | 0 | 0 | 0 | **73** |
@@ -135,7 +135,7 @@ These recommendations balance density (violations per file), risk (small isolate
 
 1. **`src/libhashtable/`** (7 files, total 21 violations) — third-party-pedigree code (Michael Berry's libhashtable, vendored). Only `//` comments to flip; no `/**< */`; no header drift. Single mechanical `sed` pass, low review burden, isolated subsystem. The matching `include/libhashtable/ht.h` (10 violations) is one more file.
 2. **`src/libfuzzy/`** (1 file, 54 violations) — single file. Easy one-shot commit.
-3. **`src/builtins/display/`** (17 files, 86 violations) — already 2 of the 17 are CLEAN (`lle_hook.c`, `lle_status.c`). Tiny per-file footprint; isolated from execution path.
+3. **`src/builtins/display/`** (16 files, 85 violations) — already 2 of the 16 are CLEAN (`lle_hook.c`, `lle_status.c`). Tiny per-file footprint; isolated from execution path.
 4. **`tests/fuzz/`** (5 files, 86 violations) — small, no production risk.
 5. **`tests/manual/`** + **`tests/lle/manual/`** + **`tests/lle/benchmarks/`** + **`tests/lle/stress/`** + **`tests/lle/e2e/`** — all small, mostly `//` and missing-`@file` only. Bundle as a single "tests-housekeeping" sweep.
 6. **`include/lle/prompt/`** + **`include/lle/completion/`** — almost pure header-form drift: `/**< */` → `///<` and `/** */`-on-trivial-decl → `///` brief. No code semantics involved; tightly scoped per subsystem.
@@ -564,9 +564,9 @@ Totals: `//`=919  `/**< */`=8  trivial-`/**`-blocks=157  static-fn-`/**`=22  in-
 | `src/builtins/bin_terminal.c` | 131 | 0 | 0 | 2 | 0 | 0 |  |
 | `src/builtins/bin_true.c` | 24 | 0 | 0 | 2 | 0 | 0 |  |
 
-### `src/builtins/display/` (17 files, 15 need work, 2 clean)
+### `src/builtins/display/` (16 files, 14 need work, 2 clean)
 
-Totals: `//`=73  `/**< */`=0  trivial-`/**`-blocks=24  static-fn-`/**`=5  in-fn `/* */`=8  missing-@file=0
+Totals: `//`=72  `/**< */`=0  trivial-`/**`-blocks=23  static-fn-`/**`=5  in-fn `/* */`=8  missing-@file=0
 
 | File | Lines | `//` | `/**<` | `/**` blocks | static-fn `/**` | in-fn `/* */` | no @file |
 |------|------:|-----:|-------:|-------------:|----------------:|--------------:|---------:|
@@ -583,7 +583,6 @@ Totals: `//`=73  `/**< */`=0  trivial-`/**`-blocks=24  static-fn-`/**`=5  in-fn 
 | `src/builtins/display/lle_widget.c` | 353 | 2 | 0 | 3 | 1 | 0 |  |
 | `src/builtins/display/lle_autosuggestions.c` | 46 | 1 | 0 | 1 | 0 | 0 |  |
 | `src/builtins/display/lle_hot_reload.c` | 49 | 1 | 0 | 1 | 0 | 0 |  |
-| `src/builtins/display/lle_multiline.c` | 39 | 1 | 0 | 1 | 0 | 0 |  |
 | `src/builtins/display/lle_newline_before.c` | 52 | 1 | 0 | 1 | 0 | 0 |  |
 | `src/builtins/display/lle_hook.c` | 202 | 0 | 0 | 1 | 0 | 0 |  |
 | `src/builtins/display/lle_status.c` | 41 | 0 | 0 | 1 | 0 | 0 |  |

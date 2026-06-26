@@ -77,8 +77,6 @@ int display_lle_diagnostics(int argc, char **argv) {
            config.display_syntax_highlighting ? "enabled" : "disabled");
     printf("  Transient prompts: %s\n",
            config.display_transient_prompt ? "enabled" : "disabled");
-    printf("  Multiline editing: %s\n",
-           config.lle_enable_multiline_editing ? "enabled" : "disabled");
     printf("  History deduplication: %s\n",
            config.lle_enable_deduplication ? "enabled" : "disabled");
 
