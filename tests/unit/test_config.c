@@ -275,19 +275,6 @@ TEST(validate_shell_option_invalid) {
 }
 
 /* ============================================================================
- * COLOR SCHEME VALIDATION TESTS
- * ============================================================================
- */
-
-TEST(validate_color_scheme_valid) {
-    /// Color scheme accepts any non-null string
-    ASSERT_TRUE(config_validate_color_scheme("default"),
-                "default should be valid");
-    ASSERT_TRUE(config_validate_color_scheme("dark"), "dark should be valid");
-    ASSERT_TRUE(config_validate_color_scheme("light"), "light should be valid");
-}
-
-/* ============================================================================
  * COLOR VALIDATION TESTS
  * ============================================================================
  */
@@ -322,7 +309,6 @@ TEST(config_set_defaults_basic) {
     ASSERT_EQ(config.history_size, 1000, "history_size should default to 1000");
     ASSERT_TRUE(config.completion_enabled,
                 "completion_enabled should default to true");
-    ASSERT_TRUE(config.colors_enabled, "colors_enabled should default to true");
 }
 
 /* ============================================================================
@@ -769,10 +755,6 @@ int main(void) {
     printf("\n=== Shell Option Validation Tests ===\n");
     RUN_TEST(validate_shell_option_valid);
     RUN_TEST(validate_shell_option_invalid);
-
-    /// Color scheme validation
-    printf("\n=== Color Scheme Validation Tests ===\n");
-    RUN_TEST(validate_color_scheme_valid);
 
     /// Color validation
     printf("\n=== Color Validation Tests ===\n");

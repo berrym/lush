@@ -338,8 +338,6 @@ typedef struct {
     bool spell_correction;   ///< Enable spell correction
     bool confirm_exit;       ///< Confirm before exit
     int tab_width;           ///< Tab display width
-    bool no_word_expand;     ///< Disable word expansion
-    bool multiline_mode;     ///< Enable multiline editing
     int brace_expansion_max; ///< Max brace expansion result count (0 =
                              ///< unbounded)
     int regex_pattern_max;   ///< Max regex pattern length before rejection (0 =
@@ -362,14 +360,6 @@ typedef struct {
     bool autocorrect_builtins;       ///< Correct builtin names
     bool autocorrect_external;       ///< Correct external commands
     bool autocorrect_case_sensitive; ///< Case-sensitive matching
-
-    /// Color settings
-    char *color_scheme;  ///< Active color scheme name
-    bool colors_enabled; ///< Enable colored output
-
-    /// Advanced settings
-    bool verbose_errors; ///< Verbose error messages
-    bool debug_mode;     ///< Enable debug mode
 
     /// Display system settings
     bool display_syntax_highlighting;    ///< Enable syntax highlighting
@@ -399,13 +389,10 @@ typedef struct {
         autosuggestion_sources; ///< History only, or history then completion
 
     /// Network settings
-    bool ssh_completion_enabled;  ///< Enable SSH host completion
-    bool cloud_discovery_enabled; ///< Enable cloud host discovery
-    bool cache_ssh_hosts;         ///< Cache SSH hosts
-    int cache_timeout_minutes;    ///< Cache timeout in minutes
-    bool show_remote_context;     ///< Show remote context
-    bool auto_detect_cloud;       ///< Auto-detect cloud environment
-    int max_completion_hosts;     ///< Maximum hosts for completion
+    bool ssh_completion_enabled; ///< Enable SSH host completion
+    bool cache_ssh_hosts;        ///< Cache SSH hosts
+    int cache_timeout_minutes;   ///< Cache timeout in minutes
+    int max_completion_hosts;    ///< Maximum hosts for completion
 
     /// Script execution control
     bool script_execution; ///< Enable script execution
@@ -611,14 +598,6 @@ bool config_validate_display_mode(const char *value);
  * @return true if valid optimization level, false otherwise
  */
 bool config_validate_optimization_level(const char *value);
-
-/**
- * @brief Validate a color scheme value
- *
- * @param value Color scheme name to validate
- * @return true if valid color scheme, false otherwise
- */
-bool config_validate_color_scheme(const char *value);
 
 /**
  * @brief Validate an East Asian Ambiguous-width policy value

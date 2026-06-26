@@ -30,8 +30,6 @@
 config_values_t config = {
     .history_enabled = true,
     .history_size = 1000,
-    .colors_enabled = true,
-    .multiline_mode = true,
     .display_syntax_highlighting = true,
     .display_autosuggestions = true,
     .tab_width = 8,

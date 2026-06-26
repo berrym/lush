@@ -277,36 +277,13 @@ static config_option_t config_options[] = {
     /// migrated to the CREG registry (bound + layered).
     /// behavior.autocorrect_* are migrated to the CREG registry (bound +
     /// layered).
-    {            "behavior.no_word_expand",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.no_word_expand,       "Disable word expansion and globbing",
-     config_validate_bool,                     NULL                                                                                 },
-    {            "behavior.multiline_mode",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.multiline_mode,             "Enable multiline editing mode",
-     config_validate_bool,                     NULL                                                                                 },
     /// behavior limits (tab_width, brace_expansion_max, regex_pattern_max,
     /// path_negative_cache_ttl_ms, loop_failure_streak/seconds) are migrated to
     /// the CREG registry (bound + layered).
 
-    /// Color settings
-    {              "behavior.color_scheme", CONFIG_TYPE_STRING,   CONFIG_SECTION_BEHAVIOR,
-     &config.color_scheme,                         "Color scheme name",    config_validate_color_scheme,
-     NULL                                                                                                                           },
-    {            "behavior.colors_enabled",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.colors_enabled,                       "Enable color output",            config_validate_bool,                     NULL },
-
-    /// Advanced settings
-    {            "behavior.verbose_errors",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.verbose_errors,               "Show verbose error messages",
-     config_validate_bool,                     NULL                                                                                 },
-    {                "behavior.debug_mode",   CONFIG_TYPE_BOOL,   CONFIG_SECTION_BEHAVIOR,
-     &config.debug_mode,                         "Enable debug mode",            config_validate_bool,                     NULL     },
-
     /// Network settings
     {             "network.ssh_completion",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.ssh_completion_enabled,                "Enable SSH host completion",
-     config_validate_bool,                     NULL                                                                                 },
-    {            "network.cloud_discovery",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.cloud_discovery_enabled,               "Enable cloud host discovery",
      config_validate_bool,                     NULL                                                                                 },
     {            "network.cache_ssh_hosts",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.cache_ssh_hosts,           "Cache SSH hosts for performance",
@@ -314,12 +291,6 @@ static config_option_t config_options[] = {
     {      "network.cache_timeout_minutes",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.cache_timeout_minutes,         "SSH host cache timeout in minutes",
      config_validate_int,                     NULL                                                                                  },
-    {        "network.show_remote_context",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.show_remote_context,             "Show remote context in prompt",
-     config_validate_bool,                     NULL                                                                                 },
-    {          "network.auto_detect_cloud",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
-     &config.auto_detect_cloud,             "Auto-detect cloud environment",
-     config_validate_bool,                     NULL                                                                                 },
     {       "network.max_completion_hosts",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.max_completion_hosts,       "Maximum hosts to show in completion",
      config_validate_int,                     NULL                                                                                  },
@@ -1385,27 +1356,18 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {  "autocorrect_case_sensitive",  "behavior.autocorrect_case_sensitive"},
     {                "confirm_exit",                "behavior.confirm_exit"},
     {                   "tab_width",                   "behavior.tab_width"},
-    {              "no_word_expand",              "behavior.no_word_expand"},
-    {              "multiline_mode",              "behavior.multiline_mode"},
     {         "brace_expansion_max",         "behavior.brace_expansion_max"},
     {           "regex_pattern_max",           "behavior.regex_pattern_max"},
     {  "path_negative_cache_ttl_ms",  "behavior.path_negative_cache_ttl_ms"},
     {         "loop_failure_streak",         "behavior.loop_failure_streak"},
     {        "loop_failure_seconds",        "behavior.loop_failure_seconds"},
-    {                "color_scheme",                "behavior.color_scheme"},
-    {              "colors_enabled",              "behavior.colors_enabled"},
-    {              "verbose_errors",              "behavior.verbose_errors"},
-    {                  "debug_mode",                  "behavior.debug_mode"},
     {         "display_performance",       "display.performance_monitoring"},
     {        "display_optimization",           "display.optimization_level"},
 
     /// Network options
     {      "ssh_completion_enabled",               "network.ssh_completion"},
-    {     "cloud_discovery_enabled",              "network.cloud_discovery"},
     {             "cache_ssh_hosts",              "network.cache_ssh_hosts"},
     {       "cache_timeout_minutes",        "network.cache_timeout_minutes"},
-    {         "show_remote_context",          "network.show_remote_context"},
-    {           "auto_detect_cloud",            "network.auto_detect_cloud"},
     {        "max_completion_hosts",         "network.max_completion_hosts"},
 
     /// Scripts options
@@ -2205,12 +2167,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Tab width for display\n"
     "behavior.tab_width = 4\n"
     "\n"
-    "# Disable word expansion and globbing\n"
-    "behavior.no_word_expand = false\n"
-    "\n"
-    "# Enable multiline editing mode\n"
-    "behavior.multiline_mode = true\n"
-    "\n"
     "# Max brace expansion result count (0 = unbounded)\n"
     "behavior.brace_expansion_max = 65536\n"
     "\n"
@@ -2231,18 +2187,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Min wall-clock seconds streak must last before tripping\n"
     "behavior.loop_failure_seconds = 5\n"
     "\n"
-    "# Color scheme name: default, dark, light, solarized\n"
-    "behavior.color_scheme = default\n"
-    "\n"
-    "# Enable color output\n"
-    "behavior.colors_enabled = true\n"
-    "\n"
-    "# Show verbose error messages\n"
-    "behavior.verbose_errors = false\n"
-    "\n"
-    "# Enable debug mode\n"
-    "behavior.debug_mode = false\n"
-    "\n"
     "# "
     "=========================================================================="
     "==\n"
@@ -2254,20 +2198,11 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Enable SSH host completion\n"
     "network.ssh_completion = true\n"
     "\n"
-    "# Enable cloud host discovery\n"
-    "network.cloud_discovery = false\n"
-    "\n"
     "# Cache SSH hosts for performance\n"
     "network.cache_ssh_hosts = true\n"
     "\n"
     "# SSH host cache timeout in minutes\n"
     "network.cache_timeout_minutes = 5\n"
-    "\n"
-    "# Show remote context in prompt\n"
-    "network.show_remote_context = true\n"
-    "\n"
-    "# Auto-detect cloud environment\n"
-    "network.auto_detect_cloud = true\n"
     "\n"
     "# Maximum hosts to show in completion\n"
     "network.max_completion_hosts = 50\n"
@@ -2560,8 +2495,6 @@ void config_set_defaults(void) {
     config.spell_correction = true;
     config.confirm_exit = false;
     config.tab_width = 4;
-    config.no_word_expand = false;
-    config.multiline_mode = true;
     config.brace_expansion_max = 65536;
     config.regex_pattern_max = 1024;
     config.path_negative_cache_ttl_ms = 1000;
@@ -2577,21 +2510,10 @@ void config_set_defaults(void) {
     config.autocorrect_external = true;
     config.autocorrect_case_sensitive = false;
 
-    /// Color defaults
-    config.color_scheme = strdup("default");
-    config.colors_enabled = true;
-
-    /// Advanced defaults
-    config.verbose_errors = false;
-    config.debug_mode = false;
-
     /// Network defaults
     config.ssh_completion_enabled = true;
-    config.cloud_discovery_enabled = false;
     config.cache_ssh_hosts = true;
     config.cache_timeout_minutes = 5;
-    config.show_remote_context = true;
-    config.auto_detect_cloud = true;
     config.max_completion_hosts = 50;
 
     /// Display defaults
@@ -3559,9 +3481,6 @@ void config_apply_settings(void) {
     symtable_set_global_int("AUTO_CD", config.auto_cd);
     symtable_set_global_int("SPELL_CORRECTION", config.spell_correction);
     symtable_set_global_int("CONFIRM_EXIT", config.confirm_exit);
-    symtable_set_global_int("COLORS_ENABLED", config.colors_enabled);
-    symtable_set_global_int("NO_WORD_EXPAND", config.no_word_expand);
-    symtable_set_global_int("MULTILINE_MODE", config.multiline_mode);
 
     /// Update autocorrect configuration when spell correction settings change
     autocorrect_config_t autocorrect_cfg;
@@ -3652,17 +3571,6 @@ bool config_validate_string(const char *value) {
 bool config_validate_color(const char *value) {
     /// Basic color validation - could be enhanced
     return config_validate_string(value);
-}
-
-/**
- * @brief Validate a color scheme name
- *
- * @param value String to validate
- * @return True if value is a known color scheme
- */
-bool config_validate_color_scheme(const char *value) {
-    return (strcmp(value, "default") == 0 || strcmp(value, "dark") == 0 ||
-            strcmp(value, "light") == 0 || strcmp(value, "solarized") == 0);
 }
 
 /**
@@ -4814,8 +4722,5 @@ void config_cleanup(void) {
     }
     if (config.theme_corporate_environment) {
         free(config.theme_corporate_environment);
-    }
-    if (config.color_scheme) {
-        free(config.color_scheme);
     }
 }

@@ -300,13 +300,6 @@ void init_shell_opts(void);
  */
 bool get_enhanced_completion(void);
 
-/**
- * @brief Check if word expansion is disabled
- *
- * @return true if word expansion is disabled
- */
-bool get_no_word_expand(void);
-
 /* ============================================================================
  * POSIX Option Management Functions
  * ============================================================================
