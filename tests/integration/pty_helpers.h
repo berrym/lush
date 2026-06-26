@@ -281,12 +281,19 @@ static inline int pty_spawn(pty_session_t *session, const char *lush_path,
 ///
 /// TERM=xterm-256color (not dumb) so the LLE does not fall back to
 /// non-interactive degraded mode.
-static inline int pty_spawn_lle(pty_session_t *session, const char *lush_path,
-                                const char *const argv[]) {
+/// Spawn lush over a full PTY (LLE active), using @p home_override as HOME when
+/// non-NULL (caller owns the directory's contents; the harness still frees the
+/// path) or a fresh mktemp'd dir otherwise. A caller-provided home lets a test
+/// pre-seed a startup config the shell reads before it accepts input.
+static inline int pty_spawn_lle_home(pty_session_t *session,
+                                     const char *lush_path,
+                                     const char *const argv[],
+                                     const char *home_override) {
     memset(session, 0, sizeof(*session));
-    session->home_dir = pty_make_tmpdir();
+    session->home_dir =
+        home_override ? strdup(home_override) : pty_make_tmpdir();
     if (!session->home_dir) {
-        perror("pty_spawn_lle: mkdtemp");
+        perror("pty_spawn_lle: home dir");
         return -1;
     }
 
@@ -353,6 +360,12 @@ static inline int pty_spawn_lle(pty_session_t *session, const char *lush_path,
     /// with the LLE's render bytes.
     session->stdin_fd = master;
     return 0;
+}
+
+/// Convenience wrapper: spawn over a full PTY with a fresh mktemp'd HOME.
+static inline int pty_spawn_lle(pty_session_t *session, const char *lush_path,
+                                const char *const argv[]) {
+    return pty_spawn_lle_home(session, lush_path, argv, NULL);
 }
 
 /// Write a NUL-terminated string to the child's stdin (the pipe end).

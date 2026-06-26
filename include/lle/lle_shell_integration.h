@@ -134,6 +134,21 @@ extern lle_shell_integration_t *g_lle_integration;
  */
 void lle_shell_integration_sync_prompt_config(void);
 
+/**
+ * @brief Switch the live prompt theme and refresh PS1/PS2 from it.
+ *
+ * Combines the active-theme switch (clears cached templates, re-applies syntax
+ * colors) with seeding the PS1/PS2 format strings the plain render path
+ * expands, so a theme change applied through any surface -- the
+ * `display lle theme set` builtin or the display.lle.theme config subscriber --
+ * updates the displayed prompt identically.
+ *
+ * @param name Theme name to activate.
+ * @return LLE_SUCCESS; LLE_ERROR_NOT_FOUND for an unknown theme; or another
+ *         error. The prompt is left unchanged on failure.
+ */
+lle_result_t lle_shell_apply_prompt_theme(const char *name);
+
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
  * ============================================================================

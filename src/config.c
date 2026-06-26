@@ -397,6 +397,9 @@ static const creg_option_t display_options[] = {
     {"lle.pager.wrap_search",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Wrap pager search to top on no-match (less-style)", true     },
+    {            "lle.theme",
+     CREG_VALUE_STRING,      {.type = CREG_VALUE_STRING, .data.string = ""},
+     "LLE prompt theme name (empty uses the default theme)", true  },
 };
 
 static const creg_section_t display_section = {
@@ -742,6 +745,8 @@ static void display_bind_runtime(void) {
                                  &config.display_lle_pager_min_lines);
     config_registry_bind_boolean("display.lle.pager.wrap_search",
                                  &config.display_lle_pager_wrap_search);
+    config_registry_bind_string_ptr("display.lle.theme",
+                                    &config.display_lle_theme);
 }
 
 /// @brief Sync completion config from registry to runtime
@@ -2294,6 +2299,10 @@ void config_set_defaults(void) {
         free(config.display_ambiguous_width);
     }
     config.display_ambiguous_width = strdup("narrow");
+    /// display.lle.theme is owned by its string-pointer binding; release any
+    /// prior value before re-defaulting so a re-init does not orphan it.
+    free(config.display_lle_theme);
+    config.display_lle_theme = NULL;
     config.display_lle_pager_enabled = true;
     config.display_lle_pager_min_lines = 0;
     config.display_lle_pager_wrap_search = true;
@@ -4452,11 +4461,15 @@ void config_cleanup(void) {
     /// Clean up config registry
     config_registry_cleanup();
 
-    /// lle.history_file is owned by its string-pointer binding (strdup on
-    /// change); release the final value.
+    /// lle.history_file and display.lle.theme are owned by their string-pointer
+    /// bindings (strdup on change); release the final values.
     if (config.lle_history_file) {
         free(config.lle_history_file);
         config.lle_history_file = NULL;
+    }
+    if (config.display_lle_theme) {
+        free(config.display_lle_theme);
+        config.display_lle_theme = NULL;
     }
 
     if (config_ctx.user_config_path) {

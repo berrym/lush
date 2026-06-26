@@ -348,6 +348,8 @@ typedef struct {
     int display_optimization_level;      ///< Optimization level (0-4)
     char *display_ambiguous_width;       ///< East Asian Ambiguous width
                                          ///< policy: "narrow" or "wide"
+    char *display_lle_theme;    ///< Persisted LLE prompt theme name (NULL/empty
+                                ///< uses the composer's default theme)
     bool enhanced_display_mode; ///< Legacy display setting (deprecated)
 
     /// LLE pager (lle_pager_present)

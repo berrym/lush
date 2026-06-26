@@ -14,6 +14,7 @@
 
 #include "lle/lle_shell_integration.h"
 #include "config.h"
+#include "config_registry.h"
 #include "executor.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/arena.h"
@@ -539,6 +540,76 @@ struct lle_segment_registry *lle_get_global_segment_registry(void) {
  * Initializes the prompt composer and registers it with the shell event hub
  * for automatic cache invalidation on directory changes and command events.
  */
+lle_result_t lle_shell_apply_prompt_theme(const char *name) {
+    if (!g_lle_integration || !g_lle_integration->prompt_composer) {
+        return LLE_ERROR_NOT_INITIALIZED;
+    }
+    lle_result_t result =
+        lle_composer_set_theme(g_lle_integration->prompt_composer, name);
+    if (result != LLE_SUCCESS) {
+        return result;
+    }
+    /// Seed the PS1/PS2 format strings the plain render path expands from the
+    /// symtable. Powerline themes render their own left prompt, so PS1 is left
+    /// untouched for them.
+    const lle_theme_t *theme =
+        lle_composer_get_theme(g_lle_integration->prompt_composer);
+    if (theme) {
+        if (theme->layout.style != LLE_PROMPT_STYLE_POWERLINE &&
+            strlen(theme->layout.ps1_format) > 0) {
+            symtable_set_global("PS1", theme->layout.ps1_format);
+        }
+        if (strlen(theme->layout.ps2_format) > 0) {
+            symtable_set_global("PS2", theme->layout.ps2_format);
+        }
+    }
+    return LLE_SUCCESS;
+}
+
+/**
+ * @brief Apply a live display.lle.theme change to the running composer.
+ *
+ * The theme name is data and persists in CREG; switching the active theme is
+ * behavior, so it runs here on change rather than through the binding. A no-op
+ * when the requested theme is already active (the echo from
+ * `display lle theme set`, which applies first then persists) and when the
+ * composer is not up yet (startup application handles the initial value). An
+ * unknown name -- e.g. a typo in `config set` or a hand-edited TOML -- is
+ * surfaced rather than leaving config and the displayed theme silently
+ * diverged.
+ */
+static void lle_theme_config_changed(const char *key,
+                                     const creg_value_t *old_value,
+                                     const creg_value_t *new_value,
+                                     void *user_data) {
+    (void)key;
+    (void)old_value;
+    (void)user_data;
+    if (!new_value || new_value->type != CREG_VALUE_STRING) {
+        return;
+    }
+    const char *name = new_value->data.string;
+    if (!name || name[0] == '\0') {
+        return; /// empty = unset; leave the current theme in place
+    }
+    if (!g_lle_integration || !g_lle_integration->prompt_composer ||
+        !g_lle_integration->prompt_composer->themes) {
+        return;
+    }
+    /// strcmp to match lle_theme_registry_find, which resolves theme names by
+    /// strcmp -- the check must agree with how the theme is actually looked up.
+    if (strcmp(g_lle_integration->prompt_composer->themes->active_theme_name,
+               name) == 0) {
+        return; /// already active
+    }
+    if (lle_shell_apply_prompt_theme(name) != LLE_SUCCESS) {
+        fprintf(stderr,
+                "lush: prompt theme '%s' not found; keeping the current "
+                "theme\n",
+                name);
+    }
+}
+
 static lle_result_t
 create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     if (!integ || !integ->event_hub) {
@@ -569,6 +640,12 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         /// - /etc/lush/themes/ (system-wide)
         lle_theme_load_user_themes(&g_theme_registry);
 
+        /// React to live display.lle.theme changes (config set / TOML reload).
+        /// Registered once; the callback no-ops until the composer exists, and
+        /// the startup application below handles the persisted initial value.
+        config_registry_subscribe("display.lle.theme", lle_theme_config_changed,
+                                  NULL);
+
         g_registries_initialized = true;
     }
 
@@ -598,6 +675,22 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         config.display_transient_prompt;
     integ->prompt_composer->config.newline_before_prompt =
         config.display_newline_before_prompt;
+
+    /// Restore the persisted prompt theme (display.lle.theme). The name is data
+    /// in CREG; applying it is behavior, so it runs here once the composer
+    /// exists. The PS1/PS2 seeding below picks up whatever theme is active, so
+    /// only the switch is needed here. An unknown persisted name (e.g. a
+    /// hand-edited TOML or a deleted theme) is surfaced and leaves the default
+    /// theme active rather than silently failing.
+    if (config.display_lle_theme && config.display_lle_theme[0] != '\0') {
+        if (lle_composer_set_theme(integ->prompt_composer,
+                                   config.display_lle_theme) != LLE_SUCCESS) {
+            fprintf(stderr,
+                    "lush: persisted prompt theme '%s' not found; using the "
+                    "default\n",
+                    config.display_lle_theme);
+        }
+    }
 
     /// Register with shell event hub for automatic updates
     /// This is the key Spec 25 <-> Spec 26 integration point
