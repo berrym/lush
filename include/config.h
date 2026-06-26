@@ -67,7 +67,6 @@ typedef enum {
     CONFIG_SECTION_NONE,          ///< No section (default)
     CONFIG_SECTION_HISTORY,       ///< History settings
     CONFIG_SECTION_COMPLETION,    ///< Completion settings
-    CONFIG_SECTION_PROMPT,        ///< Prompt settings
     CONFIG_SECTION_BEHAVIOR,      ///< Behavior settings
     CONFIG_SECTION_ALIASES,       ///< Alias definitions
     CONFIG_SECTION_KEYS,          ///< Key binding settings
@@ -90,18 +89,6 @@ typedef enum {
     LLE_ARROW_MODE_ALWAYS_HISTORY, ///< Always history, use Ctrl-P/N only
     LLE_ARROW_MODE_MULTILINE_FIRST ///< Prioritize multiline navigation
 } lle_arrow_key_mode_t;
-
-/**
- * @brief LLE History storage modes
- *
- * Controls how history is stored on disk.
- */
-typedef enum {
-    LLE_STORAGE_MODE_LLE_ONLY,       ///< Store only in LLE format
-    LLE_STORAGE_MODE_BASH_ONLY,      ///< Store only in bash format
-    LLE_STORAGE_MODE_DUAL,           ///< Store in both formats (recommended)
-    LLE_STORAGE_MODE_READLINE_COMPAT ///< Use GNU Readline's storage
-} lle_history_storage_mode_t;
 
 /**
  * @brief LLE History deduplication scope
@@ -290,7 +277,6 @@ typedef struct {
     int history_size;        ///< Maximum history entries
     bool history_no_dups;    ///< Ignore duplicate entries
     bool history_timestamps; ///< Record timestamps
-    char *history_file;      ///< History file path
     history_search_mode_t
         history_search_mode; ///< Up/down navigation filter (prefix / plain)
     history_finder_match_t
@@ -304,29 +290,17 @@ typedef struct {
 
     /// LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
-    bool lle_enable_multiline_navigation;    ///< Enable multiline navigation
-    bool lle_wrap_history_navigation;        ///< Wrap at history ends
-    bool lle_save_line_on_history_nav;       ///< Save line when navigating
-    bool lle_preserve_multiline_structure;   ///< Preserve multiline structure
     bool lle_enable_multiline_editing;       ///< Enable multiline editing
-    bool lle_show_multiline_indicators;      ///< Show multiline indicators
-    bool lle_enable_interactive_search;      ///< Enable interactive search
-    bool lle_search_fuzzy_matching;          ///< Enable fuzzy search matching
-    bool lle_search_case_sensitive;          ///< Case-sensitive search
-    lle_history_storage_mode_t lle_storage_mode; ///< History storage mode
-    char *lle_history_file;                      ///< LLE history file path
-    bool lle_sync_with_readline;                 ///< Sync with readline history
-    bool lle_export_to_bash_history;             ///< Export to bash history
-    bool lle_enable_forensic_tracking;           ///< Enable forensic tracking
-    bool lle_enable_deduplication;               ///< Enable deduplication
-    lle_dedup_scope_t lle_dedup_scope;           ///< Deduplication scope
-    lle_dedup_strategy_t lle_dedup_strategy;     ///< Deduplication strategy
-    bool lle_dedup_navigation;         ///< Skip duplicates during navigation
-    bool lle_dedup_navigation_unique;  ///< Show only unique entries
-    bool lle_dedup_unicode_normalize;  ///< Use Unicode NFC normalization
-    bool lle_enable_history_cache;     ///< Enable history cache
-    int lle_cache_size;                ///< Cache size
-    bool lle_readline_compatible_mode; ///< Readline compatibility mode
+    char *lle_history_file;                  ///< LLE history file path
+    bool lle_enable_forensic_tracking;       ///< Enable forensic tracking
+    bool lle_enable_deduplication;           ///< Enable deduplication
+    lle_dedup_scope_t lle_dedup_scope;       ///< Deduplication scope
+    lle_dedup_strategy_t lle_dedup_strategy; ///< Deduplication strategy
+    bool lle_dedup_navigation;        ///< Skip duplicates during navigation
+    bool lle_dedup_navigation_unique; ///< Show only unique entries
+    bool lle_dedup_unicode_normalize; ///< Use Unicode NFC normalization
+    bool lle_enable_history_cache;    ///< Enable history cache
+    int lle_cache_size;               ///< Cache size
 
     /// Completion settings
     bool completion_enabled;                       ///< Enable tab completion
@@ -336,35 +310,11 @@ typedef struct {
     bool completion_show_all;       ///< Show all completions
     bool hints_enabled;             ///< Enable inline hints
 
-    /// Prompt settings
-    bool use_theme_prompt;   ///< Use theme system for prompts
-    char *prompt_theme;      ///< Theme name
-    bool git_prompt_enabled; ///< Enable git info in prompt
-    int git_cache_timeout;   ///< Git info cache timeout (seconds)
-    char *prompt_format;     ///< Custom prompt format string
-
-    /// Theme settings
-    char *theme_name;                  ///< Active theme name
-    bool theme_auto_detect_colors;     ///< Auto-detect color support
-    bool theme_fallback_basic;         ///< Fall back to basic theme
-    char *theme_corporate_company;     ///< Company name for corporate theme
-    char *theme_corporate_department;  ///< Department for corporate theme
-    char *theme_corporate_project;     ///< Project for corporate theme
-    char *theme_corporate_environment; ///< Environment for corporate theme
-    bool theme_show_company;           ///< Show company in prompt
-    bool theme_show_department;        ///< Show department in prompt
-    bool theme_show_right_prompt;      ///< Enable right-side prompt
-    bool theme_enable_animations;      ///< Enable prompt animations
-    bool theme_enable_icons;           ///< Enable Unicode icons
-    int theme_color_support_override;  ///< Override detected color support
-
     /// Behavior settings
     bool auto_cd;            ///< Auto-cd to directories
     bool spell_correction;   ///< Enable spell correction
     bool confirm_exit;       ///< Confirm before exit
     int tab_width;           ///< Tab display width
-    bool no_word_expand;     ///< Disable word expansion
-    bool multiline_mode;     ///< Enable multiline editing
     int brace_expansion_max; ///< Max brace expansion result count (0 =
                              ///< unbounded)
     int regex_pattern_max;   ///< Max regex pattern length before rejection (0 =
@@ -387,14 +337,6 @@ typedef struct {
     bool autocorrect_builtins;       ///< Correct builtin names
     bool autocorrect_external;       ///< Correct external commands
     bool autocorrect_case_sensitive; ///< Case-sensitive matching
-
-    /// Color settings
-    char *color_scheme;  ///< Active color scheme name
-    bool colors_enabled; ///< Enable colored output
-
-    /// Advanced settings
-    bool verbose_errors; ///< Verbose error messages
-    bool debug_mode;     ///< Enable debug mode
 
     /// Display system settings
     bool display_syntax_highlighting;    ///< Enable syntax highlighting
@@ -424,13 +366,10 @@ typedef struct {
         autosuggestion_sources; ///< History only, or history then completion
 
     /// Network settings
-    bool ssh_completion_enabled;  ///< Enable SSH host completion
-    bool cloud_discovery_enabled; ///< Enable cloud host discovery
-    bool cache_ssh_hosts;         ///< Cache SSH hosts
-    int cache_timeout_minutes;    ///< Cache timeout in minutes
-    bool show_remote_context;     ///< Show remote context
-    bool auto_detect_cloud;       ///< Auto-detect cloud environment
-    int max_completion_hosts;     ///< Maximum hosts for completion
+    bool ssh_completion_enabled; ///< Enable SSH host completion
+    bool cache_ssh_hosts;        ///< Cache SSH hosts
+    int cache_timeout_minutes;   ///< Cache timeout in minutes
+    int max_completion_hosts;    ///< Maximum hosts for completion
 
     /// Script execution control
     bool script_execution; ///< Enable script execution
@@ -638,14 +577,6 @@ bool config_validate_display_mode(const char *value);
 bool config_validate_optimization_level(const char *value);
 
 /**
- * @brief Validate a color scheme value
- *
- * @param value Color scheme name to validate
- * @return true if valid color scheme, false otherwise
- */
-bool config_validate_color_scheme(const char *value);
-
-/**
  * @brief Validate an East Asian Ambiguous-width policy value
  *
  * @param value Width policy string ("narrow" or "wide")
@@ -732,14 +663,6 @@ bool config_validate_history_finder_rank(const char *value);
  * @return true if valid, false otherwise
  */
 bool config_validate_history_finder_display(const char *value);
-
-/**
- * @brief Validate an LLE storage mode value
- *
- * @param value Storage mode string to validate
- * @return true if valid storage mode, false otherwise
- */
-bool config_validate_lle_storage_mode(const char *value);
 
 /**
  * @brief Validate an LLE dedup scope value
