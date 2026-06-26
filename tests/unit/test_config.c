@@ -15,7 +15,9 @@
  */
 
 #include "config.h"
+#include "lle/char_width.h"
 #include "test_framework.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -369,6 +371,27 @@ TEST(config_display_lle_theme_persists) {
     ASSERT_TRUE(config.display_lle_theme != NULL &&
                     strcmp(config.display_lle_theme, "two-line") == 0,
                 "the binding should write through to the owned char* cell");
+}
+
+TEST(config_display_ambiguous_width_applies) {
+    config_init();
+
+    /// display.ambiguous_width is a registry-backed string key whose value
+    /// config_apply_settings pushes to the LLE codepoint-width policy. Setting
+    /// it widens (or narrows) East Asian Ambiguous-class characters; U+2026
+    /// HORIZONTAL ELLIPSIS is Ambiguous, so its width tracks the policy.
+    const uint32_t ambiguous = 0x2026;
+
+    ASSERT_EQ(config_set_string("display.ambiguous_width", "wide"), 0,
+              "config_set_string should reach the registry key");
+    config_apply_settings();
+    ASSERT_EQ(lle_codepoint_width(ambiguous), 2,
+              "wide policy widens an ambiguous character to 2 columns");
+
+    config_set_string("display.ambiguous_width", "narrow");
+    config_apply_settings();
+    ASSERT_EQ(lle_codepoint_width(ambiguous), 1,
+              "narrow policy renders an ambiguous character as 1 column");
 }
 
 TEST(config_display_newline_before_prompt_bound) {
@@ -838,6 +861,7 @@ int main(void) {
     RUN_TEST(config_set_get_int);
     RUN_TEST(config_set_get_string);
     RUN_TEST(config_display_lle_theme_persists);
+    RUN_TEST(config_display_ambiguous_width_applies);
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_get_bool_default);

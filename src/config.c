@@ -143,11 +143,11 @@ static config_option_t config_options[] = {
     /// completion.{enabled,match_mode,threshold,case_sensitive} are migrated to
     /// the CREG registry (bound + layered); they resolve through the registry,
     /// not this legacy table. (show_all and hints remain legacy-only.)
-    {           "completion.show_all",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
+    {           "completion.show_all", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
      &config.completion_show_all,"Show all completions",config_validate_bool,
-     NULL                                                                                                           },
-    {              "completion.hints",   CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
-     &config.hints_enabled,                  "Enable input hints",            config_validate_bool,             NULL},
+     NULL                                                                                                        },
+    {              "completion.hints", CONFIG_TYPE_BOOL, CONFIG_SECTION_COMPLETION,
+     &config.hints_enabled,                  "Enable input hints",         config_validate_bool,             NULL},
 
     /// Behavior settings
     /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
@@ -159,35 +159,31 @@ static config_option_t config_options[] = {
     /// the CREG registry (bound + layered).
 
     /// Network settings
-    {        "network.ssh_completion",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
+    {        "network.ssh_completion", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.ssh_completion_enabled,          "Enable SSH host completion",
-     config_validate_bool,             NULL                                                                         },
-    {       "network.cache_ssh_hosts",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
+     config_validate_bool,             NULL                                                                      },
+    {       "network.cache_ssh_hosts", CONFIG_TYPE_BOOL,    CONFIG_SECTION_NETWORK,
      &config.cache_ssh_hosts,     "Cache SSH hosts for performance",
-     config_validate_bool,             NULL                                                                         },
-    { "network.cache_timeout_minutes",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
+     config_validate_bool,             NULL                                                                      },
+    { "network.cache_timeout_minutes",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.cache_timeout_minutes,   "SSH host cache timeout in minutes",
-     config_validate_int,             NULL                                                                          },
-    {  "network.max_completion_hosts",    CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
+     config_validate_int,             NULL                                                                       },
+    {  "network.max_completion_hosts",  CONFIG_TYPE_INT,    CONFIG_SECTION_NETWORK,
      &config.max_completion_hosts, "Maximum hosts to show in completion",
-     config_validate_int,             NULL                                                                          },
+     config_validate_int,             NULL                                                                       },
 
     /// Display system settings
     /// v1.3.0: Layered display is now the exclusive system - no configuration
     /// needed
     /// display.system_mode and display.layered_display options removed
     /// display.{syntax_highlighting,autosuggestions,transient_prompt,
-    /// theme_hot_reload,optimization_level,lle.pager.*} are migrated to the
-    /// CREG registry (bound + layered); they resolve through the registry, not
-    /// this legacy table. performance_monitoring and ambiguous_width remain
+    /// theme_hot_reload,optimization_level,lle.pager.*,ambiguous_width} are
+    /// migrated to the CREG registry (bound + layered); they resolve through
+    /// the registry, not this legacy table. performance_monitoring remains
     /// legacy-only for now.
-    {"display.performance_monitoring",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
+    {"display.performance_monitoring", CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
      &config.display_performance_monitoring,
-     "Enable display performance monitoring",            config_validate_bool,             NULL                     },
-    {       "display.ambiguous_width", CONFIG_TYPE_STRING,    CONFIG_SECTION_DISPLAY,
-     &config.display_ambiguous_width,
-     "East Asian Ambiguous-class display width: \"narrow\" (default) or "
-     "\"wide\"", config_validate_ambiguous_width,             NULL                                                  },
+     "Enable display performance monitoring",         config_validate_bool,             NULL                     },
 
     /// Autosuggestion settings
     /// autosuggestion.* is migrated to the CREG registry (bound + layered); its
@@ -197,71 +193,71 @@ static config_option_t config_options[] = {
     /// behavior.enhanced_display_mode option removed
 
     /// Script execution control
-    {             "scripts.execution",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
-     &config.script_execution,             "Enable script execution",            config_validate_bool,
-     NULL                                                                                                           },
+    {             "scripts.execution", CONFIG_TYPE_BOOL,    CONFIG_SECTION_SCRIPTS,
+     &config.script_execution,             "Enable script execution",         config_validate_bool,
+     NULL                                                                                                        },
 
     /// Shell options integration - all 24 POSIX options with shell.* namespace
     /// These map directly to existing shell_opts flags for perfect
     /// compatibility
-    {                 "shell.errexit",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit on command failure (set -e)",    config_validate_shell_option,             NULL                          },
-    {                  "shell.xtrace",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Trace command execution (set -x)",    config_validate_shell_option,             NULL                          },
-    {                  "shell.noexec",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Syntax check only (set -n)",    config_validate_shell_option,             NULL                                },
-    {                 "shell.nounset",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Error on unset variables (set -u)",    config_validate_shell_option,             NULL                         },
-    {                 "shell.verbose",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Print input lines (set -v)",    config_validate_shell_option,             NULL                                },
-    {                  "shell.noglob",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Disable pathname expansion (set -f)",    config_validate_shell_option,             NULL                       },
-    {                 "shell.hashall",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Command hashing (set -h)",    config_validate_shell_option,             NULL                                  },
-    {                 "shell.monitor",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Job control (set -m)",    config_validate_shell_option,             NULL                                      },
-    {               "shell.allexport",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Auto export variables (set -a)",    config_validate_shell_option,             NULL                            },
-    {               "shell.noclobber",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent file overwrite (set -C)",    config_validate_shell_option,             NULL                           },
-    {                  "shell.onecmd",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Exit after one command (set -t)",    config_validate_shell_option,             NULL                           },
-    {                  "shell.notify",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Async job notification (set -b)",    config_validate_shell_option,             NULL                           },
-    {               "shell.ignoreeof",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent exit on EOF (set -o ignoreeof)",    config_validate_shell_option,
-     NULL                                                                                                           },
-    {                   "shell.nolog",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Prevent function history logging (set -o nolog)",    config_validate_shell_option,             NULL           },
-    {                   "shell.emacs",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Emacs-style editing (set -o emacs)",    config_validate_shell_option,             NULL                        },
-    {                      "shell.vi",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Vi-style editing (set -o vi)",    config_validate_shell_option,             NULL                              },
-    {                   "shell.posix",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Strict POSIX compliance (set -o posix)",    config_validate_shell_option,
-     NULL                                                                                                           },
-    {                "shell.pipefail",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Pipeline failure detection (set -o pipefail)",    config_validate_shell_option,             NULL              },
-    {              "shell.histexpand",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "History expansion (set -o histexpand)",    config_validate_shell_option,
-     NULL                                                                                                           },
-    {                 "shell.history",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Command history recording (set -o history)",    config_validate_shell_option,
-     NULL                                                                                                           },
-    {    "shell.interactive-comments",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Interactive comments (set -o interactive-comments)",    config_validate_shell_option,             NULL        },
-    {                "shell.physical",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Physical directory paths (set -o physical)",    config_validate_shell_option,
-     NULL                                                                                                           },
-    {              "shell.privileged",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
-     "Restricted shell security (set -o privileged)",    config_validate_shell_option,             NULL             },
+    {                 "shell.errexit", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Exit on command failure (set -e)", config_validate_shell_option,             NULL                          },
+    {                  "shell.xtrace", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Trace command execution (set -x)", config_validate_shell_option,             NULL                          },
+    {                  "shell.noexec", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Syntax check only (set -n)", config_validate_shell_option,             NULL                                },
+    {                 "shell.nounset", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Error on unset variables (set -u)", config_validate_shell_option,             NULL                         },
+    {                 "shell.verbose", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Print input lines (set -v)", config_validate_shell_option,             NULL                                },
+    {                  "shell.noglob", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Disable pathname expansion (set -f)", config_validate_shell_option,             NULL                       },
+    {                 "shell.hashall", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Command hashing (set -h)", config_validate_shell_option,             NULL                                  },
+    {                 "shell.monitor", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Job control (set -m)", config_validate_shell_option,             NULL                                      },
+    {               "shell.allexport", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Auto export variables (set -a)", config_validate_shell_option,             NULL                            },
+    {               "shell.noclobber", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Prevent file overwrite (set -C)", config_validate_shell_option,             NULL                           },
+    {                  "shell.onecmd", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Exit after one command (set -t)", config_validate_shell_option,             NULL                           },
+    {                  "shell.notify", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Async job notification (set -b)", config_validate_shell_option,             NULL                           },
+    {               "shell.ignoreeof", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Prevent exit on EOF (set -o ignoreeof)", config_validate_shell_option,
+     NULL                                                                                                        },
+    {                   "shell.nolog", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Prevent function history logging (set -o nolog)", config_validate_shell_option,             NULL           },
+    {                   "shell.emacs", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Emacs-style editing (set -o emacs)", config_validate_shell_option,             NULL                        },
+    {                      "shell.vi", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Vi-style editing (set -o vi)", config_validate_shell_option,             NULL                              },
+    {                   "shell.posix", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Strict POSIX compliance (set -o posix)", config_validate_shell_option,
+     NULL                                                                                                        },
+    {                "shell.pipefail", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Pipeline failure detection (set -o pipefail)", config_validate_shell_option,             NULL              },
+    {              "shell.histexpand", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "History expansion (set -o histexpand)", config_validate_shell_option,
+     NULL                                                                                                        },
+    {                 "shell.history", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Command history recording (set -o history)", config_validate_shell_option,
+     NULL                                                                                                        },
+    {    "shell.interactive-comments", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Interactive comments (set -o interactive-comments)", config_validate_shell_option,             NULL        },
+    {                "shell.physical", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Physical directory paths (set -o physical)", config_validate_shell_option,
+     NULL                                                                                                        },
+    {              "shell.privileged", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,               NULL,
+     "Restricted shell security (set -o privileged)", config_validate_shell_option,             NULL             },
 
     /// Shell mode settings (Extended Language Support)
-    {                    "shell.mode",   CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
-     "Shell compatibility mode (posix, bash, zsh, lush)",      config_validate_shell_mode, &shell_mode_enum         },
-    {             "shell.mode_strict",   CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
+    {                    "shell.mode", CONFIG_TYPE_ENUM,      CONFIG_SECTION_SHELL, &config.shell_mode,
+     "Shell compatibility mode (posix, bash, zsh, lush)",   config_validate_shell_mode, &shell_mode_enum         },
+    {             "shell.mode_strict", CONFIG_TYPE_BOOL,      CONFIG_SECTION_SHELL,
      &config.shell_mode_strict,       "Disallow runtime mode changes",
-     config_validate_bool,             NULL                                                                         },
+     config_validate_bool,             NULL                                                                      },
 };
 
 static const int num_config_options =
@@ -371,35 +367,38 @@ static const creg_section_t shell_section = {
  * -------------------------------------------------------------------------- */
 static const creg_option_t display_options[] = {
     {  "syntax_highlighting",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable syntax highlighting", true                            },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable syntax highlighting", true                              },
     {      "autosuggestions",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable Fish-style autosuggestions", true                     },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable Fish-style autosuggestions", true                       },
     {     "transient_prompt",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Enable transient prompts", true                              },
+     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Enable transient prompts", true                                },
     {   "optimization_level",
-     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 2},
-     "Display optimization level (0-4)", true                      },
+     CREG_VALUE_INTEGER,      {.type = CREG_VALUE_INTEGER, .data.integer = 2},
+     "Display optimization level (0-4)", true                        },
     {     "theme_hot_reload",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Auto-reload theme when its file changes on disk", true       },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Auto-reload theme when its file changes on disk", true         },
     {"newline_before_prompt",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Print a blank line before each prompt", true                 },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Print a blank line before each prompt", true                   },
     {    "lle.pager.enabled",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Master switch for the LLE pager", true                       },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Master switch for the LLE pager", true                         },
     {  "lle.pager.min_lines",
-     CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 0},
-     "Pager threshold in visual rows (0 = use terminal rows)", true},
+     CREG_VALUE_INTEGER,      {.type = CREG_VALUE_INTEGER, .data.integer = 0},
+     "Pager threshold in visual rows (0 = use terminal rows)", true  },
     {"lle.pager.wrap_search",
-     CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Wrap pager search to top on no-match (less-style)", true     },
+     CREG_VALUE_BOOLEAN,   {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Wrap pager search to top on no-match (less-style)", true       },
     {            "lle.theme",
-     CREG_VALUE_STRING,      {.type = CREG_VALUE_STRING, .data.string = ""},
-     "LLE prompt theme name (empty uses the default theme)", true  },
+     CREG_VALUE_STRING,       {.type = CREG_VALUE_STRING, .data.string = ""},
+     "LLE prompt theme name (empty uses the default theme)", true    },
+    {      "ambiguous_width",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "narrow"},
+     "East Asian Ambiguous-class display width: narrow or wide", true},
 };
 
 static const creg_section_t display_section = {
@@ -747,6 +746,8 @@ static void display_bind_runtime(void) {
                                  &config.display_lle_pager_wrap_search);
     config_registry_bind_string_ptr("display.lle.theme",
                                     &config.display_lle_theme);
+    config_registry_bind_string_ptr("display.ambiguous_width",
+                                    &config.display_ambiguous_width);
 }
 
 /// @brief Sync completion config from registry to runtime
@@ -4470,6 +4471,10 @@ void config_cleanup(void) {
     if (config.display_lle_theme) {
         free(config.display_lle_theme);
         config.display_lle_theme = NULL;
+    }
+    if (config.display_ambiguous_width) {
+        free(config.display_ambiguous_width);
+        config.display_ambiguous_width = NULL;
     }
 
     if (config_ctx.user_config_path) {
