@@ -450,6 +450,46 @@ TEST(config_show_lists_migrated_lle_section) {
                 "config show lle should list the history_file key");
 }
 
+TEST(config_show_lists_shell_feature_keys) {
+    config_init();
+
+    /// The feature matrix is registered as shell.feature.* keys in the registry
+    /// "shell" section, added at runtime (not in the static section
+    /// definition). `config show shell` must enumerate them through the live
+    /// option store, or features silently drop from discovery. Capturing the
+    /// section output also exercises the buffered render path that feeds the
+    /// LLE pager: non-tty stdout makes the pager stream verbatim, so the full
+    /// listing must appear here.
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0, "pipe should succeed");
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    dup2(pipefd[1], STDOUT_FILENO);
+    close(pipefd[1]);
+
+    config_show_section(CONFIG_SECTION_SHELL);
+    fflush(stdout);
+
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+
+    char buf[8192];
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    close(pipefd[0]);
+    ASSERT_TRUE(n > 0,
+                "config show should produce output for the shell section");
+    buf[n > 0 ? n : 0] = '\0';
+
+    ASSERT_TRUE(strstr(buf, "feature.extended_glob") != NULL,
+                "config show shell should list the extended_glob feature key");
+    ASSERT_TRUE(
+        strstr(buf, "feature.brace_expansion") != NULL,
+        "config show shell should list the brace_expansion feature key");
+    /// The legacy shell.* options must still appear alongside the features.
+    ASSERT_TRUE(strstr(buf, "shell.errexit") != NULL,
+                "config show shell should still list the legacy shell options");
+}
+
 TEST(config_get_bool_default) {
     config_init();
 
@@ -828,6 +868,7 @@ int main(void) {
     RUN_TEST(config_display_ambiguous_width_applies);
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
+    RUN_TEST(config_show_lists_shell_feature_keys);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
     RUN_TEST(config_get_string_default);
