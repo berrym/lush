@@ -212,32 +212,34 @@ int bin_shopt(int argc, char **argv) {
                 result = 1;
             }
         } else if (set_mode) {
-            /// -s: enable the option (alias perspective)
+            /// -s: enable the option (alias perspective). Route through the
+            /// registry under the canonical shell.feature.<name> key; the
+            /// shell.feature.* subscriber mirrors it into the matrix.
             bool target = !invert;
-            if (target) {
+            if (config_registry_is_initialized()) {
+                char key[CREG_KEY_MAX];
+                snprintf(key, sizeof(key), "shell.feature.%s",
+                         shell_feature_name(feature));
+                config_registry_set_boolean(key, target);
+            } else if (target) {
                 shell_feature_enable(feature);
             } else {
                 shell_feature_disable(feature);
-            }
-            if (config_registry_is_initialized()) {
-                char key[CREG_KEY_MAX];
-                snprintf(key, sizeof(key), "shell.features.%s",
-                         shell_feature_name(feature));
-                config_registry_set_boolean(key, target);
             }
         } else if (unset_mode) {
-            /// -u: disable the option (alias perspective)
+            /// -u: disable the option (alias perspective). Route through the
+            /// registry under the canonical shell.feature.<name> key; the
+            /// shell.feature.* subscriber mirrors it into the matrix.
             bool target = invert;
-            if (target) {
+            if (config_registry_is_initialized()) {
+                char key[CREG_KEY_MAX];
+                snprintf(key, sizeof(key), "shell.feature.%s",
+                         shell_feature_name(feature));
+                config_registry_set_boolean(key, target);
+            } else if (target) {
                 shell_feature_enable(feature);
             } else {
                 shell_feature_disable(feature);
-            }
-            if (config_registry_is_initialized()) {
-                char key[CREG_KEY_MAX];
-                snprintf(key, sizeof(key), "shell.features.%s",
-                         shell_feature_name(feature));
-                config_registry_set_boolean(key, target);
             }
         } else {
             /// No -s/-u: just print the option state.

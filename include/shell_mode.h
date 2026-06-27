@@ -300,6 +300,25 @@ bool shell_mode_set(shell_mode_t mode);
  */
 bool apply_mode_preset(shell_mode_t mode);
 
+/**
+ * @brief Register the feature matrix as shell.feature.* registry keys.
+ *
+ * Makes every FEATURE_* entry a first-class layered config key so config get /
+ * show, setopt / unsetopt / shopt, and mode presets route through the central
+ * store. Idempotent; a no-op until the registry is initialized. Implemented in
+ * config.c (bridges the feature matrix and the config registry).
+ */
+void shell_register_features(void);
+
+/**
+ * @brief Seed every feature's MODE layer from @p mode and drop overrides.
+ *
+ * The mode-change companion to shell_feature_reset_all: re-seeds the layered
+ * store with the mode matrix and clears interactive feature pins (features are
+ * mode-sticky). Called on every mode switch. Implemented in config.c.
+ */
+void shell_seed_feature_modes(shell_mode_t mode);
+
 /* ============================================================================
  * Feature Override Functions
  * ============================================================================

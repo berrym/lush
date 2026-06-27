@@ -747,6 +747,105 @@ static void shell_option_registry_apply(const char *key,
     config_set_shell_option(key, new_value->data.boolean);
 }
 
+/// ===========================================================================
+/// shell.feature.* -- the feature matrix as first-class registry keys
+/// ===========================================================================
+///
+/// The FEATURE_* matrix (per-mode feature defaults plus runtime overrides) is a
+/// second shell truth store alongside shell_opts. Each feature is registered as
+/// a key "shell.feature.<canonical-name>" so config get / show, setopt /
+/// unsetopt / shopt, and mode presets all route through the one layered store.
+/// The runtime read path stays shell_mode_allows(); the registry is the write +
+/// query surface and mirrors it via a subscriber, exactly as shell_opts does.
+///
+/// register_option stores the option_def pointer, so the defs and their key
+/// strings outlive the registry in these file-scope arrays.
+static creg_option_t g_feature_options[FEATURE_COUNT];
+static char g_feature_keys[FEATURE_COUNT][CREG_KEY_MAX];
+static bool g_features_registered = false;
+
+/// Mirror a registry write to shell.feature.<name> into the runtime matrix. A
+/// present SESSION layer means the user pinned the feature (override); its
+/// absence means follow the active mode's matrix (reset). This keeps
+/// shell_mode_allows() -- the executor's read path -- in lockstep with the
+/// layered store without making the registry a parallel truth.
+static void shell_feature_registry_apply(const char *key,
+                                         const creg_value_t *old_value,
+                                         const creg_value_t *new_value,
+                                         void *user_data) {
+    (void)old_value;
+    (void)user_data;
+    if (!key || strncmp(key, "shell.feature.", 14) != 0) {
+        return;
+    }
+    shell_feature_t feature;
+    bool invert = false;
+    if (!shell_feature_parse(key + 14, &feature, &invert)) {
+        return;
+    }
+    /// Canonical keys carry the underlying feature's own sense (canonical names
+    /// never invert), so the effective value is the feature state directly.
+    creg_inspect_t info;
+    if (config_registry_inspect(key, &info) == CREG_SUCCESS &&
+        info.layers[CREG_LAYER_SESSION].present) {
+        if (new_value && new_value->type == CREG_VALUE_BOOLEAN &&
+            new_value->data.boolean) {
+            shell_feature_enable(feature);
+        } else {
+            shell_feature_disable(feature);
+        }
+    } else {
+        /// No interactive override -> follow the mode matrix.
+        shell_feature_reset(feature);
+    }
+}
+
+void shell_seed_feature_modes(shell_mode_t mode) {
+    if (!config_registry_is_initialized()) {
+        return;
+    }
+    /// Seed every feature's MODE layer from the matrix default for @p mode and
+    /// drop any interactive override, so the new mode's defaults take effect.
+    /// The mode-change companion to apply_mode_preset's
+    /// shell_feature_reset_all: features are mode-sticky (a mode switch clears
+    /// overrides), unlike user-sticky shell options.
+    for (int i = 0; i < (int)FEATURE_COUNT; i++) {
+        shell_feature_t feature = (shell_feature_t)i;
+        char key[CREG_KEY_MAX];
+        snprintf(key, sizeof(key), "shell.feature.%s",
+                 shell_feature_name(feature));
+        config_registry_reset(key);
+        creg_value_t v =
+            creg_value_boolean(shell_mode_feature_default(mode, feature));
+        config_registry_set_mode_value(key, &v);
+    }
+}
+
+void shell_register_features(void) {
+    if (g_features_registered || !config_registry_is_initialized()) {
+        return;
+    }
+    for (int i = 0; i < (int)FEATURE_COUNT; i++) {
+        shell_feature_t feature = (shell_feature_t)i;
+        snprintf(g_feature_keys[i], CREG_KEY_MAX, "feature.%s",
+                 shell_feature_name(feature));
+        g_feature_options[i].name = g_feature_keys[i];
+        g_feature_options[i].type = CREG_VALUE_BOOLEAN;
+        g_feature_options[i].default_val = creg_value_boolean(false);
+        /// The key name is the feature name; no separate help needed.
+        g_feature_options[i].help = NULL;
+        /// Features are mode-derived, never written to the config file.
+        g_feature_options[i].persisted = false;
+        config_registry_register_option("shell", &g_feature_options[i]);
+    }
+    g_features_registered = true;
+    config_registry_subscribe("shell.feature.*", shell_feature_registry_apply,
+                              NULL);
+    /// MODE-layer seeding is driven by config_init / apply_mode_preset right
+    /// after config_registry_apply_mode_defaults, which clears every MODE slot;
+    /// seeding here would just be wiped by that overlay pass.
+}
+
 /// @brief Sync shell options from registry to runtime
 static void shell_sync_to_runtime(void) {
     bool bval;
@@ -1031,6 +1130,12 @@ static void config_register_sections(void) {
     /// (preserving option side effects). config set / set -o route through the
     /// registry; shell_opts is the read target.
     config_registry_subscribe("shell.*", shell_option_registry_apply, NULL);
+
+    /// Register the feature matrix as shell.feature.* keys. The shell.*
+    /// subscriber above skips feature keys; a dedicated shell.feature.*
+    /// subscriber mirrors them into the runtime matrix. MODE-layer seeding runs
+    /// later in config_init, after config_registry_apply_mode_defaults.
+    shell_register_features();
 }
 
 /**
@@ -2084,6 +2189,11 @@ int config_init(void) {
     /// loading user config, so any user lushrc settings layer on top of
     /// the right preset.
     config_registry_apply_mode_defaults(shell_mode_get());
+
+    /// Seed the feature matrix's MODE layer after the generic overlay:
+    /// apply_mode_defaults clears every MODE slot, so feature seeding has to
+    /// follow it or it gets wiped.
+    shell_seed_feature_modes(shell_mode_get());
 
     /// Push the freshly-applied per-mode defaults into the runtime struct now,
     /// before the user-config-file existence checks below. On a fresh install
@@ -4024,12 +4134,21 @@ void config_set_value(const char *key, const char *value) {
         }
 
         /// `enable` is the user's intent in alias terms; flip onto the
-        /// underlying feature when the alias is inverted.
+        /// underlying feature when the alias is inverted. Route through the
+        /// registry under the canonical key so the SESSION layer records the
+        /// pin and the shell.feature.* subscriber mirrors it into the matrix.
         bool target = enable ^ invert;
-        if (target) {
-            shell_feature_enable(feature);
+        if (config_registry_is_initialized()) {
+            char canon[CREG_KEY_MAX];
+            snprintf(canon, sizeof(canon), "shell.feature.%s",
+                     shell_feature_name(feature));
+            config_registry_set_boolean(canon, target);
         } else {
-            shell_feature_disable(feature);
+            if (target) {
+                shell_feature_enable(feature);
+            } else {
+                shell_feature_disable(feature);
+            }
         }
         printf("Set %s = %s\n", key, value);
         return;
@@ -4312,14 +4431,17 @@ static void config_show_registry_section(config_section_t section) {
     if (!reg_name) {
         return;
     }
-    const creg_section_t *reg = config_registry_get_section(reg_name);
-    if (!reg) {
-        return;
-    }
-    for (size_t i = 0; i < reg->option_count; i++) {
+    /// Iterate the live option store (config_registry_section_option_count),
+    /// not the section definition: runtime-registered options such as the
+    /// shell.feature.* keys live in the store, not the static definition.
+    size_t count = config_registry_section_option_count(reg_name);
+    size_t prefix_len = strlen(reg_name) + 1; /// "<section>."
+    for (size_t i = 0; i < count; i++) {
         char full_key[CREG_KEY_MAX];
-        snprintf(full_key, sizeof(full_key), "%s.%s", reg_name,
-                 reg->options[i].name);
+        if (config_registry_section_option_key(
+                reg_name, i, full_key, sizeof(full_key)) != CREG_SUCCESS) {
+            continue;
+        }
         if (legacy_has_option(full_key)) {
             continue; /// already shown by the legacy loop
         }
@@ -4329,11 +4451,10 @@ static void config_show_registry_section(config_section_t section) {
         }
         char text[CREG_VALUE_STRING_MAX];
         config_value_text(&v, text, sizeof(text));
-        printf("  %s = %s", reg->options[i].name, text);
-        if (reg->options[i].help) {
-            printf("  # %s", reg->options[i].help);
-        }
-        printf("\n");
+        /// Match the legacy loop's section-relative display.
+        const char *display =
+            strlen(full_key) > prefix_len ? full_key + prefix_len : full_key;
+        printf("  %s = %s\n", display, text);
     }
 }
 
