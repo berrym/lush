@@ -221,19 +221,27 @@ bool sighup_was_received(void);
 int send_sighup_to_jobs(void);
 
 /**
- * @brief Restore SIGHUP to its default disposition in a background-job child.
+ * @brief Reset inherited interactive SIGHUP/SIGSEGV handlers in a subshell.
  *
- * A background job is started by forking the shell; the child runs the
- * command in-process and does not necessarily exec, so it inherits the
- * interactive shell's caught SIGHUP handler (sighup_handler, which only
- * records a flag). That inherited handler would swallow the SIGHUP that a
- * login shell delivers to its background jobs on exit -- via
- * send_sighup_to_jobs() for job-controlled jobs, or the kernel's
- * controlling-terminal hangup for untracked ones -- leaving the job alive.
- * Resetting SIG_DFL in the child makes the job terminate on hangup as POSIX
- * login shells require. Called in the child of executor_execute_background
- * before the command runs.
+ * A subshell -- command substitution, a pipeline stage, `(...)`, a background
+ * job, a coprocess, a process substitution -- is a fork of the shell that runs
+ * commands in-process and may never exec, so it inherits the interactive
+ * shell's caught SIGSEGV and SIGHUP handlers (see init_signal_handlers). Those
+ * handlers do interactive work -- printing a crash report, recording a hangup
+ * flag -- that is wrong in a subshell: e.g. a login shell's exit-time SIGHUP
+ * would be swallowed rather than terminating the job (the bug fixed for
+ * background jobs and generalized here to every subshell). Restore SIG_DFL so
+ * the child is terminated by a fault or a hangup. Call in the child right after
+ * the fork, before the command runs.
+ *
+ * SIGINT is intentionally left inherited (tracked in issue #375): resetting it
+ * correctly needs foreground/background context the fork sites do not have
+ * (with job control off, a backgrounded child shares the shell's process group
+ * and a naive SIG_DFL would wrongly kill it on Ctrl-C), and the foreground
+ * benefit is moot (terminal Ctrl-C already reaches a foreground subshell's
+ * command; a builtin-only body is gated by terminal mode, not signal
+ * disposition).
  */
-void reset_background_job_signals(void);
+void reset_subshell_signals(void);
 
 #endif
