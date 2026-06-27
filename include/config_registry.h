@@ -53,9 +53,6 @@ extern "C" {
 /** @brief Maximum number of registered sections */
 #define CREG_SECTION_MAX 16
 
-/** @brief Maximum number of options per section */
-#define CREG_OPTIONS_PER_SECTION_MAX 64
-
 /** @brief Maximum number of change subscribers */
 #define CREG_SUBSCRIBERS_MAX 32
 
