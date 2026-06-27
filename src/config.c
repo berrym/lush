@@ -721,6 +721,32 @@ static void history_bind_runtime(void) {
                                  &config.history_frecency_directory_context);
 }
 
+/// @brief Apply a shell.* boolean change to the runtime shell_opts struct.
+///
+/// Registered as a `shell.*` subscriber so every registry write to a shell
+/// option -- from `config set shell.X`, from `set -o`/`+o`'s
+/// sync_shell_option_to_registry, or a future setopt route -- write-throughs to
+/// shell_opts via config_set_shell_option (which carries the option side
+/// effects, e.g. the emacs/vi mutual exclusion + lush_update_editing_mode that
+/// a plain binding could not). shell.mode (a string) and shell.feature.* (the
+/// separate FEATURE_* matrix) are not shell_opts booleans and are skipped.
+/// shell_opts stays the executor's hot-path read target; the registry is the
+/// write surface.
+static void shell_option_registry_apply(const char *key,
+                                        const creg_value_t *old_value,
+                                        const creg_value_t *new_value,
+                                        void *user_data) {
+    (void)old_value;
+    (void)user_data;
+    if (!key || !new_value || new_value->type != CREG_VALUE_BOOLEAN) {
+        return;
+    }
+    if (strncmp(key, "shell.feature.", 14) == 0) {
+        return;
+    }
+    config_set_shell_option(key, new_value->data.boolean);
+}
+
 /// @brief Sync shell options from registry to runtime
 static void shell_sync_to_runtime(void) {
     bool bval;
@@ -998,6 +1024,13 @@ static void config_register_sections(void) {
     behavior_bind_runtime();
     display_bind_runtime();
     lle_bind_runtime();
+
+    /// The shell section keeps shell_opts as the executor's hot-path truth, so
+    /// instead of bindings it uses a subscriber: every registry write to a
+    /// shell.* boolean write-throughs to shell_opts via config_set_shell_option
+    /// (preserving option side effects). config set / set -o route through the
+    /// registry; shell_opts is the read target.
+    config_registry_subscribe("shell.*", shell_option_registry_apply, NULL);
 }
 
 /**
@@ -3013,12 +3046,12 @@ int config_parse_option(const char *key, const char *value) {
             if (strncmp(key, "shell.", 6) == 0) {
                 if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
                     strcmp(value, "yes") == 0 || strcmp(value, "on") == 0) {
-                    config_set_shell_option(key, true);
+                    config_registry_set_boolean(key, true);
                 } else if (strcmp(value, "false") == 0 ||
                            strcmp(value, "0") == 0 ||
                            strcmp(value, "off") == 0 ||
                            strcmp(value, "no") == 0) {
-                    config_set_shell_option(key, false);
+                    config_registry_set_boolean(key, false);
                 } else {
                     shell_error_t *err = shell_error_create(
                         SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
@@ -4054,11 +4087,11 @@ void config_set_value(const char *key, const char *value) {
             if (strncmp(key, "shell.", 6) == 0) {
                 if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
                     strcmp(value, "on") == 0) {
-                    config_set_shell_option(key, true);
+                    config_registry_set_boolean(key, true);
                 } else if (strcmp(value, "false") == 0 ||
                            strcmp(value, "0") == 0 ||
                            strcmp(value, "off") == 0) {
-                    config_set_shell_option(key, false);
+                    config_registry_set_boolean(key, false);
                 } else {
                     printf(
                         "Invalid boolean value: %s (use true/false/on/off)\n",
