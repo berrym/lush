@@ -18,6 +18,7 @@
 #include "executor.h"
 #include "input.h"
 #include "lle/char_width.h"
+#include "lle/lle_pager.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_compare.h"
 #include "lush.h"
@@ -4357,29 +4358,53 @@ void config_set_value(const char *key, const char *value) {
  *
  * Prints all configuration sections and their values to stdout.
  */
+/// Defined below; config_show_all writes every section into one buffer through
+/// the worker so the whole listing pages as a unit (one pager view, not one per
+/// section).
+static void config_show_section_to(config_section_t section, FILE *out);
+
+/// Write the full configuration listing to @p out.
+static void config_show_all_to(FILE *out) {
+    fprintf(out, "LUSH Configuration:\n\n");
+
+    fprintf(out, "[history]\n");
+    config_show_section_to(CONFIG_SECTION_HISTORY, out);
+
+    fprintf(out, "\n[lle]\n");
+    config_show_section_to(CONFIG_SECTION_LLE, out);
+
+    fprintf(out, "\n[completion]\n");
+    config_show_section_to(CONFIG_SECTION_COMPLETION, out);
+
+    fprintf(out, "\n[behavior]\n");
+    config_show_section_to(CONFIG_SECTION_BEHAVIOR, out);
+
+    fprintf(out, "\n[display]\n");
+    config_show_section_to(CONFIG_SECTION_DISPLAY, out);
+
+    fprintf(out, "\n[autosuggestion]\n");
+    config_show_section_to(CONFIG_SECTION_AUTOSUGGESTION, out);
+
+    fprintf(out, "\n[shell]\n");
+    config_show_section_to(CONFIG_SECTION_SHELL, out);
+}
+
 void config_show_all(void) {
-    printf("LUSH Configuration:\n\n");
-
-    printf("[history]\n");
-    config_show_section(CONFIG_SECTION_HISTORY);
-
-    printf("\n[lle]\n");
-    config_show_section(CONFIG_SECTION_LLE);
-
-    printf("\n[completion]\n");
-    config_show_section(CONFIG_SECTION_COMPLETION);
-
-    printf("\n[behavior]\n");
-    config_show_section(CONFIG_SECTION_BEHAVIOR);
-
-    printf("\n[display]\n");
-    config_show_section(CONFIG_SECTION_DISPLAY);
-
-    printf("\n[autosuggestion]\n");
-    config_show_section(CONFIG_SECTION_AUTOSUGGESTION);
-
-    printf("\n[shell]\n");
-    config_show_section(CONFIG_SECTION_SHELL);
+    /// Build the whole listing into a heap buffer and hand it to the LLE pager
+    /// (which streams directly when stdout is not a tty, when the pager is
+    /// disabled, or when the content fits one screen). Falls back to a direct
+    /// stdout render if the memory stream cannot be created.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    if (!out) {
+        config_show_all_to(stdout);
+        return;
+    }
+    config_show_all_to(out);
+    fclose(out);
+    lle_pager_present(NULL, buf);
+    free(buf);
 }
 
 /**
@@ -4426,7 +4451,7 @@ static bool legacy_has_option(const char *full_key) {
 /// already show (the migrated keys), with their effective values. This keeps
 /// `config show` complete after a section migrates off the legacy table --
 /// discoverability must not regress as the registry takes over.
-static void config_show_registry_section(config_section_t section) {
+static void config_show_registry_section(config_section_t section, FILE *out) {
     const char *reg_name = registry_section_for(section);
     if (!reg_name) {
         return;
@@ -4454,36 +4479,40 @@ static void config_show_registry_section(config_section_t section) {
         /// Match the legacy loop's section-relative display.
         const char *display =
             strlen(full_key) > prefix_len ? full_key + prefix_len : full_key;
-        printf("  %s = %s\n", display, text);
+        fprintf(out, "  %s = %s\n", display, text);
     }
 }
 
-void config_show_section(config_section_t section) {
+/// Write one section's options to @p out (the legacy config_options[] entries
+/// followed by the registry-only keys). The paging public wrappers build a
+/// memory stream and hand it to the LLE pager.
+static void config_show_section_to(config_section_t section, FILE *out) {
     for (int i = 0; i < num_config_options; i++) {
         config_option_t *opt = &config_options[i];
 
         if (opt->section == section) {
-            printf("  %s = ", opt->name);
+            fprintf(out, "  %s = ", opt->name);
 
             /// Handle shell options specially - they use integration functions
             if (strncmp(opt->name, "shell.", 6) == 0) {
-                printf("%s",
-                       config_get_shell_option(opt->name) ? "true" : "false");
+                fprintf(out, "%s",
+                        config_get_shell_option(opt->name) ? "true" : "false");
             } else {
                 switch (opt->type) {
                 case CONFIG_TYPE_BOOL:
-                    printf("%s", *(bool *)opt->value_ptr ? "true" : "false");
+                    fprintf(out, "%s",
+                            *(bool *)opt->value_ptr ? "true" : "false");
                     break;
                 case CONFIG_TYPE_INT:
-                    printf("%d", *(int *)opt->value_ptr);
+                    fprintf(out, "%d", *(int *)opt->value_ptr);
                     break;
                 case CONFIG_TYPE_STRING: {
                     char *str_val = *(char **)opt->value_ptr;
-                    printf("%s", str_val ? str_val : "(null)");
+                    fprintf(out, "%s", str_val ? str_val : "(null)");
                     break;
                 }
                 case CONFIG_TYPE_COLOR:
-                    printf("(color)");
+                    fprintf(out, "(color)");
                     break;
                 case CONFIG_TYPE_ENUM:
                     if (opt->enum_def && opt->enum_def->mappings) {
@@ -4498,19 +4527,42 @@ void config_show_section(config_section_t section) {
                             }
                             mapping++;
                         }
-                        printf("%s", name);
+                        fprintf(out, "%s", name);
                     }
                     break;
                 }
             }
 
-            printf("  # %s\n", opt->description);
+            fprintf(out, "  # %s\n", opt->description);
         }
     }
 
     /// Then the registry keys this section's migration moved off the legacy
     /// table, so migrated keys stay visible in `config show`.
-    config_show_registry_section(section);
+    config_show_registry_section(section, out);
+}
+
+/// Render @p render into a heap buffer and present it through the LLE pager,
+/// which streams straight to stdout when it is not a tty, when the pager is
+/// disabled, or when the content fits one screen -- so piping and redirection
+/// are unaffected. Falls back to a direct stdout render if the memory stream
+/// cannot be created.
+static void config_page_section(config_section_t section) {
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    if (!out) {
+        config_show_section_to(section, stdout);
+        return;
+    }
+    config_show_section_to(section, out);
+    fclose(out);
+    lle_pager_present(NULL, buf);
+    free(buf);
+}
+
+void config_show_section(config_section_t section) {
+    config_page_section(section);
 }
 
 /**
