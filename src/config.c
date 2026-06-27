@@ -848,8 +848,15 @@ void shell_register_features(void) {
 }
 
 /// @brief Sync shell options from registry to runtime
+///
+/// Only shell.mode is handled here: it is a string key that no subscriber
+/// projects, so the load-from-TOML path needs this mapping. Every shell.*
+/// boolean is driven by the shell.* subscriber (shell_option_registry_apply)
+/// on each registry write, including per-key TOML load, so the booleans need no
+/// sync hook. (The prior boolean blocks were dead no-ops anyway: they called
+/// config_set_shell_option with a bare name, which the function's +6 "shell."
+/// prefix-strip turned into garbage.)
 static void shell_sync_to_runtime(void) {
-    bool bval;
     char sval[CREG_VALUE_STRING_MAX];
 
     if (config_registry_get_string("shell.mode", sval, sizeof(sval)) ==
@@ -860,37 +867,22 @@ static void shell_sync_to_runtime(void) {
         config.shell_mode =
             shell_mode_parse(sval, &parsed) ? parsed : SHELL_MODE_LUSH;
     }
-
-    /// POSIX options - sync to shell_opts via config_set_shell_option
-    if (config_registry_get_boolean("shell.errexit", &bval) == CREG_SUCCESS) {
-        config_set_shell_option("errexit", bval);
-    }
-    if (config_registry_get_boolean("shell.nounset", &bval) == CREG_SUCCESS) {
-        config_set_shell_option("nounset", bval);
-    }
-    if (config_registry_get_boolean("shell.xtrace", &bval) == CREG_SUCCESS) {
-        config_set_shell_option("xtrace", bval);
-    }
-    if (config_registry_get_boolean("shell.pipefail", &bval) == CREG_SUCCESS) {
-        config_set_shell_option("pipefail", bval);
-    }
 }
 
 /// @brief Sync shell options from runtime to registry
+///
+/// Only shell.mode is mirrored: it backs config save's mode persistence and no
+/// subscriber owns the string key. The shell.* booleans are intentionally not
+/// written here -- the subscriber already keeps the registry in step with
+/// shell_opts on every write path. The prior boolean writes were a clobber bug:
+/// config_get_shell_option("errexit") (bare name, +6 prefix-strip) returned
+/// false, so config save reset shell.errexit/nounset/xtrace/pipefail to false
+/// in the registry, which the subscriber then write-through onto shell_opts --
+/// turning off set -e on save.
 static void shell_sync_from_runtime(void) {
     /// Map mode enum to its canonical string via shell_mode_name.
     const char *mode_str = shell_mode_name(config.shell_mode);
     config_registry_set_string("shell.mode", mode_str ? mode_str : "lush");
-
-    /// POSIX options - read from shell_opts via config_get_shell_option
-    config_registry_set_boolean("shell.errexit",
-                                config_get_shell_option("errexit"));
-    config_registry_set_boolean("shell.nounset",
-                                config_get_shell_option("nounset"));
-    config_registry_set_boolean("shell.xtrace",
-                                config_get_shell_option("xtrace"));
-    config_registry_set_boolean("shell.pipefail",
-                                config_get_shell_option("pipefail"));
 }
 
 /// @brief Sync display config from registry to runtime
