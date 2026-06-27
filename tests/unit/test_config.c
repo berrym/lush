@@ -15,6 +15,7 @@
  */
 
 #include "config.h"
+#include "config_registry.h"
 #include "lle/char_width.h"
 #include "test_framework.h"
 #include <stdint.h>
@@ -450,6 +451,25 @@ TEST(config_show_lists_migrated_lle_section) {
                 "config show lle should list the history_file key");
 }
 
+TEST(config_save_sync_preserves_shell_options) {
+    config_init();
+
+    /// Enable errexit the way `set -o errexit` does: through the registry, so
+    /// the SESSION layer holds true and the shell.* subscriber sets shell_opts.
+    config_registry_set_boolean("shell.errexit", true);
+    ASSERT_TRUE(config_get_shell_option("shell.errexit"),
+                "precondition: errexit enabled via the registry");
+
+    /// `config save` runs config_registry_sync_from_runtime before writing the
+    /// TOML. It must NOT flip the option off. The prior shell_sync_from_runtime
+    /// wrote shell.errexit=config_get_shell_option("errexit") -- a bare name
+    /// the +6 prefix-strip mangled to false -- so saving silently disabled set
+    /// -e.
+    config_registry_sync_from_runtime();
+    ASSERT_TRUE(config_get_shell_option("shell.errexit"),
+                "config save (sync_from_runtime) must not disable errexit");
+}
+
 TEST(config_show_lists_shell_feature_keys) {
     config_init();
 
@@ -868,6 +888,7 @@ int main(void) {
     RUN_TEST(config_display_ambiguous_width_applies);
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
+    RUN_TEST(config_save_sync_preserves_shell_options);
     RUN_TEST(config_show_lists_shell_feature_keys);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
