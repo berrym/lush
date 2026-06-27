@@ -2520,6 +2520,9 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         }
 
         if (pid == 0) {
+            /// Reset the inherited interactive SIGHUP/SIGSEGV handlers so a
+            /// hangup or fault terminates this pipeline stage normally.
+            reset_subshell_signals();
             /// Child: wire stdin from the previous pipe and stdout (plus stderr
             /// if |&) to the next.
             if (i > 0) {
@@ -4402,7 +4405,9 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
     }
 
     if (pid == 0) {
-        /// Child process (the coprocess)
+        /// Child process (the coprocess) -- asynchronous: reset the inherited
+        /// hangup and fault handlers, leave SIGINT (own process group).
+        reset_subshell_signals();
 
         /// Redirect stdin from pipe_to_coproc[0]
         close(pipe_to_coproc[1]); /// Close write end
@@ -6865,7 +6870,10 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
     }
 
     if (pid == 0) {
-        /// Child process - execute commands in subshell environment
+        /// Child process - execute commands in subshell environment.
+        /// Reset the inherited interactive SIGHUP/SIGSEGV handlers so a
+        /// hangup or fault terminates the subshell normally.
+        reset_subshell_signals();
 
         /// Set up any redirections attached to the subshell
         if (count_redirections(subshell) > 0) {
@@ -15656,7 +15664,10 @@ static char *expand_command_substitution(executor_t *executor,
     }
 
     if (pid == 0) {
-        /// Child process - execute command using lush's own parser/executor
+        /// Child process - execute command using lush's own parser/executor.
+        /// Reset the inherited interactive SIGHUP/SIGSEGV handlers so a
+        /// hangup or fault terminates the substitution child normally.
+        reset_subshell_signals();
         close(pipefd[0]);               /// Close read end
         dup2(pipefd[1], STDOUT_FILENO); /// Redirect stdout to pipe
         close(pipefd[1]);
@@ -16567,10 +16578,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         }
 
         if (pid == 0) {
-            /// Background child: a controlling-terminal hangup must terminate
-            /// it, so drop the inherited interactive SIGHUP handler that would
-            /// otherwise swallow it.
-            reset_background_job_signals();
+            /// Background child: asynchronous, so reset the inherited hangup
+            /// and fault handlers (a controlling-terminal hangup must
+            /// terminate it); SIGINT stays inherited per POSIX async lists.
+            reset_subshell_signals();
             int result = execute_node(executor, command->first_child);
             fflush(stdout);
             fflush(stderr);
@@ -16603,9 +16614,9 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         setpgid(0, 0);
 
         /// A login shell's exit-time SIGHUP cascade (send_sighup_to_jobs)
-        /// must terminate this job; drop the inherited interactive SIGHUP
-        /// handler that would otherwise swallow it.
-        reset_background_job_signals();
+        /// must terminate this job; reset the inherited hangup and fault
+        /// handlers so the cascade is not swallowed.
+        reset_subshell_signals();
 
         /// Execute the command
         int result = execute_node(executor, command->first_child);
@@ -16917,7 +16928,10 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
     }
 
     if (pid == 0) {
-        /// Child process - setup redirections and execute builtin
+        /// Child process - setup redirections and execute builtin.
+        /// Reset the inherited interactive SIGHUP/SIGSEGV handlers so a
+        /// hangup or fault terminates this child normally.
+        reset_subshell_signals();
         int redir_result = setup_redirections(executor, command);
         if (redir_result != 0) {
             subshell_cleanup();
@@ -18427,7 +18441,10 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
     }
 
     if (pid == 0) {
-        /// Child process - execute the command
+        /// Child process - execute the command. Process substitution is
+        /// asynchronous: reset the inherited hangup and fault handlers, leave
+        /// SIGINT (own process group, fed/drained via the pipe).
+        reset_subshell_signals();
         if (is_input) {
             /// <(cmd): command writes to pipe, parent reads
             close(pipefd[0]); /// Close read end

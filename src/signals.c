@@ -180,14 +180,28 @@ int send_sighup_to_jobs(void) {
     return count;
 }
 
-void reset_background_job_signals(void) {
-    /// A background-job child inherits the interactive shell's SIGHUP
-    /// handler (which only sets a flag). Restore the default so a login
-    /// shell's exit-time SIGHUP -- whether sent by send_sighup_to_jobs() or
-    /// by the controlling terminal's hangup -- terminates the job instead of
-    /// being swallowed. The real command, once it execs, gets SIG_DFL anyway;
-    /// this covers the in-process subshell wrapper that never execs.
+void reset_subshell_signals(void) {
+    /// The interactive shell installs caught handlers for SIGSEGV and SIGHUP
+    /// (init_signal_handlers); a forked subshell that does not exec inherits
+    /// them and would run interactive logic -- print a crash report, or record
+    /// a hangup flag instead of terminating -- rather than behaving as a normal
+    /// process (e.g. a login shell's exit-time SIGHUP would be swallowed, the
+    /// bug fixed for background jobs and generalized here to every subshell).
+    /// Restore the defaults so the child is terminated by a fault or a hangup.
+    ///
+    /// SIGINT is deliberately left as inherited (tracked in issue #375).
+    /// Resetting it correctly would need foreground/background context the
+    /// fork sites do not have. Job control is on by default for interactive
+    /// shells (init.c), so a backgrounded subshell normally gets its own
+    /// process group and is isolated from terminal SIGINT -- but when job
+    /// control is off (non-interactive, or `set +m`) a backgrounded `(...) &`
+    /// shares the shell's process group and a naive SIG_DFL would wrongly kill
+    /// it on Ctrl-C (POSIX requires SIG_IGN there). The foreground benefit is
+    /// also moot: Ctrl-C already reaches a foreground subshell's running
+    /// command, and whether a builtin-only body can be interrupted is governed
+    /// by terminal mode (ISIG), not signal disposition.
     set_signal_handler(SIGHUP, SIG_DFL);
+    set_signal_handler(SIGSEGV, SIG_DFL);
 }
 
 /**
