@@ -219,12 +219,8 @@ int bin_shopt(int argc, char **argv) {
             } else {
                 shell_feature_disable(feature);
             }
-            if (config_registry_is_initialized()) {
-                char key[CREG_KEY_MAX];
-                snprintf(key, sizeof(key), "shell.features.%s",
-                         shell_feature_name(feature));
-                config_registry_set_boolean(key, target);
-            }
+            /// No registry mirror: shell.feature.* is not a registered CREG key
+            /// (read live via shell_mode_allows). See bin_setopt.c for detail.
         } else if (unset_mode) {
             /// -u: disable the option (alias perspective)
             bool target = invert;
@@ -233,12 +229,8 @@ int bin_shopt(int argc, char **argv) {
             } else {
                 shell_feature_disable(feature);
             }
-            if (config_registry_is_initialized()) {
-                char key[CREG_KEY_MAX];
-                snprintf(key, sizeof(key), "shell.features.%s",
-                         shell_feature_name(feature));
-                config_registry_set_boolean(key, target);
-            }
+            /// No registry mirror: shell.feature.* is not a registered CREG key
+            /// (read live via shell_mode_allows). See bin_setopt.c for detail.
         } else {
             /// No -s/-u: just print the option state.
             /// Print under the user-supplied alias name and its effective

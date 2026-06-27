@@ -72,14 +72,8 @@ int bin_unsetopt(int argc, char **argv) {
         } else {
             shell_feature_disable(feature);
         }
-
-        /// Sync to registry if initialized
-        if (config_registry_is_initialized()) {
-            char key[CREG_KEY_MAX];
-            snprintf(key, sizeof(key), "shell.features.%s",
-                     shell_feature_name(feature));
-            config_registry_set_boolean(key, target_value);
-        }
+        /// No registry mirror: shell.feature.* is not a registered CREG key
+        /// (read live via shell_mode_allows). See bin_setopt.c for the detail.
     }
 
     return 0;

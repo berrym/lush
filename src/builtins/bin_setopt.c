@@ -118,14 +118,12 @@ int bin_setopt(int argc, char **argv) {
         } else {
             shell_feature_disable(feature);
         }
-
-        /// Sync to registry if initialized
-        if (config_registry_is_initialized()) {
-            char key[CREG_KEY_MAX];
-            snprintf(key, sizeof(key), "shell.features.%s",
-                     shell_feature_name(feature));
-            config_registry_set_boolean(key, target_value);
-        }
+        /// No registry mirror: shell.feature.* is not a registered CREG key.
+        /// Its state is read live via shell_mode_allows (config get/set
+        /// shell.feature.X go through the dynamic special-case in config.c).
+        /// The former "shell.features.%s" (plural) sync wrote an unregistered
+        /// key and silently no-opped; first-class layered features need a
+        /// dynamic option-registration API and are a separate step.
     }
 
     return 0;
