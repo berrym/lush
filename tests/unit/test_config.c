@@ -17,6 +17,7 @@
 #include "config.h"
 #include "config_registry.h"
 #include "lle/char_width.h"
+#include "lush.h"
 #include "test_framework.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -470,6 +471,38 @@ TEST(config_save_sync_preserves_shell_options) {
                 "config save (sync_from_runtime) must not disable errexit");
 }
 
+TEST(argv_shell_options_hydrate_to_session) {
+    config_init();
+
+    /// Reproduce the init sequence: a known baseline, then a "command line"
+    /// flag flips exit_on_error (as parse_opts -e does), captured before the
+    /// mode preset, then replayed into the registry once it exists.
+    shell_opts.exit_on_error = false;
+    shell_opts_record_baseline();
+    shell_opts.exit_on_error = true;
+    shell_opts_capture_argv_overrides();
+    shell_opts_hydrate_argv_to_registry();
+
+    creg_inspect_t info;
+    ASSERT_EQ(config_registry_inspect("shell.errexit", &info), CREG_SUCCESS,
+              "shell.errexit must be registered");
+    ASSERT_TRUE(info.layers[CREG_LAYER_SESSION].present,
+                "an argv flag must hydrate the option into the SESSION layer");
+    ASSERT_TRUE(info.layers[CREG_LAYER_SESSION].value.data.boolean,
+                "the hydrated SESSION value must match the flag");
+
+    /// An option the command line did not set must not gain a SESSION override.
+    creg_inspect_t untouched;
+    ASSERT_EQ(config_registry_inspect("shell.xtrace", &untouched), CREG_SUCCESS,
+              "shell.xtrace must be registered");
+    ASSERT_FALSE(untouched.layers[CREG_LAYER_SESSION].present,
+                 "an unset option must not gain a SESSION override");
+
+    /// Leave the registry clean for subsequent tests.
+    config_registry_reset("shell.errexit");
+    shell_opts.exit_on_error = false;
+}
+
 TEST(config_show_lists_shell_feature_keys) {
     config_init();
 
@@ -889,6 +922,7 @@ int main(void) {
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_save_sync_preserves_shell_options);
+    RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_show_lists_shell_feature_keys);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);

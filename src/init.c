@@ -441,9 +441,18 @@ int init(int argc, char **argv, FILE **in) {
     /// Initialize POSIX shell options with defaults
     init_posix_options();
 
+    /// Snapshot the defaults before argv is applied, so argv-set options can be
+    /// diffed out and replayed into the registry once it exists.
+    shell_opts_record_baseline();
+
     /// Parse command line options EARLY - needed for login/interactive
     /// detection
     size_t optind = parse_opts(argc, argv);
+
+    /// Capture argv-set shell options now, before apply_mode_preset adds
+    /// mode-driven changes (posix_mode), so only command-line flags are
+    /// recorded for hydration into the registry SESSION layer below.
+    shell_opts_capture_argv_overrides();
 
     /// Resolve initial shell mode BEFORE config_init so the user's
     /// lushrc layers on top of the right preset. Priority: CLI flag
@@ -489,6 +498,11 @@ int init(int argc, char **argv, FILE **in) {
 
     /// Initialize configuration system
     config_init();
+
+    /// Replay argv-set shell options into the registry SESSION layer now that
+    /// it exists, so command-line flags outrank lushrc and mode presets and
+    /// report their true source in config get / show / explain.
+    shell_opts_hydrate_argv_to_registry();
 
     /// Initialize critical environment variables for login shells
     /// This must happen before profile scripts which may depend on them

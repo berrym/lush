@@ -311,6 +311,32 @@ bool get_enhanced_completion(void);
 void init_posix_options(void);
 
 /**
+ * @brief Snapshot shell_opts as the argv-hydration baseline.
+ *
+ * Call right after init_posix_options (defaults set) and before parse_opts, so
+ * the capture step can diff against it to find the options the command line
+ * set.
+ */
+void shell_opts_record_baseline(void);
+
+/**
+ * @brief Capture which shell options argv set, relative to the baseline.
+ *
+ * Call after parse_opts but before apply_mode_preset, so the captured set is
+ * argv-only and excludes mode-driven changes (e.g. posix_mode).
+ */
+void shell_opts_capture_argv_overrides(void);
+
+/**
+ * @brief Replay the captured argv options into the registry SESSION layer.
+ *
+ * Call after config_init initializes the registry. Makes command-line flags
+ * first-class config so they outrank lushrc/mode values and report their true
+ * source; a no-op when no flags were captured or the registry is uninitialized.
+ */
+void shell_opts_hydrate_argv_to_registry(void);
+
+/**
  * @brief Check if a POSIX option is set
  *
  * @param option Option character (e.g., 'e', 'x')

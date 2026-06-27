@@ -26,6 +26,7 @@
 #include "symtable.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,6 +116,100 @@ static void sync_shell_option_to_registry(const char *name, bool value) {
     /// Update registry if initialized
     if (config_registry_is_initialized()) {
         config_registry_set_boolean(key, value);
+    }
+}
+
+/// Maps each registry shell.<name> boolean key to its shell_opts field. The
+/// single source for the key<->field correspondence used by argv hydration;
+/// mirrors config_set_shell_option's strcmp ladder (a future cleanup folds both
+/// onto this table).
+static const struct {
+    const char *key;
+    size_t offset;
+} k_shell_bool_opts[] = {
+    {             "shell.errexit",offsetof(shell_options_t,             exit_on_error)                                  },
+    {              "shell.xtrace", offsetof(shell_options_t,           trace_execution)},
+    {              "shell.noexec", offsetof(shell_options_t,              syntax_check)},
+    {             "shell.nounset", offsetof(shell_options_t,               unset_error)},
+    {             "shell.verbose", offsetof(shell_options_t,                   verbose)},
+    {              "shell.noglob", offsetof(shell_options_t,               no_globbing)},
+    {             "shell.hashall", offsetof(shell_options_t,             hash_commands)},
+    {             "shell.monitor", offsetof(shell_options_t,               job_control)},
+    {           "shell.allexport", offsetof(shell_options_t,                 allexport)},
+    {           "shell.noclobber", offsetof(shell_options_t,                 noclobber)},
+    {              "shell.onecmd", offsetof(shell_options_t,                    onecmd)},
+    {              "shell.notify", offsetof(shell_options_t,                    notify)},
+    {           "shell.ignoreeof", offsetof(shell_options_t,                 ignoreeof)},
+    {               "shell.nolog", offsetof(shell_options_t,                     nolog)},
+    {               "shell.emacs", offsetof(shell_options_t,                emacs_mode)},
+    {                  "shell.vi", offsetof(shell_options_t,                   vi_mode)},
+    {               "shell.posix", offsetof(shell_options_t,                posix_mode)},
+    {            "shell.pipefail", offsetof(shell_options_t,             pipefail_mode)},
+    {          "shell.histexpand", offsetof(shell_options_t,           histexpand_mode)},
+    {             "shell.history", offsetof(shell_options_t,              history_mode)},
+    {"shell.interactive-comments",
+     offsetof(shell_options_t, interactive_comments_mode)                              },
+    {            "shell.physical", offsetof(shell_options_t,             physical_mode)},
+    {          "shell.privileged", offsetof(shell_options_t,           privileged_mode)},
+};
+#define K_SHELL_BOOL_OPT_COUNT                                                 \
+    (sizeof(k_shell_bool_opts) / sizeof(k_shell_bool_opts[0]))
+
+static inline bool shell_opt_field(const shell_options_t *opts, size_t offset) {
+    return *(const bool *)((const char *)opts + offset);
+}
+
+/// Snapshot of shell_opts taken right after init_posix_options, before
+/// parse_opts applies argv flags. The capture step diffs against it to find
+/// exactly which options the command line set.
+static shell_options_t g_shell_opts_baseline;
+static bool g_shell_opts_baseline_recorded = false;
+
+/// The argv-set option keys captured at the clean window, replayed into the
+/// registry SESSION layer once it exists.
+static const char *g_argv_override_keys[K_SHELL_BOOL_OPT_COUNT];
+static bool g_argv_override_values[K_SHELL_BOOL_OPT_COUNT];
+static size_t g_argv_override_count = 0;
+
+void shell_opts_record_baseline(void) {
+    g_shell_opts_baseline = shell_opts;
+    g_shell_opts_baseline_recorded = true;
+}
+
+void shell_opts_capture_argv_overrides(void) {
+    g_argv_override_count = 0;
+    if (!g_shell_opts_baseline_recorded) {
+        return;
+    }
+    /// Diff after parse_opts, before apply_mode_preset: shell_opts holds the
+    /// init defaults plus argv-set values only. Capturing here (not after
+    /// config_init) excludes mode-driven changes -- notably posix_mode, which
+    /// apply_mode_preset sets from the active mode -- so only explicit command
+    /// line flags become SESSION overrides.
+    for (size_t i = 0; i < K_SHELL_BOOL_OPT_COUNT; i++) {
+        size_t off = k_shell_bool_opts[i].offset;
+        bool now = shell_opt_field(&shell_opts, off);
+        if (now != shell_opt_field(&g_shell_opts_baseline, off)) {
+            g_argv_override_keys[g_argv_override_count] =
+                k_shell_bool_opts[i].key;
+            g_argv_override_values[g_argv_override_count] = now;
+            g_argv_override_count++;
+        }
+    }
+}
+
+void shell_opts_hydrate_argv_to_registry(void) {
+    if (!config_registry_is_initialized()) {
+        return;
+    }
+    /// Replay the captured argv flags into the SESSION layer -- the highest
+    /// precedence -- so a command line flag wins over a lushrc (USER) value and
+    /// over a mode preset (MODE), and config get / show / explain report the
+    /// option's true source. The shell.* subscriber write-throughs each value
+    /// back onto shell_opts (a no-op here since argv already set it).
+    for (size_t i = 0; i < g_argv_override_count; i++) {
+        config_registry_set_boolean(g_argv_override_keys[i],
+                                    g_argv_override_values[i]);
     }
 }
 
