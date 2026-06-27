@@ -511,9 +511,80 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
     return CREG_SUCCESS;
 }
 
+creg_result_t config_registry_register_option(const char *section_name,
+                                              const creg_option_t *option) {
+    if (!g_registry.initialized || !section_name || !option || !option->name) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    registered_section_t *reg = find_section(section_name);
+    if (!reg) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+
+    /// Re-registering an existing key is a no-op success.
+    char full_key[CREG_KEY_MAX];
+    snprintf(full_key, sizeof(full_key), "%s.%s", section_name, option->name);
+    if (find_option(full_key) != NULL) {
+        return CREG_SUCCESS;
+    }
+
+    if (!section_reserve(reg, reg->option_count + 1)) {
+        return CREG_ERROR_OPTION_FULL;
+    }
+
+    stored_option_t *stored = &reg->options[reg->option_count];
+    memset(stored, 0, sizeof(*stored));
+    snprintf(stored->key, sizeof(stored->key), "%s", full_key);
+    stored->slots[CREG_LAYER_DEFAULT].present = true;
+    stored->slots[CREG_LAYER_DEFAULT].value = option->default_val;
+    snprintf(stored->slots[CREG_LAYER_DEFAULT].origin,
+             sizeof(stored->slots[CREG_LAYER_DEFAULT].origin), "default");
+    stored->option_def = option;
+    stored->persisted = option->persisted;
+    reg->option_count++;
+    return CREG_SUCCESS;
+}
+
+creg_result_t config_registry_set_mode_value(const char *key,
+                                             const creg_value_t *value) {
+    if (!g_registry.initialized) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    /// Writes the MODE layer directly (the same layer config_registry_apply_-
+    /// mode_defaults uses). For option sets seeded per mode outside the static
+    /// per-mode-default table -- the shell.feature.* matrix, which is far
+    /// larger than CREG_MODE_DEFAULTS_MAX -- this lets the mode-change path
+    /// push each feature's matrix default into the layered model so config get
+    /// / show resolve through the registry rather than a special-case live
+    /// read.
+    return set_in_layer(key, value, CREG_LAYER_MODE, "mode preset");
+}
+
 const creg_section_t *config_registry_get_section(const char *name) {
     registered_section_t *reg = find_section(name);
     return reg ? &reg->section : NULL;
+}
+
+size_t config_registry_section_option_count(const char *section_name) {
+    registered_section_t *reg = find_section(section_name);
+    return reg ? reg->option_count : 0;
+}
+
+creg_result_t config_registry_section_option_key(const char *section_name,
+                                                 size_t index, char *out,
+                                                 size_t out_size) {
+    if (!out || out_size == 0) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    registered_section_t *reg = find_section(section_name);
+    if (!reg) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    if (index >= reg->option_count) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    snprintf(out, out_size, "%s", reg->options[index].key);
+    return CREG_SUCCESS;
 }
 
 /* ============================================================================

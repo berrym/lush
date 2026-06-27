@@ -110,21 +110,21 @@ int bin_setopt(int argc, char **argv) {
             return effective ? 0 : 1;
         }
 
-        /// Enable from the alias's perspective; flip on the underlying
-        /// feature when the alias is inverted.
+        /// Enable from the alias's perspective; flip on the underlying feature
+        /// when the alias is inverted. Route through the registry under the
+        /// canonical shell.feature.<name> key; the shell.feature.* subscriber
+        /// mirrors it into the matrix. Direct toggle is the pre-registry
+        /// fallback only.
         bool target_value = !invert;
-        if (target_value) {
+        if (config_registry_is_initialized()) {
+            char key[CREG_KEY_MAX];
+            snprintf(key, sizeof(key), "shell.feature.%s",
+                     shell_feature_name(feature));
+            config_registry_set_boolean(key, target_value);
+        } else if (target_value) {
             shell_feature_enable(feature);
         } else {
             shell_feature_disable(feature);
-        }
-
-        /// Sync to registry if initialized
-        if (config_registry_is_initialized()) {
-            char key[CREG_KEY_MAX];
-            snprintf(key, sizeof(key), "shell.features.%s",
-                     shell_feature_name(feature));
-            config_registry_set_boolean(key, target_value);
         }
     }
 

@@ -265,6 +265,48 @@ creg_result_t config_registry_register_section(const creg_section_t *section);
  */
 const creg_section_t *config_registry_get_section(const char *name);
 
+/**
+ * @brief Number of live options registered in a section.
+ *
+ * Counts the live option store, which -- unlike the section definition returned
+ * by config_registry_get_section -- includes options added at runtime via
+ * config_registry_register_option (e.g. the shell.feature.* keys).
+ */
+size_t config_registry_section_option_count(const char *section_name);
+
+/**
+ * @brief Full dotted key of the @p index-th live option in a section.
+ *
+ * Companion to config_registry_section_option_count for iterating a section's
+ * live options. Fills @p out with the full key (e.g. "shell.feature.extglob").
+ */
+creg_result_t config_registry_section_option_key(const char *section_name,
+                                                 size_t index, char *out,
+                                                 size_t out_size);
+
+/**
+ * @brief Register one option into an already-registered section at runtime.
+ *
+ * Mirrors register_section's per-option setup but adds a single option, which
+ * is how option sets too large to hand-list as a static array -- e.g. the
+ * shell.feature.* keys generated from the shell-mode feature table -- become
+ * first-class registry keys instead of ad-hoc special-cases. @p option must
+ * outlive the registry (its pointer is stored). Re-registering a present key is
+ * a no-op success.
+ */
+creg_result_t config_registry_register_option(const char *section_name,
+                                              const creg_option_t *option);
+
+/**
+ * @brief Write a key's MODE-layer value directly.
+ *
+ * For per-mode defaults that cannot go through the static per-mode-default
+ * table (CREG_MODE_DEFAULTS_MAX), such as the full shell feature matrix seeded
+ * on every mode change.
+ */
+creg_result_t config_registry_set_mode_value(const char *key,
+                                             const creg_value_t *value);
+
 /* ============================================================================
  * VALUE ACCESS
  * ============================================================================
