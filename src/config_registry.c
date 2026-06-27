@@ -64,9 +64,38 @@ typedef struct {
  */
 typedef struct {
     creg_section_t section; ///< Section definition
-    stored_option_t options[CREG_OPTIONS_PER_SECTION_MAX];
+    /// Heap-allocated, sized to the options actually registered. Each
+    /// stored_option carries one value slot per layer sized for the largest
+    /// value kind, so the prior fixed worst-case array per section wasted
+    /// megabytes of mostly-empty storage; growing on demand (section_reserve)
+    /// removes both that waste and the fixed per-section option ceiling.
+    stored_option_t *options;
+    size_t options_capacity;
     size_t option_count;
 } registered_section_t;
+
+/// Grow a section's option array to hold at least @p needed entries. New
+/// capacity is geometric. Returns false on allocation failure. Safe to call
+/// during registration only: find_option() hands out stored_option_t pointers,
+/// and a realloc here would invalidate any held across the call -- all
+/// registration completes at startup before any such pointer is retained.
+static bool section_reserve(registered_section_t *reg, size_t needed) {
+    if (reg->options_capacity >= needed) {
+        return true;
+    }
+    size_t newcap = reg->options_capacity ? reg->options_capacity * 2 : 8;
+    while (newcap < needed) {
+        newcap *= 2;
+    }
+    stored_option_t *grown =
+        realloc(reg->options, newcap * sizeof(stored_option_t));
+    if (!grown) {
+        return false;
+    }
+    reg->options = grown;
+    reg->options_capacity = newcap;
+    return true;
+}
 
 /**
  * @brief Change notification subscriber
@@ -411,6 +440,9 @@ creg_result_t config_registry_init(void) {
 }
 
 void config_registry_cleanup(void) {
+    for (size_t i = 0; i < g_registry.section_count; i++) {
+        free(g_registry.sections[i].options);
+    }
     memset(&g_registry, 0, sizeof(g_registry));
 }
 
@@ -442,16 +474,24 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
     /// Create new registered section
     registered_section_t *reg = &g_registry.sections[g_registry.section_count];
     reg->section = *section;
+    reg->options = NULL;
+    reg->options_capacity = 0;
     reg->option_count = 0;
+
+    if (section->option_count > 0 &&
+        !section_reserve(reg, section->option_count)) {
+        return CREG_ERROR_OPTION_FULL;
+    }
 
     /// Register all options with default values
     for (size_t i = 0; i < section->option_count; i++) {
-        if (reg->option_count >= CREG_OPTIONS_PER_SECTION_MAX) {
-            return CREG_ERROR_OPTION_FULL;
-        }
-
         const creg_option_t *opt = &section->options[i];
         stored_option_t *stored = &reg->options[reg->option_count];
+
+        /// Heap memory is uninitialized; clear every layer slot so only the
+        /// DEFAULT slot reads as present (the prior fixed array lived in the
+        /// zero-initialized g_registry global).
+        memset(stored, 0, sizeof(*stored));
 
         /// Build full key path
         snprintf(stored->key, sizeof(stored->key), "%s.%s", section->name,
