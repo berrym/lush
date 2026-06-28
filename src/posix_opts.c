@@ -39,57 +39,103 @@ extern int strcasecmp(const char *s1, const char *s2);
 /** @brief Global shell options instance */
 shell_options_t shell_opts = {0};
 
-/**
- * @brief Apply a mode preset across all configuration surfaces
- *
- * Canonical entry point for switching the active shell mode. Performs a
- * full re-seed: sets the active mode, drops per-feature overrides,
- * updates the legacy posix_mode mirror, persists the canonical mode label
- * to the central registry, re-seeds the registered per-mode defaults, and
- * syncs them into the runtime struct so mode-aware options take effect.
- *
- * @param mode New mode preset to apply
- * @return true on success, false if mode change is disallowed (strict
- *         mode lock or invalid mode value)
- */
+/// Apply a mode to the RUNTIME: drop per-feature overrides, update the legacy
+/// posix_mode mirror and the config.shell_mode mirror, and (once the registry
+/// exists) re-seed the per-mode option and feature defaults and push them into
+/// the runtime struct. Deliberately does NOT write shell.mode into the registry
+/// or call config_apply_settings: the registry is the source of truth and this
+/// is the downstream application, so the shell.mode subscriber and the
+/// pre-registry bootstrap both call it with no write-back recursion. The
+/// explicit-change path (apply_mode_preset) runs config_apply_settings after;
+/// startup runs it once at the end of config_init.
+static void shell_mode_runtime_apply(shell_mode_t mode) {
+    /// Mode change is a clean re-seed: drop any per-feature overrides so the
+    /// new mode's matrix defaults take effect. Picking a preset means asking.
+    shell_feature_reset_all();
+
+    /// Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates the mode
+    /// system; keep it in sync so call sites that still consult it are right.
+    shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
+
+    config.shell_mode = (int)mode;
+
+    if (config_registry_is_initialized()) {
+        /// Re-seed registered per-mode option defaults (re-seed-every-time:
+        /// a mode change overwrites mode-aware tweaks; picking a preset means
+        /// asking for it).
+        config_registry_apply_mode_defaults(mode);
+
+        /// Re-seed the feature matrix's MODE layer after the generic overlay
+        /// (apply_mode_defaults clears every MODE slot) so config get / show
+        /// resolve the new mode's features.
+        shell_seed_feature_modes(mode);
+
+        /// Push the re-seeded defaults into the runtime struct so mode-aware
+        /// options (completion.match_mode, history.search_mode, ...) change
+        /// with the mode rather than stranding the previous mode's value.
+        config_registry_sync_to_runtime();
+    }
+}
+
+/// Subscriber: a registry shell.mode change reconciles the runtime. Every
+/// surface (CLI flag, lushrc, the mode builtin, set -o posix) writes the
+/// appropriate layer; the resolved effective value is applied here exactly once
+/// per change. No write-back -- shell_mode_runtime_apply does not touch
+/// shell.mode -- so there is no recursion.
+static void shell_mode_registry_apply(const char *key,
+                                      const creg_value_t *old_value,
+                                      const creg_value_t *new_value,
+                                      void *user_data) {
+    (void)key;
+    (void)old_value;
+    (void)user_data;
+    if (!new_value || new_value->type != CREG_VALUE_STRING) {
+        return;
+    }
+    shell_mode_t parsed;
+    if (!shell_mode_parse(new_value->data.string, &parsed)) {
+        parsed = SHELL_MODE_LUSH;
+    }
+    /// shell_mode_set honors the strict-mode lock; apply only if accepted.
+    if (shell_mode_set(parsed)) {
+        shell_mode_runtime_apply(parsed);
+    }
+}
+
+void shell_mode_register_runtime_subscriber(void) {
+    config_registry_subscribe("shell.mode", shell_mode_registry_apply, NULL);
+}
+
+/// Canonical entry point for an explicit mode selection (the mode builtin,
+/// set -o posix, config set shell.mode, the startup bootstrap). Records the
+/// choice in the registry SESSION layer for provenance and persistence, applies
+/// the preset to the runtime unconditionally (drops overrides, re-seeds), and
+/// propagates via config_apply_settings. Returns false if the strict-mode lock
+/// forbids the change.
 bool apply_mode_preset(shell_mode_t mode) {
     if (!shell_mode_set(mode)) {
         return false;
     }
 
-    /// Mode change is a clean re-seed: drop any per-feature overrides so
-    /// the new mode's matrix defaults take effect. Picking a preset means
-    /// asking for it.
-    shell_feature_reset_all();
-
-    /// Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates
-    /// the mode system; keep it in sync so call sites that still consult
-    /// it see the right value.
-    shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
-
-    /// Persist the canonical mode label in the central registry.
-    config.shell_mode = (int)mode;
+    /// Record the explicit choice in the SESSION layer (highest precedence) for
+    /// provenance and persistence. This fires the shell.mode subscriber only on
+    /// a value change.
     if (config_registry_is_initialized()) {
         config_registry_set_string("shell.mode", shell_mode_name(mode));
+    }
 
-        /// Re-seed any registered per-mode default overrides. Options
-        /// without per-mode defaults are unaffected. Re-seed-every-time
-        /// semantic: mid-session mode changes overwrite user tweaks to
-        /// mode-aware options (picking a preset means asking for it).
-        config_registry_apply_mode_defaults(mode);
+    /// Apply unconditionally. An explicit preset selection must drop
+    /// per-feature overrides and re-seed even when the effective mode is
+    /// unchanged (mode
+    /// --reset, set -o posix while already posix); the change-gated subscriber
+    /// would skip those. shell_mode_runtime_apply is idempotent, so the
+    /// redundant application when the subscriber also fires on a real change is
+    /// harmless. (Picking a preset means asking for it.)
+    shell_mode_runtime_apply(mode);
 
-        /// Re-seed the feature matrix in the layered store after the generic
-        /// overlay (apply_mode_defaults clears every MODE slot): drop
-        /// interactive feature pins (mode-sticky) and set each feature's MODE
-        /// layer to the new mode's default, mirroring the shell_feature_reset_-
-        /// all above so config get / show resolve the new mode's features.
-        shell_seed_feature_modes(mode);
-
-        /// Push the re-seeded defaults into the runtime struct and apply
-        /// them, so mode-aware options (completion.match_mode,
-        /// history.search_mode, ...) change with the mode rather than
-        /// stranding the previous mode's value in the struct the engine reads.
-        config_registry_sync_to_runtime();
+    /// Propagate to the rest of the shell, as the prior apply_mode_preset did
+    /// (only meaningful once the registry/runtime exist).
+    if (config_registry_is_initialized()) {
         config_apply_settings();
     }
 

@@ -301,6 +301,16 @@ bool shell_mode_set(shell_mode_t mode);
 bool apply_mode_preset(shell_mode_t mode);
 
 /**
+ * @brief Register the shell.mode registry subscriber.
+ *
+ * Makes shell.mode registry-driven: any layer write (CLI flag, lushrc, the mode
+ * builtin, set -o posix) is reconciled into the runtime by the subscriber.
+ * Called once from config_register_sections after the shell section exists.
+ * Implemented in posix_opts.c.
+ */
+void shell_mode_register_runtime_subscriber(void);
+
+/**
  * @brief Register the feature matrix as shell.feature.* registry keys.
  *
  * Makes every FEATURE_* entry a first-class layered config key so config get /

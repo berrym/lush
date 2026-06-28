@@ -18,6 +18,7 @@
 #include "config_registry.h"
 #include "lle/char_width.h"
 #include "lush.h"
+#include "shell_mode.h"
 #include "test_framework.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -471,6 +472,45 @@ TEST(config_save_sync_preserves_shell_options) {
                 "config save (sync_from_runtime) must not disable errexit");
 }
 
+TEST(shell_mode_registry_subscriber_applies) {
+    config_init();
+
+    /// A registry shell.mode write must reconcile the *runtime* mode, not just
+    /// the label -- this subscriber is what makes a lushrc mode= take effect.
+    config_registry_set_string("shell.mode", "bash");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_BASH,
+              "a shell.mode registry write must switch the runtime mode");
+    /// extended_glob is curated on in lush, off in bash: proves the feature
+    /// matrix (not just the label) followed the registry value.
+    ASSERT_FALSE(shell_mode_allows(FEATURE_EXTENDED_GLOB),
+                 "the feature matrix must follow the registry mode");
+
+    /// Restore lush for subsequent tests.
+    config_registry_set_string("shell.mode", "lush");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "restoring the registry mode must switch back");
+}
+
+TEST(reapplying_current_mode_drops_overrides) {
+    config_init();
+
+    /// Land in a known mode with no overrides, then pin a feature override the
+    /// way setopt/unsetopt would.
+    apply_mode_preset(SHELL_MODE_LUSH);
+    shell_feature_disable(FEATURE_EXTENDED_GLOB);
+    ASSERT_FALSE(shell_mode_allows(FEATURE_EXTENDED_GLOB),
+                 "precondition: extended_glob overridden off");
+
+    /// Re-selecting the SAME mode (mode --reset, set -o posix while posix) must
+    /// drop the override and re-seed the preset, even though the registry
+    /// effective shell.mode does not change -- the change-gated subscriber
+    /// alone would skip it, so apply_mode_preset must apply the runtime
+    /// directly.
+    apply_mode_preset(SHELL_MODE_LUSH);
+    ASSERT_TRUE(shell_mode_allows(FEATURE_EXTENDED_GLOB),
+                "re-applying the current mode must drop per-feature overrides");
+}
+
 TEST(argv_shell_options_hydrate_to_session) {
     config_init();
 
@@ -922,6 +962,8 @@ int main(void) {
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_save_sync_preserves_shell_options);
+    RUN_TEST(shell_mode_registry_subscriber_applies);
+    RUN_TEST(reapplying_current_mode_drops_overrides);
     RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_show_lists_shell_feature_keys);
     RUN_TEST(config_get_bool_default);
