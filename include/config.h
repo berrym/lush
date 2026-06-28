@@ -54,8 +54,7 @@
  */
 typedef enum {
     CONFIG_FORMAT_UNKNOWN, ///< Unknown or invalid format
-    CONFIG_FORMAT_LEGACY,  ///< Legacy INI-like format (.lushrc)
-    CONFIG_FORMAT_TOML     ///< TOML format (lushrc.toml)
+    CONFIG_FORMAT_TOML     ///< TOML format (lushrc.toml) -- the only format
 } config_format_t;
 
 /**
@@ -256,13 +255,9 @@ typedef struct {
     char *user_config_path;    ///< Path to user configuration file
     char *system_config_path;  ///< Path to system configuration file
     char *xdg_config_dir;      ///< XDG config directory path
-    char *legacy_config_path;  ///< Path to legacy config if it exists
     bool user_config_exists;   ///< Whether user config file exists
     bool system_config_exists; ///< Whether system config file exists
     config_format_t format;    ///< Format of loaded config file
-    bool needs_migration;      ///< True if legacy config needs migration
-    int line_number;           ///< Current line number being parsed
-    const char *current_file;  ///< Current file being parsed
 } config_context_t;
 
 /**
@@ -776,22 +771,6 @@ int config_get_xdg_config_path(char *buffer, size_t size);
  * @return 0 on success, -1 on error
  */
 int config_get_legacy_config_path(char *buffer, size_t size);
-
-/**
- * @brief Check if legacy config needs migration
- *
- * @return true if legacy config exists and XDG config does not
- */
-bool config_needs_migration(void);
-
-/**
- * @brief Migrate legacy config to XDG location
- *
- * Converts ~/.lushrc to ~/.config/lush/lushrc.toml format.
- *
- * @return 0 on success, -1 on error
- */
-int config_migrate_to_xdg(void);
 
 /**
  * @brief Get the path to the shell script config file

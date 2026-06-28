@@ -2262,41 +2262,6 @@ static const char *get_home_directory(void) {
 }
 
 /**
- * @brief Create a directory and all parent directories recursively
- *
- * @param path Directory path to create
- * @return 0 on success, -1 on failure
- */
-static int mkdir_recursive(const char *path) {
-    char tmp[CONFIG_PATH_MAX];
-    char *p = NULL;
-    size_t len;
-
-    snprintf(tmp, sizeof(tmp), "%s", path);
-    len = strlen(tmp);
-
-    if (len > 0 && tmp[len - 1] == '/') {
-        tmp[len - 1] = '\0';
-    }
-
-    for (p = tmp + 1; *p; p++) {
-        if (*p == '/') {
-            *p = '\0';
-            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
-                return -1;
-            }
-            *p = '/';
-        }
-    }
-
-    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
-        return -1;
-    }
-
-    return 0;
-}
-
-/**
  * @brief Get the XDG config directory path
  *
  * Returns ~/.config/lush or $XDG_CONFIG_HOME/lush.
@@ -2388,92 +2353,6 @@ int config_get_script_config_path(char *buffer, size_t size) {
     }
 
     snprintf(buffer, size, "%s/%s", xdg_dir, CONFIG_XDG_SCRIPT);
-    return 0;
-}
-
-/**
- * @brief Check if legacy config needs migration
- *
- * @return true if legacy config exists and XDG config does not
- */
-bool config_needs_migration(void) { return config_ctx.needs_migration; }
-
-/**
- * @brief Ensure XDG config directory exists
- *
- * Creates ~/.config/lush if it doesn't exist.
- *
- * @return 0 on success, -1 on error
- */
-static int ensure_xdg_dir_exists(void) {
-    char xdg_dir[CONFIG_PATH_MAX];
-    if (config_get_xdg_dir(xdg_dir, sizeof(xdg_dir)) != 0) {
-        return -1;
-    }
-
-    struct stat st;
-    if (stat(xdg_dir, &st) == 0) {
-        return S_ISDIR(st.st_mode) ? 0 : -1;
-    }
-
-    return mkdir_recursive(xdg_dir);
-}
-
-/**
- * @brief Migrate legacy config to XDG location
- *
- * Converts ~/.lushrc to ~/.config/lush/lushrc.toml format.
- * This is a placeholder - full implementation requires the registry.
- *
- * @return 0 on success, -1 on error
- */
-int config_migrate_to_xdg(void) {
-    if (!config_ctx.needs_migration) {
-        return 0; /// Nothing to migrate
-    }
-
-    /// Ensure XDG directory exists
-    if (ensure_xdg_dir_exists() != 0) {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "failed to create XDG config directory");
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-        return -1;
-    }
-
-    /// Get XDG config path
-    char xdg_path[CONFIG_PATH_MAX];
-    if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) != 0) {
-        return -1;
-    }
-
-    /// Save current config to XDG location in TOML format
-    /// Note: This will be enhanced once registry is wired up
-    if (config_save_file(xdg_path) != 0) {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "failed to save config to %s", xdg_path);
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-        return -1;
-    }
-
-    /// Update context
-    free(config_ctx.user_config_path);
-    config_ctx.user_config_path = strdup(xdg_path);
-    config_ctx.format = CONFIG_FORMAT_TOML;
-    config_ctx.needs_migration = false;
-
-    fprintf(stderr, "lush: Configuration saved to %s\n", xdg_path);
-    fprintf(stderr, "lush: You may remove the old %s file\n",
-            config_ctx.legacy_config_path ? config_ctx.legacy_config_path
-                                          : "~/.lushrc");
-
     return 0;
 }
 
@@ -2587,17 +2466,7 @@ int config_save_user(void) {
         int result = config_save_file(xdg_path);
 
         if (result == 0) {
-            /// Update context to point to new location
-            if (config_ctx.needs_migration) {
-                fprintf(stderr, "lush: Configuration saved to %s\n", xdg_path);
-                fprintf(stderr, "lush: You may remove the old %s file\n",
-                        config_ctx.legacy_config_path
-                            ? config_ctx.legacy_config_path
-                            : "~/.lushrc");
-                config_ctx.needs_migration = false;
-            }
-
-            /// Update user_config_path to the new TOML location
+            /// Update user_config_path to the new TOML location.
             free(config_ctx.user_config_path);
             config_ctx.user_config_path = strdup(xdg_path);
             config_ctx.format = CONFIG_FORMAT_TOML;
@@ -3308,27 +3177,6 @@ void builtin_config(int argc, char **argv) {
         } else {
             printf("Error: Failed to save configuration\n");
         }
-    } else if (strcmp(argv[1], "migrate") == 0) {
-        if (!config_ctx.needs_migration) {
-            char xdg_path[CONFIG_PATH_MAX];
-            if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) == 0) {
-                struct stat st;
-                if (stat(xdg_path, &st) == 0) {
-                    printf("Configuration already at XDG location: %s\n",
-                           xdg_path);
-                } else {
-                    printf("No legacy configuration to migrate.\n");
-                    printf(
-                        "Use 'config save' to create a new configuration.\n");
-                }
-            }
-            return;
-        }
-        if (config_migrate_to_xdg() == 0) {
-            printf("Migration complete.\n");
-        } else {
-            printf("Error: Migration failed\n");
-        }
     } else if (strcmp(argv[1], "path") == 0) {
         /// Show current config file paths
         printf("Configuration paths:\n");
@@ -3343,17 +3191,8 @@ void builtin_config(int argc, char **argv) {
         if (config_ctx.xdg_config_dir) {
             printf("  XDG config dir: %s\n", config_ctx.xdg_config_dir);
         }
-        if (config_ctx.legacy_config_path) {
-            printf("  Legacy config: %s\n", config_ctx.legacy_config_path);
-        }
         printf("  Format: %s\n",
-               config_ctx.format == CONFIG_FORMAT_TOML     ? "TOML"
-               : config_ctx.format == CONFIG_FORMAT_LEGACY ? "Legacy INI"
-                                                           : "Unknown");
-        if (config_ctx.needs_migration) {
-            printf("  Status: Migration pending (run 'config migrate' or "
-                   "'config save')\n");
-        }
+               config_ctx.format == CONFIG_FORMAT_TOML ? "TOML" : "Unknown");
     } else {
         printf("Unknown config command: %s\n", argv[1]);
     }
@@ -4035,8 +3874,5 @@ void config_cleanup(void) {
     }
     if (config_ctx.xdg_config_dir) {
         free(config_ctx.xdg_config_dir);
-    }
-    if (config_ctx.legacy_config_path) {
-        free(config_ctx.legacy_config_path);
     }
 }
