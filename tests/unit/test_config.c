@@ -511,6 +511,27 @@ TEST(reapplying_current_mode_drops_overrides) {
                 "re-applying the current mode must drop per-feature overrides");
 }
 
+TEST(set_o_only_options_gained_config_surface) {
+    config_init();
+
+    /// errtrace (set -E) / functrace (set -T) / pipeline-diagnostic were set -o
+    /// options with no config key. Registering them means a registry write now
+    /// reaches shell_opts via the shell.* subscriber + config_set_shell_option.
+    config_registry_set_boolean("shell.errtrace", true);
+    ASSERT_TRUE(
+        config_get_shell_option("shell.errtrace"),
+        "a shell.errtrace registry write must reach shell_opts.errtrace");
+
+    config_registry_set_boolean("shell.pipeline-diagnostic", true);
+    ASSERT_TRUE(
+        config_get_shell_option("shell.pipeline-diagnostic"),
+        "a shell.pipeline-diagnostic registry write must reach shell_opts");
+
+    /// Leave the registry clean for subsequent tests.
+    config_registry_set_boolean("shell.errtrace", false);
+    config_registry_set_boolean("shell.pipeline-diagnostic", false);
+}
+
 TEST(argv_shell_options_hydrate_to_session) {
     config_init();
 
@@ -964,6 +985,7 @@ int main(void) {
     RUN_TEST(config_save_sync_preserves_shell_options);
     RUN_TEST(shell_mode_registry_subscriber_applies);
     RUN_TEST(reapplying_current_mode_drops_overrides);
+    RUN_TEST(set_o_only_options_gained_config_surface);
     RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_show_lists_shell_feature_keys);
     RUN_TEST(config_get_bool_default);
