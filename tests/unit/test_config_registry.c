@@ -875,6 +875,50 @@ TEST(type_describe_reports_valid_values) {
         CREG_ERROR_NOT_FOUND);
 }
 
+TEST(type_int_range_open_ended_describe) {
+    config_registry_register_section(&history_section);
+    char buf[64];
+
+    /// An INT64_MAX upper bound is the open-ended / non-negative case: describe
+    /// renders it in plain language, not the huge numeric limit. The check
+    /// still rejects a negative and accepts a large value.
+    creg_type_t nn;
+    creg_type_init_int_range(&nn, 0, INT64_MAX);
+    config_registry_set_type("history.size", &nn);
+    ASSERT_EQ(config_registry_describe_type("history.size", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "a non-negative integer");
+    creg_value_t neg = creg_value_integer(-1);
+    ASSERT_EQ(config_registry_set("history.size", &neg),
+              CREG_ERROR_INVALID_VALUE);
+    creg_value_t big = creg_value_integer(1000000);
+    ASSERT_EQ(config_registry_set("history.size", &big), CREG_SUCCESS);
+
+    /// A positive lower bound with an open top renders ">= min".
+    creg_type_t lo;
+    creg_type_init_int_range(&lo, 5, INT64_MAX);
+    config_registry_set_type("history.size", &lo);
+    ASSERT_EQ(config_registry_describe_type("history.size", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "an integer >= 5");
+
+    /// An open bottom with a finite top renders "<= max".
+    creg_type_t hi;
+    creg_type_init_int_range(&hi, INT64_MIN, 100);
+    config_registry_set_type("history.size", &hi);
+    ASSERT_EQ(config_registry_describe_type("history.size", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "an integer <= 100");
+
+    /// Both ends open renders the bare "an integer".
+    creg_type_t both;
+    creg_type_init_int_range(&both, INT64_MIN, INT64_MAX);
+    config_registry_set_type("history.size", &both);
+    ASSERT_EQ(config_registry_describe_type("history.size", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "an integer");
+}
+
 TEST(type_set_type_rejects_storage_mismatch) {
     config_registry_register_section(&history_section);
     /// history.size is an INTEGER key; attaching an enum (string storage) is a
@@ -971,6 +1015,7 @@ int main(void) {
     RUN_TEST(type_enum_rejects_invalid_accepts_valid);
     RUN_TEST(type_int_range_rejects_out_of_bounds);
     RUN_TEST(type_describe_reports_valid_values);
+    RUN_TEST(type_int_range_open_ended_describe);
     RUN_TEST(type_set_type_rejects_storage_mismatch);
     RUN_TEST(type_untyped_key_accepts_any_well_typed_value);
 

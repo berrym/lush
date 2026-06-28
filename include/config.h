@@ -383,6 +383,18 @@ extern config_context_t config_ctx;
 int config_init(void);
 
 /**
+ * @brief Number of type descriptors that failed to attach during config_init.
+ *
+ * Zero in a correct build. Nonzero means a key in the internal type tables is
+ * misspelled, unregistered, or has a storage kind its descriptor does not
+ * match, so that key validates nothing. A unit test asserts this is zero, so a
+ * mis-registered table entry cannot ship silently.
+ *
+ * @return Count of failed attachments from the most recent config_register.
+ */
+int config_type_attach_failure_count(void);
+
+/**
  * @brief Load user configuration file
  *
  * Loads configuration from the user's home directory.

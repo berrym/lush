@@ -28,8 +28,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <getopt.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1061,26 +1063,89 @@ static void config_register_sections(void) {
  * them.
  */
 
-/// Type descriptors for the keys whose values the registry validates. enum
-/// descriptors reuse the same pair tables the bindings map through, so the
-/// allowed set is declared once; int-range descriptors carry the documented
-/// bounds. Held as file-scope statics that outlive the registry, then attached
-/// by config_register_types() after the keys are registered.
-static creg_type_t g_type_completion_match_mode;
-static creg_type_t g_type_display_optimization_level;
+/// Enum-typed keys: a value must equal one of the pair-table names. The table
+/// is the same one the binding maps through, so the allowed set has one source.
+static const struct {
+    const char *key;
+    const creg_enum_pair_t *pairs;
+} k_enum_types[] = {
+    {        "completion.match_mode",         completion_match_mode_pairs},
+    {          "history.search_mode",           history_search_mode_pairs},
+    {         "history.finder.match",          history_finder_match_pairs},
+    {          "history.finder.rank",           history_finder_rank_pairs},
+    {       "history.finder.display",        history_finder_display_pairs},
+    {           "lle.arrow_key_mode",                lle_arrow_mode_pairs},
+    {              "lle.dedup_scope",               lle_dedup_scope_pairs},
+    {           "lle.dedup_strategy",            lle_dedup_strategy_pairs},
+    {"autosuggestion.dismiss_policy", autosuggestion_dismiss_policy_pairs},
+    {          "autosuggestion.rank",           autosuggestion_rank_pairs},
+    {"autosuggestion.partial_accept", autosuggestion_partial_accept_pairs},
+    {       "autosuggestion.sources",        autosuggestion_sources_pairs},
+};
+
+/// Integer-range keys: [min, max] inclusive. An INT64_MAX upper bound is the
+/// open-ended / non-negative case (the documented "0 = unbounded/disabled"
+/// limits, where a negative value is invalid but there is no real upper cap).
+/// Ranges mirror the bounds in each key's help string.
+static const struct {
+    const char *key;
+    int64_t min;
+    int64_t max;
+} k_range_types[] = {
+    {          "display.optimization_level", 0,       4},
+    {                "completion.threshold", 0,     100},
+    {      "behavior.autocorrect_threshold", 0,     100},
+    {"behavior.autocorrect_max_suggestions", 1,       5},
+    /// The open-ended / non-negative keys bind to 32-bit int runtime cells, so
+    /// the upper bound is INT_MAX (the cell's ceiling), not INT64_MAX: a value
+    /// the int cell cannot hold must be rejected, not accepted and then
+    /// truncated through the binding into a negative (which these keys read as
+    /// disabled/unbounded). describe renders an INT_MAX top as open-ended.
+    {        "behavior.brace_expansion_max", 0, INT_MAX},
+    {          "behavior.regex_pattern_max", 0, INT_MAX},
+    { "behavior.path_negative_cache_ttl_ms", 0, INT_MAX},
+    {        "behavior.loop_failure_streak", 0, INT_MAX},
+    {       "behavior.loop_failure_seconds", 0, INT_MAX},
+};
+
+/// Descriptor storage: one creg_type_t per typed key, filled at registration
+/// and attached. File-scope so the descriptors outlive the registry.
+static creg_type_t
+    g_enum_type_storage[sizeof(k_enum_types) / sizeof(k_enum_types[0])];
+static creg_type_t
+    g_range_type_storage[sizeof(k_range_types) / sizeof(k_range_types[0])];
+
+/// Count of type descriptors that failed to attach in config_register_types --
+/// nonzero means a table key is misspelled, unregistered, or has a storage kind
+/// the descriptor does not match, so that key validates nothing. A test asserts
+/// this is zero; the getter below exposes it.
+static int g_type_attach_failures = 0;
+
+int config_type_attach_failure_count(void) { return g_type_attach_failures; }
 
 /// Attach type descriptors to registered keys so the registry validates writes
 /// (config set, setopt, TOML load) at its single chokepoint. Called from
 /// config_init after config_register_sections so the keys exist.
 static void config_register_types(void) {
-    creg_type_init_enum(&g_type_completion_match_mode,
-                        completion_match_mode_pairs);
-    config_registry_set_type("completion.match_mode",
-                             &g_type_completion_match_mode);
-
-    creg_type_init_int_range(&g_type_display_optimization_level, 0, 4);
-    config_registry_set_type("display.optimization_level",
-                             &g_type_display_optimization_level);
+    g_type_attach_failures = 0;
+    for (size_t i = 0; i < sizeof(k_enum_types) / sizeof(k_enum_types[0]);
+         i++) {
+        creg_type_init_enum(&g_enum_type_storage[i], k_enum_types[i].pairs);
+        if (config_registry_set_type(k_enum_types[i].key,
+                                     &g_enum_type_storage[i]) != CREG_SUCCESS) {
+            g_type_attach_failures++;
+        }
+    }
+    for (size_t i = 0; i < sizeof(k_range_types) / sizeof(k_range_types[0]);
+         i++) {
+        creg_type_init_int_range(&g_range_type_storage[i], k_range_types[i].min,
+                                 k_range_types[i].max);
+        if (config_registry_set_type(k_range_types[i].key,
+                                     &g_range_type_storage[i]) !=
+            CREG_SUCCESS) {
+            g_type_attach_failures++;
+        }
+    }
 }
 
 static void config_register_per_mode_defaults(void) {
