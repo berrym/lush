@@ -262,8 +262,6 @@ static const int num_config_options =
 
 /// Forward declarations for sync hooks
 static void history_bind_runtime(void);
-static void shell_sync_to_runtime(void);
-static void shell_sync_from_runtime(void);
 static void display_bind_runtime(void);
 static void completion_bind_runtime(void);
 static void behavior_bind_runtime(void);
@@ -410,8 +408,11 @@ static const creg_section_t shell_section = {
     .option_count = sizeof(shell_options) / sizeof(creg_option_t),
     .on_load = NULL,
     .on_save = NULL,
-    .sync_to_runtime = shell_sync_to_runtime,
-    .sync_from_runtime = shell_sync_from_runtime,
+    /// No sync hooks: shell.* booleans ride the shell.* subscriber and
+    /// shell.mode rides the shell.mode subscriber (both reconcile the runtime
+    /// on every registry write). The section is pure-subscriber.
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
 };
 
 /* ----------------------------------------------------------------------------
@@ -847,44 +848,6 @@ void shell_register_features(void) {
     /// seeding here would just be wiped by that overlay pass.
 }
 
-/// @brief Sync shell options from registry to runtime
-///
-/// Only shell.mode is handled here: it is a string key that no subscriber
-/// projects, so the load-from-TOML path needs this mapping. Every shell.*
-/// boolean is driven by the shell.* subscriber (shell_option_registry_apply)
-/// on each registry write, including per-key TOML load, so the booleans need no
-/// sync hook. (The prior boolean blocks were dead no-ops anyway: they called
-/// config_set_shell_option with a bare name, which the function's +6 "shell."
-/// prefix-strip turned into garbage.)
-static void shell_sync_to_runtime(void) {
-    char sval[CREG_VALUE_STRING_MAX];
-
-    if (config_registry_get_string("shell.mode", sval, sizeof(sval)) ==
-        CREG_SUCCESS) {
-        /// Map mode string to enum via the canonical parser. Unknown
-        /// names fall back to lush, preserving the prior behavior.
-        shell_mode_t parsed;
-        config.shell_mode =
-            shell_mode_parse(sval, &parsed) ? parsed : SHELL_MODE_LUSH;
-    }
-}
-
-/// @brief Sync shell options from runtime to registry
-///
-/// Only shell.mode is mirrored: it backs config save's mode persistence and no
-/// subscriber owns the string key. The shell.* booleans are intentionally not
-/// written here -- the subscriber already keeps the registry in step with
-/// shell_opts on every write path. The prior boolean writes were a clobber bug:
-/// config_get_shell_option("errexit") (bare name, +6 prefix-strip) returned
-/// false, so config save reset shell.errexit/nounset/xtrace/pipefail to false
-/// in the registry, which the subscriber then write-through onto shell_opts --
-/// turning off set -e on save.
-static void shell_sync_from_runtime(void) {
-    /// Map mode enum to its canonical string via shell_mode_name.
-    const char *mode_str = shell_mode_name(config.shell_mode);
-    config_registry_set_string("shell.mode", mode_str ? mode_str : "lush");
-}
-
 /// @brief Sync display config from registry to runtime
 /// @brief Bind display config keys to their runtime cells.
 /// The registry is the sole writer: config_registry_set write-throughs to the
@@ -1129,6 +1092,11 @@ static void config_register_sections(void) {
     /// subscriber mirrors them into the runtime matrix. MODE-layer seeding runs
     /// later in config_init, after config_registry_apply_mode_defaults.
     shell_register_features();
+
+    /// shell.mode is registry-driven: a subscriber reconciles the runtime mode
+    /// (feature matrix, per-mode defaults) to whatever layer write wins, so a
+    /// lushrc mode= (USER) takes effect while a CLI flag (SESSION) still wins.
+    shell_mode_register_runtime_subscriber();
 }
 
 /**
@@ -2169,14 +2137,19 @@ int config_init(void) {
     /// call below.
     config_register_per_mode_defaults();
 
-    /// The registry's section defaults include shell.mode = "lush". The
-    /// active mode (set earlier by apply_mode_preset() from CLI flag /
-    /// shebang peek / default lush) may differ from "lush". Write the
-    /// active mode into the registry now so subsequent sync_to_runtime
-    /// calls (after user-config load) see the right value -- otherwise
-    /// the registry's section default would clobber a CLI-flag mode
-    /// when sync runs.
-    config_registry_set_string("shell.mode", shell_mode_name(shell_mode_get()));
+    /// Pin an explicitly chosen bootstrap mode in the SESSION layer (highest
+    /// precedence) so it outranks a lushrc mode=: a CLI flag
+    /// (--posix/--bash/--zsh/--lush) or a script shebang that selected a
+    /// non-default mode. Both are the user's/script's explicit choice. A plain
+    /// default-lush startup writes nothing, leaving shell.mode on the DEFAULT
+    /// layer so a lushrc mode= (USER) can take effect. Either way the registry
+    /// matches the runtime (config explain / save stay honest), and the write
+    /// fires the shell.mode subscriber, which reconciles the runtime.
+    if (shell_opts.cli_mode_override_set ||
+        shell_mode_get() != SHELL_MODE_LUSH) {
+        config_registry_set_string("shell.mode",
+                                   shell_mode_name(shell_mode_get()));
+    }
 
     /// Apply per-mode default overrides for the active shell mode before
     /// loading user config, so any user lushrc settings layer on top of
@@ -4163,11 +4136,16 @@ void config_set_value(const char *key, const char *value) {
                            value);
                     return;
                 }
-                if (!shell_mode_set(new_mode)) {
+                /// Route through apply_mode_preset so the registry stays
+                /// authoritative (config save / explain), the full preset is
+                /// re-seeded, and the strict-mode lock is honored -- exactly as
+                /// the mode builtin does. Poking the runtime directly here
+                /// would leave the registry stale and config save would persist
+                /// the wrong mode.
+                if (!apply_mode_preset(new_mode)) {
                     printf("Cannot change shell mode (strict mode enabled)\n");
                     return;
                 }
-                config.shell_mode = (int)new_mode;
                 printf("Set %s = %s\n", key, value);
                 return;
             }
