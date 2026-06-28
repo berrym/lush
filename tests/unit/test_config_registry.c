@@ -787,6 +787,120 @@ TEST(mode_default_apply_invalid_mode_fails) {
 }
 
 /* ============================================================================
+ * Type descriptor (vtable) validation
+ * ============================================================================
+ */
+
+static const creg_enum_pair_t mode_pairs[] = {
+    {"posix", 0},
+    { "bash", 1},
+    {  "zsh", 2},
+    { "lush", 3},
+    {   NULL, 0}
+};
+
+TEST(type_enum_rejects_invalid_accepts_valid) {
+    config_registry_register_section(&shell_section);
+    creg_type_t mode_type;
+    creg_type_init_enum(&mode_type, mode_pairs);
+    ASSERT_EQ(config_registry_set_type("shell.mode", &mode_type), CREG_SUCCESS);
+
+    /// A member of the enum is accepted.
+    creg_value_t good = creg_value_string("bash");
+    ASSERT_EQ(config_registry_set("shell.mode", &good), CREG_SUCCESS);
+    creg_value_t got;
+    config_registry_get("shell.mode", &got);
+    ASSERT_STR_EQ(got.data.string, "bash");
+
+    /// A non-member is rejected with INVALID_VALUE, and the prior value stands.
+    creg_value_t bad = creg_value_string("klingon");
+    ASSERT_EQ(config_registry_set("shell.mode", &bad),
+              CREG_ERROR_INVALID_VALUE);
+    config_registry_get("shell.mode", &got);
+    ASSERT_STR_EQ(got.data.string, "bash");
+}
+
+TEST(type_int_range_rejects_out_of_bounds) {
+    config_registry_register_section(&history_section);
+    creg_type_t size_type;
+    creg_type_init_int_range(&size_type, 0, 100);
+    ASSERT_EQ(config_registry_set_type("history.size", &size_type),
+              CREG_SUCCESS);
+
+    /// In-range and both inclusive boundaries are accepted.
+    creg_value_t mid = creg_value_integer(50);
+    ASSERT_EQ(config_registry_set("history.size", &mid), CREG_SUCCESS);
+    creg_value_t lo = creg_value_integer(0);
+    ASSERT_EQ(config_registry_set("history.size", &lo), CREG_SUCCESS);
+    creg_value_t hi = creg_value_integer(100);
+    ASSERT_EQ(config_registry_set("history.size", &hi), CREG_SUCCESS);
+
+    /// Above and below the range are rejected; the last valid value stands.
+    creg_value_t over = creg_value_integer(101);
+    ASSERT_EQ(config_registry_set("history.size", &over),
+              CREG_ERROR_INVALID_VALUE);
+    creg_value_t under = creg_value_integer(-1);
+    ASSERT_EQ(config_registry_set("history.size", &under),
+              CREG_ERROR_INVALID_VALUE);
+    creg_value_t got;
+    config_registry_get("history.size", &got);
+    ASSERT_EQ(got.data.integer, 100);
+}
+
+TEST(type_describe_reports_valid_values) {
+    config_registry_register_section(&shell_section);
+    config_registry_register_section(&history_section);
+    creg_type_t mode_type;
+    creg_type_init_enum(&mode_type, mode_pairs);
+    config_registry_set_type("shell.mode", &mode_type);
+    creg_type_t size_type;
+    creg_type_init_int_range(&size_type, 0, 100);
+    config_registry_set_type("history.size", &size_type);
+
+    char buf[128];
+    ASSERT_EQ(config_registry_describe_type("shell.mode", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "one of: posix bash zsh lush");
+    ASSERT_EQ(config_registry_describe_type("history.size", buf, sizeof(buf)),
+              CREG_SUCCESS);
+    ASSERT_STR_EQ(buf, "an integer in 0..100");
+
+    /// A REGISTERED but untyped key reports NOT_FOUND for describe: assert
+    /// history.enabled exists first, so the NOT_FOUND is about the missing
+    /// descriptor, not a missing key.
+    creg_value_t v;
+    ASSERT_EQ(config_registry_get("history.enabled", &v), CREG_SUCCESS);
+    ASSERT_EQ(
+        config_registry_describe_type("history.enabled", buf, sizeof(buf)),
+        CREG_ERROR_NOT_FOUND);
+}
+
+TEST(type_set_type_rejects_storage_mismatch) {
+    config_registry_register_section(&history_section);
+    /// history.size is an INTEGER key; attaching an enum (string storage) is a
+    /// programming error and must be rejected at attach time, so a later string
+    /// set cannot reach an int-reading check op with the wrong union member.
+    creg_type_t enum_type;
+    creg_type_init_enum(&enum_type, mode_pairs);
+    ASSERT_EQ(config_registry_set_type("history.size", &enum_type),
+              CREG_ERROR_TYPE_MISMATCH);
+
+    /// The matching storage kind attaches cleanly.
+    creg_type_t range_type;
+    creg_type_init_int_range(&range_type, 0, 100);
+    ASSERT_EQ(config_registry_set_type("history.size", &range_type),
+              CREG_SUCCESS);
+}
+
+TEST(type_untyped_key_accepts_any_well_typed_value) {
+    config_registry_register_section(&history_section);
+    /// history.size has no descriptor here: any integer is accepted (the
+    /// validation is opt-in per key, so unmigrated keys keep prior behavior).
+    creg_value_t huge = creg_value_integer(999999);
+    ASSERT_EQ(config_registry_set("history.size", &huge), CREG_SUCCESS);
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -853,6 +967,12 @@ int main(void) {
     RUN_TEST(mode_default_independent_per_mode);
     RUN_TEST(mode_default_invalid_mode_fails);
     RUN_TEST(mode_default_apply_invalid_mode_fails);
+
+    RUN_TEST(type_enum_rejects_invalid_accepts_valid);
+    RUN_TEST(type_int_range_rejects_out_of_bounds);
+    RUN_TEST(type_describe_reports_valid_values);
+    RUN_TEST(type_set_type_rejects_storage_mismatch);
+    RUN_TEST(type_untyped_key_accepts_any_well_typed_value);
 
     return TEST_RESULT();
 }

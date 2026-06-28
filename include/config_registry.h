@@ -92,6 +92,77 @@ typedef struct creg_value {
 } creg_value_t;
 
 /* ============================================================================
+ * TYPE DESCRIPTORS (the type vtable)
+ * ============================================================================
+ *
+ * A creg_value_type_t names a value's STORAGE (which union slot). A
+ * creg_type_t is the richer notion of the option's TYPE: storage plus the
+ * canonical validate / describe behavior for that type, in one place. Attaching
+ * a descriptor to a registered key (config_registry_set_type) makes the
+ * registry self-validating: every write -- config set, setopt, a TOML load --
+ * is checked at the single set chokepoint, and an out-of-range int or an
+ * unknown enum string is rejected with CREG_ERROR_INVALID_VALUE instead of
+ * silently stored. The describe op feeds the rejection a precise, typed message
+ * ("one of: prefix, substring, fuzzy") and is the same source a wizard reads.
+ *
+ * This replaces the scattered, mostly-unwired config_validate_* helpers: the
+ * validator for a type lives with the type, not at each call site.
+ */
+
+/** @brief Generic enum mapping (registry string <-> engine int). */
+typedef struct {
+    const char *name; ///< Registry string value (e.g. "fuzzy")
+    int64_t value;    ///< Engine enum value it maps to
+} creg_enum_pair_t;
+
+typedef struct creg_type creg_type_t;
+
+/**
+ * @brief A configuration type: storage kind + validate/describe behavior.
+ *
+ * Built-in singletons (bool/int/string) and the enum / int-range builders
+ * below fill this; callers hold the descriptor as a file-scope object that
+ * outlives the registry and attach it with config_registry_set_type.
+ */
+struct creg_type {
+    const char *name;          ///< "bool", "int", "string", "enum", ...
+    creg_value_type_t storage; ///< Which union slot a value of this type uses
+    const creg_enum_pair_t *pairs; ///< enum: allowed names (NULL-terminated)
+    int64_t min;                   ///< int_range: inclusive lower bound
+    int64_t max;                   ///< int_range: inclusive upper bound
+    /// Validate @p v against this type's constraints. On failure writes a short
+    /// reason into @p err. Storage kind is checked by the registry separately;
+    /// this is the semantic constraint (range, enum membership).
+    bool (*check)(const creg_type_t *self, const creg_value_t *v, char *err,
+                  size_t errlen);
+    /// Describe the valid values into @p out (for typed errors and the wizard).
+    void (*describe)(const creg_type_t *self, char *out, size_t outlen);
+};
+
+/** @brief Shared descriptor for an unconstrained boolean. */
+const creg_type_t *creg_type_bool(void);
+/** @brief Shared descriptor for an unconstrained integer. */
+const creg_type_t *creg_type_int(void);
+/** @brief Shared descriptor for an unconstrained string. */
+const creg_type_t *creg_type_string(void);
+
+/**
+ * @brief Initialize a caller-owned enum descriptor over @p pairs.
+ *
+ * Storage is string; a value is valid iff it equals one of the pair names.
+ * @p pairs must outlive @p out (typically both are file-scope statics).
+ */
+void creg_type_init_enum(creg_type_t *out, const creg_enum_pair_t *pairs);
+
+/**
+ * @brief Initialize a caller-owned integer descriptor constrained to [min,max].
+ */
+void creg_type_init_int_range(creg_type_t *out, int64_t min, int64_t max);
+
+/* config_registry_set_type / describe_type are declared with the other
+ * registry functions below, after creg_result_t is defined. */
+
+/* ============================================================================
  * CONFIGURATION LAYERS (precedence + provenance)
  * ============================================================================
  */
@@ -203,7 +274,9 @@ typedef enum creg_result {
     CREG_SUCCESS = 0,           ///< Operation succeeded
     CREG_ERROR_INVALID_PARAM,   ///< Invalid parameter
     CREG_ERROR_NOT_FOUND,       ///< Key or section not found
-    CREG_ERROR_TYPE_MISMATCH,   ///< Value type doesn't match expected
+    CREG_ERROR_TYPE_MISMATCH,   ///< Value's union kind != the option's storage
+    CREG_ERROR_INVALID_VALUE,   ///< Right kind, but fails the type's constraint
+                                ///< (enum membership, int range, ...)
     CREG_ERROR_OUT_OF_MEMORY,   ///< Memory allocation failed
     CREG_ERROR_SECTION_FULL,    ///< Too many sections registered
     CREG_ERROR_OPTION_FULL,     ///< Too many options in section
@@ -211,6 +284,32 @@ typedef enum creg_result {
     CREG_ERROR_PARSE_FAILED,    ///< Failed to parse config file
     CREG_ERROR_IO_FAILED        ///< File I/O error
 } creg_result_t;
+
+/* ============================================================================
+ * TYPE DESCRIPTOR ATTACHMENT (declared here, after creg_result_t)
+ * ============================================================================
+ */
+
+/**
+ * @brief Attach a type descriptor to a registered key.
+ *
+ * Subsequent writes to @p key (config_registry_set / setters / TOML load) are
+ * validated against @p type and rejected with CREG_ERROR_INVALID_VALUE on a
+ * constraint failure. @p type must outlive the registry.
+ *
+ * @return CREG_SUCCESS, or CREG_ERROR_NOT_FOUND if the key is unregistered.
+ */
+creg_result_t config_registry_set_type(const char *key,
+                                       const creg_type_t *type);
+
+/**
+ * @brief Describe a key's valid values into @p out (for errors / the wizard).
+ *
+ * @return CREG_SUCCESS, or CREG_ERROR_NOT_FOUND if the key is unregistered or
+ *         has no type descriptor attached.
+ */
+creg_result_t config_registry_describe_type(const char *key, char *out,
+                                            size_t outlen);
 
 /* ============================================================================
  * REGISTRY LIFECYCLE
@@ -418,16 +517,8 @@ creg_result_t config_registry_get_boolean(const char *key, bool *out);
  * ============================================================================
  */
 
-/**
- * @brief Generic enum mapping for an enum-as-string binding
- *
- * Decoupled from the engine's enum typedefs so the registry layer needs no
- * knowledge of config.h. Terminated by a {NULL, 0} sentinel.
- */
-typedef struct {
-    const char *name; ///< Registry string value (e.g. "fuzzy")
-    int64_t value;    ///< Engine enum value it maps to
-} creg_enum_pair_t;
+/* creg_enum_pair_t is defined with the type descriptors near the top, since the
+ * type system and the enum bindings share the same string<->int mapping. */
 
 /**
  * @brief Bind a boolean key to a runtime bool cell.

@@ -20,6 +20,7 @@
 #include "lush.h"
 #include "shell_mode.h"
 #include "test_framework.h"
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,48 @@ static void capture_config_get(const char *key, char *out, size_t n) {
     ssize_t r = read(pipefd[0], out, n - 1);
     close(pipefd[0]);
     out[r > 0 ? (size_t)r : 0] = '\0';
+}
+
+/// Capture the STDERR of config_set_value(@p key, @p value) into @p out, so a
+/// test can assert the structured error a rejected set renders (the typed-error
+/// text and its describe-based suggestion go to stderr via
+/// shell_error_display).
+static void capture_config_set_stderr(const char *key, const char *value,
+                                      char *out, size_t n) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        if (n)
+            out[0] = '\0';
+        return;
+    }
+    fflush(stderr);
+    int saved = dup(STDERR_FILENO);
+    dup2(pipefd[1], STDERR_FILENO);
+    close(pipefd[1]);
+    config_set_value(key, value);
+    fflush(stderr);
+    dup2(saved, STDERR_FILENO);
+    close(saved);
+    ssize_t r = read(pipefd[0], out, n - 1);
+    close(pipefd[0]);
+    out[r > 0 ? (size_t)r : 0] = '\0';
+}
+
+/// Set a config key while swallowing the "Set <key> = <value>" stdout line, so
+/// a test that drives several valid sets does not interleave noise into the
+/// suite output.
+static void config_set_quiet(const char *key, const char *value) {
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    int devnull = open("/dev/null", O_WRONLY);
+    if (devnull >= 0) {
+        dup2(devnull, STDOUT_FILENO);
+        close(devnull);
+    }
+    config_set_value(key, value);
+    fflush(stdout);
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
 }
 
 /// Test framework macros
@@ -754,6 +797,61 @@ TEST(config_get_resolves_toggles_from_registry) {
     shell_opts.exit_on_error = false;
 }
 
+TEST(config_set_validates_typed_keys) {
+    config_init();
+
+    /// Drop any SESSION residue up front so the test starts clean even if a
+    /// prior run of it longjmp'd out before its trailing restore.
+    config_registry_reset("completion.match_mode");
+    config_registry_reset("display.optimization_level");
+
+    /// config_register_types attaches an enum descriptor to
+    /// completion.match_mode and an int-range [0,4] to display.optimization_-
+    /// level, so config set rejects invalid values at the registry chokepoint
+    /// instead of silently storing them, reporting the valid set. A valid value
+    /// still applies. Valid sets go through config_set_quiet to keep the "Set
+    /// X = Y" lines out of the suite output.
+    char msg[160], after[64];
+
+    /// Enum: a non-member is rejected, the message lists the valid values, and
+    /// the prior value is unchanged.
+    config_set_quiet("completion.match_mode", "substring");
+    capture_config_set_stderr("completion.match_mode", "bogus", msg,
+                              sizeof(msg));
+    ASSERT_TRUE(
+        strstr(msg, "one of: prefix substring fuzzy") != NULL,
+        "a rejected enum set must report the valid values via describe");
+    capture_config_get("completion.match_mode", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "substring\n") == 0,
+                "an invalid enum value must be rejected, leaving the prior "
+                "value (was substring)");
+    /// A valid member applies.
+    config_set_quiet("completion.match_mode", "fuzzy");
+    capture_config_get("completion.match_mode", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "fuzzy\n") == 0, "a valid enum value must apply");
+
+    /// Int range: out of [0,4] is rejected with the range in the message; in
+    /// range applies; the inclusive upper bound is accepted.
+    config_set_quiet("display.optimization_level", "2");
+    capture_config_set_stderr("display.optimization_level", "99", msg,
+                              sizeof(msg));
+    ASSERT_TRUE(strstr(msg, "0..4") != NULL,
+                "a rejected int set must report the valid range via describe");
+    capture_config_get("display.optimization_level", after, sizeof(after));
+    ASSERT_TRUE(
+        strcmp(after, "2\n") == 0,
+        "an out-of-range int must be rejected, leaving the prior value");
+    config_set_quiet("display.optimization_level", "4");
+    capture_config_get("display.optimization_level", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "4\n") == 0,
+                "the inclusive upper bound must be accepted");
+
+    /// Restore by dropping the SESSION layer (not pinning a new SESSION value),
+    /// so the keys fall back to their mode/default and leave no residue.
+    config_registry_reset("completion.match_mode");
+    config_registry_reset("display.optimization_level");
+}
+
 TEST(config_show_shell_lists_options_not_features) {
     config_init();
 
@@ -1112,6 +1210,7 @@ int main(void) {
     RUN_TEST(set_o_only_options_gained_config_surface);
     RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_get_resolves_toggles_from_registry);
+    RUN_TEST(config_set_validates_typed_keys);
     RUN_TEST(config_show_shell_lists_options_not_features);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);

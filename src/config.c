@@ -1060,6 +1060,29 @@ static void config_register_sections(void) {
  * the registered options exist by the time we attach mode defaults to
  * them.
  */
+
+/// Type descriptors for the keys whose values the registry validates. enum
+/// descriptors reuse the same pair tables the bindings map through, so the
+/// allowed set is declared once; int-range descriptors carry the documented
+/// bounds. Held as file-scope statics that outlive the registry, then attached
+/// by config_register_types() after the keys are registered.
+static creg_type_t g_type_completion_match_mode;
+static creg_type_t g_type_display_optimization_level;
+
+/// Attach type descriptors to registered keys so the registry validates writes
+/// (config set, setopt, TOML load) at its single chokepoint. Called from
+/// config_init after config_register_sections so the keys exist.
+static void config_register_types(void) {
+    creg_type_init_enum(&g_type_completion_match_mode,
+                        completion_match_mode_pairs);
+    config_registry_set_type("completion.match_mode",
+                             &g_type_completion_match_mode);
+
+    creg_type_init_int_range(&g_type_display_optimization_level, 0, 4);
+    config_registry_set_type("display.optimization_level",
+                             &g_type_display_optimization_level);
+}
+
 static void config_register_per_mode_defaults(void) {
     /// completion.chain_directories: lush curates the fish-style
     /// auto-recurse-into-directory experience as a discoverability
@@ -2053,6 +2076,10 @@ int config_init(void) {
 
     /// Initialize config registry and register all sections
     config_register_sections();
+
+    /// Attach type descriptors so the registry validates writes at its set
+    /// chokepoint. Must come after section registration (the keys must exist).
+    config_register_types();
 
     /// Register per-mode default overrides. Must come after section
     /// registration (the options must exist before per-mode defaults
@@ -3623,9 +3650,16 @@ void config_set_value(const char *key, const char *value) {
         switch (probe.type) {
         case CREG_VALUE_BOOLEAN:
             if (!config_parse_bool_text(value, &nv.data.boolean)) {
-                printf("Invalid boolean value: %s (use "
-                       "true/false/on/off/yes/no)\n",
-                       value);
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                    SOURCE_LOC_UNKNOWN,
+                    "invalid boolean '%s' for config key %s (use "
+                    "true/false/on/off/yes/no)",
+                    value, key);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 return;
             }
             break;
@@ -3634,7 +3668,14 @@ void config_set_value(const char *key, const char *value) {
             errno = 0;
             long long parsed = strtoll(value, &end, 10);
             if (end == value || *end != '\0' || errno != 0) {
-                printf("Invalid integer value: %s\n", value);
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                    SOURCE_LOC_UNKNOWN,
+                    "invalid integer '%s' for config key %s", value, key);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 return;
             }
             nv.data.integer = (int64_t)parsed;
@@ -3645,7 +3686,14 @@ void config_set_value(const char *key, const char *value) {
             errno = 0;
             double parsed = strtod(value, &end);
             if (end == value || *end != '\0' || errno != 0) {
-                printf("Invalid number value: %s\n", value);
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                    SOURCE_LOC_UNKNOWN, "invalid number '%s' for config key %s",
+                    value, key);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 return;
             }
             nv.data.floating = parsed;
@@ -3654,13 +3702,55 @@ void config_set_value(const char *key, const char *value) {
         case CREG_VALUE_STRING:
             snprintf(nv.data.string, sizeof(nv.data.string), "%s", value);
             break;
-        case CREG_VALUE_NONE:
-            printf("Cannot set %s: key has no value type\n", key);
+        case CREG_VALUE_NONE: {
+            shell_error_t *err =
+                shell_error_create(SHELL_ERR_INVALID_ARGUMENT,
+                                   SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                   "cannot set config key %s: it has no value "
+                                   "type",
+                                   key);
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return;
         }
+        }
 
-        if (config_registry_set(key, &nv) != CREG_SUCCESS) {
-            printf("Failed to set %s\n", key);
+        creg_result_t set_rc = config_registry_set(key, &nv);
+        if (set_rc == CREG_ERROR_INVALID_VALUE) {
+            /// The value parsed to the right kind but failed the key's type
+            /// constraint (enum membership, int range). Report through the
+            /// structured error system (as the config builtin's other errors
+            /// do), with the type's describe text as the suggestion -- the
+            /// registry returns the result code, the shell-side builtin renders
+            /// the user-facing error.
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "invalid value '%s' for config key %s",
+                value, key);
+            if (err) {
+                char desc[128];
+                if (config_registry_describe_type(key, desc, sizeof(desc)) ==
+                    CREG_SUCCESS) {
+                    char suggestion[160];
+                    snprintf(suggestion, sizeof(suggestion), "expected %s",
+                             desc);
+                    shell_error_set_suggestion(err, suggestion);
+                }
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
+            return;
+        }
+        if (set_rc != CREG_SUCCESS) {
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "failed to set config key %s", key);
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return;
         }
         config_registry_sync_to_runtime();
