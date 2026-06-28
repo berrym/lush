@@ -533,6 +533,41 @@ TEST(internal_error_macro) {
 }
 
 /* ============================================================================
+ * ONE-SHOT EMIT TESTS
+ * ============================================================================
+ */
+
+TEST(error_emit_renders_to_stderr) {
+    /// shell_error_emit is the one-shot create + render-to-stderr + free.
+    /// Capture stderr around it and assert it rendered the severity, code, and
+    /// the formatted message (proving create + display happened; the free is
+    /// covered by the suite's leak check).
+    fflush(stderr);
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0, "pipe should succeed");
+    int saved = dup(STDERR_FILENO);
+    dup2(pipefd[1], STDERR_FILENO);
+    close(pipefd[1]);
+
+    shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                     SOURCE_LOC_UNKNOWN, "bad value %d", 42);
+
+    fflush(stderr);
+    dup2(saved, STDERR_FILENO);
+    close(saved);
+    char out[512];
+    ssize_t n = read(pipefd[0], out, sizeof(out) - 1);
+    close(pipefd[0]);
+    out[n > 0 ? (size_t)n : 0] = '\0';
+
+    ASSERT(strstr(out, "warning[E1204]") != NULL,
+           "emit renders the severity and the error code "
+           "(E1204 = SHELL_ERR_INVALID_ARGUMENT)");
+    ASSERT(strstr(out, "bad value 42") != NULL,
+           "emit renders the formatted message");
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -584,6 +619,9 @@ int main(void) {
 
     printf("\nInternal Error Macro Tests:\n");
     RUN_TEST(internal_error_macro);
+
+    printf("\nOne-shot Emit Tests:\n");
+    RUN_TEST(error_emit_renders_to_stderr);
 
     return TEST_RESULT();
 }

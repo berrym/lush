@@ -1688,13 +1688,9 @@ int config_execute_system_profile(void) {
         if (config_execute_script_file("/etc/lushrc") != 0) {
             /// Log warning but continue - system config failure shouldn't
             /// block login.
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN, "error sourcing /etc/lushrc");
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
+            shell_error_emit(SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                             SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                             "error sourcing /etc/lushrc");
             result = -1;
         }
     }
@@ -1708,13 +1704,9 @@ int config_execute_system_profile(void) {
         int script_result = config_execute_script_file("/etc/profile");
         shell_mode_set(saved_mode);
         if (script_result != 0) {
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN, "error sourcing /etc/profile");
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
+            shell_error_emit(SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                             SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                             "error sourcing /etc/profile");
             result = -1;
         }
     }
@@ -2496,15 +2488,10 @@ int config_save_user(void) {
                 /// Directory doesn't exist, create it
                 if (mkdir(xdg_dir, 0755) != 0 && errno != EEXIST) {
                     int saved_errno = errno;
-                    shell_error_t *err = shell_error_create(
-                        SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN,
-                        "failed to create config directory %s: %s", xdg_dir,
-                        strerror(saved_errno));
-                    if (err) {
-                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                        shell_error_free(err);
-                    }
+                    shell_error_emit(SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
+                                     SOURCE_LOC_UNKNOWN,
+                                     "failed to create config directory %s: %s",
+                                     xdg_dir, strerror(saved_errno));
                     /// Fall back to current path
                     if (config_ctx.user_config_path) {
                         return config_save_file(config_ctx.user_config_path);
@@ -2576,13 +2563,9 @@ int config_load_file(const char *path) {
     /// on a parse failure -- a malformed file reports an error rather than
     /// silently misreading.
     if (config_registry_load(path) != CREG_SUCCESS) {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
-            SOURCE_LOC_UNKNOWN, "failed to parse TOML config file: %s", path);
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
+        shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                         SOURCE_LOC_UNKNOWN,
+                         "failed to parse TOML config file: %s", path);
         return -1;
     }
 
@@ -3134,7 +3117,9 @@ void builtin_config(int argc, char **argv) {
         /// Write default configuration template to user config file
         char *path = config_get_user_config_path();
         if (!path) {
-            printf("Error: Could not determine user config path\n");
+            shell_error_emit(SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
+                             SOURCE_LOC_UNKNOWN,
+                             "could not determine the user config path");
             return;
         }
 
@@ -3161,7 +3146,9 @@ void builtin_config(int argc, char **argv) {
 
         FILE *file = fopen(path, "w");
         if (!file) {
-            printf("Error: Could not write to %s: %s\n", path, strerror(errno));
+            shell_error_emit(SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
+                             SOURCE_LOC_UNKNOWN, "could not write to %s: %s",
+                             path, strerror(errno));
             free(path);
             return;
         }
@@ -3194,26 +3181,37 @@ void builtin_config(int argc, char **argv) {
             if (section != CONFIG_SECTION_NONE) {
                 config_show_section(section);
             } else {
-                printf("Unknown section: %s\n", argv[2]);
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "unknown config section: %s", argv[2]);
             }
         } else {
             config_show_all();
         }
     } else if (strcmp(argv[1], "get") == 0) {
         if (argc < 3) {
-            printf("Usage: config get <key>\n");
+            shell_error_emit(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "config get requires a key (usage: config get "
+                             "<key>)");
             return;
         }
         config_get_value(argv[2]);
     } else if (strcmp(argv[1], "explain") == 0) {
         if (argc < 3) {
-            printf("Usage: config explain <key>\n");
+            shell_error_emit(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "config explain requires a key (usage: config "
+                             "explain <key>)");
             return;
         }
         config_explain_value(argv[2]);
     } else if (strcmp(argv[1], "set") == 0) {
         if (argc < 4) {
-            printf("Usage: config set <key> <value>\n");
+            shell_error_emit(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "config set requires a key and value (usage: "
+                             "config set <key> <value>)");
             return;
         }
         config_set_value(argv[2], argv[3]);
@@ -3226,7 +3224,9 @@ void builtin_config(int argc, char **argv) {
                    config_ctx.user_config_path ? config_ctx.user_config_path
                                                : "~/.lushrc");
         } else {
-            printf("Error: Failed to save configuration\n");
+            shell_error_emit(SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
+                             SOURCE_LOC_UNKNOWN,
+                             "failed to save configuration");
         }
     } else if (strcmp(argv[1], "path") == 0) {
         /// Show current config file paths
@@ -3245,7 +3245,9 @@ void builtin_config(int argc, char **argv) {
         printf("  Format: %s\n",
                config_ctx.format == CONFIG_FORMAT_TOML ? "TOML" : "Unknown");
     } else {
-        printf("Unknown config command: %s\n", argv[1]);
+        shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                         SOURCE_LOC_UNKNOWN, "unknown config command: %s",
+                         argv[1]);
     }
 }
 
@@ -3312,8 +3314,15 @@ void config_get_value(const char *key) {
         bool invert = false;
 
         if (!shell_feature_parse(feature_name, &feature, &invert)) {
-            printf("Unknown feature: %s\n", feature_name);
-            printf("Use 'debug features' to see available features\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "unknown feature: %s", feature_name);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "run 'debug features' to list available features");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return;
         }
 
@@ -3409,13 +3418,16 @@ void config_get_value(const char *key) {
     /// Check for legacy option name
     const char *new_name = find_new_name_for_legacy(key);
     if (new_name) {
-        printf("Warning: '%s' is deprecated, use '%s' instead\n", key,
-               new_name);
+        shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                         SOURCE_LOC_UNKNOWN,
+                         "config key '%s' is deprecated, use '%s' instead", key,
+                         new_name);
         config_get_value(new_name); /// Recursive call with new name
         return;
     }
 
-    printf("Unknown configuration key: %s\n", key);
+    shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                     SOURCE_LOC_UNKNOWN, "unknown configuration key: %s", key);
 }
 
 /**
@@ -3434,8 +3446,15 @@ void config_set_value(const char *key, const char *value) {
         bool invert = false;
 
         if (!shell_feature_parse(feature_name, &feature, &invert)) {
-            printf("Unknown feature: %s\n", feature_name);
-            printf("Use 'debug features' to see available features\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "unknown feature: %s", feature_name);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "run 'debug features' to list available features");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return;
         }
 
@@ -3447,8 +3466,11 @@ void config_set_value(const char *key, const char *value) {
                    strcmp(value, "off") == 0) {
             enable = false;
         } else {
-            printf("Invalid boolean value: %s (use true/false/on/off)\n",
-                   value);
+            shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "invalid boolean '%s' for config key %s (use "
+                             "true/false/on/off)",
+                             value, key);
             return;
         }
 
@@ -3484,12 +3506,17 @@ void config_set_value(const char *key, const char *value) {
         if (strcmp(key, "shell.mode") == 0) {
             shell_mode_t new_mode;
             if (!shell_mode_parse(value, &new_mode)) {
-                printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n",
-                       value);
+                shell_error_emit(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                    SOURCE_LOC_UNKNOWN,
+                    "invalid shell mode: %s (use posix/bash/zsh/lush)", value);
                 return;
             }
             if (!apply_mode_preset(new_mode)) {
-                printf("Cannot change shell mode (strict mode enabled)\n");
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "cannot change shell mode: strict mode is "
+                                 "enabled");
                 return;
             }
             printf("Set %s = %s\n", key, value);
@@ -3508,8 +3535,11 @@ void config_set_value(const char *key, const char *value) {
                        strcmp(value, "off") == 0) {
                 want = false;
             } else {
-                printf("Invalid boolean value: %s (use true/false/on/off)\n",
-                       value);
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid boolean '%s' for config key %s (use "
+                                 "true/false/on/off)",
+                                 value, key);
                 return;
             }
             shell_mode_t target = want ? SHELL_MODE_POSIX
@@ -3517,7 +3547,10 @@ void config_set_value(const char *key, const char *value) {
                                               ? SHELL_MODE_LUSH
                                               : shell_mode_get());
             if (target != shell_mode_get() && !apply_mode_preset(target)) {
-                printf("Cannot change shell mode (strict mode enabled)\n");
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "cannot change shell mode: strict mode is "
+                                 "enabled");
                 return;
             }
             printf("Set %s = %s\n", key, value);
@@ -3539,8 +3572,11 @@ void config_set_value(const char *key, const char *value) {
                        strcmp(value, "off") == 0) {
                 want = false;
             } else {
-                printf("Invalid boolean value: %s (use true/false/on/off)\n",
-                       value);
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid boolean '%s' for config key %s (use "
+                                 "true/false/on/off)",
+                                 value, key);
                 return;
             }
             bool emacs_on = (strcmp(key, "shell.emacs") == 0) ? want : !want;
@@ -3561,8 +3597,11 @@ void config_set_value(const char *key, const char *value) {
                        strcmp(value, "off") == 0) {
                 b = false;
             } else {
-                printf("Invalid boolean value: %s (use true/false/on/off)\n",
-                       value);
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid boolean '%s' for config key %s (use "
+                                 "true/false/on/off)",
+                                 value, key);
                 return;
             }
             config_registry_set_boolean(key, b);
@@ -3585,8 +3624,12 @@ void config_set_value(const char *key, const char *value) {
                            strcmp(value, "0") == 0) {
                     *(bool *)opt->value_ptr = false;
                 } else {
-                    printf("Invalid boolean value: %s (use true/false)\n",
-                           value);
+                    shell_error_emit(
+                        SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                        SOURCE_LOC_UNKNOWN,
+                        "invalid boolean '%s' for config key %s (use "
+                        "true/false)",
+                        value, key);
                     return;
                 }
                 break;
@@ -3606,7 +3649,10 @@ void config_set_value(const char *key, const char *value) {
                     }
                     *(char **)opt->value_ptr = strdup(value);
                 } else {
-                    printf("Invalid color value: %s\n", value);
+                    shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                     SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                     "invalid color '%s' for config key %s",
+                                     value, key);
                     return;
                 }
                 break;
@@ -3624,7 +3670,10 @@ void config_set_value(const char *key, const char *value) {
                         mapping++;
                     }
                     if (!found) {
-                        printf("Invalid enum value: %s\n", value);
+                        shell_error_emit(
+                            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                            SOURCE_LOC_UNKNOWN,
+                            "invalid value '%s' for config key %s", value, key);
                         return;
                     }
                 }
@@ -3650,16 +3699,11 @@ void config_set_value(const char *key, const char *value) {
         switch (probe.type) {
         case CREG_VALUE_BOOLEAN:
             if (!config_parse_bool_text(value, &nv.data.boolean)) {
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
-                    SOURCE_LOC_UNKNOWN,
-                    "invalid boolean '%s' for config key %s (use "
-                    "true/false/on/off/yes/no)",
-                    value, key);
-                if (err) {
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                }
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid boolean '%s' for config key %s (use "
+                                 "true/false/on/off/yes/no)",
+                                 value, key);
                 return;
             }
             break;
@@ -3668,14 +3712,10 @@ void config_set_value(const char *key, const char *value) {
             errno = 0;
             long long parsed = strtoll(value, &end, 10);
             if (end == value || *end != '\0' || errno != 0) {
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
-                    SOURCE_LOC_UNKNOWN,
-                    "invalid integer '%s' for config key %s", value, key);
-                if (err) {
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                }
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid integer '%s' for config key %s",
+                                 value, key);
                 return;
             }
             nv.data.integer = (int64_t)parsed;
@@ -3686,14 +3726,10 @@ void config_set_value(const char *key, const char *value) {
             errno = 0;
             double parsed = strtod(value, &end);
             if (end == value || *end != '\0' || errno != 0) {
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
-                    SOURCE_LOC_UNKNOWN, "invalid number '%s' for config key %s",
-                    value, key);
-                if (err) {
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                }
+                shell_error_emit(SHELL_ERR_INVALID_ARGUMENT,
+                                 SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+                                 "invalid number '%s' for config key %s", value,
+                                 key);
                 return;
             }
             nv.data.floating = parsed;
@@ -3702,19 +3738,13 @@ void config_set_value(const char *key, const char *value) {
         case CREG_VALUE_STRING:
             snprintf(nv.data.string, sizeof(nv.data.string), "%s", value);
             break;
-        case CREG_VALUE_NONE: {
-            shell_error_t *err =
-                shell_error_create(SHELL_ERR_INVALID_ARGUMENT,
-                                   SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
-                                   "cannot set config key %s: it has no value "
-                                   "type",
-                                   key);
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
+        case CREG_VALUE_NONE:
+            shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "cannot set config key %s: it has no value "
+                             "type",
+                             key);
             return;
-        }
         }
 
         creg_result_t set_rc = config_registry_set(key, &nv);
@@ -3744,13 +3774,9 @@ void config_set_value(const char *key, const char *value) {
             return;
         }
         if (set_rc != CREG_SUCCESS) {
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN, "failed to set config key %s", key);
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
+            shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN, "failed to set config key %s",
+                             key);
             return;
         }
         config_registry_sync_to_runtime();
@@ -3762,13 +3788,16 @@ void config_set_value(const char *key, const char *value) {
     /// Check for legacy option name
     const char *new_name = find_new_name_for_legacy(key);
     if (new_name) {
-        printf("Warning: '%s' is deprecated, use '%s' instead\n", key,
-               new_name);
+        shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                         SOURCE_LOC_UNKNOWN,
+                         "config key '%s' is deprecated, use '%s' instead", key,
+                         new_name);
         config_set_value(new_name, value); /// Recursive call with new name
         return;
     }
 
-    printf("Unknown configuration key: %s\n", key);
+    shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                     SOURCE_LOC_UNKNOWN, "unknown configuration key: %s", key);
 }
 
 /**

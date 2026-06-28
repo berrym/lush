@@ -147,6 +147,18 @@ shell_error_t *shell_error_createv(shell_error_code_t code,
     return error;
 }
 
+void shell_error_emit(shell_error_code_t code, shell_error_severity_t severity,
+                      source_location_t loc, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    shell_error_t *error = shell_error_createv(code, severity, loc, fmt, args);
+    va_end(args);
+    if (error) {
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        shell_error_free(error);
+    }
+}
+
 void shell_error_free(shell_error_t *error) {
     while (error) {
         shell_error_t *next = error->next;
