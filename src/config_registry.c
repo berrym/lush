@@ -43,6 +43,133 @@ static inline bool unicode_streq(const char *s1, const char *s2) {
 }
 
 /* ============================================================================
+ * Type Descriptors (the type vtable)
+ * ============================================================================
+ *
+ * One canonical validate/describe per type, attached to a registered key and
+ * consulted at the set chokepoint. The check op enforces the semantic
+ * constraint (enum membership, int range); the registry checks the storage kind
+ * separately. describe feeds typed error messages and the wizard.
+ */
+
+/// bool/int/string have no semantic constraint beyond storage kind: any
+/// well-typed value is valid.
+static bool creg_check_always(const creg_type_t *self, const creg_value_t *v,
+                              char *err, size_t errlen) {
+    (void)self;
+    (void)v;
+    (void)err;
+    (void)errlen;
+    return true;
+}
+
+static void creg_describe_bool(const creg_type_t *self, char *out,
+                               size_t outlen) {
+    (void)self;
+    snprintf(out, outlen, "true or false");
+}
+
+static void creg_describe_int(const creg_type_t *self, char *out,
+                              size_t outlen) {
+    (void)self;
+    snprintf(out, outlen, "an integer");
+}
+
+static void creg_describe_string(const creg_type_t *self, char *out,
+                                 size_t outlen) {
+    (void)self;
+    snprintf(out, outlen, "a string");
+}
+
+/// enum: the value's string must equal one of the descriptor's pair names.
+static bool creg_check_enum(const creg_type_t *self, const creg_value_t *v,
+                            char *err, size_t errlen) {
+    if (!self->pairs) {
+        return true;
+    }
+    for (const creg_enum_pair_t *p = self->pairs; p->name; p++) {
+        if (unicode_streq(p->name, v->data.string)) {
+            return true;
+        }
+    }
+    snprintf(err, errlen, "not one of the allowed values");
+    return false;
+}
+
+static void creg_describe_enum(const creg_type_t *self, char *out,
+                               size_t outlen) {
+    size_t off = (size_t)snprintf(out, outlen, "one of:");
+    for (const creg_enum_pair_t *p = self->pairs; p && p->name; p++) {
+        if (off >= outlen) {
+            break;
+        }
+        off += (size_t)snprintf(out + off, outlen - off, " %s", p->name);
+    }
+}
+
+/// int_range: the integer must lie within [min, max] inclusive.
+static bool creg_check_int_range(const creg_type_t *self, const creg_value_t *v,
+                                 char *err, size_t errlen) {
+    if (v->data.integer < self->min || v->data.integer > self->max) {
+        snprintf(err, errlen, "out of range");
+        return false;
+    }
+    return true;
+}
+
+static void creg_describe_int_range(const creg_type_t *self, char *out,
+                                    size_t outlen) {
+    snprintf(out, outlen, "an integer in %lld..%lld", (long long)self->min,
+             (long long)self->max);
+}
+
+static const creg_type_t g_type_bool = {.name = "bool",
+                                        .storage = CREG_VALUE_BOOLEAN,
+                                        .pairs = NULL,
+                                        .min = 0,
+                                        .max = 0,
+                                        .check = creg_check_always,
+                                        .describe = creg_describe_bool};
+static const creg_type_t g_type_int = {.name = "int",
+                                       .storage = CREG_VALUE_INTEGER,
+                                       .pairs = NULL,
+                                       .min = 0,
+                                       .max = 0,
+                                       .check = creg_check_always,
+                                       .describe = creg_describe_int};
+static const creg_type_t g_type_string = {.name = "string",
+                                          .storage = CREG_VALUE_STRING,
+                                          .pairs = NULL,
+                                          .min = 0,
+                                          .max = 0,
+                                          .check = creg_check_always,
+                                          .describe = creg_describe_string};
+
+const creg_type_t *creg_type_bool(void) { return &g_type_bool; }
+const creg_type_t *creg_type_int(void) { return &g_type_int; }
+const creg_type_t *creg_type_string(void) { return &g_type_string; }
+
+void creg_type_init_enum(creg_type_t *out, const creg_enum_pair_t *pairs) {
+    out->name = "enum";
+    out->storage = CREG_VALUE_STRING;
+    out->pairs = pairs;
+    out->min = 0;
+    out->max = 0;
+    out->check = creg_check_enum;
+    out->describe = creg_describe_enum;
+}
+
+void creg_type_init_int_range(creg_type_t *out, int64_t min, int64_t max) {
+    out->name = "int_range";
+    out->storage = CREG_VALUE_INTEGER;
+    out->pairs = NULL;
+    out->min = min;
+    out->max = max;
+    out->check = creg_check_int_range;
+    out->describe = creg_describe_int_range;
+}
+
+/* ============================================================================
  * Internal Structures
  * ============================================================================
  */
@@ -57,6 +184,7 @@ typedef struct {
     creg_layer_view_t slots[CREG_LAYER_COUNT];
     const creg_option_t *option_def; ///< Pointer to option definition
     bool persisted;                  ///< Should be saved to file
+    const creg_type_t *type;         ///< Optional type descriptor (validation)
 } stored_option_t;
 
 /**
@@ -406,6 +534,27 @@ static creg_result_t set_in_layer(const char *key, const creg_value_t *value,
     if (opt->option_def && opt->option_def->type != CREG_VALUE_NONE &&
         opt->option_def->type != value->type) {
         return CREG_ERROR_TYPE_MISMATCH;
+    }
+
+    /// When a type descriptor is attached, enforce its storage kind at the
+    /// funnel -- regardless of the key's declared option_def type (which may be
+    /// CREG_VALUE_NONE). This closes the typeless-key hole and lets the check
+    /// op trust the union member it reads (enum -> data.string, int_range ->
+    /// data.integer); without it a wrong-kind value could reach a check op that
+    /// reinterprets bytes.
+    if (opt->type && value->type != opt->type->storage) {
+        return CREG_ERROR_TYPE_MISMATCH;
+    }
+
+    /// Semantic validation against the attached type descriptor (enum
+    /// membership, int range). The storage kind is checked above; this rejects
+    /// a well-typed but invalid value at the single write chokepoint, so config
+    /// set, setopt, and a TOML load are all validated through one path.
+    if (opt->type && opt->type->check) {
+        char reason[64] = {0};
+        if (!opt->type->check(opt->type, value, reason, sizeof(reason))) {
+            return CREG_ERROR_INVALID_VALUE;
+        }
     }
 
     creg_value_t old_eff = *resolve_effective(opt, NULL);
@@ -904,11 +1053,17 @@ static toml_result_t load_callback(const char *section, const char *key,
     }
 
     /// A config-file value lands in the USER layer: above mode presets and the
-    /// schema default, below an interactive (SESSION) tweak. (ignore errors for
-    /// unknown keys.)
+    /// schema default, below an interactive (SESSION) tweak.
     creg_result_t result =
         set_in_layer(full_key, &config_val, CREG_LAYER_USER, "lushrc.toml");
-    if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND) {
+    /// A single bad key must not abort loading the rest of the file. Skip the
+    /// expected per-key rejections -- an unknown key (NOT_FOUND), a wrong-kind
+    /// value (TYPE_MISMATCH), or one that fails its type's constraint
+    /// (INVALID_VALUE) -- and leave the prior layer's value in place. Only a
+    /// structural error (e.g. out of memory) propagates as a load failure.
+    if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND &&
+        result != CREG_ERROR_TYPE_MISMATCH &&
+        result != CREG_ERROR_INVALID_VALUE) {
         ctx->result = result;
         snprintf(ctx->error_msg, sizeof(ctx->error_msg), "Error setting '%s'",
                  full_key);
@@ -1124,6 +1279,38 @@ creg_result_t config_registry_reset(const char *key) {
     return CREG_SUCCESS;
 }
 
+creg_result_t config_registry_set_type(const char *key,
+                                       const creg_type_t *type) {
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    /// The check ops read a fixed union member (enum -> data.string, int_range
+    /// -> data.integer), so the descriptor's storage must agree with the key's
+    /// declared kind or a later set would reinterpret bytes. Fail loudly at
+    /// attach time, mirroring the bind-an-unregistered-key loud failure.
+    if (type && opt->option_def && opt->option_def->type != CREG_VALUE_NONE &&
+        opt->option_def->type != type->storage) {
+        return CREG_ERROR_TYPE_MISMATCH;
+    }
+    opt->type = type;
+    return CREG_SUCCESS;
+}
+
+creg_result_t config_registry_describe_type(const char *key, char *out,
+                                            size_t outlen) {
+    if (!out || outlen == 0) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    out[0] = '\0';
+    stored_option_t *opt = find_option(key);
+    if (!opt || !opt->type || !opt->type->describe) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    opt->type->describe(opt->type, out, outlen);
+    return CREG_SUCCESS;
+}
+
 creg_result_t config_registry_reset_section(const char *section_name) {
     registered_section_t *section = find_section(section_name);
     if (!section) {
@@ -1220,7 +1407,10 @@ creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode) {
             continue;
         }
         /// Best-effort apply into the MODE layer; a single failure should not
-        /// abort the whole walk.
+        /// abort the whole walk. A curated mode default that violates its key's
+        /// type is a registration-time programming error, caught by the planned
+        /// CI schema invariant (default/mode-default correctness) rather than a
+        /// runtime diagnostic this standalone library cannot report richly.
         (void)set_in_layer(md->key, &md->value, CREG_LAYER_MODE, "mode preset");
     }
     return CREG_SUCCESS;
