@@ -285,6 +285,28 @@ shell_error_t *shell_error_createv(shell_error_code_t code,
                                    va_list args);
 
 /**
+ * @brief One-shot: create a structured error, render it to stderr, free it.
+ *
+ * The common case for subsystems without an executor (the config builtin, and
+ * any builtin not threading an executor): collapses the create + display + free
+ * ceremony to one call while every call site still names its own code,
+ * severity, and location -- no error semantics are hidden, so this is not a
+ * domain-specific wrapper. It is the no-executor twin of executor_error_report
+ * (which is the same one-shot for the executor context, where source-line
+ * lookup needs the executor). For an error that carries a suggestion, detail,
+ * or source line, use shell_error_create + the setters + shell_error_display
+ * directly.
+ *
+ * @param code     Error code
+ * @param severity Error severity
+ * @param loc      Source location (SOURCE_LOC_UNKNOWN when there is none)
+ * @param fmt      Printf-style format string
+ * @param ...      Format arguments
+ */
+void shell_error_emit(shell_error_code_t code, shell_error_severity_t severity,
+                      source_location_t loc, const char *fmt, ...);
+
+/**
  * @brief Free an error and its chain
  *
  * @param error Error to free (NULL safe)
