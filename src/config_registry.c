@@ -14,6 +14,7 @@
 
 #include "lle/unicode_compare.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -119,8 +120,26 @@ static bool creg_check_int_range(const creg_type_t *self, const creg_value_t *v,
 
 static void creg_describe_int_range(const creg_type_t *self, char *out,
                                     size_t outlen) {
-    snprintf(out, outlen, "an integer in %lld..%lld", (long long)self->min,
-             (long long)self->max);
+    /// Render open-ended bounds in plain language instead of the numeric limit.
+    /// A top at or above INT_MAX is "open" (the 32-bit cell ceiling that
+    /// int-backed keys use as their non-negative cap), as is INT64_MAX;
+    /// symmetrically for the bottom.
+    bool open_lo = self->min <= INT_MIN;
+    bool open_hi = self->max >= INT_MAX;
+    if (open_lo && open_hi) {
+        snprintf(out, outlen, "an integer");
+    } else if (open_hi) {
+        if (self->min == 0) {
+            snprintf(out, outlen, "a non-negative integer");
+        } else {
+            snprintf(out, outlen, "an integer >= %lld", (long long)self->min);
+        }
+    } else if (open_lo) {
+        snprintf(out, outlen, "an integer <= %lld", (long long)self->max);
+    } else {
+        snprintf(out, outlen, "an integer in %lld..%lld", (long long)self->min,
+                 (long long)self->max);
+    }
 }
 
 static const creg_type_t g_type_bool = {.name = "bool",

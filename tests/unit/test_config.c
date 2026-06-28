@@ -81,21 +81,28 @@ static void capture_config_set_stderr(const char *key, const char *value,
     out[r > 0 ? (size_t)r : 0] = '\0';
 }
 
-/// Set a config key while swallowing the "Set <key> = <value>" stdout line, so
-/// a test that drives several valid sets does not interleave noise into the
+/// Set a config key while swallowing its output -- the "Set <key> = <value>"
+/// stdout line and any structured-error stderr -- so a test driving several
+/// sets (valid or deliberately invalid) does not interleave noise into the
 /// suite output.
 static void config_set_quiet(const char *key, const char *value) {
     fflush(stdout);
-    int saved = dup(STDOUT_FILENO);
+    fflush(stderr);
+    int saved_out = dup(STDOUT_FILENO);
+    int saved_err = dup(STDERR_FILENO);
     int devnull = open("/dev/null", O_WRONLY);
     if (devnull >= 0) {
         dup2(devnull, STDOUT_FILENO);
+        dup2(devnull, STDERR_FILENO);
         close(devnull);
     }
     config_set_value(key, value);
     fflush(stdout);
-    dup2(saved, STDOUT_FILENO);
-    close(saved);
+    fflush(stderr);
+    dup2(saved_out, STDOUT_FILENO);
+    close(saved_out);
+    dup2(saved_err, STDERR_FILENO);
+    close(saved_err);
 }
 
 /// Test framework macros
@@ -852,6 +859,58 @@ TEST(config_set_validates_typed_keys) {
     config_registry_reset("display.optimization_level");
 }
 
+TEST(all_typed_keys_attach) {
+    config_init();
+
+    /// config_register_types ignores each config_registry_set_type return, so a
+    /// misspelled / unregistered / wrong-storage table key silently fails to
+    /// attach and that key then validates nothing. The failure counter catches
+    /// any such entry across the whole table, so a mis-registered key cannot
+    /// ship with a green suite even though only a few keys are behavior-tested.
+    ASSERT_EQ(config_type_attach_failure_count(), 0,
+              "every type descriptor in the registration tables must attach");
+}
+
+TEST(config_set_validates_increment_two_keys) {
+    config_init();
+
+    /// The second batch of typed keys: a representative enum, a bounded range,
+    /// and a non-negative range. Each must reject an invalid value (proving the
+    /// descriptor attached -- a mis-registered table entry would silently fail
+    /// to attach and accept anything) and apply a valid one.
+    char after[64];
+
+    /// Enum: history.search_mode accepts plain/prefix, rejects others.
+    config_set_quiet("history.search_mode", "bogus");
+    capture_config_get("history.search_mode", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "bogus\n") != 0,
+                "history.search_mode must reject an invalid enum value");
+    config_set_quiet("history.search_mode", "plain");
+    capture_config_get("history.search_mode", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "plain\n") == 0,
+                "history.search_mode must accept a valid enum value");
+
+    /// Bounded range [1,5]: reject 9, accept 3.
+    config_set_quiet("behavior.autocorrect_max_suggestions", "2");
+    config_set_quiet("behavior.autocorrect_max_suggestions", "9");
+    capture_config_get("behavior.autocorrect_max_suggestions", after,
+                       sizeof(after));
+    ASSERT_TRUE(strcmp(after, "2\n") == 0,
+                "autocorrect_max_suggestions must reject 9 (range 1..5)");
+
+    /// Non-negative range: reject a negative, accept 0 (the documented
+    /// disable sentinel).
+    config_set_quiet("behavior.loop_failure_streak", "0");
+    config_set_quiet("behavior.loop_failure_streak", "-3");
+    capture_config_get("behavior.loop_failure_streak", after, sizeof(after));
+    ASSERT_TRUE(strcmp(after, "0\n") == 0,
+                "loop_failure_streak must reject a negative value, keeping 0");
+
+    config_registry_reset("history.search_mode");
+    config_registry_reset("behavior.autocorrect_max_suggestions");
+    config_registry_reset("behavior.loop_failure_streak");
+}
+
 TEST(config_show_shell_lists_options_not_features) {
     config_init();
 
@@ -1211,6 +1270,8 @@ int main(void) {
     RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_get_resolves_toggles_from_registry);
     RUN_TEST(config_set_validates_typed_keys);
+    RUN_TEST(all_typed_keys_attach);
+    RUN_TEST(config_set_validates_increment_two_keys);
     RUN_TEST(config_show_shell_lists_options_not_features);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
