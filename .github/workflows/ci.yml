@@ -214,15 +214,31 @@ jobs:
           drain2=(a b c); drain2=
           drain3=(a b c); drain3=(d e f g)
           loopvar=(a b c); for loopvar in 1 2 3; do :; done
+          # Re-init paths: config reload reinvokes config_init, and a mode
+          # switch re-seeds the registry. These are the second-init paths that
+          # hid the config_init reload leak from a single-init workload.
+          config reload
+          config reload
+          mode bash
+          mode zsh
+          mode posix
+          mode lush
+          config set shell.errexit true
+          config get shell.errexit
           exit 0
           EOF
 
-          # Run with leaks tool using timeout to prevent hanging
           # MallocStackLogging enables memory tracking
           export MallocStackLogging=1
 
-          # Use timeout command to prevent infinite hang
-          if timeout 120 leaks --atExit -- ./build/lush /tmp/memcheck_tests.sh > leaks-report.txt 2>&1; then
+          # Run leaks directly. macOS has no `timeout` command (it is GNU
+          # coreutils, not installed here), so the previous `timeout 120 leaks`
+          # exited 127 ("command not found") on every run -- the leaks tool
+          # never actually ran, and the old informational branch swallowed it
+          # as a silent pass. The step-level `timeout-minutes: 5` above is the
+          # hang guard; the workload avoids the pipe/subshell constructs that
+          # can hang leaks(1).
+          if leaks --atExit -- ./build/lush /tmp/memcheck_tests.sh > leaks-report.txt 2>&1; then
             LEAKS_EXIT=0
           else
             LEAKS_EXIT=$?
@@ -243,15 +259,20 @@ jobs:
               exit 0
             else
               echo "memory_status=leaks" >> $GITHUB_OUTPUT
-              echo "::warning::macOS leaks detected: $LEAK_COUNT leaks found"
-              # Warning only for now - macOS leaks can have false positives
-              exit 0
+              echo "::error::macOS leaks detected: $LEAK_COUNT leaks found"
+              # Hard gate. leaks(1) is reachability-based, so a never-freed
+              # reachable singleton is NOT reported -- a nonzero count is a real
+              # leak, not a false positive. If a genuine system-library leak
+              # ever surfaces on the runner, add a targeted, documented filter
+              # here for that specific stack; never blanket-pass.
+              exit 1
             fi
           else
             echo "memory_status=unknown" >> $GITHUB_OUTPUT
-            echo "::warning::Could not parse leaks output (exit code: $LEAKS_EXIT)"
-            # Don't fail the build for macOS leaks issues - it's informational
-            exit 0
+            echo "::error::Could not parse leaks output (exit code: $LEAKS_EXIT)"
+            # Cannot certify clean -> fail. A broken or hung leaks run must be
+            # visible, not a silent green pass.
+            exit 1
           fi
 
       - name: Upload leaks report
