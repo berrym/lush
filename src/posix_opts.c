@@ -197,6 +197,10 @@ static const struct {
      offsetof(shell_options_t, interactive_comments_mode)                              },
     {            "shell.physical", offsetof(shell_options_t,             physical_mode)},
     {          "shell.privileged", offsetof(shell_options_t,           privileged_mode)},
+    {            "shell.errtrace", offsetof(shell_options_t,                  errtrace)},
+    {           "shell.functrace", offsetof(shell_options_t,                 functrace)},
+    { "shell.pipeline-diagnostic",
+     offsetof(shell_options_t,  pipeline_diagnostic_mode)                              },
 };
 #define K_SHELL_BOOL_OPT_COUNT                                                 \
     (sizeof(k_shell_bool_opts) / sizeof(k_shell_bool_opts[0]))

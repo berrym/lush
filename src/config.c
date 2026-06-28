@@ -400,6 +400,15 @@ static const creg_option_t shell_options[] = {
     {          "privileged",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Restricted shell security (set -o privileged)", true     },
+    {            "errtrace",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "ERR trap inherits into functions (set -E)", true         },
+    {           "functrace",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "DEBUG/RETURN traps inherit into functions (set -T)", true},
+    { "pipeline-diagnostic",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Structured error per non-zero pipeline stage", true      },
 };
 
 static const creg_section_t shell_section = {
@@ -1424,6 +1433,12 @@ void config_set_shell_option(const char *option_name, bool value) {
         shell_opts.physical_mode = value;
     } else if (strcmp(opt_name, "privileged") == 0) {
         shell_opts.privileged_mode = value;
+    } else if (strcmp(opt_name, "errtrace") == 0) {
+        shell_opts.errtrace = value;
+    } else if (strcmp(opt_name, "functrace") == 0) {
+        shell_opts.functrace = value;
+    } else if (strcmp(opt_name, "pipeline-diagnostic") == 0) {
+        shell_opts.pipeline_diagnostic_mode = value;
     }
 }
 
@@ -1487,6 +1502,12 @@ bool config_get_shell_option(const char *option_name) {
         return shell_opts.physical_mode;
     } else if (strcmp(opt_name, "privileged") == 0) {
         return shell_opts.privileged_mode;
+    } else if (strcmp(opt_name, "errtrace") == 0) {
+        return shell_opts.errtrace;
+    } else if (strcmp(opt_name, "functrace") == 0) {
+        return shell_opts.functrace;
+    } else if (strcmp(opt_name, "pipeline-diagnostic") == 0) {
+        return shell_opts.pipeline_diagnostic_mode;
     }
 
     return false; /// Unknown option
