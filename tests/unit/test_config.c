@@ -32,6 +32,29 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
+/// Capture the stdout of config_get_value(@p key) into @p out (NUL-terminated).
+/// Used to assert what `config get` actually prints, including its trailing
+/// newline (e.g. "true\n").
+static void capture_config_get(const char *key, char *out, size_t n) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        if (n)
+            out[0] = '\0';
+        return;
+    }
+    fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    dup2(pipefd[1], STDOUT_FILENO);
+    close(pipefd[1]);
+    config_get_value(key);
+    fflush(stdout);
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+    ssize_t r = read(pipefd[0], out, n - 1);
+    close(pipefd[0]);
+    out[r > 0 ? (size_t)r : 0] = '\0';
+}
+
 /// Test framework macros
 
 /* ============================================================================
@@ -472,6 +495,152 @@ TEST(config_save_sync_preserves_shell_options) {
                 "config save (sync_from_runtime) must not disable errexit");
 }
 
+TEST(shell_editor_mutual_exclusion_reads_executor) {
+    config_init();
+
+    /// Editor mode is single-valued; config get/show read the executor's own
+    /// shell_opts field (not the registry), so the field clear in
+    /// config_set_shell_option is the whole mutual-exclusion story.
+    config_set_value("shell.emacs", "true"); /// known editor: emacs
+
+    /// config set switches the editor and config get reflects it.
+    config_set_value("shell.vi", "true");
+    ASSERT_TRUE(config_get_shell_option("shell.vi"),
+                "vi on after config set shell.vi true");
+    ASSERT_FALSE(config_get_shell_option("shell.emacs"),
+                 "emacs off after switching to vi");
+
+    /// Second-order: switching BACK must take effect. config set drives
+    /// shell_opts directly; relying on the change-gated registry write alone
+    /// would no-op here (shell.emacs still reads true at the default) and leave
+    /// the editor on vi -- the silent-no-op the projection split removes.
+    config_set_value("shell.emacs", "true");
+    ASSERT_TRUE(config_get_shell_option("shell.emacs"),
+                "switching back to emacs must take effect");
+    ASSERT_FALSE(config_get_shell_option("shell.vi"),
+                 "vi off after switching back to emacs");
+
+    /// A config-file editor choice takes effect: loading vi=true switches the
+    /// live editor field that the executor and config get read. (Clear the
+    /// SESSION pins left above so the USER-layer file load is not outranked.)
+    config_registry_reset("shell.emacs");
+    config_registry_reset("shell.vi");
+    char path[] = "/tmp/lush_ed_vi_XXXXXX";
+    int fd = mkstemp(path);
+    ASSERT_TRUE(fd >= 0, "temp config file created");
+    FILE *a = fdopen(fd, "w");
+    fputs("[shell]\nvi = true\n", a);
+    fclose(a);
+    config_registry_load(path);
+    unlink(path); /// remove before any assert can longjmp past the unlink
+    ASSERT_TRUE(config_get_shell_option("shell.vi"),
+                "a config-file vi=true must switch the editor to vi");
+    ASSERT_FALSE(config_get_shell_option("shell.emacs"),
+                 "emacs off after a config-file vi=true");
+
+    /// Restore the default trace-free. The load left shell.vi=true in the USER
+    /// layer; a SESSION reset alone would only mask it (a stale USER slot a
+    /// later reset_all could surface). Overwrite the USER layer back to
+    /// default- equal through the load path, drop SESSION pins, then drive the
+    /// editor field back to emacs for subsequent tests.
+    char rpath[] = "/tmp/lush_ed_rst_XXXXXX";
+    int rfd = mkstemp(rpath);
+    ASSERT_TRUE(rfd >= 0, "temp restore file created");
+    FILE *r = fdopen(rfd, "w");
+    fputs("[shell]\nvi = false\nemacs = true\n", r);
+    fclose(r);
+    config_registry_load(rpath);
+    unlink(rpath);
+    config_registry_reset("shell.emacs");
+    config_registry_reset("shell.vi");
+    config_set_value("shell.emacs", "true");
+}
+
+TEST(shell_posix_is_a_mode_projection) {
+    config_init();
+    apply_mode_preset(SHELL_MODE_LUSH);
+
+    /// config set shell.posix true routes to a MODE switch (as set -o posix
+    /// does), not a SESSION pin: posix-strictness is purely (mode == POSIX).
+    config_set_value("shell.posix", "true");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_POSIX,
+              "config set shell.posix true must switch to POSIX mode");
+
+    /// In POSIX mode config get must report true. This gates the get-derive
+    /// (reading the executor's posix_mode field): with it removed config get
+    /// shell.posix returns false even in POSIX mode, diverging from the
+    /// executor and from config show.
+    char buf[64];
+    capture_config_get("shell.posix", buf, sizeof(buf));
+    ASSERT_TRUE(strcmp(buf, "true\n") == 0,
+                "config get shell.posix must report true in POSIX mode");
+
+    /// Executor-sourced, not registry-effective: in lush mode posix_mode is
+    /// false, and a divergent registry shell.posix=true must NOT leak into
+    /// config get. Pinning the registry then asserting config get still reads
+    /// false proves the read comes from the executor field; a
+    /// registry-effective read would surface the pinned true and fail.
+    apply_mode_preset(SHELL_MODE_LUSH);
+    config_registry_set_boolean("shell.posix", true); /// divergent registry pin
+    capture_config_get("shell.posix", buf, sizeof(buf));
+    ASSERT_TRUE(
+        strcmp(buf, "false\n") == 0,
+        "config get shell.posix must read the live mode (false in lush), "
+        "ignoring a divergent registry value");
+    config_registry_reset("shell.posix"); /// drop the pin (SESSION layer)
+
+    /// config set shell.posix false while in POSIX returns to lush.
+    apply_mode_preset(SHELL_MODE_POSIX);
+    config_set_value("shell.posix", "false");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "config set shell.posix false must leave POSIX for lush");
+
+    apply_mode_preset(SHELL_MODE_LUSH);
+}
+
+TEST(persisted_false_key_not_loaded_from_file) {
+    config_init();
+
+    /// A persisted=false option is runtime/environmental (shell.monitor = job
+    /// control), never a saved preference. persisted gates SAVE; it must gate
+    /// LOAD too, so a stale or hand-edited file cannot pin a runtime-only
+    /// value. shell.onecmd (persisted=true, untouched by other tests) is the
+    /// control: a real preference still loads, proving the skip is specific.
+    char path[] = "/tmp/lush_cfg_load_XXXXXX";
+    int fd = mkstemp(path);
+    ASSERT_TRUE(fd >= 0, "mkstemp should create a temp config file");
+    FILE *f = fdopen(fd, "w");
+    ASSERT_TRUE(f != NULL, "fdopen should succeed");
+    fputs("[shell]\nmonitor = true\nonecmd = true\n", f);
+    fclose(f);
+
+    creg_result_t load_rc = config_registry_load(path);
+    unlink(path); /// remove before any assert can longjmp past the unlink
+    ASSERT_EQ(load_rc, CREG_SUCCESS, "config_registry_load should succeed");
+
+    bool mon = true, one = false;
+    config_registry_get_boolean("shell.monitor", &mon);
+    config_registry_get_boolean("shell.onecmd", &one);
+    ASSERT_FALSE(mon, "shell.monitor (persisted=false) must NOT load from a "
+                      "config file -- job control is runtime-determined");
+    ASSERT_TRUE(one, "shell.onecmd (persisted=true) must still load -- the "
+                     "load-skip is specific to persisted=false keys");
+
+    /// Restore the control trace-free: the load put onecmd=true in the USER
+    /// layer, which a SESSION write would only mask (leaving a stale USER slot
+    /// a later reset_all could surface). Overwrite the same USER layer with
+    /// false through the load path so onecmd returns to its default with no
+    /// residue.
+    char rpath[] = "/tmp/lush_cfg_rst_XXXXXX";
+    int rfd = mkstemp(rpath);
+    ASSERT_TRUE(rfd >= 0, "mkstemp should create the restore file");
+    FILE *rf = fdopen(rfd, "w");
+    fputs("[shell]\nonecmd = false\n", rf);
+    fclose(rf);
+    config_registry_load(rpath);
+    unlink(rpath);
+}
+
 TEST(shell_mode_registry_subscriber_applies) {
     config_init();
 
@@ -560,6 +729,27 @@ TEST(argv_shell_options_hydrate_to_session) {
                  "an unset option must not gain a SESSION override");
 
     /// Leave the registry clean for subsequent tests.
+    config_registry_reset("shell.errexit");
+    shell_opts.exit_on_error = false;
+}
+
+TEST(config_get_resolves_toggles_from_registry) {
+    config_init();
+
+    /// The flip: config get/show resolve genuine toggles from the registry (the
+    /// single source of truth), not the shell_opts cache. Force the divergence
+    /// the shell.* subscriber normally prevents -- registry true, cache false
+    /// -- and assert config get follows the registry. Reverting config get to a
+    /// shell_opts read (the pre-flip behavior) makes this read "false".
+    config_registry_set_boolean("shell.errexit", true);
+    shell_opts.exit_on_error = false; /// desync the cache behind the registry
+    char buf[64];
+    capture_config_get("shell.errexit", buf, sizeof(buf));
+    ASSERT_TRUE(strcmp(buf, "true\n") == 0,
+                "config get must resolve a genuine toggle from registry-"
+                "effective, not the shell_opts cache");
+
+    /// Restore consistency for later tests.
     config_registry_reset("shell.errexit");
     shell_opts.exit_on_error = false;
 }
@@ -914,10 +1104,14 @@ int main(void) {
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_save_sync_preserves_shell_options);
+    RUN_TEST(shell_editor_mutual_exclusion_reads_executor);
+    RUN_TEST(shell_posix_is_a_mode_projection);
+    RUN_TEST(persisted_false_key_not_loaded_from_file);
     RUN_TEST(shell_mode_registry_subscriber_applies);
     RUN_TEST(reapplying_current_mode_drops_overrides);
     RUN_TEST(set_o_only_options_gained_config_surface);
     RUN_TEST(argv_shell_options_hydrate_to_session);
+    RUN_TEST(config_get_resolves_toggles_from_registry);
     RUN_TEST(config_show_shell_lists_options_not_features);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);

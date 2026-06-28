@@ -2799,6 +2799,15 @@ if fs.exists('tests/integration/test_nonlogin_init.sh')
        timeout: 30)
 endif
 
+# Interactive job-control auto-enable must not clobber an rc `set +m`.
+if fs.exists('tests/integration/test_monitor_autoenable_guard.sh')
+  test('monitor auto-enable guard',
+       find_program('tests/integration/test_monitor_autoenable_guard.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 30)
+endif
+
 # Logout-script firing on explicit `exit` / `logout` (#L11 explicit).
 # Bash-style: lush -l -i with stdin pipe. The SIGHUP-induced variant
 # of this test is below as a PTY-required C test program.

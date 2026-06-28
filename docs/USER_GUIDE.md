@@ -913,9 +913,9 @@ errexit = false
 nounset = false
 xtrace = false
 
-# Feature overrides (only non-default values needed)
-[shell.features]
-extended_glob = true
+# Feature overrides (extended_glob, etc.) are mode-derived, not TOML keys:
+# set them with `setopt`/`shopt` in the rc script (~/.config/lush/lushrc),
+# e.g. `setopt extended_glob`. They are never written to or read from this file.
 
 [history]
 enabled = true
