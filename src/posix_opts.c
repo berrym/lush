@@ -53,8 +53,14 @@ static void shell_mode_runtime_apply(shell_mode_t mode) {
     /// new mode's matrix defaults take effect. Picking a preset means asking.
     shell_feature_reset_all();
 
-    /// Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates the mode
-    /// system; keep it in sync so call sites that still consult it are right.
+    /// posix_mode is the executor's posix-strictness field (is_posix_mode_-
+    /// enabled, read in parser/executor hot paths). posix-strictness is purely
+    /// (mode == POSIX); this mirror keeps the field in step on the mode-preset
+    /// path and is its writer. shell.posix is a derive-only registry key
+    /// (persisted=false, no per-mode default, never SESSION-written), and
+    /// config get/show read this same posix_mode field, so the config surface
+    /// always equals what the executor does. LOAD-BEARING -- do not remove this
+    /// line.
     shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
 
     config.shell_mode = (int)mode;

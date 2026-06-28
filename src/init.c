@@ -24,6 +24,7 @@
 #include "compdef_source.h"
 #include "completion_filter.h"
 #include "config.h"
+#include "config_registry.h"
 #include "dirstack.h"
 #include "errors.h"
 #include "input.h"
@@ -762,9 +763,27 @@ int init(int argc, char **argv, FILE **in) {
     /// Set up interactive shell features if needed
     if (IS_INTERACTIVE_SHELL) {
         /// Enable job control by default for interactive shells (POSIX
-        /// behavior) This allows background jobs (cmd &) to be tracked and
-        /// managed
-        shell_opts.job_control = true;
+        /// behavior) so background jobs (cmd &) are tracked and managed. Route
+        /// through the registry (shell.monitor, persisted=false) so config get
+        /// / show reflect it via the shell.* subscriber; the auto-enable is
+        /// never serialized, so a non-interactive reload does not inherit it.
+        ///
+        /// This is a DEFAULT, not an override. The protected explicit choices
+        /// are an rc `set +m`/`set -m` (SESSION) and an argv `-m`; whichever
+        /// lands above the schema default must win, so only auto-enable when
+        /// nothing above the DEFAULT layer has spoken. A lushrc.toml
+        /// shell.monitor is intentionally NOT among them: monitor is
+        /// persisted=false, so config_registry_load drops it -- job control is
+        /// environmental, not a saved file preference. config_init guarantees
+        /// an initialized registry here, so there is no shell_opts fallback
+        /// that would set job control without reflecting it to config get/show.
+        creg_inspect_t monitor_state;
+        if (config_registry_is_initialized() &&
+            config_registry_inspect("shell.monitor", &monitor_state) ==
+                CREG_SUCCESS &&
+            monitor_state.winning == CREG_LAYER_DEFAULT) {
+            config_registry_set_boolean("shell.monitor", true);
+        }
 
         /// Initialize display integration system config first (needed for debug
         /// flags)

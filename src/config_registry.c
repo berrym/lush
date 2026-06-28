@@ -889,6 +889,20 @@ static toml_result_t load_callback(const char *section, const char *key,
         return TOML_SUCCESS;
     }
 
+    /// persisted=false keys never round-trip through the config file: persisted
+    /// gates SAVE, so gate LOAD on it too. The three families are all
+    /// runtime-determined rather than saved preferences: shell.monitor (job
+    /// control, environmental -- set by interactivity), shell.posix (a pure
+    /// projection of the active mode), and the 56 shell.feature.* keys (mode-
+    /// derived; their persistence surface is `setopt` in the rc script, not the
+    /// TOML). Skipping the load keeps a stale or hand-edited file from pinning
+    /// any of them against the runtime. (An unknown key has no stored option;
+    /// let it fall through to set_in_layer, which reports NOT_FOUND as before.)
+    stored_option_t *known = find_option(full_key);
+    if (known && !known->persisted) {
+        return TOML_SUCCESS;
+    }
+
     /// A config-file value lands in the USER layer: above mode presets and the
     /// schema default, below an interactive (SESSION) tweak. (ignore errors for
     /// unknown keys.)

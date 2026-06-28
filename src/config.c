@@ -257,88 +257,98 @@ static const creg_section_t history_section = {
 static const creg_option_t shell_options[] = {
     {                "mode",
      CREG_VALUE_STRING,  {.type = CREG_VALUE_STRING, .data.string = "lush"},
-     "Shell compatibility mode", true                          },
+     "Shell compatibility mode",  true                          },
     {         "mode_strict",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Disallow runtime mode changes", true                     },
+     "Disallow runtime mode changes",  true                     },
     {             "errexit",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit on command failure (set -e)", true                  },
+     "Exit on command failure (set -e)",  true                  },
     {              "xtrace",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Trace command execution (set -x)", true                  },
+     "Trace command execution (set -x)",  true                  },
     {              "noexec",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Syntax check only (set -n)", true                        },
+     "Syntax check only (set -n)",  true                        },
     {             "nounset",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Error on unset variables (set -u)", true                 },
+     "Error on unset variables (set -u)",  true                 },
     {             "verbose",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Print input lines (set -v)", true                        },
+     "Print input lines (set -v)",  true                        },
     {              "noglob",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Disable pathname expansion (set -f)", true               },
+     "Disable pathname expansion (set -f)",  true               },
     {             "hashall",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Command hashing (set -h)", true                          },
+     "Command hashing (set -h)",  true                          },
     {             "monitor",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Job control (set -m)", true                              },
+     /// persisted=false: job control is environmentally auto-determined
+     /// (interactive shells enable it), never serialized -- like bash, which
+     /// does not save monitor. The interactive auto-enable writes the registry
+     /// so config get/show are correct, but config save never records it (a
+     /// non-interactive reload must not inherit job control).
+     "Job control (set -m)", false                              },
     {           "allexport",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Auto export variables (set -a)", true                    },
+     "Auto export variables (set -a)",  true                    },
     {           "noclobber",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Prevent file overwrite (set -C)", true                   },
+     "Prevent file overwrite (set -C)",  true                   },
     {              "onecmd",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit after one command (set -t)", true                   },
+     "Exit after one command (set -t)",  true                   },
     {              "notify",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Async job notification (set -b)", true                   },
+     "Async job notification (set -b)",  true                   },
     {           "ignoreeof",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Prevent exit on EOF (set -o ignoreeof)", true            },
+     "Prevent exit on EOF (set -o ignoreeof)",  true            },
     {               "nolog",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Prevent function history logging (set -o nolog)", true   },
+     "Prevent function history logging (set -o nolog)",  true   },
     {               "emacs",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Emacs-style editing (set -o emacs)", true                },
+     "Emacs-style editing (set -o emacs)",  true                },
     {                  "vi",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Vi-style editing (set -o vi)", true                      },
+     "Vi-style editing (set -o vi)",  true                      },
     {               "posix",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Strict POSIX compliance (set -o posix)", true            },
+     /// persisted=false + derive-only: posix-strictness is purely a projection
+     /// of the active mode (only POSIX mode implies it). config get/show derive
+     /// it live from shell_mode_get(); config set shell.posix routes to a mode
+     /// switch. It is never a layered/saved value a SESSION write could pin
+     /// against the mode.
+     "Strict POSIX compliance (set -o posix)", false            },
     {            "pipefail",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Pipeline failure detection (set -o pipefail)", true      },
+     "Pipeline failure detection (set -o pipefail)",  true      },
     {          "histexpand",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "History expansion (set -o histexpand)", true             },
+     "History expansion (set -o histexpand)",  true             },
     {             "history",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Command history recording (set -o history)", true        },
+     "Command history recording (set -o history)",  true        },
     {"interactive-comments",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Interactive comments (set -o interactive-comments)", true},
+     "Interactive comments (set -o interactive-comments)",  true},
     {            "physical",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Physical directory paths (set -o physical)", true        },
+     "Physical directory paths (set -o physical)",  true        },
     {          "privileged",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Restricted shell security (set -o privileged)", true     },
+     "Restricted shell security (set -o privileged)",  true     },
     {            "errtrace",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "ERR trap inherits into functions (set -E)", true         },
+     "ERR trap inherits into functions (set -E)",  true         },
     {           "functrace",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "DEBUG/RETURN traps inherit into functions (set -T)", true},
+     "DEBUG/RETURN traps inherit into functions (set -T)",  true},
     { "pipeline-diagnostic",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Structured error per non-zero pipeline stage", true      },
+     "Structured error per non-zero pipeline stage",  true      },
 };
 
 static const creg_section_t shell_section = {
@@ -1280,6 +1290,13 @@ void config_set_shell_option(const char *option_name, bool value) {
     } else if (strcmp(opt_name, "nolog") == 0) {
         shell_opts.nolog = value;
     } else if (strcmp(opt_name, "emacs") == 0) {
+        /// Editor mode is single-valued: setting one clears the partner field.
+        /// config get/show read these live from shell_opts (the executor's
+        /// truth), so this field clear is the whole story -- there is no
+        /// partner registry write to misfire into the wrong layer. config set /
+        /// set -o reconcile the registry pair at the SESSION layer
+        /// (config_set_value / sync_shell_option_to_registry) for save and
+        /// provenance.
         shell_opts.emacs_mode = value;
         if (value) {
             shell_opts.vi_mode = false; /// Mutually exclusive
@@ -1291,8 +1308,6 @@ void config_set_shell_option(const char *option_name, bool value) {
             shell_opts.emacs_mode = false; /// Mutually exclusive
             lush_update_editing_mode();
         }
-    } else if (strcmp(opt_name, "posix") == 0) {
-        shell_opts.posix_mode = value;
     } else if (strcmp(opt_name, "pipefail") == 0) {
         shell_opts.pipefail_mode = value;
     } else if (strcmp(opt_name, "histexpand") == 0) {
@@ -3271,13 +3286,15 @@ void config_get_value(const char *key) {
         return;
     }
 
-    /// shell.* options resolve against the live runtime (shell_opts /
-    /// shell_mode / config.shell_mode_strict) -- the executor's truth -- rather
-    /// than the legacy config_options[] table, so the table's shell rows
-    /// retire. The registry is consulted only to confirm the key exists, so an
-    /// unknown shell.X still reports Unknown rather than a bogus "false". Reads
-    /// stay live until the registry-mirror invariant is closed by the
-    /// write-audit; the eventual flip reads registry-effective.
+    /// shell.* keys split two ways. Genuine POSIX toggles (errexit, nounset,
+    /// ...) resolve registry-effective: the registry is the single source of
+    /// truth, mirrored into shell_opts by the shell.* subscriber on every write
+    /// path. The runtime PROJECTIONS -- shell.mode, shell.mode_strict, and the
+    /// single-valued/derived shell.posix / shell.emacs / shell.vi -- read the
+    /// executor's own field (shell_opts / shell_mode), so config get equals
+    /// what the executor does and can never be skewed by a stale layer a file
+    /// load or SESSION write left in the registry. An unknown shell.X reports
+    /// Unknown rather than a bogus "false".
     if (strncmp(key, "shell.", 6) == 0) {
         if (strcmp(key, "shell.mode") == 0) {
             printf("%s\n", shell_mode_name(shell_mode_get()));
@@ -3287,9 +3304,14 @@ void config_get_value(const char *key) {
             printf("%s\n", config.shell_mode_strict ? "true" : "false");
             return;
         }
-        creg_value_t shell_probe;
-        if (config_registry_get(key, &shell_probe) == CREG_SUCCESS) {
+        if (strcmp(key, "shell.posix") == 0 ||
+            strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0) {
             printf("%s\n", config_get_shell_option(key) ? "true" : "false");
+            return;
+        }
+        bool shell_bool;
+        if (config_registry_get_boolean(key, &shell_bool) == CREG_SUCCESS) {
+            printf("%s\n", shell_bool ? "true" : "false");
             return;
         }
         /// Unknown shell.X: fall through to the Unknown-key path below.
@@ -3434,6 +3456,62 @@ void config_set_value(const char *key, const char *value) {
                 printf("Cannot change shell mode (strict mode enabled)\n");
                 return;
             }
+            printf("Set %s = %s\n", key, value);
+            return;
+        }
+        if (strcmp(key, "shell.posix") == 0) {
+            /// posix is a mode projection, not an independent option: route it
+            /// to a mode switch (as `set -o posix` does) so it can never pin a
+            /// SESSION value against the active mode. true -> POSIX; false ->
+            /// LUSH when leaving POSIX, otherwise a no-op (already non-POSIX).
+            bool want;
+            if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
+                strcmp(value, "on") == 0) {
+                want = true;
+            } else if (strcmp(value, "false") == 0 || strcmp(value, "0") == 0 ||
+                       strcmp(value, "off") == 0) {
+                want = false;
+            } else {
+                printf("Invalid boolean value: %s (use true/false/on/off)\n",
+                       value);
+                return;
+            }
+            shell_mode_t target = want ? SHELL_MODE_POSIX
+                                       : (shell_mode_get() == SHELL_MODE_POSIX
+                                              ? SHELL_MODE_LUSH
+                                              : shell_mode_get());
+            if (target != shell_mode_get() && !apply_mode_preset(target)) {
+                printf("Cannot change shell mode (strict mode enabled)\n");
+                return;
+            }
+            printf("Set %s = %s\n", key, value);
+            return;
+        }
+        if (strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0) {
+            /// Editor mode is single-valued. Drive shell_opts directly (the
+            /// change-gated registry write alone would no-op when the partner's
+            /// stale higher layer keeps the effective unchanged -- e.g. setting
+            /// emacs while shell.emacs already reads true by default), then
+            /// mirror BOTH keys to SESSION so config save persists the choice
+            /// and config explain attributes it. config get/show read the live
+            /// editor field, so the registry pair is for round-trip only.
+            bool want;
+            if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
+                strcmp(value, "on") == 0) {
+                want = true;
+            } else if (strcmp(value, "false") == 0 || strcmp(value, "0") == 0 ||
+                       strcmp(value, "off") == 0) {
+                want = false;
+            } else {
+                printf("Invalid boolean value: %s (use true/false/on/off)\n",
+                       value);
+                return;
+            }
+            bool emacs_on = (strcmp(key, "shell.emacs") == 0) ? want : !want;
+            config_set_shell_option(emacs_on ? "shell.emacs" : "shell.vi",
+                                    true);
+            config_registry_set_boolean("shell.emacs", emacs_on);
+            config_registry_set_boolean("shell.vi", !emacs_on);
             printf("Set %s = %s\n", key, value);
             return;
         }
@@ -3724,14 +3802,15 @@ static void config_show_registry_section(config_section_t section, FILE *out) {
     }
 }
 
-/// Render the shell section from the STATIC shell_options[] schema, reading
-/// LIVE runtime values (shell_mode / config.shell_mode_strict / shell_opts). It
-/// does not iterate the live registry store: that store also holds the 56
+/// Render the shell section from the STATIC shell_options[] schema. Boolean
+/// Genuine toggles resolve registry-effective (the registry is the source of
+/// truth, mirrored into shell_opts by the shell.* subscriber); mode,
+/// mode_strict, posix, emacs, and vi are runtime projections read from the
+/// executor's own field so the listing equals what the executor does. It does
+/// not iterate the live registry store: that store also holds the 56
 /// shell.feature.* keys (registered at runtime), which the static schema
-/// excludes by construction, and it would surface registry-effective values
-/// that lag the runtime for monitor/posix until the write-audit closes those
-/// bypasses. Full shell.<name> names + the schema help string, matching the
-/// prior shell listing minus the feature flood.
+/// excludes by construction. Full shell.<name> names + the schema help string,
+/// matching the prior shell listing minus the feature flood.
 static void config_show_shell_section(FILE *out) {
     size_t count = sizeof(shell_options) / sizeof(shell_options[0]);
     for (size_t i = 0; i < count; i++) {
@@ -3744,8 +3823,18 @@ static void config_show_shell_section(FILE *out) {
             val = shell_mode_name(shell_mode_get());
         } else if (strcmp(opt->name, "mode_strict") == 0) {
             val = config.shell_mode_strict ? "true" : "false";
-        } else {
+        } else if (strcmp(opt->name, "posix") == 0 ||
+                   strcmp(opt->name, "emacs") == 0 ||
+                   strcmp(opt->name, "vi") == 0) {
+            /// Runtime projection: read the executor's field, not the registry.
             val = config_get_shell_option(full_key) ? "true" : "false";
+        } else {
+            /// Registry-effective (the registry mirrors shell_opts).
+            bool b;
+            val =
+                (config_registry_get_boolean(full_key, &b) == CREG_SUCCESS && b)
+                    ? "true"
+                    : "false";
         }
 
         fprintf(out, "  %s = %s", full_key, val ? val : "(null)");
