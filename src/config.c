@@ -12,7 +12,6 @@
 
 #include "config.h"
 
-#include "alias.h"
 #include "autocorrect.h"
 #include "config_registry.h"
 #include "executor.h"
@@ -20,7 +19,6 @@
 #include "lle/char_width.h"
 #include "lle/lle_pager.h"
 #include "lle/lle_shell_integration.h"
-#include "lle/unicode_compare.h"
 #include "lush.h"
 #include "shell_error.h"
 #include "shell_mode.h"
@@ -44,7 +42,6 @@ config_values_t config;
 config_context_t config_ctx;
 
 /// Current configuration section
-static config_section_t current_section = CONFIG_SECTION_NONE;
 
 /// Error handling
 /* `last_error` and the config_error/warning wrappers were removed as
@@ -96,17 +93,8 @@ typedef struct config_option {
 /// creg_enum_pair_t tables next to lle_bind_runtime when the section migrated
 /// to registry bindings.
 
-/// Shell Mode mappings (Extended Language Support)
-static const config_enum_mapping_t shell_mode_mappings[] = {
-    {"posix", SHELL_MODE_POSIX},
-    {   "sh", SHELL_MODE_POSIX}, /// Alias for posix
-    { "bash",  SHELL_MODE_BASH},
-    {  "zsh",   SHELL_MODE_ZSH},
-    { "lush",  SHELL_MODE_LUSH},
-    {   NULL,                0}  /// Sentinel
-};
-static const config_enum_def_t shell_mode_enum = {shell_mode_mappings,
-                                                  SHELL_MODE_LUSH};
+/// The shell.mode string<->enum map retired with the legacy shell.mode row;
+/// shell.mode now parses via the canonical shell_mode_parse helper.
 
 /// completion.match_mode string<->enum mapping lives with the binding now
 /// (completion_match_mode_pairs). The old config_enum_mapping/def tables were
@@ -183,67 +171,6 @@ static config_option_t config_options[] = {
     /// unconditionally as before. A command-line --norc / --noprofile flag is
     /// the correct surface and is a separate future feature.
 
-    /// Shell options integration - all 24 POSIX options with shell.* namespace
-    /// These map directly to existing shell_opts flags for perfect
-    /// compatibility
-    {             "shell.errexit", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,NULL,
-     "Exit on command failure (set -e)",config_validate_shell_option,NULL                                                                                        },
-    {              "shell.xtrace", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Trace command execution (set -x)", config_validate_shell_option,             NULL                  },
-    {              "shell.noexec", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Syntax check only (set -n)", config_validate_shell_option,             NULL                        },
-    {             "shell.nounset", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Error on unset variables (set -u)", config_validate_shell_option,             NULL                 },
-    {             "shell.verbose", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Print input lines (set -v)", config_validate_shell_option,             NULL                        },
-    {              "shell.noglob", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Disable pathname expansion (set -f)", config_validate_shell_option,             NULL               },
-    {             "shell.hashall", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Command hashing (set -h)", config_validate_shell_option,             NULL                          },
-    {             "shell.monitor", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Job control (set -m)", config_validate_shell_option,             NULL                              },
-    {           "shell.allexport", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Auto export variables (set -a)", config_validate_shell_option,             NULL                    },
-    {           "shell.noclobber", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Prevent file overwrite (set -C)", config_validate_shell_option,             NULL                   },
-    {              "shell.onecmd", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Exit after one command (set -t)", config_validate_shell_option,             NULL                   },
-    {              "shell.notify", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Async job notification (set -b)", config_validate_shell_option,             NULL                   },
-    {           "shell.ignoreeof", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Prevent exit on EOF (set -o ignoreeof)", config_validate_shell_option,
-     NULL                                                                                                },
-    {               "shell.nolog", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Prevent function history logging (set -o nolog)", config_validate_shell_option,             NULL   },
-    {               "shell.emacs", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Emacs-style editing (set -o emacs)", config_validate_shell_option,             NULL                },
-    {                  "shell.vi", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Vi-style editing (set -o vi)", config_validate_shell_option,             NULL                      },
-    {               "shell.posix", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Strict POSIX compliance (set -o posix)", config_validate_shell_option,
-     NULL                                                                                                },
-    {            "shell.pipefail", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Pipeline failure detection (set -o pipefail)", config_validate_shell_option,             NULL      },
-    {          "shell.histexpand", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "History expansion (set -o histexpand)", config_validate_shell_option,
-     NULL                                                                                                },
-    {             "shell.history", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Command history recording (set -o history)", config_validate_shell_option,
-     NULL                                                                                                },
-    {"shell.interactive-comments", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Interactive comments (set -o interactive-comments)", config_validate_shell_option,             NULL},
-    {            "shell.physical", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Physical directory paths (set -o physical)", config_validate_shell_option,
-     NULL                                                                                                },
-    {          "shell.privileged", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,               NULL,
-     "Restricted shell security (set -o privileged)", config_validate_shell_option,             NULL     },
-
-    /// Shell mode settings (Extended Language Support)
-    {                "shell.mode", CONFIG_TYPE_ENUM, CONFIG_SECTION_SHELL, &config.shell_mode,
-     "Shell compatibility mode (posix, bash, zsh, lush)",   config_validate_shell_mode, &shell_mode_enum },
-    {         "shell.mode_strict", CONFIG_TYPE_BOOL, CONFIG_SECTION_SHELL,
-     &config.shell_mode_strict,      "Disallow runtime mode changes",
-     config_validate_bool,             NULL                                                              },
 };
 
 static const int num_config_options =
@@ -331,6 +258,9 @@ static const creg_option_t shell_options[] = {
     {                "mode",
      CREG_VALUE_STRING,  {.type = CREG_VALUE_STRING, .data.string = "lush"},
      "Shell compatibility mode", true                          },
+    {         "mode_strict",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Disallow runtime mode changes", true                     },
     {             "errexit",
      CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Exit on command failure (set -e)", true                  },
@@ -1235,64 +1165,6 @@ static void config_register_per_mode_defaults(void) {
                                      SHELL_MODE_POSIX, &bool_false);
 }
 
-/**
- * @brief Handle legacy configuration keys that were removed or renamed
- *
- * This prevents warnings for deprecated configuration options in existing
- * .lushrc files.
- *
- * @param key The legacy configuration key
- * @param value The value being set (unused but required for API)
- * @return True if key was handled as legacy, false if unknown
- */
-static bool config_handle_legacy_key(const char *key, const char *value
-                                     __attribute__((unused))) {
-    if (!key) {
-        return false;
-    }
-
-    /// Legacy editor.use_lle option - LLE is now the only line editor
-    if (strcmp(key, "editor.use_lle") == 0) {
-        /// Silently ignore - LLE is always enabled
-        return true;
-    }
-
-    /// Legacy display configuration keys
-    if (strcmp(key, "behavior.enhanced_display_mode") == 0) {
-        /// Legacy key - replaced by layered display system
-        /// Silently ignore to maintain compatibility with existing .lushrc
-        /// files
-        return true;
-    }
-
-    /// Handle legacy display.* configuration keys
-    if (strncmp(key, "display.", 8) == 0) {
-        /// Unknown display.* keys - likely legacy, handle gracefully
-        const char *display_key = key + 8; /// Skip "display." prefix
-
-        if (strcmp(display_key, "system_mode") == 0 ||
-            strcmp(display_key, "layered_display") == 0) {
-            /// Legacy display mode options - layered display is now exclusive
-            /// Silently ignore to maintain compatibility with existing .lushrc
-            /// files
-            return true;
-        }
-
-        /// Valid current display keys - let normal processing handle them
-        if (strcmp(display_key, "syntax_highlighting") == 0 ||
-            strcmp(display_key, "autosuggestions") == 0 ||
-            strcmp(display_key, "transient_prompt") == 0 ||
-            strcmp(display_key, "optimization_level") == 0) {
-            return false;
-        }
-
-        /// Other display.* keys are likely legacy - handle gracefully
-        return true;
-    }
-
-    return false;
-}
-
 /// Legacy option name mapping for backward compatibility
 typedef struct {
     const char *old_name;
@@ -1439,6 +1311,12 @@ void config_set_shell_option(const char *option_name, bool value) {
         shell_opts.functrace = value;
     } else if (strcmp(opt_name, "pipeline-diagnostic") == 0) {
         shell_opts.pipeline_diagnostic_mode = value;
+    } else if (strcmp(opt_name, "mode_strict") == 0) {
+        /// mode_strict is not a shell_opts field: it gates runtime mode changes
+        /// via shell_mode_set_strict (the read truth is g_shell_mode_state),
+        /// mirrored into config.shell_mode_strict for the config-get surface.
+        shell_mode_set_strict(value);
+        config.shell_mode_strict = value;
     }
 }
 
@@ -2197,41 +2075,18 @@ int config_init(void) {
         config_ctx.xdg_config_dir = strdup(xdg_dir);
     }
 
-    /// Check for XDG config file
-    char xdg_path[CONFIG_PATH_MAX];
-    char legacy_path[CONFIG_PATH_MAX];
+    /// Configuration is TOML-only. The user config resolves to the XDG TOML
+    /// (~/.config/lush/lushrc.toml), falling back to the home-dir TOML
+    /// (~/.lushrc.toml) for non-XDG layouts; both are TOML and load through the
+    /// registry. (The "legacy" in config_get_user_config_path / config_get_-
+    /// legacy_config_path names that home-dir TOML *location*, not the retired
+    /// INI format -- ~/.lushrc, the bare RC_SCRIPT_FILE, is a shell script and
+    /// is never read here.) Routing through the shared helper keeps startup,
+    /// config save, and config reset-defaults resolving the same path.
     struct stat st;
-    bool xdg_exists = false;
-    bool legacy_exists = false;
 
-    if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) == 0) {
-        xdg_exists = (stat(xdg_path, &st) == 0 && S_ISREG(st.st_mode));
-    }
-
-    if (config_get_legacy_config_path(legacy_path, sizeof(legacy_path)) == 0) {
-        legacy_exists = (stat(legacy_path, &st) == 0 && S_ISREG(st.st_mode));
-        if (legacy_exists) {
-            config_ctx.legacy_config_path = strdup(legacy_path);
-        }
-    }
-
-    /// Determine which config to load and set format
-    if (xdg_exists) {
-        /// Prefer XDG config
-        config_ctx.user_config_path = strdup(xdg_path);
-        config_ctx.format = CONFIG_FORMAT_TOML;
-        config_ctx.needs_migration = false;
-    } else if (legacy_exists) {
-        /// Use legacy config, mark for migration
-        config_ctx.user_config_path = strdup(legacy_path);
-        config_ctx.format = CONFIG_FORMAT_LEGACY;
-        config_ctx.needs_migration = true;
-    } else {
-        /// No config exists - use XDG path for new config
-        config_ctx.user_config_path = strdup(xdg_path);
-        config_ctx.format = CONFIG_FORMAT_TOML;
-        config_ctx.needs_migration = false;
-    }
+    config_ctx.user_config_path = config_get_user_config_path();
+    config_ctx.format = CONFIG_FORMAT_TOML;
 
     config_ctx.system_config_path = config_get_system_config_path();
 
@@ -2250,15 +2105,6 @@ int config_init(void) {
 
     if (config_ctx.user_config_exists) {
         config_load_user();
-
-        /// Print migration notice if loading legacy config
-        if (config_ctx.needs_migration) {
-            fprintf(stderr,
-                    "lush: Loading configuration from %s (legacy location)\n",
-                    config_ctx.user_config_path);
-            fprintf(stderr, "lush: Run 'config save' to migrate to %s\n",
-                    xdg_path);
-        }
     }
 
     /// Apply loaded settings (always safe to call with defaults)
@@ -2782,83 +2628,12 @@ int config_save_file(const char *path) {
         return -1;
     }
 
-    /// Detect file format based on extension
-    size_t path_len = strlen(path);
-    bool is_toml = (path_len > 5 &&
-                    lle_unicode_strings_equal(path + path_len - 5, ".toml",
-                                              &LLE_UNICODE_COMPARE_DEFAULT));
-
-    if (is_toml) {
-        /// Sync current runtime config to registry before saving
-        config_registry_sync_from_runtime();
-
-        /// Use registry's TOML save
-        creg_result_t result = config_registry_save(path);
-        return (result == CREG_SUCCESS) ? 0 : -1;
-    }
-
-    /// Legacy INI-style format
-    FILE *file = fopen(path, "w");
-    if (!file) {
-        return -1;
-    }
-
-    /// Write header comment
-    fprintf(file, "# Lush Configuration File\n");
-    fprintf(file, "# This file is automatically generated by 'config save'\n");
-    fprintf(file, "# Lines starting with # are comments\n");
-    fprintf(
-        file,
-        "# This file uses dotted notation (e.g. history.enabled = true)\n\n");
-
-    /// Write all options using full dotted names (no sections)
-    for (int i = 0; i < num_config_options; i++) {
-        config_option_t *opt = &config_options[i];
-
-        /// Handle shell options specially
-        if (opt->section == CONFIG_SECTION_SHELL) {
-            bool value = config_get_shell_option(opt->name);
-            fprintf(file, "%s = %s\n", opt->name, value ? "true" : "false");
-        } else {
-            /// Handle regular options
-            switch (opt->type) {
-            case CONFIG_TYPE_BOOL:
-                fprintf(file, "%s = %s\n", opt->name,
-                        *(bool *)opt->value_ptr ? "true" : "false");
-                break;
-            case CONFIG_TYPE_INT:
-                fprintf(file, "%s = %d\n", opt->name, *(int *)opt->value_ptr);
-                break;
-            case CONFIG_TYPE_STRING:
-            case CONFIG_TYPE_COLOR:
-                if (*(char **)opt->value_ptr &&
-                    strlen(*(char **)opt->value_ptr) > 0) {
-                    fprintf(file, "%s = %s\n", opt->name,
-                            *(char **)opt->value_ptr);
-                }
-                /// Skip NULL or empty strings entirely to avoid parsing issues
-                break;
-            case CONFIG_TYPE_ENUM:
-                if (opt->enum_def && opt->enum_def->mappings) {
-                    int current_value = *(int *)opt->value_ptr;
-                    const config_enum_mapping_t *mapping =
-                        opt->enum_def->mappings;
-                    while (mapping->name) {
-                        if (mapping->value == current_value) {
-                            fprintf(file, "%s = %s\n", opt->name,
-                                    mapping->name);
-                            break;
-                        }
-                        mapping++;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    fclose(file);
-    return 0;
+    /// Configuration is TOML-only. config_registry_save materializes the
+    /// runtime config to TOML through the registry; there is no legacy INI
+    /// writer.
+    config_registry_sync_from_runtime();
+    creg_result_t result = config_registry_save(path);
+    return (result == CREG_SUCCESS) ? 0 : -1;
 }
 
 /**
@@ -2876,369 +2651,24 @@ int config_load_file(const char *path) {
         return -1;
     }
 
-    /// Detect file format based on extension
-    size_t path_len = strlen(path);
-    bool is_toml = (path_len > 5 &&
-                    lle_unicode_strings_equal(path + path_len - 5, ".toml",
-                                              &LLE_UNICODE_COMPARE_DEFAULT));
-
-    if (is_toml) {
-        /// Use TOML parser via config registry
-        creg_result_t result = config_registry_load(path);
-        if (result == CREG_SUCCESS) {
-            /// Sync registry values to runtime config struct
-            config_registry_sync_to_runtime();
-            config_ctx.format = CONFIG_FORMAT_TOML;
-            return 0;
+    /// Configuration is TOML-only. A config file must be valid TOML, parsed
+    /// through the registry; there is no legacy INI parser and no INI fallback
+    /// on a parse failure -- a malformed file reports an error rather than
+    /// silently misreading.
+    if (config_registry_load(path) != CREG_SUCCESS) {
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+            SOURCE_LOC_UNKNOWN, "failed to parse TOML config file: %s", path);
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
         }
-        /// Fall through to legacy parser on failure
-        {
-            shell_error_t *err =
-                shell_error_create(SHELL_ERR_INVALID_ARGUMENT,
-                                   SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
-                                   "TOML parsing failed, trying legacy format");
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
-        }
-    }
-
-    /// Legacy INI-style parser
-    config_ctx.format = CONFIG_FORMAT_LEGACY;
-
-    FILE *file = fopen(path, "r");
-    if (!file) {
         return -1;
     }
 
-    config_ctx.current_file = path;
-    config_ctx.line_number = 0;
-    current_section = CONFIG_SECTION_NONE;
-
-    char line[MAX_CONFIG_LINE];
-    while (fgets(line, sizeof(line), file)) {
-        config_ctx.line_number++;
-
-        /// Remove trailing newline
-        size_t len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') {
-            line[len - 1] = '\0';
-        }
-
-        if (config_parse_line(line, config_ctx.line_number, path) != 0) {
-            source_location_t loc = {.filename = path,
-                                     .line = config_ctx.line_number,
-                                     .column = 0,
-                                     .offset = 0,
-                                     .length = 0};
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING, loc,
-                "error parsing config line");
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
-        }
-    }
-
-    fclose(file);
-
-    /// After loading legacy config, sync values to registry
-    config_registry_sync_from_runtime();
-
+    config_registry_sync_to_runtime();
+    config_ctx.format = CONFIG_FORMAT_TOML;
     return 0;
-}
-
-/**
- * @brief Parse a single configuration line
- *
- * Handles comments, section headers, and key=value pairs.
- *
- * @param line Line to parse
- * @param line_num Line number for error messages
- * @param filename File name for error messages
- * @return 0 on success, -1 on parse error
- */
-int config_parse_line(const char *line, int line_num, const char *filename) {
-    /// Skip empty lines and comments
-    const char *trimmed = line;
-    while (isspace(*trimmed)) {
-        trimmed++;
-    }
-
-    if (*trimmed == '\0' || *trimmed == '#') {
-        return 0;
-    }
-
-    /// Helper closure-style scaffolding: each error site below needs a
-    /// source_location_t pointing into the config file. Building it
-    /// inline keeps the migration symmetric with the executor's error
-    /// sites, per feedback-direct-api-error-system.
-
-    /// Check for section header
-    if (*trimmed == '[') {
-        const char *end = strchr(trimmed, ']');
-        if (!end) {
-            source_location_t loc = {.filename = filename,
-                                     .line = (size_t)line_num,
-                                     .column = 0,
-                                     .offset = 0,
-                                     .length = 0};
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-                "invalid section header (missing closing ']')");
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
-            return -1;
-        }
-
-        char section_name[64];
-        size_t section_len = end - trimmed - 1;
-        if (section_len >= sizeof(section_name)) {
-            source_location_t loc = {.filename = filename,
-                                     .line = (size_t)line_num,
-                                     .column = 0,
-                                     .offset = 0,
-                                     .length = 0};
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-                "section name too long (max %zu chars)",
-                sizeof(section_name) - 1);
-            if (err) {
-                shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                shell_error_free(err);
-            }
-            return -1;
-        }
-
-        strncpy(section_name, trimmed + 1, section_len);
-        section_name[section_len] = '\0';
-
-        return config_parse_section(section_name);
-    }
-
-    /// Parse key=value pair
-    char *equals = strchr(trimmed, '=');
-    if (!equals) {
-        source_location_t loc = {.filename = filename,
-                                 .line = (size_t)line_num,
-                                 .column = 0,
-                                 .offset = 0,
-                                 .length = 0};
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "invalid configuration line (expected key=value)");
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-        return -1;
-    }
-
-    /// Extract key
-    char key[128];
-    size_t key_len = equals - trimmed;
-    if (key_len >= sizeof(key)) {
-        source_location_t loc = {.filename = filename,
-                                 .line = (size_t)line_num,
-                                 .column = 0,
-                                 .offset = 0,
-                                 .length = 0};
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "configuration key too long (max %zu chars)", sizeof(key) - 1);
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-        return -1;
-    }
-
-    strncpy(key, trimmed, key_len);
-    key[key_len] = '\0';
-
-    /// Trim whitespace from key
-    char *key_end = key + strlen(key) - 1;
-    while (key_end > key && isspace(*key_end)) {
-        *key_end-- = '\0';
-    }
-
-    /// Extract value
-    const char *value = equals + 1;
-    while (isspace(*value)) {
-        value++;
-    }
-
-    return config_parse_option(key, value);
-}
-
-/**
- * @brief Parse a configuration section header
- *
- * Sets the current section for subsequent option parsing.
- *
- * @param section_name Name of the section (e.g., "history", "prompt")
- * @return 0 on success, -1 if unknown section
- */
-int config_parse_section(const char *section_name) {
-    if (strcmp(section_name, "history") == 0) {
-        current_section = CONFIG_SECTION_HISTORY;
-    } else if (strcmp(section_name, "completion") == 0) {
-        current_section = CONFIG_SECTION_COMPLETION;
-    } else if (strcmp(section_name, "behavior") == 0) {
-        current_section = CONFIG_SECTION_BEHAVIOR;
-    } else if (strcmp(section_name, "aliases") == 0) {
-        current_section = CONFIG_SECTION_ALIASES;
-    } else if (strcmp(section_name, "keys") == 0) {
-        current_section = CONFIG_SECTION_KEYS;
-    } else {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_WARNING,
-            SOURCE_LOC_UNKNOWN, "unknown configuration section: %s",
-            section_name);
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-        current_section = CONFIG_SECTION_NONE;
-        return -1;
-    }
-
-    return 0;
-}
-
-config_section_t config_get_current_section(void) { return current_section; }
-
-/**
- * @brief Parse a configuration option
- *
- * Parses a key=value pair and updates the corresponding config field.
- * Handles aliases specially by adding them to the alias table.
- *
- * @param key Configuration key (may use dotted notation)
- * @param value Configuration value string
- * @return 0 on success, -1 on error
- */
-int config_parse_option(const char *key, const char *value) {
-    /// Handle aliases specially
-    if (current_section == CONFIG_SECTION_ALIASES) {
-        /// Add alias: key = value
-        char *alias_cmd = malloc(strlen(value) + 1);
-        if (alias_cmd) {
-            strcpy(alias_cmd, value);
-            set_alias(key, alias_cmd);
-        }
-        return 0;
-    }
-
-    /// Handle regular options
-    for (int i = 0; i < num_config_options; i++) {
-        config_option_t *opt = &config_options[i];
-
-        if (strcmp(opt->name, key) == 0) {
-            /// Handle shell options specially - they use integration functions
-            if (strncmp(key, "shell.", 6) == 0) {
-                if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
-                    strcmp(value, "yes") == 0 || strcmp(value, "on") == 0) {
-                    config_registry_set_boolean(key, true);
-                } else if (strcmp(value, "false") == 0 ||
-                           strcmp(value, "0") == 0 ||
-                           strcmp(value, "off") == 0 ||
-                           strcmp(value, "no") == 0) {
-                    config_registry_set_boolean(key, false);
-                } else {
-                    shell_error_t *err = shell_error_create(
-                        SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN,
-                        "invalid boolean value '%s' for shell option '%s'",
-                        value, key);
-                    if (err) {
-                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                        shell_error_free(err);
-                    }
-                    return -1;
-                }
-                return 0;
-            }
-
-            /// Validate value if validator exists
-            if (opt->validator && !opt->validator(value)) {
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
-                    SOURCE_LOC_UNKNOWN, "invalid value '%s' for option '%s'",
-                    value, key);
-                if (err) {
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                }
-                return -1;
-            }
-
-            /// Set value based on type
-            switch (opt->type) {
-            case CONFIG_TYPE_BOOL: {
-                bool bool_val =
-                    (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
-                     strcmp(value, "yes") == 0 || strcmp(value, "on") == 0);
-                *(bool *)opt->value_ptr = bool_val;
-                break;
-            }
-            case CONFIG_TYPE_INT: {
-                int int_val = atoi(value);
-                *(int *)opt->value_ptr = int_val;
-                break;
-            }
-            case CONFIG_TYPE_ENUM: {
-                /// Look up string value in enum mapping table
-                int enum_val = opt->enum_def->default_value;
-                if (opt->enum_def && opt->enum_def->mappings) {
-                    for (const config_enum_mapping_t *m =
-                             opt->enum_def->mappings;
-                         m->name; m++) {
-                        if (strcmp(value, m->name) == 0) {
-                            enum_val = m->value;
-                            break;
-                        }
-                    }
-                }
-                *(int *)opt->value_ptr = enum_val;
-                break;
-            }
-            case CONFIG_TYPE_STRING: {
-                char **str_ptr = (char **)opt->value_ptr;
-                if (*str_ptr) {
-                    free(*str_ptr);
-                }
-                *str_ptr = strdup(value);
-                break;
-            }
-            case CONFIG_TYPE_COLOR:
-                /// Color handling would go here
-                break;
-            }
-
-            return 0;
-        }
-    }
-
-    /// Handle legacy configuration keys gracefully to eliminate warnings
-    if (config_handle_legacy_key(key, value)) {
-        return 0;
-    }
-
-    {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_WARNING,
-            SOURCE_LOC_UNKNOWN, "unknown configuration option: %s", key);
-        if (err) {
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-        }
-    }
-    return -1;
 }
 
 /**
@@ -4002,30 +3432,35 @@ void config_get_value(const char *key) {
         return;
     }
 
+    /// shell.* options resolve against the live runtime (shell_opts /
+    /// shell_mode / config.shell_mode_strict) -- the executor's truth -- rather
+    /// than the legacy config_options[] table, so the table's shell rows
+    /// retire. The registry is consulted only to confirm the key exists, so an
+    /// unknown shell.X still reports Unknown rather than a bogus "false". Reads
+    /// stay live until the registry-mirror invariant is closed by the
+    /// write-audit; the eventual flip reads registry-effective.
+    if (strncmp(key, "shell.", 6) == 0) {
+        if (strcmp(key, "shell.mode") == 0) {
+            printf("%s\n", shell_mode_name(shell_mode_get()));
+            return;
+        }
+        if (strcmp(key, "shell.mode_strict") == 0) {
+            printf("%s\n", config.shell_mode_strict ? "true" : "false");
+            return;
+        }
+        creg_value_t shell_probe;
+        if (config_registry_get(key, &shell_probe) == CREG_SUCCESS) {
+            printf("%s\n", config_get_shell_option(key) ? "true" : "false");
+            return;
+        }
+        /// Unknown shell.X: fall through to the Unknown-key path below.
+    }
+
     /// First try the exact key
     for (int i = 0; i < num_config_options; i++) {
         config_option_t *opt = &config_options[i];
 
         if (strcmp(opt->name, key) == 0) {
-            /// Handle shell.mode specially - it's an enum
-            if (strcmp(key, "shell.mode") == 0) {
-                printf("%s\n", shell_mode_name(shell_mode_get()));
-                return;
-            }
-
-            /// Handle shell.mode_strict specially
-            if (strcmp(key, "shell.mode_strict") == 0) {
-                printf("%s\n", config.shell_mode_strict ? "true" : "false");
-                return;
-            }
-
-            /// Handle other shell options specially - they use integration
-            /// functions
-            if (strncmp(key, "shell.", 6) == 0) {
-                printf("%s\n", config_get_shell_option(key) ? "true" : "false");
-                return;
-            }
-
             switch (opt->type) {
             case CONFIG_TYPE_BOOL:
                 printf("%s\n", *(bool *)opt->value_ptr ? "true" : "false");
@@ -4141,78 +3576,54 @@ void config_set_value(const char *key, const char *value) {
         return;
     }
 
+    /// shell.* options route to the registry / runtime directly, not the legacy
+    /// config_options[] table, so the table's shell rows retire. shell.mode
+    /// drives a full preset (strict-lock honored); shell.mode_strict and the
+    /// boolean options write the registry, firing the shell.* subscriber that
+    /// applies via config_set_shell_option (mode_strict carries the
+    /// shell_mode_set_strict side effect). The registry confirms the key exists
+    /// so an unknown shell.X still reports Unknown.
+    if (strncmp(key, "shell.", 6) == 0) {
+        if (strcmp(key, "shell.mode") == 0) {
+            shell_mode_t new_mode;
+            if (!shell_mode_parse(value, &new_mode)) {
+                printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n",
+                       value);
+                return;
+            }
+            if (!apply_mode_preset(new_mode)) {
+                printf("Cannot change shell mode (strict mode enabled)\n");
+                return;
+            }
+            printf("Set %s = %s\n", key, value);
+            return;
+        }
+        creg_value_t shell_probe;
+        if (config_registry_get(key, &shell_probe) == CREG_SUCCESS) {
+            bool b;
+            if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
+                strcmp(value, "on") == 0) {
+                b = true;
+            } else if (strcmp(value, "false") == 0 || strcmp(value, "0") == 0 ||
+                       strcmp(value, "off") == 0) {
+                b = false;
+            } else {
+                printf("Invalid boolean value: %s (use true/false/on/off)\n",
+                       value);
+                return;
+            }
+            config_registry_set_boolean(key, b);
+            printf("Set %s = %s\n", key, value);
+            return;
+        }
+        /// Unknown shell.X: fall through to the Unknown-key path below.
+    }
+
     /// First try the exact key
     for (int i = 0; i < num_config_options; i++) {
         config_option_t *opt = &config_options[i];
 
         if (strcmp(opt->name, key) == 0) {
-            /// Handle shell.mode specially - it's an enum that also updates
-            /// shell_mode system
-            if (strcmp(key, "shell.mode") == 0) {
-                /// Parse via the canonical helper (handles every mode
-                /// name and the "sh"-as-POSIX alias in one place).
-                shell_mode_t new_mode;
-                if (!shell_mode_parse(value, &new_mode)) {
-                    printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n",
-                           value);
-                    return;
-                }
-                /// Route through apply_mode_preset so the registry stays
-                /// authoritative (config save / explain), the full preset is
-                /// re-seeded, and the strict-mode lock is honored -- exactly as
-                /// the mode builtin does. Poking the runtime directly here
-                /// would leave the registry stale and config save would persist
-                /// the wrong mode.
-                if (!apply_mode_preset(new_mode)) {
-                    printf("Cannot change shell mode (strict mode enabled)\n");
-                    return;
-                }
-                printf("Set %s = %s\n", key, value);
-                return;
-            }
-
-            /// Handle shell.mode_strict specially
-            if (strcmp(key, "shell.mode_strict") == 0) {
-                bool strict;
-                if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
-                    strcmp(value, "on") == 0) {
-                    strict = true;
-                } else if (strcmp(value, "false") == 0 ||
-                           strcmp(value, "0") == 0 ||
-                           strcmp(value, "off") == 0) {
-                    strict = false;
-                } else {
-                    printf(
-                        "Invalid boolean value: %s (use true/false/on/off)\n",
-                        value);
-                    return;
-                }
-                shell_mode_set_strict(strict);
-                config.shell_mode_strict = strict;
-                printf("Set %s = %s\n", key, value);
-                return;
-            }
-
-            /// Handle other shell options specially - they use integration
-            /// functions
-            if (strncmp(key, "shell.", 6) == 0) {
-                if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
-                    strcmp(value, "on") == 0) {
-                    config_registry_set_boolean(key, true);
-                } else if (strcmp(value, "false") == 0 ||
-                           strcmp(value, "0") == 0 ||
-                           strcmp(value, "off") == 0) {
-                    config_registry_set_boolean(key, false);
-                } else {
-                    printf(
-                        "Invalid boolean value: %s (use true/false/on/off)\n",
-                        value);
-                    return;
-                }
-                printf("Set %s = %s\n", key, value);
-                return;
-            }
-
             switch (opt->type) {
             case CONFIG_TYPE_BOOL:
                 if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) {
@@ -4474,21 +3885,56 @@ static void config_show_registry_section(config_section_t section, FILE *out) {
     }
 }
 
+/// Render the shell section from the STATIC shell_options[] schema, reading
+/// LIVE runtime values (shell_mode / config.shell_mode_strict / shell_opts). It
+/// does not iterate the live registry store: that store also holds the 56
+/// shell.feature.* keys (registered at runtime), which the static schema
+/// excludes by construction, and it would surface registry-effective values
+/// that lag the runtime for monitor/posix until the write-audit closes those
+/// bypasses. Full shell.<name> names + the schema help string, matching the
+/// prior shell listing minus the feature flood.
+static void config_show_shell_section(FILE *out) {
+    size_t count = sizeof(shell_options) / sizeof(shell_options[0]);
+    for (size_t i = 0; i < count; i++) {
+        const creg_option_t *opt = &shell_options[i];
+        char full_key[CREG_KEY_MAX];
+        snprintf(full_key, sizeof(full_key), "shell.%s", opt->name);
+
+        const char *val;
+        if (strcmp(opt->name, "mode") == 0) {
+            val = shell_mode_name(shell_mode_get());
+        } else if (strcmp(opt->name, "mode_strict") == 0) {
+            val = config.shell_mode_strict ? "true" : "false";
+        } else {
+            val = config_get_shell_option(full_key) ? "true" : "false";
+        }
+
+        fprintf(out, "  %s = %s", full_key, val ? val : "(null)");
+        if (opt->help) {
+            fprintf(out, "  # %s", opt->help);
+        }
+        fprintf(out, "\n");
+    }
+}
+
 /// Write one section's options to @p out (the legacy config_options[] entries
 /// followed by the registry-only keys). The paging public wrappers build a
 /// memory stream and hand it to the LLE pager.
 static void config_show_section_to(config_section_t section, FILE *out) {
+    /// The shell section lives entirely in the registry now (no legacy rows);
+    /// render it from its static schema with live values.
+    if (section == CONFIG_SECTION_SHELL) {
+        config_show_shell_section(out);
+        return;
+    }
+
     for (int i = 0; i < num_config_options; i++) {
         config_option_t *opt = &config_options[i];
 
         if (opt->section == section) {
             fprintf(out, "  %s = ", opt->name);
 
-            /// Handle shell options specially - they use integration functions
-            if (strncmp(opt->name, "shell.", 6) == 0) {
-                fprintf(out, "%s",
-                        config_get_shell_option(opt->name) ? "true" : "false");
-            } else {
+            {
                 switch (opt->type) {
                 case CONFIG_TYPE_BOOL:
                     fprintf(out, "%s",

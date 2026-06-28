@@ -564,16 +564,15 @@ TEST(argv_shell_options_hydrate_to_session) {
     shell_opts.exit_on_error = false;
 }
 
-TEST(config_show_lists_shell_feature_keys) {
+TEST(config_show_shell_lists_options_not_features) {
     config_init();
 
-    /// The feature matrix is registered as shell.feature.* keys in the registry
-    /// "shell" section, added at runtime (not in the static section
-    /// definition). `config show shell` must enumerate them through the live
-    /// option store, or features silently drop from discovery. Capturing the
-    /// section output also exercises the buffered render path that feeds the
-    /// LLE pager: non-tty stdout makes the pager stream verbatim, so the full
-    /// listing must appear here.
+    /// config show shell renders the shell.* OPTIONS from the static schema
+    /// (mode + mode_strict + the booleans), full shell.<name> names and live
+    /// values. It deliberately EXCLUDES the 56 shell.feature.* keys (their
+    /// discovery surface is debug features / setopt) so the listing is not
+    /// flooded. The pipe capture also exercises the buffered pager render path
+    /// (non-tty stdout streams verbatim).
     int pipefd[2];
     ASSERT_EQ(pipe(pipefd), 0, "pipe should succeed");
     fflush(stdout);
@@ -594,14 +593,21 @@ TEST(config_show_lists_shell_feature_keys) {
                 "config show should produce output for the shell section");
     buf[n > 0 ? n : 0] = '\0';
 
-    ASSERT_TRUE(strstr(buf, "feature.extended_glob") != NULL,
-                "config show shell should list the extended_glob feature key");
-    ASSERT_TRUE(
-        strstr(buf, "feature.brace_expansion") != NULL,
-        "config show shell should list the brace_expansion feature key");
-    /// The legacy shell.* options must still appear alongside the features.
+    /// The shell options appear with full shell.<name> names, including the
+    /// mode keys and the newly-registered set -o options.
     ASSERT_TRUE(strstr(buf, "shell.errexit") != NULL,
-                "config show shell should still list the legacy shell options");
+                "config show shell should list shell.errexit");
+    ASSERT_TRUE(strstr(buf, "shell.mode =") != NULL,
+                "config show shell should list shell.mode");
+    ASSERT_TRUE(strstr(buf, "shell.mode_strict") != NULL,
+                "config show shell should list shell.mode_strict");
+    ASSERT_TRUE(strstr(buf, "shell.errtrace") != NULL,
+                "config show shell should list the registered set -o options");
+
+    /// The 56 shell.feature.* keys are deliberately NOT flooded into the
+    /// listing.
+    ASSERT_TRUE(strstr(buf, "feature.") == NULL,
+                "config show shell must not flood the shell.feature.* keys");
 }
 
 TEST(config_get_bool_default) {
@@ -780,84 +786,9 @@ TEST(config_get_system_config_path) {
 }
 
 /* ============================================================================
- * SECTION PARSING TESTS
- * ============================================================================
- */
-
-TEST(config_parse_section_history) {
-    int result = config_parse_section("history");
-    ASSERT_EQ(result, 0, "parsing 'history' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_HISTORY,
-              "the history section should be selected");
-}
-
-TEST(config_parse_section_completion) {
-    int result = config_parse_section("completion");
-    ASSERT_EQ(result, 0, "parsing 'completion' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_COMPLETION,
-              "the completion section should be selected");
-}
-
-TEST(config_parse_section_behavior) {
-    int result = config_parse_section("behavior");
-    ASSERT_EQ(result, 0, "parsing 'behavior' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_BEHAVIOR,
-              "the behavior section should be selected");
-}
-
-TEST(config_parse_section_aliases) {
-    int result = config_parse_section("aliases");
-    ASSERT_EQ(result, 0, "parsing 'aliases' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_ALIASES,
-              "the aliases section should be selected");
-}
-
-TEST(config_parse_section_keys) {
-    int result = config_parse_section("keys");
-    ASSERT_EQ(result, 0, "parsing 'keys' section should succeed");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_KEYS,
-              "the keys section should be selected");
-}
-
-TEST(config_parse_section_invalid) {
-    int result = config_parse_section("invalid_section");
-    /// Should return non-zero for invalid section
-    ASSERT(result != 0, "parsing invalid section should fail");
-}
-
-/* ============================================================================
  * LINE PARSING TESTS
  * ============================================================================
  */
-
-TEST(config_parse_line_comment) {
-    config_init();
-    /// Comment lines should be skipped
-    int result = config_parse_line("# This is a comment", 1, "test");
-    ASSERT_EQ(result, 0, "comment line should be parsed successfully");
-}
-
-TEST(config_parse_line_empty) {
-    config_init();
-    /// Empty lines should be skipped
-    int result = config_parse_line("", 1, "test");
-    ASSERT_EQ(result, 0, "empty line should be parsed successfully");
-}
-
-TEST(config_parse_line_whitespace) {
-    config_init();
-    /// Whitespace-only lines should be skipped
-    int result = config_parse_line("   \t  ", 1, "test");
-    ASSERT_EQ(result, 0, "whitespace line should be parsed successfully");
-}
-
-TEST(config_parse_line_section_header) {
-    config_init();
-    int result = config_parse_line("[history]", 1, "test");
-    ASSERT_EQ(result, 0, "section header should be parsed successfully");
-    ASSERT_EQ(config_get_current_section(), CONFIG_SECTION_HISTORY,
-              "the [history] header should select the history section");
-}
 
 /* ============================================================================
  * ERROR HANDLING TESTS
@@ -987,7 +918,7 @@ int main(void) {
     RUN_TEST(reapplying_current_mode_drops_overrides);
     RUN_TEST(set_o_only_options_gained_config_surface);
     RUN_TEST(argv_shell_options_hydrate_to_session);
-    RUN_TEST(config_show_lists_shell_feature_keys);
+    RUN_TEST(config_show_shell_lists_options_not_features);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);
     RUN_TEST(config_get_string_default);
@@ -1005,22 +936,6 @@ int main(void) {
     RUN_TEST(config_get_legacy_config_path);
     RUN_TEST(config_get_script_config_path);
     RUN_TEST(config_get_system_config_path);
-
-    /// Section parsing
-    printf("\n=== Section Parsing Tests ===\n");
-    RUN_TEST(config_parse_section_history);
-    RUN_TEST(config_parse_section_completion);
-    RUN_TEST(config_parse_section_behavior);
-    RUN_TEST(config_parse_section_aliases);
-    RUN_TEST(config_parse_section_keys);
-    RUN_TEST(config_parse_section_invalid);
-
-    /// Line parsing
-    printf("\n=== Line Parsing Tests ===\n");
-    RUN_TEST(config_parse_line_comment);
-    RUN_TEST(config_parse_line_empty);
-    RUN_TEST(config_parse_line_whitespace);
-    RUN_TEST(config_parse_line_section_header);
 
     /// Script execution control
     printf("\n=== Script Execution Control Tests ===\n");

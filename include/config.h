@@ -28,8 +28,8 @@
  */
 #define USER_CONFIG_FILE ".lushrc.toml"
 
-/** @brief System-wide configuration file path */
-#define SYSTEM_CONFIG_FILE "/etc/lush/lushrc"
+/** @brief System-wide configuration file path (TOML) */
+#define SYSTEM_CONFIG_FILE "/etc/lush/lushrc.toml"
 
 /** @brief XDG config directory name (relative to XDG_CONFIG_HOME) */
 #define CONFIG_XDG_DIR "lush"
@@ -432,33 +432,6 @@ void config_cleanup(void);
  * ============================================================================
  */
 
-/**
- * @brief Parse a single configuration line
- *
- * @param line Line to parse
- * @param line_num Line number for error reporting
- * @param filename Filename for error reporting
- * @return 0 on success, non-zero on error
- */
-int config_parse_line(const char *line, int line_num, const char *filename);
-
-/**
- * @brief Parse a section header
- *
- * @param section_name Section name from header
- * @return 0 on success, non-zero on error
- */
-int config_parse_section(const char *section_name);
-
-/**
- * @brief Parse a configuration option
- *
- * @param key Option key
- * @param value Option value
- * @return 0 on success, non-zero on error
- */
-int config_parse_option(const char *key, const char *value);
-
 /* ============================================================================
  * Shell Option Integration Functions
  * ============================================================================
@@ -487,13 +460,6 @@ void config_set_shell_option(const char *option_name, bool value);
  * @return Current value of the option
  */
 bool config_get_shell_option(const char *option_name);
-
-/**
- * @brief Get the current configuration section
- *
- * @return Current section being parsed
- */
-config_section_t config_get_current_section(void);
 
 /* ============================================================================
  * Configuration Validation Functions
