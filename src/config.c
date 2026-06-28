@@ -2039,6 +2039,15 @@ int config_init(void) {
     /// Set default values
     config_set_defaults();
 
+    /// config_init is re-entrant: `config reload` calls it again. The memset
+    /// below drops config_ctx's heap-owned path pointers, so free them first or
+    /// every reload leaks them (config_cleanup frees the same three at exit).
+    /// On the first init config_ctx is zero-initialized, so these are NULL and
+    /// free(NULL) is a no-op.
+    free(config_ctx.user_config_path);
+    free(config_ctx.system_config_path);
+    free(config_ctx.xdg_config_dir);
+
     /// Initialize context
     memset(&config_ctx, 0, sizeof(config_ctx));
 
@@ -3955,13 +3964,13 @@ void config_cleanup(void) {
         config.display_ambiguous_width = NULL;
     }
 
-    if (config_ctx.user_config_path) {
-        free(config_ctx.user_config_path);
-    }
-    if (config_ctx.system_config_path) {
-        free(config_ctx.system_config_path);
-    }
-    if (config_ctx.xdg_config_dir) {
-        free(config_ctx.xdg_config_dir);
-    }
+    /// Free AND NULL: config_cleanup may be followed by another config_init
+    /// (the config builtin's reload, and test lifecycles), whose free-before-
+    /// reinit would otherwise double-free these dangling pointers.
+    free(config_ctx.user_config_path);
+    config_ctx.user_config_path = NULL;
+    free(config_ctx.system_config_path);
+    config_ctx.system_config_path = NULL;
+    free(config_ctx.xdg_config_dir);
+    config_ctx.xdg_config_dir = NULL;
 }
