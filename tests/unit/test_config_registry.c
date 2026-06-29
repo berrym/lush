@@ -1085,6 +1085,64 @@ TEST(load_reported_records_dropped_keys) {
 }
 
 /* ============================================================================
+ * Discoverability tiers
+ * ============================================================================
+ */
+
+TEST(tier_set_get_roundtrip) {
+    config_registry_register_section(&history_section);
+
+    /// A freshly registered key has no tier.
+    creg_tier_t tier = CREG_TIER_BEGINNER;
+    ASSERT_EQ(config_registry_get_tier("history.size", &tier), CREG_SUCCESS);
+    ASSERT_EQ(tier, CREG_TIER_UNSET);
+
+    /// Attach and read it back.
+    ASSERT_EQ(config_registry_set_tier("history.size", CREG_TIER_BEGINNER),
+              CREG_SUCCESS);
+    ASSERT_EQ(config_registry_get_tier("history.size", &tier), CREG_SUCCESS);
+    ASSERT_EQ(tier, CREG_TIER_BEGINNER);
+
+    /// An unregistered key reports NOT_FOUND for both directions.
+    ASSERT_EQ(config_registry_set_tier("history.bogus", CREG_TIER_BEGINNER),
+              CREG_ERROR_NOT_FOUND);
+    ASSERT_EQ(config_registry_get_tier("history.bogus", &tier),
+              CREG_ERROR_NOT_FOUND);
+}
+
+TEST(collect_by_tier_returns_only_tagged_keys) {
+    config_registry_register_section(&history_section);
+    config_registry_set_tier("history.enabled", CREG_TIER_BEGINNER);
+    config_registry_set_tier("history.size", CREG_TIER_BEGINNER);
+    /// history.file is left UNSET.
+
+    char keys[8][CREG_KEY_MAX];
+    size_t n = config_registry_collect_by_tier(CREG_TIER_BEGINNER, keys, 8);
+    ASSERT_EQ(n, (size_t)2);
+
+    bool saw_enabled = false, saw_size = false, saw_file = false;
+    for (size_t i = 0; i < n; i++) {
+        if (strcmp(keys[i], "history.enabled") == 0)
+            saw_enabled = true;
+        if (strcmp(keys[i], "history.size") == 0)
+            saw_size = true;
+        if (strcmp(keys[i], "history.file") == 0)
+            saw_file = true;
+    }
+    ASSERT_TRUE(saw_enabled && saw_size, "both tagged keys are collected");
+    ASSERT_TRUE(!saw_file, "an untagged key is not collected");
+
+    /// The count is the true total even when the output buffer is smaller; only
+    /// `max` rows are written.
+    char one[1][CREG_KEY_MAX];
+    ASSERT_EQ(config_registry_collect_by_tier(CREG_TIER_BEGINNER, one, 1),
+              (size_t)2);
+    ASSERT_TRUE(strcmp(one[0], "history.enabled") == 0 ||
+                    strcmp(one[0], "history.size") == 0,
+                "the one written row is a tagged key");
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -1165,6 +1223,8 @@ int main(void) {
     RUN_TEST(validate_schema_string_truncation_not_flagged);
     RUN_TEST(validate_schema_catches_bound_cell_desync);
     RUN_TEST(load_reported_records_dropped_keys);
+    RUN_TEST(tier_set_get_roundtrip);
+    RUN_TEST(collect_by_tier_returns_only_tagged_keys);
 
     return TEST_RESULT();
 }

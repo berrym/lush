@@ -114,6 +114,13 @@ static lle_editor_t *global_lle_editor = NULL;
  * for the process lifetime. */
 static lle_history_core_t *g_debug_history = NULL;
 
+/* Set when the most recent lle_readline() call ended because the user pressed
+ * Ctrl-C (SIGINT), which returns an empty string -- indistinguishable from an
+ * empty Enter by the return value alone. A modal caller (e.g. the config
+ * wizard) reads lle_readline_interrupted() after the call to tell "abort" from
+ * "accept empty / keep". Reset at the start of every lle_readline(). */
+static bool g_lle_readline_interrupted = false;
+
 /* The debug-prompt-active flag lives in lle_debug_prompt_state.c so
  * that consumers (the completion sources) can read it without their
  * .o files chaining lle_readline.c.o into the link surface. */
@@ -3113,6 +3120,12 @@ static lle_result_t execute_keybinding_action(
 char *lle_readline(const char *prompt) {
     lle_result_t result;
 
+    /// Clear the interrupt flag before any return path (the non-TTY fast path
+    /// and the init-failure guards both return below), so a modal caller that
+    /// reads lle_readline_interrupted() never sees a stale value from a prior
+    /// Ctrl-C.
+    g_lle_readline_interrupted = false;
+
     /// CRITICAL: Check if stdin is a TTY before attempting raw mode.
     ///
     /// When the shell is forced into interactive mode with -i but stdin is
@@ -3552,6 +3565,7 @@ char *lle_readline(const char *prompt) {
             lle_readline_state_force_abort(&ctx);
 
             /// Abort line - return empty string (not NULL, which signals EOF)
+            g_lle_readline_interrupted = true;
             done = true;
             final_line = strdup("");
             continue;
@@ -3659,6 +3673,7 @@ char *lle_readline(const char *prompt) {
             dc_reset_prompt_display_state();
             /// STATE MACHINE: Force abort state
             lle_readline_state_force_abort(&ctx);
+            g_lle_readline_interrupted = true;
             done = true;
             final_line = strdup("");
             continue;
@@ -4165,3 +4180,5 @@ char *lle_readline_no_history(const char *prompt) {
     }
     return line;
 }
+
+bool lle_readline_interrupted(void) { return g_lle_readline_interrupted; }

@@ -943,6 +943,32 @@ TEST(all_typed_keys_attach) {
               "every type descriptor in the registration tables must attach");
 }
 
+TEST(beginner_tier_is_registered) {
+    config_init();
+
+    /// Every key in the curated beginner table must exist; a misspelled or
+    /// renamed key fails to attach and the wizard would silently skip it.
+    ASSERT_EQ(config_tier_attach_failure_count(), 0,
+              "every beginner-tier key must attach");
+
+    /// The wizard walks exactly the curated set. Spot-check that the set is
+    /// non-empty, that a representative key is tagged BEGINNER, and that an
+    /// everyday-but-not-first-run key is left untagged.
+    char keys[64][CREG_KEY_MAX];
+    size_t n = config_registry_collect_by_tier(CREG_TIER_BEGINNER, keys, 64);
+    ASSERT_TRUE(n >= 8, "the beginner tier is populated");
+
+    creg_tier_t tier = CREG_TIER_UNSET;
+    ASSERT_EQ(config_registry_get_tier("completion.match_mode", &tier),
+              CREG_SUCCESS, "match_mode is a registered key");
+    ASSERT_EQ(tier, CREG_TIER_BEGINNER, "match_mode is in the beginner tier");
+
+    ASSERT_EQ(config_registry_get_tier("behavior.tab_width", &tier),
+              CREG_SUCCESS, "tab_width is a registered key");
+    ASSERT_TRUE(tier != CREG_TIER_BEGINNER,
+                "an advanced knob is not in the beginner tier");
+}
+
 TEST(config_set_validates_increment_two_keys) {
     config_init();
 
@@ -978,9 +1004,22 @@ TEST(config_set_validates_increment_two_keys) {
     ASSERT_TRUE(strcmp(after, "0\n") == 0,
                 "loop_failure_streak must reject a negative value, keeping 0");
 
+    /// history.size is a wizard-exposed int bound to a 32-bit cell: it must
+    /// reject a negative and an over-INT_MAX value (either would truncate
+    /// through the binding and diverge from what is stored), accepting a normal
+    /// value.
+    config_set_quiet("history.size", "8000");
+    config_set_quiet("history.size", "-5");
+    config_set_quiet("history.size", "5000000000");
+    capture_config_get("history.size", after, sizeof(after));
+    ASSERT_TRUE(
+        strcmp(after, "8000\n") == 0,
+        "history.size must reject negative / over-INT_MAX, keeping 8000");
+
     config_registry_reset("history.search_mode");
     config_registry_reset("behavior.autocorrect_max_suggestions");
     config_registry_reset("behavior.loop_failure_streak");
+    config_registry_reset("history.size");
 }
 
 /// Capture the STDERR of config_load_file(@p path) into @p out.
@@ -1432,6 +1471,7 @@ int main(void) {
     RUN_TEST(config_set_validates_typed_keys);
     RUN_TEST(schema_invariant_holds_on_real_config);
     RUN_TEST(all_typed_keys_attach);
+    RUN_TEST(beginner_tier_is_registered);
     RUN_TEST(config_set_validates_increment_two_keys);
     RUN_TEST(config_load_file_warns_on_dropped_keys);
     RUN_TEST(config_load_file_truncates_long_drop_list);

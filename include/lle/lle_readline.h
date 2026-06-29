@@ -77,6 +77,19 @@ char *lle_readline(const char *prompt);
 char *lle_readline_no_history(const char *prompt);
 
 /**
+ * @brief Did the most recent lle_readline() call end in a Ctrl-C (SIGINT)?
+ *
+ * Ctrl-C aborts the line and returns an empty string -- the same value as an
+ * empty Enter -- so a modal caller that treats those differently (e.g. the
+ * config wizard, where Enter keeps the current value but Ctrl-C cancels) reads
+ * this immediately after the call to tell them apart. Reset at the start of
+ * every lle_readline(); meaningful only right after one returns.
+ *
+ * @return true if the last lle_readline() returned due to Ctrl-C.
+ */
+bool lle_readline_interrupted(void);
+
+/**
  * @brief Is the currently-active prompt the debugger's break-prompt?
  *
  * Returns true between the call to lle_readline_no_history() and its

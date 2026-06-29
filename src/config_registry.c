@@ -204,6 +204,7 @@ typedef struct {
     const creg_option_t *option_def; ///< Pointer to option definition
     bool persisted;                  ///< Should be saved to file
     const creg_type_t *type;         ///< Optional type descriptor (validation)
+    creg_tier_t tier;                ///< Discoverability tier (UNSET if none)
 } stored_option_t;
 
 /**
@@ -1348,6 +1349,53 @@ creg_result_t config_registry_describe_type(const char *key, char *out,
     }
     opt->type->describe(opt->type, out, outlen);
     return CREG_SUCCESS;
+}
+
+const char *config_registry_get_help(const char *key) {
+    stored_option_t *opt = find_option(key);
+    if (!opt || !opt->option_def) {
+        return NULL;
+    }
+    return opt->option_def->help;
+}
+
+creg_result_t config_registry_set_tier(const char *key, creg_tier_t tier) {
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    opt->tier = tier;
+    return CREG_SUCCESS;
+}
+
+creg_result_t config_registry_get_tier(const char *key, creg_tier_t *out) {
+    if (!out) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    stored_option_t *opt = find_option(key);
+    if (!opt) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    *out = opt->tier;
+    return CREG_SUCCESS;
+}
+
+size_t config_registry_collect_by_tier(creg_tier_t tier,
+                                       char out[][CREG_KEY_MAX], size_t max) {
+    size_t count = 0;
+    for (size_t s = 0; s < g_registry.section_count; s++) {
+        registered_section_t *reg = &g_registry.sections[s];
+        for (size_t i = 0; i < reg->option_count; i++) {
+            if (reg->options[i].tier != tier) {
+                continue;
+            }
+            if (out && count < max) {
+                snprintf(out[count], CREG_KEY_MAX, "%s", reg->options[i].key);
+            }
+            count++;
+        }
+    }
+    return count;
 }
 
 /// Does the runtime cell @p b is bound to currently hold the value the registry
