@@ -312,6 +312,36 @@ creg_result_t config_registry_describe_type(const char *key, char *out,
                                             size_t outlen);
 
 /* ============================================================================
+ * SCHEMA INVARIANT VALIDATION
+ * ============================================================================
+ */
+
+/** @brief One schema-consistency violation found by the validator. */
+typedef struct {
+    char key[CREG_KEY_MAX]; ///< The offending key
+    char problem[96];       ///< Human-readable description
+} creg_schema_violation_t;
+
+/**
+ * @brief Validate the registry's internal consistency.
+ *
+ * Three invariants, each catching a class of silent corruption:
+ *  - every typed key's DEFAULT-layer value satisfies its own type constraint
+ *    (the default seed bypasses the set chokepoint, so an out-of-spec curated
+ *    default would otherwise ship unvalidated);
+ *  - every per-mode default for a typed key satisfies its constraint (a failing
+ *    one is silently dropped when applied, so a mode would lose its default);
+ *  - every bound runtime cell equals its key's effective value (a divergence is
+ *    a phantom sync: the engine reads a value the registry does not hold).
+ *
+ * Intended for a CI/unit test (assert the count is zero) and a future
+ * `config doctor`. Writes up to @p max violations into @p out and returns the
+ * total count (0 = consistent), which may exceed @p max.
+ */
+size_t config_registry_validate_schema(creg_schema_violation_t *out,
+                                       size_t max);
+
+/* ============================================================================
  * REGISTRY LIFECYCLE
  * ============================================================================
  */

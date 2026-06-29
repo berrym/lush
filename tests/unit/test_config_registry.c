@@ -945,6 +945,90 @@ TEST(type_untyped_key_accepts_any_well_typed_value) {
 }
 
 /* ============================================================================
+ * Schema invariant validator
+ * ============================================================================
+ */
+
+static bool violation_names(const creg_schema_violation_t *v, size_t n,
+                            const char *key) {
+    for (size_t i = 0; i < n; i++) {
+        if (strcmp(v[i].key, key) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+TEST(validate_schema_clean_when_consistent) {
+    config_registry_register_section(&history_section);
+    /// No type descriptors, no bindings, no mode defaults: nothing to violate.
+    creg_schema_violation_t v[8];
+    ASSERT_EQ(config_registry_validate_schema(v, 8), (size_t)0);
+}
+
+TEST(validate_schema_catches_out_of_spec_default) {
+    config_registry_register_section(&history_section);
+    /// history.size DEFAULT is 10000; constrain it to [0,100] so its own
+    /// default is now out of spec -- the default seed bypasses the set check,
+    /// so only the validator can catch this.
+    creg_type_t t;
+    creg_type_init_int_range(&t, 0, 100);
+    config_registry_set_type("history.size", &t);
+    creg_schema_violation_t v[8];
+    size_t n = config_registry_validate_schema(v, 8);
+    ASSERT_TRUE(n >= 1, "an out-of-spec default must be reported");
+    ASSERT_TRUE(violation_names(v, n < 8 ? n : 8, "history.size"),
+                "the violation names history.size");
+}
+
+TEST(validate_schema_catches_out_of_spec_mode_default) {
+    config_registry_register_section(&history_section);
+    /// Range [0,20000] so the DEFAULT (10000) is fine and only the bad mode
+    /// default violates -- isolates the mode-default check.
+    creg_type_t t;
+    creg_type_init_int_range(&t, 0, 20000);
+    config_registry_set_type("history.size", &t);
+    creg_value_t bad = creg_value_integer(99999);
+    config_registry_set_mode_default("history.size", SHELL_MODE_BASH, &bad);
+    creg_schema_violation_t v[8];
+    size_t n = config_registry_validate_schema(v, 8);
+    ASSERT_TRUE(n >= 1, "an out-of-spec mode default must be reported");
+    ASSERT_TRUE(violation_names(v, n < 8 ? n : 8, "history.size"),
+                "the violation names history.size");
+}
+
+TEST(validate_schema_string_truncation_not_flagged) {
+    config_registry_register_section(&history_section);
+    /// A fixed-buffer string binding: apply_binding truncates the effective
+    /// value to fit, so the cell legitimately holds the truncated copy. The
+    /// validator must compare against the SAME truncation, not the full string,
+    /// or it reports a phantom desync.
+    char buf[8] = {0};
+    config_registry_bind_string("history.file", buf, sizeof(buf));
+    creg_value_t longv = creg_value_string("a_very_long_history_path");
+    ASSERT_EQ(config_registry_set("history.file", &longv), CREG_SUCCESS);
+    /// buf now holds the 7-char truncation; effective is the full string.
+    creg_schema_violation_t v[8];
+    ASSERT_EQ(config_registry_validate_schema(v, 8), (size_t)0);
+}
+
+TEST(validate_schema_catches_bound_cell_desync) {
+    config_registry_register_section(&history_section);
+    int cell = 10000; /// matches the DEFAULT effective value
+    config_registry_bind_integer("history.size", &cell);
+    creg_schema_violation_t v[8];
+    ASSERT_EQ(config_registry_validate_schema(v, 8), (size_t)0);
+
+    /// Change the cell out of band (as a stray writer would): now the bound
+    /// cell no longer equals the effective value.
+    cell = 42;
+    size_t n = config_registry_validate_schema(v, 8);
+    ASSERT_TRUE(n >= 1, "a desynced bound cell must be reported");
+    ASSERT_TRUE(violation_names(v, n < 8 ? n : 8, "history.size"),
+                "the violation names history.size");
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -1018,6 +1102,12 @@ int main(void) {
     RUN_TEST(type_int_range_open_ended_describe);
     RUN_TEST(type_set_type_rejects_storage_mismatch);
     RUN_TEST(type_untyped_key_accepts_any_well_typed_value);
+
+    RUN_TEST(validate_schema_clean_when_consistent);
+    RUN_TEST(validate_schema_catches_out_of_spec_default);
+    RUN_TEST(validate_schema_catches_out_of_spec_mode_default);
+    RUN_TEST(validate_schema_string_truncation_not_flagged);
+    RUN_TEST(validate_schema_catches_bound_cell_desync);
 
     return TEST_RESULT();
 }
