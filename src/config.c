@@ -2627,11 +2627,57 @@ int config_load_file(const char *path) {
     /// through the registry; there is no legacy INI parser and no INI fallback
     /// on a parse failure -- a malformed file reports an error rather than
     /// silently misreading.
-    if (config_registry_load(path) != CREG_SUCCESS) {
+    creg_load_report_t report;
+    if (config_registry_load_reported(path, &report) != CREG_SUCCESS) {
         shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
                          SOURCE_LOC_UNKNOWN,
                          "failed to parse TOML config file: %s", path);
         return -1;
+    }
+
+    /// The registry drops a key it rejects (unknown, wrong kind, out of spec)
+    /// so one bad line does not abort the file -- but the interactive surface
+    /// errors on the same value, so report the dropped keys here too rather
+    /// than ignoring them silently.
+    if (report.skip_count > 0) {
+        char msg[640];
+        static const char MORE[] = ", ...";
+        /// Reserve trailing room so the truncation marker always fits, whatever
+        /// cuts the list short.
+        const size_t limit = sizeof(msg) - sizeof(MORE);
+        size_t off = (size_t)snprintf(
+            msg, sizeof(msg), "%s: ignored %zu invalid config key%s: ", path,
+            report.skip_count, report.skip_count == 1 ? "" : "s");
+        if (off > limit) {
+            off = limit;
+        }
+        /// Cap the list at the recorded array; either this cap or the message
+        /// byte budget can cut it, and both must be flagged.
+        size_t shown = report.skip_count < CREG_LOAD_SKIP_MAX
+                           ? report.skip_count
+                           : CREG_LOAD_SKIP_MAX;
+        size_t listed = 0;
+        while (listed < shown) {
+            const char *why =
+                report.skipped[listed].reason == CREG_ERROR_NOT_FOUND
+                    ? "unknown key"
+                : report.skipped[listed].reason == CREG_ERROR_TYPE_MISMATCH
+                    ? "wrong value type"
+                    : "invalid value";
+            int n =
+                snprintf(msg + off, sizeof(msg) - off, "%s%s (%s)",
+                         listed ? ", " : "", report.skipped[listed].key, why);
+            if (n < 0 || off + (size_t)n > limit) {
+                break; /// keep the reserved room for the marker
+            }
+            off += (size_t)n;
+            listed++;
+        }
+        if (listed < report.skip_count) {
+            snprintf(msg + off, sizeof(msg) - off, "%s", MORE);
+        }
+        shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                         SOURCE_LOC_UNKNOWN, "%s", msg);
     }
 
     config_registry_sync_to_runtime();
