@@ -629,6 +629,30 @@ creg_result_t config_registry_unsubscribe(creg_change_callback_t callback);
  * ============================================================================
  */
 
+/** @brief Max per-load skipped keys recorded in a creg_load_report_t. */
+#define CREG_LOAD_SKIP_MAX 32
+
+/** @brief One key the load dropped, and why (NOT_FOUND / TYPE_MISMATCH /
+ * INVALID_VALUE). */
+typedef struct {
+    char key[CREG_KEY_MAX];
+    creg_result_t reason;
+} creg_load_skip_t;
+
+/**
+ * @brief Report of keys a load dropped, for surfacing to the user.
+ *
+ * A load skips a key the registry rejects -- an unknown key, a wrong-kind
+ * value, or one that fails its type constraint -- so a single bad line does not
+ * abort the file. Without a report these skips are silent, diverging from the
+ * interactive `config set` path, which errors. (Keys skipped because they are
+ * persisted=false are by design and are NOT recorded.)
+ */
+typedef struct {
+    creg_load_skip_t skipped[CREG_LOAD_SKIP_MAX];
+    size_t skip_count; ///< Total skips, may exceed CREG_LOAD_SKIP_MAX
+} creg_load_report_t;
+
 /**
  * @brief Load configuration from a TOML file
  *
@@ -639,6 +663,16 @@ creg_result_t config_registry_unsubscribe(creg_change_callback_t callback);
  * @return CREG_SUCCESS on success
  */
 creg_result_t config_registry_load(const char *path);
+
+/**
+ * @brief Load configuration from a TOML file, recording dropped keys.
+ *
+ * Like config_registry_load, but if @p report is non-NULL it is filled with the
+ * keys the load dropped (and why), so the caller can warn the user. @p report
+ * is zeroed first. Pass NULL for the silent behavior of config_registry_load.
+ */
+creg_result_t config_registry_load_reported(const char *path,
+                                            creg_load_report_t *report);
 
 /**
  * @brief Save configuration to a TOML file

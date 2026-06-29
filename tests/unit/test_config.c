@@ -983,6 +983,94 @@ TEST(config_set_validates_increment_two_keys) {
     config_registry_reset("behavior.loop_failure_streak");
 }
 
+/// Capture the STDERR of config_load_file(@p path) into @p out.
+static void capture_load_file_stderr(const char *path, char *out, size_t n) {
+    fflush(stderr);
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        if (n)
+            out[0] = '\0';
+        return;
+    }
+    int saved = dup(STDERR_FILENO);
+    dup2(pipefd[1], STDERR_FILENO);
+    close(pipefd[1]);
+    config_load_file(path);
+    fflush(stderr);
+    dup2(saved, STDERR_FILENO);
+    close(saved);
+    ssize_t r = read(pipefd[0], out, n - 1);
+    close(pipefd[0]);
+    out[r > 0 ? (size_t)r : 0] = '\0';
+}
+
+static void write_temp_toml(char *path_template, const char *contents) {
+    int fd = mkstemp(path_template);
+    if (fd >= 0) {
+        FILE *f = fdopen(fd, "w");
+        if (f) {
+            fputs(contents, f);
+            fclose(f);
+        }
+    }
+}
+
+TEST(config_load_file_warns_on_dropped_keys) {
+    config_init();
+
+    /// Two distinct rejections: an out-of-range typed value (INVALID_VALUE) and
+    /// an unknown key (NOT_FOUND). config_load_file warns naming both and tags
+    /// each reason (the interactive surface errors on the same values, so the
+    /// load surface must not be silent).
+    char bad[] = "/tmp/lush_loadwarn_XXXXXX";
+    write_temp_toml(bad,
+                    "[display]\noptimization_level = 99\nno_such_key = 1\n");
+    char out[512];
+    capture_load_file_stderr(bad, out, sizeof(out));
+    unlink(bad);
+    ASSERT_TRUE(strstr(out, "ignored") != NULL &&
+                    strstr(out, "optimization_level") != NULL,
+                "config_load_file warns and names the out-of-range key");
+    ASSERT_TRUE(strstr(out, "no_such_key") != NULL &&
+                    strstr(out, "unknown key") != NULL,
+                "config_load_file names the unknown key and its reason");
+
+    /// A clean config produces no drop warning.
+    char clean[] = "/tmp/lush_loadclean_XXXXXX";
+    write_temp_toml(clean, "[display]\noptimization_level = 2\n");
+    char out2[256];
+    capture_load_file_stderr(clean, out2, sizeof(out2));
+    unlink(clean);
+    ASSERT_TRUE(strstr(out2, "ignored") == NULL,
+                "a clean config emits no drop warning");
+}
+
+TEST(config_load_file_truncates_long_drop_list) {
+    config_init();
+
+    /// Enough dropped keys that the rendered list overflows the message buffer
+    /// before the array cap (the byte budget, not CREG_LOAD_SKIP_MAX, is what
+    /// truncates). The warning must still terminate with the "..." marker so
+    /// the user knows the list was cut, and must stay within its fixed buffer.
+    char body[2048];
+    size_t off = (size_t)snprintf(body, sizeof(body), "[display]\n");
+    for (int i = 0; i < 24; i++) {
+        off += (size_t)snprintf(body + off, sizeof(body) - off,
+                                "removed_phantom_setting_number_%02d = %d\n", i,
+                                i);
+    }
+    char bad[] = "/tmp/lush_loadtrunc_XXXXXX";
+    write_temp_toml(bad, body);
+    char out[1024];
+    capture_load_file_stderr(bad, out, sizeof(out));
+    unlink(bad);
+
+    ASSERT_TRUE(strstr(out, "ignored 24") != NULL,
+                "the warning reports the full dropped-key count");
+    ASSERT_TRUE(strstr(out, "...") != NULL,
+                "a list cut by the byte budget is marked truncated");
+}
+
 TEST(config_show_shell_lists_options_not_features) {
     config_init();
 
@@ -1345,6 +1433,8 @@ int main(void) {
     RUN_TEST(schema_invariant_holds_on_real_config);
     RUN_TEST(all_typed_keys_attach);
     RUN_TEST(config_set_validates_increment_two_keys);
+    RUN_TEST(config_load_file_warns_on_dropped_keys);
+    RUN_TEST(config_load_file_truncates_long_drop_list);
     RUN_TEST(config_show_shell_lists_options_not_features);
     RUN_TEST(config_get_bool_default);
     RUN_TEST(config_get_int_default);

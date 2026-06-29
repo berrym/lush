@@ -1029,6 +1029,62 @@ TEST(validate_schema_catches_bound_cell_desync) {
 }
 
 /* ============================================================================
+ * Load report (dropped keys)
+ * ============================================================================
+ */
+
+TEST(load_reported_records_dropped_keys) {
+    config_registry_register_section(&history_section);
+    creg_type_t small;
+    creg_type_init_int_range(&small, 0, 100);
+    config_registry_set_type("history.size", &small);
+
+    char tmpfile[] = "/tmp/lush_load_report_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ASSERT_TRUE(fd >= 0, "temp file created");
+    FILE *f = fdopen(fd, "w");
+    /// enabled=false is valid; size=999 fails [0,100]; bogus is unknown.
+    fputs("[history]\nenabled = false\nsize = 999\nbogus = 5\n", f);
+    fclose(f);
+
+    creg_load_report_t report;
+    ASSERT_EQ(config_registry_load_reported(tmpfile, &report), CREG_SUCCESS);
+    unlink(tmpfile);
+
+    ASSERT_EQ(report.skip_count, (size_t)2);
+    bool saw_invalid = false, saw_unknown = false;
+    for (size_t i = 0; i < report.skip_count && i < CREG_LOAD_SKIP_MAX; i++) {
+        if (strcmp(report.skipped[i].key, "history.size") == 0 &&
+            report.skipped[i].reason == CREG_ERROR_INVALID_VALUE) {
+            saw_invalid = true;
+        }
+        if (strcmp(report.skipped[i].key, "history.bogus") == 0 &&
+            report.skipped[i].reason == CREG_ERROR_NOT_FOUND) {
+            saw_unknown = true;
+        }
+    }
+    ASSERT_TRUE(saw_invalid,
+                "the out-of-range value is recorded as INVALID_VALUE");
+    ASSERT_TRUE(saw_unknown, "the unknown key is recorded as NOT_FOUND");
+
+    /// The valid key still loaded despite the two bad ones.
+    bool enabled = true;
+    config_registry_get_boolean("history.enabled", &enabled);
+    ASSERT_TRUE(enabled == false, "a valid key still loads past the bad keys");
+
+    /// The plain config_registry_load (NULL report) skips silently with no
+    /// crash -- the report is opt-in.
+    char tmp2[] = "/tmp/lush_load_silent_XXXXXX";
+    int fd2 = mkstemp(tmp2);
+    ASSERT_TRUE(fd2 >= 0, "second temp file created");
+    FILE *f2 = fdopen(fd2, "w");
+    fputs("[history]\nbogus = 7\n", f2);
+    fclose(f2);
+    ASSERT_EQ(config_registry_load(tmp2), CREG_SUCCESS);
+    unlink(tmp2);
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -1108,6 +1164,7 @@ int main(void) {
     RUN_TEST(validate_schema_catches_out_of_spec_mode_default);
     RUN_TEST(validate_schema_string_truncation_not_flagged);
     RUN_TEST(validate_schema_catches_bound_cell_desync);
+    RUN_TEST(load_reported_records_dropped_keys);
 
     return TEST_RESULT();
 }

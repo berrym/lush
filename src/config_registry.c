@@ -1017,6 +1017,8 @@ creg_result_t config_registry_unsubscribe(creg_change_callback_t callback) {
 typedef struct {
     creg_result_t result;
     char error_msg[256];
+    creg_load_report_t
+        *report; ///< Optional: records dropped keys (NULL = none)
 } load_context_t;
 
 /// @brief TOML parser callback for loading config
@@ -1078,11 +1080,21 @@ static toml_result_t load_callback(const char *section, const char *key,
     /// A single bad key must not abort loading the rest of the file. Skip the
     /// expected per-key rejections -- an unknown key (NOT_FOUND), a wrong-kind
     /// value (TYPE_MISMATCH), or one that fails its type's constraint
-    /// (INVALID_VALUE) -- and leave the prior layer's value in place. Only a
-    /// structural error (e.g. out of memory) propagates as a load failure.
-    if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND &&
-        result != CREG_ERROR_TYPE_MISMATCH &&
-        result != CREG_ERROR_INVALID_VALUE) {
+    /// (INVALID_VALUE) -- and leave the prior layer's value in place. Record
+    /// each in the report (if any) so the caller can warn; only a structural
+    /// error (e.g. out of memory) propagates as a load failure.
+    if (result == CREG_ERROR_NOT_FOUND || result == CREG_ERROR_TYPE_MISMATCH ||
+        result == CREG_ERROR_INVALID_VALUE) {
+        if (ctx->report) {
+            if (ctx->report->skip_count < CREG_LOAD_SKIP_MAX) {
+                creg_load_skip_t *s =
+                    &ctx->report->skipped[ctx->report->skip_count];
+                snprintf(s->key, sizeof(s->key), "%s", full_key);
+                s->reason = result;
+            }
+            ctx->report->skip_count++;
+        }
+    } else if (result != CREG_SUCCESS) {
         ctx->result = result;
         snprintf(ctx->error_msg, sizeof(ctx->error_msg), "Error setting '%s'",
                  full_key);
@@ -1097,6 +1109,14 @@ static toml_result_t load_callback(const char *section, const char *key,
  */
 
 creg_result_t config_registry_load(const char *path) {
+    return config_registry_load_reported(path, NULL);
+}
+
+creg_result_t config_registry_load_reported(const char *path,
+                                            creg_load_report_t *report) {
+    if (report) {
+        report->skip_count = 0;
+    }
     if (!path) {
         return CREG_ERROR_INVALID_PARAM;
     }
@@ -1138,7 +1158,7 @@ creg_result_t config_registry_load(const char *path) {
         return CREG_ERROR_PARSE_FAILED;
     }
 
-    load_context_t ctx = {.result = CREG_SUCCESS};
+    load_context_t ctx = {.result = CREG_SUCCESS, .report = report};
     toml_result = toml_parser_parse(&parser, load_callback, &ctx);
 
     toml_parser_cleanup(&parser);
