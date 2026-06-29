@@ -859,6 +859,78 @@ TEST(config_set_validates_typed_keys) {
     config_registry_reset("display.optimization_level");
 }
 
+/// Run config_registry_validate_schema and print any violations to stderr.
+static size_t report_schema_violations(const char *label) {
+    creg_schema_violation_t v[64];
+    size_t n = config_registry_validate_schema(v, 64);
+    for (size_t i = 0; i < n && i < 64; i++) {
+        fprintf(stderr, "  [%s] schema violation: %s -- %s\n", label, v[i].key,
+                v[i].problem);
+    }
+    return n;
+}
+
+TEST(schema_invariant_holds_on_real_config) {
+    /// Hermetic w.r.t. the user config: point HOME/XDG at an empty dir so
+    /// config_init loads no developer or CI lushrc. (The system path
+    /// /etc/lush/lushrc.toml is not isolated; it is assumed absent in the build
+    /// environment.) strdup the saved env -- a real HOME path can exceed any
+    /// fixed buffer, and a truncated restore would corrupt later tests.
+    char tmpl[] = "/tmp/lush_schema_home_XXXXXX";
+    char *home = mkdtemp(tmpl);
+    ASSERT_TRUE(home != NULL, "temp HOME created");
+    char *saved_home = getenv("HOME");
+    char *saved_xdg = getenv("XDG_CONFIG_HOME");
+    char *keep_home = saved_home ? strdup(saved_home) : NULL;
+    char *keep_xdg = saved_xdg ? strdup(saved_xdg) : NULL;
+    setenv("HOME", home, 1);
+    setenv("XDG_CONFIG_HOME", home, 1);
+
+    /// Start from a clean registry: the suite's earlier config_init calls
+    /// accumulate bindings (config_init does not reset the registry), which
+    /// would double-count. A fresh cleanup+init mirrors a production startup.
+    config_registry_cleanup();
+    config_init();
+
+    /// The real configuration must be schema-consistent: every typed key's
+    /// default and mode-defaults satisfy their constraints (mode-independent),
+    /// and every bound runtime cell equals its key's effective value. The
+    /// bound-cell check sees only the ACTIVE mode's effective value, so switch
+    /// through every mode and re-check: this exercises each mode's binding
+    /// round-trip (e.g. an enum mode-default the binding maps through its pair
+    /// table into the cell).
+    size_t total = report_schema_violations("init");
+    shell_mode_t modes[] = {SHELL_MODE_LUSH, SHELL_MODE_BASH, SHELL_MODE_ZSH,
+                            SHELL_MODE_POSIX};
+    for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
+        apply_mode_preset(modes[i]);
+        total += report_schema_violations(shell_mode_name(modes[i]));
+    }
+
+    /// Restore the environment and re-init from it before asserting, so a
+    /// failure's longjmp does not leave HOME pointing at the temp dir for later
+    /// tests.
+    if (keep_home) {
+        setenv("HOME", keep_home, 1);
+    } else {
+        unsetenv("HOME");
+    }
+    if (keep_xdg) {
+        setenv("XDG_CONFIG_HOME", keep_xdg, 1);
+    } else {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+    free(keep_home);
+    free(keep_xdg);
+    config_registry_cleanup();
+    config_init();
+    (void)rmdir(home); /// empty dir; config_init only reads under HOME
+
+    ASSERT_EQ(total, (size_t)0,
+              "the registry schema must be internally consistent across all "
+              "modes (see stderr)");
+}
+
 TEST(all_typed_keys_attach) {
     config_init();
 
@@ -1270,6 +1342,7 @@ int main(void) {
     RUN_TEST(argv_shell_options_hydrate_to_session);
     RUN_TEST(config_get_resolves_toggles_from_registry);
     RUN_TEST(config_set_validates_typed_keys);
+    RUN_TEST(schema_invariant_holds_on_real_config);
     RUN_TEST(all_typed_keys_attach);
     RUN_TEST(config_set_validates_increment_two_keys);
     RUN_TEST(config_show_shell_lists_options_not_features);

@@ -1330,6 +1330,153 @@ creg_result_t config_registry_describe_type(const char *key, char *out,
     return CREG_SUCCESS;
 }
 
+/// Does the runtime cell @p b is bound to currently hold the value the registry
+/// resolves as effective for that key? The reverse of apply_binding's forward
+/// write: a mismatch is a phantom sync (the engine reads what the registry does
+/// not hold).
+static bool binding_cell_matches_effective(const binding_t *b,
+                                           const creg_value_t *eff) {
+    switch (b->kind) {
+    case CREG_BIND_BOOL:
+        return eff->type == CREG_VALUE_BOOLEAN &&
+               *(const bool *)b->cell == eff->data.boolean;
+    case CREG_BIND_INT:
+        return eff->type == CREG_VALUE_INTEGER &&
+               *(const int *)b->cell == (int)eff->data.integer;
+    case CREG_BIND_STRING: {
+        if (eff->type != CREG_VALUE_STRING || b->cell_size == 0) {
+            return false;
+        }
+        /// apply_binding writes the cell with snprintf(cell, cell_size, ...),
+        /// truncating to cell_size-1. Compare against the same truncation so a
+        /// legitimately-truncated cell is not flagged -- the reverse must be
+        /// the exact inverse of the forward write.
+        char want[CREG_VALUE_STRING_MAX];
+        snprintf(want,
+                 b->cell_size > sizeof(want) ? sizeof(want) : b->cell_size,
+                 "%s", eff->data.string);
+        return strcmp((const char *)b->cell, want) == 0;
+    }
+    case CREG_BIND_STRING_PTR: {
+        if (eff->type != CREG_VALUE_STRING) {
+            return false;
+        }
+        const char *cell = *(const char *const *)b->cell;
+        /// An empty effective string maps to a NULL cell (unset), per
+        /// apply_binding.
+        if (eff->data.string[0] == '\0') {
+            return cell == NULL;
+        }
+        return cell != NULL && strcmp(cell, eff->data.string) == 0;
+    }
+    case CREG_BIND_ENUM_INT: {
+        if (eff->type != CREG_VALUE_STRING || !b->pairs) {
+            return false;
+        }
+        int64_t mapped = b->fallback;
+        for (const creg_enum_pair_t *p = b->pairs; p->name; p++) {
+            if (unicode_streq(p->name, eff->data.string)) {
+                mapped = p->value;
+                break;
+            }
+        }
+        return *(const int *)b->cell == (int)mapped;
+    }
+    }
+    return true;
+}
+
+size_t config_registry_validate_schema(creg_schema_violation_t *out,
+                                       size_t max) {
+    size_t count = 0;
+#define CREG_ADD_VIOLATION(k, ...)                                             \
+    do {                                                                       \
+        if (out && count < max) {                                              \
+            snprintf(out[count].key, sizeof(out[count].key), "%s", (k));       \
+            snprintf(out[count].problem, sizeof(out[count].problem),           \
+                     __VA_ARGS__);                                             \
+        }                                                                      \
+        count++;                                                               \
+    } while (0)
+
+    /// A: a typed key's own DEFAULT-layer value must satisfy its constraint.
+    for (size_t s = 0; s < g_registry.section_count; s++) {
+        registered_section_t *sec = &g_registry.sections[s];
+        for (size_t o = 0; o < sec->option_count; o++) {
+            stored_option_t *opt = &sec->options[o];
+            if (!opt->type || !opt->type->check ||
+                !opt->slots[CREG_LAYER_DEFAULT].present) {
+                continue;
+            }
+            /// Guard the storage kind before the check op reads a fixed union
+            /// member (as the forward funnel does): a wrong-kind default is
+            /// itself a violation, and reporting it avoids the check op
+            /// reinterpreting bytes.
+            if (opt->slots[CREG_LAYER_DEFAULT].value.type !=
+                opt->type->storage) {
+                CREG_ADD_VIOLATION(opt->key,
+                                   "default storage kind does not match its "
+                                   "type");
+                continue;
+            }
+            char reason[64] = {0};
+            if (!opt->type->check(opt->type,
+                                  &opt->slots[CREG_LAYER_DEFAULT].value, reason,
+                                  sizeof(reason))) {
+                CREG_ADD_VIOLATION(opt->key, "default fails its type (%s)",
+                                   reason);
+            }
+        }
+    }
+
+    /// B: every per-mode default for a typed key must satisfy its constraint.
+    for (size_t i = 0; i < g_registry.mode_default_count; i++) {
+        const mode_default_t *md = &g_registry.mode_defaults[i];
+        if (!md->active) {
+            continue;
+        }
+        stored_option_t *opt = find_option(md->key);
+        if (!opt) {
+            CREG_ADD_VIOLATION(md->key, "mode default for an unregistered key");
+            continue;
+        }
+        if (!opt->type || !opt->type->check) {
+            continue;
+        }
+        if (md->value.type != opt->type->storage) {
+            CREG_ADD_VIOLATION(md->key,
+                               "mode default storage kind does not match its "
+                               "type");
+            continue;
+        }
+        char reason[64] = {0};
+        if (!opt->type->check(opt->type, &md->value, reason, sizeof(reason))) {
+            CREG_ADD_VIOLATION(md->key, "mode default fails its type (%s)",
+                               reason);
+        }
+    }
+
+    /// C: every bound runtime cell must equal its key's effective value.
+    for (size_t i = 0; i < g_registry.binding_count; i++) {
+        const binding_t *b = &g_registry.bindings[i];
+        if (!b->active) {
+            continue;
+        }
+        stored_option_t *opt = find_option(b->key);
+        if (!opt) {
+            CREG_ADD_VIOLATION(b->key, "binding to an unregistered key");
+            continue;
+        }
+        const creg_value_t *eff = resolve_effective(opt, NULL);
+        if (!binding_cell_matches_effective(b, eff)) {
+            CREG_ADD_VIOLATION(b->key,
+                               "bound cell out of sync with effective value");
+        }
+    }
+#undef CREG_ADD_VIOLATION
+    return count;
+}
+
 creg_result_t config_registry_reset_section(const char *section_name) {
     registered_section_t *section = find_section(section_name);
     if (!section) {
