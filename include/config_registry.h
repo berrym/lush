@@ -205,6 +205,26 @@ typedef struct {
  */
 
 /**
+ * @brief Discoverability tier for a configuration option.
+ *
+ * Tiers let a surface present a curated subset of the schema rather than the
+ * whole store. The wizard walks CREG_TIER_BEGINNER; a future `config show` can
+ * group by tier. A tier is attached to a key after registration via
+ * config_registry_set_tier (the same pattern as the type vtable). Tier queries
+ * (get_tier / collect_by_tier) match the attached value EXACTLY; a key not yet
+ * curated is CREG_TIER_UNSET, so it is never collected as BEGINNER and never
+ * surfaced to a beginner. Tiers are assigned incrementally; only the curated
+ * beginner set is attached today.
+ */
+typedef enum {
+    CREG_TIER_UNSET = 0, ///< Not yet curated; never BEGINNER
+    CREG_TIER_BEGINNER,  ///< A first-run essential: safe, visible, high-value
+    CREG_TIER_COMMON,    ///< Everyday setting, not first-run essential
+    CREG_TIER_ADVANCED,  ///< Power-user setting
+    CREG_TIER_EXPERT,    ///< Rarely changed; deep behavior or diagnostics
+} creg_tier_t;
+
+/**
  * @brief Configuration option definition
  *
  * Defines a single configuration option with its name, type, default value,
@@ -310,6 +330,49 @@ creg_result_t config_registry_set_type(const char *key,
  */
 creg_result_t config_registry_describe_type(const char *key, char *out,
                                             size_t outlen);
+
+/**
+ * @brief The help text registered for @p key, or NULL if none / unregistered.
+ *
+ * Returns the descriptor's static help pointer (no copy); valid for the life of
+ * the registry. The same text `config show` prints; the wizard prompts with it.
+ */
+const char *config_registry_get_help(const char *key);
+
+/* ============================================================================
+ * DISCOVERABILITY TIER ATTACHMENT
+ * ============================================================================
+ */
+
+/**
+ * @brief Attach a discoverability tier to a registered key.
+ *
+ * Mirrors config_registry_set_type: the tier is metadata a surface reads to
+ * present a curated subset of the schema. A key with no tier attached reports
+ * CREG_TIER_UNSET.
+ *
+ * @return CREG_SUCCESS, or CREG_ERROR_NOT_FOUND if the key is unregistered.
+ */
+creg_result_t config_registry_set_tier(const char *key, creg_tier_t tier);
+
+/**
+ * @brief Read a key's discoverability tier into @p out.
+ *
+ * @return CREG_SUCCESS (with @p out set, CREG_TIER_UNSET if none attached), or
+ *         CREG_ERROR_NOT_FOUND if the key is unregistered.
+ */
+creg_result_t config_registry_get_tier(const char *key, creg_tier_t *out);
+
+/**
+ * @brief Collect the keys attached to @p tier into @p out.
+ *
+ * Walks the live option store in registration order and fills @p out (each row
+ * a full dotted key) with every key whose tier equals @p tier. This is the
+ * schema-generation core the wizard walks. Writes at most @p max rows but
+ * returns the total match count, which may exceed @p max.
+ */
+size_t config_registry_collect_by_tier(creg_tier_t tier,
+                                       char out[][CREG_KEY_MAX], size_t max);
 
 /* ============================================================================
  * SCHEMA INVARIANT VALIDATION

@@ -1106,6 +1106,11 @@ static const struct {
     { "behavior.path_negative_cache_ttl_ms", 0, INT_MAX},
     {        "behavior.loop_failure_streak", 0, INT_MAX},
     {       "behavior.loop_failure_seconds", 0, INT_MAX},
+    /// history.size binds a 32-bit int cell (consumers read `> 0 ? n : 5000`).
+    /// Typed so the wizard and config set reject a negative or > INT_MAX value
+    /// that would otherwise truncate through the binding and silently diverge
+    /// from what the registry stores (the bound-cell == effective invariant).
+    {                        "history.size", 0, INT_MAX},
 };
 
 /// Descriptor storage: one creg_type_t per typed key, filled at registration
@@ -1144,6 +1149,50 @@ static void config_register_types(void) {
                                      &g_range_type_storage[i]) !=
             CREG_SUCCESS) {
             g_type_attach_failures++;
+        }
+    }
+}
+
+/// The curated beginner tier: the handful of settings a new user actually wants
+/// to personalize, each chosen for immediate visible feedback, safe semantics
+/// (changing it cannot break scripting or POSIX expectations), and high
+/// return on personalization. The wizard walks exactly this set. Other keys
+/// stay CREG_TIER_UNSET until tiered incrementally; do not pad this list --
+/// every addition needs the same three-part justification. This is an
+/// attachment set, not a presentation order: collect_by_tier returns the keys
+/// in registration (section) order, which is how the wizard presents them.
+static const char *const k_beginner_keys[] = {
+    "display.syntax_highlighting", ///< color as you type
+    "display.autosuggestions",     ///< history ghost suggestions
+    "display.transient_prompt",    ///< collapse past prompts, clean scrollback
+    "completion.match_mode",       ///< prefix / substring / fuzzy feel
+    "completion.case_sensitive",   ///< everyday completion behavior
+    "history.size",                ///< how much history to keep
+    "history.no_dups",             ///< drop duplicate history entries
+    "behavior.auto_cd",            ///< cd by typing a bare directory name
+    "behavior.confirm_exit",       ///< guard against an accidental exit
+    "behavior.spell_correction",   ///< offer corrections for mistyped commands
+};
+
+/// Count of beginner tiers that failed to attach -- nonzero means a key above
+/// is misspelled or unregistered, so the wizard would silently skip it. A test
+/// asserts this is zero; the getter exposes it.
+static int g_tier_attach_failures = 0;
+
+int config_tier_attach_failure_count(void) { return g_tier_attach_failures; }
+
+/// Attach discoverability tiers to registered keys. Called from config_init
+/// after config_register_sections so the keys exist. Mirrors
+/// config_register_types -- tiers are schema metadata attached
+/// post-registration at the same point, read by the wizard (and a future
+/// tier-grouped show).
+static void config_register_tiers(void) {
+    g_tier_attach_failures = 0;
+    for (size_t i = 0; i < sizeof(k_beginner_keys) / sizeof(k_beginner_keys[0]);
+         i++) {
+        if (config_registry_set_tier(k_beginner_keys[i], CREG_TIER_BEGINNER) !=
+            CREG_SUCCESS) {
+            g_tier_attach_failures++;
         }
     }
 }
@@ -2137,6 +2186,10 @@ int config_init(void) {
     /// Attach type descriptors so the registry validates writes at its set
     /// chokepoint. Must come after section registration (the keys must exist).
     config_register_types();
+
+    /// Attach discoverability tiers (the wizard's beginner set). Must come
+    /// after section registration (the keys must exist).
+    config_register_tiers();
 
     /// Register per-mode default overrides. Must come after section
     /// registration (the options must exist before per-mode defaults
@@ -3215,6 +3268,7 @@ void builtin_config(int argc, char **argv) {
         printf("  show [section]     - Show configuration values\n");
         printf("  set key value      - Set configuration value\n");
         printf("  get key            - Get configuration value\n");
+        printf("  wizard             - Guided setup of common settings\n");
         printf("  reload             - Reload configuration files\n");
         printf("  save               - Save current configuration\n");
         printf("  migrate            - Migrate legacy ~/.lushrc to XDG "
@@ -3317,6 +3371,8 @@ void builtin_config(int argc, char **argv) {
             return;
         }
         config_explain_value(argv[2]);
+    } else if (strcmp(argv[1], "wizard") == 0) {
+        config_wizard_run();
     } else if (strcmp(argv[1], "set") == 0) {
         if (argc < 4) {
             shell_error_emit(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_WARNING,
@@ -3373,7 +3429,7 @@ void builtin_config(int argc, char **argv) {
  * @param out   Receives the parsed boolean on success
  * @return true if recognized, false otherwise
  */
-static bool config_parse_bool_text(const char *value, bool *out) {
+bool config_parse_bool_text(const char *value, bool *out) {
     if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
         strcmp(value, "on") == 0 || strcmp(value, "yes") == 0) {
         *out = true;

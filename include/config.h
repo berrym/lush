@@ -395,6 +395,40 @@ int config_init(void);
 int config_type_attach_failure_count(void);
 
 /**
+ * @brief Count of discoverability tiers that failed to attach.
+ *
+ * Zero in a correct build. Nonzero means a key in the beginner-tier table is
+ * misspelled or unregistered, so the wizard would silently skip it. A unit test
+ * asserts this is zero.
+ *
+ * @return Count of failed tier attachments from the most recent
+ * config_register.
+ */
+int config_tier_attach_failure_count(void);
+
+/**
+ * @brief Parse a textual boolean as the config builtin does.
+ *
+ * Accepts true/1/on/yes and false/0/off/no. Shared so the wizard parses
+ * booleans identically to `config set`.
+ *
+ * @return true if recognized (with @p out set), false otherwise.
+ */
+bool config_parse_bool_text(const char *value, bool *out);
+
+/**
+ * @brief Run the interactive configuration wizard.
+ *
+ * Walks the curated beginner tier (config_registry_collect_by_tier), prompting
+ * for each setting with its help text, current value, and valid values, and
+ * applies each answer to the SESSION layer live. Offers to persist at the end.
+ * Requires an interactive terminal.
+ *
+ * @return 0 on completion (including a user cancel), -1 if not interactive.
+ */
+int config_wizard_run(void);
+
+/**
  * @brief Load user configuration file
  *
  * Loads configuration from the user's home directory.
