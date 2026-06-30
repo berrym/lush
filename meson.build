@@ -2650,9 +2650,12 @@ if fs.exists('tests/unit/test_config.c')
                            test_config_sources + lle_shell_sources,
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep, libm])
+  # ~24s locally across 64 tests, many of which re-run config_init (register
+  # every section, apply each mode); a 30s ceiling left too little headroom and
+  # timed out on a loaded macOS CI runner. 120 matches the other heavy suites.
   test('Configuration System', test_config,
        suite: 'unit',
-       timeout: 30)
+       timeout: 120)
 endif
 
 # POSIX Options Tests
