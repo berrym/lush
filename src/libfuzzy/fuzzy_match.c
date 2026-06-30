@@ -375,6 +375,87 @@ int fuzzy_damerau_levenshtein_distance(const char *s1, const char *s2,
     return damerau_levenshtein_codepoints(&cp1, &cp2, opts->max_distance);
 }
 
+/// Damerau-Levenshtein over codepoints with per-operation weights. Identical to
+/// damerau_levenshtein_codepoints except each edit class carries its own cost,
+/// so a caller can make one class cheaper. The result is comparable only to
+/// other results computed with the same weights.
+static int weighted_damerau_codepoints(const codepoint_array_t *s1,
+                                       const codepoint_array_t *s2, int w_ins,
+                                       int w_del, int w_sub, int w_trans) {
+    int len1 = s1->length;
+    int len2 = s2->length;
+    if (len1 == 0)
+        return len2 * w_ins;
+    if (len2 == 0)
+        return len1 * w_del;
+
+    int **d = malloc((size_t)(len1 + 1) * sizeof(int *));
+    if (!d)
+        return (len1 + len2) * w_sub;
+    for (int i = 0; i <= len1; i++) {
+        d[i] = malloc((size_t)(len2 + 1) * sizeof(int));
+        if (!d[i]) {
+            for (int j = 0; j < i; j++)
+                free(d[j]);
+            free(d);
+            return (len1 + len2) * w_sub;
+        }
+    }
+
+    for (int i = 0; i <= len1; i++)
+        d[i][0] = i * w_del;
+    for (int j = 0; j <= len2; j++)
+        d[0][j] = j * w_ins;
+
+    int result = 0;
+    for (int i = 1; i <= len1; i++) {
+        for (int j = 1; j <= len2; j++) {
+            int sub =
+                (s1->codepoints[i - 1] == s2->codepoints[j - 1]) ? 0 : w_sub;
+            d[i][j] = min3(d[i - 1][j] + w_del, d[i][j - 1] + w_ins,
+                           d[i - 1][j - 1] + sub);
+            if (i > 1 && j > 1 &&
+                s1->codepoints[i - 1] == s2->codepoints[j - 2] &&
+                s1->codepoints[i - 2] == s2->codepoints[j - 1]) {
+                d[i][j] = min2(d[i][j], d[i - 2][j - 2] + w_trans);
+            }
+            if (i == len1 && j == len2) {
+                result = d[i][j];
+            }
+        }
+    }
+
+    for (int i = 0; i <= len1; i++)
+        free(d[i]);
+    free(d);
+    return result;
+}
+
+int fuzzy_weighted_edit_distance(const char *s1, const char *s2,
+                                 const fuzzy_match_options_t *options) {
+    if (!s1 && !s2)
+        return 0;
+    if (!s1)
+        return (int)strlen(s2) * 10;
+    if (!s2)
+        return (int)strlen(s1) * 10;
+
+    const fuzzy_match_options_t *opts =
+        options ? options : &FUZZY_MATCH_DEFAULT;
+
+    codepoint_array_t cp1, cp2;
+    if (decode_to_codepoints(s1, &cp1, opts) < 0 ||
+        decode_to_codepoints(s2, &cp2, opts) < 0) {
+        return abs((int)strlen(s1) - (int)strlen(s2)) * 10;
+    }
+
+    /// Insertion/deletion/substitution cost 10; transposition costs 9. An
+    /// adjacent-character swap ("gti" for "git") is the most common typo, so
+    /// the genuine word beats an unrelated single-substitution neighbour
+    /// ("gtr") that would otherwise tie it at one plain edit.
+    return weighted_damerau_codepoints(&cp1, &cp2, 10, 10, 10, 9);
+}
+
 /* ============================================================================
  * JARO AND JARO-WINKLER SIMILARITY
  * ============================================================================

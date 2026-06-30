@@ -137,6 +137,26 @@ int fuzzy_damerau_levenshtein_distance(const char *s1, const char *s2,
                                        const fuzzy_match_options_t *options);
 
 /**
+ * Calculate a typo-weighted Damerau-Levenshtein distance
+ *
+ * Like fuzzy_damerau_levenshtein_distance, but transposition costs slightly
+ * less than insertion/deletion/substitution (9 vs 10), because an
+ * adjacent-character swap is the most common typo. Used to RANK
+ * spell-correction candidates so a transposition typo ("gti") prefers the real
+ * word ("git", one transposition) over an unrelated single-substitution
+ * neighbour ("gtr"), which a plain edit distance ties. The result scales op
+ * costs by 10, so it is comparable only against other
+ * fuzzy_weighted_edit_distance results, not a plain distance.
+ *
+ * @param s1      First string (UTF-8)
+ * @param s2      Second string (UTF-8)
+ * @param options Matching options (NULL for defaults)
+ * @return Weighted edit distance (lower is closer)
+ */
+int fuzzy_weighted_edit_distance(const char *s1, const char *s2,
+                                 const fuzzy_match_options_t *options);
+
+/**
  * Calculate Jaro similarity
  *
  * Measures character matches within a sliding window, accounting for

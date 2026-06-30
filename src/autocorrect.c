@@ -20,6 +20,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +48,8 @@ static char *learned_commands[MAX_LEARNED_COMMANDS];
 static int learned_commands_count = 0;
 
 /// Forward declarations for internal helper functions
-static void sort_corrections_by_score(correction_t *corrections, int count);
+/// (autocorrect_sort_corrections_by_rank is declared in autocorrect.h so a test
+/// can verify the ranking order directly.)
 static bool is_executable_file(const char *path);
 
 /**
@@ -221,8 +223,8 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         }
     }
 
-    /// Sort suggestions by score (highest first)
-    sort_corrections_by_score(temp_suggestions, temp_count);
+    /// Rank suggestions best-first (typo-weighted distance, score as tiebreak)
+    autocorrect_sort_corrections_by_rank(temp_suggestions, temp_count);
 
     /// Copy top suggestions to results, filtering by threshold, max count, and
     /// duplicates
@@ -399,6 +401,25 @@ int autocorrect_similarity_score(const char *command1, const char *command2,
 }
 
 /**
+ * Rank distance between a mistyped command and a candidate (lower = closer).
+ *
+ * The similarity SCORE above is subsequence/prefix-biased and cannot see a
+ * transposition, so it ranks "git" below unrelated prefix-sharing neighbours
+ * for the input "gti". Ranking instead by this typo-weighted edit distance puts
+ * the genuine word first. Score stays as the admission threshold and a
+ * tiebreak.
+ */
+int autocorrect_rank_distance(const char *command1, const char *command2,
+                              bool case_sensitive) {
+    if (!command1 || !command2) {
+        return INT_MAX;
+    }
+    fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
+    opts.case_sensitive = case_sensitive;
+    return fuzzy_weighted_edit_distance(command1, command2, &opts);
+}
+
+/**
  * Add command to learning history
  */
 void autocorrect_learn_command(const char *command) {
@@ -551,15 +572,33 @@ int autocorrect_suggest_builtins(const char *command, correction_t *suggestions,
 
     int builtin_count = sizeof(builtins) / sizeof(builtins[0]);
 
-    for (int i = 0; i < builtin_count && count < max_suggestions; i++) {
+    /// Collect every above-threshold builtin, then rank by typo distance and
+    /// keep the best -- so the closest correction is never lost to array order
+    /// (the PATH source does the same). builtins[] is small enough that the
+    /// local buffer holds them all.
+    correction_t local[64];
+    int found = 0;
+    int local_cap = (int)(sizeof(local) / sizeof(local[0]));
+    for (int i = 0; i < builtin_count && found < local_cap; i++) {
         int score =
             autocorrect_similarity_score(command, builtins[i], case_sensitive);
         if (score >= MIN_SIMILARITY_SCORE) {
-            suggestions[count].command = strdup(builtins[i]);
-            suggestions[count].score = score;
-            suggestions[count].source = "builtin";
-            count++;
+            local[found].command = strdup(builtins[i]);
+            local[found].score = score;
+            local[found].distance =
+                autocorrect_rank_distance(command, builtins[i], case_sensitive);
+            local[found].source = "builtin";
+            found++;
         }
+    }
+
+    autocorrect_sort_corrections_by_rank(local, found);
+    count = found < max_suggestions ? found : max_suggestions;
+    for (int i = 0; i < count; i++) {
+        suggestions[i] = local[i];
+    }
+    for (int i = count; i < found; i++) {
+        free(local[i].command);
     }
 
     return count;
@@ -692,6 +731,9 @@ int autocorrect_suggest_path_commands(const char *command,
                 if (score >= MIN_SIMILARITY_SCORE) {
                     candidates[candidate_count].command = strdup(entry->d_name);
                     candidates[candidate_count].score = score;
+                    candidates[candidate_count].distance =
+                        autocorrect_rank_distance(command, entry->d_name,
+                                                  case_sensitive);
                     candidates[candidate_count].source = "path";
                     candidate_count++;
                 }
@@ -704,8 +746,8 @@ int autocorrect_suggest_path_commands(const char *command,
 
     free(path_copy);
 
-    /// Sort candidates by score (descending)
-    sort_corrections_by_score(candidates, candidate_count);
+    /// Rank candidates best-first (typo-weighted distance, score as tiebreak)
+    autocorrect_sort_corrections_by_rank(candidates, candidate_count);
 
     /// Copy top results to caller's buffer
     int result_count =
@@ -730,19 +772,35 @@ int autocorrect_suggest_from_history(const char *command,
                                      int max_suggestions, bool case_sensitive) {
     int count = 0;
 
-    /// Check learned commands
-    for (int i = 0; i < learned_commands_count && count < max_suggestions;
-         i++) {
+    /// Collect above-threshold learned commands, then rank by typo distance and
+    /// keep the best -- so the closest correction is not lost to insertion
+    /// order (the PATH source does the same). The local buffer caps how many
+    /// are considered, matching the bounded collection the PATH source uses.
+    correction_t local[64];
+    int found = 0;
+    int local_cap = (int)(sizeof(local) / sizeof(local[0]));
+    for (int i = 0; i < learned_commands_count && found < local_cap; i++) {
         if (learned_commands[i]) {
             int score = autocorrect_similarity_score(
                 command, learned_commands[i], case_sensitive);
             if (score >= MIN_SIMILARITY_SCORE) {
-                suggestions[count].command = strdup(learned_commands[i]);
-                suggestions[count].score = score;
-                suggestions[count].source = "history";
-                count++;
+                local[found].command = strdup(learned_commands[i]);
+                local[found].score = score;
+                local[found].distance = autocorrect_rank_distance(
+                    command, learned_commands[i], case_sensitive);
+                local[found].source = "history";
+                found++;
             }
         }
+    }
+
+    autocorrect_sort_corrections_by_rank(local, found);
+    count = found < max_suggestions ? found : max_suggestions;
+    for (int i = 0; i < count; i++) {
+        suggestions[i] = local[i];
+    }
+    for (int i = count; i < found; i++) {
+        free(local[i].command);
     }
 
     return count;
@@ -830,20 +888,23 @@ void autocorrect_set_debug(bool enabled) { debug_enabled = enabled; }
  * ============================================================================
  */
 
-/**
- * @brief Sort correction suggestions by score in descending order.
- *
- * Uses bubble sort to order corrections from highest to lowest score,
- * ensuring the best matches appear first in the results.
- *
- * @param corrections Array of correction suggestions to sort.
- * @param count Number of corrections in the array.
- */
-static void sort_corrections_by_score(correction_t *corrections, int count) {
-    /// Simple bubble sort by score (descending)
+/// Does correction @p a outrank @p b? Primary key: typo-weighted edit distance
+/// ascending (closest wins -- this is what puts "git" above "gtr" for the input
+/// "gti", which a score-only sort got backwards). Tiebreak: similarity score
+/// descending, so equal-distance candidates fall back to the prefix/subsequence
+/// affinity.
+static bool correction_outranks(const correction_t *a, const correction_t *b) {
+    if (a->distance != b->distance) {
+        return a->distance < b->distance;
+    }
+    return a->score > b->score;
+}
+
+void autocorrect_sort_corrections_by_rank(correction_t *corrections,
+                                          int count) {
     for (int i = 0; i < count - 1; i++) {
         for (int j = 0; j < count - i - 1; j++) {
-            if (corrections[j].score < corrections[j + 1].score) {
+            if (correction_outranks(&corrections[j + 1], &corrections[j])) {
                 correction_t temp = corrections[j];
                 corrections[j] = corrections[j + 1];
                 corrections[j + 1] = temp;

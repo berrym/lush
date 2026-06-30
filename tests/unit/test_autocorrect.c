@@ -260,6 +260,39 @@ TEST(similarity_score_case_insensitive) {
     ASSERT(score >= 90, "Case insensitive identical should match");
 }
 
+TEST(rank_distance_prefers_transposition) {
+    /// The ranking metric must see a transposition typo as closer than an
+    /// unrelated single substitution: "gti" is one swap from "git" but one
+    /// substitution from "gtr". A plain edit distance ties them; the weighted
+    /// distance must put "git" strictly closer, which is what fixes the
+    /// real-world "gti suggests gtr/gtail/gtac instead of git" bug.
+    int d_git = autocorrect_rank_distance("gti", "git", false);
+    int d_gtr = autocorrect_rank_distance("gti", "gtr", false);
+    ASSERT(d_git < d_gtr,
+           "transposition (gti->git) ranks closer than gti->gtr");
+    /// The classic teh->the must likewise beat teh->ten.
+    ASSERT(autocorrect_rank_distance("teh", "the", false) <
+               autocorrect_rank_distance("teh", "ten", false),
+           "transposition (teh->the) ranks closer than teh->ten");
+}
+
+TEST(rank_puts_transposition_first_despite_lower_score) {
+    /// End-to-end ranking: even though "git" has a LOWER similarity score than
+    /// the prefix-sharing neighbours (the exact reason the old score-only sort
+    /// buried it), the distance-primary sort must surface it first. These are
+    /// the real fuzzy_match_score / weighted-distance values for input "gti".
+    correction_t c[3] = {
+        {  .command = "gtr", .score = 70, .distance = 10, .source = "path"},
+        {  .command = "git", .score = 57,  .distance = 9, .source = "path"},
+        {.command = "gtail", .score = 70, .distance = 20, .source = "path"},
+    };
+    autocorrect_sort_corrections_by_rank(c, 3);
+    ASSERT(strcmp(c[0].command, "git") == 0,
+           "git ranks first despite its lower similarity score");
+    ASSERT(strcmp(c[1].command, "gtr") == 0, "gtr second");
+    ASSERT(strcmp(c[2].command, "gtail") == 0, "gtail last");
+}
+
 TEST(levenshtein_unicode_case_insensitive_latin1) {
     /// Latin-1 Supplement: É (U+00C9) folds to é (U+00E9). The byte
     /// length differs from codepoint length, so a byte-by-byte fold
@@ -624,6 +657,8 @@ int main(void) {
     RUN_TEST(similarity_score_identical);
     RUN_TEST(similarity_score_typo);
     RUN_TEST(similarity_score_case_insensitive);
+    RUN_TEST(rank_distance_prefers_transposition);
+    RUN_TEST(rank_puts_transposition_first_despite_lower_score);
     RUN_TEST(levenshtein_unicode_case_insensitive_latin1);
     RUN_TEST(levenshtein_unicode_one_codepoint_typo);
     RUN_TEST(levenshtein_unicode_extended_a);
