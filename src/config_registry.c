@@ -1359,6 +1359,14 @@ const char *config_registry_get_help(const char *key) {
     return opt->option_def->help;
 }
 
+const char *config_registry_get_description(const char *key) {
+    stored_option_t *opt = find_option(key);
+    if (!opt || !opt->option_def) {
+        return NULL;
+    }
+    return opt->option_def->description;
+}
+
 creg_result_t config_registry_set_tier(const char *key, creg_tier_t tier) {
     stored_option_t *opt = find_option(key);
     if (!opt) {

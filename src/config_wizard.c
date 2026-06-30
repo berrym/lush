@@ -138,12 +138,17 @@ static creg_result_t wizard_set(const char *key, const char *input) {
     }
 }
 
-/// Print one key's preamble (help text and valid values) before prompting.
+/// Print one key's preamble (explanation and valid values) before prompting.
+/// The plain-language description is preferred; the terse one-line help is the
+/// fallback for keys that declared no description.
 static void wizard_describe(const char *key, creg_value_type_t type) {
-    const char *help = config_registry_get_help(key);
+    const char *text = config_registry_get_description(key);
+    if (!text || !text[0]) {
+        text = config_registry_get_help(key);
+    }
     printf("\n%s\n", key);
-    if (help && help[0]) {
-        printf("  %s\n", help);
+    if (text && text[0]) {
+        printf("  %s\n", text);
     }
     char choices[160];
     if (config_registry_describe_type(key, choices, sizeof(choices)) ==

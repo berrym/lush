@@ -234,8 +234,13 @@ typedef struct creg_option {
     const char *name;         ///< Option name (e.g., "errexit")
     creg_value_type_t type;   ///< Expected value type
     creg_value_t default_val; ///< Default value
-    const char *help;         ///< Help text for this option
+    const char *help;         ///< Terse one-line help (config show, listings)
     bool persisted;           ///< Whether to save to config file
+    /// Optional longer, plain-language explanation for guided surfaces (the
+    /// setup wizard, commented config saves). NULL falls back to @ref help.
+    /// Unlike the terse @ref help, this may run to a sentence or two and
+    /// addresses someone meeting the setting for the first time.
+    const char *description;
 } creg_option_t;
 
 /* ============================================================================
@@ -338,6 +343,18 @@ creg_result_t config_registry_describe_type(const char *key, char *out,
  * the registry. The same text `config show` prints; the wizard prompts with it.
  */
 const char *config_registry_get_help(const char *key);
+
+/**
+ * @brief The plain-language description for @p key, or NULL if none.
+ *
+ * Returns the descriptor's static description pointer (no copy), or NULL when
+ * the option declared none or @p key is unregistered. Callers wanting a
+ * never-empty string fall back to @ref config_registry_get_help. Consumed by
+ * the setup wizard, and intended for future guided surfaces (commented config
+ * saves) that have room for more than the one-line @ref
+ * config_registry_get_help.
+ */
+const char *config_registry_get_description(const char *key);
 
 /* ============================================================================
  * DISCOVERABILITY TIER ATTACHMENT
