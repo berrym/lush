@@ -228,10 +228,16 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
                          "sigaction SIGCONT failed");
     }
 
-    /// NOTE: We do NOT install SIGINT/SIGTERM handlers here.
+    /// NOTE: We do NOT install SIGINT/SIGTERM/SIGHUP handlers here.
     /// Lush's signal handlers (src/signals.c) manage these properly:
     /// - SIGINT: kills child process OR clears line (but never exits shell)
     /// - SIGTERM: handles graceful shutdown
+    /// - SIGHUP: records a hangup flag; the line editor's input loop
+    ///   (lle_readline.c) consumes it and ends input (returns NULL) so the
+    ///   shell exits through its main loop, running logout scripts and
+    ///   SIGHUP'ing jobs for a login shell. Terminal-layer signals above use
+    ///   SA_RESTART; SIGHUP must NOT, so the read it interrupts returns and the
+    ///   loop can see the flag -- which is why it stays on lush's main handler.
     ///
     /// LLE previously installed handlers that would exit the shell on Ctrl+C,
     /// which is incorrect shell behavior. Now that ISIG is enabled in raw mode,
@@ -438,8 +444,18 @@ lle_result_t lle_unix_interface_exit_raw_mode(lle_unix_interface_t *interface) {
         return LLE_SUCCESS;
     }
 
-    /// Restore original settings
-    if (tcsetattr(interface->terminal_fd, TCSAFLUSH,
+    /// Restore original settings with TCSANOW, NOT TCSAFLUSH. TCSAFLUSH (and
+    /// TCSADRAIN) block until pending output has been transmitted; when the
+    /// controlling terminal has hung up and nothing is draining the other end
+    /// -- exactly the SIGHUP exit path -- that wait never completes and the
+    /// shell wedges here instead of exiting. TCSANOW applies immediately.
+    ///
+    /// Dropping TCSAFLUSH's input-flush is a deliberate, benign behavior
+    /// change: unread input typed while editing now survives into restored
+    /// cooked mode and is delivered to the command about to run (type-ahead),
+    /// matching bash/zsh. Input typed at the NEXT prompt is still discarded --
+    /// the next enter_raw_mode applies its settings with TCSAFLUSH.
+    if (tcsetattr(interface->terminal_fd, TCSANOW,
                   &interface->original_termios) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
         return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
