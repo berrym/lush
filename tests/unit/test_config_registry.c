@@ -542,6 +542,45 @@ TEST(save_sparse_format) {
     unlink(tmpfile);
 }
 
+TEST(save_documents_each_key_with_a_comment) {
+    config_registry_register_section(&shell_section);
+
+    /// Two non-default keys so both are written: mode declares a description,
+    /// errexit declares only help.
+    config_registry_set_string("shell.mode", "bash");
+    config_registry_set_boolean("shell.errexit", true);
+
+    char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    ASSERT(fd >= 0);
+    close(fd);
+    ASSERT_EQ(config_registry_save(tmpfile), CREG_SUCCESS);
+
+    FILE *f = fopen(tmpfile, "r");
+    ASSERT(f != NULL);
+    char content[2048];
+    size_t len = fread(content, 1, sizeof(content) - 1, f);
+    content[len] = '\0';
+    fclose(f);
+    unlink(tmpfile);
+
+    /// A key with a description is commented with the description, not the
+    /// terse help.
+    ASSERT(strstr(content, "# Pick the syntax dialect: bash, zsh, or lush") !=
+           NULL);
+    ASSERT(strstr(content, "# Shell mode") == NULL);
+    ASSERT(strstr(content, "mode = \"bash\"") != NULL);
+
+    /// A key with only help is commented with that help.
+    ASSERT(strstr(content, "# Exit on error") != NULL);
+    ASSERT(strstr(content, "errexit = true") != NULL);
+
+    /// The comment precedes the value it documents.
+    const char *desc = strstr(content, "# Pick the syntax dialect");
+    const char *val = strstr(content, "mode = \"bash\"");
+    ASSERT(desc != NULL && val != NULL && desc < val);
+}
+
 TEST(load_nonexistent_file) {
     creg_result_t result =
         config_registry_load("/nonexistent/path/config.toml");
@@ -1229,6 +1268,7 @@ int main(void) {
     printf("\nPersistence Tests:\n");
     RUN_TEST(save_and_load);
     RUN_TEST(save_sparse_format);
+    RUN_TEST(save_documents_each_key_with_a_comment);
     RUN_TEST(load_nonexistent_file);
     RUN_TEST(load_empty_file);
 
