@@ -205,7 +205,7 @@ static const creg_option_t history_options[] = {
      CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Enable command history", true                                                 },
     {                      "size",
-     CREG_VALUE_INTEGER,        {.type = CREG_VALUE_INTEGER, .data.integer = 1000},
+     CREG_VALUE_INTEGER,       {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
      "Maximum history entries", true                                                },
     {                   "no_dups",
      CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
@@ -1935,7 +1935,7 @@ const char *CONFIG_FILE_TEMPLATE =
     "history.enabled = true\n"
     "\n"
     "# Maximum history entries\n"
-    "history.size = 1000\n"
+    "history.size = 10000\n"
     "\n"
     "# Remove duplicate history entries\n"
     "history.no_dups = true\n"
@@ -2281,9 +2281,11 @@ int config_init(void) {
  * Called during config_init before loading config files.
  */
 void config_set_defaults(void) {
-    /// History defaults
+    /// History defaults. 10000 matches LLE_HISTORY_DEFAULT_CAPACITY (the 0 ->
+    /// "use default" fallback) and the registry DEFAULT layer above; the three
+    /// must agree (a CI schema invariant checks the bound cell == effective).
     config.history_enabled = true;
-    config.history_size = 1000;
+    config.history_size = 10000;
     config.history_no_dups = true;
     config.history_timestamps = false;
     /// Up/down navigation filters by the typed prefix (zsh-style) by default;
