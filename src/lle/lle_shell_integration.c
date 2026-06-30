@@ -128,9 +128,12 @@ static void populate_history_config(lle_history_config_t *hist_config) {
 
     memset(hist_config, 0, sizeof(lle_history_config_t));
 
-    /// Capacity settings
-    hist_config->max_entries =
-        config.history_size > 0 ? config.history_size : 5000;
+    /// Capacity settings. A history.size of 0 means "use the default", so fall
+    /// back to the one shared default (which the config default also uses), not
+    /// a separate literal that could drift from it.
+    hist_config->max_entries = config.history_size > 0
+                                   ? config.history_size
+                                   : LLE_HISTORY_DEFAULT_CAPACITY;
     hist_config->max_command_length = 8192;
 
     /// File settings
