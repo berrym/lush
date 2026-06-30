@@ -242,13 +242,18 @@ TEST(filter_uses_original_prefix_when_provided) {
  * ============================================================================
  */
 
-TEST(filter_invoke_admits_when_no_fn_registered) {
-    /// Save then unset the predicate to verify the open-by-default
-    /// behavior when LLE runs without a shell-side filter (test
-    /// harnesses, early init).
+TEST(filter_invoke_prefix_match_when_no_fn_registered) {
+    /// With no shell predicate (standalone liblle, early init) the invoker
+    /// falls back to an NFC prefix match rather than admitting everything -- so
+    /// the first-word sources that gate on it stay prefix-scoped instead of
+    /// emitting the whole PATH / every builtin.
     lle_completion_set_filter_fn(NULL);
-    ASSERT_TRUE(lle_completion_filter_invoke("anything", "everything"),
-                "no predicate registered -> admit all");
+    ASSERT_TRUE(lle_completion_filter_invoke("ev", "everything"),
+                "no predicate registered -> prefix match admits a prefix");
+    ASSERT_FALSE(lle_completion_filter_invoke("anything", "everything"),
+                 "no predicate registered -> a non-prefix is rejected");
+    ASSERT_TRUE(lle_completion_filter_invoke("", "everything"),
+                "empty prefix still admits all");
     /// Restore for downstream tests.
     lle_completion_set_filter_fn(test_filter_fn);
 }
@@ -286,7 +291,7 @@ int main(int argc, char **argv) {
     RUN_TEST(filter_uses_original_prefix_when_provided);
 
     printf("\nBridge invoke:\n");
-    RUN_TEST(filter_invoke_admits_when_no_fn_registered);
+    RUN_TEST(filter_invoke_prefix_match_when_no_fn_registered);
     RUN_TEST(filter_invoke_rejects_null_candidate);
     RUN_TEST(filter_invoke_admits_when_prefix_empty);
 

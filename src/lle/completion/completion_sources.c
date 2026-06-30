@@ -17,6 +17,7 @@
 #include "alias.h"
 #include "builtins.h"
 #include "ht.h"
+#include "lle/completion/menu_filter.h"
 #include "lle/completion/ssh_hosts.h"
 #include "lle/unicode_compare.h"
 
@@ -54,17 +55,19 @@ bool lle_shell_is_alias(const char *text) {
  * ============================================================================
  */
 
-/// @brief Test whether `prefix` is a prefix of `candidate` using
-/// NFC-aware unicode comparison. Empty prefix matches any
-/// candidate.
-static bool nfc_prefix_match(const char *prefix, const char *candidate) {
+/// @brief Admit a candidate for the typed prefix under the active match mode.
+///
+/// Every first-word source gates candidates here. It routes through the shell's
+/// registered completion predicate (lle_completion_filter_invoke -> completion_
+/// filter_admits), so prefix / substring / fuzzy, case sensitivity, and the
+/// fuzzy threshold all apply to command completion -- not just to the in-menu
+/// narrowing and compadd that consulted it before. With no predicate registered
+/// (standalone liblle) it falls back to an NFC prefix match, the prior
+/// behavior.
+static bool source_admits(const char *prefix, const char *candidate) {
     if (!prefix || !candidate)
         return false;
-    size_t plen = strlen(prefix);
-    if (plen == 0)
-        return true;
-    return lle_unicode_is_prefix(prefix, plen, candidate, strlen(candidate),
-                                 &LLE_UNICODE_COMPARE_DEFAULT);
+    return lle_completion_filter_invoke(prefix, candidate);
 }
 
 /**
@@ -95,7 +98,7 @@ lle_result_t lle_completion_source_builtins(lle_memory_pool_t *pool,
         return LLE_ERROR_INVALID_PARAMETER;
 
     for (size_t i = 0; i < builtins_count; i++) {
-        if (nfc_prefix_match(prefix, builtins[i].name)) {
+        if (source_admits(prefix, builtins[i].name)) {
             lle_result_t r =
                 lle_completion_result_add(result, builtins[i].name, NULL,
                                           LLE_COMPLETION_TYPE_BUILTIN, 900);
@@ -131,7 +134,7 @@ lle_result_t lle_completion_source_aliases(lle_memory_pool_t *pool,
     const char *alias_name = NULL;
     const char *alias_value = NULL;
     while (ht_strstr_enum_next(iter, &alias_name, &alias_value)) {
-        if (alias_name && nfc_prefix_match(prefix, alias_name)) {
+        if (alias_name && source_admits(prefix, alias_name)) {
             lle_result_t r = lle_completion_result_add(
                 result, alias_name, NULL, LLE_COMPLETION_TYPE_ALIAS, 950);
             if (r != LLE_SUCCESS) {
@@ -176,7 +179,7 @@ lle_result_t lle_completion_source_commands(lle_memory_pool_t *pool,
             while ((entry = readdir(d)) != NULL) {
                 if (entry->d_name[0] == '.')
                     continue;
-                if (!nfc_prefix_match(prefix, entry->d_name))
+                if (!source_admits(prefix, entry->d_name))
                     continue;
 
                 size_t path_size = strlen(dir) + strlen(entry->d_name) + 2;
@@ -242,7 +245,7 @@ static lle_result_t files_internal(lle_memory_pool_t *pool,
             continue;
         if (!show_hidden && entry->d_name[0] == '.')
             continue;
-        if (!nfc_prefix_match(prefix, entry->d_name))
+        if (!source_admits(prefix, entry->d_name))
             continue;
 
         size_t path_size = strlen(dir_path) + strlen(entry->d_name) + 2;
@@ -320,7 +323,7 @@ lle_result_t lle_completion_source_variables(lle_memory_pool_t *pool,
         char *var_name = strndup(*env, var_len);
         if (!var_name)
             continue;
-        if (nfc_prefix_match(prefix, var_name)) {
+        if (source_admits(prefix, var_name)) {
             lle_result_t r = lle_completion_result_add(
                 result, var_name, NULL, LLE_COMPLETION_TYPE_VARIABLE, 500);
             if (r != LLE_SUCCESS && final_result == LLE_SUCCESS)
@@ -335,7 +338,7 @@ lle_result_t lle_completion_source_variables(lle_memory_pool_t *pool,
                                          "*", "@", "-", "_"};
     for (size_t i = 0; i < sizeof(special_vars) / sizeof(special_vars[0]);
          i++) {
-        if (nfc_prefix_match(prefix, special_vars[i])) {
+        if (source_admits(prefix, special_vars[i])) {
             lle_result_t r =
                 lle_completion_result_add(result, special_vars[i], NULL,
                                           LLE_COMPLETION_TYPE_VARIABLE, 600);
@@ -425,7 +428,7 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
     for (size_t i = 0; i < cache->count; i++) {
         ssh_host_t *host = &cache->hosts[i];
 
-        if (nfc_prefix_match(host_prefix, host->hostname)) {
+        if (source_admits(host_prefix, host->hostname)) {
             char completion[320];
             if (user_prefix[0]) {
                 /// User typed `alice@...`; preserve their literal user.
@@ -449,7 +452,7 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
 
         /// Aliases (Host-stanza name distinct from HostName) are matched
         /// the same way and emitted with any user prefix preserved.
-        if (host->alias[0] && nfc_prefix_match(host_prefix, host->alias)) {
+        if (host->alias[0] && source_admits(host_prefix, host->alias)) {
             char completion[320];
             if (user_prefix[0]) {
                 snprintf(completion, sizeof(completion), "%s%s", user_prefix,
