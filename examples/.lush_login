@@ -39,7 +39,7 @@ if [ -n "$PS1" ]; then
     # Configure enhanced history for login sessions
     config set history_enabled true
     config set history_size 50000
-    config set history_no_dups true
+    config set lle.enable_deduplication true
     config set history_timestamps true
 
     # Enable advanced features for login shells

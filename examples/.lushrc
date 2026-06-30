@@ -180,7 +180,7 @@ if [ -n "$PS1" ]; then
     # Configure history
     config set history_enabled true
     config set history_size 10000
-    config set history_no_dups true
+    config set lle.enable_deduplication true
 
     # Configure auto-correction
     config set spell_correction true

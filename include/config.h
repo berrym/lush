@@ -269,7 +269,6 @@ typedef struct {
     /// History settings
     bool history_enabled;    ///< Enable command history
     int history_size;        ///< Maximum history entries
-    bool history_no_dups;    ///< Ignore duplicate entries
     bool history_timestamps; ///< Record timestamps
     history_search_mode_t
         history_search_mode; ///< Up/down navigation filter (prefix / plain)
@@ -306,7 +305,6 @@ typedef struct {
     /// Behavior settings
     bool auto_cd;            ///< Auto-cd to directories
     bool spell_correction;   ///< Enable spell correction
-    bool confirm_exit;       ///< Confirm before exit
     int tab_width;           ///< Tab display width
     int brace_expansion_max; ///< Max brace expansion result count (0 =
                              ///< unbounded)

@@ -921,7 +921,6 @@ xtrace = false
 enabled = true
 size = 10000
 file = "~/.local/share/lush/history"
-no_dups = true
 
 [display]
 syntax_highlighting = true

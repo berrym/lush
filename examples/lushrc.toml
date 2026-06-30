@@ -5,7 +5,6 @@
 [history]
 history_enabled = true
 history_size = 1000
-history_no_dups = true
 history_timestamps = false
 history_file = ~/.lush_history
 
@@ -46,7 +45,6 @@ theme_show_department = false
 [behavior]
 auto_cd = false
 spell_correction = true
-confirm_exit = false
 tab_width = 4
 no_word_expand = false
 colors_enabled = true

@@ -138,7 +138,7 @@ static config_option_t config_options[] = {
     /// both are removed.
 
     /// Behavior settings
-    /// behavior.auto_cd, behavior.spell_correction, behavior.confirm_exit are
+    /// behavior.auto_cd, behavior.spell_correction are
     /// migrated to the CREG registry (bound + layered).
     /// behavior.autocorrect_* are migrated to the CREG registry (bound +
     /// layered).
@@ -207,9 +207,6 @@ static const creg_option_t history_options[] = {
     {                      "size",
      CREG_VALUE_INTEGER,       {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
      "Maximum history entries", true                                                },
-    {                   "no_dups",
-     CREG_VALUE_BOOLEAN,        {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Remove duplicate entries", true                                               },
     {                "timestamps",
      CREG_VALUE_BOOLEAN,       {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Record timestamps", true                                                      },
@@ -507,9 +504,6 @@ static const creg_option_t behavior_options[] = {
     {           "spell_correction",
      CREG_VALUE_BOOLEAN,  {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
      "Enable spell correction", true                                              },
-    {               "confirm_exit",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Confirm before exit", true                                                  },
     {                  "tab_width",
      CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 4},
      "Tab width for display", true                                                },
@@ -660,7 +654,6 @@ static const creg_enum_pair_t history_finder_display_pairs[] = {
 static void history_bind_runtime(void) {
     config_registry_bind_boolean("history.enabled", &config.history_enabled);
     config_registry_bind_integer("history.size", &config.history_size);
-    config_registry_bind_boolean("history.no_dups", &config.history_no_dups);
     config_registry_bind_boolean("history.timestamps",
                                  &config.history_timestamps);
     config_registry_bind_enum(
@@ -874,7 +867,6 @@ static void behavior_bind_runtime(void) {
     config_registry_bind_boolean("behavior.auto_cd", &config.auto_cd);
     config_registry_bind_boolean("behavior.spell_correction",
                                  &config.spell_correction);
-    config_registry_bind_boolean("behavior.confirm_exit", &config.confirm_exit);
     /// Limits migrated into CREG from the legacy table. tab_width is read in
     /// display hot paths -- its cell stays the plain config.tab_width int, the
     /// registry just becomes its sole writer.
@@ -1176,10 +1168,9 @@ static const char *const k_beginner_keys[] = {
     "completion.match_mode",       ///< prefix / substring / fuzzy feel
     "completion.case_sensitive",   ///< everyday completion behavior
     "history.size",                ///< how much history to keep
-    "history.no_dups",             ///< drop duplicate history entries
     "behavior.auto_cd",            ///< cd by typing a bare directory name
-    "behavior.confirm_exit",       ///< guard against an accidental exit
     "behavior.spell_correction",   ///< offer corrections for mistyped commands
+    "lle.enable_deduplication",    ///< drop duplicate history entries
 };
 
 /// Count of beginner tiers that failed to attach -- nonzero means a key above
@@ -1330,7 +1321,6 @@ static legacy_option_mapping_t legacy_mappings[] = {
     /// History options
     {            "history_enabled",                      "history.enabled"},
     {               "history_size",                         "history.size"},
-    {            "history_no_dups",                      "history.no_dups"},
     {         "history_timestamps",                   "history.timestamps"},
 
     /// Completion options
@@ -1349,7 +1339,6 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {       "autocorrect_builtins",        "behavior.autocorrect_builtins"},
     {       "autocorrect_external",        "behavior.autocorrect_external"},
     { "autocorrect_case_sensitive",  "behavior.autocorrect_case_sensitive"},
-    {               "confirm_exit",                "behavior.confirm_exit"},
     {                  "tab_width",                   "behavior.tab_width"},
     {        "brace_expansion_max",         "behavior.brace_expansion_max"},
     {          "regex_pattern_max",           "behavior.regex_pattern_max"},
@@ -1945,9 +1934,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Maximum history entries\n"
     "history.size = 10000\n"
     "\n"
-    "# Remove duplicate history entries\n"
-    "history.no_dups = true\n"
-    "\n"
     "# Add timestamps to history\n"
     "history.timestamps = false\n"
     "\n"
@@ -2064,9 +2050,6 @@ const char *CONFIG_FILE_TEMPLATE =
     "\n"
     "# Case-sensitive auto-correction\n"
     "behavior.autocorrect_case_sensitive = false\n"
-    "\n"
-    "# Confirm before exiting\n"
-    "behavior.confirm_exit = false\n"
     "\n"
     "# Tab width for display\n"
     "behavior.tab_width = 4\n"
@@ -2294,7 +2277,6 @@ void config_set_defaults(void) {
     /// must agree (a CI schema invariant checks the bound cell == effective).
     config.history_enabled = true;
     config.history_size = 10000;
-    config.history_no_dups = true;
     config.history_timestamps = false;
     /// Up/down navigation filters by the typed prefix (zsh-style) by default;
     /// the per-mode table sets plain for posix/bash/zsh.
@@ -2338,7 +2320,6 @@ void config_set_defaults(void) {
     /// Behavior defaults
     config.auto_cd = false;
     config.spell_correction = true;
-    config.confirm_exit = false;
     config.tab_width = 4;
     config.brace_expansion_max = 65536;
     config.regex_pattern_max = 1024;
@@ -2765,7 +2746,6 @@ void config_apply_settings(void) {
 
     /// Basic symbol table settings
     symtable_set_global_int("CONFIG_LOADED", 1);
-    symtable_set_global_int("HISTORY_NO_DUPS", config.history_no_dups ? 1 : 0);
     /// COMPLETION_MATCH_MODE replaces the legacy FUZZY_COMPLETION
     /// 0/1 toggle: scripts read a stable string ("prefix" /
     /// "substring" / "fuzzy") and can branch on the active
@@ -2800,7 +2780,6 @@ void config_apply_settings(void) {
     /// Apply other settings as needed
     symtable_set_global_int("AUTO_CD", config.auto_cd);
     symtable_set_global_int("SPELL_CORRECTION", config.spell_correction);
-    symtable_set_global_int("CONFIRM_EXIT", config.confirm_exit);
 
     /// Update autocorrect configuration when spell correction settings change
     autocorrect_config_t autocorrect_cfg;

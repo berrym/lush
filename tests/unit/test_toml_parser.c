@@ -923,7 +923,7 @@ TEST(parse_complex_document) {
                         "\n"
                         "[history]\n"
                         "size = 10000\n"
-                        "no_dups = true\n"
+                        "timestamps = true\n"
                         "\n"
                         "[display]\n"
                         "syntax_highlighting = true\n"
