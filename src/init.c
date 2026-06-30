@@ -1026,6 +1026,12 @@ int init(int argc, char **argv, FILE **in) {
     /// (before LLE init) so it runs LAST in atexit order (LIFO).
     /// This ensures LLE can safely use pool memory during shutdown.
 
+    /// Startup is complete. Unblock SIGHUP (init_signal_handlers blocked it for
+    /// the duration of init) now that every dispatch path below -- the
+    /// interactive read loop, -c, a script -- is ready to act on it. A hangup
+    /// that arrived during startup is pending and is delivered here.
+    enable_sighup_delivery();
+
     return 0;
 }
 

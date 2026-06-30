@@ -91,6 +91,29 @@ int set_signal_handler(int signum, void (*handler)(int));
 void init_signal_handlers(void);
 
 /**
+ * @brief Unblock SIGHUP once startup is complete and dispatch can handle it
+ *
+ * init_signal_handlers blocks SIGHUP for the duration of startup so a hangup
+ * mid-init cannot wedge or half-tear-down the shell. Call this at the end of
+ * init(), before any execution path (the interactive read loop, -c, a script):
+ * it unblocks SIGHUP, delivering any startup-time hangup synchronously so the
+ * read loop's flag check exits cleanly.
+ */
+void enable_sighup_delivery(void);
+
+/**
+ * @brief Reset a child's signal mask to empty just before exec
+ *
+ * The shell blocks SIGHUP for the duration of startup (init_signal_handlers).
+ * execve preserves the signal mask, so a child exec'd during that window --
+ * a command or `exec <prog>` sourced from a login rc/profile -- would inherit
+ * the block and never die on a hangup. Call this in the exec child (or, for the
+ * `exec` builtin, the shell process itself) immediately before execvp/execv to
+ * restore the conventional empty mask.
+ */
+void reset_signal_mask_for_exec(void);
+
+/**
  * @brief Set the SIGINT (Ctrl+C) handler
  *
  * Configures handling of interrupt signals for interactive use.

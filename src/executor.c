@@ -8983,6 +8983,8 @@ static int execute_external_command_with_setup(executor_t *executor,
             }
         }
 
+        /// Do not inherit the shell's startup SIGHUP block across exec.
+        reset_signal_mask_for_exec();
         execvp(argv[0], argv);
         /// Check errno to determine appropriate exit code
         int exit_code = 127; /// Default: command not found
