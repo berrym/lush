@@ -300,6 +300,8 @@ typedef struct {
     completion_match_mode_t completion_match_mode; ///< Match predicate
     int completion_threshold;                      ///< Minimum match score
     bool completion_case_sensitive; ///< Case-sensitive completion
+    int completion_fuzzy_min_chars; ///< Min typed chars before fuzzy/substring
+                                    ///< widen (shorter stays prefix)
 
     /// Behavior settings
     bool auto_cd;            ///< Auto-cd to directories
