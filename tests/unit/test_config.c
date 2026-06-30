@@ -968,6 +968,16 @@ TEST(beginner_tier_is_registered) {
               CREG_SUCCESS, "tab_width is a registered key");
     ASSERT_TRUE(tier != CREG_TIER_BEGINNER,
                 "an advanced knob is not in the beginner tier");
+
+    /// The wizard prefers each key's plain-language description over its terse
+    /// help, so every beginner-tier key must declare a non-empty description.
+    /// A future addition that forgets one would silently fall back to the
+    /// one-line help and read as an afterthought in the guided setup. Checked
+    /// here, against the already-collected set, to avoid a second config_init.
+    for (size_t i = 0; i < n; i++) {
+        const char *desc = config_registry_get_description(keys[i]);
+        ASSERT_TRUE(desc != NULL && desc[0] != '\0', keys[i]);
+    }
 }
 
 TEST(config_set_validates_increment_two_keys) {

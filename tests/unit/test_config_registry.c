@@ -63,18 +63,27 @@
  */
 
 static const creg_option_t shell_options[] = {
-    {   "mode",
-     CREG_VALUE_STRING,  {.type = CREG_VALUE_STRING, .data.string = "lush"},
-     "Shell mode", true     },
-    {"errexit",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit on error", true  },
-    {"nounset",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Error on unset", true },
-    { "xtrace",
-     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Trace execution", true},
+    {.name = "mode",
+     .type = CREG_VALUE_STRING,
+     .default_val = {.type = CREG_VALUE_STRING, .data.string = "lush"},
+     .help = "Shell mode",
+     .persisted = true,
+     .description = "Pick the syntax dialect: bash, zsh, or lush"},
+    {.name = "errexit",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Exit on error",
+     .persisted = true},
+    {.name = "nounset",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Error on unset",
+     .persisted = true},
+    {.name = "xtrace",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Trace execution",
+     .persisted = true},
 };
 
 static const creg_section_t shell_section = {
@@ -88,15 +97,22 @@ static const creg_section_t shell_section = {
 };
 
 static const creg_option_t history_options[] = {
-    {"enabled",
-     CREG_VALUE_BOOLEAN,            {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable history", true},
-    {   "size",
-     CREG_VALUE_INTEGER,           {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
-     "History size", true  },
-    {   "file",
-     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "~/.lush_history"},
-     "History file", true  },
+    {.name = "enabled",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     .help = "Enable history",
+     .persisted = true},
+    {   .name = "size",
+     .type = CREG_VALUE_INTEGER,
+     .default_val = {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
+     .help = "History size",
+     .persisted = true},
+    {   .name = "file",
+     .type = CREG_VALUE_STRING,
+     .default_val = {.type = CREG_VALUE_STRING,
+     .data.string = "~/.lush_history"},
+     .help = "History file",
+     .persisted = true},
 };
 
 static const creg_section_t history_section = {
@@ -619,9 +635,11 @@ static void test_sync_from_runtime(void) { sync_from_runtime_called++; }
 
 TEST(on_load_hook) {
     creg_option_t opts[] = {
-        {"test",
-         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL, true}
+        {.name = "test",
+         .type = CREG_VALUE_BOOLEAN,
+         .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         .help = NULL,
+         .persisted = true}
     };
     creg_section_t sec = {
         .name = "test",
@@ -648,9 +666,11 @@ TEST(on_load_hook) {
 
 TEST(sync_hooks) {
     creg_option_t opts[] = {
-        {"test",
-         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL, true}
+        {.name = "test",
+         .type = CREG_VALUE_BOOLEAN,
+         .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         .help = NULL,
+         .persisted = true}
     };
     creg_section_t sec = {
         .name = "test",
@@ -1143,6 +1163,28 @@ TEST(collect_by_tier_returns_only_tagged_keys) {
 }
 
 /* ============================================================================
+ * Plain-language description
+ * ============================================================================
+ */
+
+TEST(get_description_returns_registered_text_else_null) {
+    config_registry_register_section(&shell_section);
+
+    /// A key that declared a description returns it verbatim (no copy).
+    const char *d = config_registry_get_description("shell.mode");
+    ASSERT(d != NULL);
+    ASSERT_STR_EQ(d, "Pick the syntax dialect: bash, zsh, or lush");
+
+    /// A key with no description returns NULL so callers fall back to help --
+    /// which this same key does have.
+    ASSERT(config_registry_get_description("shell.errexit") == NULL);
+    ASSERT(config_registry_get_help("shell.errexit") != NULL);
+
+    /// An unregistered key returns NULL, never a dangling pointer.
+    ASSERT(config_registry_get_description("shell.bogus") == NULL);
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -1225,6 +1267,7 @@ int main(void) {
     RUN_TEST(load_reported_records_dropped_keys);
     RUN_TEST(tier_set_get_roundtrip);
     RUN_TEST(collect_by_tier_returns_only_tagged_keys);
+    RUN_TEST(get_description_returns_registered_text_else_null);
 
     return TEST_RESULT();
 }
