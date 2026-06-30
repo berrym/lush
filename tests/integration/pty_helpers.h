@@ -486,6 +486,52 @@ static inline int pty_wait_pid_gone(pid_t pid, int timeout_ms) {
     return kill(pid, 0) != 0 && errno == ESRCH;
 }
 
+/// Budget for forcibly reaping a child after SIGKILL before giving up.
+#define PTY_REAP_BUDGET_MS 3000
+
+/// SIGKILL the child AND its process group, then reap with a BOUNDED poll.
+///
+/// The child setsid()s in pty_spawn / pty_spawn_lle, so its pgid == its pid;
+/// killing that group with SIGKILL -- which cannot be caught, ignored, or
+/// blocked -- terminates even a shell wedged on a signal it mishandles, along
+/// with any children still in the shell's own process group. (A background job
+/// the shell setpgid'd into its own group is NOT in this group; the harness
+/// does not rely on group-kill to reap those.)
+///
+/// Critically, the reap NEVER blocks indefinitely: a plain waitpid(pid, 0) here
+/// can wedge meson's per-test isolation if the child is somehow unreapable. If
+/// the child is not reaped within PTY_REAP_BUDGET_MS, log loudly and leak it so
+/// the test fails (or finishes) instead of hanging the runner. Returns the
+/// real waitpid status when reaped; a child that could NOT be reaped is
+/// reported as killed by SIGKILL (which it was sent), never as a clean
+/// WIFEXITED(0), so a wedged shell can never masquerade as a graceful exit in
+/// an assertion.
+static inline int pty_force_reap(pid_t pid, const char *label) {
+    /// kill(-pid) targets the child's process group; kill(pid) covers the rare
+    /// case it is not its own group leader. ESRCH (already gone) is fine.
+    kill(pid, SIGKILL);
+    kill(-pid, SIGKILL);
+    int waited = 0;
+    int st = 0;
+    for (;;) {
+        pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid || (r < 0 && errno == ECHILD)) {
+            return st;
+        }
+        if (waited >= PTY_REAP_BUDGET_MS) {
+            fprintf(stderr,
+                    "%s: pty teardown: child %d unreapable %dms after SIGKILL; "
+                    "leaking it so the suite does not hang\n",
+                    label ? label : "pty", (int)pid, PTY_REAP_BUDGET_MS);
+            /// Report it as killed-by-SIGKILL (it was), so WIFEXITED is false
+            /// and a wedged child is never mistaken for a clean exit.
+            return SIGKILL;
+        }
+        pty_sleep_ms(20);
+        waited += 20;
+    }
+}
+
 /// Wait for the child to exit. Returns waitpid status (also stashed
 /// in session->exit_status). Does NOT close master_fd -- caller may
 /// want to drain remaining output first.
@@ -508,13 +554,11 @@ static inline int pty_wait(pty_session_t *session, int timeout_ms) {
         pty_sleep_ms(50);
         elapsed += 50;
     }
-    /// Timed out: hard-kill so the test doesn't hang the suite.
-    kill(session->pid, SIGKILL);
-    int st;
-    waitpid(session->pid, &st, 0);
-    session->exit_status = st;
+    /// Timed out: hard-kill the whole group, bounded reap, so the test does not
+    /// hang the suite.
+    session->exit_status = pty_force_reap(session->pid, "pty_wait");
     session->reaped = true;
-    return st;
+    return session->exit_status;
 }
 
 /// Send SIGHUP to the child shell, drain any final output, wait for
@@ -558,9 +602,11 @@ static inline void pty_cleanup(pty_session_t *session) {
         session->master_fd = -1;
     }
     if (session->pid > 0 && !session->reaped) {
-        kill(session->pid, SIGKILL);
-        int st;
-        waitpid(session->pid, &st, 0);
+        /// Bounded group-kill reap: never block the suite even if the shell is
+        /// wedged (e.g. hung on a signal it mishandles) or left a grandchild
+        /// holding the PTY.
+        session->exit_status = pty_force_reap(session->pid, "pty_cleanup");
+        session->reaped = true;
     }
     free(session->output);
     session->output = NULL;
