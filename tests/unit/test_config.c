@@ -384,7 +384,8 @@ TEST(config_set_defaults_basic) {
     /// Check default values
     ASSERT_TRUE(config.history_enabled,
                 "history_enabled should default to true");
-    ASSERT_EQ(config.history_size, 1000, "history_size should default to 1000");
+    ASSERT_EQ(config.history_size, 10000,
+              "history_size should default to 10000");
     ASSERT_TRUE(config.completion_enabled,
                 "completion_enabled should default to true");
 }
