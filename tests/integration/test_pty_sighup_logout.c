@@ -61,11 +61,17 @@ static int run_test(const char *lush_path) {
     /// Final drain in case anything is still buffered.
     pty_drain(&s, 200);
 
-    /// Assertion 1: lush actually exited (not still running, not
-    /// SIGKILL'd by our timeout fallback).
-    if (!WIFEXITED(s.exit_status) && !WIFSIGNALED(s.exit_status)) {
-        pty_fail(TEST, "shell neither exited nor was signalled; status=%d",
-                 s.exit_status);
+    /// Assertion 1: lush exited GRACEFULLY on SIGHUP -- it ran its main-loop
+    /// teardown and exit()ed (WIFEXITED). A shell that instead WEDGED on the
+    /// hangup would be force-reaped by the harness and reported as killed by
+    /// SIGKILL (WIFSIGNALED); requiring WIFEXITED here makes such a regression
+    /// a failure rather than a silent pass.
+    if (!WIFEXITED(s.exit_status)) {
+        pty_fail(
+            TEST,
+            "shell did not exit gracefully on SIGHUP (status=%d); a wedged "
+            "shell is force-killed by the harness, not exited",
+            s.exit_status);
         pty_cleanup(&s);
         return 1;
     }

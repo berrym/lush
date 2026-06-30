@@ -299,6 +299,20 @@ int main(int argc, char **argv) {
         /// actual trap command execution happens here in main loop context.
         execute_pending_traps();
 
+        /// Honor a SIGHUP that arrived outside the input read -- during startup
+        /// (delivered when init unblocked it), before this loop was entered, or
+        /// between iterations. The async handler can only set a flag; nothing
+        /// else consumes it, so without this check a shell hung up before it
+        /// blocks on input would sit in the read below forever. Breaking here
+        /// lets the post-loop path run logout scripts and SIGHUP the jobs of a
+        /// login shell, matching the EINTR-driven exit when the hangup lands
+        /// during the read. A user SIGHUP trap installs its own handler
+        /// instead, so this flag stays clear and the trap runs as usual.
+        if (sighup_was_received()) {
+            exit_flag = true;
+            break;
+        }
+
         /// Read complete command(s) using unified input system
         /// This ensures consistent parsing behavior between interactive and
         /// non-interactive modes

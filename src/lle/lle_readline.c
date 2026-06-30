@@ -3536,6 +3536,21 @@ char *lle_readline(const char *prompt) {
         /// it but doesn't reset it before returning.
         ctx.suppress_autosuggestion = false;
 
+        /// Check if SIGHUP was received -- the controlling terminal hung up
+        /// (the terminal window closed, an ssh session dropped). Unlike Ctrl+C,
+        /// which aborts the line and reprompts, a hangup must stop editing and
+        /// end input so the shell exits through its main loop (running logout
+        /// scripts, SIGHUP'ing jobs for a login shell). lush's main handler
+        /// (src/signals.c) records the hangup in a flag; the LLE consumes it
+        /// here by returning NULL, which get_unified_input reports as
+        /// end-of-input. The 1s idle-poll cadence below bounds how long a
+        /// hangup that lands mid-read waits before this check sees it.
+        if (sighup_was_received()) {
+            done = true;
+            final_line = NULL;
+            continue;
+        }
+
         /// Check if SIGINT was received (Ctrl+C)
         /// The signal handler sets a flag instead of interrupting directly,
         /// allowing us to handle it cleanly here in the input loop.

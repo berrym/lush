@@ -2650,9 +2650,12 @@ if fs.exists('tests/unit/test_config.c')
                            test_config_sources + lle_shell_sources,
                            include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep, libm])
+  # ~24s locally across 64 tests, many of which re-run config_init (register
+  # every section, apply each mode); a 30s ceiling left too little headroom and
+  # timed out on a loaded macOS CI runner. 120 matches the other heavy suites.
   test('Configuration System', test_config,
        suite: 'unit',
-       timeout: 30)
+       timeout: 120)
 endif
 
 # POSIX Options Tests
@@ -2851,11 +2854,16 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
     test_pty_cascade = executable('test_pty_sighup_cascade',
                                   ['tests/integration/test_pty_sighup_cascade.c'],
                                   dependencies: libutil_dep)
+    # PTY tests drive a real pseudo-terminal through signals and the line
+    # editor; they run in a few seconds locally but push far more bytes through
+    # the terminal under heavy GitHub Actions runner load. A generous 120s
+    # absorbs those spikes without masking real regressions (a genuinely stuck
+    # test is force-reaped by the harness, not left to the timeout).
     test('PTY SIGHUP cascade to bg jobs',
          test_pty_cascade,
          args: [lush_exe.full_path()],
          suite: 'integration',
-         timeout: 30)
+         timeout: 120)
   endif
 
   # PTY-driven compdef TAB-completion end-to-end test
@@ -2867,7 +2875,7 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          test_pty_compdef,
          args: [lush_exe.full_path()],
          suite: 'integration',
-         timeout: 30)
+         timeout: 120)
   endif
 
   # PTY-driven autosuggestion-toggle end-to-end test
@@ -2880,7 +2888,7 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          test_pty_autosuggestions,
          args: [lush_exe.full_path()],
          suite: 'integration',
-         timeout: 90)
+         timeout: 120)
   endif
 
   if fs.exists('tests/integration/test_pty_theme_persistence.c')
@@ -2892,7 +2900,7 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          test_pty_theme,
          args: [lush_exe.full_path()],
          suite: 'integration',
-         timeout: 90)
+         timeout: 120)
   endif
 
   # L11 (SIGHUP variant): logout script fires on SIGHUP-induced exit.
@@ -2904,6 +2912,6 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          test_pty_logout,
          args: [lush_exe.full_path()],
          suite: 'integration',
-         timeout: 30)
+         timeout: 120)
   endif
 endif

@@ -9,6 +9,7 @@
 #include "alias.h"
 #include "builtins.h"
 #include "lush_fork.h"
+#include "signals.h"
 #include "symtable.h"
 
 #include <errno.h>
@@ -205,6 +206,9 @@ int bin_command(int argc, char **argv) {
         signal(SIGTTIN, SIG_DFL);
         signal(SIGTTOU, SIG_DFL);
         signal(SIGCHLD, SIG_DFL);
+        /// Dispositions reset above; also drop the startup SIGHUP block so it
+        /// is not inherited across exec.
+        reset_signal_mask_for_exec();
 
         /// Build argv for execv - use original argv from cmd_start
         execv(cmd_path, &argv[cmd_start]);

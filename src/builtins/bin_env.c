@@ -9,6 +9,7 @@
 
 #include "builtins.h"
 #include "lush_fork.h"
+#include "signals.h"
 
 #include <errno.h>
 #include <sys/wait.h>
@@ -227,6 +228,9 @@ int bin_env(int argc, char **argv) {
                 *eq = '='; /// Restore for potential re-use
             }
         }
+
+        /// Drop the startup SIGHUP block so it is not inherited across exec.
+        reset_signal_mask_for_exec();
 
         /// Execute command
         execvp(argv[i], &argv[i]);

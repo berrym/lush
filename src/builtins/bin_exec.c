@@ -205,6 +205,11 @@ int bin_exec(int argc, char **argv) {
     fflush(stderr);
     fflush(stdin);
 
+    /// The shell process is about to be replaced -- restore the empty signal
+    /// mask so an exec'd-from-rc program (e.g. `exec tmux`) is not left with
+    /// the startup SIGHUP block masked in.
+    reset_signal_mask_for_exec();
+
     /// Try to execute the command using execvp
     /// This replaces the current process entirely
     execvp(command, exec_argv);

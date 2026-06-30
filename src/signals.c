@@ -21,6 +21,7 @@
 #include "lush.h"
 #include "symtable.h"
 
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -202,6 +203,16 @@ void reset_subshell_signals(void) {
     /// by terminal mode (ISIG), not signal disposition.
     set_signal_handler(SIGHUP, SIG_DFL);
     set_signal_handler(SIGSEGV, SIG_DFL);
+
+    /// The shell blocks SIGHUP during its own startup (init_signal_handlers); a
+    /// subshell forked before init reaches enable_sighup_delivery() would
+    /// inherit that block. Restore normal delivery so the child is hung up like
+    /// any process, not left with SIGHUP masked. (pthread_sigmask for
+    /// consistency; the post-fork child is single-threaded.)
+    sigset_t hup;
+    sigemptyset(&hup);
+    sigaddset(&hup, SIGHUP);
+    pthread_sigmask(SIG_UNBLOCK, &hup, NULL);
 }
 
 /**
@@ -218,8 +229,52 @@ void init_signal_handlers(void) {
     /// This prevents accidental core dumps from Ctrl+\ keypresses
     set_signal_handler(SIGQUIT, SIG_IGN);
 
-    /// Set up SIGHUP handler for login shell hangup
+    /// Set up SIGHUP handler for login shell hangup, then block SIGHUP for the
+    /// remainder of startup. The handler only records the signal; nothing
+    /// consumes that record until the main read loop. A hangup delivered while
+    /// the shell is mid-init -- sourcing rc/login scripts, bringing up the line
+    /// editor -- would otherwise interrupt a startup read and either leave the
+    /// shell blocked in the loop's read forever or tear down a half-built
+    /// shell. Holding SIGHUP pending until enable_sighup_delivery() (called at
+    /// the end of init, once every dispatch path is ready to consume it) makes
+    /// a hangup at any point during startup resolve to one clean exit.
     set_signal_handler(SIGHUP, sighup_handler);
+    sigset_t hup;
+    sigemptyset(&hup);
+    sigaddset(&hup, SIGHUP);
+    /// pthread_sigmask, not sigprocmask: sigprocmask's behavior is unspecified
+    /// once the process is multithreaded (the LLE async worker starts later in
+    /// init), and pthread_sigmask is the defined per-thread API. Blocking on
+    /// the main thread here, before the worker is created, also means the
+    /// worker inherits the block and SIGHUP is only ever delivered to the main
+    /// thread.
+    pthread_sigmask(SIG_BLOCK, &hup, NULL);
+}
+
+void enable_sighup_delivery(void) {
+    /// Unblock SIGHUP at the end of startup, once the dispatch that follows
+    /// (the main read loop, -c, a script) can act on it (see
+    /// init_signal_handlers). Any hangup that arrived during startup is pending
+    /// and is delivered synchronously here. pthread_sigmask (per-thread)
+    /// because this can run after the async worker thread exists.
+    sigset_t hup;
+    sigemptyset(&hup);
+    sigaddset(&hup, SIGHUP);
+    pthread_sigmask(SIG_UNBLOCK, &hup, NULL);
+}
+
+void reset_signal_mask_for_exec(void) {
+    /// A child about to exec must not inherit the SIGHUP block the shell holds
+    /// during startup (init_signal_handlers). execve preserves the signal mask
+    /// (only handler dispositions reset to SIG_DFL), so a program exec'd while
+    /// the block is in effect -- e.g. `exec tmux` from a login rc, sourced
+    /// before enable_sighup_delivery() runs -- would run with SIGHUP masked and
+    /// never die on a controlling-terminal hangup. Restore the conventional
+    /// empty child mask. The exec child (or, for the exec builtin, the shell
+    /// process itself just before it is replaced) is single-threaded here.
+    sigset_t empty;
+    sigemptyset(&empty);
+    pthread_sigmask(SIG_SETMASK, &empty, NULL);
 }
 
 /**
