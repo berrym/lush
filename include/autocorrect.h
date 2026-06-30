@@ -47,8 +47,11 @@ typedef struct {
  * Represents a single command correction suggestion with metadata.
  */
 typedef struct {
-    char *command;      ///< Suggested command
-    int score;          ///< Similarity score (0-100)
+    char *command; ///< Suggested command
+    int score;     ///< Similarity score (0-100); a tiebreak, not the rank key
+    int distance;  ///< Typo-weighted edit distance from the input (rank key,
+                   ///< ascending). Lower = closer; a transposition (the most
+                   ///< common typo) costs less than a substitution.
     const char *source; ///< Source: "builtin", "history", "path", "function"
 } correction_t;
 
@@ -137,6 +140,26 @@ void autocorrect_free_results(correction_results_t *results);
  */
 int autocorrect_similarity_score(const char *command1, const char *command2,
                                  bool case_sensitive);
+
+/**
+ * @brief Typo-weighted edit distance used to RANK correction candidates.
+ *
+ * Lower is closer. Unlike the similarity score (subsequence/prefix-biased and
+ * transposition-blind), this prefers the genuine word for a transposition typo.
+ *
+ * @return Weighted edit distance, or INT_MAX on a NULL argument.
+ */
+int autocorrect_rank_distance(const char *command1, const char *command2,
+                              bool case_sensitive);
+
+/**
+ * @brief Sort corrections best-first: typo-weighted edit distance ascending,
+ *        then similarity score descending.
+ *
+ * Exposed so a test can verify the ranking order directly (the genuine word
+ * must outrank a prefix-sharing neighbour even when its score is lower).
+ */
+void autocorrect_sort_corrections_by_rank(correction_t *corrections, int count);
 
 /**
  * @brief Add command to learning history for future corrections
