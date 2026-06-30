@@ -14,10 +14,10 @@
  *     -> fuzzy_completion_score; admitted when score >=
  *        completion.threshold
  *
- * Consumed in two places so the bridge pre-emit filter (compdef
- * candidate emission) and the in-menu type-to-filter pass share the
- * exact same predicate -- the UX never diverges between "type then
- * TAB" and "TAB then narrow."
+ * Consumed by the engine's first-word sources, the bridge pre-emit
+ * filter (compdef candidate emission), and the in-menu type-to-filter
+ * pass, so the match mode applies uniformly to command completion and
+ * the UX never diverges between "type then TAB" and "TAB then narrow."
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -46,11 +46,21 @@
 bool completion_filter_admits(const char *prefix, const char *candidate);
 
 /**
- * @brief Register the shell-side filter with the LLE menu/bridge.
+ * @brief Match quality of @p candidate for @p prefix, for RANKING.
  *
- * Calls lle_completion_set_filter_fn(completion_filter_admits) so the
- * in-menu type-to-filter path and the compdef bridge invoke the same
- * predicate. Idempotent; safe to call multiple times during init.
+ * Returns the fuzzy score (higher is better) in fuzzy mode above the
+ * short-prefix floor; returns 0 in prefix/substring mode and below the floor,
+ * meaning "do not rank -- keep the source's static order".
+ */
+int completion_filter_score(const char *prefix, const char *candidate);
+
+/**
+ * @brief Register the shell-side filter and scorer with the LLE menu/bridge.
+ *
+ * Wires completion_filter_admits (so the first-word sources, the in-menu
+ * type-to-filter path, and the compdef bridge all share one match-mode
+ * predicate) and completion_filter_score (so the generate pipeline ranks fuzzy
+ * matches best-first). Idempotent; safe to call multiple times during init.
  */
 void completion_filter_bridge_init(void);
 

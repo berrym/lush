@@ -34,17 +34,23 @@ extern void init_symtable(void);
 static completion_match_mode_t saved_mode;
 static bool saved_case_sensitive;
 static int saved_threshold;
+static int saved_fuzzy_min_chars;
 
 static void config_snapshot(void) {
     saved_mode = config.completion_match_mode;
     saved_case_sensitive = config.completion_case_sensitive;
     saved_threshold = config.completion_threshold;
+    saved_fuzzy_min_chars = config.completion_fuzzy_min_chars;
+    /// Default to no floor unless a test sets one, so the existing mode tests
+    /// (single-char prefixes in fuzzy mode) are unaffected.
+    config.completion_fuzzy_min_chars = 0;
 }
 
 static void config_restore(void) {
     config.completion_match_mode = saved_mode;
     config.completion_case_sensitive = saved_case_sensitive;
     config.completion_threshold = saved_threshold;
+    config.completion_fuzzy_min_chars = saved_fuzzy_min_chars;
 }
 
 /* ============================================================================
@@ -202,6 +208,117 @@ TEST(filter_changing_mode_changes_admission) {
     config_restore();
 }
 
+/* ============================================================================
+ * First-word widening: fuzzy admits a strong non-prefix candidate (the gap
+ * this fix closes -- the engine sources now route through this predicate).
+ * ============================================================================
+ */
+
+TEST(filter_fuzzy_widens_beyond_prefix) {
+    config_snapshot();
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    config.completion_threshold = 60;
+    config.completion_case_sensitive = false;
+
+    /// "gco" is not a prefix of "git-config" but is a strong fuzzy match --
+    /// exactly the candidate prefix matching misses and fuzzy now surfaces.
+    ASSERT_TRUE(completion_filter_admits("gco", "git-config"),
+                "fuzzy admits a strong non-prefix subsequence");
+    ASSERT_FALSE(completion_filter_admits("gco", "zoo"),
+                 "fuzzy still rejects a non-subsequence");
+
+    /// Prefix mode would NOT admit it, proving the mode is what widens.
+    config.completion_match_mode = COMPLETION_MATCH_PREFIX;
+    ASSERT_FALSE(completion_filter_admits("gco", "git-config"),
+                 "prefix mode rejects the non-prefix candidate");
+    config_restore();
+}
+
+TEST(filter_fuzzy_threshold_zero_still_rejects_non_match) {
+    config_snapshot();
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    config.completion_case_sensitive = false;
+    config.completion_threshold =
+        0; /// maximally permissive, but still a filter
+
+    /// A genuine subsequence match floors at score 1, a non-subsequence scores
+    /// 0. At threshold 0 a naive `score >= threshold` would admit every
+    /// non-match (0 >= 0) and -- since the rescore pass only ranks score > 0
+    /// items -- leave that junk at its high static relevance, sorting it above
+    /// the real fuzzy hits. The filter must reject a non-subsequence at any
+    /// threshold.
+    ASSERT_FALSE(completion_filter_admits("gco", "zoo"),
+                 "threshold 0 still rejects a non-subsequence");
+    ASSERT_TRUE(completion_filter_admits("gco", "git-config"),
+                "threshold 0 admits a genuine fuzzy match");
+    config_restore();
+}
+
+/* ============================================================================
+ * Short-prefix floor: below completion.fuzzy_min_chars, substring/fuzzy fall
+ * back to prefix matching so 1-char input does not widen.
+ * ============================================================================
+ */
+
+TEST(filter_short_prefix_floor_falls_back_to_prefix) {
+    config_snapshot();
+    config.completion_case_sensitive = false;
+    config.completion_match_mode = COMPLETION_MATCH_SUBSTRING;
+
+    /// With a floor of 2, a 1-char prefix is prefix-scoped: "a" inside "cat"
+    /// is a substring but not a prefix, so the floor rejects it.
+    config.completion_fuzzy_min_chars = 2;
+    ASSERT_FALSE(completion_filter_admits("a", "cat"),
+                 "1-char prefix below the floor stays prefix-scoped");
+    ASSERT_TRUE(completion_filter_admits("c", "cat"),
+                "a genuine 1-char prefix still admits");
+
+    /// Two characters is at the floor, so substring widening resumes.
+    ASSERT_TRUE(completion_filter_admits("at", "cat"),
+                "2-char prefix at the floor widens (substring)");
+
+    /// Disabling the floor (0/1) lets the 1-char substring through again.
+    config.completion_fuzzy_min_chars = 1;
+    ASSERT_TRUE(completion_filter_admits("a", "cat"),
+                "floor of 1 disables the guard -- 1-char substring widens");
+    config_restore();
+}
+
+/* ============================================================================
+ * Ranking score: fuzzy mode reports a match score; other modes report 0
+ * ("keep static order"), as does a below-floor prefix.
+ * ============================================================================
+ */
+
+TEST(filter_score_ranks_only_in_fuzzy) {
+    config_snapshot();
+    config.completion_case_sensitive = false;
+    config.completion_threshold = 60;
+    config.completion_fuzzy_min_chars = 2;
+
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    ASSERT_TRUE(completion_filter_score("gco", "gconfig") > 0,
+                "fuzzy mode scores a match for ranking");
+    /// A stronger match outscores a weaker one (drives best-first ordering).
+    ASSERT_TRUE(completion_filter_score("gco", "gconfig") >
+                    completion_filter_score("gco", "git-cleanup-tool-old"),
+                "a closer fuzzy match scores higher");
+
+    /// Prefix/substring do not rank: 0 keeps the source's static order.
+    config.completion_match_mode = COMPLETION_MATCH_PREFIX;
+    ASSERT_EQ(completion_filter_score("gco", "gconfig"), 0,
+              "prefix mode does not rank");
+    config.completion_match_mode = COMPLETION_MATCH_SUBSTRING;
+    ASSERT_EQ(completion_filter_score("gco", "gconfig"), 0,
+              "substring mode does not rank");
+
+    /// Below the floor, fuzzy does not rank either (it acts as prefix).
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    ASSERT_EQ(completion_filter_score("g", "gconfig"), 0,
+              "a below-floor prefix does not rank");
+    config_restore();
+}
+
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -234,6 +351,10 @@ int main(int argc, char **argv) {
 
     printf("\nMode switching:\n");
     RUN_TEST(filter_changing_mode_changes_admission);
+    RUN_TEST(filter_fuzzy_widens_beyond_prefix);
+    RUN_TEST(filter_fuzzy_threshold_zero_still_rejects_non_match);
+    RUN_TEST(filter_short_prefix_floor_falls_back_to_prefix);
+    RUN_TEST(filter_score_ranks_only_in_fuzzy);
 
     return TEST_RESULT();
 }

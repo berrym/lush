@@ -9,6 +9,7 @@
  */
 
 #include "lle/completion/completion_system.h"
+#include "lle/completion/menu_filter.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -195,6 +196,31 @@ static lle_result_t sort_results(lle_completion_result_t *result) {
     return LLE_SUCCESS;
 }
 
+/**
+ * @brief Reorder by match quality when the active mode ranks (fuzzy).
+ *
+ * The sources assign static relevance by kind (alias 950, builtin 900, command
+ * 800, ...), which is right for prefix matching but buries the best fuzzy hit
+ * (typing "gti" should surface "git" first, not in alphabetical order among
+ * every fuzzy-admitted command). When a scorer is registered and ranks (fuzzy),
+ * replace each item's relevance with its match score so sort_results orders by
+ * match quality. lle_completion_filter_score_invoke returns 0 in prefix /
+ * substring mode and when no scorer is wired, leaving the static order intact.
+ */
+static void rescore_by_match(lle_completion_result_t *result,
+                             const char *prefix) {
+    if (!result || !prefix || prefix[0] == '\0') {
+        return;
+    }
+    for (size_t i = 0; i < result->count; i++) {
+        int score =
+            lle_completion_filter_score_invoke(prefix, result->items[i].text);
+        if (score > 0) {
+            result->items[i].relevance_score = score;
+        }
+    }
+}
+
 /// ============================================================================
 /// COMPLETION GENERATION (Spec 12 Core)
 /// ============================================================================
@@ -246,6 +272,11 @@ lle_completion_system_generate(lle_completion_system_t *system,
         lle_word_context_free(context);
         return res;
     }
+
+    /// Step 4.5: Rank by match quality (no-op outside fuzzy mode) so the
+    /// strongest fuzzy match sorts first instead of in static/alphabetical
+    /// order.
+    rescore_by_match(result, context->dequoted_filename_prefix);
 
     /// Step 5: Sort results
     res = sort_results(result);

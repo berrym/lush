@@ -440,6 +440,11 @@ static const creg_option_t completion_options[] = {
     {        "threshold",
      CREG_VALUE_INTEGER,     {.type = CREG_VALUE_INTEGER, .data.integer = 60},
      "Minimum fuzzy match score to accept a completion (0-100)", true},
+    {  "fuzzy_min_chars",
+     CREG_VALUE_INTEGER,      {.type = CREG_VALUE_INTEGER, .data.integer = 2},
+     "Typed characters before substring/fuzzy widen past a prefix match (0 or "
+     "1 "
+     "disables the floor; shorter input stays prefix-scoped)", true  },
 };
 
 static const creg_section_t completion_section = {
@@ -855,6 +860,8 @@ static void completion_bind_runtime(void) {
         completion_match_mode_pairs, COMPLETION_MATCH_PREFIX);
     config_registry_bind_integer("completion.threshold",
                                  &config.completion_threshold);
+    config_registry_bind_integer("completion.fuzzy_min_chars",
+                                 &config.completion_fuzzy_min_chars);
 }
 
 /// @brief Sync completion config from runtime to registry
@@ -1094,6 +1101,7 @@ static const struct {
 } k_range_types[] = {
     {          "display.optimization_level", 0,       4},
     {                "completion.threshold", 0,     100},
+    {          "completion.fuzzy_min_chars", 0,      32},
     {      "behavior.autocorrect_threshold", 0,     100},
     {"behavior.autocorrect_max_suggestions", 1,       5},
     /// The open-ended / non-negative keys bind to 32-bit int runtime cells, so
@@ -2325,6 +2333,7 @@ void config_set_defaults(void) {
     config.completion_match_mode = COMPLETION_MATCH_PREFIX;
     config.completion_threshold = 60;
     config.completion_case_sensitive = false;
+    config.completion_fuzzy_min_chars = 2;
 
     /// Behavior defaults
     config.auto_cd = false;
