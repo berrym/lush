@@ -51,6 +51,7 @@
 #include <math.h>
 #include <pwd.h>
 #include <regex.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1308,9 +1309,13 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         batch_starting_line += batch_lines;
 
         /// Honor mid-stream shell-exit requests: ${var:?word}, builtin
-        /// exit, errexit-style abort, etc. The remaining batches must
-        /// not run once the shell has decided to terminate the script.
-        if (executor->shell_exit_requested) {
+        /// exit, errexit-style abort, a SIGHUP forwarded by the foreground
+        /// wait, etc. The within-batch list checks exit_flag, but a
+        /// multi-line -c string parses each line as a separate batch, so a
+        /// hangup (or `exit`) on one line must also stop the batches after
+        /// it -- without this an `exit 3` / hung-up `sleep` still ran the
+        /// trailing lines and reported the wrong status.
+        if (executor->shell_exit_requested || exit_flag) {
             break;
         }
 
@@ -1558,6 +1563,18 @@ static int execute_command_list(executor_t *executor, node_t *list) {
         /// shell_exit_status after we return.
         if (executor->shell_exit_requested) {
             return executor->shell_exit_status;
+        }
+
+        /// A hangup received while a prior statement ran (notably while an
+        /// in-process builtin such as `read` was blocked, where no foreground
+        /// wait was active to forward it) must stop the list here rather than
+        /// run the next statement. This matches bash/zsh, which terminate at
+        /// the hangup point; the alternative -- proceeding and forwarding the
+        /// hangup to the next command -- races the child's fork/exec. Record
+        /// 128 + SIGHUP and fall through to the exit_flag return below.
+        if (sighup_was_received() && !exit_flag) {
+            set_exit_status(128 + SIGHUP);
+            exit_flag = true;
         }
 
         /// `exit` builtin requested shell termination. bin_exit sets the
@@ -2428,6 +2445,52 @@ static bool flatten_pipeline_chain(node_t *pipeline, node_t **stages_out,
 }
 
 /**
+ * @brief Wait for a foreground child, terminating the shell on a hangup.
+ *
+ * Retries past EINTR from incidental signals (SIGCHLD, SIGWINCH). On a SIGHUP
+ * -- the controlling terminal hung up -- forwards the hangup to this child: a
+ * real hangup reaches the whole foreground process group, but a SIGHUP
+ * delivered only to the shell would otherwise leave the child running while the
+ * wait merely retries. Forwarding makes the child exit, and setting the global
+ * exit_flag stops any remaining statements and exits the shell (logout runs for
+ * a login shell). A child that ignores SIGHUP is left to finish, which is
+ * correct. A `trap ... HUP` replaces the SIGHUP handler, so
+ * sighup_was_received() stays false here and the trap runs instead. Returns
+ * waitpid's result (the pid, or -1 with errno set on a real error).
+ *
+ * The hangup is forwarded at the top of the loop, before waitpid blocks: the
+ * async handler may have already run during a prior in-process builtin (`read`)
+ * or between statements, so the flag can be set with nothing left to interrupt
+ * the wait. SIGCONT accompanies the SIGHUP so a stopped child resumes and acts
+ * on it rather than queueing the hangup while remaining stopped. The hung_up
+ * guard forwards at most once.
+ */
+static pid_t executor_wait_foreground(pid_t pid, int *status) {
+    bool hung_up = false;
+    for (;;) {
+        if (sighup_was_received() && !hung_up) {
+            kill(pid, SIGHUP);
+            kill(pid, SIGCONT);
+            /// Record the hangup status (128 + SIGHUP) so paths that surface
+            /// exit_flag without reaping through set_exit_status -- pipelines,
+            /// command substitution, subshells -- report 129 rather than the
+            /// previous command's stale status. The single-command path reaps
+            /// below and overwrites this with the child's actual wait status.
+            set_exit_status(128 + SIGHUP);
+            exit_flag = true;
+            hung_up = true;
+        }
+        pid_t r = waitpid(pid, status, 0);
+        if (r != -1) {
+            return r;
+        }
+        if (errno != EINTR) {
+            return -1;
+        }
+    }
+}
+
+/**
  * @brief Execute a pipeline of N commands.
  *
  * Flattens the right-recursive NODE_PIPE chain to a linear list of N stages,
@@ -2510,8 +2573,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
                 close(pipes[j][1]);
             }
             for (size_t j = 0; j < i; j++) {
-                while (waitpid(pids[j], NULL, 0) == -1 && errno == EINTR)
-                    ;
+                executor_wait_foreground(pids[j], NULL);
             }
             free(pids);
             free(pipes);
@@ -2561,8 +2623,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     if (!stage_exit) {
         /// Reap children before giving up so we don't leak zombies.
         for (size_t i = 0; i < nstages; i++) {
-            while (waitpid(pids[i], NULL, 0) == -1 && errno == EINTR)
-                ;
+            executor_wait_foreground(pids[i], NULL);
         }
         free(pids);
         executor_pop_context(executor);
@@ -2570,9 +2631,8 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     }
 
     for (size_t i = 0; i < nstages; i++) {
-        int status;
-        while (waitpid(pids[i], &status, 0) == -1 && errno == EINTR)
-            ;
+        int status = 0;
+        executor_wait_foreground(pids[i], &status);
         stage_exit[i] =
             WIFEXITED(status)
                 ? WEXITSTATUS(status)
@@ -6939,10 +6999,10 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         exit(last_result);
     } else {
         /// Parent process - wait for subshell to complete
-        int status;
-        /// Wait for child, retrying on EINTR (signal interruption)
-        while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
-            ;
+        int status = 0;
+        /// Wait for the subshell, retrying past incidental EINTR; a hangup
+        /// terminates the shell.
+        executor_wait_foreground(pid, &status);
 
         int result;
         if (WIFEXITED(status)) {
@@ -8968,6 +9028,15 @@ static int execute_external_command_with_setup(executor_t *executor,
     }
 
     if (pid == 0) {
+        /// Restore default signal dispositions before anything else: until the
+        /// execvp below replaces this image, the child still carries the
+        /// shell's caught SIGHUP handler. A hangup forwarded by the parent's
+        /// foreground wait in this pre-exec window would otherwise be caught
+        /// (and lost) by that handler, leaving the exec'd command running past
+        /// the hangup. SIG_DFL here makes the window terminate on a forwarded
+        /// hangup, the same reset every other fork site already performs.
+        reset_subshell_signals();
+
         /// Child process - setup redirections here
         int redir_result = setup_redirections(executor, command);
         if (redir_result != 0) {
@@ -9029,14 +9098,12 @@ static int execute_external_command_with_setup(executor_t *executor,
         DEBUG_PROFILE_ENTER(argv[0]);
 
         int status;
-        /// Wait for child, retrying on EINTR (signal interruption)
-        while (waitpid(pid, &status, 0) == -1) {
-            if (errno != EINTR) {
-                /// Real error - child may have already been reaped
-                clear_current_child_pid();
-                return 1;
-            }
-            /// EINTR - signal interrupted wait, continue waiting
+        /// Wait for the command, retrying past incidental EINTR; a hangup
+        /// terminates the shell.
+        if (executor_wait_foreground(pid, &status) == -1) {
+            /// Real error - child may have already been reaped
+            clear_current_child_pid();
+            return 1;
         }
         clear_current_child_pid();
 
@@ -15712,24 +15779,35 @@ static char *expand_command_substitution(executor_t *executor,
 
         if (!output) {
             close(pipefd[0]);
-            while (waitpid(pid, NULL, 0) == -1 && errno == EINTR)
-                ;
+            executor_wait_foreground(pid, NULL);
             return strdup("");
         }
 
         ssize_t bytes_read;
         char buffer[256];
 
-        /// Wait for child process to complete first, retrying on EINTR
-        int status;
-        while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
-            ;
+        /// Wait for the command substitution, retrying past incidental EINTR;
+        /// a hangup terminates the shell.
+        int status = 0;
+        executor_wait_foreground(pid, &status);
 
         /// Propagate child's exit status to executor for $? access
         if (WIFEXITED(status)) {
             executor->exit_status = WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
             executor->exit_status = 128 + WTERMSIG(status);
+        }
+
+        /// A hangup terminated the subshell (exit_flag set by the foreground
+        /// wait). Do not drain the pipe: the substituted command runs as a
+        /// grandchild of the just-killed subshell wrapper, so its write end of
+        /// the pipe stays open and the read below would block until it exits on
+        /// its own. The shell is terminating and the captured value is unused,
+        /// so abandon the read and return promptly.
+        if (exit_flag) {
+            free(output);
+            close(pipefd[0]);
+            return strdup("");
         }
 
         /// Then read all available output
@@ -16951,15 +17029,13 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
         subshell_cleanup();
         _exit(result);
     } else {
-        /// Parent process - wait for child, retrying on EINTR
+        /// Parent process - wait for child, retrying past incidental EINTR; a
+        /// hangup terminates the shell.
         int status;
-        while (waitpid(pid, &status, 0) == -1) {
-            if (errno != EINTR) {
-                set_executor_error(executor,
-                                   "Failed to wait for builtin child process");
-                return 1;
-            }
-            /// EINTR - signal interrupted wait, continue waiting
+        if (executor_wait_foreground(pid, &status) == -1) {
+            set_executor_error(executor,
+                               "Failed to wait for builtin child process");
+            return 1;
         }
 
         if (WIFEXITED(status)) {
@@ -18403,11 +18479,12 @@ static void cleanup_procsub_fds(executor_t *executor) {
             close(executor->procsub_fds[i]);
         }
     }
-    /// Wait for all child processes to prevent zombies and terminal issues
+    /// Wait for all child processes to prevent zombies and terminal issues.
+    /// Route through executor_wait_foreground so an EINTR (the bare wait had
+    /// no retry, leaking a zombie) is retried and a hangup is honored.
     for (int i = 0; i < executor->procsub_fd_count; i++) {
         if (executor->procsub_pids[i] > 0) {
-            int status;
-            waitpid(executor->procsub_pids[i], &status, 0);
+            executor_wait_foreground(executor->procsub_pids[i], NULL);
         }
     }
     executor->procsub_fd_count = 0;

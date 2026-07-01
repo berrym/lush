@@ -2836,6 +2836,20 @@ if fs.exists('tests/integration/test_restricted_shell.sh')
        timeout: 30)
 endif
 
+# Non-interactive `lush -c` hangs up promptly on SIGHUP (#405). No PTY is
+# needed: kill -HUP to the -c process drives the foreground-wait path directly.
+# A regressed shell waits out the foreground command, which the test's wait-loop
+# timeout (well under the command's sleep duration) catches.
+if fs.exists('tests/integration/test_c_sighup_survival.c')
+  test_c_sighup = executable('test_c_sighup_survival',
+                             ['tests/integration/test_c_sighup_survival.c'])
+  test('-c SIGHUP survival',
+       test_c_sighup,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
