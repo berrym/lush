@@ -266,6 +266,12 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
             close(devnull);
         }
 
+        /// The async worker blocks all async signals; clear the mask so the
+        /// spawned shell does not inherit that block across exec.
+        sigset_t empty;
+        sigemptyset(&empty);
+        pthread_sigmask(SIG_SETMASK, &empty, NULL);
+
         /// Execute command via shell
         execl("/bin/sh", "sh", "-c", command, (char *)NULL);
         _exit(127);

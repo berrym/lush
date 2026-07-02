@@ -17,6 +17,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -150,6 +151,12 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
             dup2(devnull, STDERR_FILENO);
             close(devnull);
         }
+
+        /// The async worker blocks all async signals; clear the mask so the
+        /// spawned shell does not inherit that block across exec.
+        sigset_t empty;
+        sigemptyset(&empty);
+        pthread_sigmask(SIG_SETMASK, &empty, NULL);
 
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
         _exit(127); /// exec failed

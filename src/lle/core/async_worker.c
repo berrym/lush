@@ -13,6 +13,8 @@
 #include "lle/async_worker.h"
 #include "lle/git_command.h"
 
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -296,6 +298,21 @@ lle_result_t lle_async_worker_get_stats(const lle_async_worker_t *worker,
  */
 static void *lle_async_worker_thread(void *arg) {
     lle_async_worker_t *worker = arg;
+
+    /// Confine every asynchronous signal to the main thread: block them all on
+    /// this worker so a shell signal handler -- SIGINT, SIGHUP, a trap signal,
+    /// SIGWINCH -- can never run here and race main-thread-only state such as
+    /// the pending-trap bitmask (only SIGHUP was previously confined, via the
+    /// startup block the worker inherited). The synchronous fault signals are
+    /// left deliverable so a genuine crash in worker code is not hidden.
+    sigset_t block;
+    sigfillset(&block);
+    sigdelset(&block, SIGSEGV);
+    sigdelset(&block, SIGBUS);
+    sigdelset(&block, SIGFPE);
+    sigdelset(&block, SIGILL);
+    sigdelset(&block, SIGABRT);
+    pthread_sigmask(SIG_BLOCK, &block, NULL);
 
     while (1) {
         lle_async_request_t *request = NULL;
