@@ -121,13 +121,6 @@ void reset_signal_mask_for_exec(void);
 void set_sigint_handler(void);
 
 /**
- * @brief Set the SIGSEGV handler
- *
- * Configures segmentation fault handling for debugging.
- */
-void set_sigsegv_handler(void);
-
-/**
  * @brief Set the current child process PID
  *
  * Records the PID of a foreground child process for signal forwarding.

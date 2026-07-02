@@ -9,7 +9,6 @@
  *   - error_syscall: fatal syscall failures during early init or low-level
  *     allocation (init.c, input.c, node.c)
  *   - error_abort: fatal assertion-style failures during init
- *   - sigsegv_handler: SIGSEGV signal handler
  *
  * All user-facing shell errors must use shell_error.h instead.
  *
@@ -57,12 +56,5 @@ void error_syscall(const char *fmt, ...);
  * @param ... Format arguments
  */
 void error_abort(const char *fmt, ...);
-
-/**
- * @brief Signal handler for SIGSEGV
- *
- * @param sig Signal number (should be SIGSEGV)
- */
-void sigsegv_handler(int sig);
 
 #endif
