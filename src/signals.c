@@ -342,6 +342,31 @@ void reset_signal_mask_for_exec(void) {
     pthread_sigmask(SIG_SETMASK, &empty, NULL);
 }
 
+void reset_signals_for_exec(void) {
+    /// A child about to exec (or the shell process itself, for the `exec`
+    /// builtin) must hand the new program a clean slate. execve resets CAUGHT
+    /// handlers to SIG_DFL but LEAVES SIG_IGN as SIG_IGN, so the shell's
+    /// ignored signals -- SIGQUIT, and the job-control signals
+    /// SIGTSTP/SIGTTIN/SIGTTOU when job control is on -- would otherwise be
+    /// inherited ignored, giving a program that cannot be quit with Ctrl-\ or
+    /// stopped. Reset every disposition the shell or the line editor may have
+    /// changed to the default, then clear the mask.
+    ///
+    /// This is the single reset for every exec path (the external-command
+    /// child, the command/env/exec builtins), replacing an assortment of
+    /// hand-rolled per-signal lists and mask-only resets that disagreed on
+    /// coverage. Non-exec forked subshells use reset_subshell_signals()
+    /// instead, which deliberately leaves SIGINT inherited (issue #375).
+    static const int sigs[] = {
+        SIGINT,  SIGQUIT, SIGTERM,  SIGHUP,  SIGSEGV, SIGTSTP, SIGTTIN,
+        SIGTTOU, SIGCONT, SIGWINCH, SIGCHLD, SIGUSR1, SIGUSR2, SIGALRM,
+    };
+    for (size_t i = 0; i < sizeof(sigs) / sizeof(sigs[0]); i++) {
+        set_signal_handler(sigs[i], SIG_DFL);
+    }
+    reset_signal_mask_for_exec();
+}
+
 /**
  * @brief Set current child PID for signal forwarding
  *

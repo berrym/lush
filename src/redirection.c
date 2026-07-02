@@ -26,6 +26,7 @@
 #include "node.h"
 #include "restricted_mode.h"
 #include "shell_error.h"
+#include "signals.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -1037,7 +1038,10 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
     }
 
     if (pid == 0) {
-        /// Child process: read here document lines and write to pipe
+        /// Child process: read here document lines and write to pipe.
+        /// Reset inherited interactive handlers so this subshell is hung up or
+        /// faulted like any process rather than running shell signal logic.
+        reset_subshell_signals();
         close(pipefd[0]); /// Close read end
 
         char *line = NULL;
@@ -1150,7 +1154,10 @@ static int setup_here_document_with_content(const char *content) {
     }
 
     if (pid == 0) {
-        /// Child process: write pre-collected content to pipe
+        /// Child process: write pre-collected content to pipe.
+        /// Reset inherited interactive handlers so this subshell is hung up or
+        /// faulted like any process rather than running shell signal logic.
+        reset_subshell_signals();
         close(pipefd[0]); /// Close read end
 
         /// Write the content to the pipe

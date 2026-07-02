@@ -114,6 +114,18 @@ void enable_sighup_delivery(void);
 void reset_signal_mask_for_exec(void);
 
 /**
+ * @brief Reset all signal dispositions to default and clear the mask, for exec
+ *
+ * The single reset for every path about to exec an external program: the
+ * external-command child and the command/env/exec builtins. Sets every signal
+ * the shell or line editor may have changed back to SIG_DFL (execve does not
+ * reset SIG_IGN'd signals, so an ignored SIGQUIT or job-control signal would
+ * otherwise be inherited by the new program) and clears the signal mask.
+ * Non-exec forked subshells use reset_subshell_signals() instead.
+ */
+void reset_signals_for_exec(void);
+
+/**
  * @brief Set the SIGINT (Ctrl+C) handler
  *
  * Configures handling of interrupt signals for interactive use.

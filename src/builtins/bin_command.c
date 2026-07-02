@@ -13,7 +13,6 @@
 #include "symtable.h"
 
 #include <errno.h>
-#include <signal.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
@@ -198,17 +197,9 @@ int bin_command(int argc, char **argv) {
     }
 
     if (pid == 0) {
-        /// Child process
-        /// Reset signal handlers to default
-        signal(SIGINT, SIG_DFL);
-        signal(SIGQUIT, SIG_DFL);
-        signal(SIGTSTP, SIG_DFL);
-        signal(SIGTTIN, SIG_DFL);
-        signal(SIGTTOU, SIG_DFL);
-        signal(SIGCHLD, SIG_DFL);
-        /// Dispositions reset above; also drop the startup SIGHUP block so it
-        /// is not inherited across exec.
-        reset_signal_mask_for_exec();
+        /// Child process: reset every disposition to default and clear the mask
+        /// so the exec'd program starts from a clean slate.
+        reset_signals_for_exec();
 
         /// Build argv for execv - use original argv from cmd_start
         execv(cmd_path, &argv[cmd_start]);
