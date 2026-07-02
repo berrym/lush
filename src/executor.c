@@ -9028,14 +9028,14 @@ static int execute_external_command_with_setup(executor_t *executor,
     }
 
     if (pid == 0) {
-        /// Restore default signal dispositions before anything else: until the
-        /// execvp below replaces this image, the child still carries the
-        /// shell's caught SIGHUP handler. A hangup forwarded by the parent's
-        /// foreground wait in this pre-exec window would otherwise be caught
-        /// (and lost) by that handler, leaving the exec'd command running past
-        /// the hangup. SIG_DFL here makes the window terminate on a forwarded
-        /// hangup, the same reset every other fork site already performs.
-        reset_subshell_signals();
+        /// Restore default dispositions and clear the mask before anything
+        /// else: until the execvp below replaces this image, the child still
+        /// carries the shell's caught SIGHUP handler. A hangup forwarded by the
+        /// parent's foreground wait in this pre-exec window would otherwise be
+        /// caught (and lost) by that handler, leaving the exec'd command
+        /// running past the hangup. SIG_DFL here makes the window terminate on
+        /// a forwarded hangup, and hands the exec'd program a clean slate.
+        reset_signals_for_exec();
 
         /// Child process - setup redirections here
         int redir_result = setup_redirections(executor, command);
@@ -9052,8 +9052,6 @@ static int execute_external_command_with_setup(executor_t *executor,
             }
         }
 
-        /// Do not inherit the shell's startup SIGHUP block across exec.
-        reset_signal_mask_for_exec();
         execvp(argv[0], argv);
         /// Check errno to determine appropriate exit code
         int exit_code = 127; /// Default: command not found

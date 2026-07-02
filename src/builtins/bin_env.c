@@ -229,8 +229,9 @@ int bin_env(int argc, char **argv) {
             }
         }
 
-        /// Drop the startup SIGHUP block so it is not inherited across exec.
-        reset_signal_mask_for_exec();
+        /// Reset every disposition to default and clear the mask so the exec'd
+        /// program starts from a clean slate.
+        reset_signals_for_exec();
 
         /// Execute command
         execvp(argv[i], &argv[i]);
