@@ -1597,6 +1597,15 @@ static int execute_command_list(executor_t *executor, node_t *list) {
         /// Update exit status after each command in the sequence
         set_exit_status(last_result);
 
+        /// Dispatch any pending signal-trap bodies at this command boundary.
+        /// This is the safe point that makes a `trap ... SIG` fire under -c, in
+        /// a script, and mid-batch -- not only between REPL iterations, where
+        /// alone it was previously dispatched (issue #409).
+        /// execute_pending_traps preserves $?, so a firing trap is transparent
+        /// to the surrounding status seen by fire_err_trap, set -e, and the
+        /// next command.
+        execute_pending_traps();
+
         if (executor->debug) {
             printf("DEBUG: Command result: %d\n", last_result);
         }
