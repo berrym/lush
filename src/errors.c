@@ -71,9 +71,3 @@ void error_abort(const char *fmt, ...) {
     abort();            /// dump core and terminate
     exit(EXIT_FAILURE); /// should never happen
 }
-
-void sigsegv_handler(int signo) {
-    error_abort(
-        "lush: caught signal %d, terminating.\n\tAnd fix your damn code.\n",
-        signo);
-}

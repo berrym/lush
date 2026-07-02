@@ -15,7 +15,6 @@
 
 #include "signals.h"
 
-#include "errors.h"
 #include "executor.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lush.h"
@@ -28,6 +27,15 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+/// backtrace()/backtrace_symbols_fd() live in <execinfo.h> on glibc and macOS
+/// -- the two supported targets. They are not POSIX, so the crash handler's
+/// backtrace is compiled only where the header exists and degrades to a plain
+/// message-and-reraise elsewhere.
+#if defined(__GLIBC__) || defined(__APPLE__)
+#include <execinfo.h>
+#define LUSH_HAVE_BACKTRACE 1
+#endif
 
 /** @brief Global trap list head */
 trap_entry_t *trap_list = NULL;
@@ -132,6 +140,63 @@ static volatile sig_atomic_t sighup_received = 0;
 static void sighup_handler(int signo) {
     (void)signo;
     sighup_received = 1;
+}
+
+/**
+ * @brief Async-signal-safe crash handler for SIGSEGV.
+ *
+ * A segmentation fault leaves the process in an undefined state -- the fault
+ * may have struck mid-malloc or mid-stdio, holding an allocator or FILE lock --
+ * so the handler touches only async-signal-safe primitives. It writes a fixed
+ * message with write() (never stdio: the old handler formatted through
+ * vsprintf/fputs, which can deadlock or corrupt further), emits a best-effort
+ * backtrace where available, then restores the default disposition and
+ * re-raises the original signal. Re-raising, rather than the old abort(),
+ * terminates the shell from SIGSEGV itself -- yielding the correct 128 +
+ * SIGSEGV wait status and a core dump honoring the user's `ulimit -c`, instead
+ * of masking the fault behind SIGABRT. A one-shot guard forces straight to
+ * re-raise if the handler itself faults (e.g. walking a corrupted stack).
+ *
+ * Not handled here: a stack-overflow SIGSEGV leaves no stack to run the handler
+ * on, so the kernel takes the default action directly; catching that would need
+ * a sigaltstack, a separate hardening step.
+ *
+ * @param signo Signal number (SIGSEGV)
+ */
+static void sigsegv_handler(int signo) {
+    static volatile sig_atomic_t handling = 0;
+
+    if (handling) {
+        /// The handler itself faulted; do no further work, just terminate.
+        signal(signo, SIG_DFL);
+        raise(signo);
+        _exit(128 + signo);
+    }
+    handling = 1;
+
+    static const char msg[] =
+        "\nlush: fatal signal (segmentation fault) -- this is a bug in lush.\n"
+        "Terminating; a core dump follows if enabled (see: ulimit -c).\n";
+    (void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
+
+#ifdef LUSH_HAVE_BACKTRACE
+    /// backtrace_symbols_fd writes straight to the fd and is async-signal-safe;
+    /// backtrace_symbols (which allocates) is not, so it is never used here.
+    {
+        static const char label[] = "backtrace (innermost frame first):\n";
+        void *frames[64];
+        int n = backtrace(frames, (int)(sizeof(frames) / sizeof(frames[0])));
+        (void)!write(STDERR_FILENO, label, sizeof(label) - 1);
+        backtrace_symbols_fd(frames, n, STDERR_FILENO);
+    }
+#endif
+
+    /// Terminate from the original signal. The delivering signal is blocked for
+    /// the duration of its own handler (set_signal_handler uses no SA_NODEFER),
+    /// so the re-raised signal stays pending until this handler returns, then
+    /// is delivered to SIG_DFL -- the correct wait status and a core dump.
+    signal(signo, SIG_DFL);
+    raise(signo);
 }
 
 /**
