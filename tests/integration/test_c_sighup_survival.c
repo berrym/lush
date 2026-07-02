@@ -51,16 +51,6 @@
 #define READY_MARKER "LUSH_READY_FOR_HANGUP"
 #define READY_TIMEOUT_MS 10000
 
-/// A brief settle after the readiness marker. The marker proves init is done
-/// and the shell is executing; this covers only the fast, unobservable
-/// fork -> exec -> enter-wait transition for cases that spawn a foreground
-/// command, so SIGHUP lands on the running command rather than in the shell's
-/// fork/pre-exec window (where a forwarded hangup can be caught by the child
-/// before it resets its inherited handler). Sized with large margin over that
-/// microsecond transition; the deeper fork-window race is a signal-model
-/// concern for the P1 work, not this test.
-#define SETTLE_MS 300
-
 static void msleep(long ms) {
     struct timespec ts = {ms / 1000, (ms % 1000) * 1000000L};
     nanosleep(&ts, NULL);
@@ -154,12 +144,14 @@ static bool run_case(const char *lush, const char *script, bool block_stdin,
         }
         msleep(10);
     }
-    if (*reached_ready) {
-        msleep(SETTLE_MS);
-    }
 
     /// The hangup targets only the shell process, mimicking `kill -HUP` to the
-    /// shell rather than a terminal hangup that signals the whole group.
+    /// shell rather than a terminal hangup that signals the whole group. No
+    /// settle after the marker is needed: lush_fork blocks SIGHUP across the
+    /// fork, so a hangup that lands in the child's fork/pre-exec window is held
+    /// pending and delivered to SIG_DFL once the child resets -- the command is
+    /// terminated whether the signal arrives before or during its foreground
+    /// wait.
     kill(pid, SIGHUP);
 
     /// Poll for termination up to the timeout instead of a blocking waitpid, so

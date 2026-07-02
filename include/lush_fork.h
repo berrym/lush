@@ -24,15 +24,29 @@
 #define LUSH_FORK_H
 
 #include <errno.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 /**
- * @brief fork() wrapper that flushes libc stdio buffers first
+ * @brief fork() wrapper that flushes libc stdio buffers and blocks SIGHUP
  *
  * Same return-value semantics as fork(): -1 on error, 0 in the child,
- * child PID in the parent. The flush is the only added behavior.
+ * child PID in the parent.
+ *
+ * Beyond the stdio flush, SIGHUP is blocked across the fork so the child
+ * inherits it blocked. Until the child resets its dispositions to default
+ * (reset_subshell_signals / reset_signals_for_exec) it still carries the
+ * shell's caught SIGHUP handler; a hangup delivered into that pre-reset window
+ * -- notably one the parent's foreground wait forwards before the child has
+ * exec'd -- would otherwise be caught and lost by the inherited handler,
+ * leaving the command running past the hangup. Blocked, the hangup stays
+ * pending and is delivered to SIG_DFL the instant the child's reset lifts the
+ * block (both resets clear SIGHUP from the mask), so the child terminates as
+ * intended. The parent restores its own mask immediately; only the child keeps
+ * the block, which its reset then lifts.
  *
  * @return Same as fork()
  *
@@ -52,7 +66,21 @@ static inline pid_t lush_fork(void) {
 #else
     fflush(stdout);
     fflush(stderr);
-    return fork();
+
+    /// Block SIGHUP across the fork; the child inherits it blocked until its
+    /// signal reset lifts the block (see the function comment above). The
+    /// parent restores its previous mask right after the fork.
+    sigset_t hup, prev;
+    sigemptyset(&hup);
+    sigaddset(&hup, SIGHUP);
+    pthread_sigmask(SIG_BLOCK, &hup, &prev);
+
+    pid_t pid = fork();
+
+    if (pid != 0) {
+        pthread_sigmask(SIG_SETMASK, &prev, NULL);
+    }
+    return pid;
 #endif
 }
 
