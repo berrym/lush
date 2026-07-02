@@ -39,8 +39,27 @@
 /// shell that fails to hang up is unambiguously distinguished from one that
 /// exits promptly: the former is still alive when the timeout expires.
 #define SLEEP_SECS "30"
-#define HANGUP_DELAY_MS 300
-#define WAIT_TIMEOUT_MS 12000
+#define WAIT_TIMEOUT_MS 10000
+
+/// Readiness handshake. Each script prints this marker at the exact point the
+/// test wants to interrupt: the non-read cases echo it just before the
+/// foreground command; the read case uses `read -p`, whose prompt is flushed as
+/// read begins to block. The test waits for the marker before delivering SIGHUP
+/// instead of guessing with a fixed delay -- a fixed delay misfires under
+/// parallel-test CPU load, where the shell may not have reached the target
+/// state in time (the original cause of this test flaking under load).
+#define READY_MARKER "LUSH_READY_FOR_HANGUP"
+#define READY_TIMEOUT_MS 10000
+
+/// A brief settle after the readiness marker. The marker proves init is done
+/// and the shell is executing; this covers only the fast, unobservable
+/// fork -> exec -> enter-wait transition for cases that spawn a foreground
+/// command, so SIGHUP lands on the running command rather than in the shell's
+/// fork/pre-exec window (where a forwarded hangup can be caught by the child
+/// before it resets its inherited handler). Sized with large margin over that
+/// microsecond transition; the deeper fork-window race is a signal-model
+/// concern for the P1 work, not this test.
+#define SETTLE_MS 300
 
 static void msleep(long ms) {
     struct timespec ts = {ms / 1000, (ms % 1000) * 1000000L};
@@ -48,17 +67,21 @@ static void msleep(long ms) {
 }
 
 /**
- * @brief Run `lush -c script`, send SIGHUP after a delay, collect the outcome.
+ * @brief Run `lush -c script`, deliver SIGHUP once the shell signals readiness,
+ *        and collect the outcome.
  *
- * @param block_stdin  When true the child's stdin is a pipe the parent holds
- *                     open but never writes, so a `read` builtin blocks on it.
- *                     When false stdin is /dev/null (immediate EOF).
- * @param out          Captured stdout (NUL-terminated, truncated to out_sz).
+ * @param block_stdin    When true the child's stdin is a pipe the parent holds
+ *                       open but never writes, so a `read` builtin blocks on
+ * it. When false stdin is /dev/null (immediate EOF).
+ * @param out            Captured stdout (NUL-terminated, truncated to out_sz);
+ *                       includes the readiness marker.
+ * @param reached_ready  Set true once the readiness marker was observed.
  * @return true if the child terminated within WAIT_TIMEOUT_MS (status in
  *         *status); false if it was still running and had to be killed.
  */
 static bool run_case(const char *lush, const char *script, bool block_stdin,
-                     char *out, size_t out_sz, int *status) {
+                     char *out, size_t out_sz, int *status,
+                     bool *reached_ready) {
     int outpipe[2];
     if (pipe(outpipe) != 0) {
         fprintf(stderr, "%s: pipe failed: %s\n", TEST, strerror(errno));
@@ -108,21 +131,51 @@ static bool run_case(const char *lush, const char *script, bool block_stdin,
         close(inpipe[0]);
     }
 
+    /// Capture non-blocking from the start so the readiness wait and the final
+    /// drain never block on the pipe.
+    int flags = fcntl(outpipe[0], F_GETFL, 0);
+    fcntl(outpipe[0], F_SETFL, flags | O_NONBLOCK);
+    size_t len = 0;
+    ssize_t n;
+
+    /// Readiness handshake: wait for the marker (proof the shell is past init
+    /// and blocked at the point to interrupt) before signalling, rather than
+    /// guessing with a fixed delay that misfires under parallel-test CPU load.
+    *reached_ready = false;
+    for (long waited = 0; waited < READY_TIMEOUT_MS; waited += 10) {
+        while (len + 1 < out_sz &&
+               (n = read(outpipe[0], out + len, out_sz - 1 - len)) > 0) {
+            len += (size_t)n;
+        }
+        out[len] = '\0';
+        if (strstr(out, READY_MARKER) != NULL) {
+            *reached_ready = true;
+            break;
+        }
+        msleep(10);
+    }
+    if (*reached_ready) {
+        msleep(SETTLE_MS);
+    }
+
     /// The hangup targets only the shell process, mimicking `kill -HUP` to the
     /// shell rather than a terminal hangup that signals the whole group.
-    msleep(HANGUP_DELAY_MS);
     kill(pid, SIGHUP);
 
     /// Poll for termination up to the timeout instead of a blocking waitpid, so
     /// a shell that never hangs up is reaped by the test rather than hanging
-    /// it.
+    /// it; keep draining so a filled pipe never blocks the child mid-teardown.
     bool reaped = false;
     for (long waited = 0; waited < WAIT_TIMEOUT_MS; waited += 50) {
-        pid_t r = waitpid(pid, status, WNOHANG);
-        if (r == pid) {
+        if (waitpid(pid, status, WNOHANG) == pid) {
             reaped = true;
             break;
         }
+        while (len + 1 < out_sz &&
+               (n = read(outpipe[0], out + len, out_sz - 1 - len)) > 0) {
+            len += (size_t)n;
+        }
+        out[len] = '\0';
         msleep(50);
     }
     if (!reaped) {
@@ -136,13 +189,7 @@ static bool run_case(const char *lush, const char *script, bool block_stdin,
     /// EOF.
     kill(-pid, SIGKILL);
 
-    /// Drain whatever the shell printed before terminating. Non-blocking: a
-    /// just-killed grandchild's not-yet-closed write-end must not stall the
-    /// read. Output is tiny and already flushed by the time the shell exited.
-    int flags = fcntl(outpipe[0], F_GETFL, 0);
-    fcntl(outpipe[0], F_SETFL, flags | O_NONBLOCK);
-    size_t len = 0;
-    ssize_t n;
+    /// Final drain of anything printed before termination.
     while (len + 1 < out_sz &&
            (n = read(outpipe[0], out + len, out_sz - 1 - len)) > 0) {
         len += (size_t)n;
@@ -171,8 +218,16 @@ static int check(const char *lush, const char *label, const char *script,
                  bool block_stdin, const char *forbidden) {
     char out[4096];
     int status = 0;
-    bool reaped =
-        run_case(lush, script, block_stdin, out, sizeof(out), &status);
+    bool reached_ready = false;
+    bool reaped = run_case(lush, script, block_stdin, out, sizeof(out), &status,
+                           &reached_ready);
+    if (!reached_ready) {
+        fprintf(stderr,
+                "FAIL %s [%s]: shell never printed the readiness marker within "
+                "%d ms (captured: \"%.120s\")\n",
+                TEST, label, READY_TIMEOUT_MS, out);
+        return 1;
+    }
     if (!reaped) {
         fprintf(stderr,
                 "FAIL %s [%s]: shell did not hang up within %d ms; it waited "
@@ -213,15 +268,23 @@ int main(int argc, char **argv) {
     signal(SIGHUP, SIG_IGN);
 
     int rc = 0;
-    rc |=
-        check(lush, "lone external command", "sleep " SLEEP_SECS, false, NULL);
+    rc |= check(lush, "lone external command",
+                "echo " READY_MARKER "; sleep " SLEEP_SECS, false, NULL);
+    /// read -p flushes the marker exactly as read begins to block, so SIGHUP
+    /// lands during the read (a marker before the read could let the signal
+    /// arrive before read starts, where read would block with no input).
     rc |= check(lush, "hangup during read",
-                "read x; sleep " SLEEP_SECS "; echo LEAKED", true, "LEAKED");
-    rc |= check(lush, "multi-line batch", "sleep " SLEEP_SECS "\necho LEAKED",
+                "read -p " READY_MARKER " x; sleep " SLEEP_SECS "; echo LEAKED",
+                true, "LEAKED");
+    rc |= check(lush, "multi-line batch",
+                "echo " READY_MARKER "\nsleep " SLEEP_SECS "\necho LEAKED",
                 false, "LEAKED");
-    rc |= check(lush, "pipeline", "sleep " SLEEP_SECS " | cat", false, NULL);
+    rc |=
+        check(lush, "pipeline",
+              "echo " READY_MARKER "; sleep " SLEEP_SECS " | cat", false, NULL);
     rc |= check(lush, "command substitution",
-                "x=$(sleep " SLEEP_SECS "); echo LEAKED", false, "LEAKED");
+                "echo " READY_MARKER "; x=$(sleep " SLEEP_SECS "); echo LEAKED",
+                false, "LEAKED");
 
     if (rc == 0) {
         fprintf(stderr, "PASS %s\n", TEST);
