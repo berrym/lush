@@ -142,6 +142,16 @@ void set_sigint_handler(void);
 void set_current_child_pid(pid_t pid);
 
 /**
+ * @brief Get the current foreground child PID
+ *
+ * Returns the PID the SIGINT handler forwards Ctrl-C to, so a caller that
+ * runs nested shell code (a trap dispatcher) can snapshot and restore it.
+ *
+ * @return The current child PID, or 0 if none.
+ */
+pid_t get_current_child_pid(void);
+
+/**
  * @brief Clear the current child process PID
  *
  * Clears the recorded child PID after the child terminates.
@@ -218,6 +228,14 @@ int get_signal_number(const char *signame);
  * context. Should be called at the top of each REPL iteration.
  */
 void execute_pending_traps(void);
+
+/**
+ * @brief True if any signal trap is pending dispatch
+ *
+ * A cheap query (a single volatile read) used by run_pending_signals to skip
+ * the state-bracketing work when nothing is pending.
+ */
+bool signal_traps_pending(void);
 
 /**
  * @brief Execute all EXIT traps

@@ -60,6 +60,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
 
 /// Global executor pointer for job control builtins
@@ -1513,6 +1514,109 @@ static int execute_node(executor_t *executor, node_t *node) {
     }
 }
 
+bool run_pending_signals(executor_t *executor) {
+    /// Re-entrancy guard: a trap body that itself blocks on a foreground
+    /// command re-enters here; skip the nested call so the pending bit is
+    /// dispatched at the next outer safe point rather than recursing.
+    static bool dispatching = false;
+    if (dispatching || !executor || !signal_traps_pending()) {
+        return false;
+    }
+    dispatching = true;
+
+    /// Snapshot every piece of state a nested trap body could corrupt for the
+    /// dispatching point. State a trap is meant to change -- variables, cwd,
+    /// $!, the job list -- is deliberately not bracketed; $? is bracketed
+    /// inside execute_pending_traps.
+    int saved_errno = errno;
+    pid_t saved_child = get_current_child_pid();
+
+    int saved_procsub_fds[32];
+    pid_t saved_procsub_pids[32];
+    int saved_procsub_count = executor->procsub_fd_count;
+    memcpy(saved_procsub_fds, executor->procsub_fds, sizeof(saved_procsub_fds));
+    memcpy(saved_procsub_pids, executor->procsub_pids,
+           sizeof(saved_procsub_pids));
+
+    loop_control_t saved_loop_control = executor->loop_control;
+    int saved_loop_control_level = executor->loop_control_level;
+    int saved_loop_depth = executor->loop_depth;
+    bool saved_command_abort = executor->command_abort;
+    bool saved_has_error = executor->has_error;
+    const char *saved_error_message = executor->error_message;
+
+    char *saved_script_file = executor->current_script_file
+                                  ? strdup(executor->current_script_file)
+                                  : NULL;
+    bool saved_in_script = executor->in_script_execution;
+
+    void *saved_comp_result = executor->active_comp_result;
+    const char *saved_comp_prefix = executor->active_comp_prefix;
+
+    bool have_tty = isatty(STDIN_FILENO);
+    pid_t saved_pgrp = -1;
+    struct termios saved_termios;
+    bool have_termios = false;
+    if (have_tty) {
+        saved_pgrp = tcgetpgrp(STDIN_FILENO);
+        have_termios = (tcgetattr(STDIN_FILENO, &saved_termios) == 0);
+    }
+
+    /// Give the trap an empty process-substitution set and completion
+    /// accumulator so its own use of those touches only its own entries rather
+    /// than closing/reaping the outer command's live process substitutions.
+    executor->procsub_fd_count = 0;
+    executor->active_comp_result = NULL;
+    executor->active_comp_prefix = NULL;
+
+    execute_pending_traps();
+
+    bool exit_requested = exit_flag || executor->shell_exit_requested;
+
+    /// A POSIX abort inside a trap body (${var:?word}, set -u unbound) records
+    /// its status in shell_exit_status, not $?, and does not set exit_flag.
+    /// Surface it so the boundary's `return last_exit_status` yields the abort
+    /// status -- matching the direct POSIX-abort path (execute_command_list
+    /// returns shell_exit_status), rather than the pre-trap value.
+    if (executor->shell_exit_requested) {
+        set_exit_status(executor->shell_exit_status);
+    }
+
+    /// Restore.
+    set_current_child_pid(saved_child);
+    memcpy(executor->procsub_fds, saved_procsub_fds, sizeof(saved_procsub_fds));
+    memcpy(executor->procsub_pids, saved_procsub_pids,
+           sizeof(saved_procsub_pids));
+    executor->procsub_fd_count = saved_procsub_count;
+    executor->loop_control = saved_loop_control;
+    executor->loop_control_level = saved_loop_control_level;
+    executor->loop_depth = saved_loop_depth;
+    executor->command_abort = saved_command_abort;
+    executor->has_error = saved_has_error;
+    executor->error_message = saved_error_message;
+    free(executor->current_script_file);
+    executor->current_script_file = saved_script_file;
+    /// Keep the script-context invariant even if the strdup above failed under
+    /// OOM: in_script_execution stays true only while current_script_file holds
+    /// a valid path.
+    executor->in_script_execution =
+        saved_in_script && (saved_script_file != NULL);
+    executor->active_comp_result = saved_comp_result;
+    executor->active_comp_prefix = saved_comp_prefix;
+    if (have_tty) {
+        if (saved_pgrp != -1) {
+            tcsetpgrp(STDIN_FILENO, saved_pgrp);
+        }
+        if (have_termios) {
+            tcsetattr(STDIN_FILENO, TCSANOW, &saved_termios);
+        }
+    }
+    errno = saved_errno;
+
+    dispatching = false;
+    return exit_requested;
+}
+
 /**
  * @brief Execute a sequence of commands
  *
@@ -1597,14 +1701,15 @@ static int execute_command_list(executor_t *executor, node_t *list) {
         /// Update exit status after each command in the sequence
         set_exit_status(last_result);
 
-        /// Dispatch any pending signal-trap bodies at this command boundary.
-        /// This is the safe point that makes a `trap ... SIG` fire under -c, in
-        /// a script, and mid-batch -- not only between REPL iterations, where
-        /// alone it was previously dispatched (issue #409).
-        /// execute_pending_traps preserves $?, so a firing trap is transparent
-        /// to the surrounding status seen by fire_err_trap, set -e, and the
-        /// next command.
-        execute_pending_traps();
+        /// Dispatch any pending signal-trap bodies at this command boundary --
+        /// the safe point that makes a `trap ... SIG` fire under -c, in a
+        /// script, and mid-batch, not only between REPL iterations (issue
+        /// #409). run_pending_signals brackets $? and the executor/process
+        /// state a trap body can perturb; if a trap ran `exit`, stop the list
+        /// here.
+        if (run_pending_signals(executor)) {
+            return last_exit_status;
+        }
 
         if (executor->debug) {
             printf("DEBUG: Command result: %d\n", last_result);

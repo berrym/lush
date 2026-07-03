@@ -376,6 +376,10 @@ void reset_signals_for_exec(void) {
  */
 void set_current_child_pid(pid_t pid) { current_child_pid = pid; }
 
+pid_t get_current_child_pid(void) { return current_child_pid; }
+
+bool signal_traps_pending(void) { return pending_trap_signals != 0; }
+
 /**
  * @brief Clear current child PID
  *
@@ -728,18 +732,37 @@ void execute_pending_traps(void) {
     /// (e.g. `trap false USR1`) does not clobber $? for the following commands.
     /// Matches bash; the trap's own side effects on variables, cwd, etc. still
     /// register because it runs in the primary shell context.
+    executor_t *exec = get_global_executor();
     int saved_status = last_exit_status;
 
     for (int signo = 1; signo < 32; signo++) {
         if (pending & (1 << signo)) {
             trap_entry_t *trap = find_trap(signo);
             if (trap && trap->command) {
-                run_trap_command(trap->command);
+                /// Run a copy of the command: a self-modifying trap -- one
+                /// whose body runs `trap - SIG` or `trap other SIG` for its own
+                /// signal
+                /// -- frees this exact string via remove_trap while it is still
+                /// in use, so hand run_trap_command an independent copy.
+                char *cmd = strdup(trap->command);
+                if (cmd) {
+                    run_trap_command(cmd);
+                    free(cmd);
+                }
             }
+        }
+        /// Stop once a trap has requested shell exit (`exit`, or a POSIX abort
+        /// like ${var:?word} / set -u): no further trap bodies should run.
+        if (exit_flag || (exec && exec->shell_exit_requested)) {
+            break;
         }
     }
 
-    set_exit_status(saved_status);
+    /// Restore $? -- unless a trap requested exit, whose chosen status must
+    /// stand rather than be overwritten with the pre-trap value.
+    if (!exit_flag && !(exec && exec->shell_exit_requested)) {
+        set_exit_status(saved_status);
+    }
 }
 
 /**

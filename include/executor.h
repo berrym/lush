@@ -311,6 +311,24 @@ int executor_execute_command_line(executor_t *executor, const char *input,
                                   size_t starting_line);
 
 /**
+ * @brief Dispatch pending signal traps, re-entrant-safe and self-contained
+ *
+ * A trap body is a full nested command execution, so it can mutate executor and
+ * process state the dispatching point (a command boundary, or an interrupted
+ * foreground wait) relies on staying stable. This wrapper brackets every such
+ * piece of state around the dispatch -- the SIGINT-forwarding child pid, the
+ * process-substitution tables, loop control, the command-abort flag, the script
+ * context, the completion accumulator, the terminal foreground group and line
+ * discipline, and errno -- while deliberately letting a trap's intended effects
+ * (variables, cwd, $!) persist. A re-entrancy guard makes it safe to call from
+ * nested contexts (a trap that itself blocks on a command). Fast-returns when
+ * no trap is pending.
+ *
+ * @return true if a dispatched trap requested shell exit (`exit`, ${x:?word}).
+ */
+bool run_pending_signals(executor_t *executor);
+
+/**
  * @brief Fetch the text of a single source line for diagnostic display
  *
  * Returns a freshly-allocated copy of the requested line from the
