@@ -723,17 +723,23 @@ void execute_pending_traps(void) {
     /// during execution, it will set the bit again for next iteration)
     pending_trap_signals = 0;
 
+    /// A signal trap is transparent to $?: save the status the surrounding
+    /// script observes and restore it after the trap body, so a firing trap
+    /// (e.g. `trap false USR1`) does not clobber $? for the following commands.
+    /// Matches bash; the trap's own side effects on variables, cwd, etc. still
+    /// register because it runs in the primary shell context.
+    int saved_status = last_exit_status;
+
     for (int signo = 1; signo < 32; signo++) {
         if (pending & (1 << signo)) {
             trap_entry_t *trap = find_trap(signo);
             if (trap && trap->command) {
-                /// Trap commands are fire-and-forget; their exit status
-                /// is propagated by the surrounding shell context, not by
-                /// this trap dispatch.
                 run_trap_command(trap->command);
             }
         }
     }
+
+    set_exit_status(saved_status);
 }
 
 /**
