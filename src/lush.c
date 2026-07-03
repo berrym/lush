@@ -295,9 +295,11 @@ int main(int argc, char **argv) {
     /// or EOF is read from either stdin or input file
     while (!exit_flag) {
         /// Execute any trap commands deferred from signal handlers.
-        /// Signal handlers only set a bitmask (async-signal-safe); the
-        /// actual trap command execution happens here in main loop context.
-        execute_pending_traps();
+        /// Signal handlers only set a bitmask (async-signal-safe); the actual
+        /// trap command execution happens here in main loop context, through
+        /// the re-entrant-safe dispatcher (its state brackets are no-ops at the
+        /// quiescent REPL top but keep every dispatch path uniform).
+        run_pending_signals(global_executor);
 
         /// Honor a SIGHUP that arrived outside the input read -- during startup
         /// (delivered when init unblocked it), before this loop was entered, or
