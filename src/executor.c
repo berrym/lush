@@ -16711,9 +16711,9 @@ void executor_remove_job(executor_t *executor, int job_id) {
     }
 }
 
-void executor_reap_job(job_t *job, bool blocking) {
+int executor_reap_job(job_t *job, bool blocking) {
     if (!job) {
-        return;
+        return 0;
     }
 
     if (blocking) {
@@ -16722,27 +16722,41 @@ void executor_reap_job(job_t *job, bool blocking) {
         /// it, and a job that is already stopped is waited on until it is
         /// continued and exits -- matching bash, which blocks on a stopped job.
         if (job->state == JOB_DONE) {
-            return;
+            return 0;
         }
-        int status;
-        pid_t result = waitpid(job_target(job), &status, 0);
-        if (result <= 0) {
-            return;
+        for (;;) {
+            int status;
+            pid_t result = waitpid(job_target(job), &status, 0);
+            if (result > 0) {
+                job->status = status;
+                job->state = JOB_DONE;
+                return 0;
+            }
+            if (result == -1 && errno == EINTR) {
+                /// bash breaks a `wait` for a signal it must act on (a trap, a
+                /// hangup, an interrupt) and resumes it across an incidental
+                /// one. A break returns the signal number so the caller can
+                /// report 128 + signo.
+                int brk = signal_wait_break_check();
+                if (brk > 0) {
+                    return brk;
+                }
+                continue;
+            }
+            /// A genuine error (e.g. ECHILD): leave the job as-is.
+            return 0;
         }
-        job->status = status;
-        job->state = JOB_DONE;
-        return;
     }
 
     /// A non-blocking poll (the status sweep) also detects stops, so a `jobs`
     /// listing can show a Stopped job.
     if (job->state != JOB_RUNNING) {
-        return;
+        return 0;
     }
     int status;
     pid_t result = waitpid(job_target(job), &status, WNOHANG | WUNTRACED);
     if (result <= 0) {
-        return;
+        return 0;
     }
     if (WIFSTOPPED(status)) {
         job->state = JOB_STOPPED;
@@ -16750,6 +16764,7 @@ void executor_reap_job(job_t *job, bool blocking) {
         job->status = status;
         job->state = JOB_DONE;
     }
+    return 0;
 }
 
 int executor_job_status_code(const job_t *job) {

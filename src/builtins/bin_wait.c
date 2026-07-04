@@ -7,6 +7,7 @@
  */
 
 #include "builtins.h"
+#include "signals.h"
 
 #include <errno.h>
 #include <sys/wait.h>
@@ -19,11 +20,26 @@
  * left in the list rather than removed here, so a repeated `wait` on the same
  * job reports the same status until a status sweep retires it -- matching bash.
  *
- * @param job Tracked job to wait for
- * @return The job's shell exit code
+ * If a signal the shell must act on (a trap, a hangup, an interrupt) breaks the
+ * wait, the job is left running and 128 + signo is reported instead, matching
+ * bash's `wait` behavior; the trap then dispatches at the next command
+ * boundary. The break is reported separately in *break_signo (nonzero) so a
+ * caller iterating multiple operands can stop immediately, rather than
+ * inferring it from the 128 + signo return, which a job legitimately killed by
+ * a signal also produces.
+ *
+ * @param job         Tracked job to wait for
+ * @param break_signo Set to the breaking signal number, or 0 if the job was
+ *                    reaped normally
+ * @return The job's shell exit code, or 128 + signo if a signal broke the wait
  */
-static int wait_for_tracked_job(job_t *job) {
-    executor_reap_job(job, true);
+static int wait_for_tracked_job(job_t *job, int *break_signo) {
+    int brk = executor_reap_job(job, true);
+    if (brk > 0) {
+        *break_signo = brk;
+        return 128 + brk;
+    }
+    *break_signo = 0;
     if (job->state == JOB_DONE) {
         job->reported = true;
     }
@@ -91,7 +107,10 @@ int bin_wait(int argc, char **argv) {
     /// now-reported completed jobs.
     if (argc == 1) {
         for (job_t *job = current_executor->jobs; job; job = job->next) {
-            executor_reap_job(job, true);
+            int brk = executor_reap_job(job, true);
+            if (brk > 0) {
+                return 128 + brk;
+            }
             if (job->state == JOB_DONE) {
                 job->reported = true;
             }
@@ -123,7 +142,11 @@ int bin_wait(int argc, char **argv) {
                                       "%%%ld: no such job", id);
                 return 127;
             }
-            overall_exit_status = wait_for_tracked_job(job);
+            int break_signo;
+            overall_exit_status = wait_for_tracked_job(job, &break_signo);
+            if (break_signo > 0) {
+                return overall_exit_status;
+            }
             continue;
         }
 
@@ -139,12 +162,29 @@ int bin_wait(int argc, char **argv) {
         /// repeated wait stays consistent; otherwise wait on the pid directly.
         job_t *job = executor_find_job_by_pid(current_executor, (pid_t)target);
         if (job) {
-            overall_exit_status = wait_for_tracked_job(job);
+            int break_signo;
+            overall_exit_status = wait_for_tracked_job(job, &break_signo);
+            if (break_signo > 0) {
+                return overall_exit_status;
+            }
             continue;
         }
 
         int status;
-        pid_t result = waitpid((pid_t)target, &status, 0);
+        pid_t result;
+        for (;;) {
+            result = waitpid((pid_t)target, &status, 0);
+            if (result != -1 || errno != EINTR) {
+                break;
+            }
+            /// The same signal handling as a tracked wait: break for a trap,
+            /// hangup, or interrupt (report 128 + signo); resume across an
+            /// incidental signal.
+            int brk = signal_wait_break_check();
+            if (brk > 0) {
+                return 128 + brk;
+            }
+        }
         if (result == -1) {
             if (errno == ECHILD) {
                 executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,

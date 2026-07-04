@@ -390,6 +390,39 @@ pid_t get_current_child_pid(void) { return current_child_pid; }
 
 bool signal_traps_pending(void) { return pending_trap_signals != 0; }
 
+int signal_first_pending_trap(void) {
+    sig_atomic_t pending = pending_trap_signals;
+    for (int signo = 1; signo < 32; signo++) {
+        if (pending & (1u << signo)) {
+            return signo;
+        }
+    }
+    return 0;
+}
+
+int signal_wait_break_check(void) {
+    /// A trapped signal breaks the wait; its pending bit is left set so the
+    /// trap body dispatches at the next command boundary (the caller returns
+    /// 128 + signo, which that boundary preserves as $?).
+    int trapped = signal_first_pending_trap();
+    if (trapped > 0) {
+        return trapped;
+    }
+    /// A hangup breaks the wait; the flag stays set so the shell exits at the
+    /// next boundary.
+    if (sighup_was_received()) {
+        return SIGHUP;
+    }
+    /// An interrupt breaks the wait; the flag is consumed here because the wait
+    /// is the interrupt's target and there is no foreground child to forward it
+    /// to.
+    if (check_and_clear_sigint_flag()) {
+        return SIGINT;
+    }
+    /// An incidental signal (a SIGWINCH resize): the caller resumes the wait.
+    return 0;
+}
+
 /**
  * @brief Clear current child PID
  *
@@ -443,7 +476,7 @@ static trap_entry_t *find_trap(int signal) {
  */
 static void trap_signal_handler(int signo) {
     if (signo > 0 && signo < 32) {
-        pending_trap_signals |= (1 << signo);
+        pending_trap_signals |= (1u << signo);
     }
 }
 
@@ -746,7 +779,7 @@ void execute_pending_traps(void) {
     int saved_status = last_exit_status;
 
     for (int signo = 1; signo < 32; signo++) {
-        if (pending & (1 << signo)) {
+        if (pending & (1u << signo)) {
             trap_entry_t *trap = find_trap(signo);
             if (trap && trap->command) {
                 /// Run a copy of the command: a self-modifying trap -- one

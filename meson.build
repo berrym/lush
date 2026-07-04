@@ -2860,6 +2860,16 @@ if fs.exists('tests/integration/test_job_tracking.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_wait_interrupt.c')
+  test_wait_interrupt = executable('test_wait_interrupt',
+                                   ['tests/integration/test_wait_interrupt.c'])
+  test('wait signal interruption',
+       test_wait_interrupt,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
