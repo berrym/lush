@@ -35,6 +35,20 @@ Lush is a **superset shell**. It is not an emulator. It accepts both bash and zs
 
 Lush does NOT write different tokenizers/parsers/executors to match other shells. Lush is rich enough that its components encompass the older shells.
 
+### Architectural gate: curate, don't clone (ENFORCES the vision above and PHILOSOPHY §1–2)
+
+lush is its own shell — not bash-with-extras, not zsh-with-extras. PHILOSOPHY §1 ("Identity is curation + uniqueness, not the union of bash and zsh") and §2 ("Spelling is polyglot; behavior is canonical lush") are LAWS, not preferences. The recurring failure mode is drifting toward bash because bash is the nearest reference point. This gate exists because the law was stated but never operationalized.
+
+Run this gate BEFORE writing code, choosing a behavior, or launching any review:
+
+1. **Do bash and zsh AGREE here?** If yes → the consensus is the lush default (PHILOSOPHY §1.1); that is curation, not cloning. If they DIFFER → lush curates ONE as default with a **documented rationale**, the other reachable via config — NEVER "whichever was easier / whichever I checked first."
+2. **PHILOSOPHY §2: lush does NOT promise byte-identical bash internals.** Do not replicate a legacy quirk (a shell's exact retention/display/edge behavior) as though it were a spec.
+3. **Am I building a clean lush primitive, or copying behavior?**
+
+If a solution matches a single shell by default rather than by deliberate, documented curation — **HALT and redesign.**
+
+Reviews are gated too: an adversarial pass may **not** use one shell's output as "the oracle." bash, zsh, and POSIX are three references; the review question is "is this lush-curated per PHILOSOPHY §1.1," never "does it match bash."
+
 ## Architecture Overview
 
 ### Core Shell Pipeline
