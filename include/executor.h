@@ -604,10 +604,17 @@ void executor_reap_finished_jobs(executor_t *executor);
  * so the status a `wait` later reports is the one that first reaped it. Reaping
  * always targets job_target(job).
  *
+ * A blocking reap breaks for a signal the shell must act on (a trapped signal,
+ * a hangup, or an interrupt), returning that signal number so the caller
+ * reports 128 + signo; it resumes across an incidental signal. A non-blocking
+ * poll never breaks and always returns 0.
+ *
  * @param job      Job to reap
  * @param blocking When true, wait for the job; when false, poll with WNOHANG
+ * @return The breaking signal number, or 0 if the job was reaped, left as-is,
+ * or polled non-blocking
  */
-void executor_reap_job(job_t *job, bool blocking);
+int executor_reap_job(job_t *job, bool blocking);
 
 /**
  * @brief The shell exit code for a completed job

@@ -238,6 +238,27 @@ void execute_pending_traps(void);
 bool signal_traps_pending(void);
 
 /**
+ * @brief The lowest-numbered signal with a pending, undispatched trap
+ *
+ * Reads the pending-trap bitmask without clearing it, so a caller can act on
+ * the interrupt while leaving the trap-body dispatch to the next command
+ * boundary. Returns 0 when no trap is pending.
+ */
+int signal_first_pending_trap(void);
+
+/**
+ * @brief Whether a blocking `wait` should break for a just-arrived signal
+ *
+ * Called after waitpid returns EINTR. Returns the signal number that should
+ * break the wait -- a signal with a trap installed, a hangup, or an interrupt
+ * (bash's documented `wait` exception, which returns 128 + that signal) -- or 0
+ * when the interrupt was incidental (a SIGWINCH resize) and the wait should
+ * resume. A trapped signal and a hangup leave their pending state set so the
+ * next command boundary dispatches the trap or exits; an interrupt is consumed.
+ */
+int signal_wait_break_check(void);
+
+/**
  * @brief Execute all EXIT traps
  *
  * Runs any commands registered for the EXIT (0) pseudo-signal.
