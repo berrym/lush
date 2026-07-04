@@ -74,6 +74,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
 /// Typed-function form -- declaration, call, return, let-capture.
 static void executor_typed_fns_clear(executor_t *executor);
+static void free_process_list(process_t *processes);
 static int execute_typed_fn_decl(executor_t *executor, node_t *node);
 static int execute_typed_fn_call(executor_t *executor, node_t *node);
 static int execute_typed_fn_return(executor_t *executor, node_t *node);
@@ -491,6 +492,19 @@ void executor_free(executor_t *executor) {
             free(func);
             func = next;
         }
+
+        /// Free the job list (each job owns its command line and process
+        /// list). Background jobs are tracked for the life of the shell, so an
+        /// unpruned completed job would otherwise leak at teardown.
+        job_t *job = executor->jobs;
+        while (job) {
+            job_t *next_job = job->next;
+            free_process_list(job->processes);
+            free(job->command_line);
+            free(job);
+            job = next_job;
+        }
+        executor->jobs = NULL;
 
         /// Free typed-function registry.
         executor_typed_fns_clear(executor);
@@ -16598,8 +16612,8 @@ static void free_process_list(process_t *processes) {
  * @param command_line Command line for display
  * @return New job structure, or NULL on failure
  */
-job_t *executor_add_job(executor_t *executor, pid_t pgid,
-                        const char *command_line) {
+job_t *executor_add_job(executor_t *executor, pid_t pid, pid_t pgid,
+                        bool own_pgroup, const char *command_line) {
     if (!executor) {
         return NULL;
     }
@@ -16610,9 +16624,14 @@ job_t *executor_add_job(executor_t *executor, pid_t pgid,
     }
 
     job->job_id = executor->next_job_id++;
+    job->pid = pid;
     job->pgid = pgid;
+    job->own_pgroup = own_pgroup;
     job->state = JOB_RUNNING;
+    job->status = 0;
+    job->reported = false;
     job->foreground = false;
+    job->no_sighup = false;
     job->processes = NULL;
     job->command_line = command_line ? strdup(command_line) : NULL;
     job->next = executor->jobs;
@@ -16636,6 +16655,21 @@ job_t *executor_find_job(executor_t *executor, int job_id) {
     job_t *job = executor->jobs;
     while (job) {
         if (job->job_id == job_id) {
+            return job;
+        }
+        job = job->next;
+    }
+    return NULL;
+}
+
+job_t *executor_find_job_by_pid(executor_t *executor, pid_t pid) {
+    if (!executor) {
+        return NULL;
+    }
+
+    job_t *job = executor->jobs;
+    while (job) {
+        if (job->pid == pid) {
             return job;
         }
         job = job->next;
@@ -16677,11 +16711,124 @@ void executor_remove_job(executor_t *executor, int job_id) {
     }
 }
 
+void executor_reap_job(job_t *job, bool blocking) {
+    if (!job) {
+        return;
+    }
+
+    if (blocking) {
+        /// A blocking wait (the `wait` builtin) must return only when the job
+        /// truly ends, so it waits without WUNTRACED: a stop does not satisfy
+        /// it, and a job that is already stopped is waited on until it is
+        /// continued and exits -- matching bash, which blocks on a stopped job.
+        if (job->state == JOB_DONE) {
+            return;
+        }
+        int status;
+        pid_t result = waitpid(job_target(job), &status, 0);
+        if (result <= 0) {
+            return;
+        }
+        job->status = status;
+        job->state = JOB_DONE;
+        return;
+    }
+
+    /// A non-blocking poll (the status sweep) also detects stops, so a `jobs`
+    /// listing can show a Stopped job.
+    if (job->state != JOB_RUNNING) {
+        return;
+    }
+    int status;
+    pid_t result = waitpid(job_target(job), &status, WNOHANG | WUNTRACED);
+    if (result <= 0) {
+        return;
+    }
+    if (WIFSTOPPED(status)) {
+        job->state = JOB_STOPPED;
+    } else {
+        job->status = status;
+        job->state = JOB_DONE;
+    }
+}
+
+int executor_job_status_code(const job_t *job) {
+    if (!job) {
+        return 0;
+    }
+    if (WIFEXITED(job->status)) {
+        return WEXITSTATUS(job->status);
+    }
+    if (WIFSIGNALED(job->status)) {
+        return 128 + WTERMSIG(job->status);
+    }
+    return 0;
+}
+
+/// Retained-completed-job ceiling. A fire-and-forget background job is never
+/// reported (nothing waits for it or lists it), so without a bound a
+/// long-running non-interactive shell that backgrounds work in a loop would
+/// grow the job list without limit. The most recent completions stay
+/// addressable by `wait`; older ones age out.
+#define COMPLETED_JOB_CAP 32
+
+/**
+ * @brief Prune completed jobs from the list.
+ *
+ * Removes every completed job whose status has already been reported (a done
+ * job nothing has read yet is kept so a later `wait` can report it), then
+ * bounds the remaining completed jobs to COMPLETED_JOB_CAP, dropping the oldest
+ * first.
+ *
+ * @param executor Executor context
+ */
+static void prune_completed_jobs(executor_t *executor) {
+    /// Completed jobs are retained -- not removed once reported -- so a
+    /// repeated or delayed `wait` on the same job reports the same status,
+    /// matching bash (which keeps a completed job addressable until it ages
+    /// out). `jobs` simply does not display a completion it has already
+    /// reported. Retention is bounded here so a non-interactive loop that
+    /// backgrounds work does not grow the list without limit: the oldest
+    /// completions are dropped once the count exceeds COMPLETED_JOB_CAP.
+    int done = 0;
+    for (job_t *j = executor->jobs; j; j = j->next) {
+        if (j->state == JOB_DONE) {
+            done++;
+        }
+    }
+    /// The list is newest-first, so the last completed job in it is the oldest.
+    while (done > COMPLETED_JOB_CAP) {
+        job_t *oldest = NULL;
+        for (job_t *j = executor->jobs; j; j = j->next) {
+            if (j->state == JOB_DONE) {
+                oldest = j;
+            }
+        }
+        if (!oldest) {
+            break;
+        }
+        executor_remove_job(executor, oldest->job_id);
+        done--;
+    }
+}
+
+void executor_reap_finished_jobs(executor_t *executor) {
+    if (!executor) {
+        return;
+    }
+    for (job_t *job = executor->jobs; job; job = job->next) {
+        executor_reap_job(job, false);
+    }
+    prune_completed_jobs(executor);
+}
+
 /**
  * @brief Update status of all jobs
  *
- * Checks for completed or stopped jobs using waitpid with WNOHANG.
- * Prints status messages and removes completed jobs.
+ * Polls each running job with WNOHANG, caching the status of any that finished
+ * or stopped. Interactive shells print a completion notice once; the list is
+ * then pruned of reported completions and bounded. A completed job whose status
+ * nothing has read yet is kept so a later `wait` can still report it.
  *
  * @param executor Executor context
  */
@@ -16690,30 +16837,30 @@ void executor_update_job_status(executor_t *executor) {
         return;
     }
 
-    job_t *job = executor->jobs;
-    while (job) {
-        job_t *next_job = job->next;
+    for (job_t *job = executor->jobs; job; job = job->next) {
+        executor_reap_job(job, false);
 
-        if (job->state == JOB_RUNNING) {
-            int status;
-            pid_t result = waitpid(-job->pgid, &status, WNOHANG | WUNTRACED);
-
-            if (result > 0) {
-                if (WIFEXITED(status) || WIFSIGNALED(status)) {
-                    job->state = JOB_DONE;
-                    printf("[%d]+ Done                    %s\n", job->job_id,
-                           job->command_line ? job->command_line : "unknown");
-                    executor_remove_job(executor, job->job_id);
-                } else if (WIFSTOPPED(status)) {
-                    job->state = JOB_STOPPED;
-                    printf("[%d]+ Stopped                 %s\n", job->job_id,
-                           job->command_line ? job->command_line : "unknown");
-                }
+        /// Completion notices ([id]+ Done / Stopped) are an interactive
+        /// convenience; a non-interactive script stays silent, matching bash.
+        /// The notice reports the job's state change exactly once: `reported`
+        /// marks the current Done or Stopped state as already announced, so a
+        /// persistently stopped job does not reprint on every prompt render.
+        /// (fg/bg clear it when they continue a job, so the eventual Done still
+        /// prints.)
+        if (is_interactive_shell() && !job->reported) {
+            if (job->state == JOB_DONE) {
+                printf("[%d]+ Done                    %s\n", job->job_id,
+                       job->command_line ? job->command_line : "unknown");
+                job->reported = true;
+            } else if (job->state == JOB_STOPPED) {
+                printf("[%d]+ Stopped                 %s\n", job->job_id,
+                       job->command_line ? job->command_line : "unknown");
+                job->reported = true;
             }
         }
-
-        job = next_job;
     }
+
+    prune_completed_jobs(executor);
 }
 
 /**
@@ -16756,41 +16903,25 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         return 1;
     }
 
-    /// Check if job control is enabled (set -m)
-    if (!shell_opts.job_control) {
-        /// When job control is disabled, execute in background without job
-        /// tracking
-        pid_t pid = lush_fork();
-        if (pid == -1) {
-            int saved_errno = errno;
-            executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
-                                  "failed to fork for background process: %s",
-                                  strerror(saved_errno));
-            return 1;
-        }
+    /// Reap and prune already-finished jobs before adding another, so a
+    /// non-interactive loop that backgrounds work keeps the job list (and its
+    /// zombies) bounded rather than growing it for the life of the shell.
+    executor_reap_finished_jobs(executor);
 
-        if (pid == 0) {
-            /// Background child: asynchronous, so reset the inherited hangup
-            /// and fault handlers (a controlling-terminal hangup must
-            /// terminate it); SIGINT stays inherited per POSIX async lists.
-            reset_subshell_signals();
-            int result = execute_node(executor, command->first_child);
-            fflush(stdout);
-            fflush(stderr);
-            subshell_cleanup();
-            _exit(result);
-        } else {
-            /// Parent process - store background PID but no job tracking
-            last_background_pid = pid;
-            return 0;
-        }
-    }
-
-    /// Build command line for display
+    /// Build command line for the job list and display.
     char *command_line = NULL;
     if (command->first_child && command->first_child->type == NODE_COMMAND) {
         command_line = command->first_child->val.str;
     }
+
+    /// Job control (set -m) governs process-group topology and terminal
+    /// management, not whether a job is tracked: a background job is recorded
+    /// in the job list either way, so jobs / wait / %job work -- matching bash,
+    /// which maintains the job list regardless of `set -m`. With job control on
+    /// the job runs in its own process group; with it off it shares the shell's
+    /// group (bash's topology under `set +m`) and is reaped and signaled by its
+    /// leader pid instead of a group id.
+    bool own_pgroup = shell_opts.job_control;
 
     pid_t pid = lush_fork();
     if (pid == -1) {
@@ -16802,34 +16933,47 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     }
 
     if (pid == 0) {
-        /// Child process - create new process group
-        setpgid(0, 0);
+        /// Child process. Under job control it leads a new process group.
+        if (own_pgroup) {
+            setpgid(0, 0);
+        }
 
-        /// A login shell's exit-time SIGHUP cascade (send_sighup_to_jobs)
-        /// must terminate this job; reset the inherited hangup and fault
-        /// handlers so the cascade is not swallowed.
+        /// A login shell's exit-time SIGHUP cascade (send_sighup_to_jobs) must
+        /// terminate this job; reset the inherited hangup and fault handlers so
+        /// the cascade is not swallowed. SIGINT stays inherited per POSIX async
+        /// lists.
         reset_subshell_signals();
 
-        /// Execute the command
         int result = execute_node(executor, command->first_child);
         fflush(stdout);
         fflush(stderr);
         subshell_cleanup();
         _exit(result);
-    } else {
-        /// Parent process - add to job list
-        setpgid(pid, pid); /// Set child's process group
-
-        /// Store the background PID for $! variable
-        last_background_pid = pid;
-
-        job_t *job = executor_add_job(executor, pid, command_line);
-        if (job) {
-            printf("[%d] %d\n", job->job_id, pid);
-        }
-
-        return 0; /// Background job started successfully
     }
+
+    /// Parent process.
+    pid_t pgid;
+    if (own_pgroup) {
+        setpgid(pid, pid); /// Redundant with the child's own setpgid; both run
+                           /// to close the fork-order race.
+        pgid = pid;
+    } else {
+        pgid = getpgrp(); /// Shares the shell's process group.
+    }
+
+    /// Store the background PID for $!.
+    last_background_pid = pid;
+
+    job_t *job =
+        executor_add_job(executor, pid, pgid, own_pgroup, command_line);
+
+    /// The launch notification ([id] pid) is an interactive convenience; a
+    /// non-interactive script stays silent, matching bash.
+    if (job && is_interactive_shell()) {
+        printf("[%d] %d\n", job->job_id, pid);
+    }
+
+    return 0; /// Background job started successfully
 }
 
 /**
@@ -16848,11 +16992,9 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         return 1;
     }
 
-    /// Check if job control is enabled
-    if (!shell_opts.job_control) {
-        /// When job control is disabled, there are no tracked jobs
-        return 0;
-    }
+    /// Background jobs are tracked regardless of job control (set -m), so the
+    /// listing does not depend on it -- matching bash, whose `jobs` reports the
+    /// job list in scripts as well as interactive shells.
 
     /// Update job statuses first
     executor_update_job_status(executor);
@@ -16868,6 +17010,15 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
 
     job_t *job = executor->jobs;
     while (job) {
+        /// Skip a completion that has already been reported (by an earlier
+        /// listing, a `wait`, or the async notice): a done job is shown once,
+        /// then omitted, matching bash. Running and stopped jobs are always
+        /// listed.
+        if (job->state == JOB_DONE && job->reported) {
+            job = job->next;
+            continue;
+        }
+
         const char *state_str;
         switch (job->state) {
         case JOB_RUNNING:
@@ -16887,6 +17038,11 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         fprintf(sink, "[%d]%c %-20s %s\n", job->job_id,
                 job->foreground ? '+' : '-', state_str,
                 job->command_line ? job->command_line : "unknown");
+
+        /// Reporting a completion here means the next listing omits it.
+        if (job->state == JOB_DONE) {
+            job->reported = true;
+        }
 
         job = job->next;
     }
@@ -16935,22 +17091,27 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    /// Give the job's process group control of the terminal
-    if (isatty(STDIN_FILENO) && job->pgid > 0) {
+    /// Give the job's own process group control of the terminal. A job that
+    /// shares the shell's group already runs in the foreground group, so no
+    /// handoff is needed.
+    if (job->own_pgroup && isatty(STDIN_FILENO) && job->pgid > 0) {
         tcsetpgrp(STDIN_FILENO, job->pgid);
     }
 
     /// Continue the job if it was stopped
     if (job->state == JOB_STOPPED) {
-        kill(-job->pgid, SIGCONT);
+        kill(job_target(job), SIGCONT);
     }
 
     job->foreground = true;
     job->state = JOB_RUNNING;
+    /// Continuing the job clears the reported flag so its eventual completion
+    /// is announced, rather than being suppressed by an earlier Stopped notice.
+    job->reported = false;
 
     /// Wait for the job to complete or stop
     int status;
-    waitpid(-job->pgid, &status, WUNTRACED);
+    waitpid(job_target(job), &status, WUNTRACED);
 
     /// Reclaim terminal control for the shell
     if (isatty(STDIN_FILENO)) {
@@ -16965,6 +17126,9 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         job->foreground = false;
         printf("[%d]+ Stopped                 %s\n", job_id,
                job->command_line ? job->command_line : "unknown");
+        /// This notice reports the stop; mark it so the next prompt's status
+        /// sweep does not print a second Stopped line for the same job.
+        job->reported = true;
     }
 
     return 0;
@@ -17007,7 +17171,10 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
     /// Continue the job in background
     job->state = JOB_RUNNING;
     job->foreground = false;
-    kill(-job->pgid, SIGCONT);
+    /// Continuing the job clears the reported flag so its eventual completion
+    /// is announced, rather than being suppressed by an earlier Stopped notice.
+    job->reported = false;
+    kill(job_target(job), SIGCONT);
 
     printf("[%d]+ %s &\n", job_id,
            job->command_line ? job->command_line : "unknown");

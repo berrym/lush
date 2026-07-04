@@ -53,14 +53,40 @@ typedef struct process {
 /// Job control structure
 typedef struct job {
     int job_id;
-    pid_t pgid;
+    pid_t pid;  ///< Leader process pid: the reap/signal target when the job
+                ///< shares the shell's process group (job control off)
+    pid_t pgid; ///< Process group id: equals pid for a job that owns its group
+    bool own_pgroup; ///< True if the job runs in its own process group (job
+                     ///< control on); false if it shares the shell's group,
+                     ///< matching bash's topology under `set +m`
     job_state_t state;
+    int status;    ///< Raw waitpid status, valid once state is JOB_DONE, so a
+                   ///< later `wait` reports the code that reaped it
+    bool reported; ///< A completed job's status has been consumed (by `wait`, a
+                   ///< `jobs` listing, or an interactive notice) and it may now
+                   ///< be pruned from the list
     bool foreground;
     bool no_sighup; ///< If true, job won't receive SIGHUP on shell exit
     process_t *processes;
     char *command_line;
     struct job *next;
 } job_t;
+
+/**
+ * @brief The waitpid()/kill() first-argument selecting a job's process(es).
+ *
+ * A job that owns its process group (job control on) is reaped and signaled as
+ * a group via the negated pgid; a job that shares the shell's group (job
+ * control off, matching bash) is reaped and signaled by its leader pid, so the
+ * operation targets only that job rather than the shell's whole group.
+ * waitpid() and kill() read this sign convention identically.
+ *
+ * @param job Job to target
+ * @return -pgid when the job owns a group, otherwise the leader pid
+ */
+static inline pid_t job_target(const job_t *job) {
+    return job->own_pgroup ? -job->pgid : job->pid;
+}
 
 /// Loop control states
 typedef enum {
@@ -538,12 +564,14 @@ int executor_execute_background(executor_t *executor, node_t *command);
  * @brief Add a job to the job list
  *
  * @param executor Executor context
- * @param pgid Process group ID of the job
+ * @param pid Leader process pid (the job's first/only process)
+ * @param pgid Process group id (equals pid when the job owns its group)
+ * @param own_pgroup True if the job runs in its own process group
  * @param command_line Original command line string
  * @return New job structure or NULL on failure
  */
-job_t *executor_add_job(executor_t *executor, pid_t pgid,
-                        const char *command_line);
+job_t *executor_add_job(executor_t *executor, pid_t pid, pid_t pgid,
+                        bool own_pgroup, const char *command_line);
 
 /**
  * @brief Update status of all jobs
@@ -553,6 +581,46 @@ job_t *executor_add_job(executor_t *executor, pid_t pgid,
 void executor_update_job_status(executor_t *executor);
 
 /**
+ * @brief Reap finished jobs quietly and bound the job list
+ *
+ * Polls every job (WNOHANG), caching the status of any that finished, then
+ * prunes reported completions and caps the retained ones -- without the
+ * interactive completion notices that belong at the prompt. Called at points
+ * that must keep the list bounded, such as before launching another background
+ * job, so a non-interactive loop of background jobs does not grow it without
+ * limit.
+ *
+ * @param executor Executor context
+ */
+void executor_reap_finished_jobs(executor_t *executor);
+
+/**
+ * @brief Reap a job's process(es), caching the exit status on the job
+ *
+ * The single reap primitive shared by the job-status sweep, `wait`, and `fg`.
+ * A running job is waited on -- blocking or via WNOHANG per @p blocking -- and,
+ * once it exits, its raw wait status is stored and its state set to JOB_DONE
+ * (or JOB_STOPPED on a stop). A job already done or stopped is left untouched,
+ * so the status a `wait` later reports is the one that first reaped it. Reaping
+ * always targets job_target(job).
+ *
+ * @param job      Job to reap
+ * @param blocking When true, wait for the job; when false, poll with WNOHANG
+ */
+void executor_reap_job(job_t *job, bool blocking);
+
+/**
+ * @brief The shell exit code for a completed job
+ *
+ * Decodes a JOB_DONE job's cached wait status: the exit code for a normal exit,
+ * or 128 + signal for a job killed by a signal.
+ *
+ * @param job Completed job
+ * @return Exit code in the range a shell reports for $?
+ */
+int executor_job_status_code(const job_t *job);
+
+/**
  * @brief Find a job by ID
  *
  * @param executor Executor context
@@ -560,6 +628,15 @@ void executor_update_job_status(executor_t *executor);
  * @return Job structure or NULL if not found
  */
 job_t *executor_find_job(executor_t *executor, int job_id);
+
+/**
+ * @brief Find a job by its leader process id
+ *
+ * @param executor Executor context
+ * @param pid Leader pid to search for (the value $! expands to)
+ * @return Job structure, or NULL if no tracked job has that leader pid
+ */
+job_t *executor_find_job_by_pid(executor_t *executor, pid_t pid);
 
 /**
  * @brief Remove a job from the job list

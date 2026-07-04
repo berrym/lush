@@ -9,187 +9,163 @@
 #include "builtins.h"
 
 #include <errno.h>
-#include <signal.h>
 #include <sys/wait.h>
+
+/**
+ * @brief Report a tracked job's completion status.
+ *
+ * Reaps the job if it is still running, caches its status, and marks it
+ * reported so the job-status sweep can prune it later. The job is deliberately
+ * left in the list rather than removed here, so a repeated `wait` on the same
+ * job reports the same status until a status sweep retires it -- matching bash.
+ *
+ * @param job Tracked job to wait for
+ * @return The job's shell exit code
+ */
+static int wait_for_tracked_job(job_t *job) {
+    executor_reap_job(job, true);
+    if (job->state == JOB_DONE) {
+        job->reported = true;
+    }
+    return executor_job_status_code(job);
+}
+
+/**
+ * @brief Emit the structured error for a waitpid failure other than ECHILD.
+ *
+ * @param pid Process id that was waited on
+ */
+static void report_wait_io_error(long pid) {
+    (void)pid;
+    int saved_errno = errno;
+    source_location_t loc = builtin_get_source_location();
+    shell_error_t *error =
+        shell_error_create(SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, loc, "%s",
+                           strerror(saved_errno));
+    if (!error) {
+        fprintf(stderr, "lush: wait: %s\n", strerror(saved_errno));
+        return;
+    }
+    if (current_executor && SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(current_executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
+    }
+    if (current_executor) {
+        for (size_t k = 0;
+             k < current_executor->context_depth && k < SHELL_ERROR_CONTEXT_MAX;
+             k++) {
+            if (current_executor->context_stack[k]) {
+                shell_error_push_context(error, "%s",
+                                         current_executor->context_stack[k]);
+            }
+        }
+    }
+    shell_error_display(error, stderr, isatty(STDERR_FILENO));
+    shell_error_free(error);
+}
 
 /**
  * @brief Wait for background jobs to complete
  *
- * With no arguments, waits for all background jobs. With arguments,
- * waits for specific job IDs (%n) or process IDs.
+ * With no arguments, waits for all background jobs and returns 0 (POSIX). With
+ * arguments, waits for specific job IDs (%n) or process IDs and returns the
+ * last one's status. A pid that names a tracked job is resolved through the job
+ * list so its status is cached and reported consistently; a pid with no tracked
+ * job is waited on directly.
  *
  * @param argc Argument count
  * @param argv Argument vector with optional job/process IDs
- * @return Exit status of the last waited process
+ * @return Exit status of the last waited job, or 0 for a no-operand wait
  */
 int bin_wait(int argc, char **argv) {
-    /// Get the current executor to access job control
     if (!current_executor) {
-        /// If no executor, there are no jobs to wait for
         return 0;
     }
 
-    /// If no arguments, wait for all background jobs
+    /// No operands: wait for every running job, then report success regardless
+    /// of the jobs' statuses (POSIX). The status sweep afterward prunes the
+    /// now-reported completed jobs.
     if (argc == 1) {
-        executor_update_job_status(current_executor);
-
-        /// Wait for all running jobs
-        job_t *job = current_executor->jobs;
-        int last_exit_status = 0;
-
-        while (job) {
-            if (job->state == JOB_RUNNING) {
-                int status;
-                pid_t result = waitpid(-job->pgid, &status, 0);
-
-                if (result > 0) {
-                    if (WIFEXITED(status)) {
-                        last_exit_status = WEXITSTATUS(status);
-                    } else if (WIFSIGNALED(status)) {
-                        last_exit_status = 128 + WTERMSIG(status);
-                    } else {
-                        last_exit_status = 1;
-                    }
-
-                    /// Mark job as done
-                    job->state = JOB_DONE;
-                }
+        for (job_t *job = current_executor->jobs; job; job = job->next) {
+            executor_reap_job(job, true);
+            if (job->state == JOB_DONE) {
+                job->reported = true;
             }
-            job = job->next;
         }
-
-        /// Clean up completed jobs
         executor_update_job_status(current_executor);
-
-        return last_exit_status;
+        return 0;
     }
 
-    /// Wait for specific job(s) or process(es)
     int overall_exit_status = 0;
 
     for (int i = 1; i < argc; i++) {
         char *endptr;
         long target = strtol(argv[i], &endptr, 10);
 
-        /// Check for job ID syntax (%n)
-        bool is_job_id = false;
-        int job_or_pid = (int)target;
-
         if (argv[i][0] == '%') {
-            is_job_id = true;
-            /// Re-parse without the % sign
-            job_or_pid = (int)strtol(argv[i] + 1, &endptr, 10);
-            if (*endptr != '\0' || job_or_pid <= 0) {
+            /// Job-id form (%n).
+            long id = strtol(argv[i] + 1, &endptr, 10);
+            if (*endptr != '\0' || id <= 0) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
                                       builtin_get_source_location(),
                                       "%s: not a valid job ID", argv[i]);
                 return 1;
             }
-        } else {
-            if (*endptr != '\0' || target <= 0) {
-                executor_error_report(
-                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
-                    builtin_get_source_location(),
-                    "%s: arguments must be process or job IDs", argv[i]);
-                return 1;
-            }
-        }
-
-        if (is_job_id) {
-            /// Wait for specific job
-            job_t *job = executor_find_job(current_executor, job_or_pid);
+            job_t *job = executor_find_job(current_executor, (int)id);
             if (!job) {
                 executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
                                       builtin_get_source_location(),
-                                      "%%%d: no such job", job_or_pid);
+                                      "%%%ld: no such job", id);
                 return 127;
             }
+            overall_exit_status = wait_for_tracked_job(job);
+            continue;
+        }
 
-            if (job->state == JOB_RUNNING) {
-                int status;
-                pid_t result = waitpid(-job->pgid, &status, 0);
+        if (*endptr != '\0' || target <= 0) {
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "%s: arguments must be process or job IDs",
+                                  argv[i]);
+            return 1;
+        }
 
-                if (result > 0) {
-                    if (WIFEXITED(status)) {
-                        overall_exit_status = WEXITSTATUS(status);
-                    } else if (WIFSIGNALED(status)) {
-                        overall_exit_status = 128 + WTERMSIG(status);
-                    } else {
-                        overall_exit_status = 1;
-                    }
+        /// Pid form: prefer a tracked job so its status is cached and a
+        /// repeated wait stays consistent; otherwise wait on the pid directly.
+        job_t *job = executor_find_job_by_pid(current_executor, (pid_t)target);
+        if (job) {
+            overall_exit_status = wait_for_tracked_job(job);
+            continue;
+        }
 
-                    job->state = JOB_DONE;
-                }
-            } else if (job->state == JOB_DONE) {
-                /// Job already completed - return 0
-                overall_exit_status = 0;
+        int status;
+        pid_t result = waitpid((pid_t)target, &status, 0);
+        if (result == -1) {
+            if (errno == ECHILD) {
+                executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                                      builtin_get_source_location(),
+                                      "pid %ld is not a child of this shell",
+                                      target);
+                return 127;
             }
-        } else {
-            /// Wait for specific PID
-            int status;
-            pid_t result = waitpid(job_or_pid, &status, 0);
-
-            if (result == -1) {
-                if (errno == ECHILD) {
-                    /// Process doesn't exist or not a child
-                    executor_error_report(
-                        current_executor, SHELL_ERR_JOB_NOT_FOUND,
-                        builtin_get_source_location(),
-                        "pid %d is not a child of this shell", job_or_pid);
-                    return 127;
-                } else {
-                    int saved_errno = errno;
-                    source_location_t loc = builtin_get_source_location();
-                    shell_error_t *error = shell_error_create(
-                        SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, loc, "%s",
-                        strerror(saved_errno));
-                    if (error) {
-                        if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line = executor_get_source_line(
-                                current_executor, loc.line);
-                            if (src_line) {
-                                shell_error_set_source_line(
-                                    error, src_line, loc.column,
-                                    loc.column + loc.length);
-                                free(src_line);
-                            }
-                        }
-                        if (current_executor) {
-                            for (size_t k = 0;
-                                 k < current_executor->context_depth &&
-                                 k < SHELL_ERROR_CONTEXT_MAX;
-                                 k++) {
-                                if (current_executor->context_stack[k]) {
-                                    shell_error_push_context(
-                                        error, "%s",
-                                        current_executor->context_stack[k]);
-                                }
-                            }
-                        }
-                        shell_error_display(error, stderr,
-                                            isatty(STDERR_FILENO));
-                        shell_error_free(error);
-                    } else {
-                        fprintf(stderr, "lush: wait: %s\n",
-                                strerror(saved_errno));
-                    }
-                    return 1;
-                }
-            } else if (result > 0) {
-                if (WIFEXITED(status)) {
-                    overall_exit_status = WEXITSTATUS(status);
-                } else if (WIFSIGNALED(status)) {
-                    overall_exit_status = 128 + WTERMSIG(status);
-                } else {
-                    overall_exit_status = 1;
-                }
+            report_wait_io_error(target);
+            return 1;
+        }
+        if (result > 0) {
+            if (WIFEXITED(status)) {
+                overall_exit_status = WEXITSTATUS(status);
+            } else if (WIFSIGNALED(status)) {
+                overall_exit_status = 128 + WTERMSIG(status);
+            } else {
+                overall_exit_status = 1;
             }
         }
     }
-
-    /// Clean up completed jobs
-    executor_update_job_status(current_executor);
 
     return overall_exit_status;
 }

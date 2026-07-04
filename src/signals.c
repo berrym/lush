@@ -231,12 +231,22 @@ int send_sighup_to_jobs(void) {
             continue;
         }
 
-        if (job->pgid > 0) {
-            /// Send SIGHUP to the process group
-            if (kill(-job->pgid, SIGHUP) == 0) {
+        /// Skip already-completed jobs: their child is reaped, so the leader
+        /// pid may have been recycled to an unrelated process.
+        if (job->state == JOB_DONE) {
+            job = job->next;
+            continue;
+        }
+
+        if (job->pid > 0) {
+            /// Target the job's own group when it has one, else its leader pid
+            /// so the hangup reaches only the job and not the shell's own
+            /// group.
+            pid_t target = job_target(job);
+            if (kill(target, SIGHUP) == 0) {
                 count++;
                 /// Also send SIGCONT so stopped jobs can handle SIGHUP
-                kill(-job->pgid, SIGCONT);
+                kill(target, SIGCONT);
             }
         }
 
