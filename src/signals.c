@@ -300,8 +300,9 @@ void init_signal_handlers(void) {
     set_signal_handler(SIGINT, sigint_handler);
     set_signal_handler(SIGSEGV, sigsegv_handler);
 
-    /// Ignore SIGQUIT (Ctrl+\) like bash/zsh do
-    /// This prevents accidental core dumps from Ctrl+\ keypresses
+    /// Ignore SIGQUIT so a stray Ctrl+\ cannot dump core on the interactive
+    /// shell -- the conventional interactive-shell disposition (bash and zsh
+    /// both ignore it).
     set_signal_handler(SIGQUIT, SIG_IGN);
 
     /// Set up SIGHUP handler for login shell hangup, then block SIGHUP for the
@@ -576,7 +577,7 @@ int remove_trap(int signal) {
  * @brief Render a (pseudo-)signal number to its trap name
  *
  * For real kernel signals returns the numeric value as a string in a
- * static buffer; for pseudo-signals returns the bash-style name
+ * static buffer; for pseudo-signals returns the trap name
  * ("ERR", "DEBUG", "RETURN", "EXIT"). The returned pointer is valid
  * until the next call.
  */
@@ -649,9 +650,9 @@ int get_signal_number(const char *signame) {
         return 0; /// Special case for EXIT trap
     }
 
-    /// Bash-style pseudo-signals: not real kernel signals, dispatched
-    /// by the executor at well-known points (after a command for ERR,
-    /// before a command for DEBUG, on function return for RETURN).
+    /// Trap pseudo-signals: not real kernel signals, dispatched by the
+    /// executor at well-known points (after a command for ERR, before a
+    /// command for DEBUG, on function return for RETURN).
     if (strcmp(signame, "ERR") == 0) {
         return TRAP_PSEUDO_ERR;
     }
@@ -701,13 +702,13 @@ static void run_trap_command(const char *command) {
  * with no ERR trap registered -- a quick lookup and return.
  */
 void fire_err_trap(void) {
-    /// Bash's `set -o errtrace` (`-E`) gates trap inheritance into
-    /// function bodies: when errtrace is OFF and execution is inside a
-    /// function scope, the parent shell's ERR trap is suppressed.
-    /// Without errtrace the trap is reset to default within function
-    /// bodies; with it, the trap follows execution into nested
-    /// contexts. The check is one-sided here -- if errtrace is on, or
-    /// we're at top-level scope, the trap fires normally.
+    /// errtrace (`set -o errtrace` / `-E`) gates ERR-trap inheritance into
+    /// function bodies: when it is OFF and execution is inside a function
+    /// scope, the shell's ERR trap is suppressed; when it is ON, the trap
+    /// follows execution into nested contexts. errtrace is a bash-originated
+    /// trace option with no zsh equivalent, so lush provides it under the
+    /// established name and semantics. The check is one-sided: if errtrace is
+    /// on, or we are at top-level scope, the trap fires normally.
     if (!shell_opts.errtrace &&
         symtable_in_function_scope(symtable_manager())) {
         return;
@@ -722,11 +723,12 @@ void fire_err_trap(void) {
 /**
  * @brief Execute the registered DEBUG trap, if any
  *
- * Bash's `set -o functrace` (`-T`) gates DEBUG and RETURN trap
- * inheritance into function bodies. Without functrace, DEBUG fires
- * only at the top-level shell (not inside functions); with it, DEBUG
- * follows execution into nested contexts. Mirrors fire_err_trap's
- * gating shape exactly.
+ * functrace (`set -o functrace` / `-T`) gates DEBUG and RETURN trap
+ * inheritance into function bodies: without it, DEBUG fires only at
+ * top-level scope (not inside functions); with it, DEBUG follows
+ * execution into nested contexts. Like errtrace, functrace is a
+ * bash-originated trace option with no zsh equivalent that lush provides
+ * under the established name. Mirrors fire_err_trap's gating shape.
  */
 void fire_debug_trap(void) {
     if (!shell_opts.functrace &&
@@ -773,8 +775,10 @@ void execute_pending_traps(void) {
     /// A signal trap is transparent to $?: save the status the surrounding
     /// script observes and restore it after the trap body, so a firing trap
     /// (e.g. `trap false USR1`) does not clobber $? for the following commands.
-    /// Matches bash; the trap's own side effects on variables, cwd, etc. still
-    /// register because it runs in the primary shell context.
+    /// POSIX leaves a trap's effect on $? unspecified; transparency is the
+    /// least-surprising choice (bash and zsh both preserve $? across a trap --
+    /// the consensus). The trap's own side effects on variables, cwd, etc.
+    /// still register because it runs in the primary shell context.
     executor_t *exec = get_global_executor();
     int saved_status = last_exit_status;
 
