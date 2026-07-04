@@ -16720,7 +16720,8 @@ int executor_reap_job(job_t *job, bool blocking) {
         /// A blocking wait (the `wait` builtin) must return only when the job
         /// truly ends, so it waits without WUNTRACED: a stop does not satisfy
         /// it, and a job that is already stopped is waited on until it is
-        /// continued and exits -- matching bash, which blocks on a stopped job.
+        /// continued and exits. This is the POSIX `wait` contract -- a stopped
+        /// job has not terminated, so the wait blocks until it does.
         if (job->state == JOB_DONE) {
             return 0;
         }
@@ -16780,31 +16781,30 @@ int executor_job_status_code(const job_t *job) {
     return 0;
 }
 
-/// Retained-completed-job ceiling. A fire-and-forget background job is never
-/// reported (nothing waits for it or lists it), so without a bound a
-/// long-running non-interactive shell that backgrounds work in a loop would
-/// grow the job list without limit. The most recent completions stay
-/// addressable by `wait`; older ones age out.
+/// Backstop bound on completed jobs that were never consumed by a `wait`.
+///
+/// lush's completed-job lifecycle is single-consumption: an explicit `wait`
+/// delivers a finished job's status and drops the job (see wait_for_tracked_job
+/// in bin_wait.c). This bound covers only the jobs that are NOT waited for -- a
+/// fire-and-forget background loop, or completions the shell reaped before any
+/// `wait` -- whose statuses lush still remembers in case a later `wait` asks.
+/// It is the POSIX "remember a terminated job's status until it is waited for,"
+/// made finite: at least this many recent completions are retained, older ones
+/// dropped, so a long-running shell cannot grow the list without limit. It is a
+/// deliberate lush guardrail, not a copy of any shell's completed-job cache.
 #define COMPLETED_JOB_CAP 32
 
 /**
- * @brief Prune completed jobs from the list.
+ * @brief Bound the retained never-consumed completed jobs.
  *
- * Removes every completed job whose status has already been reported (a done
- * job nothing has read yet is kept so a later `wait` can report it), then
- * bounds the remaining completed jobs to COMPLETED_JOB_CAP, dropping the oldest
- * first.
+ * A completed job consumed by an explicit `wait` is already gone (dropped at
+ * consumption). What remains here are completions no `wait` claimed -- kept so
+ * a later `wait` can still report them. Their count is bounded to
+ * COMPLETED_JOB_CAP, dropping the oldest first.
  *
  * @param executor Executor context
  */
 static void prune_completed_jobs(executor_t *executor) {
-    /// Completed jobs are retained -- not removed once reported -- so a
-    /// repeated or delayed `wait` on the same job reports the same status,
-    /// matching bash (which keeps a completed job addressable until it ages
-    /// out). `jobs` simply does not display a completion it has already
-    /// reported. Retention is bounded here so a non-interactive loop that
-    /// backgrounds work does not grow the list without limit: the oldest
-    /// completions are dropped once the count exceeds COMPLETED_JOB_CAP.
     int done = 0;
     for (job_t *j = executor->jobs; j; j = j->next) {
         if (j->state == JOB_DONE) {
@@ -16856,7 +16856,8 @@ void executor_update_job_status(executor_t *executor) {
         executor_reap_job(job, false);
 
         /// Completion notices ([id]+ Done / Stopped) are an interactive
-        /// convenience; a non-interactive script stays silent, matching bash.
+        /// convenience; a non-interactive script stays silent (the shell
+        /// consensus for asynchronous job notices under `-c`/script).
         /// The notice reports the job's state change exactly once: `reported`
         /// marks the current Done or Stopped state as already announced, so a
         /// persistently stopped job does not reprint on every prompt render.
@@ -16930,12 +16931,13 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     }
 
     /// Job control (set -m) governs process-group topology and terminal
-    /// management, not whether a job is tracked: a background job is recorded
-    /// in the job list either way, so jobs / wait / %job work -- matching bash,
-    /// which maintains the job list regardless of `set -m`. With job control on
-    /// the job runs in its own process group; with it off it shares the shell's
-    /// group (bash's topology under `set +m`) and is reaped and signaled by its
-    /// leader pid instead of a group id.
+    /// management, not whether a job is tracked. lush keeps the job list a
+    /// property of the engine, not of a preset: a background job is recorded
+    /// either way, so jobs / wait / %job work whether or not `set -m` is on.
+    /// (bash and zsh both maintain the job list independent of `set -m`; the
+    /// shared behavior is the consensus lush follows.) With job control on the
+    /// job leads its own process group; with it off it shares the shell's group
+    /// and is reaped and signaled by its leader pid instead of a group id.
     bool own_pgroup = shell_opts.job_control;
 
     pid_t pid = lush_fork();
@@ -16983,7 +16985,8 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         executor_add_job(executor, pid, pgid, own_pgroup, command_line);
 
     /// The launch notification ([id] pid) is an interactive convenience; a
-    /// non-interactive script stays silent, matching bash.
+    /// non-interactive script stays silent (the shell consensus for job
+    /// notices under `-c`/script).
     if (job && is_interactive_shell()) {
         printf("[%d] %d\n", job->job_id, pid);
     }
@@ -17008,8 +17011,9 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
     }
 
     /// Background jobs are tracked regardless of job control (set -m), so the
-    /// listing does not depend on it -- matching bash, whose `jobs` reports the
-    /// job list in scripts as well as interactive shells.
+    /// listing does not depend on it: `jobs` reports the job list in scripts as
+    /// well as interactive shells (job tracking is an engine property, not a
+    /// preset -- the shell consensus).
 
     /// Update job statuses first
     executor_update_job_status(executor);
@@ -17025,10 +17029,10 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
 
     job_t *job = executor->jobs;
     while (job) {
-        /// Skip a completion that has already been reported (by an earlier
-        /// listing, a `wait`, or the async notice): a done job is shown once,
-        /// then omitted, matching bash. Running and stopped jobs are always
-        /// listed.
+        /// Skip a completion this listing has already reported (a done job is
+        /// shown once, then omitted). A completion consumed by an explicit
+        /// `wait` is already gone from the list; only never-waited completions
+        /// reach here. Running and stopped jobs are always listed.
         if (job->state == JOB_DONE && job->reported) {
             job = job->next;
             continue;

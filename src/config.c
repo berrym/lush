@@ -729,6 +729,50 @@ static const creg_section_t behavior_section = {
 };
 
 /* ----------------------------------------------------------------------------
+ * Jobs Section Options (background job control)
+ *
+ * jobs.retain_completed governs the completed-job retention lifecycle. lush's
+ * default is single-consumption: a background job is dropped the moment an
+ * explicit `wait` returns its status. This cell is read directly at wait time
+ * via config_get_bool (no runtime binding); the lifecycle lives in bin_wait.c.
+ * -------------------------------------------------------------------------- */
+static const creg_option_t jobs_options[] = {
+    {.name = "retain_completed",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Keep a completed job addressable after `wait` reports its status",
+     .persisted = true,
+     .description =
+         "Governs how long a finished background job's exit status stays "
+         "reachable by `wait`.\n\n"
+         "lush default (off): single-consumption. An explicit `wait` for a job "
+         "returns its exit status once and then drops the job -- you asked, "
+         "you "
+         "received it, it is gone. Listing the job with `jobs` or seeing its "
+         "completion notice reports it but does not consume it; only `wait` "
+         "does. This keeps job state predictable (no lingering already-waited "
+         "jobs) and honors the POSIX rule of remembering a terminated job's "
+         "status only until it is waited for. A never-waited completion is "
+         "held "
+         "in a bounded backstop so a background loop cannot leak.\n\n"
+         "On: a completed job stays addressable by repeated or later `wait` "
+         "calls until it ages out of the backstop -- the legacy bash behavior "
+         "(where `wait %1` twice returns the same status). Offered as an "
+         "explicit opt-in, never as an unexamined default."},
+};
+
+static const creg_section_t jobs_section = {
+    .name = "jobs",
+    .options = jobs_options,
+    .option_count = sizeof(jobs_options) / sizeof(creg_option_t),
+    .on_load = NULL,
+    .on_save = NULL,
+    /// Read directly at wait time (config_get_bool); no runtime binding.
+    .sync_to_runtime = NULL,
+    .sync_from_runtime = NULL,
+};
+
+/* ----------------------------------------------------------------------------
  * LLE Section Options (history deduplication, written by display lle history)
  *
  * The two enums (scope, strategy) are carried as strings here -- the CREG value
@@ -1215,6 +1259,7 @@ static void config_register_sections(void) {
     config_registry_register_section(&display_section);
     config_registry_register_section(&completion_section);
     config_registry_register_section(&behavior_section);
+    config_registry_register_section(&jobs_section);
     config_registry_register_section(&autosuggestion_section);
     config_registry_register_section(&lle_section);
 
