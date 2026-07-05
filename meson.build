@@ -2900,6 +2900,17 @@ if fs.exists('tests/integration/test_job_spec.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_redirected_jobcontrol.c')
+  test_redirected_jobcontrol = executable(
+    'test_redirected_jobcontrol',
+    ['tests/integration/test_redirected_jobcontrol.c'])
+  test('redirected job-control builtins run in the shell',
+       test_redirected_jobcontrol,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
