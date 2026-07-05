@@ -35,6 +35,7 @@
 #include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
+#include "node_to_source.h"
 #include "parser.h"
 #include "pattern_match.h"
 #include "redirection.h"
@@ -16522,6 +16523,8 @@ static void initialize_job_control(executor_t *executor) {
 
     executor->jobs = NULL;
     executor->next_job_id = 1;
+    executor->current_job = 0;
+    executor->previous_job = 0;
 
 #ifdef LUSH_FUZZ_SANDBOX
     /// Fuzz harness must not perform tty job-control operations.
@@ -16601,6 +16604,87 @@ static void free_process_list(process_t *processes) {
     }
 }
 
+/// Mark job_id as the current job (%+ / %%), demoting the prior current to
+/// previous (%-). Current/previous is the POSIX job-control concept both bash
+/// and zsh track: the current job is the most recently backgrounded, stopped,
+/// or fg/bg-selected job; the previous is the one that held that role before.
+static void note_current_job(executor_t *executor, int job_id) {
+    if (job_id <= 0 || job_id == executor->current_job) {
+        return;
+    }
+    executor->previous_job = executor->current_job;
+    executor->current_job = job_id;
+}
+
+/// Restore the current/previous invariant after a job is removed: both must
+/// name existing jobs. A gone current is replaced by the previous (else the
+/// newest remaining job); previous is then re-derived as the newest remaining
+/// job that is not current whenever it is unset, dangling, or equal to current
+/// -- so a '-' job always exists while two or more jobs remain.
+static void reconcile_job_markers(executor_t *executor) {
+    if (executor->current_job &&
+        !executor_find_job(executor, executor->current_job)) {
+        executor->current_job =
+            executor_find_job(executor, executor->previous_job)
+                ? executor->previous_job
+                : (executor->jobs ? executor->jobs->job_id : 0);
+        executor->previous_job = 0;
+    }
+    if (executor->previous_job == executor->current_job ||
+        !executor_find_job(executor, executor->previous_job)) {
+        executor->previous_job = 0;
+        for (job_t *j = executor->jobs; j; j = j->next) {
+            if (j->job_id != executor->current_job) {
+                executor->previous_job = j->job_id;
+                break;
+            }
+        }
+    }
+}
+
+/// The job-listing marker: '+' for the current job (%+ / %%), '-' for the
+/// previous (%-), space otherwise. Reflects the tracked current/previous state,
+/// not the transient foreground flag.
+static char job_marker(const executor_t *executor, const job_t *job) {
+    if (job->job_id == executor->current_job) {
+        return '+';
+    }
+    if (job->job_id == executor->previous_job) {
+        return '-';
+    }
+    return ' ';
+}
+
+/// The title-cased state word lush shows for a job's state.
+static const char *job_state_string(const job_t *job) {
+    switch (job->state) {
+    case JOB_RUNNING:
+        return "Running";
+    case JOB_STOPPED:
+        return "Stopped";
+    case JOB_DONE:
+        return "Done";
+    default:
+        return "Unknown";
+    }
+}
+
+/// Write one job line in lush's single curated format, shared by the `jobs`
+/// listing and every launch/stop/continue notice so all job surfaces align on
+/// the same columns: "[id]<marker> <state> <command>", with the marker glued to
+/// the id and the state left-justified in a fixed field.
+///
+/// The shape is a deliberate curation, not a copy: bash and zsh differ here --
+/// bash glues the marker and title-cases the state ("[2]- Stopped"), zsh spaces
+/// the marker and lower-cases the state ("[2]  - suspended"). lush curates the
+/// compact, single-column-aligned form (glued marker, title-cased state word)
+/// as the one legible layout every surface reuses.
+static void job_write_line(FILE *out, const executor_t *executor,
+                           const job_t *job, const char *state_str) {
+    fprintf(out, "[%d]%c %-20s %s\n", job->job_id, job_marker(executor, job),
+            state_str, job->command_line ? job->command_line : "unknown");
+}
+
 /**
  * @brief Add a new job to the job list
  *
@@ -16637,6 +16721,7 @@ job_t *executor_add_job(executor_t *executor, pid_t pid, pid_t pgid,
     job->next = executor->jobs;
 
     executor->jobs = job;
+    note_current_job(executor, job->job_id);
     return job;
 }
 
@@ -16704,6 +16789,7 @@ void executor_remove_job(executor_t *executor, int job_id) {
             free_process_list(job->processes);
             free(job->command_line);
             free(job);
+            reconcile_job_markers(executor);
             return;
         }
         prev = job;
@@ -16853,7 +16939,15 @@ void executor_update_job_status(executor_t *executor) {
     }
 
     for (job_t *job = executor->jobs; job; job = job->next) {
+        job_state_t prior = job->state;
         executor_reap_job(job, false);
+
+        /// A job that has just stopped becomes the current job (%+): a stop is
+        /// a job-control event that promotes the job, matching the current/
+        /// previous discipline POSIX, bash, and zsh share.
+        if (prior != JOB_STOPPED && job->state == JOB_STOPPED) {
+            note_current_job(executor, job->job_id);
+        }
 
         /// Completion notices ([id]+ Done / Stopped) are an interactive
         /// convenience; a non-interactive script stays silent (the shell
@@ -16862,15 +16956,13 @@ void executor_update_job_status(executor_t *executor) {
         /// marks the current Done or Stopped state as already announced, so a
         /// persistently stopped job does not reprint on every prompt render.
         /// (fg/bg clear it when they continue a job, so the eventual Done still
-        /// prints.)
+        /// prints.) The marker reflects the tracked current/previous state.
         if (is_interactive_shell() && !job->reported) {
             if (job->state == JOB_DONE) {
-                printf("[%d]+ Done                    %s\n", job->job_id,
-                       job->command_line ? job->command_line : "unknown");
+                job_write_line(stdout, executor, job, "Done");
                 job->reported = true;
             } else if (job->state == JOB_STOPPED) {
-                printf("[%d]+ Stopped                 %s\n", job->job_id,
-                       job->command_line ? job->command_line : "unknown");
+                job_write_line(stdout, executor, job, "Stopped");
                 job->reported = true;
             }
         }
@@ -16924,11 +17016,11 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     /// zombies) bounded rather than growing it for the life of the shell.
     executor_reap_finished_jobs(executor);
 
-    /// Build command line for the job list and display.
-    char *command_line = NULL;
-    if (command->first_child && command->first_child->type == NODE_COMMAND) {
-        command_line = command->first_child->val.str;
-    }
+    /// Render the full backgrounded command from its AST so the job list shows
+    /// a pipeline, subshell, or brace group in full rather than as its first
+    /// word alone (or "unknown" when the child is not a plain command).
+    /// executor_add_job copies the string; free the rendered source after.
+    char *command_line = node_to_source(command->first_child);
 
     /// Job control (set -m) governs process-group topology and terminal
     /// management, not whether a job is tracked. lush keeps the job list a
@@ -16946,6 +17038,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
                               "failed to fork for background job: %s",
                               strerror(saved_errno));
+        free(command_line);
         return 1;
     }
 
@@ -16983,6 +17076,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
 
     job_t *job =
         executor_add_job(executor, pid, pgid, own_pgroup, command_line);
+    free(command_line);
 
     /// The launch notification ([id] pid) is an interactive convenience; a
     /// non-interactive script stays silent (the shell consensus for job
@@ -17027,44 +17121,57 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
     FILE *out = open_memstream(&buf, &buf_len);
     FILE *sink = out ? out : stdout;
 
-    job_t *job = executor->jobs;
-    while (job) {
-        /// Skip a completion this listing has already reported (a done job is
-        /// shown once, then omitted). A completion consumed by an explicit
-        /// `wait` is already gone from the list; only never-waited completions
-        /// reach here. Running and stopped jobs are always listed.
+    /// The job list is stored newest-first (add prepends); present it
+    /// oldest-first so ids read in ascending order, the ordering POSIX, bash,
+    /// and zsh share. Collect the jobs and walk them in reverse; on allocation
+    /// failure fall back to the stored newest-first order.
+    int job_count = 0;
+    for (job_t *j = executor->jobs; j; j = j->next) {
+        job_count++;
+    }
+    job_t **ordered =
+        job_count ? malloc((size_t)job_count * sizeof(*ordered)) : NULL;
+    if (ordered) {
+        int fill = job_count;
+        for (job_t *j = executor->jobs; j; j = j->next) {
+            ordered[--fill] = j;
+        }
+    }
+
+    /// Emit one job per line. The ordered walk (oldest-first) is the common
+    /// path; it runs only when the ordering buffer was allocated, so on the
+    /// rare allocation failure the fallback newest-first walk below takes over.
+    /// A completion already reported is shown once then omitted (a
+    /// `wait`-consumed completion is already gone from the list); running and
+    /// stopped jobs are always listed.
+    for (int idx = 0; ordered && idx < job_count; idx++) {
+        job_t *job = ordered[idx];
+
         if (job->state == JOB_DONE && job->reported) {
-            job = job->next;
             continue;
         }
-
-        const char *state_str;
-        switch (job->state) {
-        case JOB_RUNNING:
-            state_str = "Running";
-            break;
-        case JOB_STOPPED:
-            state_str = "Stopped";
-            break;
-        case JOB_DONE:
-            state_str = "Done";
-            break;
-        default:
-            state_str = "Unknown";
-            break;
-        }
-
-        fprintf(sink, "[%d]%c %-20s %s\n", job->job_id,
-                job->foreground ? '+' : '-', state_str,
-                job->command_line ? job->command_line : "unknown");
+        job_write_line(sink, executor, job, job_state_string(job));
 
         /// Reporting a completion here means the next listing omits it.
         if (job->state == JOB_DONE) {
             job->reported = true;
         }
-
-        job = job->next;
     }
+
+    if (!ordered) {
+        /// Allocation-failure fallback: list in the stored newest-first order.
+        for (job_t *job = executor->jobs; job; job = job->next) {
+            if (job->state == JOB_DONE && job->reported) {
+                continue;
+            }
+            job_write_line(sink, executor, job, job_state_string(job));
+            if (job->state == JOB_DONE) {
+                job->reported = true;
+            }
+        }
+    }
+
+    free(ordered);
 
     if (out) {
         fclose(out);
@@ -17110,6 +17217,11 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         return 1;
     }
 
+    /// Selecting a job for the foreground makes it the current job (%+); if it
+    /// stops again it is already current, and if it ends the marker state is
+    /// reconciled on removal.
+    note_current_job(executor, job_id);
+
     /// Give the job's own process group control of the terminal. A job that
     /// shares the shell's group already runs in the foreground group, so no
     /// handoff is needed.
@@ -17143,8 +17255,10 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
     } else if (WIFSTOPPED(status)) {
         job->state = JOB_STOPPED;
         job->foreground = false;
-        printf("[%d]+ Stopped                 %s\n", job_id,
-               job->command_line ? job->command_line : "unknown");
+        /// A stop makes the job current (%+); it was already marked current on
+        /// entry, so the marker below reflects that.
+        note_current_job(executor, job_id);
+        job_write_line(stdout, executor, job, "Stopped");
         /// This notice reports the stop; mark it so the next prompt's status
         /// sweep does not print a second Stopped line for the same job.
         job->reported = true;
@@ -17193,10 +17307,14 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
     /// Continuing the job clears the reported flag so its eventual completion
     /// is announced, rather than being suppressed by an earlier Stopped notice.
     job->reported = false;
+    /// Resuming a job in the background makes it the current job (%+).
+    note_current_job(executor, job_id);
     kill(job_target(job), SIGCONT);
 
-    printf("[%d]+ %s &\n", job_id,
-           job->command_line ? job->command_line : "unknown");
+    /// The bg notice reuses the shared one-line job format (id, tracked marker,
+    /// state, command). lush does not append the trailing `&` cosmetic bash
+    /// prints here; the shared format keeps every job surface identical.
+    job_write_line(stdout, executor, job, "Running");
 
     return 0;
 }

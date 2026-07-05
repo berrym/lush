@@ -106,6 +106,8 @@ typedef struct executor {
     function_def_t *functions;    ///< Function definition table
     job_t *jobs;                  ///< Job control list
     int next_job_id;              ///< Next job ID to assign
+    int current_job;              ///< Current job id (%+ / %%), or 0 for none
+    int previous_job;             ///< Previous job id (%-), or 0 for none
     pid_t shell_pgid;             ///< Shell process group ID
     loop_control_t loop_control;  ///< Loop control state
     int loop_control_level;       ///< Levels remaining to unwind for `break N`
