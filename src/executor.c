@@ -17482,12 +17482,19 @@ static bool builtin_can_fork(const char *name) {
     if (!name)
         return false;
 
-    /// Only these builtins are "pure" - they produce output but don't modify
-    /// shell state. All others must run in the parent process.
+    /// Only these builtins are "pure" -- they produce output but read no shell
+    /// state that a subprocess could not see and mutate none that the parent
+    /// must keep. The job-control builtins (jobs, wait, fg, bg) are
+    /// deliberately excluded: a forked copy cannot waitpid the shell's
+    /// background children or persist job-list changes back to the parent, so
+    /// `wait $! >file` would return 0 instead of the job's status and `fg`/`bg`
+    /// would resume a job while leaving the parent's job list stale. They run
+    /// in the parent with the redirection applied there, the way every
+    /// state-dependent builtin does. (kill has no builtin in lush; it is not
+    /// listed.)
     static const char *pure_builtins[] = {
-        "echo", "printf", "true", "false", "test", "[",
-        "type", "which",  "help", "pwd",   "dirs", "times",
-        "kill", "wait",   "jobs", "fg",    "bg",   NULL};
+        "echo",  "printf", "true", "false", "test",  "[", "type",
+        "which", "help",   "pwd",  "dirs",  "times", NULL};
 
     for (const char **p = pure_builtins; *p; p++) {
         if (strcmp(name, *p) == 0) {
