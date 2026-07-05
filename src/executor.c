@@ -49,6 +49,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <limits.h>
 #include <math.h>
 #include <pwd.h>
 #include <regex.h>
@@ -16762,6 +16763,82 @@ job_t *executor_find_job_by_pid(executor_t *executor, pid_t pid) {
     return NULL;
 }
 
+job_t *executor_resolve_job_spec(executor_t *executor, const char *spec,
+                                 const char **reason) {
+    const char *ignored;
+    if (!reason) {
+        reason = &ignored;
+    }
+    *reason = "no such job";
+    if (!executor || !spec || spec[0] != '%') {
+        *reason = "invalid job spec";
+        return NULL;
+    }
+
+    const char *body = spec + 1;
+
+    /// %%, %+ -> the current job; %- -> the previous job.
+    if (body[0] == '\0' || strcmp(body, "%") == 0 || strcmp(body, "+") == 0) {
+        return executor_find_job(executor, executor->current_job);
+    }
+    if (strcmp(body, "-") == 0) {
+        return executor_find_job(executor, executor->previous_job);
+    }
+
+    /// %n -> job number n. Reject an out-of-range or non-numeric-tail literal
+    /// rather than truncating it onto an unrelated job.
+    /// A spec that begins with a digit is a job number in full: a trailing
+    /// non-digit is rejected rather than reinterpreted as a name match. bash
+    /// would prefix-match "%2x" as a command name and zsh would read it as job
+    /// 2; lush rejects the mixed form so a mistyped number never silently
+    /// resolves onto an unrelated job. (The cost is that a command beginning
+    /// with a digit cannot be prefix-matched; use its job number instead.)
+    if (isdigit((unsigned char)body[0])) {
+        char *end;
+        errno = 0;
+        long n = strtol(body, &end, 10);
+        if (*end != '\0' || n <= 0 || errno == ERANGE || n > INT_MAX) {
+            *reason = "invalid job spec";
+            return NULL;
+        }
+        return executor_find_job(executor, (int)n);
+    }
+
+    /// %?str -> the job whose command contains str; %str -> the job whose
+    /// command begins with str. Byte-level prefix/substring matching is exact
+    /// for UTF-8 command text (the encoding is prefix-preserving and
+    /// self-synchronizing) and matches the shells' literal, non-case-folding
+    /// job-spec semantics.
+    ///
+    /// More than one match is rejected as ambiguous rather than resolved to an
+    /// arbitrary job: acting on the wrong job for a fg/bg/kill is worse than an
+    /// error. bash rejects likewise; zsh silently takes the most recent match,
+    /// which lush does not follow.
+    bool substring = body[0] == '?';
+    const char *pat = substring ? body + 1 : body;
+    if (pat[0] == '\0') {
+        *reason = "invalid job spec";
+        return NULL;
+    }
+    size_t pat_len = strlen(pat);
+    job_t *match = NULL;
+    for (job_t *j = executor->jobs; j; j = j->next) {
+        if (!j->command_line) {
+            continue;
+        }
+        bool hit = substring ? (strstr(j->command_line, pat) != NULL)
+                             : (strncmp(j->command_line, pat, pat_len) == 0);
+        if (hit) {
+            if (match && match != j) {
+                *reason = "ambiguous job spec";
+                return NULL;
+            }
+            match = j;
+        }
+    }
+    return match;
+}
+
 /**
  * @brief Remove a job from the job list
  *
@@ -17182,6 +17259,38 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
     return 0;
 }
 
+/// Resolve the job argument shared by fg and bg: no argument selects the
+/// current job (%+, the bash/zsh default), a `%...` argument is a job spec, and
+/// a bare number is a job number. Returns NULL and sets *reason on failure.
+///
+/// The bare-number form is a curated lush convenience: bash accepts it but
+/// prints a deprecation warning ("job specification requires leading `%'") and
+/// zsh rejects it outright, so the two shells disagree. lush accepts a bare
+/// number as a job number without a warning, because a fg/bg argument names
+/// only jobs (never a pid), so `fg 2` is unambiguous and needs no `%`.
+static job_t *resolve_fgbg_job(executor_t *executor, const char *arg,
+                               const char **reason) {
+    *reason = "no such job";
+    if (!arg) {
+        job_t *job = executor_find_job(executor, executor->current_job);
+        if (!job) {
+            *reason = "no current job";
+        }
+        return job;
+    }
+    if (arg[0] == '%') {
+        return executor_resolve_job_spec(executor, arg, reason);
+    }
+    char *end;
+    errno = 0;
+    long n = strtol(arg, &end, 10);
+    if (*end != '\0' || n <= 0 || errno == ERANGE || n > INT_MAX) {
+        *reason = "invalid job spec";
+        return NULL;
+    }
+    return executor_find_job(executor, (int)n);
+}
+
 /**
  * @brief Built-in fg command implementation
  *
@@ -17197,23 +17306,20 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    int job_id = 1; /// Default to job 1
-    if (argv[1]) {
-        job_id = atoi(argv[1]);
-    }
-
-    job_t *job = executor_find_job(executor, job_id);
+    const char *reason;
+    job_t *job = resolve_fgbg_job(executor, argv[1], &reason);
     if (!job) {
         executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
-                              builtin_get_source_location(), "%d: no such job",
-                              job_id);
+                              builtin_get_source_location(), "%s: %s",
+                              argv[1] ? argv[1] : "fg", reason);
         return 1;
     }
+    int job_id = job->job_id;
 
     if (job->state == JOB_DONE) {
-        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
-                              builtin_get_source_location(),
-                              "%d: job has terminated", job_id);
+        executor_error_report(
+            executor, SHELL_ERR_JOB_NOT_FOUND, builtin_get_source_location(),
+            "%s: job has terminated", argv[1] ? argv[1] : "fg");
         return 1;
     }
 
@@ -17281,23 +17387,20 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    int job_id = 1; /// Default to job 1
-    if (argv[1]) {
-        job_id = atoi(argv[1]);
-    }
-
-    job_t *job = executor_find_job(executor, job_id);
+    const char *reason;
+    job_t *job = resolve_fgbg_job(executor, argv[1], &reason);
     if (!job) {
         executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
-                              builtin_get_source_location(), "%d: no such job",
-                              job_id);
+                              builtin_get_source_location(), "%s: %s",
+                              argv[1] ? argv[1] : "bg", reason);
         return 1;
     }
+    int job_id = job->job_id;
 
     if (job->state != JOB_STOPPED) {
-        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
-                              builtin_get_source_location(),
-                              "%d: job already in background", job_id);
+        executor_error_report(
+            executor, SHELL_ERR_JOB_NOT_FOUND, builtin_get_source_location(),
+            "%s: job already in background", argv[1] ? argv[1] : "bg");
         return 1;
     }
 
