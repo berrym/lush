@@ -252,9 +252,11 @@ alias ll              # Show specific alias
 Resume job in background.
 
 ```bash
-bg                    # Resume most recent job
-bg %1                 # Resume job 1
-bg %job_name          # Resume by name
+bg                    # Resume the current job
+bg %1                 # Resume job 1 (or: bg 1)
+bg %+                 # The current job; %- the previous
+bg '%name'            # Resume by command prefix -- quote it, since an
+                      # unquoted %name is a Map kind sigil
 ```
 
 ### `cd`
@@ -323,9 +325,11 @@ fc 100 110            # Edit range of history
 Bring job to foreground.
 
 ```bash
-fg                    # Most recent job
-fg %1                 # Job 1
-fg %job_name          # By name
+fg                    # The current job
+fg %1                 # Job 1 (or: fg 1)
+fg %+                 # The current job; %- the previous
+fg '%name'            # By command prefix -- quote it, since an unquoted
+                      # %name is a Map kind sigil
 ```
 
 ### `getopts`

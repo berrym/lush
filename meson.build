@@ -2890,6 +2890,16 @@ if fs.exists('tests/integration/test_jobs_display.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_job_spec.c')
+  test_job_spec = executable('test_job_spec',
+                             ['tests/integration/test_job_spec.c'])
+  test('job spec parser (%n/%+/%-/%string)',
+       test_job_spec,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground

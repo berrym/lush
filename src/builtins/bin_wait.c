@@ -149,23 +149,17 @@ int bin_wait(int argc, char **argv) {
         char *endptr;
 
         if (argv[i][0] == '%') {
-            /// Job-id form (%n). Bound the value to a valid job id before
-            /// narrowing to int: an out-of-range literal must be rejected, not
-            /// silently truncated onto an unrelated job.
-            errno = 0;
-            long id = strtol(argv[i] + 1, &endptr, 10);
-            if (*endptr != '\0' || id <= 0 || errno == ERANGE || id > INT_MAX) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "%s: not a valid job ID", argv[i]);
-                return 1;
-            }
-            job_t *job = executor_find_job(current_executor, (int)id);
+            /// Job-spec form. The shared resolver handles %n, %%/%+ (current),
+            /// %- (previous), %prefix, and %?substring, rejecting an out-of-
+            /// range or ambiguous spec rather than aliasing it onto an
+            /// unrelated job.
+            const char *reason;
+            job_t *job =
+                executor_resolve_job_spec(current_executor, argv[i], &reason);
             if (!job) {
                 executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
-                                      builtin_get_source_location(),
-                                      "%%%ld: no such job", id);
+                                      builtin_get_source_location(), "%s: %s",
+                                      argv[i], reason);
                 return 127;
             }
             int break_signo;

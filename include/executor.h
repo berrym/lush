@@ -648,6 +648,31 @@ job_t *executor_find_job(executor_t *executor, int job_id);
 job_t *executor_find_job_by_pid(executor_t *executor, pid_t pid);
 
 /**
+ * @brief Resolve a `%...` job-control job spec to a job
+ *
+ * Handles the spec forms bash and zsh share:
+ *   - `%%` / `%+`  the current job
+ *   - `%-`         the previous job
+ *   - `%n`         job number n
+ *   - `%str`       the job whose command begins with str
+ *   - `%?str`      the job whose command contains str
+ *
+ * Note: an unquoted `%name` word is a lush Map kind sigil, not a job spec, so
+ * the name-matching forms must be quoted (`wait '%sleep'`); the numeric and
+ * positional forms (`%n`, `%%`, `%+`, `%-`) have no kind-sigil collision and
+ * work unquoted. This function resolves whatever spec string it receives.
+ *
+ * @param executor Executor context
+ * @param spec     Spec string; must begin with '%'
+ * @param reason   If non-NULL, set to a short failure phrase ("no such job",
+ *                 "ambiguous job spec", "invalid job spec") when NULL is
+ *                 returned
+ * @return The resolved job, or NULL (with *reason set) if unresolved
+ */
+job_t *executor_resolve_job_spec(executor_t *executor, const char *spec,
+                                 const char **reason);
+
+/**
  * @brief Remove a job from the job list
  *
  * @param executor Executor context
