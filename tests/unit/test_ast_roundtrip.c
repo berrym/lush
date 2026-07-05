@@ -266,11 +266,27 @@ TEST(subshell) {
         FAIL("subshell roundtrip");
 }
 
+TEST(subshell_multi) {
+    /// A subshell body is a sibling chain; every statement must round-trip,
+    /// not just the first.
+    if (roundtrip_test("( echo a; echo b; echo c )", "subshell_multi"))
+        PASS();
+    else
+        FAIL("multi-statement subshell roundtrip");
+}
+
 TEST(brace_group) {
     if (roundtrip_test("{ echo hello; }", "brace_group"))
         PASS();
     else
         FAIL("brace group roundtrip");
+}
+
+TEST(brace_group_multi) {
+    if (roundtrip_test("{ echo a; echo b; echo c; }", "brace_group_multi"))
+        PASS();
+    else
+        FAIL("multi-statement brace group roundtrip");
 }
 
 /* ============================================================================
@@ -394,7 +410,9 @@ int main(void) {
 
     printf("\nGrouping:\n");
     RUN_TEST(subshell);
+    RUN_TEST(subshell_multi);
     RUN_TEST(brace_group);
+    RUN_TEST(brace_group_multi);
 
     printf("\nFunctions:\n");
     RUN_TEST(function_def);
