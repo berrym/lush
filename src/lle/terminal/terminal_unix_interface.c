@@ -417,8 +417,15 @@ lle_unix_interface_enter_raw_mode(lle_unix_interface_t *interface) {
     raw->c_cc[VMIN] = 0;  /// Non-blocking: return immediately
     raw->c_cc[VTIME] = 0; /// No timeout
 
-    /// Apply settings - TCSAFLUSH discards unread input
-    if (tcsetattr(interface->terminal_fd, TCSAFLUSH, raw) != 0) {
+    /// Apply with TCSANOW, not TCSAFLUSH. TCSAFLUSH discards unread input,
+    /// which throws away type-ahead: input typed, pasted, or scripted while a
+    /// command runs, or between rapidly-entered commands, is buffered by the
+    /// terminal during execution and would be flushed the instant the next
+    /// prompt re-enters raw mode -- so a multi-line paste and fast successive
+    /// commands lose every line after the first. bash and zsh preserve
+    /// type-ahead; lush does too. TCSANOW also applies immediately rather than
+    /// waiting for output to drain, the same block exit_raw_mode dodges.
+    if (tcsetattr(interface->terminal_fd, TCSANOW, raw) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
         return LLE_FAULT(LLE_ERROR_SYSTEM_CALL, "terminal",
                          "tcsetattr raw mode failed");
@@ -453,8 +460,8 @@ lle_result_t lle_unix_interface_exit_raw_mode(lle_unix_interface_t *interface) {
     /// Dropping TCSAFLUSH's input-flush is a deliberate, benign behavior
     /// change: unread input typed while editing now survives into restored
     /// cooked mode and is delivered to the command about to run (type-ahead),
-    /// matching bash/zsh. Input typed at the NEXT prompt is still discarded --
-    /// the next enter_raw_mode applies its settings with TCSAFLUSH.
+    /// matching bash/zsh. enter_raw_mode likewise applies with TCSANOW, so
+    /// type-ahead at the next prompt survives too.
     if (tcsetattr(interface->terminal_fd, TCSANOW,
                   &interface->original_termios) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
