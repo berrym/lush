@@ -304,21 +304,38 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         }
         break;
 
-    case NODE_SUBSHELL:
+    case NODE_SUBSHELL: {
+        /// The body is a sibling chain of statements, not a single node;
+        /// render each, joined by "; ", so a multi-statement subshell is not
+        /// truncated to its first command.
         strbuf_append(buf, "( ");
-        if (node->first_child) {
-            node_to_source_impl(node->first_child, buf, depth + 1);
+        int first = 1;
+        for (node_t *child = node->first_child; child;
+             child = child->next_sibling) {
+            if (!first) {
+                strbuf_append(buf, "; ");
+            }
+            first = 0;
+            node_to_source_impl(child, buf, depth + 1);
         }
         strbuf_append(buf, " )");
         break;
+    }
 
-    case NODE_BRACE_GROUP:
+    case NODE_BRACE_GROUP: {
         strbuf_append(buf, "{ ");
-        if (node->first_child) {
-            node_to_source_impl(node->first_child, buf, depth + 1);
+        int first = 1;
+        for (node_t *child = node->first_child; child;
+             child = child->next_sibling) {
+            if (!first) {
+                strbuf_append(buf, "; ");
+            }
+            first = 0;
+            node_to_source_impl(child, buf, depth + 1);
         }
         strbuf_append(buf, "; }");
         break;
+    }
 
     case NODE_IF: {
         /// if condition; then body; [elif cond; then body;]* [else body;] fi
