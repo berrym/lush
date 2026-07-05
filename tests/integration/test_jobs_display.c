@@ -13,10 +13,8 @@
  *      The marker reflects tracked current/previous state, not a transient
  * flag.
  *   3. Full command text: a backgrounded compound command (subshell, brace
- *      group) is rendered in full from its AST, not reduced to its first word
- *      or "unknown". (Backgrounded pipelines are a separate, pre-existing case:
- *      they register no job at all, so there is nothing to display; that
- *      tracking gap is tracked independently and is out of scope here.)
+ *      group, or pipeline) is rendered in full from its AST, not reduced to its
+ *      first word or "unknown".
  *
  * Usage: test_jobs_display <lush-binary-path>
  */
@@ -125,37 +123,6 @@ static void check_present(const char *lush, const char *label,
     fprintf(stderr, "ok   %s [%s]\n", TEST, label);
 }
 
-/// Assert every needle in `needles` is present and every needle in `absent` is
-/// not.
-static void check_present_absent(const char *lush, const char *label,
-                                 const char *script, const char *const *needles,
-                                 const char *const *absent) {
-    char out[8192];
-    if (!run_script(lush, script, out, sizeof(out))) {
-        fprintf(stderr, "FAIL %s [%s]: shell did not exit\n", TEST, label);
-        failures++;
-        return;
-    }
-    for (const char *const *p = needles; p && *p; p++) {
-        if (!strstr(out, *p)) {
-            fprintf(stderr, "FAIL %s [%s]: expected \"%s\" (got: \"%.400s\")\n",
-                    TEST, label, *p, out);
-            failures++;
-            return;
-        }
-    }
-    for (const char *const *p = absent; p && *p; p++) {
-        if (strstr(out, *p)) {
-            fprintf(stderr,
-                    "FAIL %s [%s]: unexpected \"%s\" (got: \"%.400s\")\n", TEST,
-                    label, *p, out);
-            failures++;
-            return;
-        }
-    }
-    fprintf(stderr, "ok   %s [%s]\n", TEST, label);
-}
-
 /// Assert `first` appears before `second` in the script's output.
 static void check_order(const char *lush, const char *label, const char *script,
                         const char *first, const char *second) {
@@ -231,14 +198,10 @@ int main(int argc, char **argv) {
                   "sleep 5 & p=$!; sleep 5 & kill -STOP $p; sleep 0.3; jobs",
                   (const char *[]){"[1]+ Stopped", "[2]- Running", NULL});
 
-    /// Boundary: a backgrounded pipeline registers no job (a separate,
-    /// pre-existing tracking gap). Lock that the listing shows nothing for it,
-    /// so the day pipelines become jobs this suite trips and the display
-    /// assertions are revisited rather than silently skipped.
-    check_present_absent(lush, "backgrounded pipeline registers no job",
-                         "sleep 2 | cat & jobs; echo END",
-                         (const char *[]){"END", NULL},
-                         (const char *[]){"[1]", "sleep 2 | cat", NULL});
+    /// Law 3c: a backgrounded pipeline registers one job whose command text is
+    /// the full pipeline.
+    check_present(lush, "pipeline command text", "sleep 2 | cat & jobs",
+                  (const char *[]){"[1]", "sleep 2 | cat", NULL});
 
     if (failures) {
         fprintf(stderr, "%s: %d failure(s)\n", TEST, failures);
