@@ -17316,6 +17316,11 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
     }
     int job_id = job->job_id;
 
+    /// Refresh the job's status before acting on it: it may have stopped or
+    /// finished since the last prompt-time status poll, and fg must see the
+    /// current state (a non-blocking WUNTRACED reap updates job->state).
+    executor_reap_job(job, false);
+
     if (job->state == JOB_DONE) {
         executor_error_report(
             executor, SHELL_ERR_JOB_NOT_FOUND, builtin_get_source_location(),
@@ -17396,6 +17401,12 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
         return 1;
     }
     int job_id = job->job_id;
+
+    /// Refresh the job's status before acting: it may have stopped since the
+    /// last prompt-time poll -- e.g. `kill -STOP %n; bg %n` in a script -- and
+    /// bg must see the current Stopped state, not a stale Running (a
+    /// non-blocking WUNTRACED reap updates job->state).
+    executor_reap_job(job, false);
 
     if (job->state != JOB_STOPPED) {
         executor_error_report(
