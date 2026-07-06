@@ -52,6 +52,7 @@ static node_t *parse_case_statement(parser_t *parser);
 static node_t *parse_function_definition(parser_t *parser);
 static bool is_function_definition(parser_t *parser);
 static node_t *parse_logical_expression(parser_t *parser);
+static node_t *parse_and_or(parser_t *parser);
 static node_t *parse_redirection(parser_t *parser);
 static bool is_redirection_token(token_type_t type);
 static bool parse_trailing_redirections(parser_t *parser,
@@ -806,15 +807,19 @@ static node_t *parse_if_body(parser_t *parser) {
 }
 
 /**
- * @brief Parse logical operators (&& and ||)
+ * @brief Parse an and-or list (&& and ||)
  *
- * Handles the and_or grammar level, creating NODE_LOGICAL_AND
- * or NODE_LOGICAL_OR nodes for compound commands.
+ * Handles the and_or grammar level, creating NODE_LOGICAL_AND or
+ * NODE_LOGICAL_OR nodes for compound commands. Does NOT consume a trailing
+ * `&` -- that is a list separator, handled by parse_logical_expression in list
+ * position. A condition (if/while/until) parses its and_or with this function
+ * directly, so a trailing `&` there is left for the caller to reject rather
+ * than silently backgrounding the condition.
  *
  * @param parser Parser instance
- * @return AST node for logical expression
+ * @return AST node for the and-or list
  */
-static node_t *parse_logical_expression(parser_t *parser) {
+static node_t *parse_and_or(parser_t *parser) {
     /// Track recursion depth for stack overflow protection
     if (!parser_enter_recursion(parser)) {
         return NULL;
@@ -857,28 +862,72 @@ static node_t *parse_logical_expression(parser_t *parser) {
         left = logical_node;
     }
 
-    /// A trailing `&` backgrounds the entire and-or list -- `a | b &` and
-    /// `a && b &` background the whole construct, not just the last pipeline
-    /// stage or operand (POSIX: `&` is a list separator terminating the
-    /// preceding and_or). Handled above the pipeline level so the background
-    /// node wraps the complete and_or; parse_pipeline no longer consumes `&`,
-    /// which previously bound it to the last stage of a pipe.
+    parser_exit_recursion(parser);
+    return left;
+}
+
+/**
+ * @brief Parse an and-or list, optionally backgrounded by a trailing `&`
+ *
+ * A trailing `&` backgrounds the entire and-or list -- `a | b &` and
+ * `a && b &` background the whole construct, not just the last pipeline stage
+ * or operand (POSIX: `&` is a list separator terminating the preceding
+ * and_or). This is the list-position entry point; conditions call parse_and_or
+ * directly so a `&` after a condition is not consumed here.
+ *
+ * @param parser Parser instance
+ * @return The and_or, wrapped in NODE_BACKGROUND when followed by `&`
+ */
+static node_t *parse_logical_expression(parser_t *parser) {
+    node_t *node = parse_and_or(parser);
+    if (!node) {
+        return NULL;
+    }
+
     if (tokenizer_match(parser->tokenizer, TOK_AND) ||
         tokenizer_match(parser->tokenizer, TOK_BACKGROUND_DISOWN)) {
         tokenizer_advance(parser->tokenizer); /// consume & / &| / &!
 
         node_t *background_node = new_node(NODE_BACKGROUND);
         if (!background_node) {
-            free_node_tree(left);
-            parser_exit_recursion(parser);
+            free_node_tree(node);
             return NULL;
         }
-        add_child_node(background_node, left);
-        left = background_node;
+        add_child_node(background_node, node);
+        node = background_node;
     }
 
-    parser_exit_recursion(parser);
-    return left;
+    return node;
+}
+
+/**
+ * @brief Reject a trailing `&` on the condition of a compound command
+ *
+ * A `&` (`&`, `&|`, or `&!`) immediately after the condition of an
+ * if/elif/while/until is a common mistake: `&` backgrounds a list element, but
+ * a condition is not a list element, and a backgrounded condition would return
+ * 0 asynchronously and break control flow (an `if` always takes the
+ * then-branch, a `while` loops forever). This records a targeted structured
+ * error -- naming the construct and how to fix it -- instead of the generic
+ * missing-terminator diagnostic. Emitted at the `&` token's location.
+ *
+ * @param parser    Parser instance
+ * @param construct Keyword for the message ("if" / "elif" / "while" / "until")
+ * @return true if a `&` was present and an error was recorded (abort the parse)
+ */
+static bool reject_backgrounded_condition(parser_t *parser,
+                                          const char *construct) {
+    if (tokenizer_match(parser->tokenizer, TOK_AND) ||
+        tokenizer_match(parser->tokenizer, TOK_BACKGROUND_DISOWN)) {
+        parser_error_add_with_help(
+            parser, SHELL_ERR_MALFORMED_CONSTRUCT,
+            "remove the '&': a condition runs synchronously. To run the whole "
+            "compound command in the background, put '&' after its closing "
+            "keyword, e.g. `if ...; fi &`.",
+            "the condition of '%s' cannot be backgrounded with '&'", construct);
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -3092,14 +3141,22 @@ static node_t *parse_if_statement(parser_t *parser) {
         return NULL;
     }
 
-    /// Parse condition - parse until we hit 'then' or ';'
-    node_t *condition = parse_logical_expression(parser);
+    /// Parse the condition as a bare and-or: a trailing `&` is a list
+    /// separator, not valid after a condition, so parse_and_or leaves it for
+    /// the `then`/`;` terminator rather than backgrounding the condition.
+    node_t *condition = parse_and_or(parser);
     if (!condition) {
         free_node_tree(if_node);
         parser_pop_context(parser);
         return NULL;
     }
     add_child_node(if_node, condition);
+
+    if (reject_backgrounded_condition(parser, "if")) {
+        free_node_tree(if_node);
+        parser_pop_context(parser);
+        return NULL;
+    }
 
     /// Skip any separators (semicolons, newlines, whitespace)
     skip_separators(parser);
@@ -3138,13 +3195,19 @@ static node_t *parse_if_statement(parser_t *parser) {
         tokenizer_advance(parser->tokenizer);
 
         /// Parse elif condition
-        node_t *elif_condition = parse_logical_expression(parser);
+        node_t *elif_condition = parse_and_or(parser);
         if (!elif_condition) {
             free_node_tree(if_node);
             parser_pop_context(parser);
             return NULL;
         }
         add_child_node(if_node, elif_condition);
+
+        if (reject_backgrounded_condition(parser, "elif")) {
+            free_node_tree(if_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
 
         /// Skip separators before 'then'
         skip_separators(parser);
@@ -3248,8 +3311,9 @@ static node_t *parse_while_statement(parser_t *parser) {
     /// Parse condition as a full logical expression so that &&/|| chains
     /// (e.g. `while [ $i -lt N ] && true; do ...`) parse like in if/elif.
     /// The `do` terminator is unambiguous, so logical operators in the
-    /// condition introduce no parser ambiguity.
-    node_t *condition = parse_logical_expression(parser);
+    /// condition introduce no parser ambiguity. A bare and-or (parse_and_or)
+    /// so a trailing `&` does not background the loop condition.
+    node_t *condition = parse_and_or(parser);
 
     if (!condition) {
         free_node_tree(while_node);
@@ -3260,6 +3324,12 @@ static node_t *parse_while_statement(parser_t *parser) {
         return NULL;
     }
     add_child_node(while_node, condition);
+
+    if (reject_backgrounded_condition(parser, "while")) {
+        free_node_tree(while_node);
+        parser_pop_context(parser);
+        return NULL;
+    }
 
     /// Skip any separators (semicolons, newlines, whitespace)
     skip_separators(parser);
@@ -3430,10 +3500,11 @@ static node_t *parse_until_statement(parser_t *parser) {
         return NULL;
     }
 
-    /// Parse condition as a full logical expression — same rationale as
+    /// Parse the condition as a bare and-or — same rationale as
     /// parse_while_statement: &&/|| in conditions are unambiguous because
-    /// `do` is the terminator.
-    node_t *condition = parse_logical_expression(parser);
+    /// `do` is the terminator; parse_and_or also leaves a trailing `&` for the
+    /// terminator rather than backgrounding the condition.
+    node_t *condition = parse_and_or(parser);
 
     if (!condition) {
         free_node_tree(until_node);
@@ -3444,6 +3515,12 @@ static node_t *parse_until_statement(parser_t *parser) {
         return NULL;
     }
     add_child_node(until_node, condition);
+
+    if (reject_backgrounded_condition(parser, "until")) {
+        free_node_tree(until_node);
+        parser_pop_context(parser);
+        return NULL;
+    }
 
     /// Skip any separators (semicolons, newlines, whitespace)
     skip_separators(parser);
