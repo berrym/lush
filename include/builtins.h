@@ -373,6 +373,15 @@ int bin_exec(int argc, char **argv);
 int bin_wait(int argc, char **argv);
 
 /**
+ * @brief `kill` builtin -- send a signal to jobs and processes
+ *
+ * @param argc Argument count
+ * @param argv Arguments: [-s SIGNAL | -SIGNAL] target... or -l [name|number]...
+ * @return 0 on success, non-zero if any target or option was invalid
+ */
+int bin_kill(int argc, char **argv);
+
+/**
  * @brief Set or display file creation mask
  * @param argc Argument count
  * @param argv Argument vector

@@ -479,6 +479,27 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
 /**
+ * @brief Report a structured runtime error with an actionable `= help:` line
+ *
+ * The twin of executor_error_report that also attaches a suggestion, rendered
+ * as the rust-style `= help:` line, telling the user how to fix the problem.
+ * Same source-line and context handling; use it wherever a runtime error has a
+ * concrete remedy.
+ *
+ * @param executor   Executor context
+ * @param code       Error code
+ * @param loc        Source location of error
+ * @param suggestion The help text (copied); the `= help:` line
+ * @param fmt        Printf-style format string for the primary message
+ * @param ...        Format arguments
+ */
+void executor_error_report_with_help(executor_t *executor,
+                                     shell_error_code_t code,
+                                     source_location_t loc,
+                                     const char *suggestion, const char *fmt,
+                                     ...);
+
+/**
  * @brief Reject a mixed-script identifier when the hardening flag is set
  *
  * Author-time guard for the UAX #39 homograph vector: an identifier
