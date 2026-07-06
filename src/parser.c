@@ -857,6 +857,26 @@ static node_t *parse_logical_expression(parser_t *parser) {
         left = logical_node;
     }
 
+    /// A trailing `&` backgrounds the entire and-or list -- `a | b &` and
+    /// `a && b &` background the whole construct, not just the last pipeline
+    /// stage or operand (POSIX: `&` is a list separator terminating the
+    /// preceding and_or). Handled above the pipeline level so the background
+    /// node wraps the complete and_or; parse_pipeline no longer consumes `&`,
+    /// which previously bound it to the last stage of a pipe.
+    if (tokenizer_match(parser->tokenizer, TOK_AND) ||
+        tokenizer_match(parser->tokenizer, TOK_BACKGROUND_DISOWN)) {
+        tokenizer_advance(parser->tokenizer); /// consume & / &| / &!
+
+        node_t *background_node = new_node(NODE_BACKGROUND);
+        if (!background_node) {
+            free_node_tree(left);
+            parser_exit_recursion(parser);
+            return NULL;
+        }
+        add_child_node(background_node, left);
+        left = background_node;
+    }
+
     parser_exit_recursion(parser);
     return left;
 }
@@ -997,21 +1017,11 @@ static node_t *parse_pipeline(parser_t *parser) {
         left = pipe_node;
     }
 
-    /// Check for background execution
-    if (tokenizer_match(parser->tokenizer, TOK_AND) ||
-        tokenizer_match(parser->tokenizer, TOK_BACKGROUND_DISOWN)) {
-        tokenizer_advance(parser->tokenizer); /// consume & / &| / &!
-
-        node_t *background_node = new_node(NODE_BACKGROUND);
-        if (!background_node) {
-            free_node_tree(left);
-            parser_exit_recursion(parser);
-            return NULL;
-        }
-
-        add_child_node(background_node, left);
-        left = background_node;
-    }
+    /// A trailing `&` is NOT handled here: it backgrounds the whole and-or
+    /// list, not the last pipeline stage. parse_logical_expression applies it
+    /// above this level (otherwise the right-recursive pipe parse would bind
+    /// `a | b &` as `a | (b &)`). The negation prefix, by contrast, is a
+    /// genuine pipeline operator and stays here.
 
     /// Wrap in negation node if ! prefix was present
     if (negate) {

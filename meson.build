@@ -2911,6 +2911,17 @@ if fs.exists('tests/integration/test_redirected_jobcontrol.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_background_pipeline.c')
+  test_background_pipeline = executable(
+    'test_background_pipeline',
+    ['tests/integration/test_background_pipeline.c'])
+  test('background pipeline and-or list',
+       test_background_pipeline,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
