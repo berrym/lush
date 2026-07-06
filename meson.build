@@ -2922,6 +2922,17 @@ if fs.exists('tests/integration/test_background_pipeline.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_condition_background.c')
+  test_condition_background = executable(
+    'test_condition_background',
+    ['tests/integration/test_condition_background.c'])
+  test('condition trailing-& rejection',
+       test_condition_background,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
