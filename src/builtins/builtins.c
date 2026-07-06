@@ -20,7 +20,14 @@
  *     context stack (which includes "in builtin '<name>'" pushed by the
  *     dispatcher).
  *
- *   - With suggestion: inline the canonical shell_error_create() block.
+ *   - With a `help:` suggestion:
+ *       executor_error_report_with_help(current_executor, CODE,
+ *                                       builtin_get_source_location(),
+ *                                       "suggestion", "fmt", args);
+ *     The twin of executor_error_report that also attaches the `= help:` line;
+ *     same source-line and context handling. (Both are executor-level API, not
+ *     a builtin-specific facade.) For a site that needs setters the wrapper
+ *     does not expose, inline the canonical shell_error_create() block.
  *
  * The pre-2026-04 builtin_error() and builtin_error_help() helpers were
  * removed when the foundation made source-line + dispatcher-context
@@ -194,6 +201,7 @@ builtin builtins[] = {
     {        "trap",                                      "set signal handlers",         bin_trap},
     {        "exec",                               "replace shell with command",         bin_exec},
     {        "wait",                                 "wait for background jobs",         bin_wait},
+    {        "kill",                       "send a signal to jobs or processes",         bin_kill},
     {       "umask",                           "set/display file creation mask",        bin_umask},
     {      "ulimit",                              "set/display resource limits",       bin_ulimit},
     {       "times",                                    "display process times",        bin_times},

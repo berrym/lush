@@ -802,23 +802,31 @@ void executor_clear_context(executor_t *executor) {
 /**
  * @brief Report a structured runtime error with context chain
  */
-void executor_error_report(executor_t *executor, shell_error_code_t code,
-                           source_location_t loc, const char *fmt, ...) {
+/// Shared core for executor_error_report and executor_error_report_with_help:
+/// create the structured error, attach the optional `= help:` suggestion, the
+/// rust-style source snippet, and the context stack, display it, and set the
+/// legacy error state. `suggestion` may be NULL for an error that carries no
+/// help line.
+static void executor_report_error_v(executor_t *executor,
+                                    shell_error_code_t code,
+                                    source_location_t loc,
+                                    const char *suggestion, const char *fmt,
+                                    va_list args) {
     if (!executor) {
         return;
     }
 
-    /// Create the error
-    va_list args;
-    va_start(args, fmt);
     shell_error_t *error =
         shell_error_createv(code, SHELL_SEVERITY_ERROR, loc, fmt, args);
-    va_end(args);
-
     if (!error) {
         /// Fallback to legacy error system
         set_executor_error(executor, "runtime error");
         return;
+    }
+
+    /// Actionable `= help:` line (rust-style), when the caller supplies one.
+    if (suggestion) {
+        shell_error_set_suggestion(error, suggestion);
     }
 
     /// Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
@@ -847,8 +855,26 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
     /// already displayed
     executor->has_error = true;
     executor->error_message = NULL; /// Already displayed via structured system
-
     shell_error_free(error);
+}
+
+void executor_error_report(executor_t *executor, shell_error_code_t code,
+                           source_location_t loc, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    executor_report_error_v(executor, code, loc, NULL, fmt, args);
+    va_end(args);
+}
+
+void executor_error_report_with_help(executor_t *executor,
+                                     shell_error_code_t code,
+                                     source_location_t loc,
+                                     const char *suggestion, const char *fmt,
+                                     ...) {
+    va_list args;
+    va_start(args, fmt);
+    executor_report_error_v(executor, code, loc, suggestion, fmt, args);
+    va_end(args);
 }
 
 bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,

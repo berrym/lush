@@ -91,6 +91,7 @@ src = ['src/arithmetic.c',
        'src/builtins/bin_help.c',
        'src/builtins/bin_history.c',
        'src/builtins/bin_jobs.c',
+       'src/builtins/bin_kill.c',
        'src/builtins/bin_let.c',
        'src/builtins/bin_lint.c',
        'src/builtins/bin_local.c',
@@ -2928,6 +2929,16 @@ if fs.exists('tests/integration/test_condition_background.c')
     ['tests/integration/test_condition_background.c'])
   test('condition trailing-& rejection',
        test_condition_background,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
+if fs.exists('tests/integration/test_kill_builtin.c')
+  test_kill_builtin = executable('test_kill_builtin',
+                                 ['tests/integration/test_kill_builtin.c'])
+  test('kill builtin (jobspec, signals, -l)',
+       test_kill_builtin,
        args: [lush_exe.full_path()],
        suite: 'integration',
        timeout: 120)
