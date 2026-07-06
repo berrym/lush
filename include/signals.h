@@ -221,6 +221,19 @@ void list_traps(void);
 int get_signal_number(const char *signame);
 
 /**
+ * @brief Convert a signal number to its canonical name (without "SIG")
+ *
+ * The inverse of get_signal_number for real kernel signals: SIGTERM -> "TERM",
+ * SIGWINCH -> "WINCH". Resolves through the shared signal table, so it returns
+ * the canonical name for numbers with aliases (SIGABRT -> "ABRT", not "IOT").
+ *
+ * @param signum Signal number
+ * @return Static signal name string, or NULL if the number is not a known
+ *         kernel signal
+ */
+const char *signal_number_to_name(int signum);
+
+/**
  * @brief Execute pending trap commands deferred from signal handlers
  *
  * Signal handlers set a bitmask instead of calling system() directly.

@@ -574,12 +574,155 @@ int remove_trap(int signal) {
  * re-input to the shell.
  */
 /**
+ * @brief One entry in the signal name/number table
+ */
+typedef struct {
+    const char *name; ///< Signal name without the SIG prefix ("TERM")
+    int number;       ///< Signal number (SIGTERM)
+} signal_name_entry_t;
+
+/**
+ * @brief The canonical name<->number table for kernel signals
+ *
+ * Every entry is guarded by `#ifdef` on its signal macro, so the table holds
+ * exactly the signals the platform defines -- SIGINFO/SIGEMT on the BSDs and
+ * macOS, SIGPWR/SIGSTKFLT/SIGPOLL on Linux, etc. Aliases that share a number
+ * (IOT==ABRT, CLD==CHLD, POLL==IO) are listed after their canonical name so a
+ * reverse lookup returns the canonical form. Forward lookup accepts either.
+ *
+ * This is the single source of truth for signal names in the shell:
+ * get_signal_number(), signal_number_to_name(), the `trap` builtin, and the
+ * `kill` builtin all resolve through it.
+ */
+static const signal_name_entry_t signal_table[] = {
+#ifdef SIGHUP
+    {   "HUP",    SIGHUP},
+#endif
+#ifdef SIGINT
+    {   "INT",    SIGINT},
+#endif
+#ifdef SIGQUIT
+    {  "QUIT",   SIGQUIT},
+#endif
+#ifdef SIGILL
+    {   "ILL",    SIGILL},
+#endif
+#ifdef SIGTRAP
+    {  "TRAP",   SIGTRAP},
+#endif
+#ifdef SIGABRT
+    {  "ABRT",   SIGABRT},
+#endif
+#ifdef SIGIOT
+    {   "IOT",    SIGIOT},
+#endif
+#ifdef SIGBUS
+    {   "BUS",    SIGBUS},
+#endif
+#ifdef SIGFPE
+    {   "FPE",    SIGFPE},
+#endif
+#ifdef SIGKILL
+    {  "KILL",   SIGKILL},
+#endif
+#ifdef SIGUSR1
+    {  "USR1",   SIGUSR1},
+#endif
+#ifdef SIGSEGV
+    {  "SEGV",   SIGSEGV},
+#endif
+#ifdef SIGUSR2
+    {  "USR2",   SIGUSR2},
+#endif
+#ifdef SIGPIPE
+    {  "PIPE",   SIGPIPE},
+#endif
+#ifdef SIGALRM
+    {  "ALRM",   SIGALRM},
+#endif
+#ifdef SIGTERM
+    {  "TERM",   SIGTERM},
+#endif
+#ifdef SIGSTKFLT
+    {"STKFLT", SIGSTKFLT},
+#endif
+#ifdef SIGCHLD
+    {  "CHLD",   SIGCHLD},
+#endif
+#ifdef SIGCLD
+    {   "CLD",    SIGCLD},
+#endif
+#ifdef SIGCONT
+    {  "CONT",   SIGCONT},
+#endif
+#ifdef SIGSTOP
+    {  "STOP",   SIGSTOP},
+#endif
+#ifdef SIGTSTP
+    {  "TSTP",   SIGTSTP},
+#endif
+#ifdef SIGTTIN
+    {  "TTIN",   SIGTTIN},
+#endif
+#ifdef SIGTTOU
+    {  "TTOU",   SIGTTOU},
+#endif
+#ifdef SIGURG
+    {   "URG",    SIGURG},
+#endif
+#ifdef SIGXCPU
+    {  "XCPU",   SIGXCPU},
+#endif
+#ifdef SIGXFSZ
+    {  "XFSZ",   SIGXFSZ},
+#endif
+#ifdef SIGVTALRM
+    {"VTALRM", SIGVTALRM},
+#endif
+#ifdef SIGPROF
+    {  "PROF",   SIGPROF},
+#endif
+#ifdef SIGWINCH
+    { "WINCH",  SIGWINCH},
+#endif
+#ifdef SIGIO
+    {    "IO",     SIGIO},
+#endif
+#ifdef SIGPOLL
+    {  "POLL",   SIGPOLL},
+#endif
+#ifdef SIGPWR
+    {   "PWR",    SIGPWR},
+#endif
+#ifdef SIGINFO
+    {  "INFO",   SIGINFO},
+#endif
+#ifdef SIGEMT
+    {   "EMT",    SIGEMT},
+#endif
+#ifdef SIGSYS
+    {   "SYS",    SIGSYS},
+#endif
+};
+
+#define SIGNAL_TABLE_COUNT (sizeof(signal_table) / sizeof(signal_table[0]))
+
+const char *signal_number_to_name(int signum) {
+    for (size_t i = 0; i < SIGNAL_TABLE_COUNT; i++) {
+        if (signal_table[i].number == signum) {
+            return signal_table[i].name;
+        }
+    }
+    return NULL;
+}
+
+/**
  * @brief Render a (pseudo-)signal number to its trap name
  *
- * For real kernel signals returns the numeric value as a string in a
- * static buffer; for pseudo-signals returns the trap name
- * ("ERR", "DEBUG", "RETURN", "EXIT"). The returned pointer is valid
- * until the next call.
+ * Returns the trap name for pseudo-signals ("ERR", "DEBUG", "RETURN", "EXIT")
+ * and the canonical signal name for real kernel signals ("TERM", "WINCH").
+ * An unknown number falls back to its decimal value in a static buffer; that
+ * one path aside, the returned pointer is to a string literal.
  */
 static const char *trap_signal_name(int signum) {
     if (signum == 0) {
@@ -593,6 +736,10 @@ static const char *trap_signal_name(int signum) {
     }
     if (signum == TRAP_PSEUDO_RETURN) {
         return "RETURN";
+    }
+    const char *name = signal_number_to_name(signum);
+    if (name) {
+        return name;
     }
     static char buf[16];
     snprintf(buf, sizeof(buf), "%d", signum);
@@ -618,41 +765,22 @@ void list_traps(void) {
  * @return Signal number, or -1 if not recognized
  */
 int get_signal_number(const char *signame) {
-    if (!signame) {
+    if (!signame || signame[0] == '\0') {
         return -1;
     }
 
-    /// Handle numeric signals
+    /// Numeric form ("9", "15").
     if (signame[0] >= '0' && signame[0] <= '9') {
         return atoi(signame);
     }
 
-    /// Handle signal names (with or without SIG prefix)
-    if (strcmp(signame, "INT") == 0 || strcmp(signame, "SIGINT") == 0) {
-        return SIGINT;
-    }
-    if (strcmp(signame, "TERM") == 0 || strcmp(signame, "SIGTERM") == 0) {
-        return SIGTERM;
-    }
-    if (strcmp(signame, "QUIT") == 0 || strcmp(signame, "SIGQUIT") == 0) {
-        return SIGQUIT;
-    }
-    if (strcmp(signame, "HUP") == 0 || strcmp(signame, "SIGHUP") == 0) {
-        return SIGHUP;
-    }
-    if (strcmp(signame, "USR1") == 0 || strcmp(signame, "SIGUSR1") == 0) {
-        return SIGUSR1;
-    }
-    if (strcmp(signame, "USR2") == 0 || strcmp(signame, "SIGUSR2") == 0) {
-        return SIGUSR2;
-    }
+    /// EXIT and the trap pseudo-signals never carry a SIG prefix. They are not
+    /// real kernel signals; the executor dispatches them at well-known points
+    /// (after a command for ERR, before a command for DEBUG, on function return
+    /// for RETURN, at shell exit for EXIT).
     if (strcmp(signame, "EXIT") == 0) {
-        return 0; /// Special case for EXIT trap
+        return 0;
     }
-
-    /// Trap pseudo-signals: not real kernel signals, dispatched by the
-    /// executor at well-known points (after a command for ERR, before a
-    /// command for DEBUG, on function return for RETURN).
     if (strcmp(signame, "ERR") == 0) {
         return TRAP_PSEUDO_ERR;
     }
@@ -661,6 +789,17 @@ int get_signal_number(const char *signame) {
     }
     if (strcmp(signame, "RETURN") == 0) {
         return TRAP_PSEUDO_RETURN;
+    }
+
+    /// Real signal name, with or without the SIG prefix ("TERM" or "SIGTERM").
+    const char *name = signame;
+    if (strncmp(name, "SIG", 3) == 0) {
+        name += 3;
+    }
+    for (size_t i = 0; i < SIGNAL_TABLE_COUNT; i++) {
+        if (strcmp(name, signal_table[i].name) == 0) {
+            return signal_table[i].number;
+        }
     }
 
     return -1; /// Unknown signal
