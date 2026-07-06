@@ -192,20 +192,17 @@ int main(int argc, char **argv) {
     check(lush, "no such job", "sleep 5 & wait %9 2>&1; echo R=$?",
           (const char *[]){"no such job", "R=127", NULL}, NULL);
 
-    /// bg with an explicit %n resolves and resumes a stopped job. The
-    /// unredirected `jobs` forces a status poll so the stop is observed before
-    /// bg (bg does not itself poll -- a separate, pre-existing job-control
-    /// gap).
+    /// bg with an explicit %n resolves and resumes a stopped job. bg refreshes
+    /// the job's status itself, so no intervening `jobs` poll is needed to
+    /// observe the stop.
     check(lush, "bg %n resumes a stopped job",
-          "sleep 0.5 & p=$!; kill -STOP $p; sleep 0.2; jobs; bg %1; echo "
-          "BG=$?; wait",
+          "sleep 0.5 & p=$!; kill -STOP $p; sleep 0.2; bg %1; echo BG=$?; wait",
           (const char *[]){"BG=0", NULL},
           (const char *[]){"no such job", "already in background", NULL});
 
     /// bg with no argument acts on the current job.
     check(lush, "bg no-arg resumes the current job",
-          "sleep 0.5 & p=$!; kill -STOP $p; sleep 0.2; jobs; bg; echo BG=$?; "
-          "wait",
+          "sleep 0.5 & p=$!; kill -STOP $p; sleep 0.2; bg; echo BG=$?; wait",
           (const char *[]){"BG=0", NULL},
           (const char *[]){"no such job", "already in background", NULL});
 
