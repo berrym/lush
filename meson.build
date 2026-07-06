@@ -2953,6 +2953,19 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          timeout: 120)
   endif
 
+  # Type-ahead across prompts: rapid multi-line input is not flushed.
+  if fs.exists('tests/integration/test_pty_typeahead.c')
+    test_pty_typeahead = executable(
+      'test_pty_typeahead',
+      ['tests/integration/test_pty_typeahead.c'],
+      dependencies: libutil_dep)
+    test('PTY type-ahead across prompts',
+         test_pty_typeahead,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 120)
+  endif
+
   # PTY-driven autosuggestion-toggle end-to-end test
   if fs.exists('tests/integration/test_pty_autosuggestions.c')
     test_pty_autosuggestions = executable(
