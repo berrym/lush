@@ -89,8 +89,6 @@ TEST(get_signal_number_quit) {
     ASSERT_EQ(sig, SIGQUIT, "QUIT should map to SIGQUIT");
 }
 
-/// Note: KILL signal not implemented in get_signal_number
-
 TEST(get_signal_number_usr1) {
     int sig = get_signal_number("USR1");
     ASSERT_EQ(sig, SIGUSR1, "USR1 should map to SIGUSR1");
@@ -101,8 +99,63 @@ TEST(get_signal_number_usr2) {
     ASSERT_EQ(sig, SIGUSR2, "USR2 should map to SIGUSR2");
 }
 
-/* Note: PIPE, ALRM, CHLD, CONT, STOP, TSTP signals not implemented in
- * get_signal_number */
+/// The signal table covers the full standard signal set; a prior version
+/// resolved only ~6 names (INT/TERM/QUIT/HUP/USR1/USR2). KILL, STOP, CONT, and
+/// the job-control/misc signals all resolve now.
+TEST(get_signal_number_kill) {
+    ASSERT_EQ(get_signal_number("KILL"), SIGKILL, "KILL -> SIGKILL");
+    ASSERT_EQ(get_signal_number("SIGKILL"), SIGKILL, "SIGKILL -> SIGKILL");
+}
+
+TEST(get_signal_number_full_set) {
+    ASSERT_EQ(get_signal_number("STOP"), SIGSTOP, "STOP -> SIGSTOP");
+    ASSERT_EQ(get_signal_number("CONT"), SIGCONT, "CONT -> SIGCONT");
+    ASSERT_EQ(get_signal_number("TSTP"), SIGTSTP, "TSTP -> SIGTSTP");
+    ASSERT_EQ(get_signal_number("PIPE"), SIGPIPE, "PIPE -> SIGPIPE");
+    ASSERT_EQ(get_signal_number("ALRM"), SIGALRM, "ALRM -> SIGALRM");
+    ASSERT_EQ(get_signal_number("CHLD"), SIGCHLD, "CHLD -> SIGCHLD");
+    ASSERT_EQ(get_signal_number("WINCH"), SIGWINCH, "WINCH -> SIGWINCH");
+    ASSERT_EQ(get_signal_number("SIGWINCH"), SIGWINCH, "SIGWINCH -> SIGWINCH");
+}
+
+TEST(signal_number_to_name_basic) {
+    ASSERT(signal_number_to_name(SIGTERM) &&
+               strcmp(signal_number_to_name(SIGTERM), "TERM") == 0,
+           "SIGTERM -> TERM");
+    ASSERT(signal_number_to_name(SIGKILL) &&
+               strcmp(signal_number_to_name(SIGKILL), "KILL") == 0,
+           "SIGKILL -> KILL");
+    ASSERT(signal_number_to_name(SIGWINCH) &&
+               strcmp(signal_number_to_name(SIGWINCH), "WINCH") == 0,
+           "SIGWINCH -> WINCH");
+}
+
+TEST(signal_number_to_name_canonical) {
+    /// SIGABRT and SIGIOT share a number; the reverse lookup returns the
+    /// canonical ABRT because it is listed first in the table.
+    ASSERT(signal_number_to_name(SIGABRT) &&
+               strcmp(signal_number_to_name(SIGABRT), "ABRT") == 0,
+           "SIGABRT -> ABRT (canonical)");
+}
+
+TEST(signal_number_to_name_unknown) {
+    ASSERT(signal_number_to_name(0) == NULL,
+           "0 is not a kernel signal -> NULL");
+    ASSERT(signal_number_to_name(9999) == NULL, "unknown number -> NULL");
+}
+
+TEST(signal_name_round_trip) {
+    /// name -> number -> canonical name round-trips for canonical names.
+    const char *names[] = {"HUP",  "INT",  "TERM",  "KILL",
+                           "STOP", "CONT", "WINCH", NULL};
+    for (int i = 0; names[i]; i++) {
+        int n = get_signal_number(names[i]);
+        ASSERT(n > 0, "name resolves to a positive number");
+        const char *back = signal_number_to_name(n);
+        ASSERT(back && strcmp(back, names[i]) == 0,
+               "round-trips to the same name");
+    }
+}
 
 TEST(get_signal_number_invalid) {
     int sig = get_signal_number("NOTASIGNAL");
@@ -333,7 +386,12 @@ int main(void) {
     /// get_signal_number_kill removed - KILL not implemented
     RUN_TEST(get_signal_number_usr1);
     RUN_TEST(get_signal_number_usr2);
-    /// PIPE, ALRM, CHLD, CONT, STOP, TSTP tests removed - not implemented
+    RUN_TEST(get_signal_number_kill);
+    RUN_TEST(get_signal_number_full_set);
+    RUN_TEST(signal_number_to_name_basic);
+    RUN_TEST(signal_number_to_name_canonical);
+    RUN_TEST(signal_number_to_name_unknown);
+    RUN_TEST(signal_name_round_trip);
     RUN_TEST(get_signal_number_invalid);
     RUN_TEST(get_signal_number_empty);
     RUN_TEST(get_signal_number_lowercase);
