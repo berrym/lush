@@ -1,17 +1,18 @@
 /**
- * @file test_subshell_script_execution.c
- * @brief A subshell in a script file must not re-execute the rest of the
- * script.
+ * @file test_fork_child_script_reexec.c
+ * @brief A forked child in a script file must not re-execute the rest of it.
  *
- * The subshell child once terminated with exit() (Issue #441), whose stdio
- * cleanup fclosed the inherited script FILE* and repositioned the shared,
+ * A forked child that terminated with exit() (Issues #441, #444) ran stdio
+ * cleanup, whose fclose of the inherited script FILE* repositioned the shared,
  * seekable input fd; the parent then re-read and re-executed every statement
- * after the `( ... )`, with side effects. The fix terminates the child with
- * _exit() like every other forked child. These run lush on a real script FILE
+ * after the fork point, with side effects. The fix terminates every forked
+ * child with _exit(). The trigger is any fork child in a script: a subshell
+ * `( ... )`, an external command with a failing redirect, or an `exec` failure
+ * inside a subshell or pipeline stage. These run lush on a real script FILE
  * (the `-c` and pipe paths are immune because their input is not seekable) and
  * assert each statement runs exactly once.
  *
- * Usage: test_subshell_script_execution <lush-binary-path>
+ * Usage: test_fork_child_script_reexec <lush-binary-path>
  */
 
 #include <fcntl.h>
@@ -24,7 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define TEST "test_subshell_script_execution"
+#define TEST "test_fork_child_script_reexec"
 #define REAP_TIMEOUT_MS 15000
 
 static void msleep(long ms) {
@@ -138,6 +139,47 @@ static void expect_exact(const char *lush, const char *label,
     fprintf(stderr, "ok   %s [%s]\n", TEST, label);
 }
 
+/// Count non-overlapping occurrences of `needle` in `hay`.
+static int count_substr(const char *hay, const char *needle) {
+    int n = 0;
+    size_t nlen = strlen(needle);
+    for (const char *p = hay; (p = strstr(p, needle)) != NULL; p += nlen) {
+        n++;
+    }
+    return n;
+}
+
+/// Assert `marker` appears exactly once in lush's output for `script`. Used
+/// where the child also prints an error diagnostic (so an exact-output match
+/// would be brittle): only the tail marker's repetition matters.
+static void expect_marker_once(const char *lush, const char *label,
+                               const char *script, const char *marker) {
+    char path[256];
+    if (!write_script(script, path, sizeof(path))) {
+        fprintf(stderr, "FAIL %s [%s]: could not write script\n", TEST, label);
+        failures++;
+        return;
+    }
+    char out[8192];
+    bool ok = run_file(lush, path, out, sizeof(out));
+    unlink(path);
+    if (!ok) {
+        fprintf(stderr, "FAIL %s [%s]: shell did not exit\n", TEST, label);
+        failures++;
+        return;
+    }
+    int c = count_substr(out, marker);
+    if (c != 1) {
+        fprintf(stderr,
+                "FAIL %s [%s]: marker \"%s\" appeared %d times (expected 1) in "
+                "\"%.400s\"\n",
+                TEST, label, marker, c, out);
+        failures++;
+        return;
+    }
+    fprintf(stderr, "ok   %s [%s]\n", TEST, label);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: %s <lush-binary-path>\n", argv[0]);
@@ -161,6 +203,30 @@ int main(int argc, char **argv) {
     expect_exact(lush, "subshell exit trap then statement",
                  "( trap 'echo INNER' EXIT; echo body )\necho after\n",
                  "body\nINNER\nafter\n");
+
+    /// An external command with a failing redirect: the child terminated with
+    /// exit() before exec, corrupting the parent's read offset. The diagnostic
+    /// goes to stderr, so assert the tail marker runs exactly once.
+    expect_marker_once(lush, "external command with a failing redirect",
+                       "ls / > /nonexistent_dir_xyz/f\necho TAILMARK\n",
+                       "TAILMARK");
+
+    /// A path-based command that fails to exec (execvp ENOENT): a bare name is
+    /// caught before the fork, but a name containing '/' forks and reaches the
+    /// exec-failure termination in the child.
+    expect_marker_once(lush, "external command that fails to exec",
+                       "/nonexistent_cmd_xyz\necho TAILMARK\n", "TAILMARK");
+
+    /// An exec failure inside a subshell: bin_exec's exit() ran in the forked
+    /// child. The tail must run once.
+    expect_marker_once(lush, "exec failure inside a subshell",
+                       "( exec /nonexistent_cmd_xyz )\necho TAILMARK\n",
+                       "TAILMARK");
+
+    /// An exec failure in a pipeline stage: same, in the pipeline child.
+    expect_marker_once(lush, "exec failure in a pipeline stage",
+                       "exec /nonexistent_cmd_xyz | cat\necho TAILMARK\n",
+                       "TAILMARK");
 
     /// Side effects must run once: an appending command after a subshell writes
     /// a single line, not two.

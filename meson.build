@@ -2954,11 +2954,11 @@ if fs.exists('tests/integration/test_trap_disposition.c')
        timeout: 120)
 endif
 
-if fs.exists('tests/integration/test_subshell_script_execution.c')
-  test_subshell_script_execution = executable('test_subshell_script_execution',
-    ['tests/integration/test_subshell_script_execution.c'])
-  test('subshell in a script does not re-execute the tail',
-       test_subshell_script_execution,
+if fs.exists('tests/integration/test_fork_child_script_reexec.c')
+  test_fork_child_script_reexec = executable('test_fork_child_script_reexec',
+    ['tests/integration/test_fork_child_script_reexec.c'])
+  test('a forked child in a script does not re-execute the tail',
+       test_fork_child_script_reexec,
        args: [lush_exe.full_path()],
        suite: 'integration',
        timeout: 120)

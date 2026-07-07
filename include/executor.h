@@ -479,6 +479,18 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
 /**
+ * @brief Terminate the current process, correctly for a forked child.
+ *
+ * A forked child (getpid() != shell_pid) terminates with _exit() so stdio
+ * cleanup does not fclose and lseek the inherited, seekable script input --
+ * which would make the parent shell re-execute the script tail (Issue #441 /
+ * #444). The top-level shell uses exit() so its atexit cleanup runs. Every
+ * fork-child termination path that might run in the top-level shell too (e.g.
+ * `exec` failure) should route through this. Never returns.
+ */
+_Noreturn void lush_process_terminate(int status);
+
+/**
  * @brief Report a structured runtime error with an actionable `= help:` line
  *
  * The twin of executor_error_report that also attaches a suggestion, rendered

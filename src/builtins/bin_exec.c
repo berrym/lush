@@ -223,6 +223,10 @@ int bin_exec(int argc, char **argv) {
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
     shell_error_free(error);
 
-    /// exec failure should exit the shell with error status
-    exit(127);
+    /// exec failure terminates the process with status 127. At the top level
+    /// that exits the shell (with cleanup); inside a subshell or pipeline stage
+    /// this runs in a forked child, which must _exit so it does not lseek the
+    /// shared script input and make the parent re-execute the tail (Issue
+    /// #444).
+    lush_process_terminate(127);
 }
