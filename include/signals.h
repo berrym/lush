@@ -234,6 +234,15 @@ int get_signal_number(const char *signame);
 const char *signal_number_to_name(int signum);
 
 /**
+ * @brief Print the full signal listing, by number and canonical name.
+ *
+ * Every signal the platform defines, laid out in aligned numbered columns
+ * (`%2d) SIG%-9s`). Shared by `kill -l` and `trap -l` so the two present an
+ * identical, self-describing number<->name reference.
+ */
+void print_signal_list(void);
+
+/**
  * @brief Execute pending trap commands deferred from signal handlers
  *
  * Signal handlers set a bitmask instead of calling system() directly.

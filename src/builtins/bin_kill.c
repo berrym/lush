@@ -31,36 +31,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-/// Number of signal columns per row in the `kill -l` listing.
-#define KILL_LIST_COLUMNS 5
-
-/// Print the full `kill -l` listing: every signal the platform defines, by
-/// number and canonical name, laid out in aligned columns. lush curates one
-/// numbered form (bash lists numbered columns, zsh lists bare names); the
-/// numbers make the listing self-describing as a number<->name reference.
-static void kill_print_signal_list(void) {
-    int col = 0;
-    for (int n = 1; n < NSIG; n++) {
-        const char *name = signal_number_to_name(n);
-        if (!name) {
-            continue; /// A number the platform leaves unnamed (a gap or RT).
-        }
-        printf("%2d) SIG%-9s", n, name);
-        if (++col % KILL_LIST_COLUMNS == 0) {
-            printf("\n");
-        }
-    }
-    if (col % KILL_LIST_COLUMNS != 0) {
-        printf("\n");
-    }
-}
-
 /// Handle `kill -l [arg...]`. With no argument, list every signal; with numeric
 /// arguments, print the corresponding name (stripping a 128+signo exit-status
 /// offset); with name arguments, print the number.
 static int kill_list_signals(int argc, char **argv, int start) {
     if (start >= argc) {
-        kill_print_signal_list();
+        print_signal_list();
         return 0;
     }
 

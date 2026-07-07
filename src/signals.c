@@ -44,15 +44,14 @@ trap_entry_t *trap_list = NULL;
 static pid_t current_child_pid = 0;
 
 /**
- * @brief Bitmask of signals with pending trap execution
+ * @brief Per-signal flags marking a pending trap dispatch
  *
- * Set by the signal handler (async-signal-safe), cleared by
- * execute_pending_traps() in the main loop. Only signals that
- * have traps registered will set bits here.
- *
- * Bit positions correspond to signal numbers (e.g., bit 2 = SIGINT).
+ * pending_trap_flags[signo] is set by the signal handler (async-signal-safe: a
+ * plain sig_atomic_t store) and cleared by execute_pending_traps() in the main
+ * loop. One flag per signal number spans the whole platform range (NSIG),
+ * including the real-time signals a fixed 32-bit bitmask could not reach.
  */
-static volatile sig_atomic_t pending_trap_signals = 0;
+static volatile sig_atomic_t pending_trap_flags[NSIG];
 
 /**
  * @brief Flag set when SIGINT received during readline
@@ -389,12 +388,18 @@ void set_current_child_pid(pid_t pid) { current_child_pid = pid; }
 
 pid_t get_current_child_pid(void) { return current_child_pid; }
 
-bool signal_traps_pending(void) { return pending_trap_signals != 0; }
+bool signal_traps_pending(void) {
+    for (int signo = 1; signo < NSIG; signo++) {
+        if (pending_trap_flags[signo]) {
+            return true;
+        }
+    }
+    return false;
+}
 
 int signal_first_pending_trap(void) {
-    sig_atomic_t pending = pending_trap_signals;
-    for (int signo = 1; signo < 32; signo++) {
-        if (pending & (1u << signo)) {
+    for (int signo = 1; signo < NSIG; signo++) {
+        if (pending_trap_flags[signo]) {
             return signo;
         }
     }
@@ -466,9 +471,9 @@ static trap_entry_t *find_trap(int signal) {
 /**
  * @brief Signal handler that defers trap commands to the main loop
  *
- * Sets a bit in pending_trap_signals so execute_pending_traps() can
- * run the trap command safely from the main loop context. This is
- * async-signal-safe (only sets a volatile sig_atomic_t).
+ * Sets pending_trap_flags[signo] so execute_pending_traps() can run the trap
+ * command safely from the main loop context. This is async-signal-safe (only
+ * a store to a volatile sig_atomic_t).
  *
  * Previously called system() directly, which is NOT async-signal-safe
  * and could deadlock or corrupt state.
@@ -476,31 +481,52 @@ static trap_entry_t *find_trap(int signal) {
  * @param signo Signal number received
  */
 static void trap_signal_handler(int signo) {
-    if (signo > 0 && signo < 32) {
-        pending_trap_signals |= (1u << signo);
+    if (signo > 0 && signo < NSIG) {
+        pending_trap_flags[signo] = 1;
     }
+}
+
+/**
+ * @brief Report whether a signal carries a real kernel disposition.
+ *
+ * A genuine, catchable signal number has a default / ignore / caught
+ * disposition installed via sigaction. The pseudo-traps (EXIT == 0 and the
+ * negative ERR / DEBUG / RETURN sentinels) are dispatched by the executor at
+ * command boundaries and have no kernel handler; SIGKILL and SIGSTOP can never
+ * be caught or ignored. The upper bound spans the full platform signal range
+ * (NSIG), covering the real-time signals as well as the standard set.
+ *
+ * @param signal Signal or pseudo-signal number
+ * @return true if the signal takes an OS-level disposition
+ */
+static bool signal_has_os_disposition(int signal) {
+    return signal > 0 && signal < NSIG && signal != SIGKILL &&
+           signal != SIGSTOP;
 }
 
 /**
  * @brief Set a trap for a signal
  *
- * Associates a command string with a signal. When the signal is
- * received, the command will be executed.
+ * Records a disposition for a signal. A non-empty command is deferred and run
+ * from the main loop when the signal is next delivered. An empty command is
+ * `trap '' SIG`: the signal is ignored (SIG_IGN), distinct from a NULL command,
+ * which resets it to the default. Every catchable signal is honored, not a
+ * hardcoded subset.
  *
- * @param signal Signal number (0 for EXIT trap)
- * @param command Command string to execute (NULL or empty to remove)
+ * @param signal Signal number (0 for the EXIT trap)
+ * @param command Command to run; "" to ignore the signal; NULL to reset
  * @return 0 on success, -1 on error
  */
 int set_trap(int signal, const char *command) {
-    /// Remove existing trap for this signal
+    /// Drop any existing trap and reset the kernel disposition to the default.
     remove_trap(signal);
 
-    if (!command || strlen(command) == 0) {
-        /// Empty command means remove trap (already done above)
+    /// A NULL command resets to the default -- already done by remove_trap.
+    if (!command) {
         return 0;
     }
 
-    /// Create new trap entry
+    /// Record the trap so it survives to dispatch time and appears in listings.
     trap_entry_t *new_trap = malloc(sizeof(trap_entry_t));
     if (!new_trap) {
         return -1;
@@ -513,14 +539,15 @@ int set_trap(int signal, const char *command) {
         return -1;
     }
 
-    /// Add to list
     new_trap->next = trap_list;
     trap_list = new_trap;
 
-    /// Set the signal handler
-    if (signal == SIGINT || signal == SIGTERM || signal == SIGQUIT ||
-        signal == SIGHUP || signal == SIGUSR1 || signal == SIGUSR2) {
-        set_signal_handler(signal, trap_signal_handler);
+    /// Install the kernel disposition for every real, catchable signal: an
+    /// empty command ignores (SIG_IGN), a non-empty command defers to
+    /// trap_signal_handler. Pseudo-traps and the uncatchable signals get none.
+    if (signal_has_os_disposition(signal)) {
+        set_signal_handler(signal,
+                           command[0] == '\0' ? SIG_IGN : trap_signal_handler);
     }
 
     return 0;
@@ -552,9 +579,9 @@ int remove_trap(int signal) {
             free(current->command);
             free(current);
 
-            /// Reset signal handler to default (but not for EXIT trap which is
-            /// special)
-            if (signal != 0) {
+            /// Reset the kernel disposition to the default. Pseudo-traps and
+            /// the uncatchable signals have no disposition to reset.
+            if (signal_has_os_disposition(signal)) {
                 set_signal_handler(signal, SIG_DFL);
             }
 
@@ -716,6 +743,30 @@ const char *signal_number_to_name(int signum) {
     return NULL;
 }
 
+/// Number of signal columns per row in the `kill -l` / `trap -l` listing.
+#define SIGNAL_LIST_COLUMNS 5
+
+/// Print every signal the platform defines, by number and canonical name, in
+/// aligned columns. lush curates one numbered form (bash lists numbered
+/// columns, zsh lists bare names); the numbers make the listing self-describing
+/// as a number<->name reference, shared verbatim by `kill -l` and `trap -l`.
+void print_signal_list(void) {
+    int col = 0;
+    for (int n = 1; n < NSIG; n++) {
+        const char *name = signal_number_to_name(n);
+        if (!name) {
+            continue; /// A number the platform leaves unnamed (a gap or RT).
+        }
+        printf("%2d) SIG%-9s", n, name);
+        if (++col % SIGNAL_LIST_COLUMNS == 0) {
+            printf("\n");
+        }
+    }
+    if (col % SIGNAL_LIST_COLUMNS != 0) {
+        printf("\n");
+    }
+}
+
 /**
  * @brief Render a (pseudo-)signal number to its trap name
  *
@@ -769,9 +820,16 @@ int get_signal_number(const char *signame) {
         return -1;
     }
 
-    /// Numeric form ("9", "15").
+    /// Numeric form ("9", "15"). 0 is the EXIT pseudo-trap; a real signal is
+    /// 1..NSIG-1. Reject anything past the platform range (e.g. "9999", or "34"
+    /// where the platform has no such signal) rather than recording a trap that
+    /// could never be installed or delivered.
     if (signame[0] >= '0' && signame[0] <= '9') {
-        return atoi(signame);
+        int n = atoi(signame);
+        if (n < 0 || n >= NSIG) {
+            return -1;
+        }
+        return n;
     }
 
     /// EXIT and the trap pseudo-signals never carry a SIG prefix. They are not
@@ -808,7 +866,7 @@ int get_signal_number(const char *signame) {
 /**
  * @brief Execute any pending trap commands deferred from signal handlers
  *
- * Checks the pending_trap_signals bitmask and runs the corresponding
+ * Checks the pending_trap_flags array and runs the corresponding
  * trap commands. Must be called from the main loop (not signal context)
  * so that system() and other non-async-signal-safe functions are safe.
  *
@@ -902,14 +960,9 @@ void fire_return_trap(void) {
 }
 
 void execute_pending_traps(void) {
-    sig_atomic_t pending = pending_trap_signals;
-    if (pending == 0) {
+    if (!signal_traps_pending()) {
         return;
     }
-
-    /// Clear all pending bits before executing (if a new signal arrives
-    /// during execution, it will set the bit again for next iteration)
-    pending_trap_signals = 0;
 
     /// A signal trap is transparent to $?: save the status the surrounding
     /// script observes and restore it after the trap body, so a firing trap
@@ -921,10 +974,14 @@ void execute_pending_traps(void) {
     executor_t *exec = get_global_executor();
     int saved_status = last_exit_status;
 
-    for (int signo = 1; signo < 32; signo++) {
-        if (pending & (1u << signo)) {
+    for (int signo = 1; signo < NSIG; signo++) {
+        if (pending_trap_flags[signo]) {
+            /// Clear before running: a signal re-delivered during its own trap
+            /// body re-arms the flag for the next dispatch rather than being
+            /// lost.
+            pending_trap_flags[signo] = 0;
             trap_entry_t *trap = find_trap(signo);
-            if (trap && trap->command) {
+            if (trap && trap->command && trap->command[0] != '\0') {
                 /// Run a copy of the command: a self-modifying trap -- one
                 /// whose body runs `trap - SIG` or `trap other SIG` for its own
                 /// signal
@@ -959,10 +1016,11 @@ void execute_pending_traps(void) {
  */
 void execute_exit_traps(void) {
     trap_entry_t *trap = find_trap(0); /// EXIT is signal 0
-    if (trap && trap->command) {
+    if (trap && trap->command && trap->command[0] != '\0') {
         /// Run in the current shell via the global executor so user
         /// functions, variables, and options are in scope. Exit-trap
-        /// status is not propagated.
+        /// status is not propagated. An empty command (`trap '' EXIT`)
+        /// records an ignore entry that fires nothing, so skip it.
         run_trap_command(trap->command);
     }
 

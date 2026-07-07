@@ -2944,6 +2944,16 @@ if fs.exists('tests/integration/test_kill_builtin.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_trap_disposition.c')
+  test_trap_disposition = executable('test_trap_disposition',
+                                     ['tests/integration/test_trap_disposition.c'])
+  test('trap dispositions (ignore, any signal, listing)',
+       test_trap_disposition,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
