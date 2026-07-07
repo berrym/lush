@@ -263,20 +263,20 @@ void reset_subshell_signals(void) {
     /// process (e.g. a login shell's exit-time SIGHUP would be swallowed, the
     /// bug fixed for background jobs and generalized here to every subshell).
     /// Restore the defaults so the child is terminated by a fault or a hangup.
-    ///
-    /// SIGINT is deliberately left as inherited (tracked in issue #375).
-    /// Resetting it correctly would need foreground/background context the
-    /// fork sites do not have. Job control is on by default for interactive
-    /// shells (init.c), so a backgrounded subshell normally gets its own
-    /// process group and is isolated from terminal SIGINT -- but when job
-    /// control is off (non-interactive, or `set +m`) a backgrounded `(...) &`
-    /// shares the shell's process group and a naive SIG_DFL would wrongly kill
-    /// it on Ctrl-C (POSIX requires SIG_IGN there). The foreground benefit is
-    /// also moot: Ctrl-C already reaches a foreground subshell's running
-    /// command, and whether a builtin-only body can be interrupted is governed
-    /// by terminal mode (ISIG), not signal disposition.
     set_signal_handler(SIGHUP, SIG_DFL);
     set_signal_handler(SIGSEGV, SIG_DFL);
+
+    /// SIGINT disposition follows the POSIX async-list rule (#375). The
+    /// interactive shell catches SIGINT with sigint_handler, which does
+    /// interactive work (forward to the current child, set a readline flag) a
+    /// subshell must not run. A synchronous foreground subshell gets SIG_DFL so
+    /// a terminal Ctrl-C interrupts it like any foreground command; an
+    /// asynchronous child (a background job, coprocess, or process
+    /// substitution, and anything nested inside one) gets SIG_IGN so a terminal
+    /// Ctrl-C does not kill it. The async_context flag, set in each async
+    /// fork's child and inherited by nested forks, distinguishes the two.
+    executor_t *ex = get_global_executor();
+    set_signal_handler(SIGINT, (ex && ex->async_context) ? SIG_IGN : SIG_DFL);
 
     /// The shell blocks SIGHUP during its own startup (init_signal_handlers); a
     /// subshell forked before init reaches enable_sighup_delivery() would
@@ -366,7 +366,7 @@ void reset_signals_for_exec(void) {
     /// child, the command/env/exec builtins), replacing an assortment of
     /// hand-rolled per-signal lists and mask-only resets that disagreed on
     /// coverage. Non-exec forked subshells use reset_subshell_signals()
-    /// instead, which deliberately leaves SIGINT inherited (issue #375).
+    /// instead; both set SIGINT per the POSIX async-list rule (issue #375).
     static const int sigs[] = {
         SIGINT,  SIGQUIT, SIGTERM,  SIGHUP,  SIGSEGV, SIGTSTP, SIGTTIN,
         SIGTTOU, SIGCONT, SIGWINCH, SIGCHLD, SIGUSR1, SIGUSR2, SIGALRM,
@@ -374,6 +374,20 @@ void reset_signals_for_exec(void) {
     for (size_t i = 0; i < sizeof(sigs) / sizeof(sigs[0]); i++) {
         set_signal_handler(sigs[i], SIG_DFL);
     }
+
+    /// A command exec'd in an asynchronous list (a background job, coprocess,
+    /// or process substitution) must ignore both SIGINT and SIGQUIT, per the
+    /// POSIX async-list rule (XCU 2.11). SIG_IGN survives the execve where the
+    /// SIG_DFL just set above would be reset, so a terminal interrupt (Ctrl-C)
+    /// or quit (Ctrl-backslash) does not kill a backgrounded command. A
+    /// foreground exec keeps SIG_DFL and stays interruptible and quittable
+    /// (issue #375).
+    executor_t *ex = get_global_executor();
+    if (ex && ex->async_context) {
+        set_signal_handler(SIGINT, SIG_IGN);
+        set_signal_handler(SIGQUIT, SIG_IGN);
+    }
+
     reset_signal_mask_for_exec();
 }
 

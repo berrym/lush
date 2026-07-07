@@ -123,6 +123,15 @@ typedef struct executor {
     char *current_script_file; ///< Current script file being executed
     bool in_script_execution;  ///< True if executing from script file
 
+    /// True once execution has forked into an asynchronous (background) list:
+    /// a background job, coprocess, or process substitution, and anything
+    /// nested inside them. Set in the child of each async fork and inherited by
+    /// nested forks via the child's copy. Read by reset_subshell_signals() and
+    /// reset_signals_for_exec() to give an async child SIG_IGN for SIGINT (the
+    /// POSIX async-list rule) and a synchronous foreground child SIG_DFL
+    /// (#375).
+    bool async_context;
+
     /// Sourced script tracking (return from sourced scripts)
     int source_depth;   ///< Depth of nested source commands (0 = not sourced)
     bool source_return; ///< True if return was called in sourced script

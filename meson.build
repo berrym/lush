@@ -2994,6 +2994,19 @@ if host_os == 'linux' or host_os == 'darwin' or host_os == 'freebsd' or host_os 
          timeout: 120)
   endif
 
+  # PTY-driven SIGINT disposition: async children ignore terminal Ctrl-C,
+  # foreground commands are interrupted (#375).
+  if fs.exists('tests/integration/test_pty_sigint_disposition.c')
+    test_pty_sigint = executable('test_pty_sigint_disposition',
+                                 ['tests/integration/test_pty_sigint_disposition.c'],
+                                 dependencies: libutil_dep)
+    test('PTY SIGINT disposition (async vs foreground)',
+         test_pty_sigint,
+         args: [lush_exe.full_path()],
+         suite: 'integration',
+         timeout: 120)
+  endif
+
   # PTY-driven compdef TAB-completion end-to-end test
   if fs.exists('tests/integration/test_pty_compdef.c')
     test_pty_compdef = executable('test_pty_compdef',
