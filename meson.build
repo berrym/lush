@@ -2954,6 +2954,16 @@ if fs.exists('tests/integration/test_trap_disposition.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_subshell_script_execution.c')
+  test_subshell_script_execution = executable('test_subshell_script_execution',
+    ['tests/integration/test_subshell_script_execution.c'])
+  test('subshell in a script does not re-execute the tail',
+       test_subshell_script_execution,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground
