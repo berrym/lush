@@ -30,14 +30,9 @@ int bin_trap(int argc, char **argv) {
 
     /// Handle special options
     if (argc == 2 && strcmp(argv[1], "-l") == 0) {
-        /// List available signals
-        printf("EXIT  0) exit from shell\n");
-        printf("HUP   1) hangup\n");
-        printf("INT   2) interrupt\n");
-        printf("QUIT  3) quit\n");
-        printf("TERM  15) software termination signal\n");
-        printf("USR1  10) user defined signal 1\n");
-        printf("USR2  12) user defined signal 2\n");
+        /// List every signal the platform defines -- the same numbered listing
+        /// as `kill -l`, not a hardcoded subset.
+        print_signal_list();
         return 0;
     }
 
@@ -169,18 +164,33 @@ int bin_trap(int argc, char **argv) {
             return 1;
         }
 
+        /// SIGKILL and SIGSTOP can never be caught, ignored, or blocked -- the
+        /// kernel always delivers them -- so a trap on either could never fire.
+        /// Reject setting one rather than silently recording a trap that would
+        /// never run (bash and zsh no-op quietly; lush explains why). A reset
+        /// (`trap - KILL`) is a harmless no-op and stays allowed.
+        if ((signal == SIGKILL || signal == SIGSTOP) &&
+            strcmp(action, "-") != 0) {
+            executor_error_report_with_help(
+                current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                builtin_get_source_location(),
+                "SIGKILL and SIGSTOP cannot be caught; put cleanup on a "
+                "trappable signal such as TERM, INT, or EXIT",
+                "%s: cannot be trapped", argv[i]);
+            return 1;
+        }
+
         /// Handle special cases
         if (strcmp(action, "-") == 0) {
             /// Reset to default
             remove_trap(signal);
         } else if (strcmp(action, "") == 0 || strcmp(action, "\"\"") == 0) {
-            /// Ignore signal
-            if (signal == 0) {
-                /// EXIT trap - remove it
-                remove_trap(signal);
-            } else {
-                set_trap(signal, "");
-            }
+            /// Ignore the signal: record an empty trap. For a real signal this
+            /// installs SIG_IGN; for EXIT it records an entry that suppresses a
+            /// previously set exit action. Either way `trap` lists it as
+            /// `trap -- '' NAME`, matching the bash and zsh consensus (EXIT was
+            /// formerly special-cased to remove, diverging from both).
+            set_trap(signal, "");
         } else {
             /// Set trap command
             if (set_trap(signal, action) != 0) {
