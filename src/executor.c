@@ -7095,7 +7095,10 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         if (count_redirections(subshell) > 0) {
             int redir_result = setup_redirections(executor, subshell);
             if (redir_result != 0) {
-                exit(redir_result);
+                fflush(stdout);
+                fflush(stderr);
+                subshell_cleanup();
+                _exit(redir_result);
             }
         }
 
@@ -7151,8 +7154,19 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         /// silently dropping the trap. POSIX 2.11 also requires this.
         execute_exit_traps();
 
-        /// Exit with the last command's result
-        exit(last_result);
+        /// Terminate the child with _exit, never exit(). exit() runs stdio
+        /// cleanup, and fclosing the inherited script FILE* repositions the
+        /// shared, seekable input fd to the buffer's logical position; because
+        /// fork() shares the open file description, that lseek drags the
+        /// PARENT's read offset backward, so the parent re-reads and
+        /// re-executes the rest of the script. _exit skips stdio cleanup, so
+        /// the input fd is untouched. Output is flushed per command already;
+        /// flush again explicitly, then terminate like every other forked
+        /// child (subshell_cleanup + _exit). Issue #441.
+        fflush(stdout);
+        fflush(stderr);
+        subshell_cleanup();
+        _exit(last_result);
     } else {
         /// Parent process - wait for subshell to complete
         int status = 0;
