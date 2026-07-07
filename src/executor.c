@@ -376,6 +376,7 @@ executor_t *executor_new(void) {
     executor->functions = NULL;
     executor->current_script_file = NULL;
     executor->in_script_execution = false;
+    executor->async_context = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
     executor->shell_exit_requested = false;
@@ -448,6 +449,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->functions = NULL;
     executor->current_script_file = NULL;
     executor->in_script_execution = false;
+    executor->async_context = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
     executor->shell_exit_requested = false;
@@ -4646,8 +4648,10 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
     }
 
     if (pid == 0) {
-        /// Child process (the coprocess) -- asynchronous: reset the inherited
-        /// hangup and fault handlers, leave SIGINT (own process group).
+        /// Child process (the coprocess) -- asynchronous: mark the context so
+        /// it ignores SIGINT per the POSIX async-list rule, then reset the
+        /// inherited hangup and fault handlers (#375).
+        executor->async_context = true;
         reset_subshell_signals();
 
         /// Redirect stdin from pipe_to_coproc[0]
@@ -17185,10 +17189,15 @@ int executor_execute_background(executor_t *executor, node_t *command) {
             setpgid(0, 0);
         }
 
+        /// This child heads an asynchronous list: mark the context so it and
+        /// everything nested inside it (subshells, execs) ignore SIGINT per the
+        /// POSIX async-list rule -- a terminal Ctrl-C must not kill a
+        /// background job. reset_subshell_signals reads the flag (#375).
+        executor->async_context = true;
+
         /// A login shell's exit-time SIGHUP cascade (send_sighup_to_jobs) must
         /// terminate this job; reset the inherited hangup and fault handlers so
-        /// the cascade is not swallowed. SIGINT stays inherited per POSIX async
-        /// lists.
+        /// the cascade is not swallowed.
         reset_subshell_signals();
 
         int result = execute_node(executor, command->first_child);
@@ -19118,8 +19127,10 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
 
     if (pid == 0) {
         /// Child process - execute the command. Process substitution is
-        /// asynchronous: reset the inherited hangup and fault handlers, leave
-        /// SIGINT (own process group, fed/drained via the pipe).
+        /// asynchronous: mark the context so it ignores SIGINT per the POSIX
+        /// async-list rule, then reset the inherited hangup/fault handlers
+        /// (#375).
+        executor->async_context = true;
         reset_subshell_signals();
         if (is_input) {
             /// <(cmd): command writes to pipe, parent reads
