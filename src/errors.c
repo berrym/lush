@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /**
  * @brief Internal error printing function
@@ -60,6 +61,12 @@ void error_syscall(const char *fmt, ...) {
     va_start(args, fmt);
     do_error(true, errno, fmt, args);
     va_end(args);
+    /// A forked child must _exit so stdio cleanup does not fclose and lseek the
+    /// shared, seekable script input, making the parent re-execute the tail
+    /// (Issue #444); the top-level shell exits with atexit cleanup.
+    if (getpid() != shell_pid) {
+        _exit(EXIT_FAILURE);
+    }
     exit(EXIT_FAILURE);
 }
 
