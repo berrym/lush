@@ -218,6 +218,16 @@ Feature names use lush-canonical spellings (`extended_glob`,
 `process_substitution`, `case_modification`, ...). Underscores or no
 underscores both work (`extended_glob` and `extendedglob` are equivalent).
 
+`extended_glob` covers the structured operators that require a `(`: bash-style
+`?(pat)`, `*(pat)`, `+(pat)`, `@(pat)`, `!(pat)` and zsh-style `(a|b)`
+alternation. The zsh *bare* operators -- the `X#` / `X##` postfix quantifiers
+and a leading `^` negation -- are gated separately by `zsh_extended_glob`
+(alias `zshextglob`), which is **off in every mode**. Because those operators
+turn ordinary punctuation into glob syntax, keeping them off makes a mid-word
+`#` a literal word (`echo abc#def` -> `abc#def`), matching the bash and zsh
+defaults (zsh's own `EXTENDED_GLOB` is off unless enabled). Turn them on with
+`setopt zshextglob` to use the zsh quantifier and negation operators.
+
 ### Polyglot aliases
 
 Many features have alternate spellings from bash or zsh; lush recognizes

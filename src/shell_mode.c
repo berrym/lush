@@ -74,6 +74,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
 
                             /// Extended Globbing
             [FEATURE_EXTENDED_GLOB] = false,
+                            [FEATURE_ZSH_EXTENDED_GLOB] = false,
                             [FEATURE_NULL_GLOB] = false,
                             [FEATURE_DOT_GLOB] = false,
                             [FEATURE_GLOBSTAR] = false, /// POSIX doesn't have ** recursive glob
@@ -166,6 +167,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
 
                             /// Extended Globbing - off by default in Bash, use shopt extglob
             [FEATURE_EXTENDED_GLOB] = false,
+                            /// zsh bare glob ops: bash has no such operators
+            [FEATURE_ZSH_EXTENDED_GLOB] = false,
                             [FEATURE_NULL_GLOB] = false,
                             [FEATURE_DOT_GLOB] = false,
                             [FEATURE_GLOBSTAR] = false, /// shopt globstar, off by default
@@ -263,6 +266,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
 
                             /// Extended Globbing - on by default in Zsh
             [FEATURE_EXTENDED_GLOB] = true,
+                            /// zsh EXTENDED_GLOB (bare #/^ operators) is OFF by
+            /// default in real zsh -- reachable via setopt
+            [FEATURE_ZSH_EXTENDED_GLOB] = false,
                             [FEATURE_NULL_GLOB] = true, /// CSH_NULL_GLOB behavior
             [FEATURE_DOT_GLOB] = false, /// GLOB_DOTS off by default
             [FEATURE_GLOBSTAR] = true,  /* ** recursive glob on by default */
@@ -359,6 +365,10 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
 
                             /// Extended Globbing - on like Zsh (more powerful)
             [FEATURE_EXTENDED_GLOB] = true,
+                            /// Bare #/^ glob operators stay opt-in: with nullglob
+            /// on, a literal mid-word # would silently vanish, so
+            /// the bash+zsh consensus (# is literal) is the default
+            [FEATURE_ZSH_EXTENDED_GLOB] = false,
                             [FEATURE_NULL_GLOB] = true, /// Safer: no literal *.foo
             [FEATURE_DOT_GLOB] = false, /// Explicit is better
             [FEATURE_GLOBSTAR] = true,  /* ** recursive glob - very useful */
@@ -502,6 +512,7 @@ static const char *feature_names[FEATURE_COUNT] = {
 
     /// Extended Globbing
     [FEATURE_EXTENDED_GLOB] = "extended_glob",
+    [FEATURE_ZSH_EXTENDED_GLOB] = "zsh_extended_glob",
     [FEATURE_NULL_GLOB] = "null_glob",
     [FEATURE_DOT_GLOB] = "dot_glob",
     [FEATURE_GLOBSTAR] = "globstar",
@@ -574,6 +585,7 @@ static const struct {
     {           "regex",          FEATURE_REGEX_MATCH, false},
     {         "procsub", FEATURE_PROCESS_SUBSTITUTION, false},
     {         "extglob",        FEATURE_EXTENDED_GLOB, false},
+    {      "zshextglob",    FEATURE_ZSH_EXTENDED_GLOB, false},
     {        "nullglob",            FEATURE_NULL_GLOB, false},
     {         "dotglob",             FEATURE_DOT_GLOB, false},
     {        "globstar",             FEATURE_GLOBSTAR, false},

@@ -2974,6 +2974,16 @@ if fs.exists('tests/integration/test_comment_after_operator.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_hash_in_word.c')
+  test_hash_in_word = executable('test_hash_in_word',
+    ['tests/integration/test_hash_in_word.c'])
+  test('an unquoted mid-word # is a literal word',
+       test_hash_in_word,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground

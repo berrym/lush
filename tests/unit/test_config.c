@@ -1126,7 +1126,7 @@ TEST(config_show_shell_lists_options_not_features) {
 
     /// config show shell renders the shell.* OPTIONS from the static schema
     /// (mode + mode_strict + the booleans), full shell.<name> names and live
-    /// values. It deliberately EXCLUDES the 56 shell.feature.* keys (their
+    /// values. It deliberately EXCLUDES the 57 shell.feature.* keys (their
     /// discovery surface is debug features / setopt) so the listing is not
     /// flooded. The pipe capture also exercises the buffered pager render path
     /// (non-tty stdout streams verbatim).
@@ -1161,7 +1161,7 @@ TEST(config_show_shell_lists_options_not_features) {
     ASSERT_TRUE(strstr(buf, "shell.errtrace") != NULL,
                 "config show shell should list the registered set -o options");
 
-    /// The 56 shell.feature.* keys are deliberately NOT flooded into the
+    /// The 57 shell.feature.* keys are deliberately NOT flooded into the
     /// listing.
     ASSERT_TRUE(strstr(buf, "feature.") == NULL,
                 "config show shell must not flood the shell.feature.* keys");
