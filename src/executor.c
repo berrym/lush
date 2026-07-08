@@ -7419,49 +7419,66 @@ static bool matches_glob_qualifier(const char *path,
  * Detects X#, X##, (a|b) alternation, and ^pattern negation.
  */
 static bool has_zsh_extglob_pattern(const char *pattern) {
-    if (!pattern || !shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
+    if (!pattern) {
+        return false;
+    }
+    /// (a|b) alternation is structured (it requires a `(`), so it stays under
+    /// the on-by-default FEATURE_EXTENDED_GLOB. The bare operators -- a leading
+    /// ^ negation and X#/X## quantifiers -- turn ordinary punctuation into glob
+    /// operators, so they are opt-in via FEATURE_ZSH_EXTENDED_GLOB (off by
+    /// default). Keeping them off leaves a mid-word # a literal word, the
+    /// bash+zsh default (#448).
+    bool alternation = shell_mode_allows(FEATURE_EXTENDED_GLOB);
+    bool bare_ops = shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB);
+    if (!alternation && !bare_ops) {
         return false;
     }
 
-    /// Check for ^pattern negation at start
-    if (pattern[0] == '^') {
+    /// Check for ^pattern negation at start (bare operator, opt-in)
+    if (bare_ops && pattern[0] == '^') {
         return true;
     }
 
     /// Check for (a|b) alternation - parentheses with | inside, NOT preceded by
     /// extglob op
-    const char *p = pattern;
-    while (*p) {
-        if (*p == '(' && (p == pattern || !strchr("?*+@!", *(p - 1)))) {
-            /// Found ( not preceded by extglob operator - check for | inside
-            const char *inner = p + 1;
-            int depth = 1;
-            while (*inner && depth > 0) {
-                if (*inner == '(')
-                    depth++;
-                else if (*inner == ')')
-                    depth--;
-                else if (*inner == '|' && depth == 1)
-                    return true;
-                inner++;
-            }
-        }
-        p++;
-    }
-
-    /// Check for # or ## quantifiers (after a char or ])
-    p = pattern;
-    while (*p) {
-        if (*p == '#') {
-            /// # must be preceded by something (char, ], or ))
-            if (p > pattern) {
-                char prev = *(p - 1);
-                if (prev != '/' && prev != ' ' && prev != '\t') {
-                    return true;
+    if (alternation) {
+        const char *p = pattern;
+        while (*p) {
+            if (*p == '(' && (p == pattern || !strchr("?*+@!", *(p - 1)))) {
+                /// Found ( not preceded by extglob operator - check for |
+                /// inside
+                const char *inner = p + 1;
+                int depth = 1;
+                while (*inner && depth > 0) {
+                    if (*inner == '(')
+                        depth++;
+                    else if (*inner == ')')
+                        depth--;
+                    else if (*inner == '|' && depth == 1)
+                        return true;
+                    inner++;
                 }
             }
+            p++;
         }
-        p++;
+    }
+
+    /// Check for # or ## quantifiers (after a char or ]) (bare operator,
+    /// opt-in)
+    if (bare_ops) {
+        const char *p = pattern;
+        while (*p) {
+            if (*p == '#') {
+                /// # must be preceded by something (char, ], or ))
+                if (p > pattern) {
+                    char prev = *(p - 1);
+                    if (prev != '/' && prev != ' ' && prev != '\t') {
+                        return true;
+                    }
+                }
+            }
+            p++;
+        }
     }
 
     return false;
@@ -7504,8 +7521,19 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
         return NULL;
     }
 
+    /// The bare zsh operators (leading ^ negation, X#/X## quantifiers) are
+    /// opt-in. A pattern reaches here whenever it carries the always-on
+    /// (a|b) alternation, so when the bare operators are off a co-occurring ^
+    /// or # must stay literal rather than ride in on the alternation route
+    /// (#448). Passing the LUSH_PATTERN_ZSH_EXTENDED flag conditionally keeps
+    /// # literal in the matcher; gating is_negated keeps a leading ^ literal.
+    unsigned match_flags = shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB)
+                               ? LUSH_PATTERN_ZSH_EXTENDED
+                               : 0;
+
     /// Check for ^pattern negation
-    bool is_negated = (pattern[0] == '^');
+    bool is_negated =
+        (match_flags & LUSH_PATTERN_ZSH_EXTENDED) && (pattern[0] == '^');
     const char *match_pattern = is_negated ? pattern + 1 : pattern;
 
     /// Split pattern into directory and filename parts
@@ -7550,8 +7578,8 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
             continue;
         }
 
-        bool zsh_match = lush_pattern_match_ex(entry->d_name, file_pattern,
-                                               LUSH_PATTERN_ZSH_EXTENDED);
+        bool zsh_match =
+            lush_pattern_match_ex(entry->d_name, file_pattern, match_flags);
         if (is_negated) {
             zsh_match = !zsh_match;
         }
@@ -8417,25 +8445,15 @@ static bool needs_glob_expansion(const char *str) {
         if (*p == '*' || *p == '?' || *p == '[') {
             return true;
         }
-        /// Check for bash-style extglob patterns: ?(pat), *(pat), +(pat),
-        /// @(pat), !(pat)
+        /// Bash-style extglob (?(pat), *(pat), +(pat), @(pat), !(pat)) and zsh
+        /// (a|b) alternation stay under the on-by-default
+        /// FEATURE_EXTENDED_GLOB: both require a `(`, so they never collide
+        /// with ordinary punctuation.
         if (shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
             if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' ||
                  *p == '!') &&
                 *(p + 1) == '(') {
                 return true;
-            }
-            /// Check for zsh-style extglob: ^pattern, X#, X##, (a|b)
-            /// ^ at start = negation
-            if (p == str && *p == '^') {
-                return true;
-            }
-            /// # after a char or ] = zero or more quantifier
-            if (*p == '#' && p > str) {
-                char prev = *(p - 1);
-                if (prev != '/' && prev != ' ' && prev != '\t') {
-                    return true;
-                }
             }
             /// ( not preceded by extglob op may be zsh alternation
             if (*p == '(' && (p == str || !strchr("?*+@!", *(p - 1)))) {
@@ -8450,6 +8468,24 @@ static bool needs_glob_expansion(const char *str) {
                     else if (*inner == '|' && depth == 1)
                         return true;
                     inner++;
+                }
+            }
+        }
+        /// The zsh bare operators -- a leading ^ negation and X#/X##
+        /// quantifiers
+        /// -- turn ordinary punctuation into glob operators, so they are opt-in
+        /// via FEATURE_ZSH_EXTENDED_GLOB (off by default). Keeping them off
+        /// leaves a mid-word # a literal word, the bash+zsh default (#448).
+        if (shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB)) {
+            /// ^ at start = negation
+            if (p == str && *p == '^') {
+                return true;
+            }
+            /// # after a char = zero or more quantifier
+            if (*p == '#' && p > str) {
+                char prev = *(p - 1);
+                if (prev != '/' && prev != ' ' && prev != '\t') {
+                    return true;
                 }
             }
         }

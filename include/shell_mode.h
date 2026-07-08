@@ -82,10 +82,15 @@ typedef enum {
     FEATURE_PARAM_TRANSFORMATION, ///< ${var@Q}, ${var@E}, etc.
 
     /// Extended Globbing
-    FEATURE_EXTENDED_GLOB, ///< extglob: ?(pat), *(pat), etc.
-    FEATURE_NULL_GLOB,     ///< Null glob: unmatched patterns expand to nothing
-    FEATURE_DOT_GLOB,      ///< Include dotfiles in glob matches
-    FEATURE_GLOBSTAR,      ///< ** matches recursively through directories
+    FEATURE_EXTENDED_GLOB,     ///< extglob: ?(pat), *(pat), etc.
+    FEATURE_ZSH_EXTENDED_GLOB, ///< zsh bare glob operators: X#/X## quantifiers
+                               ///< and leading ^ negation. Opt-in (off in every
+                               ///< mode) so a mid-word # stays a literal word,
+                               ///< matching the bash+zsh default; enable via
+                               ///< setopt.
+    FEATURE_NULL_GLOB, ///< Null glob: unmatched patterns expand to nothing
+    FEATURE_DOT_GLOB,  ///< Include dotfiles in glob matches
+    FEATURE_GLOBSTAR,  ///< ** matches recursively through directories
 
     /// Brace Expansion
     FEATURE_BRACE_EXPANSION, ///< {a,b,c} and {1..10} brace expansion
