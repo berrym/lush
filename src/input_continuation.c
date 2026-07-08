@@ -321,6 +321,27 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
             continue;
         }
 
+        /// A '#' at a token boundary begins a comment that runs to end of line.
+        /// Skip it so quote, brace, and paren characters inside the comment do
+        /// not corrupt continuation tracking (an apostrophe in a comment must
+        /// not open a single-quote span that swallows following lines). This
+        /// matches the tokenizer, which treats '#' as a comment whenever it
+        /// begins a token: after input start, a blank, a newline, or an
+        /// operator character that ends the previous token (; & | ( ) }). A '#'
+        /// inside a word (abc#def), a $# / ${#name} expansion, or a ${var#pat}
+        /// operator is preceded by a non-separator ('$', '{', or a word char),
+        /// so it is left alone. '{' is deliberately excluded to keep ${#name}
+        /// (a length expansion) from being read as a comment.
+        if (c == '#' && !state->in_single_quote && !state->in_double_quote &&
+            !state->in_backtick && !state->in_here_doc &&
+            (p == line || strchr(" \t\n;&|(){}", *(p - 1)) != NULL)) {
+            while (*p && *p != '\n') {
+                p++;
+            }
+            word_pos = 0;
+            continue;
+        }
+
         /// Handle quotes
         if (c == '\'' && !state->in_double_quote && !state->in_backtick) {
             state->in_single_quote = !state->in_single_quote;
