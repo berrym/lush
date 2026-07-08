@@ -746,6 +746,97 @@ TEST(quote_in_comment) {
                  "quotes inside a comment do not open a quote context");
 }
 
+/// A single (odd) apostrophe inside a comment must not open a single-quote
+/// span. The earlier quote_in_comment used a balanced pair, which passed even
+/// without comment handling; one apostrophe discriminates the bug (#213).
+TEST(odd_apostrophe_in_comment_is_complete) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("# it's a comment", &state);
+
+    ASSERT_FALSE(state.in_single_quote,
+                 "an apostrophe in a comment does not open a single quote");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "a commented line with one apostrophe is complete");
+}
+
+/// The root of #213: a comment apostrophe followed by a double-quoted string.
+/// Without comment handling the phantom single-quote makes the following `"`
+/// be treated as literal, so the double-quote is never tracked and the input
+/// is judged incomplete forever.
+TEST(comment_apostrophe_then_double_quote_completes) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("# it's a note", &state);
+    continuation_analyze_line("v=\"hello world\"", &state);
+
+    ASSERT_FALSE(state.in_single_quote,
+                 "comment apostrophe left no single quote");
+    ASSERT_FALSE(state.in_double_quote, "the double-quoted string is closed");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "comment apostrophe must not corrupt the following quote");
+}
+
+/// A '#' inside a word (abc#def) is not a comment, so an apostrophe after it is
+/// a real quote -- the scan must NOT skip it. Guards against over-eager comment
+/// detection.
+TEST(hash_mid_word_is_not_a_comment) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("echo abc#'x", &state);
+
+    ASSERT_TRUE(state.in_single_quote,
+                "a '#' inside a word is literal; the following quote is real");
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "the unclosed single quote after abc# needs continuation");
+}
+
+/// '$#' is the positional-parameter count, not a comment; an apostrophe after
+/// it is a real quote. Guards the expansion case.
+TEST(dollar_hash_is_not_a_comment) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("echo $#'x", &state);
+
+    ASSERT_TRUE(state.in_single_quote,
+                "'$#' is an expansion; the following quote is real");
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "the unclosed single quote after $# needs continuation");
+}
+
+/// A '#' immediately after a closing ')' begins a comment (a subshell close is
+/// a token boundary), matching the tokenizer. An apostrophe in that comment
+/// must not open a quote span. Without ')' as a separator this reproduces #213.
+TEST(close_paren_then_comment_completes) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("(echo hi)# it's done", &state);
+
+    ASSERT_FALSE(state.in_single_quote,
+                 "an apostrophe in a )-abutting comment opens no quote");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "a balanced subshell with a trailing comment is complete");
+}
+
+/// A '#' immediately after a closing '}' likewise begins a comment (matching
+/// the tokenizer), so an apostrophe in it must not corrupt quote tracking.
+TEST(close_brace_then_comment_completes) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("{ echo hi; }# it's done", &state);
+
+    ASSERT_FALSE(state.in_single_quote,
+                 "an apostrophe in a }-abutting comment opens no quote");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "a balanced brace group with a trailing comment is complete");
+}
+
 TEST(semicolon_separates_commands) {
     continuation_state_t state;
     continuation_state_init(&state);
@@ -857,6 +948,12 @@ int main(void) {
     printf("\n=== Edge Case Tests ===\n");
     RUN_TEST(comment_line);
     RUN_TEST(quote_in_comment);
+    RUN_TEST(odd_apostrophe_in_comment_is_complete);
+    RUN_TEST(comment_apostrophe_then_double_quote_completes);
+    RUN_TEST(hash_mid_word_is_not_a_comment);
+    RUN_TEST(dollar_hash_is_not_a_comment);
+    RUN_TEST(close_paren_then_comment_completes);
+    RUN_TEST(close_brace_then_comment_completes);
     RUN_TEST(semicolon_separates_commands);
 
     return TEST_RESULT();
