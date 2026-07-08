@@ -2964,6 +2964,16 @@ if fs.exists('tests/integration/test_fork_child_script_reexec.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_comment_after_operator.c')
+  test_comment_after_operator = executable('test_comment_after_operator',
+    ['tests/integration/test_comment_after_operator.c'])
+  test('a comment after && || | does not break the RHS',
+       test_comment_after_operator,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 # PTY-based tests follow the zsh Test/W02jobs.ztst model: any test
 # whose subject is defined by terminal semantics (SIGHUP delivery on
 # controlling-terminal hangup, SIGHUP cascade to the foreground

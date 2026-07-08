@@ -1028,9 +1028,12 @@ static node_t *parse_pipeline(parser_t *parser) {
         bool pipe_stderr = tokenizer_match(parser->tokenizer, TOK_PIPE_STDERR);
         tokenizer_advance(parser->tokenizer); /// consume | or |&
 
-        /// Skip newlines after pipe - allows multiline pipelines
+        /// Skip newlines, whitespace, and comments after a pipe -- this allows
+        /// a multiline pipeline and a trailing comment before the next stage
+        /// (`cmd | # note` then the stage on the following line).
         while (tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
-               tokenizer_match(parser->tokenizer, TOK_WHITESPACE)) {
+               tokenizer_match(parser->tokenizer, TOK_WHITESPACE) ||
+               tokenizer_match(parser->tokenizer, TOK_COMMENT)) {
             /// `cmd <<EOF |` then newline: the heredoc body follows that
             /// newline. Collect it before consuming the newline.
             if (tokenizer_match(parser->tokenizer, TOK_NEWLINE) &&

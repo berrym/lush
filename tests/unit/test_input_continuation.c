@@ -837,6 +837,70 @@ TEST(close_brace_then_comment_completes) {
                 "a balanced brace group with a trailing comment is complete");
 }
 
+/// A trailing `&&` followed by a comment still continues to the next line: the
+/// trailing-operator check must look past the comment, not treat the comment
+/// text as the line end (#450).
+TEST(and_before_comment_needs_continuation) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("true && # note", &state);
+
+    ASSERT_TRUE(state.has_continuation,
+                "a trailing && behind a comment still continues");
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "cmd && # comment needs the next line");
+}
+
+/// Same for `||`.
+TEST(or_before_comment_needs_continuation) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("false || # note", &state);
+
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "cmd || # comment needs the next line");
+}
+
+/// Same for a bare trailing `|`.
+TEST(pipe_before_comment_needs_continuation) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("echo hi | # note", &state);
+
+    ASSERT_FALSE(continuation_is_complete(&state),
+                 "cmd | # comment needs the next pipeline stage");
+}
+
+/// A comment after a COMPLETE command does not force continuation.
+TEST(comment_after_complete_command_is_complete) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("true && echo x # note", &state);
+
+    ASSERT_FALSE(state.has_continuation, "a satisfied && does not continue");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "cmd && cmd # comment is complete");
+}
+
+/// `${#name}` is a length expansion, not a comment. The '#' after '{' must not
+/// be treated as a comment start (which would swallow the closing '}' and leave
+/// brace_count unbalanced, judging the line incomplete). '{' is therefore
+/// excluded from the comment-boundary separator set.
+TEST(length_expansion_is_not_a_comment) {
+    continuation_state_t state;
+    continuation_state_init(&state);
+
+    continuation_analyze_line("echo ${#v}", &state);
+
+    ASSERT_EQ(state.brace_count, 0, "the ${#v} braces balance");
+    ASSERT_TRUE(continuation_is_complete(&state),
+                "${#v} is a complete line, not an open comment");
+}
+
 TEST(semicolon_separates_commands) {
     continuation_state_t state;
     continuation_state_init(&state);
@@ -954,6 +1018,11 @@ int main(void) {
     RUN_TEST(dollar_hash_is_not_a_comment);
     RUN_TEST(close_paren_then_comment_completes);
     RUN_TEST(close_brace_then_comment_completes);
+    RUN_TEST(and_before_comment_needs_continuation);
+    RUN_TEST(or_before_comment_needs_continuation);
+    RUN_TEST(pipe_before_comment_needs_continuation);
+    RUN_TEST(comment_after_complete_command_is_complete);
+    RUN_TEST(length_expansion_is_not_a_comment);
     RUN_TEST(semicolon_separates_commands);
 
     return TEST_RESULT();

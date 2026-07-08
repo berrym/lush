@@ -282,6 +282,12 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
     char word[256] = {0};
     int word_pos = 0;
 
+    /// Start of an unquoted trailing comment on this line, if any. The
+    /// trailing-operator continuation check below must look past a comment so a
+    /// line like `cmd && # note` is still seen as continued by its `&&` rather
+    /// than judged complete because its last characters are the comment.
+    const char *comment_start = NULL;
+
     while (*p) {
         unsigned char uc = (unsigned char)*p;
         char c = *p;
@@ -334,7 +340,8 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
         /// (a length expansion) from being read as a comment.
         if (c == '#' && !state->in_single_quote && !state->in_double_quote &&
             !state->in_backtick && !state->in_here_doc &&
-            (p == line || strchr(" \t\n;&|(){}", *(p - 1)) != NULL)) {
+            (p == line || strchr(" \t\n;&|()}", *(p - 1)) != NULL)) {
+            comment_start = p;
             while (*p && *p != '\n') {
                 p++;
             }
@@ -654,15 +661,16 @@ void continuation_analyze_line(const char *line, continuation_state_t *state) {
     /// check, an `&&`-at-EOL is treated as one statement and the
     /// parser sees the operator with nothing on its right.
     ///
-    /// The local analyzer in src/input.c already does this for the
-    /// file/stdin reader path; this shared analyzer is used by the
-    /// executor's per-batch splitter (issue #151) and by the LLE
-    /// interactive multi-line driver. The two analyzers should
-    /// eventually collapse onto a single canonical implementation
-    /// (tracked: duplicate-path audit).
+    /// This is the single canonical analyzer: the file/stdin reader
+    /// (src/input.c), the executor's per-batch splitter (issue #151), and the
+    /// LLE interactive multi-line driver all dispatch here. src/input.c's
+    /// former private copy has been retired.
     if (!state->in_single_quote && !state->in_double_quote &&
         !state->in_backtick && !state->in_here_doc) {
-        const char *trim_end = line + strlen(line);
+        /// Measure from before any trailing comment so `cmd && # note` and
+        /// `cmd | # note` see their trailing operator, not the comment text.
+        const char *trim_end =
+            comment_start ? comment_start : line + strlen(line);
         while (trim_end > line &&
                (*(trim_end - 1) == ' ' || *(trim_end - 1) == '\t')) {
             trim_end--;
