@@ -462,6 +462,21 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
 char *symtable_get_var(symtable_manager_t *manager, const char *name);
 
 /**
+ * @brief Get a scalar variable's value from the CURRENT scope only
+ *
+ * Unlike symtable_get_var, this does NOT walk to parent scopes: it returns a
+ * value only when @p name is bound as a scalar in the current scope. Used
+ * when declaring a new local must not inherit a same-named outer value.
+ *
+ * @param manager Symbol table manager
+ * @param name    Variable name
+ * @return Owned copy of the value, or NULL if unbound in the current scope
+ *         (or bound as an array / marked unset). Caller frees.
+ */
+char *symtable_get_var_current_scope(symtable_manager_t *manager,
+                                     const char *name);
+
+/**
  * @brief Unset a variable
  *
  * @param manager Manager instance

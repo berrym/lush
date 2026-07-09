@@ -660,17 +660,21 @@ int bin_declare(int argc, char **argv) {
                 }
                 free(final_value);
             } else {
-                /// Declare without value. If the variable already
-                /// exists, preserve its current value and just update
-                /// the flags so attribute promotion (declare -l X
-                /// after X already had a value) does not clobber the
-                /// content. When SYMVAR_LOWERCASE / SYMVAR_UPPERCASE
-                /// is among the new flags, apply the fold retroactively
-                /// to the preserved value -- this matches bash, which
-                /// folds existing values when the attribute is added.
-                /// For nonexistent variables the historical empty-
-                /// string default still applies.
-                char *existing = symtable_get_var(manager, name);
+                /// Declare without value. If the variable already exists IN
+                /// THE CURRENT SCOPE, preserve its current value and just
+                /// update the flags so attribute promotion (declare -l X
+                /// after X already had a value) does not clobber the content.
+                /// When SYMVAR_LOWERCASE / SYMVAR_UPPERCASE is among the new
+                /// flags, apply the fold retroactively to the preserved value
+                /// -- this matches bash, which folds existing values when the
+                /// attribute is added. The lookup is current-scope-only: a
+                /// same-named variable in a PARENT scope is being shadowed by
+                /// a new local (declare/local X inside a function), and
+                /// inheriting the outer value would leak it into the new local
+                /// -- bash and zsh both start the local empty. For a variable
+                /// unbound in this scope the historical empty-string default
+                /// applies.
+                char *existing = symtable_get_var_current_scope(manager, name);
                 const char *write_value = existing ? existing : "";
                 char *folded = NULL;
                 if (existing &&

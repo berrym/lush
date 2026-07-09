@@ -756,6 +756,112 @@ TEST(local_in_function) {
     ASSERT_STDOUT_EQ(r, "in\nout\n");
 }
 
+TEST(local_assoc_array_in_function) {
+    /// #201: local -A (associative) works in the default mode, not only zsh.
+    /// local delegates to declare, which creates function-locals in scope.
+    run_result_t r = run_shell(
+        "mode lush\nf() { local -A m; m=(k v); echo \"${m[k]}\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "v\n");
+}
+
+TEST(local_indexed_array_in_function) {
+    /// local -a (indexed) likewise reaches the full declare grammar.
+    run_result_t r = run_shell(
+        "mode lush\nf() { local -a a; a=(x y z); echo \"${a[2]}\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "z\n");
+}
+
+TEST(local_integer_attribute_in_function) {
+    /// local -i evaluates the assignment as an arithmetic expression.
+    run_result_t r =
+        run_shell("mode lush\nf() { local -i n=3+4; echo \"$n\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+}
+
+TEST(local_assoc_consecutive_blocks) {
+    /// #201 shape: consecutive `local -A NAME; NAME=(...)` blocks in one
+    /// function body each declare and populate independently (the git.zsh
+    /// _omz_git_prompt_status pattern that surfaced the original report).
+    run_result_t r = run_shell("mode lush\nf() {\n"
+                               "  local -A first; first=(A foo)\n"
+                               "  local -A second; second=(B bar)\n"
+                               "  echo \"${first[A]} ${second[B]}\"\n"
+                               "}\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "foo bar\n");
+}
+
+TEST(local_attribute_options_preserve_scope_check) {
+    /// Scope strictness is preserved: an attribute-carrying local at top
+    /// level (non-zsh) still errors that it must be inside a function.
+    run_result_t r = run_shell("mode lush\nlocal -A x\n");
+    ASSERT(r.exit_status != 0, "top-level local -A should fail");
+    ASSERT_STDERR_CONTAINS(r, "function");
+}
+
+TEST(local_readonly_attribute_in_function) {
+    /// local -r marks the variable readonly; reassigning it fails.
+    run_result_t r = run_shell("mode lush\nf() { local -r c=5; c=6; }\nf\n");
+    ASSERT(r.exit_status != 0, "reassigning a local -r variable should fail");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+}
+
+TEST(local_nameref_writes_through) {
+    /// local -n binds a nameref; writing the ref updates the target. The
+    /// nameref path moved onto bin_declare's handling in the delegation, so
+    /// this guards that move.
+    run_result_t r =
+        run_shell("mode lush\nf() { local target=orig; local -n ref=target; "
+                  "ref=changed; echo \"$target\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "changed\n");
+}
+
+TEST(local_attribute_var_does_not_escape_scope) {
+    /// The premise of the fix: declare-in-function makes a local. A local -A
+    /// declared and populated inside f is gone (empty) after f returns, never
+    /// leaking to global scope.
+    run_result_t r = run_shell(
+        "mode lush\nf() { local -A m; m=(k v); }\nf\necho \"[${m[k]}]\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(local_bare_shadow_does_not_inherit_outer) {
+    /// A bare `local x` shadowing a same-named global must start EMPTY, not
+    /// inherit the outer value. bin_declare's no-value branch must read the
+    /// current scope only, not walk to a parent scope (#201 review finding).
+    run_result_t r =
+        run_shell("mode lush\nx=OUTER\nf() { local x; echo \"[$x]\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(local_attribute_promotion_preserves_same_scope_value) {
+    /// A same-scope re-declaration with a value-neutral attribute preserves
+    /// the value -- the current-scope lookup still finds the local's own
+    /// binding (guards that the shadow fix did not break attribute promotion).
+    run_result_t r = run_shell(
+        "mode lush\nf() { local v=keep; local -x v; echo \"[$v]\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[keep]\n");
+}
+
+TEST(local_array_shadow_does_not_double_free) {
+    /// A local array shadowing a same-named global array must not free the
+    /// global's backing store (which lives in the parent scope) -- doing so
+    /// double-frees at scope teardown (SIGABRT). The local holds its own
+    /// values; the global is intact after the function returns (#201 finding).
+    run_result_t r =
+        run_shell("mode lush\na=(G0 G1)\nf() { local -a a; a=(L0 L1); echo "
+                  "\"${a[0]}\"; }\nf\necho \"${a[0]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "L0\nG0\n");
+}
+
 /* ============================================================================
  * READONLY BUILTIN TESTS
  * ============================================================================
@@ -1172,6 +1278,17 @@ int main(void) {
     RUN_TEST(declare_variable);
     RUN_TEST(local_outside_function);
     RUN_TEST(local_in_function);
+    RUN_TEST(local_assoc_array_in_function);
+    RUN_TEST(local_indexed_array_in_function);
+    RUN_TEST(local_integer_attribute_in_function);
+    RUN_TEST(local_assoc_consecutive_blocks);
+    RUN_TEST(local_attribute_options_preserve_scope_check);
+    RUN_TEST(local_readonly_attribute_in_function);
+    RUN_TEST(local_nameref_writes_through);
+    RUN_TEST(local_attribute_var_does_not_escape_scope);
+    RUN_TEST(local_bare_shadow_does_not_inherit_outer);
+    RUN_TEST(local_attribute_promotion_preserves_same_scope_value);
+    RUN_TEST(local_array_shadow_does_not_double_free);
 
     printf("\n--- readonly Tests ---\n");
     RUN_TEST(readonly_variable);
