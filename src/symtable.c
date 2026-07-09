@@ -884,6 +884,36 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
     return result;
 }
 
+char *symtable_get_var_current_scope(symtable_manager_t *manager,
+                                     const char *name) {
+    if (!manager || !manager->current_scope || !name) {
+        return NULL;
+    }
+    /// NFC-normalize so a lookup with NFD bytes resolves the NFC-stored key.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return NULL;
+    }
+    /// Look up the CURRENT scope's own binding only -- do not walk to parent
+    /// scopes. Returns an owned copy of the scalar value, or NULL when the
+    /// name is unbound in this scope, is an array, or is marked unset.
+    const char *serialized =
+        ht_strstr_get(manager->current_scope->vars_ht, canon);
+    char *result = NULL;
+    if (serialized) {
+        symvar_t *var = deserialize_variable(canon, serialized);
+        if (var) {
+            if (var->type != SYMVAR_ARRAY && !(var->flags & SYMVAR_UNSET) &&
+                var->value) {
+                result = strdup(var->value);
+            }
+            free_symvar(var);
+        }
+    }
+    free(canon);
+    return result;
+}
+
 static char *symtable_get_var_impl(symtable_manager_t *manager,
                                    const char *name) {
     /// Handle special dynamic variables
@@ -3035,13 +3065,25 @@ int symtable_set_array(const char *name, array_value_t *array) {
     }
     name = canon;
 
-    /// Free any existing array bound to this name -- assignment to an
-    /// already-array variable replaces the underlying array_value_t.
-    /// symtable_get_array walks the scope chain; if it finds an old
-    /// array, free its backing memory before we overwrite.
-    array_value_t *existing = symtable_get_array(name);
-    if (existing && existing != array) {
-        symtable_array_free(existing);
+    /// Free any existing array bound to this name IN THE CURRENT SCOPE only,
+    /// before the ht_strstr_insert below overwrites its hex-encoded pointer.
+    /// An array of the same name in a PARENT scope is being shadowed by a new
+    /// local, not replaced: symtable_get_array walks the chain, so freeing its
+    /// result would free the parent's array while the parent's serialized
+    /// pointer keeps pointing at the freed memory, double-freeing at scope
+    /// teardown (a `local -A` / `local -a` shadowing a global). Mirror
+    /// symtable_set_var and inspect the current scope's own binding directly.
+    const char *cur_serialized =
+        ht_strstr_get(global_manager->current_scope->vars_ht, name);
+    if (cur_serialized) {
+        symvar_t *cur = deserialize_variable(name, cur_serialized);
+        if (cur) {
+            if (cur->type == SYMVAR_ARRAY && cur->array &&
+                cur->array != array) {
+                symtable_array_free(cur->array);
+            }
+            free_symvar(cur);
+        }
     }
 
     /// Encode the pointer as a hex string in the serialized value;
