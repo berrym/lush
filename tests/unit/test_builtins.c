@@ -862,6 +862,53 @@ TEST(local_array_shadow_does_not_double_free) {
     ASSERT_STDOUT_EQ(r, "L0\nG0\n");
 }
 
+TEST(local_nameref_error_names_local_not_declare) {
+    /// A `local -n` misuse must suggest `local -n`, not `declare -n`: the
+    /// delegated error names the invoked builtin (#201 follow-up).
+    run_result_t r = run_shell("mode lush\nf() { local -n r; }\nf\n");
+    ASSERT(r.exit_status != 0, "local -n with no target should fail");
+    ASSERT_STDERR_CONTAINS(r, "local -n ref=target");
+}
+
+TEST(local_integer_promotion_preserves_value) {
+    /// local -i on an already-set variable preserves its value (bash keeps
+    /// it), rather than clobbering to 0 (#201 follow-up).
+    run_result_t r = run_shell(
+        "mode lush\nf() { local n=5; local -i n; echo \"$n\"; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+}
+
+TEST(local_print_lists_only_scope_locals) {
+    /// `local -p` lists the function's own locals, not the global set nor
+    /// shell-managed entries (FUNCNAME, the special parameters) (#201
+    /// follow-up).
+    run_result_t r = run_shell(
+        "mode lush\nGLOBALONLY=g\nf() { local mylocal=L; local -p; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "mylocal=\"L\"");
+    ASSERT(!strstr(r.out, "GLOBALONLY"), "local -p must not list globals");
+    ASSERT(!strstr(r.out, "FUNCNAME"), "local -p must not list FUNCNAME");
+}
+
+TEST(local_integer_promotion_does_not_inherit_parent) {
+    /// local -i on a name bound only in a PARENT scope creates a fresh local
+    /// 0 -- it must NOT inherit the outer value (current-scope-only lookup).
+    run_result_t r = run_shell("mode lush\nn=9\nf() { local -i n; echo "
+                               "\"[$n]\"; }\nf\necho \"[$n]\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[0]\n[9]\n");
+}
+
+TEST(local_print_includes_array_locals) {
+    /// local -p routes an array-typed local through the array printer, not
+    /// just scalars.
+    run_result_t r = run_shell(
+        "mode lush\nf() { local -a arr; arr=(a b c); local -p; }\nf\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "arr=([0]=\"a\" [1]=\"b\" [2]=\"c\")");
+}
+
 /* ============================================================================
  * READONLY BUILTIN TESTS
  * ============================================================================
@@ -1289,6 +1336,11 @@ int main(void) {
     RUN_TEST(local_bare_shadow_does_not_inherit_outer);
     RUN_TEST(local_attribute_promotion_preserves_same_scope_value);
     RUN_TEST(local_array_shadow_does_not_double_free);
+    RUN_TEST(local_nameref_error_names_local_not_declare);
+    RUN_TEST(local_integer_promotion_preserves_value);
+    RUN_TEST(local_print_lists_only_scope_locals);
+    RUN_TEST(local_integer_promotion_does_not_inherit_parent);
+    RUN_TEST(local_print_includes_array_locals);
 
     printf("\n--- readonly Tests ---\n");
     RUN_TEST(readonly_variable);
