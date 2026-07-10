@@ -1279,6 +1279,15 @@ creg_result_t config_registry_save(const char *path) {
                 continue;
             }
 
+            /// The editor aliases shell.emacs / shell.vi are loadable for
+            /// legacy configs but never saved: shell.editing_mode is the one
+            /// canonical key that records the editor choice, and the aliases
+            /// would otherwise duplicate it in the file.
+            if (strcmp(opt->key, "shell.emacs") == 0 ||
+                strcmp(opt->key, "shell.vi") == 0) {
+                continue;
+            }
+
             /// Persist the effective value, but only when it differs from the
             /// schema default (sparse file: a config save records the user's
             /// actual choices, not the whole schema).
