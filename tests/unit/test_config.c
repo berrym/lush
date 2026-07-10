@@ -607,6 +607,63 @@ TEST(shell_editor_mutual_exclusion_reads_executor) {
     config_set_value("shell.emacs", "true");
 }
 
+TEST(shell_editing_mode_is_single_layered_enum) {
+    /// #390: editing_mode is one enum key ("emacs" | "vi"); emacs/vi are
+    /// derived aliases that route their writes to it and derive their reads
+    /// from the live editor field the subscriber keeps in step.
+    config_init();
+    config_registry_reset("shell.editing_mode");
+
+    /// config set editing_mode=vi drives the editor and the derived aliases.
+    config_set_value("shell.editing_mode", "vi");
+    ASSERT_TRUE(shell_opts.vi_mode, "editing_mode=vi selects the vi editor");
+    ASSERT_FALSE(shell_opts.emacs_mode, "editing_mode=vi clears emacs");
+    ASSERT_FALSE(config_get_shell_option("shell.emacs"),
+                 "emacs alias derives false under editing_mode=vi");
+    ASSERT_TRUE(config_get_shell_option("shell.vi"),
+                "vi alias derives true under editing_mode=vi");
+    char out[32];
+    capture_config_get("shell.editing_mode", out, sizeof(out));
+    ASSERT_STR_EQ(out, "vi\n", "config get editing_mode reads vi");
+
+    /// The emacs alias write routes to the single editing_mode key.
+    config_set_value("shell.emacs", "true");
+    ASSERT_TRUE(shell_opts.emacs_mode, "emacs alias switches the editor");
+    capture_config_get("shell.editing_mode", out, sizeof(out));
+    ASSERT_STR_EQ(out, "emacs\n", "emacs alias updated editing_mode");
+
+    /// An invalid value is refused at the registry type funnel (same E1204 as
+    /// every other enum key, with an expected-values suggestion) and leaves the
+    /// editor unchanged.
+    char err[192];
+    capture_config_set_stderr("shell.editing_mode", "bogus", err, sizeof(err));
+    ASSERT_TRUE(strstr(err, "invalid value") != NULL &&
+                    strstr(err, "shell.editing_mode") != NULL,
+                "a bogus editing_mode is refused with E1204");
+    ASSERT_TRUE(shell_opts.emacs_mode,
+                "a refused set left the editor unchanged");
+
+    /// Single-key layered resolution (the precedence fix the two-boolean model
+    /// could not express): a MODE-layer vi resurfaces when the SESSION write is
+    /// dropped, resolving via the standard layer order.
+    creg_value_t vi = creg_value_string("vi");
+    config_registry_set_mode_value("shell.editing_mode", &vi);
+    config_registry_reset("shell.editing_mode"); /// drop the SESSION emacs pin
+    ASSERT_TRUE(shell_opts.vi_mode,
+                "editing_mode falls back to the MODE-layer vi");
+    capture_config_get("shell.editing_mode", out, sizeof(out));
+    ASSERT_STR_EQ(out, "vi\n", "config get reflects the MODE-layer fallback");
+
+    /// Restore the default editor for later tests. config_registry_reset drops
+    /// only the SESSION layer, so also clear the MODE-layer vi written above
+    /// (set it back to the default) to leave the registry clean for later
+    /// tests.
+    creg_value_t emacs = creg_value_string("emacs");
+    config_registry_set_mode_value("shell.editing_mode", &emacs);
+    config_registry_reset("shell.editing_mode");
+    config_set_value("shell.editing_mode", "emacs");
+}
+
 TEST(shell_restricted_is_read_only_engaged_projection) {
     /// #391: shell.restricted is a read-only projection of the ENGAGED
     /// restricted-shell enforcement state. config get/show derive it live
@@ -1505,6 +1562,7 @@ int main(void) {
     RUN_TEST(config_save_sync_preserves_shell_options);
     RUN_TEST(shell_restricted_is_read_only_engaged_projection);
     RUN_TEST(shell_editor_mutual_exclusion_reads_executor);
+    RUN_TEST(shell_editing_mode_is_single_layered_enum);
     RUN_TEST(shell_posix_is_a_mode_projection);
     RUN_TEST(persisted_false_key_not_loaded_from_file);
     RUN_TEST(shell_mode_registry_subscriber_applies);

@@ -358,15 +358,30 @@ static const creg_option_t shell_options[] = {
      .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      .help = "Prevent function history logging (set -o nolog)",
      .persisted = true },
+    /// editing_mode is the single-valued editor key: one layered string
+    /// ("emacs" | "vi") the registry resolves last-wins across config layers.
+    /// emacs/vi are derived aliases (persisted=false) that route their writes
+    /// here and read back from the live editor field, so multi-file precedence
+    /// follows the standard layer order rather than two change-gated booleans.
+    {        .name = "editing_mode",
+     .type = CREG_VALUE_STRING,
+     .default_val = {.type = CREG_VALUE_STRING, .data.string = "emacs"},
+     .help = "Line editing mode: emacs or vi (set -o emacs / set -o vi)",
+     .persisted = true },
+    /// emacs/vi remain loadable (a legacy config's emacs=true/vi=true still
+    /// selects the editor, routed to editing_mode by the shell.* subscriber),
+    /// but are NOT saved -- editing_mode is the one canonical key config save
+    /// writes (see the emacs/vi skip in config_registry_save). persisted=true
+    /// keeps them loadable; the save-side skip keeps the alias out of the file.
     {               .name = "emacs",
      .type = CREG_VALUE_BOOLEAN,
      .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     .help = "Emacs-style editing (set -o emacs)",
+     .help = "Emacs-style editing (alias of editing_mode=emacs)",
      .persisted = true },
     {                  .name = "vi",
      .type = CREG_VALUE_BOOLEAN,
      .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     .help = "Vi-style editing (set -o vi)",
+     .help = "Vi-style editing (alias of editing_mode=vi)",
      .persisted = true },
     /// posix: persisted=false + derive-only: posix-strictness is purely a
     /// projection of the active mode (only POSIX mode implies it). config
@@ -939,10 +954,41 @@ static void shell_option_registry_apply(const char *key,
                                         void *user_data) {
     (void)old_value;
     (void)user_data;
-    if (!key || !new_value || new_value->type != CREG_VALUE_BOOLEAN) {
+    if (!key || !new_value) {
+        return;
+    }
+    /// The single-valued editor. shell.editing_mode is the storage key; its
+    /// string value ("emacs" | "vi") drives both runtime bools and the live
+    /// editor, so every layer / save / set path resolves through this one key.
+    if (strcmp(key, "shell.editing_mode") == 0 &&
+        new_value->type == CREG_VALUE_STRING) {
+        bool vi = (strcmp(new_value->data.string, "vi") == 0);
+        shell_opts.vi_mode = vi;
+        shell_opts.emacs_mode = !vi;
+        lush_update_editing_mode();
+        return;
+    }
+    if (new_value->type != CREG_VALUE_BOOLEAN) {
         return;
     }
     if (strncmp(key, "shell.feature.", 14) == 0) {
+        return;
+    }
+    /// emacs/vi are derived aliases: a boolean write (a legacy config file's
+    /// emacs=true / vi=true, or set -o emacs/vi's registry sync) applies to
+    /// the runtime editor here and mirrors the choice into the single
+    /// editing_mode key so config get / show / save reflect it. The registry's
+    /// nested-notify guard suppresses the editing_mode write's callback, so the
+    /// bools are set directly above rather than relying on a cascade.
+    if (strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0) {
+        bool emacs_on = (strcmp(key, "shell.emacs") == 0)
+                            ? new_value->data.boolean
+                            : !new_value->data.boolean;
+        shell_opts.emacs_mode = emacs_on;
+        shell_opts.vi_mode = !emacs_on;
+        lush_update_editing_mode();
+        config_registry_set_string("shell.editing_mode",
+                                   emacs_on ? "emacs" : "vi");
         return;
     }
     config_set_shell_option(key, new_value->data.boolean);
@@ -1317,10 +1363,22 @@ static void config_register_sections(void) {
 
 /// Enum-typed keys: a value must equal one of the pair-table names. The table
 /// is the same one the binding maps through, so the allowed set has one source.
+/// shell.editing_mode enum members (#390). The int values are unused -- the
+/// key is stored and read as its string by the shell.* subscriber, not bound
+/// to an int cell -- but registering the pairs gives the key a creg_type_t
+/// enum descriptor, so an invalid value is rejected at the single write funnel
+/// (config set, setopt, and TOML load alike) rather than only at config set.
+static const creg_enum_pair_t editing_mode_pairs[] = {
+    {"emacs", 0},
+    {   "vi", 1},
+    {   NULL, 0},
+};
+
 static const struct {
     const char *key;
     const creg_enum_pair_t *pairs;
 } k_enum_types[] = {
+    {           "shell.editing_mode",                  editing_mode_pairs},
     {        "completion.match_mode",         completion_match_mode_pairs},
     {          "history.search_mode",           history_search_mode_pairs},
     {         "history.finder.match",          history_finder_match_pairs},
@@ -3771,6 +3829,13 @@ void config_get_value(const char *key) {
             printf("%s\n", config.shell_mode_strict ? "true" : "false");
             return;
         }
+        if (strcmp(key, "shell.editing_mode") == 0) {
+            /// The single-valued editor key derives from the live editor
+            /// field (kept in step with the layered registry value by the
+            /// shell.* subscriber), so it reads what the executor uses.
+            printf("%s\n", shell_opts.vi_mode ? "vi" : "emacs");
+            return;
+        }
         if (strcmp(key, "shell.posix") == 0 ||
             strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0 ||
             strcmp(key, "shell.restricted") == 0) {
@@ -3991,14 +4056,44 @@ void config_set_value(const char *key, const char *value) {
             printf("Set %s = %s\n", key, value);
             return;
         }
+        if (strcmp(key, "shell.editing_mode") == 0) {
+            /// The single-valued editor key. Its enum descriptor (k_enum_types)
+            /// validates the value at the registry write funnel, so an invalid
+            /// value is rejected there (same path as a TOML load) -- no
+            /// per-site value check here. On success the subscriber applies it
+            /// to the runtime editor; on an invalid value the registry returns
+            /// INVALID_VALUE and the builtin renders the structured error with
+            /// the type's expected-values suggestion (as the generic enum path
+            /// below does).
+            creg_result_t rc =
+                config_registry_set_string("shell.editing_mode", value);
+            if (rc == CREG_SUCCESS) {
+                printf("Set %s = %s\n", key, value);
+            } else if (rc == CREG_ERROR_INVALID_VALUE) {
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                    SOURCE_LOC_UNKNOWN, "invalid value '%s' for config key %s",
+                    value, key);
+                if (err) {
+                    char desc[128];
+                    if (config_registry_describe_type(
+                            key, desc, sizeof(desc)) == CREG_SUCCESS) {
+                        char suggestion[160];
+                        snprintf(suggestion, sizeof(suggestion), "expected %s",
+                                 desc);
+                        shell_error_set_suggestion(err, suggestion);
+                    }
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
+            }
+            return;
+        }
         if (strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0) {
-            /// Editor mode is single-valued. Drive shell_opts directly (the
-            /// change-gated registry write alone would no-op when the partner's
-            /// stale higher layer keeps the effective unchanged -- e.g. setting
-            /// emacs while shell.emacs already reads true by default), then
-            /// mirror BOTH keys to SESSION so config save persists the choice
-            /// and config explain attributes it. config get/show read the live
-            /// editor field, so the registry pair is for round-trip only.
+            /// emacs/vi are derived aliases of the single-valued editing_mode
+            /// enum: route the boolean write there so the choice lands as one
+            /// layered value (correct last-wins precedence across config
+            /// layers), not two change-gated booleans.
             bool want;
             if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
                 strcmp(value, "on") == 0) {
@@ -4015,10 +4110,8 @@ void config_set_value(const char *key, const char *value) {
                 return;
             }
             bool emacs_on = (strcmp(key, "shell.emacs") == 0) ? want : !want;
-            config_set_shell_option(emacs_on ? "shell.emacs" : "shell.vi",
-                                    true);
-            config_registry_set_boolean("shell.emacs", emacs_on);
-            config_registry_set_boolean("shell.vi", !emacs_on);
+            config_registry_set_string("shell.editing_mode",
+                                       emacs_on ? "emacs" : "vi");
             printf("Set %s = %s\n", key, value);
             return;
         }
@@ -4386,6 +4479,10 @@ static void config_show_shell_section(FILE *out) {
             val = shell_mode_name(shell_mode_get());
         } else if (strcmp(opt->name, "mode_strict") == 0) {
             val = config.shell_mode_strict ? "true" : "false";
+        } else if (strcmp(opt->name, "editing_mode") == 0) {
+            /// String projection of the live editor field (kept in step with
+            /// the layered editing_mode value by the shell.* subscriber).
+            val = shell_opts.vi_mode ? "vi" : "emacs";
         } else if (strcmp(opt->name, "posix") == 0 ||
                    strcmp(opt->name, "emacs") == 0 ||
                    strcmp(opt->name, "vi") == 0 ||
