@@ -4515,6 +4515,24 @@ static node_t *parse_anonymous_function(parser_t *parser) {
  * @param parser Parser instance
  * @return Case statement AST node
  */
+
+/// Append @p s to a growable case-pattern buffer. Returns false on allocation
+/// failure (the caller frees @p *buf and unwinds).
+static bool case_pat_append(char **buf, size_t *len, const char *s) {
+    if (!s) {
+        return true;
+    }
+    size_t sl = strlen(s);
+    char *nb = realloc(*buf, *len + sl + 1);
+    if (!nb) {
+        return false;
+    }
+    *buf = nb;
+    memcpy(*buf + *len, s, sl + 1);
+    *len += sl;
+    return true;
+}
+
 static node_t *parse_case_statement(parser_t *parser) {
     if (!expect_token(parser, TOK_CASE)) {
         return NULL;
@@ -4652,7 +4670,13 @@ static node_t *parse_case_statement(parser_t *parser) {
         char *pattern = NULL;
         size_t pattern_len = 0;
 
+        /// Set when a numeric-range alternative closed with a `>|` token (the
+        /// lexer merges the range's `>` with a following alternation `|`); the
+        /// `|` is already consumed, so the do-while must continue anyway.
+        bool pipe_from_clobber = false;
+
         do {
+            pipe_from_clobber = false;
             /// Build pattern from multiple tokens until ) or |
             char *single_pattern = NULL;
             size_t single_pattern_len = 0;
@@ -4680,6 +4704,62 @@ static node_t *parse_case_statement(parser_t *parser) {
                 /// context wants their literal text. Accept the tokens
                 /// here and append "[[" / "]]" -- match_pattern handles
                 /// the resulting `[[:class:]]` string correctly.
+                ///
+                /// zsh numeric-range case pattern <lo-hi> / <-> / <lo-> /
+                /// <-hi> (#205). The lexer fragments `<...>` into a
+                /// redirection-shaped run: `<` is REDIRECT_IN, the interior a
+                /// WORD (e.g. "1-9", "100-", "-50") or, for the bare `<->`, an
+                /// ARROW "->", and the closing `>` REDIRECT_OUT. `<` is never a
+                /// redirect in pattern position, so reassemble the literal
+                /// "<...>" text; execute_case range-tests it (a malformed or
+                /// non-numeric `<...>` falls through to the glob matcher).
+                if (pattern_token->type == TOK_REDIRECT_IN) {
+                    bool ok = case_pat_append(&single_pattern,
+                                              &single_pattern_len, "<");
+                    tokenizer_advance(parser->tokenizer);
+                    token_t *mid = tokenizer_current(parser->tokenizer);
+                    if (ok && mid && mid->type == TOK_ARROW) {
+                        /// "<->": the ARROW carries "->" (interior + closing).
+                        ok = case_pat_append(&single_pattern,
+                                             &single_pattern_len, mid->text);
+                        tokenizer_advance(parser->tokenizer);
+                    } else if (ok && mid && mid->text &&
+                               token_is_word_like(mid->type)) {
+                        /// "<1-9>" etc.: a word-like interior then the closing
+                        /// `>`. Require word-like so a bare `<` on malformed
+                        /// input does not swallow the following `)` or `|`.
+                        ok = case_pat_append(&single_pattern,
+                                             &single_pattern_len, mid->text);
+                        tokenizer_advance(parser->tokenizer);
+                        token_t *close = tokenizer_current(parser->tokenizer);
+                        if (ok && close && close->type == TOK_REDIRECT_OUT) {
+                            ok = case_pat_append(&single_pattern,
+                                                 &single_pattern_len, ">");
+                            tokenizer_advance(parser->tokenizer);
+                        } else if (ok && close &&
+                                   close->type == TOK_REDIRECT_CLOBBER) {
+                            /// The lexer merged the range's closing `>` with a
+                            /// following alternation `|` into one `>|` token.
+                            /// Close the range and treat the `|` as the
+                            /// alternative separator (the do-while continues,
+                            /// the `|` being already consumed here).
+                            ok = case_pat_append(&single_pattern,
+                                                 &single_pattern_len, ">");
+                            tokenizer_advance(parser->tokenizer);
+                            pipe_from_clobber = true;
+                        }
+                    }
+                    if (!ok) {
+                        free(single_pattern);
+                        free_node_tree(case_item);
+                        free_node_tree(case_node);
+                        return NULL;
+                    }
+                    if (pipe_from_clobber) {
+                        break;
+                    }
+                    continue;
+                }
                 if (token_is_word_like(pattern_token->type) ||
                     pattern_token->type == TOK_MULTIPLY ||
                     pattern_token->type == TOK_QUESTION ||
@@ -4750,9 +4830,12 @@ static node_t *parse_case_statement(parser_t *parser) {
 
             free(single_pattern);
 
-            /// Check for | to continue with more patterns
-        } while (tokenizer_match(parser->tokenizer, TOK_PIPE) &&
-                 (tokenizer_advance(parser->tokenizer), true));
+            /// Check for | to continue with more patterns. pipe_from_clobber
+            /// covers a range alternative that ended in a merged `>|` token
+            /// (its `|` is already consumed).
+        } while (pipe_from_clobber ||
+                 (tokenizer_match(parser->tokenizer, TOK_PIPE) &&
+                  (tokenizer_advance(parser->tokenizer), true)));
 
         /// Store pattern in case item
         case_item->val.str = pattern;

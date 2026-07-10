@@ -639,6 +639,47 @@ TEST(rt_case_plain_alternation_unregressed) {
     ASSERT_STDOUT_EQ(r, "abc\nempty-or-z\n");
 }
 
+TEST(rt_case_numeric_range_pattern) {
+    /// zsh numeric-range case patterns (#205): <->, <lo-hi>, <lo->. A digit
+    /// word matches when its value is in range; a non-digit word and an
+    /// out-of-range value fall through to *).
+    run_result_t r = run_shell("for n in 7 abc 5 12 150 50 30 99; do\n"
+                               "  case $n in\n"
+                               "    <100->) echo \"$n:big\";;\n"
+                               "    <1-9>) echo \"$n:single\";;\n"
+                               "    <->) echo \"$n:digits\";;\n"
+                               "    *) echo \"$n:other\";;\n"
+                               "  esac\n"
+                               "done\n");
+    ASSERT_STDOUT_EQ(r, "7:single\nabc:other\n5:single\n12:digits\n"
+                        "150:big\n50:digits\n30:digits\n99:digits\n");
+}
+
+TEST(rt_case_numeric_range_upper_bound_and_expansion) {
+    /// <-hi> is an upper-bounded range; leading zeros are numeric; the case
+    /// word may come from an expansion.
+    run_result_t r =
+        run_shell("x=42\n"
+                  "case $x in <-50>) echo le50;; *) echo no;; esac\n"
+                  "case 60 in <-50>) echo le50;; *) echo gt50;; esac\n"
+                  "case 007 in <1-9>) echo z;; *) echo no;; esac\n");
+    ASSERT_STDOUT_EQ(r, "le50\ngt50\nz\n");
+}
+
+TEST(rt_case_numeric_range_alternation) {
+    /// A bounded range as a non-final |-alternative with no surrounding spaces
+    /// (the lexer merges the range's `>` with the `|` into a single `>|`
+    /// token), mixed with a glob alternative. A non-numeric `<abc>` (no dash)
+    /// falls through to the glob matcher and does not match a bare word.
+    run_result_t r =
+        run_shell("case 5 in <1-9>|<20-30>) echo hit;; *) echo miss;; esac\n"
+                  "case 25 in <1-9>|<20-30>) echo hit;; *) echo miss;; esac\n"
+                  "case 99 in <1-9>|<20-30>) echo hit;; *) echo miss;; esac\n"
+                  "case cat in <1-9>|cat) echo hit;; *) echo miss;; esac\n"
+                  "case abc in <abc>) echo lit;; *) echo other;; esac\n");
+    ASSERT_STDOUT_EQ(r, "hit\nhit\nmiss\nhit\nother\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4564,6 +4605,9 @@ int main(void) {
     RUN_TEST(rt_set_e_aborts_remaining_batches);
     RUN_TEST(rt_err_trap_fires_across_batch_boundaries);
     RUN_TEST(rt_case_plain_alternation_unregressed);
+    RUN_TEST(rt_case_numeric_range_pattern);
+    RUN_TEST(rt_case_numeric_range_upper_bound_and_expansion);
+    RUN_TEST(rt_case_numeric_range_alternation);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);
