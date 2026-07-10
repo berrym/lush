@@ -607,6 +607,38 @@ TEST(shell_editor_mutual_exclusion_reads_executor) {
     config_set_value("shell.emacs", "true");
 }
 
+TEST(shell_restricted_is_read_only_engaged_projection) {
+    /// #391: shell.restricted is a read-only projection of the ENGAGED
+    /// restricted-shell enforcement state. config get/show derive it live
+    /// from shell_opts.restricted_mode_engaged (not the registry, not the
+    /// requested-only restricted_mode); config set refuses it.
+    bool saved = shell_opts.restricted_mode_engaged;
+
+    shell_opts.restricted_mode_engaged = false;
+    ASSERT_FALSE(config_get_shell_option("shell.restricted"),
+                 "restricted derives false when not engaged");
+    char out[64];
+    capture_config_get("shell.restricted", out, sizeof(out));
+    ASSERT_STR_EQ(out, "false\n", "config get prints false when not engaged");
+
+    shell_opts.restricted_mode_engaged = true;
+    ASSERT_TRUE(config_get_shell_option("shell.restricted"),
+                "restricted derives true when engaged");
+    capture_config_get("shell.restricted", out, sizeof(out));
+    ASSERT_STR_EQ(out, "true\n", "config get prints true when engaged");
+
+    /// Read-only: config set is refused with a warning and does not change the
+    /// derived value (it still reflects the engaged field).
+    char err[192];
+    capture_config_set_stderr("shell.restricted", "false", err, sizeof(err));
+    ASSERT_TRUE(strstr(err, "read-only") != NULL,
+                "config set shell.restricted is refused as read-only");
+    ASSERT_TRUE(config_get_shell_option("shell.restricted"),
+                "a refused config set did not change the derived value");
+
+    shell_opts.restricted_mode_engaged = saved;
+}
+
 TEST(shell_posix_is_a_mode_projection) {
     config_init();
     apply_mode_preset(SHELL_MODE_LUSH);
@@ -1471,6 +1503,7 @@ int main(void) {
     RUN_TEST(config_display_newline_before_prompt_bound);
     RUN_TEST(config_show_lists_migrated_lle_section);
     RUN_TEST(config_save_sync_preserves_shell_options);
+    RUN_TEST(shell_restricted_is_read_only_engaged_projection);
     RUN_TEST(shell_editor_mutual_exclusion_reads_executor);
     RUN_TEST(shell_posix_is_a_mode_projection);
     RUN_TEST(persisted_false_key_not_loaded_from_file);
