@@ -68,6 +68,36 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
     }
 }
 
+/// Print one current-scope binding for `local -p`. Unlike the global
+/// declare -p callbacks, this receives the symvar type so it can route an
+/// array entry (whose enumerated value is only the backing pointer) through
+/// the array printer; scalars/integers/namerefs print with the scalar format,
+/// matching lush's existing declare -p rendering.
+static void declare_print_local_callback(const char *name, const char *value,
+                                         symvar_type_t type, void *userdata) {
+    FILE *out = (FILE *)userdata;
+    if (!out || !name) {
+        return;
+    }
+    if (name[0] == '_' && name[1] == '_') {
+        return;
+    }
+    /// A function scope also holds shell-managed entries -- the special
+    /// parameters (#, ?, *, @, positional digits) and FUNCNAME -- which bash's
+    /// `local -p` does not list. Show only user-declarable identifiers.
+    if (!is_valid_identifier(name) || strcmp(name, "FUNCNAME") == 0) {
+        return;
+    }
+    if (type == SYMVAR_ARRAY) {
+        array_value_t *array = symtable_get_array(name);
+        if (array) {
+            declare_print_array_callback(name, array, out);
+        }
+        return;
+    }
+    fprintf(out, "declare -- %s=\"%s\"\n", name, value ? value : "");
+}
+
 /**
  * @brief Declare variables with attributes
  *
@@ -263,10 +293,23 @@ int bin_declare(int argc, char **argv) {
         size_t buf_len = 0;
         FILE *out = open_memstream(&buf, &buf_len);
         FILE *sink = out ? out : stdout;
-        /// Print all arrays first
-        symtable_enumerate_arrays(declare_print_array_callback, sink);
-        /// Then print all scalar variables
-        symtable_enumerate_global_vars(declare_print_var_callback, sink);
+        /// `local -p` lists only the current scope's own bindings (bash
+        /// parity); `declare -p` / `typeset -p` list the global set. In
+        /// bash/POSIX/lush-default modes bin_local's scope guard means
+        /// `local -p` reaches here only from inside a function, so
+        /// current_scope is that function's scope; zsh permits a top-level
+        /// `local`, where current_scope is the global scope and its bindings
+        /// are the ones listed -- still coherent.
+        if (argv[0] && strcmp(argv[0], "local") == 0) {
+            symtable_enumerate_current_scope_vars(symtable_get_global_manager(),
+                                                  declare_print_local_callback,
+                                                  sink);
+        } else {
+            /// Print all arrays first
+            symtable_enumerate_arrays(declare_print_array_callback, sink);
+            /// Then print all scalar variables
+            symtable_enumerate_global_vars(declare_print_var_callback, sink);
+        }
         if (out) {
             fclose(out);
             lle_pager_present(NULL, buf);
@@ -493,7 +536,16 @@ int bin_declare(int argc, char **argv) {
                     symtable_set(manager, name, "0");
                 }
             } else {
-                symtable_set(manager, name, "0");
+                /// -i with no value: preserve an existing current-scope value
+                /// (attribute promotion, e.g. n=5; declare -i n keeps 5, and
+                /// n=3+4 keeps the literal until the next assignment -- bash
+                /// does not re-evaluate on the attribute add). Only a variable
+                /// unbound in the current scope defaults to 0. Current-scope
+                /// only: a bare declare/local -i inside a function must not
+                /// inherit an outer value.
+                char *existing = symtable_get_var_current_scope(manager, name);
+                symtable_set(manager, name, existing ? existing : "0");
+                free(existing);
             }
             /// Mark the variable as integer-typed so subsequent
             /// assignments arith-evaluate their RHS (issue #102).
@@ -562,13 +614,20 @@ int bin_declare(int argc, char **argv) {
                             }
                         }
                     }
-                    shell_error_set_suggestion(
-                        err, "use 'declare -n ref=target' to bind a nameref");
+                    /// Name the invoked builtin (declare/typeset/local) in the
+                    /// suggestion rather than hardcoding "declare": local
+                    /// delegates here, so a `local -n` misuse must be told to
+                    /// use `local -n`, not a different builtin.
+                    char suggestion[64];
+                    snprintf(suggestion, sizeof(suggestion),
+                             "use '%s -n ref=target' to bind a nameref",
+                             argv[0]);
+                    shell_error_set_suggestion(err, suggestion);
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr,
-                            "lush: declare: -n requires a target variable\n");
+                    fprintf(stderr, "lush: %s: -n requires a target variable\n",
+                            argv[0]);
                 }
                 free(name);
                 return 1;
