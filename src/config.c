@@ -378,6 +378,16 @@ static const creg_option_t shell_options[] = {
      .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      .help = "Strict POSIX compliance (set -o posix)",
      .persisted = false},
+    /// restricted: persisted=false + derive-only + read-only. The
+    /// restricted-shell security flag is engaged once at invocation (-r /
+    /// set -o restricted) and is one-way. config get/show observe it live
+    /// from shell_opts.restricted_mode; config set refuses it (never a
+    /// settable or saved value).
+    {          .name = "restricted",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Restricted shell (-r / set -o restricted); read-only",
+     .persisted = false},
     {            .name = "pipefail",
      .type = CREG_VALUE_BOOLEAN,
      .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
@@ -1760,6 +1770,18 @@ bool config_get_shell_option(const char *option_name) {
         return shell_opts.vi_mode;
     } else if (strcmp(opt_name, "posix") == 0) {
         return shell_opts.posix_mode;
+    } else if (strcmp(opt_name, "restricted") == 0) {
+        /// Read-only projection of the ENGAGED restricted-shell state -- the
+        /// enforcement gate the executor actually consults
+        /// (restricted_mode_is_engaged), not the requested-only
+        /// restricted_mode. The two diverge for a bare `set -o restricted`,
+        /// which sets restricted_mode (requested) without engaging
+        /// enforcement, so surfacing restricted_mode would falsely report
+        /// "restricted" while cd and friends still work. Under `-r` both flags
+        /// are true (engagement runs once after rc files and never clears the
+        /// requested flag). restricted_mode_engaged is the honest answer to
+        /// "is this shell restricted now".
+        return shell_opts.restricted_mode_engaged;
     } else if (strcmp(opt_name, "pipefail") == 0) {
         return shell_opts.pipefail_mode;
     } else if (strcmp(opt_name, "histexpand") == 0) {
@@ -3750,7 +3772,8 @@ void config_get_value(const char *key) {
             return;
         }
         if (strcmp(key, "shell.posix") == 0 ||
-            strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0) {
+            strcmp(key, "shell.emacs") == 0 || strcmp(key, "shell.vi") == 0 ||
+            strcmp(key, "shell.restricted") == 0) {
             printf("%s\n", config_get_shell_option(key) ? "true" : "false");
             return;
         }
@@ -3920,6 +3943,18 @@ void config_set_value(const char *key, const char *value) {
                 return;
             }
             printf("Set %s = %s\n", key, value);
+            return;
+        }
+        if (strcmp(key, "shell.restricted") == 0) {
+            /// restricted is a one-way security flag engaged at invocation
+            /// (-r / set -o restricted), never cleared and never enabled
+            /// through config. It is observable (config get/show) but
+            /// read-only: refuse the write rather than pretend to set it.
+            shell_error_emit(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                             SOURCE_LOC_UNKNOWN,
+                             "shell.restricted is read-only: the "
+                             "restricted-shell flag is set only at invocation "
+                             "(-r) and cannot be changed via config");
             return;
         }
         if (strcmp(key, "shell.posix") == 0) {
@@ -4353,7 +4388,8 @@ static void config_show_shell_section(FILE *out) {
             val = config.shell_mode_strict ? "true" : "false";
         } else if (strcmp(opt->name, "posix") == 0 ||
                    strcmp(opt->name, "emacs") == 0 ||
-                   strcmp(opt->name, "vi") == 0) {
+                   strcmp(opt->name, "vi") == 0 ||
+                   strcmp(opt->name, "restricted") == 0) {
             /// Runtime projection: read the executor's field, not the registry.
             val = config_get_shell_option(full_key) ? "true" : "false";
         } else {
