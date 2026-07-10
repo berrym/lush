@@ -9752,6 +9752,63 @@ static const char *find_case_alt_separator(const char *p) {
     return NULL;
 }
 
+/// Match a zsh numeric-range case pattern: <lo-hi>, <->, <lo->, <-hi> (#205).
+/// Sets *is_range true when @p pattern has the <...-...> shape -- a `<...>`
+/// whose interior holds a single '-' separating two all-digit-or-empty bounds
+/// -- so the caller skips the glob matcher for it. Returns true when @p word
+/// is a non-empty digit run whose numeric value lies within [lo, hi], either
+/// bound omitted meaning open. A non-range pattern (no <...>, no interior '-',
+/// or a non-digit bound) leaves *is_range false and falls through to the glob
+/// matcher, so a literal `<abc>` still matches literally.
+static bool case_numeric_range_match(const char *word, const char *pattern,
+                                     bool *is_range) {
+    *is_range = false;
+    if (!word || !pattern) {
+        return false;
+    }
+    size_t plen = strlen(pattern);
+    if (plen < 3 || pattern[0] != '<' || pattern[plen - 1] != '>') {
+        return false;
+    }
+    const char *interior = pattern + 1;
+    size_t ilen = plen - 2;
+    const char *dash = memchr(interior, '-', ilen);
+    if (!dash) {
+        return false;
+    }
+    size_t lo_len = (size_t)(dash - interior);
+    const char *hi = dash + 1;
+    size_t hi_len = ilen - lo_len - 1;
+    for (size_t i = 0; i < lo_len; i++) {
+        if (!isdigit((unsigned char)interior[i])) {
+            return false;
+        }
+    }
+    for (size_t i = 0; i < hi_len; i++) {
+        if (!isdigit((unsigned char)hi[i])) {
+            return false;
+        }
+    }
+    /// Confirmed a numeric range; from here it never falls to the glob matcher.
+    *is_range = true;
+    if (word[0] == '\0') {
+        return false;
+    }
+    for (const char *w = word; *w; w++) {
+        if (!isdigit((unsigned char)*w)) {
+            return false;
+        }
+    }
+    unsigned long long wv = strtoull(word, NULL, 10);
+    if (lo_len > 0 && wv < strtoull(interior, NULL, 10)) {
+        return false;
+    }
+    if (hi_len > 0 && wv > strtoull(hi, NULL, 10)) {
+        return false;
+    }
+    return true;
+}
+
 static int execute_case(executor_t *executor, node_t *node) {
     if (!executor || !node || node->type != NODE_CASE) {
         return 1;
@@ -9832,7 +9889,15 @@ static int execute_case(executor_t *executor, node_t *node) {
 
                 char *expanded_pattern = expand_if_needed(executor, pattern);
                 if (expanded_pattern) {
-                    if (lush_pattern_match(test_word, expanded_pattern)) {
+                    /// A zsh numeric-range pattern (<lo-hi>/<->) is
+                    /// range-tested; anything else falls to the glob matcher
+                    /// (#205).
+                    bool is_range = false;
+                    if (case_numeric_range_match(test_word, expanded_pattern,
+                                                 &is_range)) {
+                        matched = true;
+                    } else if (!is_range && lush_pattern_match(
+                                                test_word, expanded_pattern)) {
                         matched = true;
                     }
                     free(expanded_pattern);
