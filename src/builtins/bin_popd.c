@@ -9,9 +9,58 @@
 #include "builtins.h"
 #include "dirstack.h"
 #include "lush.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <errno.h>
+
+/**
+ * @brief Pop the top of the directory stack and cd to it.
+ *
+ * Shared by bare `popd` and by `popd +0` / `popd -N` when the target is the
+ * current directory: bash and zsh both remove the current directory and
+ * change to the new top. The caller guarantees the stack is non-empty
+ * (checked at entry to bin_popd), so the empty branch is a defensive
+ * fallback.
+ *
+ * @return 0 on success, 1 on error.
+ */
+static int popd_pop_and_cd(void) {
+    char *dir = dirstack_pop();
+    if (!dir) {
+        executor_error_report(current_executor, SHELL_ERR_DIRECTORY_STACK,
+                              builtin_get_source_location(),
+                              "directory stack empty");
+        return 1;
+    }
+
+    char *cwd = getcwd(NULL, 0);
+    if (chdir(dir) < 0) {
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                              builtin_get_source_location(), "%s: %s", dir,
+                              strerror(saved_errno));
+        dirstack_push(dir); /// put it back
+        free(dir);
+        free(cwd);
+        return 1;
+    }
+
+    if (cwd) {
+        symtable_set_global("OLDPWD", cwd);
+        free(cwd);
+    }
+
+    char *new_cwd = getcwd(NULL, 0);
+    if (new_cwd) {
+        symtable_set_global("PWD", new_cwd);
+        free(new_cwd);
+    }
+
+    free(dir);
+    dirstack_print(false, false);
+    return 0;
+}
 
 /**
  * @brief Pop directory from stack and change to it
@@ -68,80 +117,8 @@ int bin_popd(int argc, char **argv) {
     }
 
     if (argc == 1) {
-        /// popd with no args: pop top and cd there
-        char *dir = dirstack_pop();
-        if (!dir) {
-            {
-                source_location_t loc = builtin_get_source_location();
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
-                    "directory stack empty");
-                if (err) {
-                    if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line = executor_get_source_line(
-                            current_executor, loc.line);
-                        if (src_line) {
-                            shell_error_set_source_line(
-                                err, src_line, loc.column,
-                                loc.column + loc.length);
-                            free(src_line);
-                        }
-                    }
-                    if (current_executor) {
-                        for (size_t i = 0;
-                             i < current_executor->context_depth &&
-                             i < SHELL_ERROR_CONTEXT_MAX;
-                             i++) {
-                            if (current_executor->context_stack[i]) {
-                                shell_error_push_context(
-                                    err, "%s",
-                                    current_executor->context_stack[i]);
-                            }
-                        }
-                    }
-                    shell_error_set_suggestion(
-                        err, "push a directory first: pushd <dir>");
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                } else {
-                    fprintf(stderr,
-                            "lush: %s: "
-                            "directory stack empty"
-                            "\n",
-                            "popd");
-                }
-            }
-            return 1;
-        }
-
-        char *cwd = getcwd(NULL, 0);
-
-        if (chdir(dir) < 0) {
-            int saved_errno = errno;
-            executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                                  builtin_get_source_location(), "%s: %s", dir,
-                                  strerror(saved_errno));
-            /// Put it back
-            dirstack_push(dir);
-            free(dir);
-            free(cwd);
-            return 1;
-        }
-
-        if (cwd) {
-            symtable_set_global("OLDPWD", cwd);
-            free(cwd);
-        }
-
-        char *new_cwd = getcwd(NULL, 0);
-        if (new_cwd) {
-            symtable_set_global("PWD", new_cwd);
-            free(new_cwd);
-        }
-
-        free(dir);
-        dirstack_print(false, false);
-        return 0;
+        /// popd with no args: pop top and cd there.
+        return popd_pop_and_cd();
     }
 
     char *arg = argv[1];
@@ -151,56 +128,22 @@ int bin_popd(int argc, char **argv) {
         char *endptr;
         long n = strtol(arg + 1, &endptr, 10);
         if (*endptr == '\0' && n >= 0) {
+            /// zsh pushdminus inverts the +N / -N sign convention.
+            char sign = arg[0];
+            if (shell_mode_allows(FEATURE_PUSHD_MINUS)) {
+                sign = (sign == '+') ? '-' : '+';
+            }
             int idx;
-            if (arg[0] == '+') {
+            if (sign == '+') {
                 idx = (int)n;
             } else {
                 idx = dirstack_size() - (int)n;
             }
 
-            /// +0 means current directory, can't remove that
+            /// idx 0 targets the current directory. bash and zsh both remove
+            /// it and cd to the new top -- the same as no-arg popd.
             if (idx == 0) {
-                {
-                    source_location_t loc = builtin_get_source_location();
-                    shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
-                        "can't remove current directory");
-                    if (err) {
-                        if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line = executor_get_source_line(
-                                current_executor, loc.line);
-                            if (src_line) {
-                                shell_error_set_source_line(
-                                    err, src_line, loc.column,
-                                    loc.column + loc.length);
-                                free(src_line);
-                            }
-                        }
-                        if (current_executor) {
-                            for (size_t i = 0;
-                                 i < current_executor->context_depth &&
-                                 i < SHELL_ERROR_CONTEXT_MAX;
-                                 i++) {
-                                if (current_executor->context_stack[i]) {
-                                    shell_error_push_context(
-                                        err, "%s",
-                                        current_executor->context_stack[i]);
-                                }
-                            }
-                        }
-                        shell_error_set_suggestion(
-                            err, "use 'cd' to change current directory");
-                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                        shell_error_free(err);
-                    } else {
-                        fprintf(stderr,
-                                "lush: %s: "
-                                "can't remove current directory"
-                                "\n",
-                                "popd");
-                    }
-                }
-                return 1;
+                return popd_pop_and_cd();
             }
 
             /// Adjust for cwd being position 0

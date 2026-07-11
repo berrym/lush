@@ -730,6 +730,65 @@ TEST(rt_glob_qualifier_quoted_element) {
                         "F: keep.txt\nG:\nH: keep.txt(5)\n");
 }
 
+TEST(rt_pushd_popd_rotation) {
+    /// pushd/popd +N/-N is a circular rotation of the full directory list
+    /// shown by `dirs` (D0 = cwd, D1.. = stack top-to-bottom), #216. +N
+    /// counts from the left, -N from the right; the target becomes the new
+    /// cwd and the rest keep circular order (no duplicate, cwd never lost).
+    /// popd removes the indexed entry. Each op runs in a subshell so the
+    /// baseline is unchanged between checks; db prints the basenames.
+    /// run_shell shares cwd + the dirstack across tests; run the whole body
+    /// in a subshell so its cd/pushd never leak to (or inherit dirt from)
+    /// other tests. Each rotation runs in its own nested subshell so the
+    /// baseline is unchanged between checks; db prints the basenames.
+    run_result_t r = run_shell(
+        "( d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c \"$d\"/e\n"
+        "  cd \"$d/a\"; pushd \"$d/b\" >/dev/null; "
+        "pushd \"$d/c\" >/dev/null; pushd \"$d/e\" >/dev/null\n"
+        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "}\n"
+        "  printf 'A '; ( pushd +1 >/dev/null; db )\n"
+        "  printf 'B '; ( pushd +2 >/dev/null; db )\n"
+        "  printf 'C '; ( pushd +3 >/dev/null; db )\n"
+        "  printf 'D '; ( pushd -1 >/dev/null; db )\n"
+        "  printf 'E '; ( pushd -2 >/dev/null; db )\n"
+        "  printf 'F '; ( popd +1 >/dev/null; db )\n"
+        "  printf 'G '; ( popd -1 >/dev/null; db )\n"
+        "  printf 'H '; ( popd +0 >/dev/null; db )\n"
+        "  printf 'I '; ( popd >/dev/null; db )\n"
+        "  rm -rf \"$d\" )\n");
+    ASSERT_STDOUT_EQ(r, "A c b a e \n"
+                        "B b a e c \n"
+                        "C a e c b \n"
+                        "D b a e c \n"
+                        "E c b a e \n"
+                        "F e b a \n"
+                        "G e c a \n"
+                        "H c b a \n"
+                        "I c b a \n");
+}
+
+TEST(rt_pushdminus_option) {
+    /// setopt pushdminus is a real, off-by-default option (#216) that
+    /// inverts the +N / -N sign convention: with it set, `pushd +N` behaves
+    /// like the default `pushd -N`. Verifies the setopt/unsetopt/[[ -o ]]
+    /// wiring and the inversion symmetry.
+    run_result_t r = run_shell(
+        "( [[ -o pushdminus ]] || echo default-off\n"
+        "  setopt pushdminus; [[ -o pushdminus ]] && echo set-on\n"
+        "  unsetopt pushdminus; [[ -o pushdminus ]] || echo unset-off\n"
+        "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c\n"
+        "  cd \"$d/a\"; pushd \"$d/b\" >/dev/null; pushd \"$d/c\" >/dev/null\n"
+        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "}\n"
+        "  printf 'pm '; ( setopt pushdminus; pushd +1 >/dev/null; db )\n"
+        "  printf 'df '; ( pushd -1 >/dev/null; db )\n"
+        "  rm -rf \"$d\" )\n");
+    ASSERT_STDOUT_EQ(r, "default-off\nset-on\nunset-off\n"
+                        "pm b a c \n"
+                        "df b a c \n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4660,6 +4719,8 @@ int main(void) {
     RUN_TEST(rt_case_numeric_range_alternation);
     RUN_TEST(rt_glob_qualifier_mtime);
     RUN_TEST(rt_glob_qualifier_quoted_element);
+    RUN_TEST(rt_pushd_popd_rotation);
+    RUN_TEST(rt_pushdminus_option);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);

@@ -214,6 +214,11 @@ typedef enum {
                             ///< by the LLE engine. setopt name
                             ///< `completion_dsl`.
 
+    FEATURE_PUSHD_MINUS, ///< Zsh pushdminus: invert the sign of `pushd +N` /
+                         ///< `pushd -N` (and popd). Off by default in every
+                         ///< profile (zsh's own default); `setopt pushdminus`
+                         ///< opts into the inversion.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;

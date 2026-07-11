@@ -9,9 +9,12 @@
 #include "builtins.h"
 #include "dirstack.h"
 #include "lush.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief Push directory onto stack and change to it
@@ -167,21 +170,23 @@ int bin_pushd(int argc, char **argv) {
         char *endptr;
         long n = strtol(arg + 1, &endptr, 10);
         if (*endptr == '\0' && n >= 0) {
-            int idx = (arg[0] == '+') ? (int)n : -(int)n - 1;
-
-            /// Need to account for cwd being index 0
-            if (idx == 0) {
-                /// +0 means current dir, nothing to do
-                free(cwd);
-                dirstack_print(false, false);
-                return 0;
+            /// zsh pushdminus inverts the +N / -N sign convention.
+            char sign = arg[0];
+            if (shell_mode_allows(FEATURE_PUSHD_MINUS)) {
+                sign = (sign == '+') ? '-' : '+';
             }
-
-            /// Adjust for the fact that cwd is position 0
-            int stack_idx = idx - 1;
-
-            const char *target = dirstack_peek(stack_idx);
-            if (!target) {
+            /// pushd +N / -N circularly rotates the full directory list
+            /// shown by `dirs`: D0 = cwd, D1.. = stack top-to-bottom. +N
+            /// counts from the left (0-based), -N from the right; the target
+            /// entry becomes the new cwd and the remaining entries keep their
+            /// circular order. pushdminus (above) already swapped which sign
+            /// counts from which end.
+            int size = dirstack_size() + 1; /// full list including cwd
+            /// Validate against the long n before the (int) cast below, so a
+            /// huge argument cannot truncate into a small in-range index or
+            /// overflow the signed subtraction. n >= 0 is already checked;
+            /// n < size makes t land in [0, size-1] for both signs.
+            if (n >= (long)size) {
                 {
                     source_location_t loc = builtin_get_source_location();
                     shell_error_t *err = shell_error_create(
@@ -226,59 +231,60 @@ int bin_pushd(int argc, char **argv) {
                 return 1;
             }
 
-            /// Rotate stack and cd
-            if (dirstack_rotate(stack_idx) < 0) {
-                {
-                    source_location_t loc = builtin_get_source_location();
-                    shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
-                        "%s: rotation failed", arg);
-                    if (err) {
-                        if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line = executor_get_source_line(
-                                current_executor, loc.line);
-                            if (src_line) {
-                                shell_error_set_source_line(
-                                    err, src_line, loc.column,
-                                    loc.column + loc.length);
-                                free(src_line);
-                            }
-                        }
-                        if (current_executor) {
-                            for (size_t i = 0;
-                                 i < current_executor->context_depth &&
-                                 i < SHELL_ERROR_CONTEXT_MAX;
-                                 i++) {
-                                if (current_executor->context_stack[i]) {
-                                    shell_error_push_context(
-                                        err, "%s",
-                                        current_executor->context_stack[i]);
-                                }
-                            }
-                        }
-                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                        shell_error_free(err);
-                    } else {
-                        fprintf(stderr,
-                                "lush: %s: "
-                                "%s: rotation failed"
-                                "\n",
-                                "pushd", arg);
-                    }
+            int t = (sign == '+') ? (int)n : (size - 1 - (int)n);
+            if (t == 0) {
+                /// Rotating to the current directory is a no-op.
+                free(cwd);
+                dirstack_print(false, false);
+                return 0;
+            }
+
+            /// Snapshot the full list D0..D(size-1): D0 = cwd, Di =
+            /// peek(i-1). Copy the strings before mutating the stack.
+            char **list = malloc((size_t)size * sizeof(char *));
+            if (!list) {
+                free(cwd);
+                return 1;
+            }
+            bool snap_ok = true;
+            for (int i = 0; i < size; i++) {
+                const char *d = (i == 0) ? cwd : dirstack_peek(i - 1);
+                list[i] = d ? strdup(d) : NULL;
+                if (!list[i]) {
+                    snap_ok = false;
                 }
+            }
+            if (!snap_ok) {
+                for (int i = 0; i < size; i++) {
+                    free(list[i]);
+                }
+                free(list);
                 free(cwd);
                 return 1;
             }
 
-            target = dirstack_peek(0);
-            if (chdir(target) < 0) {
+            /// cd to the rotation target (the new cwd, D0').
+            if (chdir(list[t]) < 0) {
                 int saved_errno = errno;
                 executor_error_report(current_executor,
                                       SHELL_ERR_FILE_NOT_FOUND,
                                       builtin_get_source_location(), "%s: %s",
-                                      target, strerror(saved_errno));
+                                      list[t], strerror(saved_errno));
+                for (int i = 0; i < size; i++) {
+                    free(list[i]);
+                }
+                free(list);
                 free(cwd);
                 return 1;
+            }
+
+            /// Rebuild the stack in rotated order. The new dirs order is
+            /// list[(t + j) % size] for j = 0..size-1: j == 0 is the new
+            /// cwd, and j = 1..size-1 are the stack entries D1'..Dk'. Push
+            /// bottom-up (Dk' first) so the internal top ends as D1'.
+            dirstack_clear();
+            for (int j = size - 1; j >= 1; j--) {
+                dirstack_push(list[(t + j) % size]);
             }
 
             symtable_set_global("OLDPWD", cwd);
@@ -288,6 +294,10 @@ int bin_pushd(int argc, char **argv) {
                 free(new_cwd);
             }
 
+            for (int i = 0; i < size; i++) {
+                free(list[i]);
+            }
+            free(list);
             free(cwd);
             dirstack_print(false, false);
             return 0;

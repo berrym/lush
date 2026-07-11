@@ -617,10 +617,15 @@ readarray -t arr < <(seq 1 5)    # Same as mapfile; bash alias
 Pop a directory off the stack and change to the new top. See `pushd`
 for the inverse.
 
+`popd +N` / `popd -N` remove the Nth entry from the `dirs` list (`+N`
+from the left, `-N` from the right). Removing the current directory
+(`popd +0`) drops it and changes to the new top, like bare `popd`.
+`setopt pushdminus` inverts the two signs.
+
 ```bash
 popd                  # Pop top of stack, cd to new top
-popd +1               # Remove entry at offset 1
-popd -n               # Pop without changing directory
+popd +1               # Remove the entry at offset 1 from the left
+popd +0               # Remove the current directory, cd to the new top
 ```
 
 ### `print`
@@ -656,11 +661,19 @@ printf "%.*f\n" 2 3.14159
 Push the current directory onto the stack and change to a new
 directory. Use `popd` to return, `dirs` to inspect.
 
+`pushd +N` / `pushd -N` circularly rotate the directory stack. The full
+list shown by `dirs` is `D0 D1 D2 ...` where `D0` is the current
+directory: `+N` counts from the left (0-based), `-N` from the right; the
+selected entry becomes the new current directory and the rest keep their
+circular order. `setopt pushdminus` inverts the two signs (`pushd +N`
+then behaves like `pushd -N`).
+
 ```bash
 pushd /tmp            # Push pwd, cd /tmp
 pushd                 # Swap top two stack entries
-pushd +1              # Rotate stack
-pushd -n /opt         # Push without changing directory
+pushd +1              # Rotate: second-from-left becomes current
+pushd -0              # Rotate: rightmost (oldest) becomes current
+setopt pushdminus     # Invert the +N / -N sign convention
 ```
 
 ### `shopt`
