@@ -1185,6 +1185,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
     typedef struct {
         token_type_t type;
         char *text;
+        bool glob_qualified;
     } token_info_t;
 
     token_info_t *collected_tokens = NULL;
@@ -1211,6 +1212,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
         collected_tokens[token_count].type = arg_token->type;
         collected_tokens[token_count].text = strdup(arg_token->text);
+        collected_tokens[token_count].glob_qualified =
+            arg_token->glob_qualified;
         token_count++;
 
         last_end_pos = arg_token->end_position;
@@ -1248,6 +1251,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         if (arg_node) {
             arg_node->val.str = strdup(collected_tokens[0].text);
             arg_node->val_type = VAL_STR;
+            arg_node->glob_qualified = collected_tokens[0].glob_qualified;
             add_child_node(parent, arg_node);
         }
     } else if (token_count > 1) {
@@ -1343,11 +1347,24 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                     break;
                 }
             }
+            /// A fused glob qualifier on any collected segment flags the
+            /// whole concatenation. If more segments follow the fused one
+            /// (`"$f"(N)bar`) the `(...)` is no longer at the string end, so
+            /// parse_glob_qualifier finds no qualifier and the value stays
+            /// literal -- degraded, never dropped.
+            bool any_glob_qualified = false;
+            for (int i = 0; i < token_count; i++) {
+                if (collected_tokens[i].glob_qualified) {
+                    any_glob_qualified = true;
+                    break;
+                }
+            }
             node_t *arg_node =
                 new_node(any_quoted ? NODE_STRING_EXPANDABLE : NODE_VAR);
             if (arg_node) {
                 arg_node->val.str = concatenated;
                 arg_node->val_type = VAL_STR;
+                arg_node->glob_qualified = any_glob_qualified;
                 add_child_node(parent, arg_node);
             } else {
                 free(concatenated);
@@ -3944,6 +3961,7 @@ static node_t *parse_for_statement(parser_t *parser) {
                 }
                 word_node->val.str = strdup(word_token->text);
                 word_node->val_type = VAL_STR;
+                word_node->glob_qualified = word_token->glob_qualified;
                 add_child_node(word_list, word_node);
                 tokenizer_advance(parser->tokenizer);
             } else {
@@ -4061,7 +4079,9 @@ static node_t *parse_for_statement(parser_t *parser) {
             }
 
             /// Start building the word string - may need to combine with '='
-            /// and more
+            /// and more. Capture the fused-qualifier flag before the advance
+            /// below frees word_token.
+            bool word_glob_qualified = word_token->glob_qualified;
             char *combined = strdup(word_token->text);
             if (!combined) {
                 free_node_tree(word_node);
@@ -4110,12 +4130,15 @@ static node_t *parse_for_statement(parser_t *parser) {
                 }
                 combined = new_combined;
                 strcat(combined, next_tok->text);
+                word_glob_qualified =
+                    word_glob_qualified || next_tok->glob_qualified;
                 current_end_pos = next_tok->end_position;
                 tokenizer_advance(parser->tokenizer);
             }
 
             word_node->val.str = combined;
             word_node->val_type = VAL_STR;
+            word_node->glob_qualified = word_glob_qualified;
             add_child_node(word_list, word_node);
         } else {
             break;
@@ -4277,6 +4300,7 @@ static node_t *parse_select_statement(parser_t *parser) {
 
                 word_node->val.str = strdup(word_token->text);
                 word_node->val_type = VAL_STR;
+                word_node->glob_qualified = word_token->glob_qualified;
                 add_child_node(word_list, word_node);
                 tokenizer_advance(parser->tokenizer);
             } else {
@@ -5836,6 +5860,7 @@ static node_t *parse_array_literal(parser_t *parser) {
 
             elem_node->val.str = strdup(current->text);
             elem_node->val_type = VAL_STR;
+            elem_node->glob_qualified = current->glob_qualified;
             add_child_node(array_node, elem_node);
 
             tokenizer_advance(parser->tokenizer);

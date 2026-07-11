@@ -63,6 +63,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 /// Global executor pointer for job control builtins
@@ -194,6 +195,7 @@ static void set_executor_error(executor_t *executor, const char *message);
 static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
+static char **apply_glob_qualifier_to_literal(const char *value, int *count);
 static bool needs_glob_expansion(const char *str);
 /* expand_brace_pattern is declared in include/executor.h so the
  * completion analyzer can enumerate per-branch directory targets for
@@ -3911,11 +3913,37 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                     }
                 }
             }
-            /// Pathname-expand the words this UNQUOTED word node just
-            /// produced. normal_wc_start is -1 for the `$@` / vector
-            /// paths and for quoted word nodes, leaving those
-            /// untouched.
-            if (normal_wc_start >= 0 && word_globbable) {
+            /// A fused qualifier on a for-list word (`for i in "$f"(N)`)
+            /// filters the literal value like argv/array position -- checked
+            /// before the plain glob path because for-list words are
+            /// NODE_VAR (so word_globbable is true) yet the qualifier form
+            /// must not re-glob metacharacters in the value. The produced
+            /// word is scalar, so replace the single element at
+            /// normal_wc_start with the 0-or-1 filter result.
+            if (word->glob_qualified && normal_wc_start >= 0 &&
+                normal_wc_start == word_count - 1 &&
+                shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+                int qc = 0;
+                char **qr = apply_glob_qualifier_to_literal(
+                    expanded_words[normal_wc_start], &qc);
+                if (qr) {
+                    free(expanded_words[normal_wc_start]);
+                    if (qc >= 1) {
+                        expanded_words[normal_wc_start] = qr[0];
+                        for (int k = 1; k < qc; k++) {
+                            free(qr[k]);
+                        }
+                    } else {
+                        /// Nothing matched: drop the trailing word.
+                        word_count--;
+                    }
+                    free(qr);
+                }
+            } else if (normal_wc_start >= 0 && word_globbable) {
+                /// Pathname-expand the words this UNQUOTED word node just
+                /// produced. normal_wc_start is -1 for the `$@` / vector
+                /// paths and for quoted word nodes, leaving those
+                /// untouched.
                 if (!for_word_list_glob_range(&expanded_words, &word_count,
                                               normal_wc_start)) {
                     set_executor_error(executor,
@@ -6019,6 +6047,39 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 child->val.str, expanded_arg);
                     }
 
+                    /// A fused glob qualifier (`"$f"(N)`, `"$f"(Nm-1)`)
+                    /// applies to the expanded value even though it came from
+                    /// a quoted string: the qualifier filters the literal
+                    /// value, it does not re-glob it (SEMANTICS 3.6). Gated to
+                    /// the modes that enable glob qualifiers; elsewhere the
+                    /// word falls through and stays a literal `value(N)`,
+                    /// matching the unquoted `*(.)`-stays-literal behavior.
+                    if (child->glob_qualified && expanded_arg &&
+                        shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+                        int glob_count = 0;
+                        char **glob_results = apply_glob_qualifier_to_literal(
+                            expanded_arg, &glob_count);
+                        if (glob_results) {
+                            for (int j = 0; j < glob_count; j++) {
+                                if (!add_to_argv_list(&argv_list, &argv_count,
+                                                      &argv_capacity,
+                                                      glob_results[j])) {
+                                    for (int k = j; k < glob_count; k++) {
+                                        free(glob_results[k]);
+                                    }
+                                    free(glob_results);
+                                    free(expanded_arg);
+                                    goto cleanup_and_fail;
+                                }
+                            }
+                            free(glob_results);
+                            free(expanded_arg);
+                            child = child->next_sibling;
+                            continue;
+                        }
+                        /// glob failed: fall through to add the value literally
+                    }
+
                     /// Check if argument needs brace expansion first
                     /// Skip brace/glob expansion for quoted strings
                     if (child->type != NODE_STRING_LITERAL &&
@@ -7248,29 +7309,81 @@ typedef enum {
      GLOB_QUAL_READABLE | GLOB_QUAL_WRITABLE)
 
 /**
- * @brief Parse and strip glob qualifier from pattern
+ * @brief A parsed glob qualifier group `(...)`.
  *
- * @param pattern Input pattern (may be modified)
- * @param base_pattern Output: pattern without qualifier (must be freed)
- * @return Glob qualifier type
+ * The type/permission/behavior letters combine as a bitmask in `flags`.
+ * The modification-time qualifier `m[Mwhms][+-]n` is parametric (unit,
+ * comparison, count) rather than a flag, so it rides alongside the mask.
  */
-static glob_qualifier_t parse_glob_qualifier(const char *pattern,
+typedef struct {
+    glob_qualifier_t flags; ///< OR of the GLOB_QUAL_* letter bits
+    bool has_mtime;         ///< an `m` modification-time qualifier is present
+    char mtime_unit;        ///< 's','m','h','d','w','M'; default 'd' (days)
+    char mtime_cmp;         ///< '-' younger-than, '+' older-than, 0 == exact
+    long mtime_count;       ///< n in the `m...n` spec
+} glob_qual_spec_t;
+
+/// True when the group carries any qualifier at all (letters or an mtime
+/// spec). A bare `(N)`/`(D)` counts: those steer nullglob/dotglob behavior.
+static inline bool spec_has_qualifier(const glob_qual_spec_t *s) {
+    return s->flags != GLOB_QUAL_NONE || s->has_mtime;
+}
+
+/// True when the group requires per-file inspection: a type/permission
+/// letter or an mtime spec. N and D alone need no lstat/stat filtering.
+static inline bool spec_needs_filter(const glob_qual_spec_t *s) {
+    return (s->flags & GLOB_QUAL_FILTER_MASK) || s->has_mtime;
+}
+
+/// Seconds in one unit of the zsh time-qualifier alphabet.
+static long glob_mtime_unit_seconds(char unit) {
+    switch (unit) {
+    case 's':
+        return 1L;
+    case 'm':
+        return 60L;
+    case 'h':
+        return 3600L;
+    case 'w':
+        return 7L * 86400L;
+    case 'M':
+        return 30L * 86400L; /// zsh defines a month as 30 days here
+    case 'd':
+    default:
+        return 86400L;
+    }
+}
+
+/**
+ * @brief Parse and strip a trailing glob qualifier group from a pattern.
+ *
+ * @param pattern      Input pattern (not modified)
+ * @param base_pattern Output: pattern without the qualifier (caller frees)
+ * @return Parsed qualifier spec; flags == GLOB_QUAL_NONE and has_mtime ==
+ *         false when the pattern carries no valid qualifier group.
+ */
+static glob_qual_spec_t parse_glob_qualifier(const char *pattern,
                                              char **base_pattern) {
+    glob_qual_spec_t spec = {0};
+    spec.flags = GLOB_QUAL_NONE;
+
     if (!pattern || !base_pattern) {
-        *base_pattern = pattern ? strdup(pattern) : NULL;
-        return GLOB_QUAL_NONE;
+        if (base_pattern) {
+            *base_pattern = pattern ? strdup(pattern) : NULL;
+        }
+        return spec;
     }
 
     size_t len = strlen(pattern);
 
     /// Check for qualifier pattern: ends with (X) or (X,Y,...) where X,Y are
-    /// qualifier chars
+    /// qualifier chars. A time qualifier (`m[Mwhms][+-]n`) plus combined
+    /// letters can run a couple dozen characters, so the backward scan for
+    /// the opening paren covers the tail generously while still refusing to
+    /// reach a `(` from far earlier in the path.
     if (len >= 3 && pattern[len - 1] == ')') {
-        /// Find matching open paren - must be near end (qualifiers are short)
-        /// Limit search to last 10 chars (or start of string for short
-        /// patterns)
         const char *open_paren = NULL;
-        size_t min_idx = (len > 10) ? (len - 10) : 1;
+        size_t min_idx = (len > 24) ? (len - 24) : 1;
         for (size_t i = len - 2; i >= min_idx; i--) {
             if (pattern[i] == '(') {
                 open_paren = &pattern[i];
@@ -7282,35 +7395,77 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
 
         if (open_paren) {
             /// Parse all qualifier characters between ( and )
-            glob_qualifier_t qual = GLOB_QUAL_NONE;
+            glob_qual_spec_t parsed = {0};
+            parsed.flags = GLOB_QUAL_NONE;
             bool valid_qualifier = true;
 
             for (const char *p = open_paren + 1; p < pattern + len - 1; p++) {
                 switch (*p) {
                 case '.':
-                    qual |= GLOB_QUAL_FILE;
+                    parsed.flags |= GLOB_QUAL_FILE;
                     break;
                 case '/':
-                    qual |= GLOB_QUAL_DIR;
+                    parsed.flags |= GLOB_QUAL_DIR;
                     break;
                 case '@':
-                    qual |= GLOB_QUAL_LINK;
+                    parsed.flags |= GLOB_QUAL_LINK;
                     break;
                 case '*':
-                    qual |= GLOB_QUAL_EXEC;
+                    parsed.flags |= GLOB_QUAL_EXEC;
                     break;
                 case 'r':
-                    qual |= GLOB_QUAL_READABLE;
+                    parsed.flags |= GLOB_QUAL_READABLE;
                     break;
                 case 'w':
-                    qual |= GLOB_QUAL_WRITABLE;
+                    parsed.flags |= GLOB_QUAL_WRITABLE;
                     break;
                 case 'N':
-                    qual |= GLOB_QUAL_NULLGLOB;
+                    parsed.flags |= GLOB_QUAL_NULLGLOB;
                     break;
                 case 'D':
-                    qual |= GLOB_QUAL_DOTGLOB;
+                    parsed.flags |= GLOB_QUAL_DOTGLOB;
                     break;
+                case 'm': {
+                    /// zsh modification-time qualifier m[Mwhms][+-]n:
+                    /// optional unit (default days), optional comparison
+                    /// ('-' younger than n units, '+' older, none == exactly
+                    /// n units old at unit resolution), then the count.
+                    const char *q = p + 1;
+                    char unit = 'd';
+                    if (*q && strchr("Mwhms", *q)) {
+                        unit = *q;
+                        q++;
+                    }
+                    char cmp = 0;
+                    if (*q == '+' || *q == '-') {
+                        cmp = *q;
+                        q++;
+                    }
+                    if (!isdigit((unsigned char)*q)) {
+                        valid_qualifier = false;
+                        break;
+                    }
+                    long n = 0;
+                    while (isdigit((unsigned char)*q)) {
+                        int digit = *q - '0';
+                        /// Saturate rather than overflow: a 20-digit count
+                        /// (reachable within the 24-char scan window) would
+                        /// wrap a signed long (UB). Any real mtime count is
+                        /// tiny; clamp at the last value that stays in range
+                        /// while still consuming every digit so the group
+                        /// parses as well-formed.
+                        if (n <= (LONG_MAX - digit) / 10) {
+                            n = n * 10 + digit;
+                        }
+                        q++;
+                    }
+                    parsed.has_mtime = true;
+                    parsed.mtime_unit = unit;
+                    parsed.mtime_cmp = cmp;
+                    parsed.mtime_count = n;
+                    p = q - 1; /// the loop's p++ steps past the digits
+                    break;
+                }
                 case ',':
                     break; /// Separator, ignore
                 default:
@@ -7322,28 +7477,28 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
                     break;
             }
 
-            if (valid_qualifier && qual != GLOB_QUAL_NONE) {
+            if (valid_qualifier && spec_has_qualifier(&parsed)) {
                 /// Strip the qualifier
                 *base_pattern = strndup(pattern, open_paren - pattern);
-                return qual;
+                return parsed;
             }
         }
     }
 
     *base_pattern = strdup(pattern);
-    return GLOB_QUAL_NONE;
+    return spec;
 }
 
 /**
  * @brief Check if file matches glob qualifier
  *
  * @param path File path to check
- * @param qualifier Glob qualifier type
+ * @param spec Parsed qualifier spec (type/permission/time filters)
  * @return true if file matches qualifier
  */
 static bool matches_glob_qualifier(const char *path,
-                                   glob_qualifier_t qualifier) {
-    if (qualifier == GLOB_QUAL_NONE) {
+                                   const glob_qual_spec_t *spec) {
+    if (!spec_needs_filter(spec)) {
         return true;
     }
 
@@ -7358,22 +7513,22 @@ static bool matches_glob_qualifier(const char *path,
     bool has_type_qualifier = false;
 
     /// Check type qualifiers (file, dir, link, exec) - OR logic
-    if (qualifier & GLOB_QUAL_FILE) {
+    if (spec->flags & GLOB_QUAL_FILE) {
         has_type_qualifier = true;
         if (S_ISREG(st.st_mode))
             type_match = true;
     }
-    if (qualifier & GLOB_QUAL_DIR) {
+    if (spec->flags & GLOB_QUAL_DIR) {
         has_type_qualifier = true;
         if (S_ISDIR(st.st_mode))
             type_match = true;
     }
-    if (qualifier & GLOB_QUAL_LINK) {
+    if (spec->flags & GLOB_QUAL_LINK) {
         has_type_qualifier = true;
         if (S_ISLNK(st.st_mode))
             type_match = true;
     }
-    if (qualifier & GLOB_QUAL_EXEC) {
+    if (spec->flags & GLOB_QUAL_EXEC) {
         has_type_qualifier = true;
         if (S_ISREG(st.st_mode) &&
             (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
@@ -7391,16 +7546,117 @@ static bool matches_glob_qualifier(const char *path,
     }
 
     /// Check permission qualifiers - AND logic (must satisfy all)
-    if (qualifier & GLOB_QUAL_READABLE) {
+    if (spec->flags & GLOB_QUAL_READABLE) {
         if (access(path, R_OK) != 0)
             return false;
     }
-    if (qualifier & GLOB_QUAL_WRITABLE) {
+    if (spec->flags & GLOB_QUAL_WRITABLE) {
         if (access(path, W_OK) != 0)
             return false;
     }
 
+    /// Modification-time qualifier m[Mwhms][+-]n. Age is measured from the
+    /// lstat mtime (consistent with the type checks above, which also do not
+    /// dereference symlinks).
+    if (spec->has_mtime) {
+        long unit_secs = glob_mtime_unit_seconds(spec->mtime_unit);
+        double age = difftime(time(NULL), st.st_mtime);
+        double threshold = (double)spec->mtime_count * (double)unit_secs;
+        if (spec->mtime_cmp == '-') {
+            /// younger than n units (modified within the window)
+            if (!(age < threshold)) {
+                return false;
+            }
+        } else if (spec->mtime_cmp == '+') {
+            /// older than n units
+            if (!(age > threshold)) {
+                return false;
+            }
+        } else {
+            /// no comparison: exactly n units old, truncated to the unit
+            long units_old = (age < 0.0) ? -1 : (long)(age / (double)unit_secs);
+            if (units_old != spec->mtime_count) {
+                return false;
+            }
+        }
+    }
+
     return true;
+}
+
+/**
+ * @brief Apply a glob qualifier fused onto a quoted word to its expanded
+ *        literal value.
+ *
+ * A double quote already fixed the value as a scalar (SEMANTICS 3.6), so a
+ * trailing qualifier is an existence/attribute filter on that literal value
+ * -- NOT a re-glob of any pattern metacharacters it may contain. This
+ * matches zsh: `f="*.txt"; "$f"(N)` tests the literal `*.txt` for existence
+ * (empty) rather than expanding it to the matching files. The result is
+ * therefore always zero or one word.
+ *
+ * When the trailing group is not a well-formed qualifier (a malformed time
+ * spec, a digit-only group, etc.) the value is returned verbatim as a single
+ * word, so a quoted word is never silently dropped.
+ *
+ * @param value Already-expanded value, possibly ending in a `(...)` group.
+ * @param count OUT: number of words produced (0 or 1).
+ * @return Newly-allocated NULL-terminated array (caller frees each element
+ *         and the array), or NULL on allocation failure.
+ */
+static char **apply_glob_qualifier_to_literal(const char *value, int *count) {
+    *count = 0;
+
+    char *base = NULL;
+    glob_qual_spec_t spec = parse_glob_qualifier(value, &base);
+
+    if (!spec_has_qualifier(&spec)) {
+        /// No qualifier (or a malformed group): the literal value stands.
+        free(base);
+        char **result = malloc(2 * sizeof(char *));
+        if (!result) {
+            return NULL;
+        }
+        result[0] = strdup(value);
+        if (!result[0]) {
+            free(result);
+            return NULL;
+        }
+        result[1] = NULL;
+        *count = 1;
+        return result;
+    }
+
+    /// A qualifier makes this a one-element glob of the literal base: the
+    /// path contributes iff it exists and satisfies the type/permission/time
+    /// filter; otherwise the word expands to nothing (the `(N)`-style empty
+    /// result, never the literal).
+    struct stat st;
+    bool keep = (lstat(base, &st) == 0) && matches_glob_qualifier(base, &spec);
+
+    char **result;
+    if (keep) {
+        result = malloc(2 * sizeof(char *));
+        if (result) {
+            result[0] = strdup(base);
+            if (!result[0]) {
+                /// Honor the NULL-on-allocation-failure contract rather than
+                /// returning a count==1 array with a NULL element.
+                free(result);
+                result = NULL;
+            } else {
+                result[1] = NULL;
+                *count = 1;
+            }
+        }
+    } else {
+        result = malloc(sizeof(char *));
+        if (result) {
+            result[0] = NULL;
+        }
+    }
+    free(base);
+    return result;
 }
 
 /// =============================================================================
@@ -8026,13 +8282,13 @@ static char **expand_globstar_pattern(const char *pattern,
  * bits combined with D.
  *
  * @param base_pattern Pattern with the qualifier already stripped
- * @param qualifier    Parsed qualifier bitmask (includes GLOB_QUAL_DOTGLOB)
+ * @param spec         Parsed qualifier spec (includes GLOB_QUAL_DOTGLOB)
  * @param count        OUT: number of matches
  * @return Match array (caller frees), empty array on no match, or NULL
  *         on error
  */
 static char **expand_glob_dotglob(const char *base_pattern,
-                                  glob_qualifier_t qualifier, int *count) {
+                                  const glob_qual_spec_t *spec, int *count) {
     *count = 0;
 
     /// Split into directory and filename pattern at the last '/'.
@@ -8084,8 +8340,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
         if (!path) {
             continue;
         }
-        if ((qualifier & GLOB_QUAL_FILTER_MASK) &&
-            !matches_glob_qualifier(path, qualifier)) {
+        if (spec_needs_filter(spec) && !matches_glob_qualifier(path, spec)) {
             free(path);
             continue;
         }
@@ -8177,7 +8432,8 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     ///   - Bash extglob: zero or more of pattern "."
     /// Glob qualifiers are always a single char at the END, so check that first
     char *base_pattern = NULL;
-    glob_qualifier_t qualifier = GLOB_QUAL_NONE;
+    glob_qual_spec_t qualifier = {0};
+    qualifier.flags = GLOB_QUAL_NONE;
 
     if (shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
         qualifier = parse_glob_qualifier(pattern, &base_pattern);
@@ -8186,10 +8442,10 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     /// If we found a glob qualifier, use the base pattern for further expansion
     /// Otherwise, use the original pattern
     const char *pattern_to_expand =
-        (qualifier != GLOB_QUAL_NONE) ? base_pattern : pattern;
+        spec_has_qualifier(&qualifier) ? base_pattern : pattern;
 
     /// Try zsh-style extglob expansion first (X#, X##, (a|b), ^pattern)
-    if (qualifier == GLOB_QUAL_NONE &&
+    if (!spec_has_qualifier(&qualifier) &&
         has_zsh_extglob_pattern(pattern_to_expand)) {
         /// Free base_pattern if it was allocated by parse_glob_qualifier
         free(base_pattern);
@@ -8224,7 +8480,8 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
 
     /// Try bash-style extglob expansion if pattern contains extglob syntax
     /// (only if we didn't already strip a glob qualifier)
-    if (qualifier == GLOB_QUAL_NONE && has_extglob_pattern(pattern_to_expand)) {
+    if (!spec_has_qualifier(&qualifier) &&
+        has_extglob_pattern(pattern_to_expand)) {
         /// Free base_pattern if it was allocated by parse_glob_qualifier
         free(base_pattern);
         char **extglob_results =
@@ -8264,7 +8521,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     /// disabled and parse_glob_qualifier was therefore never called --
     /// doing it unconditionally would leak the parse_glob_qualifier
     /// allocation (issue #112).
-    if (qualifier == GLOB_QUAL_NONE && !base_pattern) {
+    if (!spec_has_qualifier(&qualifier) && !base_pattern) {
         base_pattern = strdup(pattern);
     }
 
@@ -8275,9 +8532,9 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
 
     /// The zsh `D` qualifier requests dotfile matching, which libc
     /// glob() cannot do portably -- route through a readdir scan.
-    if (qualifier & GLOB_QUAL_DOTGLOB) {
+    if (qualifier.flags & GLOB_QUAL_DOTGLOB) {
         char **dot_results =
-            expand_glob_dotglob(base_pattern, qualifier, expanded_count);
+            expand_glob_dotglob(base_pattern, &qualifier, expanded_count);
         free(base_pattern);
         if (dot_results) {
             return dot_results;
@@ -8305,7 +8562,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         /// No matches - nullglob mode OR an explicit (N) qualifier
         /// both mean "expand to nothing" rather than the literal.
         if (shell_mode_allows(FEATURE_NULL_GLOB) ||
-            (qualifier & GLOB_QUAL_NULLGLOB)) {
+            (qualifier.flags & GLOB_QUAL_NULLGLOB)) {
             /// Nullglob: unmatched patterns expand to nothing
             /// Return empty array (not NULL, to distinguish from error)
             char **result = malloc(sizeof(char *));
@@ -8334,7 +8591,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     }
 
     /// Success - copy results, filtering by qualifier if present
-    if (qualifier == GLOB_QUAL_NONE) {
+    if (!spec_needs_filter(&qualifier)) {
         /// No filtering needed
         *expanded_count = globbuf.gl_pathc;
         char **result = malloc((globbuf.gl_pathc + 1) * sizeof(char *));
@@ -8373,7 +8630,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
 
         size_t match_count = 0;
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            if (matches_glob_qualifier(globbuf.gl_pathv[i], qualifier)) {
+            if (matches_glob_qualifier(globbuf.gl_pathv[i], &qualifier)) {
                 result[match_count] = strdup(globbuf.gl_pathv[i]);
                 if (!result[match_count]) {
                     /// Cleanup on allocation failure
@@ -8397,7 +8654,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             /// explicit (N) qualifier both expand to nothing.
             free(result);
             if (shell_mode_allows(FEATURE_NULL_GLOB) ||
-                (qualifier & GLOB_QUAL_NULLGLOB)) {
+                (qualifier.flags & GLOB_QUAL_NULLGLOB)) {
                 /// Nullglob: expand to nothing
                 /// Return empty array (not NULL, to distinguish from error)
                 result = malloc(sizeof(char *));
@@ -18842,6 +19099,34 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                     free(brace_results[bi]);
                                 }
                                 free(brace_results);
+                                if (expanded) {
+                                    free(expanded);
+                                }
+                                elem = elem->next_sibling;
+                                continue;
+                            }
+                        }
+
+                        /// A fused glob qualifier (`arr=("$f"(Nm-1))`)
+                        /// filters the quoted element's literal value; per
+                        /// SEMANTICS 3.6 the quote already fixed it as a
+                        /// scalar, so the qualifier is an existence/attribute
+                        /// test, not a re-glob. Gated to the glob-qualifier
+                        /// modes; elsewhere the element stays literal.
+                        if (elem->glob_qualified &&
+                            shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+                            int glob_count = 0;
+                            char **glob_results =
+                                apply_glob_qualifier_to_literal(final_value,
+                                                                &glob_count);
+                            if (glob_results) {
+                                for (int gi = 0; gi < glob_count; gi++) {
+                                    symtable_array_set_index(array, index,
+                                                             glob_results[gi]);
+                                    index++;
+                                    free(glob_results[gi]);
+                                }
+                                free(glob_results);
                                 if (expanded) {
                                     free(expanded);
                                 }

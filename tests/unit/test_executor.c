@@ -680,6 +680,56 @@ TEST(rt_case_numeric_range_alternation) {
     ASSERT_STDOUT_EQ(r, "hit\nhit\nmiss\nhit\nother\n");
 }
 
+TEST(rt_glob_qualifier_mtime) {
+    /// zsh modification-time qualifier m[Mwhms][+-]n (#206). A brand-new
+    /// file is younger than a day; a file stamped in 2020 is older. m-1
+    /// keeps the recent one, m+1 the old one; the `.` type filter combines,
+    /// and mh+1 switches the unit to hours.
+    run_result_t r = run_shell("OLD=$(pwd)\n"
+                               "d=$(mktemp -d)\n"
+                               "cd \"$d\"\n"
+                               "touch a.txt\n"
+                               "touch -t 202001010000 b.txt\n"
+                               "echo recent: *(m-1)\n"
+                               "echo old: *(m+1)\n"
+                               "echo regrecent: *(.m-1)\n"
+                               "echo hourold: *(mh+1)\n"
+                               "cd \"$OLD\"; rm -rf \"$d\"\n");
+    ASSERT_STDOUT_EQ(r, "recent: a.txt\nold: b.txt\n"
+                        "regrecent: a.txt\nhourold: b.txt\n");
+}
+
+TEST(rt_glob_qualifier_quoted_element) {
+    /// A glob qualifier fused onto a quoted word (#206): "$f"(N) filters the
+    /// expanded value in command-argument, array-literal, and for-list
+    /// position, and the m time filter still applies. Because the quote fixed
+    /// the value as a scalar (SEMANTICS 3.6), the qualifier is an existence
+    /// test on the LITERAL value -- a metacharacter value is not re-globbed
+    /// (G). A malformed group stays literal, never dropped (H). Parens inside
+    /// the quotes ("abc(N)") stay literal -- the distinction rides on a token
+    /// flag, not the concatenated text (E).
+    run_result_t r =
+        run_shell("OLD=$(pwd)\n"
+                  "d=$(mktemp -d)\n"
+                  "cd \"$d\"\n"
+                  "touch keep.txt\n"
+                  "touch -t 202001010000 stale.txt\n"
+                  "f=keep.txt\n"
+                  "echo A: \"$f\"(N)\n"
+                  "g=missing.txt\n"
+                  "echo B: \"$g\"(N)\n"
+                  "arr=(\"$f\"(Nm-1)); echo C: ${#arr[@]} ${arr[@]}\n"
+                  "old=stale.txt\n"
+                  "arr2=(\"$old\"(Nm-1)); echo D: ${#arr2[@]}\n"
+                  "echo E: \"abc(N)\"\n"
+                  "for i in \"$f\"(N); do echo F: $i; done\n"
+                  "p='k*.txt'; echo G: \"$p\"(N)\n"
+                  "echo H: \"$f\"(5)\n"
+                  "cd \"$OLD\"; rm -rf \"$d\"\n");
+    ASSERT_STDOUT_EQ(r, "A: keep.txt\nB:\nC: 1 keep.txt\nD: 0\nE: abc(N)\n"
+                        "F: keep.txt\nG:\nH: keep.txt(5)\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4608,6 +4658,8 @@ int main(void) {
     RUN_TEST(rt_case_numeric_range_pattern);
     RUN_TEST(rt_case_numeric_range_upper_bound_and_expansion);
     RUN_TEST(rt_case_numeric_range_alternation);
+    RUN_TEST(rt_glob_qualifier_mtime);
+    RUN_TEST(rt_glob_qualifier_quoted_element);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);
