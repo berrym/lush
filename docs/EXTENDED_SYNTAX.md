@@ -728,6 +728,32 @@ ls *(r)
 
 # Writable files
 ls *(w)
+
+# No-match expands to nothing instead of erroring (nullglob for this glob)
+ls *(N)
+
+# Include dot (hidden) files
+ls *(D)
+```
+
+### Modification-Time Qualifier
+
+`m[Mwhms][+-]n` filters by modification time. The optional unit is
+`M` (30-day months), `w` (weeks), `h` (hours), `m` (minutes), or `s`
+(seconds); the default is days. A leading `-` matches files younger than
+`n` units, `+` matches older, and a bare count matches exactly `n` units
+old at unit resolution. The age is measured from the file's own
+modification time (symlinks are not dereferenced).
+
+```bash
+# Files modified within the last day
+ls *(m-1)
+
+# Files modified more than a week ago
+ls *(mw+1)
+
+# Regular files touched in the last hour
+ls *(.mh-1)
 ```
 
 ### Combining Qualifiers
@@ -738,6 +764,27 @@ ls *(.*)
 
 # Readable directories
 ls *(r/)
+
+# Nullglob plus recently-modified
+ls *(Nm-1)
+```
+
+### Qualifiers on Quoted Words
+
+A qualifier may be attached to a quoted word, not just a bare glob. The
+double quote fixes the value as a scalar, so the qualifier is an
+existence/attribute test on the literal value (it does not re-expand any
+pattern characters the value contains); the word contributes the value
+when it matches and nothing when it does not.
+
+```bash
+# Yields the file if it exists and was modified in the last day, else
+# expands to nothing -- the idiom from oh-my-zsh grep.zsh
+cache="$HOME/.cache/thing"
+entries=("$cache"(Nm-1))
+
+# Parentheses inside the quotes stay literal: this echoes abc(N)
+echo "abc(N)"
 ```
 
 ### Common Use Cases

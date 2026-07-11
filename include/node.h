@@ -15,6 +15,7 @@
 
 #include "shell_error.h" /// For source_location_t
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -152,6 +153,11 @@ typedef struct node {
 
     /// Source location tracking for error reporting
     source_location_t loc;
+
+    /// A trailing zsh glob-qualifier group was fused onto this word during
+    /// tokenization (`"$f"(N)`, `'$f'(Nm-1)`). The executor globs the
+    /// expanded value with the qualifier even though it came from quotes.
+    bool glob_qualified;
 } node_t;
 
 /**

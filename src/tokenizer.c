@@ -627,6 +627,7 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
     /// wrapper still get a usable value for unquoted tokens.
     token->end_position = position + length;
     token->next = NULL;
+    token->glob_qualified = false;
 
     if (text && length > 0) {
         token->text = malloc(length + 1);
@@ -858,6 +859,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         }
         size_t result_len = 0;
         bool has_expandable = false;
+        bool glob_qualified = false;
 
     parse_next_segment:;
         char quote_char = tokenizer->input[tokenizer->position];
@@ -1224,11 +1226,68 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
+        /// Fuse a trailing zsh glob-qualifier group onto the quoted string:
+        /// `"$f"(N)`, `'$f'(.)`, `"$f"(Nm-1)`. Gated on FEATURE_GLOB_QUALIFIERS
+        /// so a mode without glob qualifiers (posix/bash) tokenizes
+        /// `"x"(cmd)` exactly as before -- a quoted word then a subshell --
+        /// rather than swallowing the group into a literal. The alphabet check
+        /// is deliberately coarse: a balanced, whitespace-free, non-nested run
+        /// drawn from the qualifier ALPHABET (type/permission letters plus the
+        /// `m` time qualifier's unit/comparison/count chars). It is a
+        /// character-set test, not the full qualifier grammar:
+        /// parse_glob_qualifier is the single grammar authority and rejects a
+        /// malformed run (`"$f"(5)`, `"$f"(mh)`), after which the value stays
+        /// literal rather than being dropped. An ordinary adjacent
+        /// subshell/grouping (a char outside the alphabet) falls through
+        /// untouched. The parens are appended to the text and the token is
+        /// flagged so the executor applies the qualifier to the expanded
+        /// value; keeping the parens outside the quotes distinct from
+        /// `"$f(N)"` (literal parens) rides on the flag, not the text.
+        if (tokenizer->position < tokenizer->input_length &&
+            tokenizer->input[tokenizer->position] == '(' &&
+            shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+            size_t scan = tokenizer->position + 1;
+            while (scan < tokenizer->input_length &&
+                   tokenizer->input[scan] != ')') {
+                if (!strchr(".@/*rwNDmMhs+-,0123456789",
+                            tokenizer->input[scan])) {
+                    break;
+                }
+                scan++;
+            }
+            /// Require a non-empty interior and a closing ')'.
+            if (scan < tokenizer->input_length &&
+                tokenizer->input[scan] == ')' &&
+                scan > tokenizer->position + 1) {
+                size_t group_len = scan - tokenizer->position + 1;
+                while (result_len + group_len + 1 >= result_capacity) {
+                    result_capacity *= 2;
+                    char *new_result = realloc(result, result_capacity);
+                    if (!new_result) {
+                        free(result);
+                        return token_new(TOK_ERROR,
+                                         &tokenizer->input[start_pos], 1,
+                                         start_line, start_column, start_pos);
+                    }
+                    result = new_result;
+                }
+                memcpy(result + result_len,
+                       &tokenizer->input[tokenizer->position], group_len);
+                result_len += group_len;
+                tokenizer->position = scan + 1;
+                tokenizer->column += group_len;
+                glob_qualified = true;
+            }
+        }
+
         /// No more adjacent content - return the complete token
         result[result_len] = '\0';
         token_type_t type = has_expandable ? TOK_EXPANDABLE_STRING : TOK_STRING;
         token_t *tok = token_new(type, result, result_len, start_line,
                                  start_column, start_pos);
+        if (tok) {
+            tok->glob_qualified = glob_qualified;
+        }
         free(result);
         return tok;
     }

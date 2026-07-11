@@ -155,6 +155,14 @@ typedef struct token {
      */
     size_t end_position;
     struct token *next; ///< For token stream
+    /**
+     * A zsh glob-qualifier group (`(N)`, `(.)`, `(Nm-1)`, ...) was fused
+     * onto the tail of this quoted string during tokenization, e.g.
+     * `"$f"(N)`. The parser propagates this to the AST node so the
+     * executor globs the expanded value even though it came from quotes.
+     * Distinguishes `"$f"(N)` (qualifier) from `"$f(N)"` (literal parens).
+     */
+    bool glob_qualified;
 } token_t;
 
 /// Tokenizer state for parser
