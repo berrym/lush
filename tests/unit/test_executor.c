@@ -814,6 +814,27 @@ TEST(rt_magic_equal_subst) {
                         "G: regex\n");
 }
 
+TEST(rt_assignment_tilde_expansion) {
+    /// Real assignment RHS tilde expansion (#219): a tilde-prefix at the value
+    /// start and after every UNQUOTED colon is expanded (bash and zsh agree);
+    /// a double-quoted or single-quoted tilde stays literal; a tilde produced
+    /// by a later $var expansion is not itself re-expanded. Subshell-wrapped so
+    /// the HOME export does not leak to other run_shell tests.
+    run_result_t r = run_shell("( export HOME=/tmp/meq_home\n"
+                               "  a=~/a:~/b;         echo \"1:$a\"\n"
+                               "  b=\"~/a\";           echo \"2:$b\"\n"
+                               "  c=~/a:\"~/b\";       echo \"3:$c\"\n"
+                               "  d='a:~';           echo \"4:$d\"\n"
+                               "  e=~/a:'~/b';       echo \"5:$e\"\n"
+                               "  v=\"~\"; f=$v/bar;    echo \"6:$f\" )\n");
+    ASSERT_STDOUT_EQ(r, "1:/tmp/meq_home/a:/tmp/meq_home/b\n"
+                        "2:~/a\n"
+                        "3:/tmp/meq_home/a:~/b\n"
+                        "4:a:~\n"
+                        "5:/tmp/meq_home/a:~/b\n"
+                        "6:~/bar\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4747,6 +4768,7 @@ int main(void) {
     RUN_TEST(rt_pushd_popd_rotation);
     RUN_TEST(rt_pushdminus_option);
     RUN_TEST(rt_magic_equal_subst);
+    RUN_TEST(rt_assignment_tilde_expansion);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);

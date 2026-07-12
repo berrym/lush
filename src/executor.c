@@ -194,6 +194,7 @@ static bool is_builtin_command(const char *cmd);
 static void set_executor_error(executor_t *executor, const char *message);
 static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
+static char *colon_segmented_tilde_expand(const char *value);
 static char *magic_equal_tilde_expand(const char *word);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static char **apply_glob_qualifier_to_literal(const char *value, int *count);
@@ -9805,10 +9806,18 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         return 1;
     }
 
+    /// Assignment-context tilde expansion (POSIX 2.6.1): a tilde-prefix at the
+    /// value start and after every unquoted colon is expanded, so `x=~/a:~/b`
+    /// expands both segments (bash and zsh agree). This runs on the literal
+    /// value before variable/command expansion -- a tilde later produced by
+    /// $var is not itself expanded -- and honors quote provenance the parser
+    /// preserved (single-quoted spans as '...', double-quoted tildes as \~).
+    char *pre_tilde = colon_segmented_tilde_expand(eq + 1);
     /// Expand the value using modern expansion
     /// Save exit status set by command substitution (POSIX: assignment-only
     /// commands should return the exit status of the last command substitution)
-    char *value = expand_if_needed(executor, eq + 1);
+    char *value = expand_if_needed(executor, pre_tilde ? pre_tilde : eq + 1);
+    free(pre_tilde);
     int cmd_sub_exit_status = executor->exit_status;
 
     /// Propagate expansion failure. ${var:?word} and friends set
@@ -16155,23 +16164,119 @@ static char *expand_tilde(const char *text) {
 /// True when `word` is an assignment-style word `NAME=...` with NAME a valid
 /// shell identifier -- the form zsh's magic_equal_subst acts on. A bare `=`,
 /// a non-identifier left side (`a/b=x`), or a leading digit does not qualify.
+/// NAME is validated through lush_is_valid_identifier -- the same predicate the
+/// real assignment path uses -- so it honors FEATURE_UNICODE_IDENTIFIERS and
+/// does not do byte comparisons on possibly-non-ASCII text.
 static bool is_magic_equal_word(const char *word) {
-    if (!word || !(isalpha((unsigned char)word[0]) || word[0] == '_')) {
+    if (!word) {
         return false;
     }
-    size_t i = 1;
-    while (isalnum((unsigned char)word[i]) || word[i] == '_') {
-        i++;
+    const char *eq = strchr(word, '=');
+    if (!eq || eq == word) {
+        return false;
     }
-    return word[i] == '=';
+    char *name = strndup(word, (size_t)(eq - word));
+    if (!name) {
+        return false;
+    }
+    bool ok = lush_is_valid_identifier(name);
+    free(name);
+    return ok;
 }
 
-/// For magic_equal_subst: tilde-expand the value of an assignment-style word.
-/// The value's leading segment and each colon-separated segment may start
-/// with `~` (as in `foo=~/a:~bob/b`), the same rule a real assignment RHS
-/// follows. Returns a newly-allocated word, or NULL when `word` is not an
-/// assignment-style word (caller keeps the original) or on allocation
-/// failure.
+/// Assignment-context tilde expansion (POSIX 2.6.1, matched by bash and zsh): a
+/// tilde-prefix at the value start and immediately after every unquoted colon
+/// is tilde-expanded, both the leading and colon segments (`~/a:~bob/b`). Quote
+/// provenance is carried into `value` by the parser: single-quoted spans are
+/// re-wrapped `'...'` (tracked here so an interior colon does not split and an
+/// interior `~` is not expanded); a `~` that was inside double quotes arrives
+/// escaped as `\~`, which never begins with a bare `~` and so is left for the
+/// downstream backslash-removal pass. Returns a newly-allocated string, or NULL
+/// on allocation failure. Shared by execute_assignment and magic_equal_subst.
+static char *colon_segmented_tilde_expand(const char *value) {
+    if (!value) {
+        return NULL;
+    }
+    size_t vlen = strlen(value);
+    size_t cap = vlen + 1;
+    char *out = malloc(cap);
+    if (!out) {
+        return NULL;
+    }
+    size_t olen = 0;
+    size_t seg_start = 0;
+    bool in_squote = false;
+
+    for (size_t i = 0;; i++) {
+        bool at_end = (i == vlen);
+        char c = at_end ? '\0' : value[i];
+        /// A backslash escapes the next byte: neither can toggle quoting or act
+        /// as a separator. Skip both (the loop's i++ skips the backslash).
+        if (!at_end && c == '\\' && value[i + 1]) {
+            i++;
+            continue;
+        }
+        if (!at_end && c == '\'') {
+            in_squote = !in_squote;
+            continue;
+        }
+        bool is_sep = !at_end && c == ':' && !in_squote;
+        if (!is_sep && !at_end) {
+            continue;
+        }
+
+        /// Emit value[seg_start, i), tilde-expanding it iff it begins with a
+        /// bare ~ (a single-quoted segment begins with ' and an escaped tilde
+        /// with \, so neither is touched).
+        size_t seg_len = i - seg_start;
+        char *seg = strndup(value + seg_start, seg_len);
+        if (!seg) {
+            free(out);
+            return NULL;
+        }
+        char *piece = seg;
+        if (seg_len > 0 && seg[0] == '~') {
+            char *exp = expand_tilde(seg);
+            if (exp) {
+                free(seg);
+                piece = exp;
+            }
+            /// expand_tilde OOM (NULL) -> keep the literal segment.
+        }
+
+        size_t plen = strlen(piece);
+        if (olen + plen + 2 > cap) {
+            cap = (olen + plen + 2) * 2;
+            char *grown = realloc(out, cap);
+            if (!grown) {
+                free(piece);
+                free(out);
+                return NULL;
+            }
+            out = grown;
+        }
+        memcpy(out + olen, piece, plen);
+        olen += plen;
+        free(piece);
+
+        if (is_sep) {
+            out[olen++] = ':';
+            seg_start = i + 1;
+        }
+        if (at_end) {
+            break;
+        }
+    }
+
+    out[olen] = '\0';
+    return out;
+}
+
+/// For magic_equal_subst: tilde-expand the value of an assignment-style word
+/// via the shared colon_segmented_tilde_expand primitive -- the same rule a
+/// real assignment RHS follows (`foo=~/a:~bob/b`). Returns a newly-allocated
+/// word, or NULL when `word` is not an assignment-style word (caller keeps the
+/// original) or on allocation failure.
 static char *magic_equal_tilde_expand(const char *word) {
     if (!is_magic_equal_word(word)) {
         return NULL;
@@ -16180,58 +16285,19 @@ static char *magic_equal_tilde_expand(const char *word) {
     const char *eq = strchr(word, '=');
     size_t head = (size_t)(eq - word) + 1; /// through the '='
 
-    size_t cap = strlen(word) + 1;
-    char *out = malloc(cap);
-    if (!out) {
+    char *value = colon_segmented_tilde_expand(eq + 1);
+    if (!value) {
         return NULL;
     }
-    memcpy(out, word, head); /// copy "NAME="
-    size_t len = head;
-
-    const char *seg = eq + 1;
-    for (;;) {
-        const char *colon = strchr(seg, ':');
-        size_t seg_len = colon ? (size_t)(colon - seg) : strlen(seg);
-
-        char *segstr = strndup(seg, seg_len);
-        if (!segstr) {
-            free(out);
-            return NULL;
-        }
-        /// Only a segment that begins with ~ is tilde-expanded; expand_tilde
-        /// returns a copy unchanged for anything else.
-        char *expanded = (segstr[0] == '~') ? expand_tilde(segstr) : segstr;
-        if (expanded != segstr) {
-            free(segstr);
-        }
-        if (!expanded) {
-            free(out);
-            return NULL;
-        }
-
-        size_t elen = strlen(expanded);
-        if (len + elen + 2 > cap) {
-            cap = (len + elen + 2) * 2;
-            char *grown = realloc(out, cap);
-            if (!grown) {
-                free(out);
-                free(expanded);
-                return NULL;
-            }
-            out = grown;
-        }
-        memcpy(out + len, expanded, elen);
-        len += elen;
-        free(expanded);
-
-        if (!colon) {
-            break;
-        }
-        out[len++] = ':';
-        seg = colon + 1;
+    size_t vlen = strlen(value);
+    char *out = malloc(head + vlen + 1);
+    if (!out) {
+        free(value);
+        return NULL;
     }
-
-    out[len] = '\0';
+    memcpy(out, word, head);             /// copy "NAME="
+    memcpy(out + head, value, vlen + 1); /// value plus its NUL
+    free(value);
     return out;
 }
 
