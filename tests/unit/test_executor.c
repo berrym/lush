@@ -789,6 +789,31 @@ TEST(rt_pushdminus_option) {
                         "df b a c \n");
 }
 
+TEST(rt_magic_equal_subst) {
+    /// zsh magic_equal_subst (#219): the RHS of an unquoted assignment-style
+    /// argument word `name=~/path` is tilde-expanded like a real assignment
+    /// value, including after each colon. Off by default (word stays
+    /// literal); a quoted word or a non-identifier left side is untouched.
+    /// Wrapped in a subshell so the HOME export and the setopt do not leak to
+    /// other run_shell tests.
+    run_result_t r = run_shell("( export HOME=/tmp/meq_home\n"
+                               "  echo A: foo=~/bar\n"
+                               "  setopt magic_equal_subst\n"
+                               "  echo B: foo=~/bar\n"
+                               "  echo C: p=x:~/y\n"
+                               "  echo D: \"q=~/keep\"\n"
+                               "  echo E: bad/name=~/no\n"
+                               "  x=~/z; echo F: $x\n"
+                               "  [[ abc =~ ^a ]] && echo G: regex )\n");
+    ASSERT_STDOUT_EQ(r, "A: foo=~/bar\n"
+                        "B: foo=/tmp/meq_home/bar\n"
+                        "C: p=x:/tmp/meq_home/y\n"
+                        "D: q=~/keep\n"
+                        "E: bad/name=~/no\n"
+                        "F: /tmp/meq_home/z\n"
+                        "G: regex\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4721,6 +4746,7 @@ int main(void) {
     RUN_TEST(rt_glob_qualifier_quoted_element);
     RUN_TEST(rt_pushd_popd_rotation);
     RUN_TEST(rt_pushdminus_option);
+    RUN_TEST(rt_magic_equal_subst);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);

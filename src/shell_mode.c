@@ -539,6 +539,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
     [FEATURE_ZSH_PARAM_MODIFIERS] = "zsh_param_modifiers",
     [FEATURE_XPG_ECHO] = "xpg_echo",
+    [FEATURE_MAGIC_EQUAL_SUBST] = "magic_equal_subst",
     [FEATURE_COMPLETION_DSL] = "completion_dsl",
 
     /// History Behavior
@@ -606,6 +607,7 @@ static const struct {
     {       "longlistjobs",         FEATURE_LONG_LIST_JOBS, false},
     {            "plugins",          FEATURE_PLUGIN_SYSTEM, false},
     {            "xpgecho",               FEATURE_XPG_ECHO, false},
+    {    "magicequalsubst",      FEATURE_MAGIC_EQUAL_SUBST, false},
     /* zsh BSD_ECHO is the inverse of xpg_echo:
      * `setopt BSD_ECHO` disables escape interpretation. */
     {           "bsd_echo",               FEATURE_XPG_ECHO,  true},

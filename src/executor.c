@@ -194,6 +194,7 @@ static bool is_builtin_command(const char *cmd);
 static void set_executor_error(executor_t *executor, const char *message);
 static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
+static char *magic_equal_tilde_expand(const char *word);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static char **apply_glob_qualifier_to_literal(const char *value, int *count);
 static bool needs_glob_expansion(const char *str);
@@ -6045,6 +6046,21 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         fprintf(stderr,
                                 "DEBUG: Processing argument: '%s' -> '%s'\n",
                                 child->val.str, expanded_arg);
+                    }
+
+                    /// magic_equal_subst (zsh): an unquoted assignment-style
+                    /// argument word `name=~/path` gets its RHS tilde-expanded
+                    /// like a real assignment value. Gated on the option and
+                    /// restricted to bareword (unquoted) words, so `"x=~"` and
+                    /// non-assignment args are untouched.
+                    if (expanded_arg && child->type != NODE_STRING_LITERAL &&
+                        child->type != NODE_STRING_EXPANDABLE &&
+                        shell_mode_allows(FEATURE_MAGIC_EQUAL_SUBST)) {
+                        char *magic = magic_equal_tilde_expand(expanded_arg);
+                        if (magic) {
+                            free(expanded_arg);
+                            expanded_arg = magic;
+                        }
                     }
 
                     /// A fused glob qualifier (`"$f"(N)`, `"$f"(Nm-1)`)
@@ -16134,6 +16150,89 @@ static char *expand_tilde(const char *text) {
             return result;
         }
     }
+}
+
+/// True when `word` is an assignment-style word `NAME=...` with NAME a valid
+/// shell identifier -- the form zsh's magic_equal_subst acts on. A bare `=`,
+/// a non-identifier left side (`a/b=x`), or a leading digit does not qualify.
+static bool is_magic_equal_word(const char *word) {
+    if (!word || !(isalpha((unsigned char)word[0]) || word[0] == '_')) {
+        return false;
+    }
+    size_t i = 1;
+    while (isalnum((unsigned char)word[i]) || word[i] == '_') {
+        i++;
+    }
+    return word[i] == '=';
+}
+
+/// For magic_equal_subst: tilde-expand the value of an assignment-style word.
+/// The value's leading segment and each colon-separated segment may start
+/// with `~` (as in `foo=~/a:~bob/b`), the same rule a real assignment RHS
+/// follows. Returns a newly-allocated word, or NULL when `word` is not an
+/// assignment-style word (caller keeps the original) or on allocation
+/// failure.
+static char *magic_equal_tilde_expand(const char *word) {
+    if (!is_magic_equal_word(word)) {
+        return NULL;
+    }
+
+    const char *eq = strchr(word, '=');
+    size_t head = (size_t)(eq - word) + 1; /// through the '='
+
+    size_t cap = strlen(word) + 1;
+    char *out = malloc(cap);
+    if (!out) {
+        return NULL;
+    }
+    memcpy(out, word, head); /// copy "NAME="
+    size_t len = head;
+
+    const char *seg = eq + 1;
+    for (;;) {
+        const char *colon = strchr(seg, ':');
+        size_t seg_len = colon ? (size_t)(colon - seg) : strlen(seg);
+
+        char *segstr = strndup(seg, seg_len);
+        if (!segstr) {
+            free(out);
+            return NULL;
+        }
+        /// Only a segment that begins with ~ is tilde-expanded; expand_tilde
+        /// returns a copy unchanged for anything else.
+        char *expanded = (segstr[0] == '~') ? expand_tilde(segstr) : segstr;
+        if (expanded != segstr) {
+            free(segstr);
+        }
+        if (!expanded) {
+            free(out);
+            return NULL;
+        }
+
+        size_t elen = strlen(expanded);
+        if (len + elen + 2 > cap) {
+            cap = (len + elen + 2) * 2;
+            char *grown = realloc(out, cap);
+            if (!grown) {
+                free(out);
+                free(expanded);
+                return NULL;
+            }
+            out = grown;
+        }
+        memcpy(out + len, expanded, elen);
+        len += elen;
+        free(expanded);
+
+        if (!colon) {
+            break;
+        }
+        out[len++] = ':';
+        seg = colon + 1;
+    }
+
+    out[len] = '\0';
+    return out;
 }
 
 /**
