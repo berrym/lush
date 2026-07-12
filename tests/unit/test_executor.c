@@ -826,13 +826,17 @@ TEST(rt_assignment_tilde_expansion) {
                                "  c=~/a:\"~/b\";       echo \"3:$c\"\n"
                                "  d='a:~';           echo \"4:$d\"\n"
                                "  e=~/a:'~/b';       echo \"5:$e\"\n"
-                               "  v=\"~\"; f=$v/bar;    echo \"6:$f\" )\n");
+                               "  v=\"~\"; f=$v/bar;    echo \"6:$f\"\n"
+                               "  g=$(echo a:~/b);   echo \"7:$g\"\n"
+                               "  h=${HOME}:~/b;     echo \"8:$h\" )\n");
     ASSERT_STDOUT_EQ(r, "1:/tmp/meq_home/a:/tmp/meq_home/b\n"
                         "2:~/a\n"
                         "3:/tmp/meq_home/a:~/b\n"
                         "4:a:~\n"
                         "5:/tmp/meq_home/a:~/b\n"
-                        "6:~/bar\n");
+                        "6:~/bar\n"
+                        "7:a:~/b\n"
+                        "8:/tmp/meq_home:/tmp/meq_home/b\n");
 }
 
 /* ============================================================================

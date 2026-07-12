@@ -9813,6 +9813,10 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     /// $var is not itself expanded -- and honors quote provenance the parser
     /// preserved (single-quoted spans as '...', double-quoted tildes as \~).
     char *pre_tilde = colon_segmented_tilde_expand(eq + 1);
+    if (getenv("DBG_TILDE")) {
+        fprintf(stderr, "DBG raw=[%s] pre_tilde=[%s]\n", eq + 1,
+                pre_tilde ? pre_tilde : "(null)");
+    }
     /// Expand the value using modern expansion
     /// Save exit status set by command substitution (POSIX: assignment-only
     /// commands should return the exit status of the last command substitution)
@@ -16184,6 +16188,73 @@ static bool is_magic_equal_word(const char *word) {
     return ok;
 }
 
+/// Byte length of an expansion construct starting at `s` -- a backtick command
+/// substitution, `$(...)`, `$((...))`, or `${...}` -- or 0 if `s` does not
+/// begin one. Its interior (colons and tildes included) is the source of a
+/// later expansion, not a path, so assignment tilde expansion must treat the
+/// whole span opaquely. Quotes and nested constructs inside are respected so a
+/// `)` / `}` / backtick inside a quoted or nested span does not close early.
+static size_t expansion_construct_len(const char *s, size_t n) {
+    if (n == 0) {
+        return 0;
+    }
+    if (s[0] == '`') {
+        for (size_t i = 1; i < n; i++) {
+            if (s[i] == '\\' && i + 1 < n) {
+                i++;
+                continue;
+            }
+            if (s[i] == '`') {
+                return i + 1;
+            }
+        }
+        return n; /// unterminated: consume the rest
+    }
+    if (s[0] == '$' && n >= 2 && (s[1] == '(' || s[1] == '{')) {
+        char close = (s[1] == '(') ? ')' : '}';
+        bool in_sq = false;
+        bool in_dq = false;
+        for (size_t i = 2; i < n; i++) {
+            char c = s[i];
+            if (c == '\\' && i + 1 < n) {
+                i++;
+                continue;
+            }
+            if (in_sq) {
+                if (c == '\'') {
+                    in_sq = false;
+                }
+                continue;
+            }
+            if (in_dq) {
+                if (c == '"') {
+                    in_dq = false;
+                }
+                continue;
+            }
+            if (c == '\'') {
+                in_sq = true;
+                continue;
+            }
+            if (c == '"') {
+                in_dq = true;
+                continue;
+            }
+            if (c == close) {
+                return i + 1;
+            }
+            /// Recurse into a nested construct so its own delimiters do not
+            /// prematurely close this one.
+            size_t sub = expansion_construct_len(s + i, n - i);
+            if (sub > 0) {
+                i += sub - 1;
+            }
+        }
+        return n; /// unterminated
+    }
+    return 0;
+}
+
 /// Assignment-context tilde expansion (POSIX 2.6.1, matched by bash and zsh): a
 /// tilde-prefix at the value start and immediately after every unquoted colon
 /// is tilde-expanded, both the leading and colon segments (`~/a:~bob/b`). Quote
@@ -16191,8 +16262,10 @@ static bool is_magic_equal_word(const char *word) {
 /// re-wrapped `'...'` (tracked here so an interior colon does not split and an
 /// interior `~` is not expanded); a `~` that was inside double quotes arrives
 /// escaped as `\~`, which never begins with a bare `~` and so is left for the
-/// downstream backslash-removal pass. Returns a newly-allocated string, or NULL
-/// on allocation failure. Shared by execute_assignment and magic_equal_subst.
+/// downstream backslash-removal pass. Expansion constructs ($(...), ${...},
+/// `...`) are skipped opaquely so their interior colons/tildes are untouched.
+/// Returns a newly-allocated string, or NULL on allocation failure. Shared by
+/// execute_assignment and magic_equal_subst.
 static char *colon_segmented_tilde_expand(const char *value) {
     if (!value) {
         return NULL;
@@ -16210,6 +16283,17 @@ static char *colon_segmented_tilde_expand(const char *value) {
     for (size_t i = 0;; i++) {
         bool at_end = (i == vlen);
         char c = at_end ? '\0' : value[i];
+        /// An expansion construct ($(...), $((...)), ${...}, `...`) is opaque:
+        /// its interior colons and tildes belong to a later expansion, not to
+        /// this value's path segments, so skip the whole span. Not inside
+        /// '...', where such text is literal.
+        if (!at_end && !in_squote) {
+            size_t clen = expansion_construct_len(value + i, vlen - i);
+            if (clen > 0) {
+                i += clen - 1;
+                continue;
+            }
+        }
         /// A backslash escapes the next byte: neither can toggle quoting or act
         /// as a separator. Skip both (the loop's i++ skips the backslash).
         if (!at_end && c == '\\' && value[i + 1]) {
