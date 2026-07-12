@@ -576,9 +576,15 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
         /// Manually add to history without calling lle_history_add_entry
         /// (to avoid deadlock - we already have write lock)
 
-        /// Check capacity
+        /// Check capacity. A HISTFILE larger than the cap keeps the NEWEST
+        /// lines (bash/zsh), so evict an old entry to make room rather than
+        /// dropping the line just read.
         if (core->entry_count >= core->entry_capacity) {
             result = lle_history_expand_capacity(core);
+            if (result == LLE_ERROR_BUFFER_OVERFLOW) {
+                lle_history_trim_one(core);
+                result = LLE_SUCCESS;
+            }
             if (result != LLE_SUCCESS) {
                 lle_history_entry_destroy(entry, core->memory_pool);
                 break;

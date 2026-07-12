@@ -180,6 +180,11 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
         config.lle_enable_deduplication &&
         (config.lle_dedup_scope != LLE_DEDUP_SCOPE_NONE);
 
+    /// zsh hist_expire_dups_first: at the size cap, trim duplicates before
+    /// unique entries (setopt-driven, off by default).
+    hist_config->expire_dups_first =
+        shell_mode_allows(FEATURE_HIST_EXPIRE_DUPS_FIRST);
+
     /// Map config dedup strategy to history dedup strategy
     switch (config.lle_dedup_strategy) {
     case LLE_DEDUP_STRATEGY_IGNORE:
