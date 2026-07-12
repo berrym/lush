@@ -533,6 +533,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_WORD_SPLIT_DEFAULT] = "word_split",
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
+    [FEATURE_PUSHD_MINUS] = "pushd_minus",
     [FEATURE_CDABLE_VARS] = "cdable_vars",
     [FEATURE_ERREXIT_IN_LOOPS] = "errexit_in_loops",
     [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
@@ -605,6 +606,7 @@ static const struct {
      * `setopt BSD_ECHO` disables escape interpretation. */
     {        "bsd_echo",             FEATURE_XPG_ECHO,  true},
     {         "bsdecho",             FEATURE_XPG_ECHO,  true},
+    {      "pushdminus",          FEATURE_PUSHD_MINUS, false},
     {              NULL,                            0, false}
 };
 

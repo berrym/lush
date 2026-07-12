@@ -238,7 +238,12 @@ setopt arrays           # alias for indexed_arrays
 setopt exttest          # alias for extended_test
 setopt xpg_echo         # bash spelling
 setopt bsd_echo         # zsh spelling (inverted: implies !xpg_echo)
+setopt pushdminus       # alias for pushd_minus; off by default
 ```
+
+`pushd_minus` (zsh `pushdminus`) is off in every profile. When set it
+inverts the `pushd +N` / `pushd -N` (and `popd`) sign convention, so `+N`
+counts from the right of the `dirs` list instead of the left.
 
 Inverted aliases (the `bsd_echo` row) are used when a knob has opposite-
 named knobs across shells -- the alias system bridges them while keeping a
