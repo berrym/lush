@@ -71,6 +71,8 @@ static void drive(const char *lush, const char *home, const timed_input_t *in,
         if (elapsed >= total_ms) {
             break;
         }
+        /// Inputs fire in order; a gated input that is not yet ready blocks
+        /// every later input as well, so a gated entry must be last in `in`.
         while (idx < n && elapsed >= in[idx].at_ms &&
                (in[idx].gate_file == NULL ||
                 access(in[idx].gate_file, F_OK) == 0)) {
@@ -109,10 +111,14 @@ static bool bg_survives_ctrl(const char *lush, char ctrl, const char *tag) {
     snprintf(ready, sizeof(ready), "%s/rdy_%s", home, tag);
     unlink(ready);
 
-    /// The subshell writes `ready` the instant its body begins -- after the
-    /// async fork has installed SIG_IGN -- then sleeps. Gating the control
-    /// character on `ready` guarantees it reaches an already-armed child, so a
-    /// slow subshell start under load cannot race the signal.
+    /// The subshell writes `ready` as the FIRST act of its body. lush arms the
+    /// async child's SIG_IGN before running any body command (the #375/#447
+    /// disposition under test), so `ready` existing proves SIG_IGN is
+    /// installed. Gating the control character on `ready` guarantees it reaches
+    /// an already-armed child -- a slow subshell start under load cannot race
+    /// the signal. (Were the arm-before-first-command ordering ever changed,
+    /// this gate would need to move too.) total_ms leaves wide margin for the
+    /// marker write (ready + 2s sleep) even when the subshell start is delayed.
     char line[PATH_MAX * 2 + 96];
     snprintf(line, sizeof(line),
              "( echo r > %s; sleep 2 && echo x > %s ) & sleep 6\n", ready,
@@ -123,7 +129,7 @@ static bool bg_survives_ctrl(const char *lush, char ctrl, const char *tag) {
         {1200,       line,  NULL},
         {1300,        seq, ready}, /// fires once the armed subshell is running
     };
-    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 4800);
+    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 5200);
 
     bool survived = access(marker, F_OK) == 0;
     pty_rmrf(home);
@@ -132,7 +138,11 @@ static bool bg_survives_ctrl(const char *lush, char ctrl, const char *tag) {
 }
 
 /// Returns true if a foreground command is interrupted by a terminal Ctrl-C:
-/// the marker it would write only on completion is absent.
+/// the marker it would write only on completion is absent. The `sleep` is
+/// deliberately shorter than the drive window, so this stays discriminating: a
+/// shell that (wrongly) ignored the foreground Ctrl-C would let the sleep run
+/// to completion and write the marker inside the window, failing the check --
+/// whereas a correct shell's SIG_DFL kills the sleep first, leaving it absent.
 static bool fg_interrupted_by_ctrl_c(const char *lush) {
     char *home = pty_make_tmpdir();
     if (!home) {
@@ -147,13 +157,13 @@ static bool fg_interrupted_by_ctrl_c(const char *lush) {
     unlink(ready);
 
     char line[PATH_MAX * 2 + 64];
-    snprintf(line, sizeof(line), "echo r > %s; sleep 8 && echo x > %s\n", ready,
+    snprintf(line, sizeof(line), "echo r > %s; sleep 2 && echo x > %s\n", ready,
              marker);
     const timed_input_t in[] = {
         {600,   line,  NULL},
         {700, "\x03", ready}, /// interrupt once the foreground sleep is running
     };
-    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 3000);
+    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 3600);
 
     bool interrupted = access(marker, F_OK) != 0;
     pty_rmrf(home);
