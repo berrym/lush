@@ -11,9 +11,12 @@
  * cooked/ISIG mode) generates the signal for the whole foreground group -- the
  * exact path pty_spawn (stdin on a pipe) cannot exercise.
  *
- * The background command is `( sleep 2 && echo x > marker )`: the marker is
- * gated on the exec'd `sleep` surviving, so if the signal kills the subshell or
- * the sleep the marker is never written. Sent during a foreground `sleep`.
+ * The background command is `( echo r > rdy; sleep N && echo x > marker )`: the
+ * marker is gated on the exec'd `sleep` surviving, so if the signal kills the
+ * subshell or the sleep the marker is never written. The control character is
+ * withheld until the subshell writes `rdy` -- proof it has forked and armed
+ * SIG_IGN -- so delivery cannot race a slow subshell start under load. Sent
+ * during a foreground `sleep`.
  *
  * Usage: test_pty_sigint_disposition <lush-binary-path>
  */
@@ -24,10 +27,16 @@
 
 #define TEST "test_pty_sigint_disposition"
 
-/// A scheduled input: write `bytes` at `at_ms` from the start of the session.
+/// A scheduled input: write `bytes` at `at_ms` from the start of the session,
+/// but never before `gate_file` (when non-NULL) exists on disk. The gate turns
+/// a fixed-delay send into a readiness barrier -- the input fires only once the
+/// shell has reached the state that creates the file, regardless of how long a
+/// forked subshell takes to start under load.
 typedef struct {
     long at_ms;
     const char *bytes;
+    const char *
+        gate_file; ///< absolute path; send only once it exists (NULL = ungated)
 } timed_input_t;
 
 /// Spawn lush on a fresh controlling PTY (all fds on the terminal), feed the
@@ -62,7 +71,9 @@ static void drive(const char *lush, const char *home, const timed_input_t *in,
         if (elapsed >= total_ms) {
             break;
         }
-        while (idx < n && elapsed >= in[idx].at_ms) {
+        while (idx < n && elapsed >= in[idx].at_ms &&
+               (in[idx].gate_file == NULL ||
+                access(in[idx].gate_file, F_OK) == 0)) {
             (void)!write(master, in[idx].bytes, strlen(in[idx].bytes));
             idx++;
         }
@@ -94,17 +105,25 @@ static bool bg_survives_ctrl(const char *lush, char ctrl, const char *tag) {
     char marker[PATH_MAX];
     snprintf(marker, sizeof(marker), "%s/bg_%s", home, tag);
     unlink(marker);
+    char ready[PATH_MAX];
+    snprintf(ready, sizeof(ready), "%s/rdy_%s", home, tag);
+    unlink(ready);
 
-    char line[PATH_MAX + 96];
-    snprintf(line, sizeof(line), "( sleep 2 && echo x > %s ) & sleep 8\n",
+    /// The subshell writes `ready` the instant its body begins -- after the
+    /// async fork has installed SIG_IGN -- then sleeps. Gating the control
+    /// character on `ready` guarantees it reaches an already-armed child, so a
+    /// slow subshell start under load cannot race the signal.
+    char line[PATH_MAX * 2 + 96];
+    snprintf(line, sizeof(line),
+             "( echo r > %s; sleep 2 && echo x > %s ) & sleep 6\n", ready,
              marker);
     char seq[2] = {ctrl, '\0'};
     const timed_input_t in[] = {
-        { 600, "set +m\n"},
-        {1200,       line},
-        {2400,        seq}, /// Ctrl-* ~1.2s into both sleeps (terminal in ISIG mode).
+        { 600, "set +m\n",  NULL},
+        {1200,       line,  NULL},
+        {1300,        seq, ready}, /// fires once the armed subshell is running
     };
-    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 5200);
+    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 4800);
 
     bool survived = access(marker, F_OK) == 0;
     pty_rmrf(home);
@@ -123,12 +142,16 @@ static bool fg_interrupted_by_ctrl_c(const char *lush) {
     char marker[PATH_MAX];
     snprintf(marker, sizeof(marker), "%s/fg", home);
     unlink(marker);
+    char ready[PATH_MAX];
+    snprintf(ready, sizeof(ready), "%s/rdy_fg", home);
+    unlink(ready);
 
-    char line[PATH_MAX + 64];
-    snprintf(line, sizeof(line), "sleep 8 && echo x > %s\n", marker);
+    char line[PATH_MAX * 2 + 64];
+    snprintf(line, sizeof(line), "echo r > %s; sleep 8 && echo x > %s\n", ready,
+             marker);
     const timed_input_t in[] = {
-        { 600,   line},
-        {1600, "\x03"},
+        {600,   line,  NULL},
+        {700, "\x03", ready}, /// interrupt once the foreground sleep is running
     };
     drive(lush, home, in, sizeof(in) / sizeof(in[0]), 3000);
 
