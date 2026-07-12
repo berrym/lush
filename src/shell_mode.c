@@ -548,6 +548,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_HIST_VERIFY] = "hist_verify",
     [FEATURE_HIST_EXPIRE_DUPS_FIRST] = "hist_expire_dups_first",
     [FEATURE_CHECKJOBS] = "checkjobs",
+    [FEATURE_LONG_LIST_JOBS] = "long_list_jobs",
 
     /// Function Enhancements
     [FEATURE_NAMEREF] = "nameref",
@@ -602,6 +603,7 @@ static const struct {
     {         "histverify",            FEATURE_HIST_VERIFY, false},
     {"histexpiredupsfirst", FEATURE_HIST_EXPIRE_DUPS_FIRST, false},
     {          "checkjobs",              FEATURE_CHECKJOBS, false},
+    {       "longlistjobs",         FEATURE_LONG_LIST_JOBS, false},
     {            "plugins",          FEATURE_PLUGIN_SYSTEM, false},
     {            "xpgecho",               FEATURE_XPG_ECHO, false},
     /* zsh BSD_ECHO is the inverse of xpg_echo:
