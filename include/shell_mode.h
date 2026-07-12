@@ -118,6 +118,9 @@ typedef enum {
                       ///< unless `-e` is given (bash default). Bridged via
                       ///< `xpg_echo` (bash shopt name) and inverted alias
                       ///< `bsd_echo` (zsh setopt name).
+    FEATURE_MAGIC_EQUAL_SUBST, ///< Tilde-expand the RHS of assignment-style
+                               ///< argument words `cmd name=~/path` (zsh
+                               ///< magic_equal_subst); off by default
 
     /// History Behavior
     FEATURE_HISTAPPEND,         ///< Append to history file instead of overwrite

@@ -789,6 +789,56 @@ TEST(rt_pushdminus_option) {
                         "df b a c \n");
 }
 
+TEST(rt_magic_equal_subst) {
+    /// zsh magic_equal_subst (#219): the RHS of an unquoted assignment-style
+    /// argument word `name=~/path` is tilde-expanded like a real assignment
+    /// value, including after each colon. Off by default (word stays
+    /// literal); a quoted word or a non-identifier left side is untouched.
+    /// Wrapped in a subshell so the HOME export and the setopt do not leak to
+    /// other run_shell tests.
+    run_result_t r = run_shell("( export HOME=/tmp/meq_home\n"
+                               "  echo A: foo=~/bar\n"
+                               "  setopt magic_equal_subst\n"
+                               "  echo B: foo=~/bar\n"
+                               "  echo C: p=x:~/y\n"
+                               "  echo D: \"q=~/keep\"\n"
+                               "  echo E: bad/name=~/no\n"
+                               "  x=~/z; echo F: $x\n"
+                               "  [[ abc =~ ^a ]] && echo G: regex )\n");
+    ASSERT_STDOUT_EQ(r, "A: foo=~/bar\n"
+                        "B: foo=/tmp/meq_home/bar\n"
+                        "C: p=x:/tmp/meq_home/y\n"
+                        "D: q=~/keep\n"
+                        "E: bad/name=~/no\n"
+                        "F: /tmp/meq_home/z\n"
+                        "G: regex\n");
+}
+
+TEST(rt_assignment_tilde_expansion) {
+    /// Real assignment RHS tilde expansion (#219): a tilde-prefix at the value
+    /// start and after every UNQUOTED colon is expanded (bash and zsh agree);
+    /// a double-quoted or single-quoted tilde stays literal; a tilde produced
+    /// by a later $var expansion is not itself re-expanded. Subshell-wrapped so
+    /// the HOME export does not leak to other run_shell tests.
+    run_result_t r = run_shell("( export HOME=/tmp/meq_home\n"
+                               "  a=~/a:~/b;         echo \"1:$a\"\n"
+                               "  b=\"~/a\";           echo \"2:$b\"\n"
+                               "  c=~/a:\"~/b\";       echo \"3:$c\"\n"
+                               "  d='a:~';           echo \"4:$d\"\n"
+                               "  e=~/a:'~/b';       echo \"5:$e\"\n"
+                               "  v=\"~\"; f=$v/bar;    echo \"6:$f\"\n"
+                               "  g=$(echo a:~/b);   echo \"7:$g\"\n"
+                               "  h=${HOME}:~/b;     echo \"8:$h\" )\n");
+    ASSERT_STDOUT_EQ(r, "1:/tmp/meq_home/a:/tmp/meq_home/b\n"
+                        "2:~/a\n"
+                        "3:/tmp/meq_home/a:~/b\n"
+                        "4:a:~\n"
+                        "5:/tmp/meq_home/a:~/b\n"
+                        "6:~/bar\n"
+                        "7:a:~/b\n"
+                        "8:/tmp/meq_home:/tmp/meq_home/b\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4721,6 +4771,8 @@ int main(void) {
     RUN_TEST(rt_glob_qualifier_quoted_element);
     RUN_TEST(rt_pushd_popd_rotation);
     RUN_TEST(rt_pushdminus_option);
+    RUN_TEST(rt_magic_equal_subst);
+    RUN_TEST(rt_assignment_tilde_expansion);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);

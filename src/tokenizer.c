@@ -1879,10 +1879,19 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case '=':
-            /// Check for =~ regex match operator (inside [[ ]])
+            /// `=~` is the regex-match operator (inside [[ ]]) ONLY when it
+            /// stands alone -- at input start or preceded by whitespace, as in
+            /// `[[ str =~ re ]]`. When the `=` immediately follows a word
+            /// character it is an assignment `=` and the `~` is a separate
+            /// tilde (e.g. `x=~/path`, or `cmd foo=~/path`); tokenizing that as
+            /// the regex operator broke tilde-expanded assignments entirely.
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '~' &&
-                shell_mode_allows(FEATURE_REGEX_MATCH)) {
+                shell_mode_allows(FEATURE_REGEX_MATCH) &&
+                (start_pos == 0 || tokenizer->input[start_pos - 1] == ' ' ||
+                 tokenizer->input[start_pos - 1] == '\t' ||
+                 tokenizer->input[start_pos - 1] == '\n' ||
+                 tokenizer->input[start_pos - 1] == '\r')) {
                 tokenizer->position += 2;
                 tokenizer->column += 2;
                 return token_new(TOK_REGEX_MATCH, "=~", 2, start_line,

@@ -2102,9 +2102,17 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 }
                 for (size_t k = 0; k < token_len; k++) {
                     char ch = value->text[k];
-                    if (ch == '\'') {
+                    /// A `~` that was inside "..." must NOT undergo tilde
+                    /// expansion (POSIX: tilde-prefixes are unquoted-only).
+                    /// The value string has already lost its outer quotes, so
+                    /// escape the `~` as \~ to record that it was quoted; the
+                    /// assignment tilde pass skips \~ and the downstream
+                    /// POSIX-unquoted backslash rule restores the literal `~`.
+                    /// Literal single quotes are escaped for the same reason
+                    /// (issue #102).
+                    if (ch == '\'' || ch == '~') {
                         full_value[value_len++] = '\\';
-                        full_value[value_len++] = '\'';
+                        full_value[value_len++] = ch;
                     } else {
                         full_value[value_len++] = ch;
                     }
