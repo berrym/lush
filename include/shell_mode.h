@@ -129,6 +129,9 @@ typedef enum {
                                     ///< unique ones when at the size cap (zsh
                                     ///< hist_expire_dups_first); off by default
     FEATURE_CHECKJOBS,              ///< Warn about running jobs on exit
+    FEATURE_LONG_LIST_JOBS,         ///< `jobs` defaults to the long (PID)
+                                    ///< format (zsh long_list_jobs / bash
+                                    ///< `jobs -l`); off by default
 
     /// Function Enhancements
     FEATURE_NAMEREF,             ///< local -n nameref variables

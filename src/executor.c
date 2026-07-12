@@ -17103,9 +17103,19 @@ static const char *job_state_string(const job_t *job) {
 /// compact, single-column-aligned form (glued marker, title-cased state word)
 /// as the one legible layout every surface reuses.
 static void job_write_line(FILE *out, const executor_t *executor,
-                           const job_t *job, const char *state_str) {
-    fprintf(out, "[%d]%c %-20s %s\n", job->job_id, job_marker(executor, job),
-            state_str, job->command_line ? job->command_line : "unknown");
+                           const job_t *job, const char *state_str,
+                           bool long_form) {
+    /// The long format (zsh long_list_jobs / bash `jobs -l`) adds the job
+    /// leader's PID column between the marker and the state.
+    if (long_form) {
+        fprintf(out, "[%d]%c %d %-20s %s\n", job->job_id,
+                job_marker(executor, job), (int)job->pid, state_str,
+                job->command_line ? job->command_line : "unknown");
+    } else {
+        fprintf(out, "[%d]%c %-20s %s\n", job->job_id,
+                job_marker(executor, job), state_str,
+                job->command_line ? job->command_line : "unknown");
+    }
 }
 
 /**
@@ -17458,10 +17468,10 @@ void executor_update_job_status(executor_t *executor) {
         /// prints.) The marker reflects the tracked current/previous state.
         if (is_interactive_shell() && !job->reported) {
             if (job->state == JOB_DONE) {
-                job_write_line(stdout, executor, job, "Done");
+                job_write_line(stdout, executor, job, "Done", false);
                 job->reported = true;
             } else if (job->state == JOB_STOPPED) {
-                job_write_line(stdout, executor, job, "Stopped");
+                job_write_line(stdout, executor, job, "Stopped", false);
                 job->reported = true;
             }
         }
@@ -17603,9 +17613,18 @@ int executor_execute_background(executor_t *executor, node_t *command) {
  * @return 0 on success
  */
 int executor_builtin_jobs(executor_t *executor, char **argv) {
-    (void)argv; /// Reserved for job filtering options
     if (!executor) {
         return 1;
+    }
+
+    /// The long format adds the leader PID column. It is requested per-call
+    /// with `jobs -l` (bash/zsh) or made the default by the long_list_jobs
+    /// option (zsh).
+    bool long_form = shell_mode_allows(FEATURE_LONG_LIST_JOBS);
+    for (int i = 1; argv && argv[i]; i++) {
+        if (strcmp(argv[i], "-l") == 0) {
+            long_form = true;
+        }
     }
 
     /// Background jobs are tracked regardless of job control (set -m), so the
@@ -17654,7 +17673,7 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         if (job->state == JOB_DONE && job->reported) {
             continue;
         }
-        job_write_line(sink, executor, job, job_state_string(job));
+        job_write_line(sink, executor, job, job_state_string(job), long_form);
 
         /// Reporting a completion here means the next listing omits it.
         if (job->state == JOB_DONE) {
@@ -17668,7 +17687,8 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
             if (job->state == JOB_DONE && job->reported) {
                 continue;
             }
-            job_write_line(sink, executor, job, job_state_string(job));
+            job_write_line(sink, executor, job, job_state_string(job),
+                           long_form);
             if (job->state == JOB_DONE) {
                 job->reported = true;
             }
@@ -17796,7 +17816,7 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         /// A stop makes the job current (%+); it was already marked current on
         /// entry, so the marker below reflects that.
         note_current_job(executor, job_id);
-        job_write_line(stdout, executor, job, "Stopped");
+        job_write_line(stdout, executor, job, "Stopped", false);
         /// This notice reports the stop; mark it so the next prompt's status
         /// sweep does not print a second Stopped line for the same job.
         job->reported = true;
@@ -17855,7 +17875,7 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
     /// The bg notice reuses the shared one-line job format (id, tracked marker,
     /// state, command). lush does not append the trailing `&` cosmetic bash
     /// prints here; the shared format keeps every job surface identical.
-    job_write_line(stdout, executor, job, "Running");
+    job_write_line(stdout, executor, job, "Running", false);
 
     return 0;
 }

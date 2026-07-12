@@ -20,6 +20,7 @@
  */
 
 #include <fcntl.h>
+#include <regex.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -150,6 +151,35 @@ static void check_order(const char *lush, const char *label, const char *script,
     fprintf(stderr, "ok   %s [%s]\n", TEST, label);
 }
 
+/// Assert the script's output does or does not match an extended regex.
+/// Used for the long job format, whose PID column is non-deterministic.
+static void check_regex(const char *lush, const char *label, const char *script,
+                        const char *pattern, bool want_match) {
+    char out[8192];
+    if (!run_script(lush, script, out, sizeof(out))) {
+        fprintf(stderr, "FAIL %s [%s]: shell did not exit\n", TEST, label);
+        failures++;
+        return;
+    }
+    regex_t re;
+    if (regcomp(&re, pattern, REG_EXTENDED | REG_NEWLINE) != 0) {
+        fprintf(stderr, "FAIL %s [%s]: bad regex\n", TEST, label);
+        failures++;
+        return;
+    }
+    bool matched = regexec(&re, out, 0, NULL, 0) == 0;
+    regfree(&re);
+    if (matched != want_match) {
+        fprintf(stderr, "FAIL %s [%s]: %s \"%s\" (got: \"%.400s\")\n", TEST,
+                label,
+                want_match ? "expected match for" : "unexpected match for",
+                pattern, out);
+        failures++;
+        return;
+    }
+    fprintf(stderr, "ok   %s [%s]\n", TEST, label);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: %s <lush-binary-path>\n", argv[0]);
@@ -202,6 +232,17 @@ int main(int argc, char **argv) {
     /// the full pipeline.
     check_present(lush, "pipeline command text", "sleep 2 | cat & jobs",
                   (const char *[]){"[1]", "sleep 2 | cat", NULL});
+
+    /// Law 6: the long format (zsh long_list_jobs / bash `jobs -l`) inserts
+    /// the leader PID between the marker and the state. `jobs -l` and the
+    /// long_list_jobs option both produce it; the default listing does not.
+    check_regex(lush, "jobs -l shows the PID column", "sleep 5 & jobs -l",
+                "\\[1\\][-+] [0-9]+ ", true);
+    check_regex(lush, "long_list_jobs option shows the PID column",
+                "setopt long_list_jobs; sleep 5 & jobs", "\\[1\\][-+] [0-9]+ ",
+                true);
+    check_regex(lush, "default jobs omits the PID column", "sleep 5 & jobs",
+                "\\[1\\][-+] [0-9]+ ", false);
 
     if (failures) {
         fprintf(stderr, "%s: %d failure(s)\n", TEST, failures);
