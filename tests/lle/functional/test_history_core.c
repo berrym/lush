@@ -529,6 +529,170 @@ void test_clear_history(void) {
 }
 
 /*
+ * Test: size-cap trim keeps the NEWEST entries (FIFO drop-oldest),
+ * matching bash/zsh -- the incoming command is never the one discarded.
+ */
+void test_cap_trim_keeps_newest(void) {
+    TEST("Size-cap trim keeps newest (FIFO)");
+
+    lle_history_config_t *cfg = NULL;
+    if (lle_history_config_create_default(&cfg, NULL) != LLE_SUCCESS) {
+        FAIL("config create");
+    }
+    cfg->max_entries = 3;
+    cfg->initial_capacity = 3;
+    cfg->load_on_init = false;
+    cfg->auto_save = false;
+
+    lle_history_core_t *core = NULL;
+    lle_result_t result = lle_history_core_create(&core, NULL, cfg);
+    lle_history_config_destroy(cfg, NULL);
+    if (result != LLE_SUCCESS) {
+        FAIL("core create");
+    }
+
+    const char *cmds[] = {"a", "b", "c", "d"};
+    for (int i = 0; i < 4; i++) {
+        uint64_t id;
+        if (lle_history_add_entry(core, cmds[i], 0, &id) != LLE_SUCCESS) {
+            lle_history_core_destroy(core);
+            FAIL("add");
+        }
+    }
+
+    size_t count = 0;
+    lle_history_get_entry_count(core, &count);
+    if (count != 3) {
+        lle_history_core_destroy(core);
+        FAIL("count should stay at the cap of 3");
+    }
+
+    /// Oldest ("a") evicted; the newest three survive in order.
+    const char *want[] = {"b", "c", "d"};
+    for (int i = 0; i < 3; i++) {
+        lle_history_entry_t *e = NULL;
+        if (lle_history_get_entry_by_index(core, i, &e) != LLE_SUCCESS || !e ||
+            strcmp(e->command, want[i]) != 0) {
+            lle_history_core_destroy(core);
+            FAIL("expected newest-three [b c d] after cap trim");
+        }
+    }
+
+    lle_history_core_destroy(core);
+    PASS();
+}
+
+/*
+ * Test: hist_expire_dups_first trims the oldest DUPLICATE before a unique
+ * entry. Input uniq,b,b,c at cap 3 keeps [uniq,b,c] (one "b" expired),
+ * where plain FIFO would drop the unique "uniq" and keep [b,b,c].
+ */
+void test_cap_trim_expire_dups_first(void) {
+    TEST("Size-cap trim expires duplicates first");
+
+    lle_history_config_t *cfg = NULL;
+    if (lle_history_config_create_default(&cfg, NULL) != LLE_SUCCESS) {
+        FAIL("config create");
+    }
+    cfg->max_entries = 3;
+    cfg->initial_capacity = 3;
+    cfg->expire_dups_first = true;
+    cfg->load_on_init = false;
+    cfg->auto_save = false;
+
+    lle_history_core_t *core = NULL;
+    lle_result_t result = lle_history_core_create(&core, NULL, cfg);
+    lle_history_config_destroy(cfg, NULL);
+    if (result != LLE_SUCCESS) {
+        FAIL("core create");
+    }
+
+    const char *cmds[] = {"uniq", "b", "b", "c"};
+    for (int i = 0; i < 4; i++) {
+        uint64_t id;
+        if (lle_history_add_entry(core, cmds[i], 0, &id) != LLE_SUCCESS) {
+            lle_history_core_destroy(core);
+            FAIL("add");
+        }
+    }
+
+    const char *want[] = {"uniq", "b", "c"};
+    for (int i = 0; i < 3; i++) {
+        lle_history_entry_t *e = NULL;
+        if (lle_history_get_entry_by_index(core, i, &e) != LLE_SUCCESS || !e ||
+            strcmp(e->command, want[i]) != 0) {
+            lle_history_core_destroy(core);
+            FAIL("expected [uniq b c]: dup 'b' expired before unique 'uniq'");
+        }
+    }
+
+    lle_history_core_destroy(core);
+    PASS();
+}
+
+/*
+ * Test: at the cap, a duplicate the dedup engine rejects must not evict any
+ * existing entry (the eviction runs only after dedup accepts a net-new
+ * entry). Without the fix, the pre-dedup trim dropped the oldest entry for
+ * a command that was then discarded.
+ */
+void test_cap_trim_rejected_dup_keeps_all(void) {
+    TEST("Size-cap trim: a rejected duplicate evicts nothing");
+
+    lle_history_config_t *cfg = NULL;
+    if (lle_history_config_create_default(&cfg, NULL) != LLE_SUCCESS) {
+        FAIL("config create");
+    }
+    cfg->max_entries = 3;
+    cfg->initial_capacity = 3;
+    cfg->ignore_duplicates = true;
+    cfg->dedup_strategy = LLE_DEDUP_IGNORE;
+    cfg->load_on_init = false;
+    cfg->auto_save = false;
+
+    lle_history_core_t *core = NULL;
+    lle_result_t result = lle_history_core_create(&core, NULL, cfg);
+    lle_history_config_destroy(cfg, NULL);
+    if (result != LLE_SUCCESS) {
+        FAIL("core create");
+    }
+
+    const char *cmds[] = {"a", "b", "c"};
+    for (int i = 0; i < 3; i++) {
+        uint64_t id;
+        if (lle_history_add_entry(core, cmds[i], 0, &id) != LLE_SUCCESS) {
+            lle_history_core_destroy(core);
+            FAIL("add");
+        }
+    }
+
+    /// Re-run an existing command; dedup rejects it, so nothing is added and
+    /// no existing entry is evicted to make room.
+    uint64_t id;
+    lle_history_add_entry(core, "b", 0, &id);
+
+    size_t count = 0;
+    lle_history_get_entry_count(core, &count);
+    if (count != 3) {
+        lle_history_core_destroy(core);
+        FAIL("a rejected duplicate must not change the entry count");
+    }
+
+    const char *want[] = {"a", "b", "c"};
+    for (int i = 0; i < 3; i++) {
+        lle_history_entry_t *e = NULL;
+        if (lle_history_get_entry_by_index(core, i, &e) != LLE_SUCCESS || !e ||
+            strcmp(e->command, want[i]) != 0) {
+            lle_history_core_destroy(core);
+            FAIL("expected [a b c] preserved after a rejected duplicate");
+        }
+    }
+
+    lle_history_core_destroy(core);
+    PASS();
+}
+
+/*
  * Main test runner
  */
 int main(void) {
@@ -547,6 +711,9 @@ int main(void) {
     test_get_entry_count();
     test_statistics_tracking();
     test_clear_history();
+    test_cap_trim_keeps_newest();
+    test_cap_trim_expire_dups_first();
+    test_cap_trim_rejected_dup_keeps_all();
 
     /// Summary
     printf("\n=================================================\n");

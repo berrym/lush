@@ -11,7 +11,9 @@
  * management, storage, and retrieval functionality.
  */
 
+#include "ht.h"
 #include "lle/history.h"
+#include "lle/unicode_compare.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -73,6 +75,7 @@ lle_result_t lle_history_config_create_default(lle_history_config_t **config,
     cfg->ignore_duplicates = false;                     /// deduplication
     cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT;        /// Default strategy
     cfg->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_SESSION; /// Default scope
+    cfg->expire_dups_first = false;  /// FIFO trim unless opted in
     cfg->ignore_space_prefix = true; /// Standard shell behavior
     cfg->save_timestamps = true;
     cfg->save_working_dir = true;
@@ -532,6 +535,149 @@ lle_result_t lle_history_expand_capacity(lle_history_core_t *core) {
 }
 
 /**
+ * @brief Physically remove entries[idx] and free it.
+ *
+ * Keeps the entry array (compacted oldest -> newest), the doubly-linked
+ * list, the id -> entry index, and the statistics consistent. The caller
+ * must hold the write lock and guarantee 0 <= idx < entry_count.
+ */
+static void lle_history_evict_entry_at(lle_history_core_t *core, size_t idx) {
+    lle_history_entry_t *victim = core->entries[idx];
+    if (!victim) {
+        return;
+    }
+
+    /// Unlink from the doubly-linked list.
+    if (victim->prev) {
+        victim->prev->next = victim->next;
+    } else {
+        core->first_entry = victim->next;
+    }
+    if (victim->next) {
+        victim->next->prev = victim->prev;
+    } else {
+        core->last_entry = victim->prev;
+    }
+
+    /// Drop from the id -> entry index.
+    if (core->entry_lookup) {
+        lle_history_index_remove(core->entry_lookup, victim->entry_id);
+    }
+
+    /// Compact the array so entries stay contiguous.
+    if (idx + 1 < core->entry_count) {
+        memmove(&core->entries[idx], &core->entries[idx + 1],
+                (core->entry_count - idx - 1) * sizeof(lle_history_entry_t *));
+    }
+    core->entry_count--;
+    core->entries[core->entry_count] = NULL;
+
+    /// Statistics.
+    if (victim->state == LLE_HISTORY_STATE_ACTIVE) {
+        if (core->stats.active_entries > 0) {
+            core->stats.active_entries--;
+        }
+    } else if (victim->state == LLE_HISTORY_STATE_DELETED) {
+        if (core->stats.deleted_entries > 0) {
+            core->stats.deleted_entries--;
+        }
+    }
+
+    lle_history_entry_destroy(victim, core->memory_pool);
+}
+
+/**
+ * @brief Index of the oldest live entry whose command is duplicated by
+ *        another live entry, or 0 (oldest) when there is no duplicate.
+ *
+ * One O(n) pass records each NFC-normalized command in a "seen" set and,
+ * on the second sighting, in a "duplicated" set; a second pass returns the
+ * first (oldest) entry whose command is duplicated. Falls back to the
+ * oldest entry (FIFO) on any allocation failure. NFC normalization matches
+ * the dedup engine's default notion of equality.
+ */
+static size_t lle_history_oldest_duplicate(lle_history_core_t *core) {
+    size_t victim = 0;
+
+    ht_strset_t *seen = ht_strset_create(NULL);
+    ht_strset_t *duplicated = ht_strset_create(NULL);
+    char **norm = calloc(core->entry_count, sizeof(char *));
+    if (!seen || !duplicated || !norm) {
+        free(norm);
+        ht_strset_destroy(seen);
+        ht_strset_destroy(duplicated);
+        return victim;
+    }
+
+    for (size_t i = 0; i < core->entry_count; i++) {
+        if (!core->entries[i]->command) {
+            continue;
+        }
+        norm[i] = lle_unicode_normalize_nfc_alloc(core->entries[i]->command);
+        if (!norm[i]) {
+            continue;
+        }
+        /// ht_strset_add returns false when the key is already present, i.e.
+        /// this is a second (or later) sighting of the command.
+        if (!ht_strset_add(seen, norm[i])) {
+            ht_strset_add(duplicated, norm[i]);
+        }
+    }
+
+    for (size_t i = 0; i < core->entry_count; i++) {
+        if (norm[i] && ht_strset_contains(duplicated, norm[i])) {
+            victim = i;
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < core->entry_count; i++) {
+        free(norm[i]);
+    }
+    free(norm);
+    ht_strset_destroy(seen);
+    ht_strset_destroy(duplicated);
+    return victim;
+}
+
+/**
+ * @brief Evict one entry to reclaim a slot when the history is at its cap.
+ *
+ * A soft-deleted tombstone (dedup's superseded duplicate, still occupying a
+ * slot) is reclaimed first, so making room never loses live history when
+ * deduplication is active. Otherwise the default policy drops the oldest
+ * entry (FIFO), keeping the most recent commands -- matching bash and zsh,
+ * which discard old history rather than the incoming command. With
+ * hist_expire_dups_first (config->expire_dups_first) the oldest live entry
+ * that is duplicated by another live entry is dropped before any unique
+ * entry, via a single O(n) normalized-command pass. The caller must hold
+ * the write lock.
+ */
+void lle_history_trim_one(lle_history_core_t *core) {
+    if (!core || core->entry_count == 0) {
+        return;
+    }
+
+    /// Reclaim a soft-deleted tombstone first -- frees a slot with no live
+    /// loss, and is the dups-first outcome while dedup is active.
+    for (size_t i = 0; i < core->entry_count; i++) {
+        if (core->entries[i]->state == LLE_HISTORY_STATE_DELETED) {
+            lle_history_evict_entry_at(core, i);
+            return;
+        }
+    }
+
+    size_t victim = 0; /// oldest live entry by default (FIFO)
+
+    if (core->config && core->config->expire_dups_first &&
+        core->entry_count > 1) {
+        victim = lle_history_oldest_duplicate(core);
+    }
+
+    lle_history_evict_entry_at(core, victim);
+}
+
+/**
  * @brief Add a new command entry to history
  * @param core History core engine
  * @param command Command string to add
@@ -563,15 +709,6 @@ lle_result_t lle_history_add_entry(lle_history_core_t *core,
     /// Start performance measurement
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
-
-    /// Check if array is full
-    if (core->entry_count >= core->entry_capacity) {
-        result = lle_history_expand_capacity(core);
-        if (result != LLE_SUCCESS) {
-            pthread_rwlock_unlock(&core->lock);
-            return result;
-        }
-    }
 
     /// Create entry
     lle_history_entry_t *entry = NULL;
@@ -615,6 +752,25 @@ lle_result_t lle_history_add_entry(lle_history_core_t *core,
             }
 
             return LLE_SUCCESS;
+        }
+    }
+
+    /// Make room for the accepted entry -- only now, after dedup could have
+    /// rejected a duplicate, so a rejected or failed add never costs an
+    /// existing entry. At the max_entries cap bash and zsh keep the newest
+    /// command and discard old history; lle_history_trim_one reclaims a
+    /// soft-deleted tombstone first, then (with hist_expire_dups_first) an
+    /// old duplicate, else the oldest entry.
+    if (core->entry_count >= core->entry_capacity) {
+        result = lle_history_expand_capacity(core);
+        if (result == LLE_ERROR_BUFFER_OVERFLOW) {
+            lle_history_trim_one(core);
+            result = LLE_SUCCESS;
+        }
+        if (result != LLE_SUCCESS) {
+            lle_history_entry_destroy(entry, core->memory_pool);
+            pthread_rwlock_unlock(&core->lock);
+            return result;
         }
     }
 

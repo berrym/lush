@@ -546,6 +546,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_INC_APPEND_HISTORY] = "inc_append_history",
     [FEATURE_SHARE_HISTORY] = "share_history",
     [FEATURE_HIST_VERIFY] = "hist_verify",
+    [FEATURE_HIST_EXPIRE_DUPS_FIRST] = "hist_expire_dups_first",
     [FEATURE_CHECKJOBS] = "checkjobs",
 
     /// Function Enhancements
@@ -580,34 +581,35 @@ static const struct {
     shell_feature_t feature;
     bool invert;
 } feature_aliases[] = {
-    {          "arrays",       FEATURE_INDEXED_ARRAYS, false},
-    {           "assoc",   FEATURE_ASSOCIATIVE_ARRAYS, false},
-    {         "exttest",        FEATURE_EXTENDED_TEST, false},
-    {           "regex",          FEATURE_REGEX_MATCH, false},
-    {         "procsub", FEATURE_PROCESS_SUBSTITUTION, false},
-    {         "extglob",        FEATURE_EXTENDED_GLOB, false},
-    {      "zshextglob",    FEATURE_ZSH_EXTENDED_GLOB, false},
-    {        "nullglob",            FEATURE_NULL_GLOB, false},
-    {         "dotglob",             FEATURE_DOT_GLOB, false},
-    {        "globstar",             FEATURE_GLOBSTAR, false},
-    {        "braceexp",      FEATURE_BRACE_EXPANSION, false},
-    {     "ansiquoting",         FEATURE_ANSI_QUOTING, false},
-    {     "dollarquote",         FEATURE_ANSI_QUOTING, false},
-    {          "autocd",              FEATURE_AUTO_CD, false},
-    {       "wordsplit",   FEATURE_WORD_SPLIT_DEFAULT, false},
-    {      "histappend",           FEATURE_HISTAPPEND, false},
-    {"incappendhistory",   FEATURE_INC_APPEND_HISTORY, false},
-    {    "sharehistory",        FEATURE_SHARE_HISTORY, false},
-    {      "histverify",          FEATURE_HIST_VERIFY, false},
-    {       "checkjobs",            FEATURE_CHECKJOBS, false},
-    {         "plugins",        FEATURE_PLUGIN_SYSTEM, false},
-    {         "xpgecho",             FEATURE_XPG_ECHO, false},
+    {             "arrays",         FEATURE_INDEXED_ARRAYS, false},
+    {              "assoc",     FEATURE_ASSOCIATIVE_ARRAYS, false},
+    {            "exttest",          FEATURE_EXTENDED_TEST, false},
+    {              "regex",            FEATURE_REGEX_MATCH, false},
+    {            "procsub",   FEATURE_PROCESS_SUBSTITUTION, false},
+    {            "extglob",          FEATURE_EXTENDED_GLOB, false},
+    {         "zshextglob",      FEATURE_ZSH_EXTENDED_GLOB, false},
+    {           "nullglob",              FEATURE_NULL_GLOB, false},
+    {            "dotglob",               FEATURE_DOT_GLOB, false},
+    {           "globstar",               FEATURE_GLOBSTAR, false},
+    {           "braceexp",        FEATURE_BRACE_EXPANSION, false},
+    {        "ansiquoting",           FEATURE_ANSI_QUOTING, false},
+    {        "dollarquote",           FEATURE_ANSI_QUOTING, false},
+    {             "autocd",                FEATURE_AUTO_CD, false},
+    {          "wordsplit",     FEATURE_WORD_SPLIT_DEFAULT, false},
+    {         "histappend",             FEATURE_HISTAPPEND, false},
+    {   "incappendhistory",     FEATURE_INC_APPEND_HISTORY, false},
+    {       "sharehistory",          FEATURE_SHARE_HISTORY, false},
+    {         "histverify",            FEATURE_HIST_VERIFY, false},
+    {"histexpiredupsfirst", FEATURE_HIST_EXPIRE_DUPS_FIRST, false},
+    {          "checkjobs",              FEATURE_CHECKJOBS, false},
+    {            "plugins",          FEATURE_PLUGIN_SYSTEM, false},
+    {            "xpgecho",               FEATURE_XPG_ECHO, false},
     /* zsh BSD_ECHO is the inverse of xpg_echo:
      * `setopt BSD_ECHO` disables escape interpretation. */
-    {        "bsd_echo",             FEATURE_XPG_ECHO,  true},
-    {         "bsdecho",             FEATURE_XPG_ECHO,  true},
-    {      "pushdminus",          FEATURE_PUSHD_MINUS, false},
-    {              NULL,                            0, false}
+    {           "bsd_echo",               FEATURE_XPG_ECHO,  true},
+    {            "bsdecho",               FEATURE_XPG_ECHO,  true},
+    {         "pushdminus",            FEATURE_PUSHD_MINUS, false},
+    {                 NULL,                              0, false}
 };
 
 /* ============================================================================

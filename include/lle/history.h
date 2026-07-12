@@ -230,6 +230,8 @@ struct lle_history_config {
     lle_history_dedup_strategy_t dedup_strategy; ///< Deduplication strategy
     lle_history_dedup_scope_t dedup_scope;       ///< Deduplication scope
     bool unicode_normalize;   ///< Use Unicode NFC normalization for dedup
+    bool expire_dups_first;   ///< Trim duplicates before uniques at the cap
+                              ///< (zsh hist_expire_dups_first)
     bool ignore_space_prefix; ///< Ignore commands starting with space
     bool save_timestamps;     ///< Save timestamp metadata
     bool save_working_dir;    ///< Save working directory
@@ -883,6 +885,16 @@ lle_result_t lle_history_events_print_stats(void);
  * @return LLE_SUCCESS or error code
  */
 lle_result_t lle_history_expand_capacity(lle_history_core_t *core);
+
+/**
+ * Evict one entry to reclaim a slot when the history is at its cap
+ * (internal use only). Drops the oldest entry, or -- when
+ * config->expire_dups_first is set -- the oldest still-duplicated entry.
+ * The caller must hold the core write lock.
+ *
+ * @param core History core
+ */
+void lle_history_trim_one(lle_history_core_t *core);
 
 /**
  * Validate entry (internal use only)

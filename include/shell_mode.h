@@ -125,7 +125,10 @@ typedef enum {
                                 ///< crash recovery)
     FEATURE_SHARE_HISTORY,      ///< Share history between concurrent sessions
     FEATURE_HIST_VERIFY,        ///< Verify history expansion before execution
-    FEATURE_CHECKJOBS,          ///< Warn about running jobs on exit
+    FEATURE_HIST_EXPIRE_DUPS_FIRST, ///< Trim duplicate history entries before
+                                    ///< unique ones when at the size cap (zsh
+                                    ///< hist_expire_dups_first); off by default
+    FEATURE_CHECKJOBS,              ///< Warn about running jobs on exit
 
     /// Function Enhancements
     FEATURE_NAMEREF,             ///< local -n nameref variables
