@@ -295,6 +295,14 @@ exactly as `${arr[@]}` does. In a scalar-requiring slot it is a type
 error. `${arr[*]}` and explicit joins produce a scalar and are valid
 in scalar-requiring slots.
 
+For a **map**, "its elements" are its **values** in insertion order --
+`${m}`, `${m[@]}`, and the vector sigil `@m` all contribute the values,
+matching `${arr[@]}` for an associative array in bash and zsh (lush fixes
+the insertion order rather than a hash order). The other projections are
+explicit: `${(k)m}` / `${(v)m}` / `${(kv)m}` yield the keys, the values,
+and interleaved `key value key value ...` pairs; the pair sigil `%m` is
+the same key-value interleave. `${m[*]}` joins the values to a scalar.
+
 **Quotes do not flatten.** Slot category is set by the surrounding
 syntactic position, not by the quotes around the expansion. A
 vector-yielding expansion inside double quotes is still a vector

@@ -839,6 +839,34 @@ TEST(rt_assignment_tilde_expansion) {
                         "8:/tmp/meq_home:/tmp/meq_home/b\n");
 }
 
+TEST(rt_map_in_argv_forms) {
+    /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
+    /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
+    /// ${(k)m} gives keys; ${(kv)m} and the pair sigil %m give interleaved
+    /// `key value ...` pairs; ${m[*]} joins the values to a scalar. Subshell
+    /// wrapped so the global map does not leak to other run_shell tests.
+    run_result_t r = run_shell("( typeset -A m; m[a]=1; m[b]=2\n"
+                               "  echo \"at:$(echo ${m[@]})\"\n"
+                               "  echo \"bare:$(echo $m)\"\n"
+                               "  echo \"v:$(echo ${(v)m})\"\n"
+                               "  echo \"k:$(echo ${(k)m})\"\n"
+                               "  echo \"kv:$(echo ${(kv)m})\"\n"
+                               "  echo \"vec:$(echo @m)\"\n"
+                               "  echo \"pair:$(echo %m)\"\n"
+                               "  echo \"star:${m[*]}\"\n"
+                               "  typeset -A e\n"
+                               "  echo \"empty:[$(echo ${e[@]})]\" )\n");
+    ASSERT_STDOUT_EQ(r, "at:1 2\n"
+                        "bare:1 2\n"
+                        "v:1 2\n"
+                        "k:a b\n"
+                        "kv:a 1 b 2\n"
+                        "vec:1 2\n"
+                        "pair:a 1 b 2\n"
+                        "star:1 2\n"
+                        "empty:[]\n");
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -4773,6 +4801,7 @@ int main(void) {
     RUN_TEST(rt_pushdminus_option);
     RUN_TEST(rt_magic_equal_subst);
     RUN_TEST(rt_assignment_tilde_expansion);
+    RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);
