@@ -5274,7 +5274,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 flag_end++;
             }
             if (flag_end < end && *flag_end == ')') {
-                bool flag_k = false, flag_o = false, flag_O = false;
+                bool flag_k = false, flag_v = false, flag_o = false,
+                     flag_O = false;
                 bool flag_u = false;
                 bool flag_s = false;
                 char *split_sep = NULL; /// owned; set when flag_s
@@ -5285,7 +5286,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         flag_k = true;
                         break;
                     case 'v':
-                        flag_k = false;
+                        /// Values. `(kv)` (both k and v) interleaves pairs.
+                        flag_v = true;
                         break;
                     case 'o':
                         flag_o = true;
@@ -5437,8 +5439,64 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         } else {
                             array_value_t *arr = symtable_get_array(nbuf);
                             if (arr) {
-                                if (flag_k) {
+                                if (flag_k && flag_v) {
+                                    /// (kv): interleaved key value ... (2N
+                                    /// slots). Map keys/values in insertion
+                                    /// order; a list uses index positions as
+                                    /// keys.
+                                    size_t n = 0, nv = 0;
+                                    char **ks = NULL, **vs = NULL;
+                                    if (arr->is_associative) {
+                                        ks = symtable_array_get_keys(arr, &n);
+                                        vs =
+                                            symtable_array_get_values(arr, &nv);
+                                    } else {
+                                        n = symtable_array_length(arr);
+                                    }
+                                    items =
+                                        malloc(sizeof(char *) * (2 * n + 1));
+                                    if (items) {
+                                        for (size_t i = 0; i < n; i++) {
+                                            if (arr->is_associative) {
+                                                items[2 * i] =
+                                                    ks ? ks[i] : strdup("");
+                                                items[2 * i + 1] =
+                                                    (vs && i < nv) ? vs[i]
+                                                                   : strdup("");
+                                            } else {
+                                                char idx[32];
+                                                snprintf(idx, sizeof(idx),
+                                                         "%zu", i);
+                                                items[2 * i] = strdup(idx);
+                                                const char *e =
+                                                    symtable_array_get_index(
+                                                        arr, (int)i);
+                                                items[2 * i + 1] =
+                                                    strdup(e ? e : "");
+                                            }
+                                        }
+                                        kc = 2 * n;
+                                        /// assoc element ptrs moved into items;
+                                        /// free only the source arrays.
+                                        free(ks);
+                                        free(vs);
+                                    } else {
+                                        /// OOM: reclaim the source arrays.
+                                        for (size_t i = 0; ks && i < n; i++) {
+                                            free(ks[i]);
+                                        }
+                                        for (size_t i = 0; vs && i < nv; i++) {
+                                            free(vs[i]);
+                                        }
+                                        free(ks);
+                                        free(vs);
+                                    }
+                                } else if (flag_k) {
                                     items = symtable_array_get_keys(arr, &kc);
+                                } else if (arr->is_associative) {
+                                    /// Values, insertion order (get_index
+                                    /// returns NULL for a map).
+                                    items = symtable_array_get_values(arr, &kc);
                                 } else {
                                     size_t total = symtable_array_length(arr);
                                     items =
@@ -5799,8 +5857,26 @@ braced_bare_array_ready:;
                 free(keys);
             }
         } else {
-            /// Produce values. Honor slicing.
+            /// Produce values, in insertion order for a map. Honor slicing.
+            /// Associative arrays are keyed, not index-addressable:
+            /// symtable_array_get_index returns NULL for a map (which silently
+            /// produced empty slots), so read map values via the values
+            /// accessor instead. Matches SEMANTICS 3.9 (a map in a
+            /// vector-accepting slot contributes its values, like ${arr[@]}).
             size_t total = symtable_array_length(array);
+            char **avals = NULL;
+            size_t aval_count = 0;
+            if (array->is_associative) {
+                avals = symtable_array_get_values(array, &aval_count);
+                /// get_values returns NULL for BOTH a real allocation failure
+                /// and an EMPTY map (count 0); only a populated map's NULL is a
+                /// failure. An empty map contributes zero elements
+                /// (aval_count == 0 -> the loop is skipped), not a type error.
+                if (!avals && symtable_array_length(array) > 0) {
+                    return false;
+                }
+                total = aval_count;
+            }
             int start = 0, end_idx = (int)total - 1;
             if (has_slice) {
                 start = slice_offset;
@@ -5820,15 +5896,28 @@ braced_bare_array_ready:;
                 }
             }
             for (int k = start; k <= end_idx; k++) {
-                const char *elem = symtable_array_get_index(array, k);
+                const char *elem =
+                    avals ? avals[k] : symtable_array_get_index(array, k);
                 if (!add_to_argv_list(&vec, &vcount, &vcap,
                                       strdup(elem ? elem : ""))) {
                     for (int j = 0; j < vcount; j++) {
                         free(vec[j]);
                     }
                     free(vec);
+                    if (avals) {
+                        for (size_t j = 0; j < aval_count; j++) {
+                            free(avals[j]);
+                        }
+                        free(avals);
+                    }
                     return false;
                 }
+            }
+            if (avals) {
+                for (size_t j = 0; j < aval_count; j++) {
+                    free(avals[j]);
+                }
+                free(avals);
             }
         }
     }
@@ -14149,18 +14238,20 @@ static char *parse_parameter_expansion(executor_t *executor,
                         /// in a SCALAR-REQUIRING context (vector-accepting
                         /// positions are handled earlier by
                         /// try_expand_vector_arg). Per SEMANTICS.md section
-                        /// 3.9, this is a runtime type mismatch -- a list
-                        /// value cannot flow into a scalar slot.
+                        /// 3.9, this is a runtime type mismatch -- a list or
+                        /// map value cannot flow into a scalar slot.
+                        const char *kind =
+                            (array && array->is_associative) ? "map" : "list";
                         shell_error_t *err = shell_error_create(
                             SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                             executor_current_loc(executor),
-                            "type mismatch: list value ${%s[@]} in a "
+                            "type mismatch: %s value ${%s[@]} in a "
                             "scalar position",
-                            arr_name ? arr_name : "?");
+                            kind, arr_name ? arr_name : "?");
                         if (err) {
                             shell_error_set_suggestion(
                                 err,
-                                "join the list explicitly -- use ${name[*]} "
+                                "join the values explicitly -- use ${name[*]} "
                                 "for space-joining, or build a scalar from "
                                 "the elements with an explicit join.");
                             shell_error_display(err, stderr,
@@ -14171,9 +14262,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                             executor_error_report(
                                 executor, SHELL_ERR_TYPE_MISMATCH,
                                 executor_current_loc(executor),
-                                "type mismatch: list value ${%s[@]} in a "
+                                "type mismatch: %s value ${%s[@]} in a "
                                 "scalar position",
-                                arr_name ? arr_name : "?");
+                                kind, arr_name ? arr_name : "?");
                         }
                         /// SEMANTICS.md section 3.9 enforcement: in a
                         /// script, a type mismatch aborts before the bad
