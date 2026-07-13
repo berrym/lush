@@ -693,6 +693,58 @@ void test_cap_trim_rejected_dup_keeps_all(void) {
 }
 
 /*
+ * Test: runtime ignore_duplicates toggle (#220 -- setopt hist_ignore_dups).
+ * Enabling lazily creates the dedup engine and suppresses a duplicate;
+ * disabling destroys it and duplicates accumulate again.
+ */
+void test_runtime_ignore_duplicates_toggle(void) {
+    TEST("Runtime ignore_duplicates toggle");
+
+    lle_history_core_t *core = NULL;
+    uint64_t id = 0;
+    if (lle_history_core_create(&core, NULL, NULL) != LLE_SUCCESS) {
+        FAIL("Failed to create core");
+    }
+
+    /// The setter honors the configured strategy. Use IGNORE so a duplicate is
+    /// rejected outright, a clean observable (the shell default is KEEP_RECENT,
+    /// which instead keeps the newest and tombstones the old).
+    core->config->dedup_strategy = LLE_DEDUP_IGNORE;
+
+    /// Enable at runtime: the dedup engine is created, so a duplicate command
+    /// is rejected and the entry count does not grow.
+    if (lle_history_set_ignore_duplicates(core, true) != LLE_SUCCESS) {
+        lle_history_core_destroy(core);
+        FAIL("Enabling ignore_duplicates failed");
+    }
+    if (!core->dedup_engine) {
+        lle_history_core_destroy(core);
+        FAIL("Dedup engine should exist after enable");
+    }
+    lle_history_add_entry(core, "ls", 0, &id);
+    lle_history_add_entry(core, "ls", 0, &id);
+    if (core->entry_count != 1) {
+        lle_history_core_destroy(core);
+        FAIL("Duplicate should be rejected while dedup is on");
+    }
+
+    /// Disable at runtime: the engine is destroyed and duplicates accumulate.
+    lle_history_set_ignore_duplicates(core, false);
+    if (core->dedup_engine) {
+        lle_history_core_destroy(core);
+        FAIL("Dedup engine should be gone after disable");
+    }
+    lle_history_add_entry(core, "ls", 0, &id);
+    if (core->entry_count != 2) {
+        lle_history_core_destroy(core);
+        FAIL("Duplicate should accumulate after disable");
+    }
+
+    lle_history_core_destroy(core);
+    PASS();
+}
+
+/*
  * Main test runner
  */
 int main(void) {
@@ -714,6 +766,7 @@ int main(void) {
     test_cap_trim_keeps_newest();
     test_cap_trim_expire_dups_first();
     test_cap_trim_rejected_dup_keeps_all();
+    test_runtime_ignore_duplicates_toggle();
 
     /// Summary
     printf("\n=================================================\n");

@@ -613,6 +613,33 @@ static void lle_theme_config_changed(const char *key,
     }
 }
 
+/**
+ * @brief React to live lle.enable_deduplication changes.
+ *
+ * Applies the canonical dedup setting to the active history's engine, so
+ * `config set lle.enable_deduplication`, `setopt hist_ignore_dups` (its
+ * bash/zsh spelling, routed to this same key), and a TOML reload all take
+ * effect without restarting. No-ops until a history exists; the creation-time
+ * config picks up the persisted initial value. The `lle.*` binding has already
+ * write-through config.lle_enable_deduplication by the time this runs.
+ */
+static void lle_dedup_config_changed(const char *key,
+                                     const creg_value_t *old_value,
+                                     const creg_value_t *new_value,
+                                     void *user_data) {
+    (void)key;
+    (void)old_value;
+    (void)user_data;
+    if (!new_value || new_value->type != CREG_VALUE_BOOLEAN) {
+        return;
+    }
+    if (g_lle_integration && g_lle_integration->editor &&
+        g_lle_integration->editor->history_system) {
+        (void)lle_history_set_ignore_duplicates(
+            g_lle_integration->editor->history_system, new_value->data.boolean);
+    }
+}
+
 static lle_result_t
 create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     if (!integ || !integ->event_hub) {
@@ -648,6 +675,12 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         /// the startup application below handles the persisted initial value.
         config_registry_subscribe("display.lle.theme", lle_theme_config_changed,
                                   NULL);
+
+        /// React to live lle.enable_deduplication changes (the canonical dedup
+        /// key that `setopt hist_ignore_dups` writes). Registered once; the
+        /// callback no-ops until a history exists.
+        config_registry_subscribe("lle.enable_deduplication",
+                                  lle_dedup_config_changed, NULL);
 
         g_registries_initialized = true;
     }

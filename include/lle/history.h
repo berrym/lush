@@ -301,6 +301,18 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
 lle_result_t lle_history_core_destroy(lle_history_core_t *core);
 
 /**
+ * Enable or disable duplicate-command suppression at runtime (setopt
+ * hist_ignore_dups). Lazily creates or destroys the dedup engine on a state
+ * change; idempotent otherwise. NULL core is a no-op success.
+ *
+ * @param core   History core
+ * @param enable Desired duplicate-suppression state
+ * @return LLE_SUCCESS, or the dedup-create error (flag left off on failure)
+ */
+lle_result_t lle_history_set_ignore_duplicates(lle_history_core_t *core,
+                                               bool enable);
+
+/**
  * Create default configuration
  *
  * @param config Output pointer to configuration

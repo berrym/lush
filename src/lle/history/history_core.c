@@ -417,6 +417,49 @@ lle_result_t lle_history_core_create(lle_history_core_t **core,
 }
 
 /**
+ * @brief Enable or disable duplicate-command suppression at runtime.
+ *
+ * Enabling lazily creates the dedup engine the same way the creation path does
+ * (configured strategy/scope, Unicode normalization); disabling destroys it so
+ * the add path stops consulting it. Keys on `enable` alone -- a scope==NONE
+ * engine is a harmless no-op (the check returns not-found), so the extra
+ * scope condition the creation gate applies is unnecessary here. Idempotent --
+ * a no-op when already in the requested state. Backs `setopt hist_ignore_dups`.
+ *
+ * @param core   History core (may be NULL -> no-op success)
+ * @param enable Desired duplicate-suppression state
+ * @return LLE_SUCCESS, or the dedup-create error (flag left off on failure)
+ */
+lle_result_t lle_history_set_ignore_duplicates(lle_history_core_t *core,
+                                               bool enable) {
+    if (!core || !core->config) {
+        return LLE_SUCCESS;
+    }
+    pthread_rwlock_wrlock(&core->lock);
+    lle_result_t result = LLE_SUCCESS;
+    if (core->config->ignore_duplicates != enable) {
+        core->config->ignore_duplicates = enable;
+        if (enable && !core->dedup_engine) {
+            result = lle_history_dedup_create(&core->dedup_engine, core,
+                                              core->config->dedup_strategy,
+                                              core->config->dedup_scope);
+            if (result == LLE_SUCCESS) {
+                lle_history_dedup_set_unicode_normalize(
+                    core->dedup_engine, core->config->unicode_normalize);
+            } else {
+                core->config->ignore_duplicates = false;
+                core->dedup_engine = NULL;
+            }
+        } else if (!enable && core->dedup_engine) {
+            lle_history_dedup_destroy(core->dedup_engine);
+            core->dedup_engine = NULL;
+        }
+    }
+    pthread_rwlock_unlock(&core->lock);
+    return result;
+}
+
+/**
  * @brief Destroy history core and free all resources
  * @param core History core to destroy
  * @return LLE_SUCCESS on success, or error code on failure
