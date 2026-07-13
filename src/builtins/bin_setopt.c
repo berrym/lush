@@ -89,6 +89,19 @@ int bin_setopt(int argc, char **argv) {
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
+            /// Registry-backed spelling (e.g. hist_ignore_dups): write the
+            /// canonical CREG cell; its subscriber applies to the live history.
+            const char *reg_key = shell_option_registry_key(argv[i]);
+            if (reg_key) {
+                if (query_mode) {
+                    if (!shell_is_option_set(argv[i])) {
+                        return 1;
+                    }
+                } else {
+                    config_registry_set_boolean(reg_key, true);
+                }
+                continue;
+            }
             /// Zsh-compat names: silently accepted no-op (see bin_unsetopt.c).
             if (shell_feature_is_noop_alias(argv[i])) {
                 shell_feature_record_noop_alias_state(argv[i], true);

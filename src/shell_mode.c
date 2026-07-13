@@ -696,12 +696,6 @@ static const struct {
      "(see src/lle/history/history_storage.c:233); the zsh option "
      "name is accepted as a spelling alias for the always-on behavior"                 },
     {     "extendedhistory",  true,                        "alias for extended_history"},
-    {    "hist_ignore_dups", false,
-     "lush has a full dedup engine (src/lle/history/history_dedup.c) "
-     "controlled by the ignore_duplicates config knob, but setopt is "
-     "not yet wired to flip the knob. Name accepted so init scripts "
-     "run; actual dedup behavior tracked in #220"                                      },
-    {      "histignoredups", false,                        "alias for hist_ignore_dups"},
     {   "hist_ignore_space",  true,
      "lush already skips commands starting with a space "
      "(ignore_space_prefix defaults to true; see "
@@ -725,6 +719,20 @@ bool shell_feature_is_noop_alias(const char *name) {
         }
     }
     return false;
+}
+
+const char *shell_option_registry_key(const char *name) {
+    if (!name) {
+        return NULL;
+    }
+    /// A bash/zsh option spelling that is really the canonical CREG dedup
+    /// setting -- setopt/unsetopt write it, `[[ -o ]]` reads it, and the
+    /// lle.enable_deduplication subscriber applies it to the live history.
+    if (strcasecmp(name, "hist_ignore_dups") == 0 ||
+        strcasecmp(name, "histignoredups") == 0) {
+        return "lle.enable_deduplication";
+    }
+    return NULL;
 }
 
 /* ============================================================================

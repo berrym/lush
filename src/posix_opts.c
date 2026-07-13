@@ -533,7 +533,15 @@ bool shell_is_option_set(const char *name) {
         bool effective = shell_mode_allows(feature);
         return invert ? !effective : effective;
     }
-    /// 4. noop-alias recorded state (default-true for any unset entry)
+    /// 4. Registry-backed option spellings (e.g. hist_ignore_dups) resolve to
+    ///    their canonical CREG cell so introspection reflects the real state.
+    const char *reg_key = shell_option_registry_key(name);
+    if (reg_key) {
+        bool val = false;
+        return config_registry_get_boolean(reg_key, &val) == CREG_SUCCESS &&
+               val;
+    }
+    /// 5. noop-alias recorded state (default-true for any unset entry)
     if (shell_feature_is_noop_alias(name)) {
         return shell_feature_noop_alias_is_enabled(name);
     }

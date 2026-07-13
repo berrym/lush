@@ -53,6 +53,13 @@ int bin_unsetopt(int argc, char **argv) {
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
+            /// Registry-backed spelling (e.g. hist_ignore_dups): clear the
+            /// canonical CREG cell; its subscriber applies to the live history.
+            const char *reg_key = shell_option_registry_key(argv[i]);
+            if (reg_key) {
+                config_registry_set_boolean(reg_key, false);
+                continue;
+            }
             /// Zsh-compat names: silently accepted no-op (see bin_setopt.c).
             if (shell_feature_is_noop_alias(argv[i])) {
                 shell_feature_record_noop_alias_state(argv[i], false);

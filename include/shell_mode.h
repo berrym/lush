@@ -476,6 +476,17 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
 bool shell_feature_is_noop_alias(const char *name);
 
 /**
+ * @brief Canonical CREG registry key for a registry-backed option spelling.
+ *
+ * Returns the registry key a bash/zsh option name resolves to (e.g.
+ * `hist_ignore_dups` -> `lle.enable_deduplication`), or NULL if @p name is not
+ * registry-backed. setopt/unsetopt write the key, `[[ -o name ]]` reads it, and
+ * a registry subscriber applies it to the owning subsystem -- one canonical
+ * setting behind the polyglot spelling.
+ */
+const char *shell_option_registry_key(const char *name);
+
+/**
  * @brief Record a setopt / unsetopt call for a noop alias.
  *
  * The behavior the alias would toggle is already always-on in lush;
