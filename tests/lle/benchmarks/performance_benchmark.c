@@ -194,8 +194,8 @@ int main(void) {
         return 1;
     }
 
-    lle_buffer_insert_text(buffer, 0,
-                           "This is a test string for cursor movement", 42);
+    const char *cursor_text = "This is a test string for cursor movement";
+    lle_buffer_insert_text(buffer, 0, cursor_text, strlen(cursor_text));
 
     RUN_BENCHMARK(
         {
@@ -273,8 +273,8 @@ int main(void) {
         lle_buffer_destroy(buffer);
         return 1;
     }
-    lle_buffer_insert_text(buffer, 0,
-                           "Test validation performance with UTF-8: 🌍", 46);
+    const char *validation_text = "Test validation performance with UTF-8: 🌍";
+    lle_buffer_insert_text(buffer, 0, validation_text, strlen(validation_text));
 
     RUN_BENCHMARK(
         {
