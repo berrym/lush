@@ -1920,11 +1920,22 @@ if fs.exists('tests/unit/test_screen_buffer.c')
       test_screen_buffer_sources += s
     endif
   endforeach
+  # screen_buffer_t is ~400KB (lines[100] x cells[512]). Each test declares one
+  # on the stack; at -O3 the single-call test functions inline into main, and
+  # AddressSanitizer does not reuse stack slots (it needs each variable's slot
+  # live to detect use-after-scope), so all ~60 buffers coexist in one frame and
+  # overflow the stack. Build this binary without inlining under a sanitizer so
+  # each test keeps its own transient frame; the normal build stays optimized.
+  test_screen_buffer_opts = []
+  if get_option('b_sanitize') != 'none'
+    test_screen_buffer_opts = ['optimization=0']
+  endif
   test_screen_buffer = executable('test_screen_buffer',
                                   'tests/unit/test_screen_buffer.c',
                                   'tests/unit/test_executor_stubs.c',
                                   test_screen_buffer_sources + lle_shell_sources,
                                   include_directories: [inc, include_directories('tests')],
+                                  override_options: test_screen_buffer_opts,
                                   dependencies: [lle_dep, libm])
   test('Screen Buffer', test_screen_buffer,
        suite: 'unit',
