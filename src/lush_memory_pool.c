@@ -38,32 +38,44 @@ static size_t fallback_sizes[100];
 static int fallback_count = 0;
 
 /// Malloc fallback pointer tracking for proper cleanup
-/// Uses a simple dynamic array that grows as needed
+/// Uses two lockstep dynamic arrays that grow as needed: one for the pointers,
+/// one for their requested sizes. The sizes are the authoritative usable
+/// capacity of each fallback allocation, consulted by lush_pool_realloc so it
+/// never over-reads a smaller original buffer when growing.
 #define INITIAL_FALLBACK_CAPACITY 256
 static void **malloc_fallback_ptrs = NULL;
+static size_t *malloc_fallback_sizes = NULL;
 static size_t malloc_fallback_count = 0;
 static size_t malloc_fallback_capacity = 0;
 
 /**
  * @brief Track a malloc fallback allocation for later cleanup
  * @param ptr Pointer to track
+ * @param size Requested allocation size in bytes (usable capacity)
  * @return true on success, false on failure
  */
-static bool track_malloc_fallback(void *ptr) {
+static bool track_malloc_fallback(void *ptr, size_t size) {
     if (!ptr)
         return false;
 
-    /// Initialize array on first use
+    /// Initialize arrays on first use
     if (!malloc_fallback_ptrs) {
         malloc_fallback_ptrs =
             malloc(INITIAL_FALLBACK_CAPACITY * sizeof(void *));
         if (!malloc_fallback_ptrs)
             return false;
+        malloc_fallback_sizes =
+            malloc(INITIAL_FALLBACK_CAPACITY * sizeof(size_t));
+        if (!malloc_fallback_sizes) {
+            free(malloc_fallback_ptrs);
+            malloc_fallback_ptrs = NULL;
+            return false;
+        }
         malloc_fallback_capacity = INITIAL_FALLBACK_CAPACITY;
         malloc_fallback_count = 0;
     }
 
-    /// Grow array if needed
+    /// Grow arrays if needed
     if (malloc_fallback_count >= malloc_fallback_capacity) {
         size_t new_capacity = malloc_fallback_capacity * 2;
         void **new_ptrs =
@@ -71,9 +83,15 @@ static bool track_malloc_fallback(void *ptr) {
         if (!new_ptrs)
             return false;
         malloc_fallback_ptrs = new_ptrs;
+        size_t *new_sizes =
+            realloc(malloc_fallback_sizes, new_capacity * sizeof(size_t));
+        if (!new_sizes)
+            return false;
+        malloc_fallback_sizes = new_sizes;
         malloc_fallback_capacity = new_capacity;
     }
 
+    malloc_fallback_sizes[malloc_fallback_count] = size;
     malloc_fallback_ptrs[malloc_fallback_count++] = ptr;
     return true;
 }
@@ -90,9 +108,32 @@ static bool untrack_malloc_fallback(void *ptr) {
 
     for (size_t i = 0; i < malloc_fallback_count; i++) {
         if (malloc_fallback_ptrs[i] == ptr) {
-            /// Move last element to this position (order doesn't matter)
+            /// Move last element to this position (order doesn't matter);
+            /// keep the size array in lockstep with the pointer array
+            malloc_fallback_count--;
             malloc_fallback_ptrs[i] =
-                malloc_fallback_ptrs[--malloc_fallback_count];
+                malloc_fallback_ptrs[malloc_fallback_count];
+            malloc_fallback_sizes[i] =
+                malloc_fallback_sizes[malloc_fallback_count];
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * @brief Look up the tracked size of a malloc fallback allocation
+ * @param ptr Pointer to look up
+ * @param size_out Receives the requested allocation size when found
+ * @return true if ptr is a tracked fallback allocation, false otherwise
+ */
+static bool malloc_fallback_size(void *ptr, size_t *size_out) {
+    if (!ptr || !malloc_fallback_ptrs)
+        return false;
+
+    for (size_t i = 0; i < malloc_fallback_count; i++) {
+        if (malloc_fallback_ptrs[i] == ptr) {
+            *size_out = malloc_fallback_sizes[i];
             return true;
         }
     }
@@ -111,7 +152,9 @@ static void free_all_malloc_fallbacks(void) {
     }
 
     free(malloc_fallback_ptrs);
+    free(malloc_fallback_sizes);
     malloc_fallback_ptrs = NULL;
+    malloc_fallback_sizes = NULL;
     malloc_fallback_count = 0;
     malloc_fallback_capacity = 0;
 }
@@ -545,12 +588,17 @@ void *lush_pool_alloc(size_t size) {
     pthread_mutex_lock(&pool_mutex);
 
     if (!global_memory_pool || !global_memory_pool->initialized) {
-        /// Fallback to malloc if pool not initialized
-        pthread_mutex_unlock(&pool_mutex);
+        /// Fallback to malloc if pool not initialized. Track the allocation and
+        /// its size like any other fallback so lush_pool_realloc can recover
+        /// the original size and shutdown can reclaim it.
         result = malloc(size);
-        if (result && global_memory_pool) {
-            update_stats(false, size, get_timestamp_ns() - start_time);
+        if (result) {
+            track_malloc_fallback(result, size);
+            if (global_memory_pool) {
+                update_stats(false, size, get_timestamp_ns() - start_time);
+            }
         }
+        pthread_mutex_unlock(&pool_mutex);
         set_last_error(result ? LUSH_POOL_SUCCESS
                               : LUSH_POOL_ERROR_MALLOC_FAILED);
         return result;
@@ -579,7 +627,7 @@ void *lush_pool_alloc(size_t size) {
 
         /// Track pointer for cleanup during shutdown
         if (result) {
-            track_malloc_fallback(result);
+            track_malloc_fallback(result, size);
         }
 
         POOL_DEBUG("Malloc fallback: size=%zu (total fallbacks: %d)", size,
@@ -610,14 +658,18 @@ void lush_pool_free(void *ptr) {
 
     /// Handle case where pool is NULL
     if (!global_memory_pool) {
-        pthread_mutex_unlock(&pool_mutex);
         if (pool_was_ever_initialized) {
             /// Pool was shut down - memory was already freed during shutdown.
             /// Do NOT call free() here as it would cause double-free.
+            pthread_mutex_unlock(&pool_mutex);
             return;
         } else {
-            /// Pool was never initialized - this memory came from malloc
-            /// fallback. We must free it to avoid leaking.
+            /// Pool was never initialized - this memory came from a pre-init
+            /// malloc fallback. Untrack it (still under the lock) before
+            /// freeing so a later init+shutdown cannot double-free a stale
+            /// entry.
+            untrack_malloc_fallback(ptr);
+            pthread_mutex_unlock(&pool_mutex);
             free(ptr);
             return;
         }
@@ -671,6 +723,39 @@ void lush_pool_free(void *ptr) {
 }
 
 /**
+ * @brief Usable capacity in bytes of a live allocation owned by the pool
+ * @param ptr Pointer previously returned by lush_pool_alloc
+ * @return Backing capacity in bytes, or 0 if ptr is not owned by the pool
+ *
+ * For a pooled allocation this is the fixed block size; for a malloc fallback
+ * it is the tracked requested size. The caller must hold pool_mutex.
+ */
+static size_t usable_capacity_for_ptr(void *ptr) {
+    if (!ptr) {
+        return 0;
+    }
+
+    if (global_memory_pool && global_memory_pool->initialized) {
+        for (int i = 0; i < LUSH_POOL_COUNT; i++) {
+            lush_pool_t *pool = &global_memory_pool->pools[i];
+            for (size_t j = 0; j < pool->current_blocks; j++) {
+                if (pool->all_blocks[j].memory == ptr &&
+                    pool->all_blocks[j].in_use) {
+                    return pool->all_blocks[j].size;
+                }
+            }
+        }
+    }
+
+    size_t fallback = 0;
+    if (malloc_fallback_size(ptr, &fallback)) {
+        return fallback;
+    }
+
+    return 0;
+}
+
+/**
  * @brief Reallocate memory (may use malloc for complex resizing)
  * @param ptr Pointer to existing memory allocation (NULL allocates new memory)
  * @param new_size New size in bytes (0 frees the memory)
@@ -686,15 +771,21 @@ void *lush_pool_realloc(void *ptr, size_t new_size) {
         return lush_pool_alloc(new_size);
     }
 
-    /// For simplicity, we use malloc/free for realloc operations
-    /// This could be optimized in the future to use pools when possible
+    /// The pool does not record the caller's original requested size, but the
+    /// usable capacity of the backing allocation (fixed block size, or the
+    /// tracked malloc-fallback size) is a safe upper bound on what may be read
+    /// from ptr. Copying at most that many bytes preserves the caller's data
+    /// without over-reading a smaller original buffer when growing.
+    pthread_mutex_lock(&pool_mutex);
+    size_t old_capacity = usable_capacity_for_ptr(ptr);
+    pthread_mutex_unlock(&pool_mutex);
+
     void *new_ptr = lush_pool_alloc(new_size);
-    if (new_ptr && ptr) {
-        /// Copy data (we don't know the original size, so copy conservatively)
-        /// This is a limitation - in practice, we might need to track
-        /// allocation sizes
-        memcpy(new_ptr, ptr,
-               new_size); /// Assumes new_size <= old_size or undefined behavior
+    if (new_ptr) {
+        size_t copy_size = (new_size < old_capacity) ? new_size : old_capacity;
+        if (copy_size > 0) {
+            memcpy(new_ptr, ptr, copy_size);
+        }
         lush_pool_free(ptr);
     }
 
