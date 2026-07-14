@@ -842,6 +842,20 @@ static node_t *parse_and_or(parser_t *parser) {
 
         node_t *right = parse_pipeline(parser);
         if (!right) {
+            /// A missing right operand is a syntax error. parse_simple_command
+            /// returns NULL without recording one when the next token is a
+            /// closing keyword (esac/fi/done/then/else/elif/do), so report it
+            /// here. Beyond the diagnostic this sets has_error before the
+            /// free below, which lets collect_pending_heredocs discard a
+            /// here-document left pending on `left` instead of dereferencing
+            /// the node this free releases.
+            if (!parser->has_error) {
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                    "a binary operator must be followed by a command",
+                    "expected a command after '%s'",
+                    op_type == TOK_LOGICAL_AND ? "&&" : "||");
+            }
             free_node_tree(left);
             parser_exit_recursion(parser);
             return NULL;
@@ -1046,6 +1060,18 @@ static node_t *parse_pipeline(parser_t *parser) {
 
         node_t *right = parse_pipeline(parser);
         if (!right) {
+            /// A missing stage after a pipe is a syntax error that
+            /// parse_simple_command leaves unreported for a closing keyword;
+            /// record it so the diagnostic surfaces and has_error is set
+            /// before the free (see the matching note in parse_and_or, which
+            /// keeps a here-document pending on `left` from being collected
+            /// against a freed node).
+            if (!parser->has_error) {
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                    "a pipe must be followed by a command",
+                    "expected a command after '%s'", pipe_stderr ? "|&" : "|");
+            }
             free_node_tree(left);
             parser_exit_recursion(parser);
             return NULL;
@@ -3060,6 +3086,19 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
 static bool collect_pending_heredocs(parser_t *parser) {
     if (!parser || parser->pending_heredoc_count == 0) {
         return true;
+    }
+
+    /// Each pending entry borrows its redir_node (and the delimiter string the
+    /// node owns) from the AST. A parse error recovers by freeing the partial
+    /// AST via free_node_tree -- e.g. parse_case_statement discards the case
+    /// subtree when a here-document appears inside a case whose 'esac' is
+    /// missing -- which frees those borrowed nodes while the pending count is
+    /// still set. The safety-net flush in parser_parse then walks the queue
+    /// into freed memory. Once the parse has errored the queue is meaningless:
+    /// drop it without dereferencing the freed nodes.
+    if (parser->has_error) {
+        parser->pending_heredoc_count = 0;
+        return false;
     }
 
     tokenizer_t *tk = parser->tokenizer;
