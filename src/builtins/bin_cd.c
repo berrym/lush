@@ -32,7 +32,10 @@ static char *canonicalize_logical_path(const char *path) {
         return NULL;
 
     size_t path_len = strlen(path);
-    char *result = malloc(path_len + 1);
+    /// +2, not +1: canonicalization never grows the path except the empty-input
+    /// case below, which writes the two-byte "/" into result. path_len + 1
+    /// would be a single byte for an empty path and overflow that strcpy.
+    char *result = malloc(path_len + 2);
     if (!result)
         return NULL;
 
@@ -68,6 +71,13 @@ static char *canonicalize_logical_path(const char *path) {
                     continue;
                 }
             }
+            /// The slash (and any run of them) has been emitted; re-test the
+            /// loop condition rather than falling through to copy *src. When
+            /// the slashes ran to the end of the string src now points at the
+            /// terminator, and the fall-through would copy it and advance src
+            /// past the buffer -- a heap read overflow on the next *src (e.g.
+            /// the path "/", or any path with a trailing slash).
+            continue;
         }
         *dst++ = *src++;
     }
