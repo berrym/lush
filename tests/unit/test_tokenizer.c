@@ -772,14 +772,16 @@ TEST(utf8_partial_sequence_at_eof_brace_expansion) {
     ASSERT_NOT_NULL(t, "tokenizer_new failed");
     /// Drain all tokens. The previous defect crashed inside token_new during
     /// the first WORD emission; reaching TOK_EOF here proves the bound holds.
-    token_t *tok = NULL;
-    do {
-        tok = tokenizer_current(t);
+    /// tokenizer_advance frees the current token, so test the type before
+    /// advancing rather than re-reading the cached pointer afterward.
+    for (;;) {
+        token_t *tok = tokenizer_current(t);
         ASSERT_NOT_NULL(tok, "tokenizer_current returned NULL");
-        if (tok->type != TOK_EOF) {
-            tokenizer_advance(t);
+        if (tok->type == TOK_EOF) {
+            break;
         }
-    } while (tok->type != TOK_EOF);
+        tokenizer_advance(t);
+    }
     tokenizer_free(t);
 }
 
