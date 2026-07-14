@@ -55,21 +55,28 @@ struct lle_kill_ring {
  */
 
 /**
- * @brief Allocate string from memory pool or malloc
+ * @brief Allocate raw bytes from the ring's memory pool or malloc
  * @param ring Kill ring instance containing memory pool reference
- * @param str Source string to duplicate
- * @param len Length of string to allocate (excluding null terminator)
+ * @param size Number of bytes to allocate
+ * @return Pointer to allocated memory, or NULL on failure
+ */
+static char *kill_ring_alloc(lle_kill_ring_t *ring, size_t size) {
+    if (ring->pool != NULL) {
+        return (char *)lle_pool_allocate_fast(ring->pool, size);
+    }
+    return (char *)malloc(size);
+}
+
+/**
+ * @brief Allocate and copy a string from the ring's memory pool or malloc
+ * @param ring Kill ring instance containing memory pool reference
+ * @param str Source string to duplicate (must hold at least len bytes)
+ * @param len Number of bytes to copy (excluding null terminator)
  * @return Pointer to allocated string copy, or NULL on failure
  */
 static char *kill_ring_strdup(lle_kill_ring_t *ring, const char *str,
                               size_t len) {
-    char *copy;
-
-    if (ring->pool != NULL) {
-        copy = (char *)lle_pool_allocate_fast(ring->pool, len + 1);
-    } else {
-        copy = (char *)malloc(len + 1);
-    }
+    char *copy = kill_ring_alloc(ring, len + 1);
 
     if (copy != NULL) {
         memcpy(copy, str, len);
@@ -279,9 +286,12 @@ lle_result_t lle_kill_ring_add(lle_kill_ring_t *ring, const char *text,
         /// Append to current head entry
         lle_kill_entry_t *entry = &ring->entries[ring->head];
 
-        /// Reallocate with additional space
+        /// Allocate the combined buffer, then fill it from the existing
+        /// entry and the appended text below. This is a raw allocation, not
+        /// a copy: kill_ring_strdup would read new_len bytes from its source,
+        /// so passing "" (a single byte) over-reads by new_len - 1.
         size_t new_len = entry->length + text_len;
-        char *new_text = kill_ring_strdup(ring, "", new_len);
+        char *new_text = kill_ring_alloc(ring, new_len + 1);
 
         if (new_text == NULL) {
             pthread_mutex_unlock(&ring->lock);
@@ -361,9 +371,11 @@ lle_result_t lle_kill_ring_prepend(lle_kill_ring_t *ring, const char *text) {
     /// Prepend to current head entry
     lle_kill_entry_t *entry = &ring->entries[ring->head];
 
-    /// Reallocate with additional space
+    /// Allocate the combined buffer, then fill it from the appended text and
+    /// the existing entry below. Raw allocation, not a copy: kill_ring_strdup
+    /// would read new_len bytes from "" and over-read by new_len - 1.
     size_t new_len = text_len + entry->length;
-    char *new_text = kill_ring_strdup(ring, "", new_len);
+    char *new_text = kill_ring_alloc(ring, new_len + 1);
 
     if (new_text == NULL) {
         pthread_mutex_unlock(&ring->lock);
