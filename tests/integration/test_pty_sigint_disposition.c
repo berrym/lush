@@ -37,6 +37,15 @@ typedef struct {
     const char *bytes;
     const char *
         gate_file; ///< absolute path; send only once it exists (NULL = ungated)
+    /// Hold the input this many ms after the gate opens (or, when ungated,
+    /// after at_ms) before sending. This turns "fire when the readiness file
+    /// appears" into "fire a fixed margin after it", so the send lands after
+    /// the state the file signals is fully established -- e.g. after a
+    /// foreground child has been forked and handed the terminal, not merely
+    /// after the command that wrote the file returned. The margin is measured
+    /// from the readiness event, so it holds regardless of how far load pushes
+    /// that event out.
+    long after_gate_ms;
 } timed_input_t;
 
 /// Spawn lush on a fresh controlling PTY (all fds on the terminal), feed the
@@ -62,6 +71,7 @@ static void drive(const char *lush, const char *home, const timed_input_t *in,
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
     size_t idx = 0;
+    long gate_open_ms = -1; /// when in[idx]'s gate first opened (-1 = not yet)
     char buf[4096];
     for (;;) {
         struct timespec now;
@@ -73,11 +83,25 @@ static void drive(const char *lush, const char *home, const timed_input_t *in,
         }
         /// Inputs fire in order; a gated input that is not yet ready blocks
         /// every later input as well, so a gated entry must be last in `in`.
-        while (idx < n && elapsed >= in[idx].at_ms &&
-               (in[idx].gate_file == NULL ||
-                access(in[idx].gate_file, F_OK) == 0)) {
+        while (idx < n) {
+            if (elapsed < in[idx].at_ms) {
+                break;
+            }
+            if (in[idx].gate_file != NULL &&
+                access(in[idx].gate_file, F_OK) != 0) {
+                break; /// gate closed; wait (and hold every later input)
+            }
+            /// Gate is open (or the input is ungated). Stamp the moment it
+            /// opened, then hold for after_gate_ms measured from that stamp.
+            if (gate_open_ms < 0) {
+                gate_open_ms = elapsed;
+            }
+            if (elapsed < gate_open_ms + in[idx].after_gate_ms) {
+                break;
+            }
             (void)!write(master, in[idx].bytes, strlen(in[idx].bytes));
             idx++;
+            gate_open_ms = -1;
         }
         struct timeval tv = {.tv_sec = 0, .tv_usec = 100000};
         fd_set r;
@@ -125,9 +149,9 @@ static bool bg_survives_ctrl(const char *lush, char ctrl, const char *tag) {
              marker);
     char seq[2] = {ctrl, '\0'};
     const timed_input_t in[] = {
-        { 600, "set +m\n",  NULL},
-        {1200,       line,  NULL},
-        {1300,        seq, ready}, /// fires once the armed subshell is running
+        { 600, "set +m\n",  NULL, 0},
+        {1200,       line,  NULL, 0},
+        {1300,        seq, ready, 0}, /// fires once the armed subshell is running
     };
     drive(lush, home, in, sizeof(in) / sizeof(in[0]), 5200);
 
@@ -157,13 +181,20 @@ static bool fg_interrupted_by_ctrl_c(const char *lush) {
     unlink(ready);
 
     char line[PATH_MAX * 2 + 64];
-    snprintf(line, sizeof(line), "echo r > %s; sleep 2 && echo x > %s\n", ready,
+    snprintf(line, sizeof(line), "echo r > %s; sleep 4 && echo x > %s\n", ready,
              marker);
     const timed_input_t in[] = {
-        {600,   line,  NULL},
-        {700, "\x03", ready}, /// interrupt once the foreground sleep is running
+        {600,   line,  NULL,    0},
+        /// Send the interrupt 1200 ms after `ready` (written by the leading
+        /// echo) appears. The shell forks the foreground `sleep` and hands it
+        /// the terminal only after that echo returns; firing on the bare gate
+        /// raced that setup, so the Ctrl-C occasionally reached the shell's
+        /// group instead of the sleep and the sleep ran to completion. The
+        /// margin waits that setup out, and the 4 s sleep leaves ample room for
+        /// the send to land while it is still running.
+        {  0, "\x03", ready, 1200},
     };
-    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 3600);
+    drive(lush, home, in, sizeof(in) / sizeof(in[0]), 6000);
 
     bool interrupted = access(marker, F_OK) != 0;
     pty_rmrf(home);
