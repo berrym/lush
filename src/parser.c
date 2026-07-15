@@ -4822,6 +4822,7 @@ static node_t *parse_case_statement(parser_t *parser) {
                     }
                     if (!ok) {
                         free(single_pattern);
+                        free(pattern);
                         free_node_tree(case_item);
                         free_node_tree(case_node);
                         return NULL;
@@ -4848,6 +4849,7 @@ static node_t *parse_case_statement(parser_t *parser) {
                         single_pattern, single_pattern_len + token_len + 1);
                     if (!new_single_pattern) {
                         free(single_pattern);
+                        free(pattern);
                         free_node_tree(case_item);
                         free_node_tree(case_node);
                         return NULL;
@@ -4864,8 +4866,12 @@ static node_t *parse_case_statement(parser_t *parser) {
                 }
             }
 
-            /// If we didn't collect any pattern tokens, that's an error
+            /// If we didn't collect any pattern tokens, that's an error. Any
+            /// pattern accumulated from earlier alternatives (e.g. the `a` in
+            /// `a|`) is still a standalone allocation here -- not yet attached
+            /// to case_item -- so release it too.
             if (!single_pattern) {
+                free(pattern);
                 free_node_tree(case_item);
                 free_node_tree(case_node);
                 parser_error_add_with_help(
