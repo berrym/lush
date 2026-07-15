@@ -196,6 +196,7 @@ static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
 static char *colon_segmented_tilde_expand(const char *value);
 static char *magic_equal_tilde_expand(const char *word);
+static bool is_assignment_builtin(const char *cmd);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static char **apply_glob_qualifier_to_literal(const char *value, int *count);
 static bool needs_glob_expansion(const char *str);
@@ -2125,11 +2126,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
     /// command is NOT one of the assignment-aware set; the targeted
     /// builtins handle the sentinel themselves.
     if (argc > 0 && argv[0]) {
-        const char *cmd = argv[0];
-        bool sentinel_aware =
-            (strcmp(cmd, "local") == 0 || strcmp(cmd, "declare") == 0 ||
-             strcmp(cmd, "typeset") == 0 || strcmp(cmd, "readonly") == 0 ||
-             strcmp(cmd, "export") == 0);
+        bool sentinel_aware = is_assignment_builtin(argv[0]);
         if (!sentinel_aware) {
             for (int i = 0; i < argc; i++) {
                 if (argv[i] && argv[i][0] == '\x1F') {
@@ -6122,35 +6119,51 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         continue;
                     }
 
-                    /// Type-aware expansion via the shared helper.
-                    /// Process substitution is the only path that
-                    /// propagates failure as NULL — everything else
+                    char *expanded_arg = NULL;
+
+                    /// An unquoted assignment-style argument word `name=~/path`
+                    /// gets its RHS tilde-expanded like a real assignment
+                    /// value. This happens for the assignment-aware builtins
+                    /// (export/local/declare/typeset/readonly) always -- POSIX
+                    /// assignment semantics -- and for every command under
+                    /// zsh's magic_equal_subst. Restricted to bareword
+                    /// (unquoted) words, so `export E="~/a"` and non-assignment
+                    /// args are untouched. The tilde runs on the RAW value
+                    /// BEFORE variable and command expansion, exactly like
+                    /// execute_assignment, so a tilde that later emerges from
+                    /// $var/$(...) is not itself expanded (`export E=~/a:$u`
+                    /// with u=~/b keeps ~/b literal).
+                    if (child->val.str && child->type != NODE_STRING_LITERAL &&
+                        child->type != NODE_STRING_EXPANDABLE &&
+                        (shell_mode_allows(FEATURE_MAGIC_EQUAL_SUBST) ||
+                         is_assignment_builtin(command->val.str))) {
+                        char *pre_tilde =
+                            magic_equal_tilde_expand(child->val.str);
+                        if (pre_tilde) {
+                            expanded_arg =
+                                expand_if_needed(executor, pre_tilde);
+                            free(pre_tilde);
+                        }
+                    }
+
+                    /// Type-aware expansion via the shared helper for every
+                    /// other word (and for assignment words that were not a
+                    /// name=value shape). Process substitution is the only path
+                    /// that propagates failure as NULL -- everything else
                     /// either succeeds or returns "".
-                    char *expanded_arg = expand_arg_node(executor, child);
-                    if (!expanded_arg && (child->type == NODE_PROC_SUB_IN ||
-                                          child->type == NODE_PROC_SUB_OUT)) {
-                        goto cleanup_and_fail;
+                    if (!expanded_arg) {
+                        expanded_arg = expand_arg_node(executor, child);
+                        if (!expanded_arg &&
+                            (child->type == NODE_PROC_SUB_IN ||
+                             child->type == NODE_PROC_SUB_OUT)) {
+                            goto cleanup_and_fail;
+                        }
                     }
 
                     if (getenv("NEW_PARSER_DEBUG")) {
                         fprintf(stderr,
                                 "DEBUG: Processing argument: '%s' -> '%s'\n",
                                 child->val.str, expanded_arg);
-                    }
-
-                    /// magic_equal_subst (zsh): an unquoted assignment-style
-                    /// argument word `name=~/path` gets its RHS tilde-expanded
-                    /// like a real assignment value. Gated on the option and
-                    /// restricted to bareword (unquoted) words, so `"x=~"` and
-                    /// non-assignment args are untouched.
-                    if (expanded_arg && child->type != NODE_STRING_LITERAL &&
-                        child->type != NODE_STRING_EXPANDABLE &&
-                        shell_mode_allows(FEATURE_MAGIC_EQUAL_SUBST)) {
-                        char *magic = magic_equal_tilde_expand(expanded_arg);
-                        if (magic) {
-                            free(expanded_arg);
-                            expanded_arg = magic;
-                        }
                     }
 
                     /// A fused glob qualifier (`"$f"(N)`, `"$f"(Nm-1)`)
@@ -16503,6 +16516,17 @@ static char *colon_segmented_tilde_expand(const char *value) {
 
     out[olen] = '\0';
     return out;
+}
+
+/// The assignment-aware builtins. Their name=value arguments follow
+/// assignment semantics -- notably tilde expansion of the value after `=` and
+/// each unquoted `:`, exactly like a real assignment RHS (POSIX 2.6.1; bash and
+/// zsh agree). This is independent of the zsh magic_equal_subst option, which
+/// extends the same treatment to every command's arguments.
+static bool is_assignment_builtin(const char *cmd) {
+    return cmd && (strcmp(cmd, "export") == 0 || strcmp(cmd, "local") == 0 ||
+                   strcmp(cmd, "declare") == 0 || strcmp(cmd, "typeset") == 0 ||
+                   strcmp(cmd, "readonly") == 0);
 }
 
 /// For magic_equal_subst: tilde-expand the value of an assignment-style word
