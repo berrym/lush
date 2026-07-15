@@ -143,6 +143,55 @@ TEST(var_concatenation) {
     teardown_executor(exec);
 }
 
+TEST(cmdsub_leading_with_trailing_text) {
+    /// An assignment value beginning with a command substitution followed by
+    /// literal text concatenates rather than collapsing to empty (issue #467).
+    /// Previously x=$(cmd):b ran the whole word "$(cmd):b" as a command and
+    /// stored nothing.
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "A=$(echo a):b", 1);
+    char *a = symtable_get_var(exec->symtable, "A");
+    ASSERT_NOT_NULL(a, "A should be set");
+    ASSERT_STR_EQ(a, "a:b", "$(echo a):b should concatenate to a:b");
+    free(a);
+
+    executor_execute_command_line(exec, "B=$(echo a)/lit", 1);
+    char *b = symtable_get_var(exec->symtable, "B");
+    ASSERT_NOT_NULL(b, "B should be set");
+    ASSERT_STR_EQ(b, "a/lit", "$(echo a)/lit should concatenate to a/lit");
+    free(b);
+
+    executor_execute_command_line(exec, "C=`echo a`:b", 1);
+    char *c = symtable_get_var(exec->symtable, "C");
+    ASSERT_NOT_NULL(c, "C should be set");
+    ASSERT_STR_EQ(c, "a:b", "`echo a`:b should concatenate to a:b");
+    free(c);
+
+    /// Arithmetic expansion is the same family: $((expr))<text> also
+    /// concatenates.
+    executor_execute_command_line(exec, "E=$((1+2)):z", 1);
+    char *e = symtable_get_var(exec->symtable, "E");
+    ASSERT_NOT_NULL(e, "E should be set");
+    ASSERT_STR_EQ(e, "3:z", "$((1+2)):z should concatenate to 3:z");
+    free(e);
+
+    /// Bare substitution and bare arithmetic are unaffected.
+    executor_execute_command_line(exec, "D=$(echo bare)", 1);
+    char *d = symtable_get_var(exec->symtable, "D");
+    ASSERT_NOT_NULL(d, "D should be set");
+    ASSERT_STR_EQ(d, "bare", "bare $(echo bare) still expands to bare");
+    free(d);
+
+    executor_execute_command_line(exec, "F=$((2*3))", 1);
+    char *f = symtable_get_var(exec->symtable, "F");
+    ASSERT_NOT_NULL(f, "F should be set");
+    ASSERT_STR_EQ(f, "6", "bare $((2*3)) still expands to 6");
+    free(f);
+
+    teardown_executor(exec);
+}
+
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
@@ -750,6 +799,7 @@ int main(void) {
     RUN_TEST(simple_var_expansion);
     RUN_TEST(braced_var_expansion);
     RUN_TEST(var_concatenation);
+    RUN_TEST(cmdsub_leading_with_trailing_text);
     RUN_TEST(unset_var_expands_empty);
 
     printf("\n--- Parameter Expansion Tests ---\n");
