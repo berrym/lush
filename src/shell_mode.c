@@ -696,11 +696,6 @@ static const struct {
      "(see src/lle/history/history_storage.c:233); the zsh option "
      "name is accepted as a spelling alias for the always-on behavior"                 },
     {     "extendedhistory",  true,                        "alias for extended_history"},
-    {   "hist_ignore_space",  true,
-     "lush already skips commands starting with a space "
-     "(ignore_space_prefix defaults to true; see "
-     "src/lle/history/history_core.c:75 and :540)"                                     },
-    {     "histignorespace",  true,                       "alias for hist_ignore_space"},
     { "interactivecomments",  true,
      "zsh-style spelling of POSIX `interactive-comments`; lush already "
      "recognizes `#` as a comment introducer in interactive input"                     },
@@ -731,6 +726,13 @@ const char *shell_option_registry_key(const char *name) {
     if (strcasecmp(name, "hist_ignore_dups") == 0 ||
         strcasecmp(name, "histignoredups") == 0) {
         return "lle.enable_deduplication";
+    }
+    /// hist_ignore_space is likewise the canonical CREG history cell -- setopt/
+    /// unsetopt write it, `[[ -o ]]` reads it, and the lle.hist_ignore_space
+    /// subscriber applies it to the live history's add-time space filter.
+    if (strcasecmp(name, "hist_ignore_space") == 0 ||
+        strcasecmp(name, "histignorespace") == 0) {
+        return "lle.hist_ignore_space";
     }
     return NULL;
 }

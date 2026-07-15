@@ -228,7 +228,8 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
     hist_config->unicode_normalize = config.lle_dedup_unicode_normalize;
 
     hist_config->ignore_space_prefix =
-        false; /// Standard bash behavior: space = don't save
+        config.lle_hist_ignore_space; /// bash/zsh hist_ignore_space, off by
+                                      /// default; setopt writes the cell
 
     /// Metadata to save
     hist_config->save_timestamps =

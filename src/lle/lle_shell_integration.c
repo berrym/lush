@@ -190,7 +190,7 @@ static void populate_history_config(lle_history_config_t *hist_config) {
     }
 
     hist_config->unicode_normalize = config.lle_dedup_unicode_normalize;
-    hist_config->ignore_space_prefix = false;
+    hist_config->ignore_space_prefix = config.lle_hist_ignore_space;
 
     /// Metadata
     hist_config->save_timestamps = config.history_timestamps;
@@ -640,6 +640,26 @@ static void lle_dedup_config_changed(const char *key,
     }
 }
 
+/// React to live lle.hist_ignore_space changes (the canonical key that `setopt
+/// hist_ignore_space` writes) and apply them to the active history's add-time
+/// space-prefix filter. No-ops until a history exists.
+static void lle_hist_ignore_space_changed(const char *key,
+                                          const creg_value_t *old_value,
+                                          const creg_value_t *new_value,
+                                          void *user_data) {
+    (void)key;
+    (void)old_value;
+    (void)user_data;
+    if (!new_value || new_value->type != CREG_VALUE_BOOLEAN) {
+        return;
+    }
+    if (g_lle_integration && g_lle_integration->editor &&
+        g_lle_integration->editor->history_system) {
+        (void)lle_history_set_ignore_space_prefix(
+            g_lle_integration->editor->history_system, new_value->data.boolean);
+    }
+}
+
 static lle_result_t
 create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     if (!integ || !integ->event_hub) {
@@ -681,6 +701,11 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         /// callback no-ops until a history exists.
         config_registry_subscribe("lle.enable_deduplication",
                                   lle_dedup_config_changed, NULL);
+
+        /// React to live lle.hist_ignore_space changes (the canonical key that
+        /// `setopt hist_ignore_space` writes).
+        config_registry_subscribe("lle.hist_ignore_space",
+                                  lle_hist_ignore_space_changed, NULL);
 
         g_registries_initialized = true;
     }

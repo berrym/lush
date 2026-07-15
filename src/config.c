@@ -816,6 +816,15 @@ static const creg_option_t lle_options[] = {
          "Keeps repeated commands from piling up in your history. By default, "
          "running a command again moves its existing entry to the most recent "
          "position rather than storing a second copy."},
+    {.name = "hist_ignore_space",
+     .type = CREG_VALUE_BOOLEAN,
+     .default_val = {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     .help = "Do not save commands that start with a space",
+     .persisted = true,
+     .description =
+         "When on, a command line beginning with a space is not written to "
+         "history -- a quick way to run something without recording it. Off by "
+         "default, matching bash and zsh."},
     {.name = "dedup_scope",
      .type = CREG_VALUE_STRING,
      .default_val = {.type = CREG_VALUE_STRING, .data.string = "session"},
@@ -1231,6 +1240,8 @@ static const creg_enum_pair_t lle_dedup_strategy_pairs[] = {
 static void lle_bind_runtime(void) {
     config_registry_bind_boolean("lle.enable_deduplication",
                                  &config.lle_enable_deduplication);
+    config_registry_bind_boolean("lle.hist_ignore_space",
+                                 &config.lle_hist_ignore_space);
     config_registry_bind_enum("lle.dedup_scope", (int *)&config.lle_dedup_scope,
                               lle_dedup_scope_pairs, LLE_DEDUP_SCOPE_SESSION);
     config_registry_bind_enum(
@@ -2312,6 +2323,9 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Use Unicode NFC normalization for dedup comparison\n"
     "lle.dedup_unicode_normalize = true\n"
     "\n"
+    "# Skip commands that begin with a space (setopt hist_ignore_space)\n"
+    "lle.hist_ignore_space = false\n"
+    "\n"
     "# Enable history caching for performance\n"
     "lle.enable_history_cache = true\n"
     "\n"
@@ -2622,6 +2636,7 @@ void config_set_defaults(void) {
     config.lle_history_file = NULL; /// Will default to ~/.lush_history
     config.lle_enable_forensic_tracking = true;
     config.lle_enable_deduplication = true;
+    config.lle_hist_ignore_space = false;
     config.lle_dedup_scope = LLE_DEDUP_SCOPE_SESSION;
     config.lle_dedup_strategy = LLE_DEDUP_STRATEGY_KEEP_RECENT;
     config.lle_dedup_navigation =
