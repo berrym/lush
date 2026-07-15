@@ -6667,6 +6667,44 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
     return result ? result : strdup("");
 }
 
+/// Return true when `text` is a single command substitution -- $(...) or
+/// `...` -- that spans the entire string, i.e. nothing follows the closing
+/// delimiter. When text continues after it (an assignment value like
+/// x=$(cmd):b or x=`cmd`.txt), the word is a concatenation and must go
+/// through the general expander: expand_command_substitution treats the whole
+/// word as the command when it does not end in the closer, so the substitution
+/// output plus the trailing literal collapse to empty. The scan is quote- and
+/// nesting-aware so a ) or ` inside the substitution's own quotes does not end
+/// it prematurely.
+static bool cmdsub_spans_whole_word(const char *text) {
+    size_t tlen = strlen(text);
+    if (strncmp(text, "$(", 2) == 0) {
+        /// Match the '(' at text[1] to its ')'. lush_find_matching_brace is
+        /// nesting-aware and understands the four shell quote dialects (so a
+        /// ) inside '...'/"..."/`...`/$'...' does not end it early), and it
+        /// also spans the outer '))' of an arithmetic $((...)). The
+        /// substitution covers the whole word iff its ')' is the last byte.
+        size_t off;
+        if (!lush_find_matching_brace(text + 1, tlen - 1, &off)) {
+            return false;
+        }
+        return (1 + off + 1) == tlen;
+    }
+    if (text[0] == '`') {
+        size_t i = 1;
+        while (i < tlen && text[i] != '`') {
+            if (text[i] == '\\' && i + 1 < tlen) {
+                i++;
+            }
+            i++;
+        }
+        /// i is at the closing backtick; the sub spans the word iff it is the
+        /// last character.
+        return i < tlen && i + 1 == tlen;
+    }
+    return true;
+}
+
 char *expand_if_needed(executor_t *executor, const char *text) {
     if (!executor || !text) {
         return NULL;
@@ -7036,6 +7074,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return strdup(text);
         } else if (strncmp(text, "$((", 3) == 0) {
+            /// $((expr))<text> (e.g. x=$((1+2)):b) is a concatenation, not a
+            /// bare arithmetic/substitution -- route it through the general
+            /// expander so the trailing literal survives, the same as the
+            /// $(...) and `...` branches below.
+            if (!cmdsub_spans_whole_word(text)) {
+                return expand_quoted_string(executor, text, false);
+            }
             /// Disambiguate `$((` between arithmetic and command-sub of an
             /// anonymous function `$(() {...})` (issue #99). Shared helper
             /// with the tokenizer; `${...}` parameter expansions inside the
@@ -7046,6 +7091,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return expand_command_substitution(executor, text);
         } else if (strncmp(text, "$(", 2) == 0) {
+            /// A bare $(...) is a pure substitution; $(...)<text> (e.g.
+            /// x=$(cmd):b) is a concatenation whose trailing literal
+            /// expand_command_substitution would swallow. Route the latter
+            /// through the general expander, mirroring the ${...} branch.
+            if (!cmdsub_spans_whole_word(text)) {
+                return expand_quoted_string(executor, text, false);
+            }
             return expand_command_substitution(executor, text);
         } else if (strncmp(text, "${", 2) == 0) {
             /// ${var} format - check if there's more text after }
@@ -7086,6 +7138,12 @@ char *expand_if_needed(executor_t *executor, const char *text) {
 
     /// Check for backtick command substitution
     if (text[0] == '`') {
+        /// `cmd`<text> (e.g. x=`cmd`:b) is a concatenation, not a bare
+        /// substitution; route it through the general expander so the
+        /// trailing literal survives.
+        if (!cmdsub_spans_whole_word(text)) {
+            return expand_quoted_string(executor, text, false);
+        }
         return expand_command_substitution(executor, text);
     }
 
