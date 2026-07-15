@@ -163,7 +163,8 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            /// Check if variable exists and get its value
+            /// Check whether the variable exists. symtable_get_global returns
+            /// an owned copy used only for this presence test, so free it.
             char *current_value = symtable_get_global(argv[i]);
             if (current_value) {
                 /// Variable exists - just export it
@@ -173,6 +174,7 @@ int bin_export(int argc, char **argv) {
                 symtable_set_global(argv[i], "");
                 symtable_export_global(argv[i]);
             }
+            free(current_value);
         }
     }
 
