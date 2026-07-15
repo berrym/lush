@@ -58,7 +58,7 @@ static int popd_pop_and_cd(void) {
     }
 
     free(dir);
-    dirstack_print(false, false);
+    builtin_report_dirstack();
     return 0;
 }
 
@@ -193,7 +193,7 @@ int bin_popd(int argc, char **argv) {
                 return 1;
             }
 
-            dirstack_print(false, false);
+            builtin_report_dirstack();
             return 0;
         }
     }

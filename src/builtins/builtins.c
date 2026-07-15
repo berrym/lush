@@ -40,9 +40,11 @@
 #include "builtins.h"
 
 #include "config.h"
+#include "dirstack.h"
 #include "executor.h"
 #include "ht.h"
 #include "identifier.h"
+#include "shell_mode.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -315,6 +317,14 @@ source_location_t builtin_get_source_location(void) {
             ->context_locations[current_executor->context_depth - 1];
     }
     return SOURCE_LOC_UNKNOWN;
+}
+
+void builtin_report_dirstack(void) {
+    /// pushd_silent suppresses the automatic post-operation stack echo. The
+    /// explicit `dirs` command calls dirstack_print directly and is not gated.
+    if (!shell_mode_allows(FEATURE_PUSHD_SILENT)) {
+        dirstack_print(false, false);
+    }
 }
 
 /* ============================================================================

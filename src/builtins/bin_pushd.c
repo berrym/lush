@@ -17,13 +17,60 @@
 #include <string.h>
 
 /**
+ * @brief Change to `target`, pushing the old working directory onto the stack
+ *
+ * Shared by `pushd <dir>` and by bare `pushd` under pushd_to_home. Honors
+ * pushd_ignore_dups (an existing copy of `cwd` is dropped before the push so
+ * the stack never keeps duplicates) and pushd_silent (via
+ * builtin_report_dirstack). Takes ownership of `cwd` and frees it.
+ *
+ * @param cwd Owned copy of the current working directory (freed here)
+ * @param target Directory to change into
+ * @return 0 on success, 1 on error (already reported)
+ */
+static int pushd_to(char *cwd, const char *target) {
+    if (chdir(target) < 0) {
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                              builtin_get_source_location(), "%s: %s", target,
+                              strerror(saved_errno));
+        free(cwd);
+        return 1;
+    }
+
+    dirstack_push(cwd);
+
+    symtable_set_global("OLDPWD", cwd);
+    char *new_cwd = getcwd(NULL, 0);
+    if (new_cwd) {
+        symtable_set_global("PWD", new_cwd);
+        /// pushd_ignore_dups: drop any older stack copy of the directory we
+        /// just moved to, so the current directory is not duplicated in the
+        /// stack. zsh deduplicates the target (the new cwd), not the old
+        /// directory being pushed; the just-pushed old cwd differs from the
+        /// new cwd (except for `pushd .`, where the redundant push is exactly
+        /// what should be dropped). Match on the resolved absolute path so a
+        /// relative target still deduplicates.
+        if (shell_mode_allows(FEATURE_PUSHD_IGNORE_DUPS)) {
+            dirstack_remove_matching(new_cwd);
+        }
+        free(new_cwd);
+    }
+
+    free(cwd);
+    builtin_report_dirstack();
+    return 0;
+}
+
+/**
  * @brief Push directory onto stack and change to it
  *
  * Usage:
  *   pushd [dir]  - Push current dir, cd to dir
  *   pushd +N     - Rotate stack so Nth entry is at top, cd there
  *   pushd -N     - Rotate stack so Nth from bottom is at top, cd there
- *   pushd        - Exchange top two stack entries
+ *   pushd        - Exchange top two stack entries (or cd to $HOME under
+ *                  pushd_to_home)
  *
  * @param argc Argument count
  * @param argv Argument vector
@@ -40,6 +87,20 @@ int bin_pushd(int argc, char **argv) {
     }
 
     if (argc == 1) {
+        /// zsh pushd_to_home: bare `pushd` behaves like `pushd $HOME` instead
+        /// of exchanging the top two entries.
+        if (shell_mode_allows(FEATURE_PUSHD_TO_HOME)) {
+            const char *home = getenv("HOME");
+            if (!home || !*home) {
+                executor_error_report(
+                    current_executor, SHELL_ERR_UNBOUND_VARIABLE,
+                    builtin_get_source_location(), "HOME not set");
+                free(cwd);
+                return 1;
+            }
+            return pushd_to(cwd, home);
+        }
+
         /// pushd with no args: exchange top two entries
         if (dirstack_size() < 1) {
             {
@@ -159,7 +220,7 @@ int bin_pushd(int argc, char **argv) {
 
         free(old_top);
         free(cwd);
-        dirstack_print(false, false);
+        builtin_report_dirstack();
         return 0;
     }
 
@@ -235,7 +296,7 @@ int bin_pushd(int argc, char **argv) {
             if (t == 0) {
                 /// Rotating to the current directory is a no-op.
                 free(cwd);
-                dirstack_print(false, false);
+                builtin_report_dirstack();
                 return 0;
             }
 
@@ -299,31 +360,11 @@ int bin_pushd(int argc, char **argv) {
             }
             free(list);
             free(cwd);
-            dirstack_print(false, false);
+            builtin_report_dirstack();
             return 0;
         }
     }
 
-    /// Push current directory and cd to new one
-    if (chdir(arg) < 0) {
-        int saved_errno = errno;
-        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                              builtin_get_source_location(), "%s: %s", arg,
-                              strerror(saved_errno));
-        free(cwd);
-        return 1;
-    }
-
-    dirstack_push(cwd);
-
-    symtable_set_global("OLDPWD", cwd);
-    char *new_cwd = getcwd(NULL, 0);
-    if (new_cwd) {
-        symtable_set_global("PWD", new_cwd);
-        free(new_cwd);
-    }
-
-    free(cwd);
-    dirstack_print(false, false);
-    return 0;
+    /// Push current directory and cd to new one.
+    return pushd_to(cwd, arg);
 }

@@ -668,12 +668,23 @@ selected entry becomes the new current directory and the rest keep their
 circular order. `setopt pushdminus` inverts the two signs (`pushd +N`
 then behaves like `pushd -N`).
 
+Three zsh options, all off by default, adjust `pushd`/`popd`:
+`setopt pushd_silent` suppresses the automatic stack print after each
+`pushd`/`popd` (the explicit `dirs` command still prints); `setopt
+pushd_to_home` makes a bare `pushd` behave like `pushd $HOME` instead of
+swapping the top two entries; `setopt pushd_ignore_dups` keeps a single copy
+of each directory on the stack, dropping the older one when you `pushd` back
+into a directory already present.
+
 ```bash
 pushd /tmp            # Push pwd, cd /tmp
 pushd                 # Swap top two stack entries
 pushd +1              # Rotate: second-from-left becomes current
 pushd -0              # Rotate: rightmost (oldest) becomes current
 setopt pushdminus     # Invert the +N / -N sign convention
+setopt pushd_silent   # No stack print after pushd/popd
+setopt pushd_to_home  # Bare pushd goes to $HOME
+setopt pushd_ignore_dups  # Keep one copy of each directory
 ```
 
 ### `shopt`

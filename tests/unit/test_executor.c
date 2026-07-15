@@ -789,6 +789,72 @@ TEST(rt_pushdminus_option) {
                         "df b a c \n");
 }
 
+TEST(rt_pushd_silent_option) {
+    /// setopt pushd_silent is a real, off-by-default option (#460) that
+    /// suppresses the automatic directory-stack echo after pushd and popd.
+    /// The explicit `dirs` command is never gated. Each pushd/popd runs in a
+    /// command substitution so the auto-report is the captured output and the
+    /// cd/setopt never leak to sibling tests.
+    run_result_t r = run_shell(
+        "( [[ -o pushd_silent ]] || echo default-off\n"
+        "  setopt pushd_silent; [[ -o pushd_silent ]] && echo set-on\n"
+        "  unsetopt pushd_silent; [[ -o pushd_silent ]] || echo unset-off\n"
+        "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b\n"
+        "  o=$( cd \"$d/a\"; pushd \"$d/b\" ); [ -n \"$o\" ] && echo "
+        "off-prints\n"
+        "  o=$( cd \"$d/a\"; setopt pushd_silent; pushd \"$d/b\" ); "
+        "[ -z \"$o\" ] && echo on-silent\n"
+        "  o=$( cd \"$d/a\"; setopt pushd_silent; pushd \"$d/b\" >/dev/null; "
+        "popd ); [ -z \"$o\" ] && echo popd-silent\n"
+        "  o=$( cd \"$d/a\"; setopt pushd_silent; pushd \"$d/b\" >/dev/null; "
+        "dirs ); [ -n \"$o\" ] && echo dirs-prints\n"
+        "  rm -rf \"$d\" )\n");
+    ASSERT_STDOUT_EQ(r, "default-off\nset-on\nunset-off\n"
+                        "off-prints\non-silent\npopd-silent\ndirs-prints\n");
+}
+
+TEST(rt_pushd_to_home_option) {
+    /// setopt pushd_to_home is a real, off-by-default option (#460): bare
+    /// `pushd` acts like `pushd $HOME` instead of exchanging the top two
+    /// entries. Default bare pushd on an empty stack still errors.
+    run_result_t r = run_shell(
+        "( [[ -o pushd_to_home ]] || echo default-off\n"
+        "  setopt pushd_to_home; [[ -o pushd_to_home ]] && echo set-on\n"
+        "  unsetopt pushd_to_home; [[ -o pushd_to_home ]] || echo unset-off\n"
+        "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b; export HOME=\"$d/b\"\n"
+        "  ( cd \"$d/a\"; pushd 2>/dev/null; echo \"df-rc=$?\" )\n"
+        "  ( cd \"$d/a\"; setopt pushd_to_home; pushd >/dev/null; "
+        "[ \"$(pwd -P)\" = \"$(cd \"$d/b\" && pwd -P)\" ] && echo at-home )\n"
+        "  rm -rf \"$d\" )\n");
+    ASSERT_STDOUT_EQ(r, "default-off\nset-on\nunset-off\n"
+                        "df-rc=1\nat-home\n");
+}
+
+TEST(rt_pushd_ignore_dups_option) {
+    /// setopt pushd_ignore_dups is a real, off-by-default option (#460): the
+    /// stack keeps only one copy of a directory. Pushing a directory that is
+    /// already on the stack drops the older occurrence (zsh deduplicates the
+    /// directory moved to). Default keeps the duplicate.
+    run_result_t r = run_shell(
+        "( [[ -o pushd_ignore_dups ]] || echo default-off\n"
+        "  setopt pushd_ignore_dups; [[ -o pushd_ignore_dups ]] && echo "
+        "set-on\n"
+        "  unsetopt pushd_ignore_dups; [[ -o pushd_ignore_dups ]] || "
+        "echo unset-off\n"
+        "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c\n"
+        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "}\n"
+        "  printf 'df '; ( cd \"$d/a\"; pushd \"$d/b\" >/dev/null; "
+        "pushd \"$d/c\" >/dev/null; pushd \"$d/b\" >/dev/null; db )\n"
+        "  printf 'ig '; ( cd \"$d/a\"; setopt pushd_ignore_dups; "
+        "pushd \"$d/b\" >/dev/null; pushd \"$d/c\" >/dev/null; "
+        "pushd \"$d/b\" >/dev/null; db )\n"
+        "  rm -rf \"$d\" )\n");
+    ASSERT_STDOUT_EQ(r, "default-off\nset-on\nunset-off\n"
+                        "df b c b a \n"
+                        "ig b c a \n");
+}
+
 TEST(rt_magic_equal_subst) {
     /// zsh magic_equal_subst (#219): the RHS of an unquoted assignment-style
     /// argument word `name=~/path` is tilde-expanded like a real assignment
@@ -4825,6 +4891,9 @@ int main(void) {
     RUN_TEST(rt_glob_qualifier_quoted_element);
     RUN_TEST(rt_pushd_popd_rotation);
     RUN_TEST(rt_pushdminus_option);
+    RUN_TEST(rt_pushd_silent_option);
+    RUN_TEST(rt_pushd_to_home_option);
+    RUN_TEST(rt_pushd_ignore_dups_option);
     RUN_TEST(rt_magic_equal_subst);
     RUN_TEST(rt_assignment_tilde_expansion);
     RUN_TEST(rt_declaration_util_tilde_expansion);

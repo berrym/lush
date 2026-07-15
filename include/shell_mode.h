@@ -228,6 +228,19 @@ typedef enum {
                          ///< profile (zsh's own default); `setopt pushdminus`
                          ///< opts into the inversion.
 
+    FEATURE_PUSHD_SILENT,  ///< Zsh pushd_silent: suppress the automatic
+                           ///< directory-stack print after pushd/popd. Off by
+                           ///< default (bash always prints; zsh's own
+                           ///< default is off), so lush prints unless set.
+    FEATURE_PUSHD_TO_HOME, ///< Zsh pushd_to_home: bare `pushd` acts like
+                           ///< `pushd $HOME` instead of swapping the top two
+                           ///< entries. Off by default (zsh's own default).
+    FEATURE_PUSHD_IGNORE_DUPS, ///< Zsh pushd_ignore_dups: do not keep multiple
+                               ///< copies of the same directory on the stack;
+                               ///< an existing occurrence is dropped before the
+                               ///< new push. Off by default (zsh's own
+                               ///< default).
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;
