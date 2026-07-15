@@ -50,7 +50,11 @@ static char *canonicalize_logical_path(const char *path) {
             /// Skip multiple slashes
             while (*src == '/')
                 src++;
-            if (dst > result || dst == result)
+            /// Emit a single separator, but not when dst already ends in one.
+            /// After a `..` component is resolved the retained separator sits
+            /// at dst[-1]; the slash that introduced the next component would
+            /// otherwise add a second one (`/a/b/../c` -> `/a//c`).
+            if (dst == result || dst[-1] != '/')
                 *dst++ = '/';
 
             /// Check for . and ..
