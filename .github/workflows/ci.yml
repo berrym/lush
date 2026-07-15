@@ -63,6 +63,38 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  # AddressSanitizer + UndefinedBehaviorSanitizer build. Leak detection is
+  # disabled for now: the unit suite still has known leaks tracked separately,
+  # so this job gates on hard memory-safety errors (heap-buffer-overflow,
+  # use-after-free, stack-overflow) and undefined behavior, not leaks. The
+  # top-level `integration` suite (PTY/job-control) and `lle-benchmarks`
+  # (timing-sensitive) are excluded; expand coverage once they are verified
+  # clean under the sanitizers.
+  sanitizer-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang meson ninja-build
+
+      - name: Configure (address + undefined sanitizers)
+        run: |
+          CC=clang meson setup build \
+            -Db_sanitize=address,undefined -Db_lundef=false -Dwerror=false
+
+      - name: Build
+        run: |
+          meson compile -C build
+
+      - name: Run tests under sanitizers (leaks off)
+        run: |
+          ASAN_OPTIONS=detect_leaks=0 meson test -C build --print-errorlogs \
+            --suite unit --suite lle-unit --suite lle-functional \
+            --suite lle-integration --suite lle-compliance
+
   # Memory leak detection on Linux using Valgrind
   memory-check-linux:
     runs-on: ubuntu-latest
