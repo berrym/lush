@@ -286,7 +286,8 @@ typedef struct {
     char *lle_history_file;                  ///< LLE history file path
     bool lle_enable_forensic_tracking;       ///< Enable forensic tracking
     bool lle_enable_deduplication;           ///< Enable deduplication
-    lle_dedup_scope_t lle_dedup_scope;       ///< Deduplication scope
+    bool lle_hist_ignore_space;        ///< Skip commands starting with a space
+    lle_dedup_scope_t lle_dedup_scope; ///< Deduplication scope
     lle_dedup_strategy_t lle_dedup_strategy; ///< Deduplication strategy
     bool lle_dedup_navigation;        ///< Skip duplicates during navigation
     bool lle_dedup_navigation_unique; ///< Show only unique entries

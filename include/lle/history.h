@@ -313,6 +313,18 @@ lle_result_t lle_history_set_ignore_duplicates(lle_history_core_t *core,
                                                bool enable);
 
 /**
+ * Apply a live change to the "ignore commands starting with a space" setting
+ * (the bash/zsh hist_ignore_space option). Takes effect immediately -- the add
+ * path consults it on every insert. NULL core is a no-op success.
+ *
+ * @param core   History core
+ * @param enable Desired space-prefix-ignore state
+ * @return LLE_SUCCESS
+ */
+lle_result_t lle_history_set_ignore_space_prefix(lle_history_core_t *core,
+                                                 bool enable);
+
+/**
  * Create default configuration
  *
  * @param config Output pointer to configuration

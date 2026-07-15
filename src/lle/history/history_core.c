@@ -75,8 +75,10 @@ lle_result_t lle_history_config_create_default(lle_history_config_t **config,
     cfg->ignore_duplicates = false;                     /// deduplication
     cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT;        /// Default strategy
     cfg->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_SESSION; /// Default scope
-    cfg->expire_dups_first = false;  /// FIFO trim unless opted in
-    cfg->ignore_space_prefix = true; /// Standard shell behavior
+    cfg->expire_dups_first = false; /// FIFO trim unless opted in
+    cfg->ignore_space_prefix =
+        false; /// Off by default (bash/zsh); the lle.hist_ignore_space cell and
+               /// the two live populate paths drive it
     cfg->save_timestamps = true;
     cfg->save_working_dir = true;
     cfg->save_exit_codes = true;
@@ -459,6 +461,21 @@ lle_result_t lle_history_set_ignore_duplicates(lle_history_core_t *core,
     return result;
 }
 
+/// Apply a live change to the "ignore space-prefixed commands" setting. The add
+/// path consults core->config->ignore_space_prefix on every insert, so this
+/// takes effect immediately -- the target of the lle.hist_ignore_space
+/// subscriber that `setopt hist_ignore_space` writes.
+lle_result_t lle_history_set_ignore_space_prefix(lle_history_core_t *core,
+                                                 bool enable) {
+    if (!core || !core->config) {
+        return LLE_SUCCESS;
+    }
+    pthread_rwlock_wrlock(&core->lock);
+    core->config->ignore_space_prefix = enable;
+    pthread_rwlock_unlock(&core->lock);
+    return LLE_SUCCESS;
+}
+
 /**
  * @brief Destroy history core and free all resources
  * @param core History core to destroy
@@ -739,13 +756,16 @@ lle_result_t lle_history_add_entry(lle_history_core_t *core,
         return LLE_ERROR_NOT_INITIALIZED;
     }
 
-    /// Check for space prefix (ignore if configured)
-    if (core->config->ignore_space_prefix && command[0] == ' ') {
-        return LLE_SUCCESS; /// Silently ignore
-    }
-
     /// Acquire write lock
     pthread_rwlock_wrlock(&core->lock);
+
+    /// Skip commands that begin with a space when configured. The field is
+    /// runtime-mutable via lle_history_set_ignore_space_prefix (which writes it
+    /// under this same lock), so the read is held under the lock too.
+    if (core->config->ignore_space_prefix && command[0] == ' ') {
+        pthread_rwlock_unlock(&core->lock);
+        return LLE_SUCCESS; /// Silently ignore
+    }
 
     lle_result_t result = LLE_SUCCESS;
 

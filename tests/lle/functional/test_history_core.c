@@ -745,6 +745,59 @@ void test_runtime_ignore_duplicates_toggle(void) {
 }
 
 /*
+ * Test: runtime ignore_space_prefix toggle (#469 -- setopt hist_ignore_space).
+ * Enabling suppresses a command that begins with a space at add time;
+ * disabling lets space-prefixed commands accumulate again.
+ */
+void test_runtime_ignore_space_prefix_toggle(void) {
+    TEST("Runtime ignore_space_prefix toggle");
+
+    lle_history_core_t *core = NULL;
+    uint64_t id = 0;
+    if (lle_history_core_create(&core, NULL, NULL) != LLE_SUCCESS) {
+        FAIL("Failed to create core");
+    }
+
+    /// Default is off: a space-prefixed command is stored like any other.
+    lle_history_add_entry(core, " secret", 0, &id);
+    if (core->entry_count != 1) {
+        lle_history_core_destroy(core);
+        FAIL("Space-prefixed command should be stored while filter is off");
+    }
+
+    /// Enable at runtime: the next space-prefixed command is dropped silently
+    /// and the count does not grow.
+    if (lle_history_set_ignore_space_prefix(core, true) != LLE_SUCCESS) {
+        lle_history_core_destroy(core);
+        FAIL("Enabling ignore_space_prefix failed");
+    }
+    lle_history_add_entry(core, " hidden", 0, &id);
+    if (core->entry_count != 1) {
+        lle_history_core_destroy(core);
+        FAIL("Space-prefixed command should be dropped while filter is on");
+    }
+
+    /// A command without a leading space is still stored while the filter is
+    /// on.
+    lle_history_add_entry(core, "visible", 0, &id);
+    if (core->entry_count != 2) {
+        lle_history_core_destroy(core);
+        FAIL("Non-space command should be stored while filter is on");
+    }
+
+    /// Disable at runtime: space-prefixed commands accumulate again.
+    lle_history_set_ignore_space_prefix(core, false);
+    lle_history_add_entry(core, " again", 0, &id);
+    if (core->entry_count != 3) {
+        lle_history_core_destroy(core);
+        FAIL("Space-prefixed command should accumulate after disable");
+    }
+
+    lle_history_core_destroy(core);
+    PASS();
+}
+
+/*
  * Main test runner
  */
 int main(void) {
@@ -767,6 +820,7 @@ int main(void) {
     test_cap_trim_expire_dups_first();
     test_cap_trim_rejected_dup_keeps_all();
     test_runtime_ignore_duplicates_toggle();
+    test_runtime_ignore_space_prefix_toggle();
 
     /// Summary
     printf("\n=================================================\n");
