@@ -839,6 +839,32 @@ TEST(rt_assignment_tilde_expansion) {
                         "8:/tmp/meq_home:/tmp/meq_home/b\n");
 }
 
+TEST(rt_declaration_util_tilde_expansion) {
+    /// The assignment-aware builtins (export/local/declare/typeset/readonly)
+    /// tilde-expand their name=value arguments like a real assignment (#466),
+    /// independent of magic_equal_subst; a double-quoted value stays literal.
+    /// Subshell-wrapped so the HOME export does not leak to other run_shell
+    /// tests.
+    run_result_t r =
+        run_shell("( export HOME=/tmp/meq_home\n"
+                  "  export E=~/a:~/b;   echo \"1:$E\"\n"
+                  "  declare D=~/d;      echo \"2:$D\"\n"
+                  "  readonly R=~/r;     echo \"3:$R\"\n"
+                  "  typeset T=~/t;      echo \"4:$T\"\n"
+                  "  f() { local L=~/l; echo \"5:$L\"; }; f\n"
+                  "  export Q=\"~/keep\"; echo \"6:$Q\"\n"
+                  "  u=\"~/b\"; export W=~/a:$u; echo \"7:$W\" )\n");
+    ASSERT_STDOUT_EQ(r, "1:/tmp/meq_home/a:/tmp/meq_home/b\n"
+                        "2:/tmp/meq_home/d\n"
+                        "3:/tmp/meq_home/r\n"
+                        "4:/tmp/meq_home/t\n"
+                        "5:/tmp/meq_home/l\n"
+                        "6:~/keep\n"
+                        /// A tilde that emerges from $u is NOT re-expanded: the
+                        /// leading ~/a expands, the ~/b from $u stays literal.
+                        "7:/tmp/meq_home/a:~/b\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -4801,6 +4827,7 @@ int main(void) {
     RUN_TEST(rt_pushdminus_option);
     RUN_TEST(rt_magic_equal_subst);
     RUN_TEST(rt_assignment_tilde_expansion);
+    RUN_TEST(rt_declaration_util_tilde_expansion);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
