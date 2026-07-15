@@ -120,6 +120,9 @@ int bin_cd(int argc __attribute__((unused)),
     static char *previous_dir = NULL;
     char *current_dir = NULL;
     char *target_dir = NULL;
+    /// Set when target_dir points at an owned copy (the cdable_vars path below
+    /// aliases the owned symtable_get_global result); freed before returning.
+    bool target_dir_owned = false;
 
     /// Restricted-shell mode forbids `cd` outright. Matches bash's
     /// rbash and zsh's RESTRICTED. See include/restricted_mode.h for
@@ -226,15 +229,16 @@ int bin_cd(int argc __attribute__((unused)),
         /// variable name
         if (shell_mode_allows(FEATURE_CDABLE_VARS) && target_dir[0] != '/' &&
             target_dir[0] != '.' && target_dir[0] != '~') {
-            const char *var_value = symtable_get_global(target_dir);
-            if (var_value && var_value[0] == '/') {
-                /// Try cd to the variable's value
-                if (chdir(var_value) == 0) {
-                    /// Success - update target_dir for PWD setting
-                    target_dir = (char *)var_value;
-                    goto cd_success;
-                }
+            /// symtable_get_global returns an owned copy.
+            char *var_value = symtable_get_global(target_dir);
+            if (var_value && var_value[0] == '/' && chdir(var_value) == 0) {
+                /// Success - the owned copy becomes target_dir for PWD setting
+                /// and is released before the function returns.
+                target_dir = var_value;
+                target_dir_owned = true;
+                goto cd_success;
             }
+            free(var_value);
         }
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
@@ -340,6 +344,8 @@ cd_success:
                     free(new_dir);
                 }
             }
+            /// symtable_get_global returns an owned copy; release it.
+            free(current_pwd);
         } else {
             /// cd with no arguments - go to HOME
             char *home = getenv("HOME");
@@ -360,6 +366,10 @@ cd_success:
     /// etc.) that the working directory has changed. previous_dir holds the old
     /// dir.
     lle_fire_directory_changed(previous_dir, NULL);
+
+    if (target_dir_owned) {
+        free(target_dir);
+    }
 
     return 0;
 }
