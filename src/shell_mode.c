@@ -534,6 +534,9 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
     [FEATURE_PUSHD_MINUS] = "pushd_minus",
+    [FEATURE_PUSHD_SILENT] = "pushd_silent",
+    [FEATURE_PUSHD_TO_HOME] = "pushd_to_home",
+    [FEATURE_PUSHD_IGNORE_DUPS] = "pushd_ignore_dups",
     [FEATURE_CDABLE_VARS] = "cdable_vars",
     [FEATURE_ERREXIT_IN_LOOPS] = "errexit_in_loops",
     [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
@@ -613,6 +616,9 @@ static const struct {
     {           "bsd_echo",               FEATURE_XPG_ECHO,  true},
     {            "bsdecho",               FEATURE_XPG_ECHO,  true},
     {         "pushdminus",            FEATURE_PUSHD_MINUS, false},
+    {        "pushdsilent",           FEATURE_PUSHD_SILENT, false},
+    {        "pushdtohome",          FEATURE_PUSHD_TO_HOME, false},
+    {    "pushdignoredups",      FEATURE_PUSHD_IGNORE_DUPS, false},
     {                 NULL,                              0, false}
 };
 
@@ -649,41 +655,32 @@ static const struct {
 } feature_noop_aliases[] = {
     {        "prompt_subst",  true,
      "lush prompt always supports parameter / arith / "
-     "command expansion; no opt-in needed"                                             },
-    {         "promptsubst",  true,                            "alias for prompt_subst"},
-    {       "menu_complete",  true,  "lush completion is always menu-shaped; no toggle"},
-    {        "menucomplete",  true,                           "alias for menu_complete"},
-    {       "always_to_end",  true,   "completion always lands at end of inserted word"},
-    {         "alwaystoend",  true,                           "alias for always_to_end"},
-    {           "auto_menu",  true,      "lush completion auto-menus on TAB; no toggle"},
-    {            "automenu",  true,                               "alias for auto_menu"},
+     "command expansion; no opt-in needed"                                            },
+    {         "promptsubst",  true,                           "alias for prompt_subst"},
+    {       "menu_complete",  true, "lush completion is always menu-shaped; no toggle"},
+    {        "menucomplete",  true,                          "alias for menu_complete"},
+    {       "always_to_end",  true,  "completion always lands at end of inserted word"},
+    {         "alwaystoend",  true,                          "alias for always_to_end"},
+    {           "auto_menu",  true,     "lush completion auto-menus on TAB; no toggle"},
+    {            "automenu",  true,                              "alias for auto_menu"},
     {    "complete_in_word",  true,
-     "lush completion always treats cursor mid-word as completable"                    },
-    {      "completeinword",  true,                        "alias for complete_in_word"},
+     "lush completion always treats cursor mid-word as completable"                   },
+    {      "completeinword",  true,                       "alias for complete_in_word"},
     {         "flowcontrol",  true,
      "terminal flow-control toggle; lush LLE manages its own "
-     "tty raw-mode state"                                                              },
-    {         "correct_all",  true,  "lush has no spelling-correction prompt to toggle"},
-    {          "correctall",  true,                             "alias for correct_all"},
-    {   "pushd_ignore_dups",  true,
-     "lush dirstack dedup behavior is benign and introspection-invisible"              },
-    {     "pushdignoredups",  true,                       "alias for pushd_ignore_dups"},
-    {        "pushd_silent",  true, "lush pushd/popd never prints the stack; always-on"},
-    {         "pushdsilent",  true,                            "alias for pushd_silent"},
-    {       "pushd_to_home",  true,
-     "zsh-specific pushd-with-no-arg-goes-home; lush requires "
-     "an argument"                                                                     },
-    {         "pushdtohome",  true,                           "alias for pushd_to_home"},
+     "tty raw-mode state"                                                             },
+    {         "correct_all",  true, "lush has no spelling-correction prompt to toggle"},
+    {          "correctall",  true,                            "alias for correct_all"},
     {             "multios",  true,
      "zsh multiple-redirection-target option; lush has its own "
-     "redirection engine"                                                              },
+     "redirection engine"                                                             },
     {             "clobber",  true,
      "zsh positive CLOBBER (inverse of POSIX noclobber); accepted "
      "as alias since unsetopt CLOBBER and set -o noclobber express the same "
-     "intent. Full inversion wiring is a future refinement"                            },
+     "intent. Full inversion wiring is a future refinement"                           },
     {                "beep",  true,
      "zsh line-editor terminal-bell-on-error; LLE has its own bell "
-     "behavior and never gates on this option"                                         },
+     "behavior and never gates on this option"                                        },
 
     /* Zsh setopt names accepted for parity with oh-my-zsh / prezto
      * etc. Each entry's underlying behavior is already what zsh
@@ -694,14 +691,14 @@ static const struct {
     {    "extended_history",  true,
      "lush HISTFILE format already records timestamps "
      "(see src/lle/history/history_storage.c:233); the zsh option "
-     "name is accepted as a spelling alias for the always-on behavior"                 },
-    {     "extendedhistory",  true,                        "alias for extended_history"},
+     "name is accepted as a spelling alias for the always-on behavior"                },
+    {     "extendedhistory",  true,                       "alias for extended_history"},
     { "interactivecomments",  true,
      "zsh-style spelling of POSIX `interactive-comments`; lush already "
-     "recognizes `#` as a comment introducer in interactive input"                     },
-    {"interactive_comments",  true,                     "alias for interactivecomments"},
+     "recognizes `#` as a comment introducer in interactive input"                    },
+    {"interactive_comments",  true,                    "alias for interactivecomments"},
 
-    {                  NULL, false,                                                NULL}
+    {                  NULL, false,                                               NULL}
 };
 
 bool shell_feature_is_noop_alias(const char *name) {

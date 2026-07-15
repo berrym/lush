@@ -265,6 +265,52 @@ TEST(dirstack_remove_out_of_range) {
     dirstack_cleanup();
 }
 
+TEST(dirstack_remove_matching_all_copies) {
+    /// dirstack_remove_matching drops every entry equal to the path (backs
+    /// pushd_ignore_dups, #460). Two copies of /dup are both removed; the
+    /// surrounding entries keep their order.
+    dirstack_init();
+    dirstack_push("/a");
+    dirstack_push("/dup");
+    dirstack_push("/b");
+    dirstack_push("/dup");
+
+    int removed = dirstack_remove_matching("/dup");
+    ASSERT_EQ(removed, 2, "Both /dup copies should be removed");
+    ASSERT_EQ(dirstack_size(), 2, "Stack should have 2 entries left");
+    ASSERT_STR_EQ(dirstack_peek(0), "/b", "Top should be /b");
+    ASSERT_STR_EQ(dirstack_peek(1), "/a", "Bottom should be /a");
+
+    dirstack_cleanup();
+}
+
+TEST(dirstack_remove_matching_none) {
+    /// A path not on the stack removes nothing and leaves the stack intact.
+    dirstack_init();
+    dirstack_push("/a");
+    dirstack_push("/b");
+
+    int removed = dirstack_remove_matching("/missing");
+    ASSERT_EQ(removed, 0, "No entry should be removed");
+    ASSERT_EQ(dirstack_size(), 2, "Stack should be unchanged");
+
+    dirstack_cleanup();
+}
+
+TEST(dirstack_remove_matching_nfc) {
+    /// Paths compare with NFC normalization, so a decomposed and a
+    /// precomposed spelling of the same directory count as one. Push the
+    /// NFD form (e + combining acute), remove the NFC form (precomposed e).
+    dirstack_init();
+    dirstack_push("/cafe\xCC\x81"); /// "/cafe" + U+0301 (NFD)
+
+    int removed = dirstack_remove_matching("/caf\xC3\xA9"); /// "/caf" + U+00E9
+    ASSERT_EQ(removed, 1, "NFD and NFC spellings should match");
+    ASSERT_EQ(dirstack_size(), 0, "Stack should be empty");
+
+    dirstack_cleanup();
+}
+
 /* ============================================================================
  * CLEAR TESTS
  * ============================================================================
@@ -506,6 +552,9 @@ int main(void) {
     RUN_TEST(dirstack_remove_top);
     RUN_TEST(dirstack_remove_middle);
     RUN_TEST(dirstack_remove_out_of_range);
+    RUN_TEST(dirstack_remove_matching_all_copies);
+    RUN_TEST(dirstack_remove_matching_none);
+    RUN_TEST(dirstack_remove_matching_nfc);
 
     /// Clear tests
     printf("\nClear Tests:\n");

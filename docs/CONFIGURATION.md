@@ -245,6 +245,16 @@ setopt pushdminus       # alias for pushd_minus; off by default
 inverts the `pushd +N` / `pushd -N` (and `popd`) sign convention, so `+N`
 counts from the right of the `dirs` list instead of the left.
 
+`pushd_silent` (zsh `pushdsilent`), `pushd_to_home` (zsh `pushdtohome`), and
+`pushd_ignore_dups` (zsh `pushdignoredups`) are likewise off in every profile
+-- bash has no equivalents and zsh leaves them off, so the curated default
+prints the stack, swaps the top two entries on a bare `pushd`, and keeps
+duplicates. When set: `pushd_silent` suppresses the automatic directory-stack
+print after `pushd`/`popd` (the explicit `dirs` command still prints);
+`pushd_to_home` makes a bare `pushd` behave like `pushd $HOME`; and
+`pushd_ignore_dups` drops an older copy of a directory from the stack when you
+`pushd` back into it.
+
 Inverted aliases (the `bsd_echo` row) are used when a knob has opposite-
 named knobs across shells -- the alias system bridges them while keeping a
 single canonical underlying flag.

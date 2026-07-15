@@ -70,6 +70,16 @@ source_location_t builtin_swap_source_location(source_location_t loc);
 source_location_t builtin_get_source_location(void);
 
 /**
+ * @brief Print the directory stack after a pushd/popd unless silenced
+ *
+ * pushd and popd echo the resulting stack after each operation. The zsh
+ * `pushd_silent` option suppresses that automatic report; the explicit
+ * `dirs` command is unaffected. Shared by bin_pushd and bin_popd so the
+ * gate lives in one place.
+ */
+void builtin_report_dirstack(void);
+
+/**
  * @brief Shared implementation for `break` and `continue`
  *
  * Both builtins parse an optional positive-integer level, validate that

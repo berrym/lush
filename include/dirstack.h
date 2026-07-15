@@ -66,6 +66,18 @@ const char *dirstack_peek(int n);
 int dirstack_remove(int n);
 
 /**
+ * @brief Remove every stack entry equal to a directory path
+ *
+ * Paths are compared with NFC normalization, so a decomposed and a
+ * precomposed spelling of the same directory are treated as one. Backs
+ * `pushd_ignore_dups`, which drops an existing occurrence before pushing.
+ *
+ * @param dir Directory path to match (not freed)
+ * @return Number of entries removed
+ */
+int dirstack_remove_matching(const char *dir);
+
+/**
  * @brief Clear all entries from the stack
  */
 void dirstack_clear(void);

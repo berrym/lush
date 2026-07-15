@@ -10,6 +10,7 @@
 
 #include "dirstack.h"
 #include "lle/lle_pager.h"
+#include "lle/unicode_compare.h"
 #include "symtable.h"
 
 #include <stdio.h>
@@ -126,6 +127,37 @@ int dirstack_remove(int n) {
 
     dirstack_sync_variable();
     return 0;
+}
+
+int dirstack_remove_matching(const char *dir) {
+    if (!initialized || stack_top < 0 || !dir) {
+        return 0;
+    }
+
+    int removed = 0;
+    /// Scan the array from the base upward. Paths compare with NFC
+    /// normalization so a decomposed and a precomposed spelling of the same
+    /// directory count as one. Removing an entry shifts the higher entries
+    /// down, so the same index is re-tested after a removal.
+    for (int idx = 0; idx <= stack_top;) {
+        if (lle_unicode_strings_equal(stack[idx], dir,
+                                      &LLE_UNICODE_COMPARE_DEFAULT)) {
+            free(stack[idx]);
+            for (int i = idx; i < stack_top; i++) {
+                stack[i] = stack[i + 1];
+            }
+            stack[stack_top] = NULL;
+            stack_top--;
+            removed++;
+        } else {
+            idx++;
+        }
+    }
+
+    if (removed > 0) {
+        dirstack_sync_variable();
+    }
+    return removed;
 }
 
 void dirstack_clear(void) {
