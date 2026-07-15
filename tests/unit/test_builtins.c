@@ -280,6 +280,21 @@ TEST(pwd_physical_option) {
     ASSERT_STDOUT_EQ(r, "/\n");
 }
 
+TEST(pwd_canonicalizes_dot_dot) {
+    /// A logical cd collapses interior . and .. without leaving a doubled
+    /// separator. These paths exist on Linux and macOS; the logical PWD
+    /// reflects the canonicalized input, so symlinks do not affect the
+    /// expected value. Regression: `/usr/../usr` yielded `//usr` and
+    /// `/usr/bin/../bin` yielded `/usr//bin`.
+    run_result_t r = run_shell("cd /usr/../usr\npwd\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "/usr\n");
+
+    run_result_t r2 = run_shell("cd /usr/bin/../bin\npwd\n");
+    ASSERT_EXIT_STATUS(r2, 0);
+    ASSERT_STDOUT_EQ(r2, "/usr/bin\n");
+}
+
 /* ============================================================================
  * CD BUILTIN TESTS (via executor)
  * ============================================================================
@@ -1264,6 +1279,7 @@ int main(void) {
     RUN_TEST(pwd_returns_directory);
     RUN_TEST(pwd_logical_option);
     RUN_TEST(pwd_physical_option);
+    RUN_TEST(pwd_canonicalizes_dot_dot);
 
     printf("\n--- cd Tests ---\n");
     RUN_TEST(cd_to_tmp);
