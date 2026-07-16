@@ -1385,15 +1385,74 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                     break;
                 }
             }
+
+            /// For an assignment-shaped word that has a quoted segment
+            /// (`E=~/a:"~/b"`), also record the provenance value an assignment
+            /// RHS carries, so the assignment-builtin / magic_equal tilde path
+            /// (build_argv_from_ast) expands ONLY the unquoted tilde segments.
+            /// Same per-token treatment as parse_scalar_assignment_string:
+            /// single-quoted tokens re-wrapped '...', double-quoted tokens have
+            /// `~` and `'` escaped as \~ / \', every other token appended
+            /// verbatim (unquoted words keep a bare `~` to expand). val.str and
+            /// all other consumers are untouched (#488). Only built when the
+            /// word contains a `=` past its first byte; the executor validates
+            /// the identifier before using it.
+            char *magic_equal_prov = NULL;
+            const char *eqp = any_quoted ? strchr(concatenated, '=') : NULL;
+            if (eqp && eqp != concatenated) {
+                size_t pcap = total_len * 2 + 4;
+                magic_equal_prov = malloc(pcap);
+                if (magic_equal_prov) {
+                    size_t plen = 0;
+                    for (int i = 0; i < token_count; i++) {
+                        const char *t = collected_tokens[i].text;
+                        size_t tl = t ? strlen(t) : 0;
+                        if (plen + tl * 2 + 3 > pcap) {
+                            pcap = (plen + tl * 2 + 3) * 2;
+                            char *pg = realloc(magic_equal_prov, pcap);
+                            if (!pg) {
+                                free(magic_equal_prov);
+                                magic_equal_prov = NULL;
+                                break;
+                            }
+                            magic_equal_prov = pg;
+                        }
+                        if (collected_tokens[i].type == TOK_STRING) {
+                            magic_equal_prov[plen++] = '\'';
+                            memcpy(magic_equal_prov + plen, t, tl);
+                            plen += tl;
+                            magic_equal_prov[plen++] = '\'';
+                        } else if (collected_tokens[i].type ==
+                                   TOK_EXPANDABLE_STRING) {
+                            for (size_t k = 0; k < tl; k++) {
+                                char ch = t[k];
+                                if (ch == '\'' || ch == '~') {
+                                    magic_equal_prov[plen++] = '\\';
+                                }
+                                magic_equal_prov[plen++] = ch;
+                            }
+                        } else {
+                            memcpy(magic_equal_prov + plen, t, tl);
+                            plen += tl;
+                        }
+                    }
+                    if (magic_equal_prov) {
+                        magic_equal_prov[plen] = '\0';
+                    }
+                }
+            }
+
             node_t *arg_node =
                 new_node(any_quoted ? NODE_STRING_EXPANDABLE : NODE_VAR);
             if (arg_node) {
                 arg_node->val.str = concatenated;
                 arg_node->val_type = VAL_STR;
                 arg_node->glob_qualified = any_glob_qualified;
+                arg_node->magic_equal_value = magic_equal_prov;
                 add_child_node(parent, arg_node);
             } else {
                 free(concatenated);
+                free(magic_equal_prov);
             }
         }
         for (int i = 0; i < token_count; i++) {

@@ -931,6 +931,39 @@ TEST(rt_declaration_util_tilde_expansion) {
                         "7:/tmp/meq_home/a:~/b\n");
 }
 
+TEST(rt_declaration_util_mixed_quote_tilde) {
+    /// #488: an assignment-aware builtin tilde-expands a MIXED-quote value
+    /// exactly like a plain assignment -- the unquoted tilde segment expands,
+    /// the double- or single-quoted one stays literal. Previously the whole
+    /// word was skipped when it contained any quoted span (both segments
+    /// literal). The in-a-function cases exercise the deep-copied body: the
+    /// parser's provenance value must survive copy_ast_node / copy_node_simple.
+    run_result_t r =
+        run_shell("( export HOME=/tmp/h\n"
+                  "  export A=~/a:\"~/b\";        echo \"1:$A\"\n"
+                  "  declare B=~/a:'~/b';         echo \"2:$B\"\n"
+                  "  export C=\"~/a:~/b\";        echo \"3:$C\"\n"
+                  "  export D=~/a:~/b;            echo \"4:$D\"\n"
+                  "  f() { declare E=~/e:\"~/q\"; echo \"5:$E\"; }; f\n"
+                  "  g() { local L=~/l:\"~/q\";   echo \"6:$L\"; }; g\n"
+                  "  echo 7: E=~/a:\"~/b\" )\n");
+    ASSERT_STDOUT_EQ(r,
+                     /// double-quoted second segment stays literal
+                     "1:/tmp/h/a:~/b\n"
+                     /// single-quoted second segment stays literal
+                     "2:/tmp/h/a:~/b\n"
+                     /// fully double-quoted value: entirely literal
+                     "3:~/a:~/b\n"
+                     /// fully unquoted: both segments expand
+                     "4:/tmp/h/a:/tmp/h/b\n"
+                     /// declaration inside a function: provenance survives copy
+                     "5:/tmp/h/e:~/q\n"
+                     "6:/tmp/h/l:~/q\n"
+                     /// a non-assignment command (echo) does not tilde-expand
+                     /// its assignment-shaped argument (magic_equal_subst off)
+                     "7: E=~/a:~/b\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -4897,6 +4930,7 @@ int main(void) {
     RUN_TEST(rt_magic_equal_subst);
     RUN_TEST(rt_assignment_tilde_expansion);
     RUN_TEST(rt_declaration_util_tilde_expansion);
+    RUN_TEST(rt_declaration_util_mixed_quote_tilde);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
