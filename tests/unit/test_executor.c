@@ -964,6 +964,53 @@ TEST(rt_declaration_util_mixed_quote_tilde) {
                      "7: E=~/a:~/b\n");
 }
 
+TEST(rt_mixed_quote_provenance_assignment) {
+    /// #495: an assignment value that fuses quote contexts re-encodes per
+    /// character from the tokenizer's quote-provenance map, so only the quoted
+    /// characters are held literal. Before this, the tokenizer flattened a
+    /// fused word (`"b":~/c`) into one wholesale-typed token and the re-encoder
+    /// escaped the unquoted `~` too (leaving it literal). Covers: a quoted
+    /// segment BEFORE an unquoted tilde (the reversed case), a quoted segment
+    /// in the middle, single-quote expansion protection, an escaped literal
+    /// quote (the ESCAPED provenance state), an assignment builtin, and a
+    /// declaration inside a deep-copied function body. Subshell-wrapped so the
+    /// HOME export does not leak to other run_shell tests.
+    run_result_t r = run_shell(
+        "( export HOME=/tmp/h; y=Y\n"
+        "  x=\"~/a\":~/b;   echo \"1:$x\"\n"
+        "  x=~/a:\"b\":~/c; echo \"2:$x\"\n"
+        "  x='$y'z;         echo \"3:$x\"\n"
+        "  x='it'\\''s';    echo \"4:$x\"\n"
+        "  export E=\"~/a\":~/b;            echo \"5:$E\"\n"
+        "  f() { declare D=\"~/m\":~/n; echo \"6:$D\"; }; f\n"
+        "  x=v:~/b:'lit';   echo \"7:$x\"\n"
+        /// a single-quoted value that is exactly a kind sigil
+        /// (@ident / %ident, lush default) must stay literal, not be
+        /// sigil-expanded: the re-encoding escapes every single-quoted
+        /// character so the run never begins with @ or %.
+        "  x='@foo';        echo \"8:$x\"\n"
+        "  x='%s';          echo \"9:$x\" )\n");
+    ASSERT_STDOUT_EQ(r,
+                     /// quoted-first, then an unquoted after-colon tilde: only
+                     /// the second segment expands
+                     "1:~/a:/tmp/h/b\n"
+                     /// quoted middle segment: the two unquoted tildes expand
+                     "2:/tmp/h/a:b:/tmp/h/c\n"
+                     /// single-quoted $y stays literal (not expanded to Y)
+                     "3:$yz\n"
+                     /// \' escaped literal quote survives (ESCAPED provenance)
+                     "4:it's\n"
+                     /// assignment builtin, same per-character semantics
+                     "5:~/a:/tmp/h/b\n"
+                     /// inside a deep-copied function body
+                     "6:~/m:/tmp/h/n\n"
+                     /// unquoted tilde segment then a single-quoted literal
+                     "7:v:/tmp/h/b:lit\n"
+                     /// single-quoted kind sigils stay literal
+                     "8:@foo\n"
+                     "9:%s\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -4931,6 +4978,7 @@ int main(void) {
     RUN_TEST(rt_assignment_tilde_expansion);
     RUN_TEST(rt_declaration_util_tilde_expansion);
     RUN_TEST(rt_declaration_util_mixed_quote_tilde);
+    RUN_TEST(rt_mixed_quote_provenance_assignment);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

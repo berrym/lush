@@ -629,6 +629,10 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
     token->end_position = position + length;
     token->next = NULL;
     token->glob_qualified = false;
+    /// Per-character quote provenance is opt-in: only the mixed-quote word
+    /// reader fills it (after this constructor). NULL means "no per-character
+    /// quote map"; consumers fall back to per-token-type handling.
+    token->quote_prov = NULL;
 
     if (text && length > 0) {
         token->text = malloc(length + 1);
@@ -664,7 +668,41 @@ static void token_free(token_t *token) {
     if (token->text) {
         free(token->text);
     }
+    free(token->quote_prov);
     free(token);
+}
+
+/// Append `n` copies of provenance byte `state` to the mixed-quote reader's
+/// parallel provenance buffer, growing it as needed. Every byte the reader
+/// pushes to its `result` text buffer is mirrored here with the quote context
+/// it was scanned under, so quote_prov stays aligned 1:1 with the token text.
+/// A `*cap` of 0 means provenance tracking is disabled -- either the initial
+/// allocation failed or a grow failed mid-scan -- after which appends no-op and
+/// the token is created without a map (consumers fall back to per-token
+/// handling). This keeps the reader's many error/return paths free of an extra
+/// failure mode: provenance degrades gracefully rather than aborting the token.
+static void prov_append(char **prov, size_t *len, size_t *cap, char state,
+                        size_t n) {
+    if (*cap == 0 || n == 0) {
+        return;
+    }
+    if (*len + n > *cap) {
+        size_t new_cap = *cap;
+        while (*len + n > new_cap) {
+            new_cap *= 2;
+        }
+        char *grown = realloc(*prov, new_cap);
+        if (!grown) {
+            free(*prov);
+            *prov = NULL;
+            *cap = 0;
+            return;
+        }
+        *prov = grown;
+        *cap = new_cap;
+    }
+    memset(*prov + *len, state, n);
+    *len += n;
 }
 
 /**
@@ -861,6 +899,17 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         size_t result_len = 0;
         bool has_expandable = false;
         bool glob_qualified = false;
+        /// Per-character quote provenance, built in lockstep with `result`
+        /// (see prov_append). Handed to the finished token so the assignment
+        /// re-encoders can tell which characters of a fused mixed-quote word
+        /// were single/double/unquoted. A failed allocation sets prov_cap 0,
+        /// disabling tracking without aborting tokenization.
+        size_t prov_cap = 256;
+        size_t prov_len = 0;
+        char *prov = malloc(prov_cap);
+        if (!prov) {
+            prov_cap = 0; /// degrade: token created without a provenance map
+        }
 
     parse_next_segment:;
         char quote_char = tokenizer->input[tokenizer->position];
@@ -885,7 +934,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
                         if (!new_result) {
-                            free(result);
+                            free(result), free(prov);
                             return token_new(
                                 TOK_ERROR, &tokenizer->input[start_pos], 1,
                                 start_line, start_column, start_pos);
@@ -895,6 +944,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     memcpy(&result[result_len],
                            &tokenizer->input[segment_start], segment_len);
                     result_len += segment_len;
+                    prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_SINGLE,
+                                segment_len);
 
                     tokenizer->position++; /// Skip closing quote
                     tokenizer->column++;
@@ -913,7 +964,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             /// with an unbalanced quote leaks 256+ bytes (caught via
             /// LeakSanitizer running fuzz_parser; see corresponding
             /// fix at the unterminated-double-quote site below).
-            free(result);
+            free(result), free(prov);
             return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                              tokenizer->position - start_pos, start_line,
                              start_column, start_pos);
@@ -991,7 +1042,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1001,6 +1052,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 memcpy(&result[result_len], &tokenizer->input[subst_start],
                        subst_len);
                 result_len += subst_len;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
+                            subst_len);
             } else if (curr == '`') {
                 /// Handle backtick command substitution - copy verbatim
                 size_t subst_start = tokenizer->position;
@@ -1034,7 +1087,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1044,6 +1097,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 memcpy(&result[result_len], &tokenizer->input[subst_start],
                        subst_len);
                 result_len += subst_len;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
+                            subst_len);
             } else if (curr == '\\' &&
                        tokenizer->position + 1 < tokenizer->input_length) {
                 /// Handle backslash escapes in double quotes
@@ -1064,7 +1119,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
                         if (!new_result) {
-                            free(result);
+                            free(result), free(prov);
                             return token_new(
                                 TOK_ERROR, &tokenizer->input[start_pos], 1,
                                 start_line, start_column, start_pos);
@@ -1075,6 +1130,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     /// processing
                     result[result_len++] = '\\';
                     result[result_len++] = escaped;
+                    prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
+                                2);
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                 } else {
@@ -1083,7 +1140,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
                         if (!new_result) {
-                            free(result);
+                            free(result), free(prov);
                             return token_new(
                                 TOK_ERROR, &tokenizer->input[start_pos], 1,
                                 start_line, start_column, start_pos);
@@ -1092,6 +1149,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     }
                     result[result_len++] = '\\';
                     result[result_len++] = escaped;
+                    prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
+                                2);
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                 }
@@ -1101,7 +1160,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1109,6 +1168,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result = new_result;
                 }
                 result[result_len++] = curr;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE, 1);
                 tokenizer->line++;
                 tokenizer->column = 1;
                 tokenizer->position++;
@@ -1118,7 +1178,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1126,6 +1186,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result = new_result;
                 }
                 result[result_len++] = curr;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE, 1);
                 tokenizer->column++;
                 tokenizer->position++;
             }
@@ -1134,7 +1195,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         /// Unterminated double-quoted string -- free the segment
         /// builder buffer before returning, otherwise every input
         /// with an unbalanced double quote leaks 256+ bytes.
-        free(result);
+        free(result), free(prov);
         return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                          tokenizer->position - start_pos, start_line,
                          start_column, start_pos);
@@ -1158,7 +1219,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1166,6 +1227,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result = new_result;
                 }
                 result[result_len++] = '$';
+                /// ANSI-C `$'...'` fused onto a quoted segment is a rare,
+                /// already-murky case. Disable provenance for this token so it
+                /// retains its existing per-token handling downstream rather
+                /// than risk a new mis-encoding; the assignment-tilde fix does
+                /// not depend on ANSI-C.
+                free(prov);
+                prov = NULL;
+                prov_cap = 0;
                 goto parse_next_segment;
             }
             /// Check for adjacent unquoted word characters
@@ -1183,6 +1252,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         tokenizer->position++;
                         tokenizer->column++;
                         result[result_len++] = '$';
+                        /// ANSI-C fused onto a quoted segment: disable
+                        /// provenance (see the sibling site above).
+                        free(prov);
+                        prov = NULL;
+                        prov_cap = 0;
                         goto parse_next_segment;
                     }
                     if (!is_word_char(wc) && wc != '\\' && wc != '$') {
@@ -1193,7 +1267,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
                         if (!new_result) {
-                            free(result);
+                            free(result), free(prov);
                             return token_new(
                                 TOK_ERROR, &tokenizer->input[start_pos], 1,
                                 start_line, start_column, start_pos);
@@ -1216,8 +1290,17 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         tokenizer->column++;
                         result[result_len++] =
                             tokenizer->input[tokenizer->position];
+                        /// The backslash is consumed here, so mark the literal
+                        /// ESCAPED to distinguish it from a genuine bare
+                        /// character (a `\~` must stay literal; a bare `~`
+                        /// expands). The line-continuation branch `continue`s
+                        /// above and writes nothing.
+                        prov_append(&prov, &prov_len, &prov_cap,
+                                    QUOTE_PROV_ESCAPED, 1);
                     } else {
                         result[result_len++] = wc;
+                        prov_append(&prov, &prov_len, &prov_cap,
+                                    QUOTE_PROV_UNQUOTED, 1);
                     }
                     tokenizer->position++;
                     tokenizer->column++;
@@ -1265,7 +1348,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
                     if (!new_result) {
-                        free(result);
+                        free(result), free(prov);
                         return token_new(TOK_ERROR,
                                          &tokenizer->input[start_pos], 1,
                                          start_line, start_column, start_pos);
@@ -1275,6 +1358,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 memcpy(result + result_len,
                        &tokenizer->input[tokenizer->position], group_len);
                 result_len += group_len;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_UNQUOTED,
+                            group_len);
                 tokenizer->position = scan + 1;
                 tokenizer->column += group_len;
                 glob_qualified = true;
@@ -1288,8 +1373,20 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                  start_column, start_pos);
         if (tok) {
             tok->glob_qualified = glob_qualified;
+            /// Transfer ownership of the provenance map to the token, but only
+            /// when it is complete and exactly as long as the text. A shorter
+            /// map (a mid-scan allocation failure disabled tracking) is
+            /// discarded so consumers fall back to per-token handling rather
+            /// than indexing a truncated map. prov is nulled so the cleanup
+            /// below is a no-op on this path.
+            if (prov && prov_len == result_len) {
+                tok->quote_prov = prov;
+                prov = NULL;
+            }
         }
-        free(result);
+        /// prov is NULL here on success (ownership moved to tok); non-NULL only
+        /// on token_new OOM or a discarded truncated map -- freed exactly once.
+        free(result), free(prov);
         return tok;
     }
 
