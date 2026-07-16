@@ -158,6 +158,15 @@ typedef struct node {
     /// tokenization (`"$f"(N)`, `'$f'(Nm-1)`). The executor globs the
     /// expanded value with the qualifier even though it came from quotes.
     bool glob_qualified;
+
+    /// For an assignment-shaped word with a quoted segment (`E=~/a:"~/b"`), the
+    /// same word with fine-grained quote provenance the assignment RHS carries:
+    /// a double-quoted `~` escaped as `\~`, single-quoted spans re-wrapped
+    /// `'...'`. The assignment-builtin / magic_equal tilde path expands THIS
+    /// (so only unquoted tilde segments expand); val.str -- and every other
+    /// consumer -- is unchanged. NULL for words that are not assignment-shaped
+    /// or have no quoted segment. Heap-allocated (owner).
+    char *magic_equal_value;
 } node_t;
 
 /**

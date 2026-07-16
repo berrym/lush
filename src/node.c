@@ -157,5 +157,8 @@ void free_node_tree(node_t *node) {
         free(node->val.str);
     }
 
+    /// Free the assignment-tilde provenance value (independent of val.str).
+    free(node->magic_equal_value);
+
     free(node);
 }

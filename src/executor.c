@@ -6133,12 +6133,23 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                     /// execute_assignment, so a tilde that later emerges from
                     /// $var/$(...) is not itself expanded (`export E=~/a:$u`
                     /// with u=~/b keeps ~/b literal).
-                    if (child->val.str && child->type != NODE_STRING_LITERAL &&
-                        child->type != NODE_STRING_EXPANDABLE &&
+                    /// A quoted assignment-shaped word carries a provenance
+                    /// value (double-quoted tildes escaped as \~) so only its
+                    /// unquoted tilde segments expand; a fully-unquoted word
+                    /// tilde-expands its own value. A plain quoted word (no
+                    /// provenance, no assignment shape) is left to the normal
+                    /// quoted-string path. #488.
+                    const char *tilde_word = child->magic_equal_value
+                                                 ? child->magic_equal_value
+                                                 : child->val.str;
+                    bool tilde_word_eligible =
+                        child->magic_equal_value != NULL ||
+                        (child->type != NODE_STRING_LITERAL &&
+                         child->type != NODE_STRING_EXPANDABLE);
+                    if (tilde_word && tilde_word_eligible &&
                         (shell_mode_allows(FEATURE_MAGIC_EQUAL_SUBST) ||
                          is_assignment_builtin(command->val.str))) {
-                        char *pre_tilde =
-                            magic_equal_tilde_expand(child->val.str);
+                        char *pre_tilde = magic_equal_tilde_expand(tilde_word);
                         if (pre_tilde) {
                             expanded_arg =
                                 expand_if_needed(executor, pre_tilde);
@@ -11002,6 +11013,19 @@ node_t *copy_ast_node(node_t *node) {
         }
     } else {
         copy->val = node->val;
+    }
+
+    copy->glob_qualified = node->glob_qualified;
+
+    /// The assignment-tilde provenance value must survive a deep copy (a
+    /// function body is copied at definition time); otherwise a mixed-quote
+    /// declaration inside a function loses it and stops expanding (#488).
+    if (node->magic_equal_value) {
+        copy->magic_equal_value = strdup(node->magic_equal_value);
+        if (!copy->magic_equal_value) {
+            free_node_tree(copy);
+            return NULL;
+        }
     }
 
     /// Copy children
@@ -16891,6 +16915,18 @@ static node_t *copy_node_simple(node_t *original) {
     if (original->val_type == VAL_STR && original->val.str) {
         copy->val.str = strdup(original->val.str);
         if (!copy->val.str) {
+            free_node_tree(copy);
+            return NULL;
+        }
+    }
+
+    copy->glob_qualified = original->glob_qualified;
+
+    /// Preserve the assignment-tilde provenance across the copy (#488), as
+    /// copy_ast_node does -- a function body reaches here too.
+    if (original->magic_equal_value) {
+        copy->magic_equal_value = strdup(original->magic_equal_value);
+        if (!copy->magic_equal_value) {
             free_node_tree(copy);
             return NULL;
         }
