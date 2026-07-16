@@ -4151,6 +4151,28 @@ TEST(rt_pipeline_lush_pipestatus_three_stages) {
     ASSERT_STDOUT_EQ(r, "0 1 0\n");
 }
 
+TEST(rt_pipestatus_simple_command_and_opacity) {
+    /// #492: PIPESTATUS/pipestatus is refreshed for a simple command (a
+    /// one-element pipeline), not only for a multi-stage pipeline -- bash and
+    /// zsh both update the array for every executed pipeline, and a simple
+    /// command is a pipeline of one. A function call and a subshell are opaque:
+    /// their aggregate status is published as a one-element array, not the
+    /// per-stage array of an inner pipeline (bash and zsh agree).
+    run_result_t r = run_shell(
+        "false;    echo \"simple:${PIPESTATUS[*]}\"\n"
+        "true;     echo \"t:${PIPESTATUS[*]}\"\n"
+        ":;        echo \"b:${PIPESTATUS[*]}\"\n"
+        "myf() { false | true | false; }; myf; echo \"fn:${PIPESTATUS[*]}\"\n"
+        "( exit 4 ); echo \"sub:${pipestatus[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "simple:1\n"
+                        "t:0\n"
+                        "b:0\n"
+                        /// function call opaque: [return], not the body's array
+                        "fn:1\n"
+                        /// subshell opaque: [exit status]
+                        "sub:4\n");
+}
+
 TEST(rt_pipeline_pipefail_rightmost_nonzero) {
     run_result_t r = run_shell("set -o pipefail\n"
                                "true | false | true\n"
@@ -5264,6 +5286,7 @@ int main(void) {
     RUN_TEST(rt_pipeline_four_stages);
     RUN_TEST(rt_pipeline_pipestatus_three_stages);
     RUN_TEST(rt_pipeline_lush_pipestatus_three_stages);
+    RUN_TEST(rt_pipestatus_simple_command_and_opacity);
     RUN_TEST(rt_pipeline_pipefail_rightmost_nonzero);
     RUN_TEST(rt_pipeline_pipefail_all_succeed);
     RUN_TEST(rt_pipeline_diagnostic_per_stage_errors);

@@ -74,6 +74,7 @@ executor_t *current_executor = NULL;
 static int execute_node(executor_t *executor, node_t *node);
 static int execute_command(executor_t *executor, node_t *command);
 static int execute_pipeline(executor_t *executor, node_t *pipeline);
+static void executor_publish_pipestatus(const int *exits, size_t count);
 static int execute_function_definition(executor_t *executor, node_t *function);
 /// Typed-function form -- declaration, call, return, let-capture.
 static void executor_typed_fns_clear(executor_t *executor);
@@ -1513,6 +1514,14 @@ static int execute_node(executor_t *executor, node_t *node) {
         int result = execute_command(executor, node);
         /// Clean up any process substitution fds after command execution
         cleanup_procsub_fds(executor);
+        /// A simple command is a one-element pipeline: refresh PIPESTATUS with
+        /// its status (bash and zsh both do this for every command, not just
+        /// multi-stage pipelines). A function call reaches here too, so its
+        /// aggregate return status overwrites whatever its body's last pipeline
+        /// left -- matching bash/zsh, which treat a function call as opaque to
+        /// PIPESTATUS. Compound commands (if/for/brace) dispatch elsewhere and
+        /// are left transparent (their inner pipeline's array survives).
+        executor_publish_pipestatus(&result, 1);
         return result;
     }
     case NODE_PIPE:
@@ -1545,8 +1554,14 @@ static int execute_node(executor_t *executor, node_t *node) {
         return execute_function_definition(executor, node);
     case NODE_BRACE_GROUP:
         return execute_brace_group(executor, node);
-    case NODE_SUBSHELL:
-        return execute_subshell(executor, node);
+    case NODE_SUBSHELL: {
+        int result = execute_subshell(executor, node);
+        /// A subshell runs in a forked child, so any PIPESTATUS its body set
+        /// does not reach this shell. From here it is one command: publish its
+        /// aggregate status as a one-element array (bash and zsh agree).
+        executor_publish_pipestatus(&result, 1);
+        return result;
+    }
     case NODE_COMMAND_LIST:
         return execute_command_list(executor, node);
     case NODE_BACKGROUND:
@@ -2675,6 +2690,87 @@ static pid_t executor_wait_foreground(pid_t pid, int *status) {
 }
 
 /**
+ * @brief Publish the per-stage exit codes of the most recent pipeline under
+ *        both polyglot names (bash `PIPESTATUS`, zsh `pipestatus`).
+ *
+ * A simple command is a one-element pipeline, so this is called with count 1
+ * from the statement-level simple-command and subshell dispatch as well as with
+ * the full stage count from execute_pipeline -- matching bash and zsh, where
+ * every executed pipeline (a simple command included) refreshes the array. Both
+ * arrays are 0-indexed and hold identical data.
+ *
+ * @param exits Array of `count` stage exit statuses (pipeline order)
+ * @param count Number of stages (>= 1)
+ */
+static void executor_publish_pipestatus(const int *exits, size_t count) {
+    array_value_t *bash_arr = symtable_array_create(false);
+    array_value_t *lush_arr = symtable_array_create(false);
+    if (bash_arr && lush_arr) {
+        for (size_t i = 0; i < count; i++) {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d", exits[i]);
+            symtable_array_set_index(bash_arr, (int)i, buf);
+            symtable_array_set_index(lush_arr, (int)i, buf);
+        }
+        if (symtable_set_array("PIPESTATUS", bash_arr) != 0) {
+            symtable_array_free(bash_arr);
+        }
+        if (symtable_set_array("pipestatus", lush_arr) != 0) {
+            symtable_array_free(lush_arr);
+        }
+    } else {
+        if (bash_arr) {
+            symtable_array_free(bash_arr);
+        }
+        if (lush_arr) {
+            symtable_array_free(lush_arr);
+        }
+    }
+}
+
+pipestatus_snapshot_t executor_save_pipestatus(void) {
+    pipestatus_snapshot_t snap = {NULL, 0, false};
+    array_value_t *arr = symtable_get_array("PIPESTATUS");
+    if (!arr) {
+        return snap;
+    }
+    snap.present = true;
+    size_t n = symtable_array_length(arr);
+    if (n == 0) {
+        return snap;
+    }
+    snap.exits = malloc(n * sizeof(int));
+    if (!snap.exits) {
+        /// Out of memory: drop the snapshot rather than abort. The trap body's
+        /// PIPESTATUS will leak through, which is preferable to a crash.
+        snap.present = false;
+        return snap;
+    }
+    for (size_t i = 0; i < n; i++) {
+        const char *v = symtable_array_get_index(arr, (int)i);
+        snap.exits[i] = v ? (int)strtol(v, NULL, 10) : 0;
+    }
+    snap.count = n;
+    return snap;
+}
+
+void executor_restore_pipestatus(pipestatus_snapshot_t *snap) {
+    if (!snap) {
+        return;
+    }
+    if (snap->present && snap->count > 0) {
+        executor_publish_pipestatus(snap->exits, snap->count);
+    }
+    /// A present-but-empty snapshot is not reconstructed: an empty PIPESTATUS
+    /// is indistinguishable from unset for every consumer, and the publish
+    /// helper has no meaningful zero-element form.
+    free(snap->exits);
+    snap->exits = NULL;
+    snap->count = 0;
+    snap->present = false;
+}
+
+/**
  * @brief Execute a pipeline of N commands.
  *
  * Flattens the right-recursive NODE_PIPE chain to a linear list of N stages,
@@ -2855,31 +2951,8 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     }
 
     /// Publish per-stage exit codes under both polyglot names so callers can
-    /// diagnose which stage failed.  Both arrays are 0-indexed; the data is
-    /// identical.
-    {
-        array_value_t *bash_arr = symtable_array_create(false);
-        array_value_t *lush_arr = symtable_array_create(false);
-        if (bash_arr && lush_arr) {
-            for (size_t i = 0; i < nstages; i++) {
-                char buf[16];
-                snprintf(buf, sizeof(buf), "%d", stage_exit[i]);
-                symtable_array_set_index(bash_arr, (int)i, buf);
-                symtable_array_set_index(lush_arr, (int)i, buf);
-            }
-            if (symtable_set_array("PIPESTATUS", bash_arr) != 0) {
-                symtable_array_free(bash_arr);
-            }
-            if (symtable_set_array("pipestatus", lush_arr) != 0) {
-                symtable_array_free(lush_arr);
-            }
-        } else {
-            if (bash_arr)
-                symtable_array_free(bash_arr);
-            if (lush_arr)
-                symtable_array_free(lush_arr);
-        }
-    }
+    /// diagnose which stage failed.
+    executor_publish_pipestatus(stage_exit, nstages);
 
     free(stage_exit);
     executor_pop_context(executor);

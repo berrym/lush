@@ -104,6 +104,37 @@ static inline pid_t job_target(const job_t *job) {
  */
 void executor_signal_job(const job_t *job, int sig);
 
+/**
+ * @brief A saved snapshot of PIPESTATUS for transparent trap execution.
+ *
+ * A signal trap is transparent to PIPESTATUS just as it is to `$?`: capture the
+ * array the interrupted script observes before the trap body runs, then restore
+ * it, so a trap whose body runs any command does not leave its own PIPESTATUS
+ * visible. `present` records whether PIPESTATUS existed at capture time.
+ */
+typedef struct {
+    int *exits;   ///< Owned copy of the per-stage statuses (NULL if none)
+    size_t count; ///< Number of statuses
+    bool present; ///< PIPESTATUS existed when captured
+} pipestatus_snapshot_t;
+
+/**
+ * @brief Capture the current PIPESTATUS values (pipestatus mirrors it).
+ * @return A snapshot to hand to executor_restore_pipestatus.
+ */
+pipestatus_snapshot_t executor_save_pipestatus(void);
+
+/**
+ * @brief Restore a snapshot captured by executor_save_pipestatus and free it.
+ *
+ * Republishes the captured statuses when the snapshot was present and
+ * non-empty; always frees the snapshot's storage. Safe to call once per
+ * snapshot.
+ *
+ * @param snap Snapshot to restore and release
+ */
+void executor_restore_pipestatus(pipestatus_snapshot_t *snap);
+
 /// Loop control states
 typedef enum {
     LOOP_NORMAL,  ///< Normal execution
