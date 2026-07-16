@@ -192,6 +192,48 @@ TEST(cmdsub_leading_with_trailing_text) {
     teardown_executor(exec);
 }
 
+TEST(cmdsub_with_quoted_paren) {
+    /// A command substitution whose command contains a quoted `)` must not
+    /// mis-terminate at that paren (issue #486). The tokenizer's paren scan for
+    /// `$(...)` is quote-aware, so the substitution runs to its real closing
+    /// `)` and the surrounding literal text concatenates. Previously the scan
+    /// stopped at the quoted `)`, leaving a dangling quote that failed to
+    /// parse.
+    executor_t *exec = setup_executor();
+
+    /// Leading literal + a double-quoted `)` inside, then a suffix.
+    executor_execute_command_line(exec, "A=z$(echo \")\"):b", 1);
+    char *a = symtable_get_var(exec->symtable, "A");
+    ASSERT_NOT_NULL(a, "A should be set");
+    ASSERT_STR_EQ(a, "z):b", "z$(echo \")\"):b should concatenate to z):b");
+    free(a);
+
+    /// Embedded substitution with a quoted `)`, literal on both sides.
+    executor_execute_command_line(exec, "B=pre$(echo \")\")post", 1);
+    char *b = symtable_get_var(exec->symtable, "B");
+    ASSERT_NOT_NULL(b, "B should be set");
+    ASSERT_STR_EQ(b, "pre)post",
+                  "pre$(echo \")\")post should concatenate to pre)post");
+    free(b);
+
+    /// A single-quoted `)` inside the substitution behaves the same.
+    executor_execute_command_line(exec, "C=$(echo ')')", 1);
+    char *c = symtable_get_var(exec->symtable, "C");
+    ASSERT_NOT_NULL(c, "C should be set");
+    ASSERT_STR_EQ(c, ")", "$(echo ')') should expand to a literal )");
+    free(c);
+
+    /// An unquoted `(` / `)` inside a quoted argument is still balanced text,
+    /// not a nesting change: the whole quoted run is one argument to echo.
+    executor_execute_command_line(exec, "D=$(echo \"a(b)c\")", 1);
+    char *d = symtable_get_var(exec->symtable, "D");
+    ASSERT_NOT_NULL(d, "D should be set");
+    ASSERT_STR_EQ(d, "a(b)c", "$(echo \"a(b)c\") should expand to a(b)c");
+    free(d);
+
+    teardown_executor(exec);
+}
+
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
@@ -800,6 +842,7 @@ int main(void) {
     RUN_TEST(braced_var_expansion);
     RUN_TEST(var_concatenation);
     RUN_TEST(cmdsub_leading_with_trailing_text);
+    RUN_TEST(cmdsub_with_quoted_paren);
     RUN_TEST(unset_var_expands_empty);
 
     printf("\n--- Parameter Expansion Tests ---\n");

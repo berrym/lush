@@ -10,6 +10,7 @@
  */
 
 #include "tokenizer.h"
+#include "brace_match.h"
 #include "identifier.h"
 #include "lle/utf8_support.h"
 #include "shell_mode.h"
@@ -1363,32 +1364,42 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     /// paren-counter will track.
                 }
                 {
-                    /// Command substitution $(cmd)
-                    int paren_count = 1;
-                    while (tokenizer->position < tokenizer->input_length &&
-                           paren_count > 0) {
-                        char curr = tokenizer->input[tokenizer->position];
-                        if (curr == '(') {
-                            paren_count++;
-                        } else if (curr == ')') {
-                            paren_count--;
-                        } else if (curr == '\n') {
+                    /// Command substitution $(cmd). Use the canonical
+                    /// quote-aware matcher so a quoted `)` inside the command
+                    /// (e.g. `$(echo ")")`) does not mis-terminate it -- the
+                    /// hand-rolled paren counter here stopped at the first `)`,
+                    /// even one inside quotes, so the rest of the word (a
+                    /// dangling quote) then failed to parse (#486). The opener
+                    /// is the `(` at start + 1; a `$((`-that-is-really-`$(` (an
+                    /// anonymous function) has fallen through to here with the
+                    /// same opener.
+                    size_t close_off = 0;
+                    bool matched = lush_find_matching_brace(
+                        &tokenizer->input[start + 1],
+                        tokenizer->input_length - (start + 1), &close_off);
+                    /// One past the matching `)` (offset is relative to the
+                    /// `(`); on no match consume to end and report the error.
+                    size_t end_pos = matched ? start + 1 + close_off + 1
+                                             : tokenizer->input_length;
+                    /// Advance across the substitution, keeping the line/column
+                    /// counters in step for diagnostics.
+                    while (tokenizer->position < end_pos) {
+                        if (tokenizer->input[tokenizer->position] == '\n') {
                             tokenizer->line++;
                             tokenizer->column = 0;
+                        } else {
+                            tokenizer->column++;
                         }
                         tokenizer->position++;
-                        tokenizer->column++;
                     }
 
-                    /// Check for unclosed command substitution
-                    if (paren_count > 0) {
-                        size_t length = tokenizer->position - start;
+                    size_t length = tokenizer->position - start;
+                    if (!matched) {
+                        /// Unclosed command substitution.
                         return token_new(TOK_ERROR, &tokenizer->input[start],
                                          length, start_line, start_column,
                                          start_pos);
                     }
-
-                    size_t length = tokenizer->position - start;
                     return token_new(TOK_COMMAND_SUB, &tokenizer->input[start],
                                      length, start_line, start_column,
                                      start_pos);
