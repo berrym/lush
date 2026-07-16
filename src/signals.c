@@ -986,6 +986,11 @@ void execute_pending_traps(void) {
     /// still register because it runs in the primary shell context.
     executor_t *exec = get_global_executor();
     int saved_status = last_exit_status;
+    /// PIPESTATUS is transparent to a trap for the same reason $? is: a simple
+    /// command in the trap body now refreshes PIPESTATUS, so without this the
+    /// array a following `${PIPESTATUS[@]}` reads would be the trap's, not the
+    /// interrupted pipeline's. Snapshot and restore it alongside $?.
+    pipestatus_snapshot_t saved_pipestatus = executor_save_pipestatus();
 
     for (int signo = 1; signo < NSIG; signo++) {
         if (pending_trap_flags[signo]) {
@@ -1014,10 +1019,14 @@ void execute_pending_traps(void) {
         }
     }
 
-    /// Restore $? -- unless a trap requested exit, whose chosen status must
-    /// stand rather than be overwritten with the pre-trap value.
+    /// Restore $? and PIPESTATUS -- unless a trap requested exit, whose chosen
+    /// status must stand rather than be overwritten with the pre-trap value.
+    /// executor_restore_pipestatus frees the snapshot on either path.
     if (!exit_flag && !(exec && exec->shell_exit_requested)) {
         set_exit_status(saved_status);
+        executor_restore_pipestatus(&saved_pipestatus);
+    } else {
+        free(saved_pipestatus.exits);
     }
 }
 

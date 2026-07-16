@@ -192,6 +192,30 @@ int main(int argc, char **argv) {
           "sh -c 'exit 5' | sh -c 'exit 7' & wait $!; echo \"WS=$?\"",
           (const char *[]){"WS=7", NULL});
 
+    /// #492: `wait $!` on a backgrounded pipeline refreshes PIPESTATUS with the
+    /// waited job's status as a one-element array (the following simple `wait`
+    /// is itself a one-element pipeline). Pre-change PIPESTATUS was left stale
+    /// because lush only published it for a multi-stage foreground pipeline.
+    check(lush, "wait on a backgrounded pipeline refreshes PIPESTATUS",
+          "sh -c 'exit 5' | sh -c 'exit 7' & wait $!; "
+          "echo \"PS=[${PIPESTATUS[*]}]\"",
+          (const char *[]){"PS=[7]", NULL});
+
+    /// #492: a signal trap is transparent to PIPESTATUS just as it is to $?.
+    /// The last pipeline stage signals the shell, so the trap is pending at the
+    /// echo boundary; its body runs a command that now refreshes PIPESTATUS,
+    /// but execute_pending_traps saves and restores the array so the echo still
+    /// sees the pipeline's statuses. (Robust to CI timing: if the signal lands
+    /// after the echo the trap simply does not clobber, so the assertion never
+    /// false-fails; it exercises the bracket whenever the trap fires first.)
+    check(
+        lush, "a signal trap is transparent to PIPESTATUS",
+        "MAIN=$$\n"
+        "trap 'true' USR1\n"
+        "sh -c 'exit 3' | sh -c 'exit 5' | sh -c \"kill -USR1 $MAIN; exit 7\"\n"
+        "echo \"PS=[${PIPESTATUS[*]}]\"",
+        (const char *[]){"PS=[3 5 7]", NULL});
+
     /// #463 gap 1: an unknown option errors rather than listing.
     check(lush, "jobs rejects an invalid option",
           "jobs -x 2>&1; echo \"RC=$?\"",
