@@ -17420,7 +17420,6 @@ static void initialize_job_control(executor_t *executor) {
  * @param command Command string (will be copied)
  * @return New process structure, or NULL on failure
  */
-MAYBE_UNUSED
 static process_t *create_process(pid_t pid, const char *command) {
     process_t *proc = malloc(sizeof(process_t));
     if (!proc) {
@@ -17430,6 +17429,7 @@ static process_t *create_process(pid_t pid, const char *command) {
     proc->pid = pid;
     proc->command = command ? strdup(command) : NULL;
     proc->status = 0;
+    proc->done = false;
     proc->next = NULL;
 
     return proc;
@@ -17527,6 +17527,34 @@ static const char *job_state_string(const job_t *job) {
 static void job_write_line(FILE *out, const executor_t *executor,
                            const job_t *job, const char *state_str,
                            bool long_form) {
+    /// A tracked background pipeline is a multi-process job. In long form it
+    /// lists every stage pid on its own line -- the [id] and state head the
+    /// first line, the remaining stages align beneath it -- matching the
+    /// per-process detail bash and zsh both show for `jobs -l`. Short form (and
+    /// any single-process job) keeps the compact one-line format.
+    if (long_form && job->processes && job->processes->next) {
+        char head[32];
+        int head_len = snprintf(head, sizeof(head), "[%d]%c ", job->job_id,
+                                job_marker(executor, job));
+        if (head_len < 0) {
+            head_len = 0;
+        }
+        bool first = true;
+        for (process_t *p = job->processes; p; p = p->next) {
+            const char *cmd = p->command ? p->command : "unknown";
+            if (first) {
+                fprintf(out, "%s%d %-20s %s\n", head, (int)p->pid, state_str,
+                        cmd);
+                first = false;
+            } else {
+                /// Align the pid under the first line's; leave the state blank.
+                fprintf(out, "%*s%d %-20s %s\n", head_len, "", (int)p->pid, "",
+                        cmd);
+            }
+        }
+        return;
+    }
+
     /// The long format (zsh long_list_jobs / bash `jobs -l`) adds the job
     /// leader's PID column between the marker and the state.
     if (long_form) {
@@ -17611,6 +17639,15 @@ job_t *executor_find_job_by_pid(executor_t *executor, pid_t pid) {
     while (job) {
         if (job->pid == pid) {
             return job;
+        }
+        /// A multi-process job (a tracked background pipeline) matches on any
+        /// of its stage pids, so `wait <pid>` for the last stage ($!) or any
+        /// stage resolves to the job rather than falling through to an
+        /// untracked wait.
+        for (process_t *p = job->processes; p; p = p->next) {
+            if (p->pid == pid) {
+                return job;
+            }
         }
         job = job->next;
     }
@@ -17728,9 +17765,145 @@ void executor_remove_job(executor_t *executor, int job_id) {
     }
 }
 
+void executor_signal_job(const job_t *job, int sig) {
+    if (!job) {
+        return;
+    }
+    /// A multi-process job sharing the shell's process group must be signaled
+    /// per-process: kill(-pgid) would target the shell's own group. A job that
+    /// owns its group (or any single-process job) is signaled through
+    /// job_target(), reaching the whole group in one call.
+    if (job->processes && !job->own_pgroup) {
+        for (process_t *p = job->processes; p; p = p->next) {
+            if (!p->done) {
+                kill(p->pid, sig);
+            }
+        }
+        return;
+    }
+    kill(job_target(job), sig);
+}
+
+/// The exit status a multi-process job reports: its last stage's, matching the
+/// shell rule that a pipeline's status is that of its final command. Returns 0
+/// for an empty list (defensive).
+static int job_last_process_status(const job_t *job) {
+    int status = 0;
+    for (process_t *p = job->processes; p; p = p->next) {
+        status = p->status;
+    }
+    return status;
+}
+
+/// Reap the processes of a multi-process job (a tracked background pipeline).
+/// Blocking waits each still-live process to termination (the `wait` contract
+/// -- a stop does not satisfy it); non-blocking polls with WNOHANG|WUNTRACED,
+/// noting a stop. The job becomes JOB_DONE once every process has terminated,
+/// its status set to the last stage's; a poll that sees a stop marks it
+/// JOB_STOPPED. Returns a signal number if a blocking wait was broken by a
+/// signal the shell must act on, else 0.
+static int reap_job_processes(job_t *job, bool blocking) {
+    if (blocking) {
+        /// Wait every still-live stage to termination (a stop does not satisfy
+        /// the `wait` contract). Handlers run without SA_RESTART, so waitpid
+        /// can return EINTR; a signal the shell must act on breaks the wait,
+        /// the rest are retried.
+        for (process_t *p = job->processes; p; p = p->next) {
+            if (p->done) {
+                continue;
+            }
+            for (;;) {
+                int status;
+                pid_t r = waitpid(p->pid, &status, 0);
+                if (r == p->pid) {
+                    p->status = status;
+                    p->done = true;
+                    break;
+                }
+                if (r == -1 && errno == EINTR) {
+                    int brk = signal_wait_break_check();
+                    if (brk > 0) {
+                        return brk;
+                    }
+                    continue;
+                }
+                /// ECHILD or another non-EINTR error: the child is gone; treat
+                /// it as terminated rather than blocking forever.
+                p->done = true;
+                break;
+            }
+        }
+        job->state = JOB_DONE;
+        job->status = job_last_process_status(job);
+        return 0;
+    }
+
+    /// Non-blocking poll: reap any stage that has exited, note stops, and leave
+    /// still-running (or signal-interrupted) stages for the next poll --
+    /// exactly the discipline of the single-process path, which treats a
+    /// non-positive waitpid result as "still running, leave as-is."
+    bool any_stopped = false;
+    bool any_running = false;
+    for (process_t *p = job->processes; p; p = p->next) {
+        if (p->done) {
+            continue;
+        }
+        int status;
+        pid_t r = waitpid(p->pid, &status, WNOHANG | WUNTRACED);
+        if (r == p->pid) {
+            if (WIFSTOPPED(status)) {
+                any_stopped = true;
+            } else {
+                p->status = status;
+                p->done = true;
+            }
+        } else if (r == -1 && errno == ECHILD) {
+            /// No such child -- already reaped elsewhere. Treat as terminated
+            /// so the job can complete rather than polling a pid that never
+            /// returns.
+            p->done = true;
+        } else {
+            /// r == 0 (still running) or r == -1 with EINTR (a caught signal
+            /// interrupted this poll): the stage is still live; the next poll
+            /// retries it. Marking it done here would leak a zombie and report
+            /// a stale status.
+            any_running = true;
+        }
+    }
+
+    bool all_done = true;
+    for (process_t *p = job->processes; p; p = p->next) {
+        if (!p->done) {
+            all_done = false;
+            break;
+        }
+    }
+    if (all_done) {
+        job->state = JOB_DONE;
+        job->status = job_last_process_status(job);
+    } else if (any_stopped && !any_running) {
+        /// Every still-live stage is stopped: the job is stopped. bash marks a
+        /// job stopped only when all its processes are, not on the first stop.
+        job->state = JOB_STOPPED;
+    }
+    return 0;
+}
+
 int executor_reap_job(job_t *job, bool blocking) {
     if (!job) {
         return 0;
+    }
+
+    /// A tracked background pipeline reaps each of its stages; a blocking wait
+    /// blocks past a stop until every stage terminates.
+    if (job->processes) {
+        if (blocking && job->state == JOB_DONE) {
+            return 0;
+        }
+        if (!blocking && job->state != JOB_RUNNING) {
+            return 0;
+        }
+        return reap_job_processes(job, blocking);
     }
 
     if (blocking) {
@@ -17926,6 +18099,176 @@ int executor_count_jobs(executor_t *executor) {
     return count;
 }
 
+/// Execute a backgrounded pipeline (`cmd1 | cmd2 &`) as a tracked multi-process
+/// job. Each stage is a direct child of the shell -- so every stage pid is
+/// reapable and listed by `jobs -l` -- sharing one process group (its own under
+/// job control, else the shell's). `$!` becomes the last stage's pid, matching
+/// bash and zsh, and each stage is recorded in job->processes in pipeline
+/// order. Returns 0 once the job is launched (the pipeline runs
+/// asynchronously), or 1 on a setup failure.
+static int executor_execute_background_pipeline(executor_t *executor,
+                                                node_t *pipeline,
+                                                const char *command_line) {
+    enum { MAX_PIPELINE_STAGES = 256 };
+    node_t *stages[MAX_PIPELINE_STAGES];
+    bool stderr_to_next[MAX_PIPELINE_STAGES];
+    size_t nstages = 0;
+
+    if (!flatten_pipeline_chain(pipeline, stages, stderr_to_next, &nstages,
+                                MAX_PIPELINE_STAGES) ||
+        nstages < 2) {
+        executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
+                           pipeline->loc, "malformed pipeline");
+        return 1;
+    }
+
+    size_t npipes = nstages - 1;
+    int (*pipes)[2] = calloc(npipes, sizeof(*pipes));
+    if (!pipes) {
+        executor_error_add(executor, SHELL_ERR_PIPE_FAILED, pipeline->loc,
+                           "pipeline allocation failed");
+        return 1;
+    }
+    for (size_t i = 0; i < npipes; i++) {
+        if (pipe(pipes[i]) == -1) {
+            for (size_t j = 0; j < i; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            free(pipes);
+            executor_error_add(executor, SHELL_ERR_PIPE_FAILED, pipeline->loc,
+                               "failed to create pipe: %s", strerror(errno));
+            return 1;
+        }
+    }
+
+    bool own_pgroup = shell_opts.job_control;
+    pid_t *pids = calloc(nstages, sizeof(pid_t));
+    if (!pids) {
+        for (size_t i = 0; i < npipes; i++) {
+            close(pipes[i][0]);
+            close(pipes[i][1]);
+        }
+        free(pipes);
+        return 1;
+    }
+
+    pid_t pgid = 0; /// The group every stage joins (the first stage's pid).
+
+    for (size_t i = 0; i < nstages; i++) {
+        pid_t pid = lush_fork();
+        if (pid == -1) {
+            executor_error_report(
+                executor, SHELL_ERR_FORK_FAILED, pipeline->loc,
+                "failed to fork for background pipeline: %s", strerror(errno));
+            for (size_t j = 0; j < npipes; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            /// Reap the stages already forked so they do not leak as zombies,
+            /// retrying past an EINTR (handlers run without SA_RESTART).
+            for (size_t j = 0; j < i; j++) {
+                pid_t r;
+                do {
+                    r = waitpid(pids[j], NULL, 0);
+                } while (r == -1 && errno == EINTR);
+            }
+            free(pids);
+            free(pipes);
+            return 1;
+        }
+
+        if (pid == 0) {
+            /// Child stage. Join the job's process group -- the first stage
+            /// creates it, the rest join -- so one kill(-pgid) reaches the
+            /// whole pipeline under job control.
+            if (own_pgroup) {
+                setpgid(0, (i == 0) ? 0 : pgid);
+            }
+            /// A backgrounded pipeline is an async list: ignore SIGINT/SIGQUIT
+            /// (a terminal Ctrl-C must not kill it) and restore the default
+            /// hangup/fault handlers for the exit-time SIGHUP cascade (#375).
+            executor->async_context = true;
+            reset_subshell_signals();
+
+            if (i > 0) {
+                dup2(pipes[i - 1][0], STDIN_FILENO);
+            }
+            if (i < npipes) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+                if (stderr_to_next[i]) {
+                    dup2(pipes[i][1], STDERR_FILENO);
+                }
+            }
+            for (size_t j = 0; j < npipes; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            int result = execute_node(executor, stages[i]);
+            fflush(stdout);
+            fflush(stderr);
+            subshell_cleanup();
+            _exit(result);
+        }
+
+        /// Parent. Set group membership from this side too (both sides run to
+        /// close the fork-order race); the first stage's pid is the group id.
+        if (own_pgroup) {
+            if (i == 0) {
+                pgid = pid;
+            }
+            setpgid(pid, pgid);
+        }
+        pids[i] = pid;
+    }
+
+    /// Parent: close every pipe fd so each stage sees EOF as its neighbor
+    /// exits.
+    for (size_t i = 0; i < npipes; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+    free(pipes);
+
+    pid_t leader = pids[0];
+    pid_t group = own_pgroup ? leader : getpgrp();
+
+    job_t *job =
+        executor_add_job(executor, leader, group, own_pgroup, command_line);
+    if (job) {
+        /// Record one process per stage, in pipeline order, so `jobs -l` lists
+        /// every pid and reaping/signaling can address each stage.
+        process_t *tail = NULL;
+        for (size_t i = 0; i < nstages; i++) {
+            char *stage_src = node_to_source(stages[i]);
+            process_t *proc = create_process(pids[i], stage_src);
+            free(stage_src);
+            if (!proc) {
+                continue;
+            }
+            if (tail) {
+                tail->next = proc;
+            } else {
+                job->processes = proc;
+            }
+            tail = proc;
+        }
+    }
+
+    /// $! is the last stage's pid (bash/zsh), not the leader's.
+    last_background_pid = pids[nstages - 1];
+    free(pids);
+
+    /// The launch notice ([id] pid) is an interactive convenience and reports
+    /// $! (the last stage), matching a single-command background job.
+    if (job && is_interactive_shell()) {
+        printf("[%d] %d\n", job->job_id, (int)last_background_pid);
+    }
+
+    return 0;
+}
+
 /**
  * @brief Execute a command in the background
  *
@@ -17952,6 +18295,18 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     /// word alone (or "unknown" when the child is not a plain command).
     /// executor_add_job copies the string; free the rendered source after.
     char *command_line = node_to_source(command->first_child);
+
+    /// A backgrounded pipeline is tracked as a multi-process job: every stage
+    /// is a direct child of the shell, so each stage pid is reapable, listed by
+    /// `jobs -l`, and $! is the last stage (bash/zsh). A single command (or an
+    /// and-or list, subshell, brace group, ...) stays a one-child job on the
+    /// path below.
+    if (command->first_child && command->first_child->type == NODE_PIPE) {
+        int rc = executor_execute_background_pipeline(
+            executor, command->first_child, command_line);
+        free(command_line);
+        return rc;
+    }
 
     /// Job control (set -m) governs process-group topology and terminal
     /// management, not whether a job is tracked. lush keeps the job list a
@@ -18039,13 +18394,44 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         return 1;
     }
 
-    /// The long format adds the leader PID column. It is requested per-call
-    /// with `jobs -l` (bash/zsh) or made the default by the long_list_jobs
-    /// option (zsh).
+    /// The long format adds the PID column. It is requested per-call with
+    /// `jobs -l` (bash/zsh) or made the default by the long_list_jobs option
+    /// (zsh). Any other `-X` is an invalid option (bash/zsh/POSIX); `--` ends
+    /// option parsing; remaining words are jobspecs that filter the listing.
     bool long_form = shell_mode_allows(FEATURE_LONG_LIST_JOBS);
-    for (int i = 1; argv && argv[i]; i++) {
-        if (strcmp(argv[i], "-l") == 0) {
-            long_form = true;
+    int argc = 0;
+    while (argv && argv[argc]) {
+        argc++;
+    }
+    const char **specs =
+        argc > 1 ? malloc((size_t)(argc - 1) * sizeof(*specs)) : NULL;
+    int nspecs = 0;
+    bool opts_ended = false;
+    for (int i = 1; i < argc; i++) {
+        const char *a = argv[i];
+        if (!opts_ended && a[0] == '-' && a[1] != '\0') {
+            if (strcmp(a, "--") == 0) {
+                opts_ended = true;
+                continue;
+            }
+            for (const char *p = a + 1; *p; p++) {
+                if (*p == 'l') {
+                    long_form = true;
+                } else {
+                    executor_error_report(executor, SHELL_ERR_INVALID_OPTION,
+                                          builtin_get_source_location(),
+                                          "jobs: -%c: invalid option", *p);
+                    free(specs);
+                    return 2;
+                }
+            }
+        } else {
+            /// The first non-option word ends option parsing (POSIX operand
+            /// rule); it and the rest are jobspecs.
+            opts_ended = true;
+            if (specs) {
+                specs[nspecs++] = a;
+            }
         }
     }
 
@@ -18083,30 +18469,36 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         }
     }
 
-    /// Emit one job per line. The ordered walk (oldest-first) is the common
-    /// path; it runs only when the ordering buffer was allocated, so on the
-    /// rare allocation failure the fallback newest-first walk below takes over.
-    /// A completion already reported is shown once then omitted (a
-    /// `wait`-consumed completion is already gone from the list); running and
-    /// stopped jobs are always listed.
-    for (int idx = 0; ordered && idx < job_count; idx++) {
-        job_t *job = ordered[idx];
+    int rc = 0;
 
-        if (job->state == JOB_DONE && job->reported) {
-            continue;
-        }
-        job_write_line(sink, executor, job, job_state_string(job), long_form);
-
-        /// Reporting a completion here means the next listing omits it.
-        if (job->state == JOB_DONE) {
-            job->reported = true;
-        }
-    }
-
-    if (!ordered) {
-        /// Allocation-failure fallback: list in the stored newest-first order.
-        for (job_t *job = executor->jobs; job; job = job->next) {
-            if (job->state == JOB_DONE && job->reported) {
+    if (nspecs > 0) {
+        /// Filtered listing: resolve each jobspec in argument order, emitting
+        /// its line or a per-spec error (bash lists the valid specs and errors
+        /// on the rest, returning nonzero). A bare number is accepted as a job
+        /// id, matching the fg/bg convenience; otherwise a leading % is
+        /// required.
+        for (int i = 0; i < nspecs; i++) {
+            const char *spec = specs[i];
+            const char *reason = "no such job";
+            job_t *job = NULL;
+            if (spec[0] == '%') {
+                job = executor_resolve_job_spec(executor, spec, &reason);
+            } else {
+                char *end;
+                errno = 0;
+                long n = strtol(spec, &end, 10);
+                if (spec[0] != '\0' && *end == '\0' && n > 0 &&
+                    errno != ERANGE && n <= INT_MAX) {
+                    job = executor_find_job(executor, (int)n);
+                } else {
+                    reason = "invalid job spec";
+                }
+            }
+            if (!job) {
+                executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                                      builtin_get_source_location(),
+                                      "jobs: %s: %s", spec, reason);
+                rc = 1;
                 continue;
             }
             job_write_line(sink, executor, job, job_state_string(job),
@@ -18115,9 +18507,46 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
                 job->reported = true;
             }
         }
+    } else {
+        /// Emit one job per line. The ordered walk (oldest-first) is the common
+        /// path; it runs only when the ordering buffer was allocated, so on the
+        /// rare allocation failure the fallback newest-first walk below takes
+        /// over. A completion already reported is shown once then omitted (a
+        /// `wait`-consumed completion is already gone from the list); running
+        /// and stopped jobs are always listed.
+        for (int idx = 0; ordered && idx < job_count; idx++) {
+            job_t *job = ordered[idx];
+
+            if (job->state == JOB_DONE && job->reported) {
+                continue;
+            }
+            job_write_line(sink, executor, job, job_state_string(job),
+                           long_form);
+
+            /// Reporting a completion here means the next listing omits it.
+            if (job->state == JOB_DONE) {
+                job->reported = true;
+            }
+        }
+
+        if (!ordered) {
+            /// Allocation-failure fallback: list in the stored newest-first
+            /// order.
+            for (job_t *job = executor->jobs; job; job = job->next) {
+                if (job->state == JOB_DONE && job->reported) {
+                    continue;
+                }
+                job_write_line(sink, executor, job, job_state_string(job),
+                               long_form);
+                if (job->state == JOB_DONE) {
+                    job->reported = true;
+                }
+            }
+        }
     }
 
     free(ordered);
+    free(specs);
 
     if (out) {
         fclose(out);
@@ -18125,7 +18554,7 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
         free(buf);
     }
 
-    return 0;
+    return rc;
 }
 
 /// Resolve the job argument shared by fg and bg: no argument selects the
@@ -18209,9 +18638,10 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         tcsetpgrp(STDIN_FILENO, job->pgid);
     }
 
-    /// Continue the job if it was stopped
+    /// Continue the job if it was stopped. executor_signal_job reaches every
+    /// stage of a multi-process pipeline even when it shares the shell's group.
     if (job->state == JOB_STOPPED) {
-        kill(job_target(job), SIGCONT);
+        executor_signal_job(job, SIGCONT);
     }
 
     job->foreground = true;
@@ -18220,29 +18650,63 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
     /// is announced, rather than being suppressed by an earlier Stopped notice.
     job->reported = false;
 
-    /// Wait for the job to complete or stop
-    int status;
-    waitpid(job_target(job), &status, WUNTRACED);
+    /// Wait for the job to complete or stop. A multi-process pipeline waits
+    /// every stage to termination, returning early if the group stops; its
+    /// status is the last stage's. A single-process job waits its one target.
+    bool stopped = false;
+    int status = 0;
+    if (job->processes) {
+        for (process_t *p = job->processes; p && !stopped; p = p->next) {
+            if (p->done) {
+                continue;
+            }
+            for (;;) {
+                int st;
+                pid_t r = waitpid(p->pid, &st, WUNTRACED);
+                if (r == p->pid) {
+                    if (WIFSTOPPED(st)) {
+                        stopped = true;
+                    } else {
+                        p->status = st;
+                        p->done = true;
+                    }
+                    break;
+                }
+                if (r == -1 && errno == EINTR) {
+                    continue;
+                }
+                /// ECHILD or another error: treat the stage as terminated.
+                p->done = true;
+                break;
+            }
+        }
+        if (!stopped) {
+            status = job_last_process_status(job);
+        }
+    } else {
+        waitpid(job_target(job), &status, WUNTRACED);
+        stopped = WIFSTOPPED(status);
+    }
 
     /// Reclaim terminal control for the shell
     if (isatty(STDIN_FILENO)) {
         tcsetpgrp(STDIN_FILENO, executor->shell_pgid);
     }
 
-    if (WIFEXITED(status) || WIFSIGNALED(status)) {
+    if (!stopped) {
         executor_remove_job(executor, job_id);
         return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-    } else if (WIFSTOPPED(status)) {
-        job->state = JOB_STOPPED;
-        job->foreground = false;
-        /// A stop makes the job current (%+); it was already marked current on
-        /// entry, so the marker below reflects that.
-        note_current_job(executor, job_id);
-        job_write_line(stdout, executor, job, "Stopped", false);
-        /// This notice reports the stop; mark it so the next prompt's status
-        /// sweep does not print a second Stopped line for the same job.
-        job->reported = true;
     }
+
+    job->state = JOB_STOPPED;
+    job->foreground = false;
+    /// A stop makes the job current (%+); it was already marked current on
+    /// entry, so the marker below reflects that.
+    note_current_job(executor, job_id);
+    job_write_line(stdout, executor, job, "Stopped", false);
+    /// This notice reports the stop; mark it so the next prompt's status
+    /// sweep does not print a second Stopped line for the same job.
+    job->reported = true;
 
     return 0;
 }
@@ -18292,7 +18756,9 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
     job->reported = false;
     /// Resuming a job in the background makes it the current job (%+).
     note_current_job(executor, job_id);
-    kill(job_target(job), SIGCONT);
+    /// executor_signal_job reaches every stage of a multi-process pipeline even
+    /// when it shares the shell's process group.
+    executor_signal_job(job, SIGCONT);
 
     /// The bg notice reuses the shared one-line job format (id, tracked marker,
     /// state, command). lush does not append the trailing `&` cosmetic bash
