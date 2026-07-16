@@ -1162,6 +1162,92 @@ static char *posix_unquoted_dequote(const char *text) {
 }
 
 /**
+ * @brief Append a token's text to a growable buffer, re-encoding it from a
+ *        per-character quote-provenance map into the smuggled-quote form the
+ *        value expander consumes.
+ *
+ * The assignment value/word expanders (colon_segmented_tilde_expand,
+ * expand_if_needed) reconstruct quote context by re-scanning embedded
+ * backslashes: a `\X` is a POSIX-unquoted literal character. The parser must
+ * therefore re-encode a dequoted token back into that form. Per whole token
+ * this is easy (a single-quoted token holds every character literal; a
+ * double-quoted token has `~`/`'` escaped). But the mixed-quote tokenizer fuses
+ * a quoted segment with an adjacent unquoted run into ONE token (`"b":~/c`), so
+ * a per-token rule mis-encodes the unquoted part. Driven by the per-character
+ * map this re-encodes each character by its own quote context: an unquoted
+ * character is verbatim (a bare `~` stays expandable); a backslash-escaped
+ * literal and a double-quoted `~`/`'` are re-emitted `\X`; a single-quoted
+ * character is escaped `\X` unless it is a newline. Backslash escaping is used
+ * throughout rather than re-wrapping runs in `'...'`: the value expander's
+ * single-quote-span scanner and its backslash rule interact badly when real
+ * spans and `\'` escapes coexist in one string, so a fused word must smuggle
+ * its literals as backslash escapes only.
+ *
+ * @return true on success, false on allocation failure (buffer left valid).
+ */
+static bool prov_reencode_append(char **buf, size_t *len, size_t *cap,
+                                 const char *text, const char *prov, size_t n) {
+    /// Worst case per input character is 2 output bytes (a backslash escape);
+    /// reserve that plus a NUL. Grow once up front so the loop needs no bounds
+    /// checks. Backslash escaping is used throughout rather than `'...'` spans:
+    /// the value expander's single-quote-span scanner and its backslash rule
+    /// interact badly when real spans and `\'` escapes are mixed in one string,
+    /// so a fused mixed-quote word must smuggle its literals as backslash
+    /// escapes only (this is also what the pre-fix per-token encoder produced).
+    size_t need = *len + n * 2 + 1;
+    if (need >= *cap) {
+        size_t new_cap = (*cap > 0 ? *cap : 16);
+        while (need >= new_cap) {
+            new_cap *= 2;
+        }
+        char *grown = realloc(*buf, new_cap);
+        if (!grown) {
+            return false;
+        }
+        *buf = grown;
+        *cap = new_cap;
+    }
+    for (size_t k = 0; k < n; k++) {
+        char ch = text[k];
+        char p = prov ? prov[k] : QUOTE_PROV_UNQUOTED;
+        bool escape = false;
+        switch (p) {
+        case QUOTE_PROV_ESCAPED:
+            /// Unquoted backslash-escaped literal: re-emit `\X` so the literal
+            /// survives (a `\~` stays `~`, a `\'` stays a literal quote).
+            escape = true;
+            break;
+        case QUOTE_PROV_DOUBLE:
+            /// Double-quoted: `$`/`` ` ``/`$(...)` still expand (bare), but a
+            /// `~` must not tilde-expand and a `'` must stay literal for the
+            /// downstream single-quote scanner.
+            escape = (ch == '~' || ch == '\'');
+            break;
+        case QUOTE_PROV_SINGLE:
+            /// Single-quoted: fully literal. Backslash-escape EVERY character
+            /// so the run always begins with `\`, which makes it immune to any
+            /// first-character dispatch in the value expander -- `$name`, the
+            /// `@`/`%` kind sigils (lush default), a leading `~` -- present or
+            /// future. The downstream POSIX-unquoted-backslash rule strips each
+            /// `\` back to the literal. The one exception is a newline: a
+            /// `\<newline>` is a line continuation and would be removed, so a
+            /// literal newline is left bare (a bare newline is not special).
+            escape = (ch != '\n');
+            break;
+        default: /// QUOTE_PROV_UNQUOTED: genuine bare character, expands.
+            escape = false;
+            break;
+        }
+        if (escape) {
+            (*buf)[(*len)++] = '\\';
+        }
+        (*buf)[(*len)++] = ch;
+    }
+    (*buf)[*len] = '\0';
+    return true;
+}
+
+/**
  * @brief Try to consume one shell-style word argument from the current token.
  *
  * Tests whether the current token is "argument-like" (any of TOK_STRING,
@@ -1212,6 +1298,12 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         token_type_t type;
         char *text;
         bool glob_qualified;
+        /// Copy of the token's per-character quote provenance (strlen(text)
+        /// bytes, NOT NUL-terminated), or NULL. Copied because the live token
+        /// is freed as collection advances. Consumed by the magic_equal
+        /// provenance builder to re-encode a fused mixed-quote word per
+        /// character.
+        char *quote_prov;
     } token_info_t;
 
     token_info_t *collected_tokens = NULL;
@@ -1228,7 +1320,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             realloc(collected_tokens, (token_count + 1) * sizeof(token_info_t));
         if (!new_tokens) {
             for (int i = 0; i < token_count; i++) {
-                free(collected_tokens[i].text);
+                free(collected_tokens[i].text),
+                    free(collected_tokens[i].quote_prov);
             }
             free(collected_tokens);
             parser->has_error = true;
@@ -1240,6 +1333,18 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         collected_tokens[token_count].text = strdup(arg_token->text);
         collected_tokens[token_count].glob_qualified =
             arg_token->glob_qualified;
+        /// Copy the quote-provenance map (strlen(text) bytes, parallel to the
+        /// text; not NUL-terminated). The live token is freed as collection
+        /// advances, so a borrow would dangle.
+        collected_tokens[token_count].quote_prov = NULL;
+        if (arg_token->quote_prov && arg_token->text) {
+            size_t tl = strlen(arg_token->text);
+            char *qp = malloc(tl > 0 ? tl : 1);
+            if (qp) {
+                memcpy(qp, arg_token->quote_prov, tl);
+                collected_tokens[token_count].quote_prov = qp;
+            }
+        }
         token_count++;
 
         last_end_pos = arg_token->end_position;
@@ -1308,7 +1413,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         char **dequoted = malloc((size_t)token_count * sizeof(char *));
         if (!dequoted) {
             for (int i = 0; i < token_count; i++) {
-                free(collected_tokens[i].text);
+                free(collected_tokens[i].text),
+                    free(collected_tokens[i].quote_prov);
             }
             free(collected_tokens);
             parser->has_error = true;
@@ -1343,7 +1449,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             }
             free(dequoted);
             for (int i = 0; i < token_count; i++) {
-                free(collected_tokens[i].text);
+                free(collected_tokens[i].text),
+                    free(collected_tokens[i].quote_prov);
             }
             free(collected_tokens);
             parser->has_error = true;
@@ -1407,6 +1514,21 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                     for (int i = 0; i < token_count; i++) {
                         const char *t = collected_tokens[i].text;
                         size_t tl = t ? strlen(t) : 0;
+                        /// When the token carries a per-character quote map
+                        /// (any mixed-quote-reader token except ANSI-C-disabled
+                        /// ones), re-encode per character so a fused quoted +
+                        /// unquoted run (`"b":~/c`) escapes only the quoted
+                        /// characters. The helper grows the buffer itself.
+                        if (collected_tokens[i].quote_prov) {
+                            if (!prov_reencode_append(
+                                    &magic_equal_prov, &plen, &pcap, t,
+                                    collected_tokens[i].quote_prov, tl)) {
+                                free(magic_equal_prov);
+                                magic_equal_prov = NULL;
+                                break;
+                            }
+                            continue;
+                        }
                         if (plen + tl * 2 + 3 > pcap) {
                             pcap = (plen + tl * 2 + 3) * 2;
                             char *pg = realloc(magic_equal_prov, pcap);
@@ -1463,6 +1585,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
     for (int i = 0; i < token_count; i++) {
         free(collected_tokens[i].text);
+        free(collected_tokens[i].quote_prov);
     }
     free(collected_tokens);
     return true;
@@ -2150,7 +2273,21 @@ static char *parse_scalar_assignment_string(parser_t *parser,
             /// Only single quotes need to be preserved to prevent
             /// expansion Double quotes: expand variables but don't keep
             /// quotes
-            if (wrap_single) {
+            if (value->quote_prov) {
+                /// The token carries a per-character quote map (a mixed-quote
+                /// reader token that is not ANSI-C-disabled). Re-encode per
+                /// character so a fused quoted + unquoted run (`~/a:"b":~/c`)
+                /// escapes only the quoted `~`/`'` and leaves an unquoted `~`
+                /// after a `:` bare to expand. Generalizes the per-token
+                /// branches below; the helper grows the buffer itself.
+                if (!prov_reencode_append(&full_value, &value_len,
+                                          &value_capacity, value->text,
+                                          value->quote_prov, token_len)) {
+                    free(full_value);
+                    free(var_name);
+                    return NULL;
+                }
+            } else if (wrap_single) {
                 /// Regular single-quoted: re-wrap with quotes to
                 /// preserve no-expansion semantics through
                 /// expand_if_needed.

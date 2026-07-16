@@ -163,7 +163,32 @@ typedef struct token {
      * Distinguishes `"$f"(N)` (qualifier) from `"$f(N)"` (literal parens).
      */
     bool glob_qualified;
+    /**
+     * Per-character quote provenance, parallel to `text` (one byte per text
+     * byte), or NULL when this token was not produced by the mixed-quote word
+     * reader. Each byte is QUOTE_PROV_UNQUOTED / QUOTE_PROV_SINGLE /
+     * QUOTE_PROV_DOUBLE / QUOTE_PROV_ESCAPED, recording the quote context the
+     * character was scanned under. The mixed-quote reader flattens a word that
+     * fuses a quoted segment with an adjacent unquoted run (`"b":~/c`) into ONE
+     * token of a single type, discarding which characters were quoted. This map
+     * preserves that so the assignment re-encoders decide per character -- not
+     * per whole token -- how to hold each character literal or expandable.
+     * Owned; freed by token_free.
+     */
+    char *quote_prov;
 } token_t;
+
+/// quote_prov byte values (see token_t.quote_prov). Printable so the map is
+/// legible in a debugger. ESCAPED marks an unquoted character that was
+/// backslash-escaped in the source (`\~`, `\'`): the reader consumes the
+/// backslash, so this distinguishes an escaped literal (must NOT expand) from a
+/// genuine bare character (a `~` that must tilde-expand, a `'` that opens a
+/// quote). The re-encoder emits an ESCAPED character as `\X` so the downstream
+/// POSIX-unquoted-backslash rule restores it as a literal.
+#define QUOTE_PROV_UNQUOTED 'U'
+#define QUOTE_PROV_SINGLE 'S'
+#define QUOTE_PROV_DOUBLE 'D'
+#define QUOTE_PROV_ESCAPED 'E'
 
 /// Tokenizer state for parser
 typedef struct tokenizer {
