@@ -238,15 +238,14 @@ int send_sighup_to_jobs(void) {
         }
 
         if (job->pid > 0) {
-            /// Target the job's own group when it has one, else its leader pid
-            /// so the hangup reaches only the job and not the shell's own
-            /// group.
-            pid_t target = job_target(job);
-            if (kill(target, SIGHUP) == 0) {
-                count++;
-                /// Also send SIGCONT so stopped jobs can handle SIGHUP
-                kill(target, SIGCONT);
-            }
+            /// Signal the job's own group when it has one, else each of its
+            /// processes, so the hangup reaches every stage of a multi-process
+            /// pipeline (that shares the shell's group) without hitting the
+            /// shell itself.
+            executor_signal_job(job, SIGHUP);
+            count++;
+            /// Also send SIGCONT so stopped jobs can act on the hangup.
+            executor_signal_job(job, SIGCONT);
         }
 
         job = job->next;

@@ -122,6 +122,24 @@ static void check(const char *lush, const char *label, const char *script,
     fprintf(stderr, "ok   %s [%s]\n", TEST, label);
 }
 
+/// Assert `needle` is absent from the script's output.
+static void check_absent(const char *lush, const char *label,
+                         const char *script, const char *needle) {
+    char out[8192];
+    if (!run_script(lush, script, out, sizeof(out))) {
+        fprintf(stderr, "FAIL %s [%s]: shell did not exit\n", TEST, label);
+        failures++;
+        return;
+    }
+    if (strstr(out, needle)) {
+        fprintf(stderr, "FAIL %s [%s]: unexpected \"%s\" (got: \"%.400s\")\n",
+                TEST, label, needle, out);
+        failures++;
+        return;
+    }
+    fprintf(stderr, "ok   %s [%s]\n", TEST, label);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: %s <lush-binary-path>\n", argv[0]);
@@ -153,6 +171,41 @@ int main(int argc, char **argv) {
     /// Law 4 (regression): each `&` in a list still makes its own job.
     check(lush, "multiple background jobs in a list",
           "sleep 2 & sleep 2 & jobs", (const char *[]){"[1]", "[2]", NULL});
+
+    /// #463: a backgrounded pipeline is tracked as a multi-process job. `$!` is
+    /// the last stage (not a wrapper), so `jobs -l` shows one pid per stage:
+    /// line 1's second field is the first stage's pid, line 2's first field is
+    /// the last stage's pid, and that pid equals $!. The shell computes the
+    /// verdict so the assertion does not depend on specific pid values.
+    check(lush, "backgrounded pipeline jobs -l lists a pid per stage",
+          "sleep 9 | sleep 9 & last=$!; "
+          "first=$(jobs -l | awk 'NR==1{print $2}'); "
+          "second=$(jobs -l | awk 'NR==2{print $1}'); "
+          "if [ \"$second\" = \"$last\" ] && [ \"$first\" != \"$last\" ] && "
+          "[ -n \"$first\" ]; then echo PERPROC_OK; else echo PERPROC_BAD; fi; "
+          "kill %1 2>/dev/null",
+          (const char *[]){"PERPROC_OK", NULL});
+
+    /// #463: `$!` is the last stage, so `wait $!` resolves the whole pipeline
+    /// job and returns the last command's exit status (the pipeline's status).
+    check(lush, "wait $! on a pipeline returns the last stage status",
+          "sh -c 'exit 5' | sh -c 'exit 7' & wait $!; echo \"WS=$?\"",
+          (const char *[]){"WS=7", NULL});
+
+    /// #463 gap 1: an unknown option errors rather than listing.
+    check(lush, "jobs rejects an invalid option",
+          "jobs -x 2>&1; echo \"RC=$?\"",
+          (const char *[]){"invalid option", "RC=2", NULL});
+
+    /// #463 gap 2: a jobspec filters the listing to just that job.
+    check(lush, "jobs %n filters to one job",
+          "sleep 5 & sleep 5 & sleep 5 & jobs %2 2>&1",
+          (const char *[]){"[2]", NULL});
+    check_absent(lush, "jobs %2 omits the other jobs",
+                 "sleep 5 & sleep 5 & sleep 5 & jobs %2 2>&1", "[1]");
+    check(lush, "jobs on an unknown jobspec errors",
+          "sleep 5 & jobs %9 2>&1; echo \"RC=$?\"",
+          (const char *[]){"no such job", "RC=1", NULL});
 
     if (failures) {
         fprintf(stderr, "%s: %d failure(s)\n", TEST, failures);

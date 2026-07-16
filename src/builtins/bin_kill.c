@@ -159,8 +159,10 @@ int bin_kill(int argc, char **argv) {
     for (; i < argc; i++) {
         pid_t target;
         if (argv[i][0] == '%') {
-            /// Job spec: resolve against the shell's job list and signal the
-            /// job's process (or group, via the negated pgid from job_target).
+            /// Job spec: resolve against the shell's job list and signal every
+            /// process of the job. executor_signal_job reaches the whole group
+            /// (via the negated pgid) or, for a multi-process pipeline sharing
+            /// the shell's group, each stage individually.
             const char *reason;
             job_t *job =
                 executor_resolve_job_spec(current_executor, argv[i], &reason);
@@ -171,7 +173,8 @@ int bin_kill(int argc, char **argv) {
                 status = 1;
                 continue;
             }
-            target = job_target(job);
+            executor_signal_job(job, signo);
+            continue;
         } else {
             /// A pid, or a negative pid for a process group. Reject a
             /// non-numeric or out-of-range operand rather than aliasing it.

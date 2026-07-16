@@ -46,7 +46,8 @@ typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } job_state_t;
 typedef struct process {
     pid_t pid;
     char *command;
-    int status;
+    int status; ///< Raw waitpid status, valid once done is true
+    bool done;  ///< True once this process has terminated and been reaped
     struct process *next;
 } process_t;
 
@@ -87,6 +88,21 @@ typedef struct job {
 static inline pid_t job_target(const job_t *job) {
     return job->own_pgroup ? -job->pgid : job->pid;
 }
+
+/**
+ * @brief Send a signal to every process of a job.
+ *
+ * A single-process job (processes == NULL) is signaled through job_target():
+ * the process group when the job owns one, else the leader pid. A multi-process
+ * job (a tracked background pipeline) that owns its group is likewise signaled
+ * as a group, but one sharing the shell's group must be signaled per-process --
+ * kill(-pgid) there would hit the shell itself. Only still-live processes are
+ * signaled.
+ *
+ * @param job Job to signal
+ * @param sig Signal number
+ */
+void executor_signal_job(const job_t *job, int sig);
 
 /// Loop control states
 typedef enum {
