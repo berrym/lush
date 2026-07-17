@@ -1119,7 +1119,8 @@ static node_t *parse_pipeline(parser_t *parser) {
 }
 
 /**
- * @brief Strip POSIX-unquoted backslash escapes from a word token's text.
+ * @brief Strip POSIX-unquoted backslash escapes from a word token's text,
+ *        emitting a parallel per-character quote-provenance map.
  *
  * The tokenizer's word-context scanner keeps `\X` pairs in the token text
  * verbatim — escape interpretation is deferred. For tokens that did NOT
@@ -1134,30 +1135,43 @@ static node_t *parse_pipeline(parser_t *parser) {
  * double-quote scanner) follow double-quote escape rules and are
  * resolved later by the executor's expand_quoted_string.
  *
- * Returns a freshly malloc'd string the caller owns.
+ * Returns a freshly malloc'd string the caller owns, and via *out_prov a
+ * parallel per-character quote map (ESCAPED for a de-escaped `\X` output
+ * character, UNQUOTED for a bare one; same length as the dequoted string) used
+ * to build a fused word's node_t.quote_prov for its bare word-token segments
+ * (#498). Returns NULL and sets *out_prov to NULL on OOM.
  */
-static char *posix_unquoted_dequote(const char *text) {
-    if (!text) {
+static char *posix_unquoted_dequote_prov(const char *text, char **out_prov) {
+    if (out_prov) {
+        *out_prov = NULL;
+    }
+    if (!text || !out_prov) {
         return NULL;
     }
     size_t len = strlen(text);
     char *out = malloc(len + 1);
-    if (!out) {
+    char *prov = malloc(len + 1);
+    if (!out || !prov) {
+        free(out);
+        free(prov);
         return NULL;
     }
     size_t w = 0;
     for (size_t i = 0; i < len; i++) {
         if (text[i] == '\\' && i + 1 < len) {
-            /// `\<newline>` was already removed by the tokenizer's word
-            /// scanner; no special case needed here. Any other `\X`
-            /// collapses to a literal X.
-            out[w++] = text[i + 1];
+            out[w] = text[i + 1];
+            prov[w] = QUOTE_PROV_ESCAPED;
+            w++;
             i++;
             continue;
         }
-        out[w++] = text[i];
+        out[w] = text[i];
+        prov[w] = QUOTE_PROV_UNQUOTED;
+        w++;
     }
     out[w] = '\0';
+    prov[w] = '\0';
+    *out_prov = prov;
     return out;
 }
 
@@ -1383,6 +1397,19 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             arg_node->val.str = strdup(collected_tokens[0].text);
             arg_node->val_type = VAL_STR;
             arg_node->glob_qualified = collected_tokens[0].glob_qualified;
+            /// A fused mixed-quote word (`'$x'y`, `"b":~/c`) arrives as one
+            /// TOK_EXPANDABLE_STRING with a per-character quote map; carry it
+            /// onto the node so the word expander decides per character (#498).
+            if (arg_node->type == NODE_STRING_EXPANDABLE &&
+                collected_tokens[0].quote_prov && arg_node->val.str) {
+                size_t qn = strlen(arg_node->val.str);
+                char *qp = malloc(qn + 1);
+                if (qp) {
+                    memcpy(qp, collected_tokens[0].quote_prov, qn);
+                    qp[qn] = '\0';
+                    arg_node->quote_prov = qp;
+                }
+            }
             add_child_node(parent, arg_node);
         }
     } else if (token_count > 1) {
@@ -1410,8 +1437,25 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         ///   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
         ///   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
         ///   TOK_VARIABLE             — `$VAR`, no escapes by construction
-        char **dequoted = malloc((size_t)token_count * sizeof(char *));
+        /// calloc (not malloc) so a mid-loop failure leaves the not-yet-filled
+        /// tail NULL -- the cleanup loops free(dequoted[i]) over the full
+        /// range.
+        char **dequoted = calloc((size_t)token_count, sizeof(char *));
         if (!dequoted) {
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text),
+                    free(collected_tokens[i].quote_prov);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
+        /// Parallel per-character quote provenance for each dequoted segment,
+        /// concatenated below into node_t.quote_prov so the word expander can
+        /// decide per character in a fused mixed-quote word (#498).
+        char **dequoted_prov = calloc((size_t)token_count, sizeof(char *));
+        if (!dequoted_prov) {
+            free(dequoted);
             for (int i = 0; i < token_count; i++) {
                 free(collected_tokens[i].text),
                     free(collected_tokens[i].quote_prov);
@@ -1431,13 +1475,41 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             case TOK_BACKQUOTE:
             case TOK_VARIABLE:
                 dequoted[i] = strdup(collected_tokens[i].text);
+                if (dequoted[i]) {
+                    size_t tl = strlen(dequoted[i]);
+                    dequoted_prov[i] = malloc(tl + 1);
+                    if (dequoted_prov[i]) {
+                        if (collected_tokens[i].quote_prov) {
+                            /// The token's map is parallel to its (unchanged)
+                            /// text.
+                            memcpy(dequoted_prov[i],
+                                   collected_tokens[i].quote_prov, tl);
+                        } else {
+                            /// No per-character map: classify the whole segment
+                            /// -- a single-/double-quoted reader token, or an
+                            /// expansion (`$var`/`$(...)`/`$((...))`) that must
+                            /// still expand, so UNQUOTED.
+                            char cls = collected_tokens[i].type == TOK_STRING
+                                           ? QUOTE_PROV_SINGLE
+                                           : (collected_tokens[i].type ==
+                                                      TOK_EXPANDABLE_STRING
+                                                  ? QUOTE_PROV_DOUBLE
+                                                  : QUOTE_PROV_UNQUOTED);
+                            memset(dequoted_prov[i], cls, tl);
+                        }
+                        dequoted_prov[i][tl] = '\0';
+                    }
+                }
                 break;
             default:
-                /// Word-like tokens: word-context backslashes collapse.
-                dequoted[i] = posix_unquoted_dequote(collected_tokens[i].text);
+                /// Word-like tokens: word-context backslashes collapse; the
+                /// companion emits the parallel provenance (bare U, de-escaped
+                /// E).
+                dequoted[i] = posix_unquoted_dequote_prov(
+                    collected_tokens[i].text, &dequoted_prov[i]);
                 break;
             }
-            if (!dequoted[i]) {
+            if (!dequoted[i] || !dequoted_prov[i]) {
                 ok = false;
                 break;
             }
@@ -1446,8 +1518,10 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         if (!ok) {
             for (int i = 0; i < token_count; i++) {
                 free(dequoted[i]);
+                free(dequoted_prov[i]);
             }
             free(dequoted);
+            free(dequoted_prov);
             for (int i = 0; i < token_count; i++) {
                 free(collected_tokens[i].text),
                     free(collected_tokens[i].quote_prov);
@@ -1490,6 +1564,25 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 if (collected_tokens[i].glob_qualified) {
                     any_glob_qualified = true;
                     break;
+                }
+            }
+
+            /// Concatenate the per-character quote provenance parallel to
+            /// `concatenated` so the word expander can decide per character
+            /// (#498). Only meaningful for a fused word that carries a quote
+            /// (any_quoted -> NODE_STRING_EXPANDABLE); a fully-unquoted word
+            /// keeps the untouched NODE_VAR expander path.
+            char *node_quote_prov = NULL;
+            if (any_quoted) {
+                node_quote_prov = malloc(total_len + 1);
+                if (node_quote_prov) {
+                    size_t pw = 0;
+                    for (int i = 0; i < token_count; i++) {
+                        size_t dl = strlen(dequoted[i]);
+                        memcpy(node_quote_prov + pw, dequoted_prov[i], dl);
+                        pw += dl;
+                    }
+                    node_quote_prov[pw] = '\0';
                 }
             }
 
@@ -1571,16 +1664,20 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 arg_node->val_type = VAL_STR;
                 arg_node->glob_qualified = any_glob_qualified;
                 arg_node->magic_equal_value = magic_equal_prov;
+                arg_node->quote_prov = node_quote_prov;
                 add_child_node(parent, arg_node);
             } else {
                 free(concatenated);
                 free(magic_equal_prov);
+                free(node_quote_prov);
             }
         }
         for (int i = 0; i < token_count; i++) {
             free(dequoted[i]);
+            free(dequoted_prov[i]);
         }
         free(dequoted);
+        free(dequoted_prov);
     }
 
     for (int i = 0; i < token_count; i++) {

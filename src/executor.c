@@ -43,6 +43,7 @@
 #include "shell_mode.h"
 #include "signals.h"
 #include "symtable.h"
+#include "tokenizer.h" /// QUOTE_PROV_* byte values for node_t.quote_prov (#498)
 
 #include <ctype.h>
 #include <dirent.h>
@@ -221,6 +222,12 @@ static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
 static char *expand_quoted_string(executor_t *executor, const char *str,
                                   bool in_double_quotes);
+/// Provenance-aware variant: `prov` is a per-character quote map parallel to
+/// `str` (see node_t.quote_prov), or NULL. NULL is byte-identical to
+/// expand_quoted_string; a map lets a fused mixed-quote word expand each
+/// character by its own quote context (#498).
+static char *expand_quoted_string_prov(executor_t *executor, const char *str,
+                                       bool in_double_quotes, const char *prov);
 static char *expand_arg_node(executor_t *executor, node_t *node);
 static char *expand_array_unsubscripted(executor_t *executor,
                                         array_value_t *array,
@@ -6019,8 +6026,11 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
         /// Per parser.c collect_word_argument: word-context backslashes
         /// have been pre-stripped during multi-token concat, so any `\X`
         /// still present in node->val.str came from a `"..."` segment and
-        /// must be resolved with double-quote rules.
-        return expand_quoted_string(executor, node->val.str, true);
+        /// must be resolved with double-quote rules. When the word fused quote
+        /// contexts, node->quote_prov drives per-character decisions (#498);
+        /// NULL keeps the whole-string double-quote policy.
+        return expand_quoted_string_prov(executor, node->val.str, true,
+                                         node->quote_prov);
     case NODE_ARITH_EXP:
         return expand_arithmetic(executor, node->val.str);
     case NODE_COMMAND_SUB:
@@ -11094,6 +11104,15 @@ node_t *copy_ast_node(node_t *node) {
     if (node->magic_equal_value) {
         copy->magic_equal_value = strdup(node->magic_equal_value);
         if (!copy->magic_equal_value) {
+            free_node_tree(copy);
+            return NULL;
+        }
+    }
+
+    /// Same node-copy-completeness rule for the per-character quote map (#498).
+    if (node->quote_prov) {
+        copy->quote_prov = strdup(node->quote_prov);
+        if (!copy->quote_prov) {
             free_node_tree(copy);
             return NULL;
         }
@@ -17003,6 +17022,15 @@ static node_t *copy_node_simple(node_t *original) {
         }
     }
 
+    /// Same for the per-character quote map (#498).
+    if (original->quote_prov) {
+        copy->quote_prov = strdup(original->quote_prov);
+        if (!copy->quote_prov) {
+            free_node_tree(copy);
+            return NULL;
+        }
+    }
+
     /// Copy children recursively
     node_t *child = original->first_child;
     while (child) {
@@ -17029,8 +17057,15 @@ static node_t *copy_node_simple(node_t *original) {
  * @param str Double-quoted string content
  * @return Expanded string (caller must free)
  */
+/// Thin wrapper: the whole-string double-quote policy, no per-character map.
 static char *expand_quoted_string(executor_t *executor, const char *str,
                                   bool in_double_quotes) {
+    return expand_quoted_string_prov(executor, str, in_double_quotes, NULL);
+}
+
+static char *expand_quoted_string_prov(executor_t *executor, const char *str,
+                                       bool in_double_quotes,
+                                       const char *prov) {
     if (!executor || !str) {
         return strdup("");
     }
@@ -17038,6 +17073,13 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
     size_t len = strlen(str);
     if (len == 0) {
         return strdup("");
+    }
+
+    /// The per-character quote map must line up with the string one-for-one; a
+    /// mismatch (should never happen) disables it rather than risking an
+    /// out-of-bounds read.
+    if (prov && strlen(prov) != len) {
+        prov = NULL;
     }
 
     /// Allocate a buffer for expansion (estimate double the original size)
@@ -17050,7 +17092,62 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
     size_t result_pos = 0;
     size_t i = 0;
 
+    /// Edit 4 -- an unquoted leading `~` is tilde-expanded even though the word
+    /// as a whole came through the double-quote expander (a fused word like
+    /// `~/a"b"`). Only fires when the first character is genuinely unquoted; a
+    /// quoted or non-`~` first character keeps the legacy behavior. A `~` after
+    /// a `:` is NOT expanded here -- that is the assignment/magic_equal path.
+    if (prov && str[0] == '~' && prov[0] == QUOTE_PROV_UNQUOTED) {
+        size_t tprefix = 1; /// consume `~` and any `~user` up to `/` or end
+        while (tprefix < len && str[tprefix] != '/' &&
+               prov[tprefix] == QUOTE_PROV_UNQUOTED) {
+            tprefix++;
+        }
+        char *tprefix_str = malloc(tprefix + 1);
+        char *home = NULL;
+        if (tprefix_str) {
+            memcpy(tprefix_str, str, tprefix);
+            tprefix_str[tprefix] = '\0';
+            home = expand_tilde(tprefix_str);
+            free(tprefix_str);
+        }
+        if (home) {
+            size_t hlen = strlen(home);
+            while (result_pos + hlen + 1 >= buffer_size) {
+                buffer_size *= 2;
+                char *nr = realloc(result, buffer_size);
+                if (!nr) {
+                    free(home);
+                    free(result);
+                    return strdup("");
+                }
+                result = nr;
+            }
+            memcpy(result + result_pos, home, hlen);
+            result_pos += hlen;
+            free(home);
+            i = tprefix; /// continue after the consumed `~`-prefix
+        }
+    }
+
     while (i < len) {
+        /// Edit 1 -- a single-quoted or backslash-escaped character is literal:
+        /// no `$`/backtick/backslash processing. This is what keeps a
+        /// single-quoted `$x` (`'$x'y`) from expanding.
+        if (prov &&
+            (prov[i] == QUOTE_PROV_SINGLE || prov[i] == QUOTE_PROV_ESCAPED)) {
+            if (result_pos + 2 >= buffer_size) {
+                buffer_size *= 2;
+                char *nr = realloc(result, buffer_size);
+                if (!nr) {
+                    free(result);
+                    return strdup("");
+                }
+                result = nr;
+            }
+            result[result_pos++] = str[i++];
+            continue;
+        }
         /// `@` and `%` kind sigils are bare-word-only: like `~` tilde
         /// expansion, double quotes suppress them, so a quoted string stays a
         /// literal -- `printf "%s\n"`, `"user@host"`, and `"100% off"` all
@@ -17269,6 +17366,15 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     /// FEATURE_UNICODE_IDENTIFIERS via
                     /// lush_ident_match_continue.
                     while (var_start + var_name_len < len) {
+                        /// Edit 2 -- bound the name at a quote-context change
+                        /// so
+                        /// `"$y"z` reads `$y` (the name shares the `$`'s class,
+                        /// at var_start - 1) and leaves `z` literal, rather
+                        /// than greedily reading `$yz`.
+                        if (prov && prov[var_start + var_name_len] !=
+                                        prov[var_start - 1]) {
+                            break;
+                        }
                         size_t n = lush_ident_match_continue(
                             str + var_start + var_name_len,
                             len - var_start - var_name_len);
@@ -17409,8 +17515,14 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
             char next_char = str[i + 1];
             bool is_dq_meta = (next_char == '\\' || next_char == '"' ||
                                next_char == '$' || next_char == '`');
+            /// Edit 3 -- the backslash regime is per character when a map is
+            /// present: a DOUBLE-quoted backslash keeps double-quote rules, an
+            /// UNQUOTED one collapses `\X` to X. (SINGLE/ESCAPED never reach
+            /// here -- edit 1 already emitted them literally.)
+            bool eff_dq =
+                prov ? (prov[i] == QUOTE_PROV_DOUBLE) : in_double_quotes;
 
-            if (!in_double_quotes || is_dq_meta) {
+            if (!eff_dq || is_dq_meta) {
                 if (result_pos >= buffer_size - 1) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -20058,8 +20170,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                     if (is_associative) {
                         /// Zsh-style: arr=(key1 val1 key2 val2 ...)
                         /// Alternating key-value pairs
-                        char *expanded_key =
-                            expand_if_needed(executor, elem_str);
+                        char *expanded_key = expand_arg_node(executor, elem);
                         const char *key =
                             expanded_key ? expanded_key : elem_str;
 
@@ -20067,7 +20178,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         node_t *value_elem = elem->next_sibling;
                         if (value_elem && value_elem->val.str) {
                             char *expanded_val =
-                                expand_if_needed(executor, value_elem->val.str);
+                                expand_arg_node(executor, value_elem);
                             const char *val = expanded_val
                                                   ? expanded_val
                                                   : value_elem->val.str;
@@ -20081,10 +20192,14 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         if (expanded_key)
                             free(expanded_key);
                     } else {
-                        /// Indexed array - assign to next index
-                        /// Expand the element using full expansion (handles
-                        /// $'...' ANSI-C quoting)
-                        char *expanded = expand_if_needed(executor, elem_str);
+                        /// Indexed array - assign to next index. Expand through
+                        /// the command-word dispatch so a quoted element goes
+                        /// through the double-quote expander (no tilde -- a
+                        /// `"~/y"` element stays literal) while an unquoted
+                        /// element keeps expand_if_needed's tilde/glob path
+                        /// (#498). Handles $'...' ANSI-C via the LITERAL
+                        /// branch.
+                        char *expanded = expand_arg_node(executor, elem);
                         const char *final_value =
                             expanded ? expanded : elem_str;
 

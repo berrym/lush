@@ -1011,6 +1011,38 @@ TEST(rt_mixed_quote_provenance_assignment) {
                      "9:%s\n");
 }
 
+TEST(rt_command_word_mixed_quote_provenance) {
+    /// #498: a COMMAND-ARGUMENT (and array-element) word that fuses quote
+    /// contexts expands each character by its own quote context -- an unquoted
+    /// leading `~` expands, a single-quoted `$var` stays literal, and a
+    /// `"$var"` abutting text bounds the name at the quote edge rather than
+    /// greedily swallowing it. The command-word half of the #495 provenance
+    /// arc, consumed by expand_quoted_string_prov via node_t.quote_prov.
+    /// Subshell-wrapped for the HOME export.
+    run_result_t r =
+        run_shell("( export HOME=/tmp/h; y=Y; unset x\n"
+                  "  echo ~/a\"b\"\n"
+                  "  echo '$x'y\n"
+                  "  echo x\"$y\"z\n"
+                  "  echo pre'$y'post\n"
+                  "  echo '$y'~/b\n"
+                  "  a=(~/x \"~/y\" ~/z); echo \"${a[0]} ${a[1]} ${a[2]}\"\n"
+                  "  f() { echo x\"$y\"z; }; f )\n");
+    ASSERT_STDOUT_EQ(r,
+                     /// unquoted leading ~ expands though the word is fused
+                     "/tmp/h/ab\n"
+                     /// single-quoted $x stays literal
+                     "$xy\n"
+                     /// "$y" bounds at the quote edge; z stays literal
+                     "xYz\n"
+                     "pre$ypost\n"
+                     "$y~/b\n"
+                     /// array: unquoted ~ expands, quoted "~/y" stays literal
+                     "/tmp/h/x ~/y /tmp/h/z\n"
+                     /// inside a deep-copied function body (copy_node_simple)
+                     "xYz\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -5001,6 +5033,7 @@ int main(void) {
     RUN_TEST(rt_declaration_util_tilde_expansion);
     RUN_TEST(rt_declaration_util_mixed_quote_tilde);
     RUN_TEST(rt_mixed_quote_provenance_assignment);
+    RUN_TEST(rt_command_word_mixed_quote_provenance);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
