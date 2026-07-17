@@ -602,6 +602,21 @@ bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,
 char *expand_if_needed(executor_t *executor, const char *text);
 
 /**
+ * @brief Expand a single word/argument AST node to its string value.
+ *
+ * Dispatches by node type: ANSI-C decode for a `$'...'` NODE_STRING_LITERAL,
+ * double-quote rules for NODE_STRING_EXPANDABLE, command substitution,
+ * arithmetic, process substitution, and expand_if_needed for the rest. The
+ * single source of truth for per-node-type word expansion, shared by command
+ * arguments and redirection/here-string operands.
+ *
+ * @param executor Executor context
+ * @param node Word node (must have val.str non-NULL for string node types)
+ * @return Newly allocated expanded string (caller must free)
+ */
+char *expand_arg_node(executor_t *executor, node_t *node);
+
+/**
  * @brief Expand a brace pattern into its enumerated branches
  *
  * Given a pattern such as `{a,b,c}/Doc` or `{1..3}-tail`, returns a

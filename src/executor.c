@@ -228,7 +228,8 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
 /// character by its own quote context (#498).
 static char *expand_quoted_string_prov(executor_t *executor, const char *str,
                                        bool in_double_quotes, const char *prov);
-static char *expand_arg_node(executor_t *executor, node_t *node);
+/// expand_arg_node is declared in executor.h -- it is the shared per-node-type
+/// word expander, also consumed by the redirection/here-string target path.
 static char *expand_array_unsubscripted(executor_t *executor,
                                         array_value_t *array,
                                         const char *arr_name);
@@ -6007,7 +6008,7 @@ braced_bare_array_ready:;
     return true;
 }
 
-static char *expand_arg_node(executor_t *executor, node_t *node) {
+char *expand_arg_node(executor_t *executor, node_t *node) {
     if (!node || !node->val.str) {
         return strdup("");
     }
