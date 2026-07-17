@@ -62,6 +62,17 @@
  *
  * Outside any quote, `\X` consumes both bytes.
  *
+ * For a `(` group the scan is additionally shell-structure-aware so a
+ * `case` pattern's closing `)` -- which has no matching `(` -- is
+ * recognized as case syntax rather than a group close (`$(case x in x)
+ * echo M;; esac)` matches the final `)`, not the pattern one; #494).
+ * `case`/`esac` are recognized only at command position and `in` only
+ * after a `case` subject, so those words used as ordinary arguments do
+ * not affect the scan. A `#` comment at a word boundary runs to end of
+ * line (so a `)` inside it is not a close). Without a `case`, a `(`
+ * group scans byte-identically to a plain nested-paren match. The `{`
+ * path is a plain nested match with no structure awareness.
+ *
  * Multi-byte UTF-8 sequences are advanced atomically via
  * `lle_utf8_decode_codepoint`. Invalid UTF-8 falls through as a one-
  * byte advance so the scan never gets stuck.

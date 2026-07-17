@@ -234,6 +234,96 @@ TEST(brace_utf8_content_does_not_false_match) {
     ASSERT_EQ(scan("{中文}"), (size_t)7, "ok");
 }
 
+/* ----------------------------------------------------------------------------
+ * Case-aware `(` scan (#494): a case-pattern `)` has no matching `(` and must
+ * not close the group. Each input is written so the real closing `)` is the
+ * final byte, so the expected offset is strlen(s) - 1.
+ * ------------------------------------------------------------------------- */
+
+/// Assert the group opened at s[0] closes at the final byte.
+#define ASSERT_CLOSES_AT_END(s, msg) ASSERT_EQ(scan(s), strlen(s) - 1, msg)
+
+TEST(brace_case_pattern_paren_not_a_close) {
+    ASSERT_CLOSES_AT_END("(case x in x) echo M;; esac)", "pattern ) skipped");
+}
+
+TEST(brace_case_multi_arm) {
+    ASSERT_CLOSES_AT_END("(case ab in a) A;; b) B;; *) S;; esac)", "multi-arm");
+}
+
+TEST(brace_case_nested) {
+    ASSERT_CLOSES_AT_END("(case a in a) case b in b) X;; esac;; esac)",
+                         "nested case");
+}
+
+TEST(brace_case_esac_as_argument) {
+    /// `esac` as an argument in an arm body is not the case terminator, so the
+    /// group must not close early at the following pattern list.
+    ASSERT_CLOSES_AT_END("(case x in x) echo esac;; esac)", "esac argument");
+    ASSERT_CLOSES_AT_END("(case x in x) echo case in y;; esac)",
+                         "case/in as arguments");
+}
+
+TEST(brace_case_alternation_and_leading_paren) {
+    ASSERT_CLOSES_AT_END("(case b in a|b) AB;; esac)", "alternation");
+    ASSERT_CLOSES_AT_END("(case x in (x) M;; esac)", "leading-( pattern");
+    ASSERT_CLOSES_AT_END("(case foo in @(a|b)) E;; esac)", "extglob pattern");
+}
+
+TEST(brace_case_fallthrough_terminators) {
+    ASSERT_CLOSES_AT_END("(case a in a) F;& b) G;; esac)", ";& fallthrough");
+    ASSERT_CLOSES_AT_END("(case a in a) P;;& a) Q;; esac)", ";;& continue");
+}
+
+TEST(brace_case_subshell_in_body) {
+    /// A real subshell `)` in an arm body IS balanced and counted.
+    ASSERT_CLOSES_AT_END("(case a in a) (echo x);; esac)", "subshell in body");
+}
+
+TEST(brace_case_quoted_esac_pattern) {
+    /// A quoted `esac` is pattern text, not the terminator.
+    ASSERT_CLOSES_AT_END("(case x in \"esac\") Q;; x) X;; esac)",
+                         "quoted esac is a pattern");
+}
+
+TEST(brace_case_keywords_as_arguments_inert) {
+    /// Bare `case`/`esac` used as ordinary command words do not open or close a
+    /// case; the group still closes at the right `)`.
+    ASSERT_CLOSES_AT_END("(echo case)", "case as argument");
+    ASSERT_CLOSES_AT_END("(echo esac)", "esac as argument");
+}
+
+TEST(brace_case_comment_swallows_paren) {
+    /// A `#` comment at a word boundary runs to end of line, so a `)` inside it
+    /// is not a group close.
+    ASSERT_CLOSES_AT_END("(echo hi # ) esac\n)", "comment ) ignored");
+}
+
+TEST(brace_case_state_machine_inert_without_case) {
+    /// Plain groups are byte-identical to the pre-case behavior.
+    ASSERT_CLOSES_AT_END("(echo hi)", "plain group");
+    ASSERT_CLOSES_AT_END("( (a) )", "nested subshell");
+    ASSERT_EQ(scan("(echo \")\")"), strlen("(echo \")\")") - 1,
+              "quoted ) not a close (#486)");
+}
+
+TEST(brace_case_after_compound_introducer) {
+    /// A `case` on the SAME line as a compound-command reserved word keeps
+    /// command position, so its pattern `)` is recognized (do/then/else/if/
+    /// while/brace-group), not mis-read as the group close.
+    ASSERT_CLOSES_AT_END("(for x in a; do case $x in a) echo A;; esac; done)",
+                         "do case");
+    ASSERT_CLOSES_AT_END("(if true; then case x in x) echo T;; esac; fi)",
+                         "then case");
+    ASSERT_CLOSES_AT_END("(if false; then :; else case x in x) E;; esac; fi)",
+                         "else case");
+    ASSERT_CLOSES_AT_END("(while false; do case x in x) W;; esac; done)",
+                         "while ... do case");
+    ASSERT_CLOSES_AT_END("({ case x in x) B;; esac; })", "brace-group case");
+    /// `do`/`then` as ordinary arguments do NOT introduce a case.
+    ASSERT_CLOSES_AT_END("(echo do then else)", "reserved words as arguments");
+}
+
 /* ============================================================================
  * MAIN
  * ============================================================================
@@ -281,6 +371,20 @@ int main(void) {
 
     printf("\nMulti-byte UTF-8:\n");
     RUN_TEST(brace_utf8_content_does_not_false_match);
+
+    printf("\nCase-aware ( scan (#494):\n");
+    RUN_TEST(brace_case_pattern_paren_not_a_close);
+    RUN_TEST(brace_case_multi_arm);
+    RUN_TEST(brace_case_nested);
+    RUN_TEST(brace_case_esac_as_argument);
+    RUN_TEST(brace_case_alternation_and_leading_paren);
+    RUN_TEST(brace_case_fallthrough_terminators);
+    RUN_TEST(brace_case_subshell_in_body);
+    RUN_TEST(brace_case_quoted_esac_pattern);
+    RUN_TEST(brace_case_keywords_as_arguments_inert);
+    RUN_TEST(brace_case_comment_swallows_paren);
+    RUN_TEST(brace_case_state_machine_inert_without_case);
+    RUN_TEST(brace_case_after_compound_introducer);
 
     return TEST_RESULT();
 }
