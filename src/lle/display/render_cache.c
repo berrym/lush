@@ -41,6 +41,9 @@
 #define LLE_CACHE_EVICTION_BATCH_SIZE                                          \
     100 /* Evict in batches for efficiency                                     \
          */
+/// Upper bound on the serialized metadata header, before the '|' separator
+/// and the raw data section.
+#define LLE_CACHE_HEADER_SIZE 128
 
 /* ========================================================================== */
 /// CACHE ENTRY SERIALIZATION
@@ -66,7 +69,7 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
     }
 
     /// Calculate required size: header + data
-    size_t header_size = 128; /// Space for metadata
+    size_t header_size = LLE_CACHE_HEADER_SIZE; /// Space for metadata
     size_t total_size = header_size + entry->data_size;
 
     char *serialized = lle_pool_alloc(total_size);
@@ -95,8 +98,10 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
 /**
  * @brief Deserialize cache entry from length-prefixed binary blob
  *
- * @param serialized Serialized blob (NUL-terminated header section, then raw
- *                   data bytes which may include NULs)
+ * @param serialized Serialized blob: ASCII metadata header, a '|' separator,
+ *                   then raw data bytes which may include NULs. The blob is
+ *                   not NUL-terminated, so the header is parsed from a bounded
+ *                   copy rather than scanned as a C string.
  * @param serialized_size Total length of @p serialized in bytes
  * @param entry Output entry structure (caller must allocate)
  * @return LLE_SUCCESS or error code
@@ -110,21 +115,10 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
 
     const char *bytes = serialized;
 
-    /// Parse metadata header (header section ends at '|' and contains no NULs)
-    uint64_t timestamp, last_access;
-    unsigned int access_count;
-    int valid;
-    size_t data_size;
-
-    int fields = sscanf(bytes, "%zu:%" SCNu64 ":%" SCNu64 ":%u:%d|", &data_size,
-                        &timestamp, &last_access, &access_count, &valid);
-
-    if (fields != 5) {
-        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
-                         "cache entry header malformed");
-    }
-
-    /// Find data start (after '|') — bounded scan limited to header size
+    /// Locate the header terminator with a bounded scan before treating the
+    /// header as a string. The blob is not NUL-terminated (the data section
+    /// abuts the header and may hold arbitrary bytes), so parsing it directly
+    /// with sscanf would run strlen off the end of the allocation.
     const char *separator = memchr(bytes, '|', serialized_size);
     if (!separator) {
         return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
@@ -132,6 +126,32 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
     }
     const char *data_start = separator + 1;
     size_t header_len = (size_t)(data_start - bytes);
+
+    /// Copy the header (through '|') into a NUL-terminated buffer so sscanf
+    /// operates on a bounded C string. A header larger than the buffer holds
+    /// (bigger than any the serializer emits) marks a malformed blob.
+    char header[LLE_CACHE_HEADER_SIZE + 1];
+    if (header_len >= sizeof(header)) {
+        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
+                         "cache entry header too large");
+    }
+    memcpy(header, bytes, header_len);
+    header[header_len] = '\0';
+
+    /// Parse metadata header (header section ends at '|' and contains no NULs)
+    uint64_t timestamp, last_access;
+    unsigned int access_count;
+    int valid;
+    size_t data_size;
+
+    int fields =
+        sscanf(header, "%zu:%" SCNu64 ":%" SCNu64 ":%u:%d|", &data_size,
+               &timestamp, &last_access, &access_count, &valid);
+
+    if (fields != 5) {
+        return LLE_FAULT(LLE_ERROR_INVALID_FORMAT, "display",
+                         "cache entry header malformed");
+    }
 
     /// Reject blobs whose payload length disagrees with the header
     if (header_len + data_size != serialized_size) {
