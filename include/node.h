@@ -167,6 +167,18 @@ typedef struct node {
     /// consumer -- is unchanged. NULL for words that are not assignment-shaped
     /// or have no quoted segment. Heap-allocated (owner).
     char *magic_equal_value;
+
+    /// Per-character quote provenance parallel to val.str (one byte per val.str
+    /// byte, NUL-terminated), or NULL. Bytes are QUOTE_PROV_UNQUOTED / SINGLE /
+    /// DOUBLE / ESCAPED (see tokenizer.h). Built for a fused mixed-quote
+    /// command word or array element whose quoted and unquoted runs were
+    /// flattened into one val.str, so the word expander decides per character:
+    /// expand `$`, bound a `$name` at the quote edge, hold a
+    /// single-quoted/escaped character literal, tilde-expand only an unquoted
+    /// leading `~`. NULL for words with no quoted segment (the untouched
+    /// expander paths handle those). Heap-allocated (owner). Length must equal
+    /// strlen(val.str); a mismatch is ignored.
+    char *quote_prov;
 } node_t;
 
 /**

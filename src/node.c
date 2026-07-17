@@ -160,5 +160,8 @@ void free_node_tree(node_t *node) {
     /// Free the assignment-tilde provenance value (independent of val.str).
     free(node->magic_equal_value);
 
+    /// Free the per-character quote-provenance map (independent of val.str).
+    free(node->quote_prov);
+
     free(node);
 }
