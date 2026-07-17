@@ -5,7 +5,7 @@ project('lush',
                           'warning_level=2',
                           'werror=true'
                          ],
-        version: '1.5.0',
+        version: '0.3.0-dev',
         license: 'MIT')
 
 # Import filesystem module for directory checks
