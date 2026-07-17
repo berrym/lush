@@ -989,46 +989,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 size_t subst_start = tokenizer->position;
                 tokenizer->position += 2; /// Skip $(
                 tokenizer->column += 2;
-                int paren_depth = 1;
-
-                while (tokenizer->position < tokenizer->input_length &&
-                       paren_depth > 0) {
-                    char sub_curr = tokenizer->input[tokenizer->position];
-                    if (sub_curr == '(') {
-                        paren_depth++;
-                    } else if (sub_curr == ')') {
-                        paren_depth--;
-                    } else if (sub_curr == '"' || sub_curr == '\'') {
-                        char sub_quote = sub_curr;
-                        tokenizer->position++;
-                        tokenizer->column++;
-                        while (tokenizer->position < tokenizer->input_length) {
-                            char nested_curr =
-                                tokenizer->input[tokenizer->position];
-                            if (nested_curr == sub_quote) {
-                                break;
-                            } else if (nested_curr == '\\' &&
-                                       tokenizer->position + 1 <
-                                           tokenizer->input_length) {
-                                tokenizer->position++;
-                                tokenizer->column++;
-                            }
-                            if (nested_curr == '\n') {
-                                tokenizer->line++;
-                                tokenizer->column = 1;
-                            } else {
-                                tokenizer->column++;
-                            }
-                            tokenizer->position++;
-                        }
-                    } else if (sub_curr == '\\' &&
-                               tokenizer->position + 1 <
-                                   tokenizer->input_length) {
-                        tokenizer->position++;
-                        tokenizer->column++;
-                    }
-
-                    if (sub_curr == '\n') {
+                /// Find the matching ')' with the canonical structure-aware
+                /// matcher (quote-aware, and a case-pattern ')' is not a group
+                /// close -- #494) so an embedded $(case ...) is captured whole.
+                /// The opener is the '(' at subst_start + 1.
+                size_t dq_close_off = 0;
+                bool dq_matched = lush_find_matching_brace(
+                    &tokenizer->input[subst_start + 1],
+                    tokenizer->input_length - (subst_start + 1), &dq_close_off);
+                size_t dq_end = dq_matched ? subst_start + 1 + dq_close_off + 1
+                                           : tokenizer->input_length;
+                while (tokenizer->position < dq_end) {
+                    if (tokenizer->input[tokenizer->position] == '\n') {
                         tokenizer->line++;
                         tokenizer->column = 1;
                     } else {

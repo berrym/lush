@@ -7018,17 +7018,15 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                     i = brace_end - 1;
                 } else if (i + 1 < len && text[i + 1] == '(') {
-                    /// $(cmd) or $((arith)) - find closing paren
-                    size_t paren_end = i + 2;
-                    int paren_depth = 1;
-                    while (paren_end < len && paren_depth > 0) {
-                        if (text[paren_end] == '(')
-                            paren_depth++;
-                        else if (text[paren_end] == ')')
-                            paren_depth--;
-                        paren_end++;
-                    }
-                    i = paren_end - 1;
+                    /// $(cmd) or $((arith)) - find the matching ')' with the
+                    /// canonical structure-aware matcher (quote-aware, and a
+                    /// case-pattern ')' is not a group close -- #486/#494). The
+                    /// opener is the '(' at var_start + 1; for $((arith)) it
+                    /// matches the outer paren pair.
+                    size_t cs_off = 0;
+                    bool cs_matched = lush_find_matching_brace(
+                        &text[var_start + 1], len - (var_start + 1), &cs_off);
+                    i = cs_matched ? var_start + 1 + cs_off : len - 1;
                 } else {
                     /// $var format
                     i++;

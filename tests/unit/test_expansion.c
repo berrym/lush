@@ -234,6 +234,53 @@ TEST(cmdsub_with_quoted_paren) {
     teardown_executor(exec);
 }
 
+TEST(cmdsub_with_case_pattern_paren) {
+    /// A `case` pattern's `)` inside a command substitution is case syntax, not
+    /// the substitution's closing paren (issue #494). The boundary scan is
+    /// structure-aware, so the whole `case ... esac` is captured.
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "A=$(case x in x) echo M;; esac)", 1);
+    char *a = symtable_get_var(exec->symtable, "A");
+    ASSERT_NOT_NULL(a, "A should be set");
+    ASSERT_STR_EQ(a, "M", "case-pattern ) does not terminate the substitution");
+    free(a);
+
+    /// Multiple arms: every pattern `)` is internal to the substitution.
+    executor_execute_command_line(
+        exec, "B=$(case ab in a) echo A;; b) echo B;; *) echo S;; esac)", 1);
+    char *b = symtable_get_var(exec->symtable, "B");
+    ASSERT_NOT_NULL(b, "B should be set");
+    ASSERT_STR_EQ(b, "S", "multi-arm case boundary");
+    free(b);
+
+    /// `esac` as an argument in an arm body is not the case terminator.
+    executor_execute_command_line(exec, "C=$(case x in x) echo esac;; esac)",
+                                  1);
+    char *c = symtable_get_var(exec->symtable, "C");
+    ASSERT_NOT_NULL(c, "C should be set");
+    ASSERT_STR_EQ(c, "esac", "esac argument is not the case terminator");
+    free(c);
+
+    /// Nested case inside an arm body.
+    executor_execute_command_line(
+        exec, "D=$(case a in a) case c in c) echo AC;; esac;; esac)", 1);
+    char *d = symtable_get_var(exec->symtable, "D");
+    ASSERT_NOT_NULL(d, "D should be set");
+    ASSERT_STR_EQ(d, "AC", "nested case boundary");
+    free(d);
+
+    /// The double-quoted `"$(...)"` scan path handles it too.
+    executor_execute_command_line(exec, "E=\"$(case x in x) echo M;; esac)\"",
+                                  1);
+    char *e = symtable_get_var(exec->symtable, "E");
+    ASSERT_NOT_NULL(e, "E should be set");
+    ASSERT_STR_EQ(e, "M", "case in a double-quoted substitution");
+    free(e);
+
+    teardown_executor(exec);
+}
+
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
@@ -843,6 +890,7 @@ int main(void) {
     RUN_TEST(var_concatenation);
     RUN_TEST(cmdsub_leading_with_trailing_text);
     RUN_TEST(cmdsub_with_quoted_paren);
+    RUN_TEST(cmdsub_with_case_pattern_paren);
     RUN_TEST(unset_var_expands_empty);
 
     printf("\n--- Parameter Expansion Tests ---\n");
