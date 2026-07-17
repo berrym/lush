@@ -1,10 +1,10 @@
 # Lush
 
-**A Unix shell with developer-first design.**
+**A modern, polyglot Unix shell built from scratch — with its own ideas about what a shell should be.**
 
 [![CI](https://github.com/berrym/lush/actions/workflows/ci.yml/badge.svg)](https://github.com/berrym/lush/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/berrym/lush/graph/badge.svg)](https://codecov.io/gh/berrym/lush)
-[![Version](https://img.shields.io/badge/version-1.5.0--prerelease-blue)](https://github.com/berrym/lush/releases)
+[![Version](https://img.shields.io/badge/version-0.3.0--dev-orange)](https://github.com/berrym/lush)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![C11](https://img.shields.io/badge/standard-C11-blue)](https://github.com/berrym/lush)
 
@@ -12,72 +12,107 @@
 
 ## What is Lush?
 
-Lush is a Unix shell built entirely from scratch. It combines POSIX compliance with carefully chosen extensions from Bash and Zsh, plus capabilities found nowhere else—most notably an integrated debugger for shell scripts. The native line editor (LLE) provides syntax highlighting and context-aware completions without relying on GNU Readline or any external library. Lush is a single binary with zero runtime dependencies.
+Lush is a Unix shell written from scratch in C11, with no dependency on GNU
+Readline or any external runtime library — a single binary.
 
-**Current status:** Under heavy development. Not yet suitable for daily use or production environments. Many features work well; others remain incomplete.
+It is **polyglot**: POSIX, bash, and zsh syntax are treated as different ways
+to reach the *same* underlying engine, not as separate compatibility modes
+bolted on. `${var^^}` and `${(U)var}` both uppercase a string because they
+compile to the same operation.
+
+It is also **its own shell**. Lush honors the shells that came before it, but
+it is not a clone of any of them and is not afraid to diverge from them when
+that means fixing a long-standing problem rather than reproducing it. Some of
+what it does — a real integrated script debugger, a schema-driven
+configuration system, a first-class value model that refuses silent
+list-to-string coercion — no other shell does.
+
+> **Status: early-stage (`0.3.0-dev`), under active development.**
+> Lush is capable and genuinely fun to use today, but it is **not** yet a
+> production daily driver, and nothing here should be read as *proven*
+> complete. It is honest work in progress. Testers, feedback, and
+> contributors are welcome — this is an interesting project to poke at and
+> help shape.
 
 ---
 
-## Core Components
+## What makes it different
 
-### LLE (Lush Line Editor)
+- **One polyglot engine, not three emulators.** Bash and zsh spellings map
+  onto shared operations. `mode bash` / `mode zsh` load presets, but the
+  features stay available regardless of mode — profiles are presets, not
+  restrictions.
+- **First-class value kinds.** Scalar / List / Map are distinguished by the
+  executor. There is no implicit list-to-string coercion; a vector-yielding
+  expansion must occupy its whole word, so how a value prints depends on the
+  `[@]` / `[*]` / `[N]` you ask for, never on quoting accidents
+  (SEMANTICS §3).
+- **An integrated debugger**, not `set -x`. Breakpoints on real source lines,
+  depth-aware stepping, kind-aware variable inspection, and a predictive
+  static analyzer — held to a written contract that requires it to keep pace
+  with the language.
+- **A native line editor (LLE).** Real-time syntax highlighting, context-aware
+  completion, multi-line editing, and a customization surface (widgets, hooks,
+  prompt segments) — built for lush, not inherited from Readline.
+- **A configuration nervous system.** A schema-first, reactive registry keeps
+  runtime state and config files in sync, validates writes, and drives layered
+  precedence and provenance.
+- **Errors that help.** Rust-style diagnostics with source locations,
+  context, and suggestions — including "did you mean?" for unknown commands.
+
+---
+
+## A closer look
+
+### LLE — the Lush Line Editor
 
 A native line editor built specifically for lush:
 
 - Real-time syntax highlighting with kind-aware token classification
   (including path *shape* × *kind* coloring)
-- Context-aware tab completions for every shell builtin and the
-  `(lush-debug)` break-prompt vocabulary
-- Emacs keybindings with kill ring and undo
+- Context-aware tab completion for builtins and the `(lush-debug)`
+  break-prompt vocabulary
+- Emacs keybindings with kill ring and undo (a vi-mode framework exists but
+  is not complete)
 - Multi-line editing with automatic continuation
-- User customization trio: `display lle widget` (custom editing
-  actions), `display lle hook` (lifecycle hooks), and `display lle
-  segment` (prompt segments) — all routed through the central
-  config registry
+- User customization: `display lle widget` (editing actions),
+  `display lle hook` (lifecycle hooks), and `display lle segment`
+  (prompt segments), all routed through the config registry
 
-Inspired by the line editors in Zsh (ZLE) and Fish.
+### Polyglot modes
 
-### Multi-Mode Architecture
-
-Run scripts with different compatibility levels. `mode` is the
-canonical builtin; `set -o posix` is a bash-bridge alias:
+`mode` is the canonical builtin; `set -o posix` is a bash-bridge alias for it.
 
 ```bash
-mode posix     # Strict POSIX sh compliance
-mode bash      # Bash compatibility features
-mode zsh       # Zsh compatibility features
-mode lush      # Default mode - curated feature set
+mode posix     # POSIX-conforming defaults
+mode bash      # bash-flavored defaults
+mode zsh       # zsh-flavored defaults
+mode lush      # the curated default
 ```
 
-Modes are **presets, not restrictions** (see PHILOSOPHY.md §4):
-selecting POSIX mode configures POSIX-conforming defaults, but lush
-features (arrays, `[[ ]]`, debugger, process substitution) remain
-available.
+Modes are **presets, not restrictions** (PHILOSOPHY §4): POSIX mode sets
+POSIX-conforming defaults, but lush features (arrays, `[[ ]]`, the debugger,
+process substitution) remain reachable.
 
-### Integrated Debugger
-
-Debug shell scripts interactively — breakpoints anchored on real
-source lines, depth-aware stepping, kind-aware variable inspection
-(Scalar / List / Map), predictive type-mismatch warnings, and an
-LLE-driven `(lush-debug)` break prompt. Not just `set -x` tracing.
+### Integrated debugger
 
 ```bash
-debug on                         # Enable debugging
-debug break add script.sh 15     # Set breakpoint
-debug vars                       # Inspect variables (kind-aware)
-debug analyze script.sh          # Static type/style/portability scan
-source script.sh                 # Halts at line 15:
-# (lush-debug) t arr             #   → arr: List (3 elements)
-# (lush-debug) next               #   → depth-aware step over
+debug on                         # enable debugging
+debug break add script.sh 15     # set a breakpoint
+debug analyze script.sh          # static type / style / portability scan
+source script.sh                 # halts at line 15:
+# (lush-debug) t arr             #   -> arr: List (3 elements)
+# (lush-debug) next              #   -> depth-aware step over
 # (lush-debug) continue
 ```
 
-PHILOSOPHY.md §7 binds the debugger to keep pace with the language;
-an integration-test gate enforces it.
+Breakpoints anchor on real source lines; inspection is kind-aware
+(Scalar / List / Map) with predictive type-mismatch warnings. PHILOSOPHY §7
+binds the debugger to the language via an integration-test gate.
 
-### Unified Configuration (v1.5.0)
+### Configuration
 
-TOML-based configuration with XDG Base Directory compliance:
+TOML with XDG Base Directory compliance, backed by the config registry:
 
 ```toml
 # ~/.config/lush/lushrc.toml
@@ -91,28 +126,30 @@ syntax_highlighting = true
 size = 10000
 ```
 
-The `setopt`/`unsetopt` commands provide Zsh-style option control. A central config registry keeps runtime state and configuration files synchronized.
+`setopt` / `unsetopt` provide zsh-style option control; `config` inspects and
+edits registry-backed settings directly. The registry validates writes and
+rejects bad values with a targeted diagnostic.
 
----
+### Extended syntax
 
-## Extended Syntax
+Beyond POSIX, lush implements:
 
-Lush implements extended shell features beyond POSIX:
+- **Brace expansion** — `{a,b,c}`, `{1..10}`
+- **Arrays** — indexed with negative indices (`${arr[-1]}`) and append
+  (`arr+=(x y)`)
+- **Associative arrays** — including literal `declare -A map=([key]=value)`
+- **Extended tests** — `[[ ]]` with pattern matching, regex, and file
+  comparisons (`-nt`, `-ot`, `-ef`)
+- **Process substitution** — `<(cmd)`, `>(cmd)`
+- **Parameter expansion** — case modification, substitution, slicing, bash
+  transformations (`@Q`, `@E`, `@P`, `@a`), and zsh parameter flags
+  (`${(U)var}`, `${(o)arr}`, `${(k)m}`)
+- **Extended globbing** — `?(pat)`, `*(pat)`, `+(pat)`, `@(pat)`, `!(pat)`
+- **Compound-command redirections** — `{ cmd; } > file`,
+  `while ...; done < input`
+- **Hook functions** — `precmd`, `preexec`, `chpwd`, `periodic`
 
-- **Brace expansion** - `{a,b,c}` and `{1..10}` sequence expansion
-- **Arrays** - Indexed arrays with negative index support (`${arr[-1]}`) and append syntax (`arr+=(x y)`)
-- **Associative arrays** - Full support including literal syntax `declare -A map=([key]=value)`
-- **Extended tests** - `[[ ]]` with pattern matching, regex, and file comparison (`-nt`, `-ot`, `-ef`)
-- **Process substitution** - `<(cmd)` and `>(cmd)`
-- **Parameter expansion** - Case modification, substitution, slicing, bash transformations (`@Q`, `@E`, `@P`, `@a`), zsh parameter flags (`${(U)var}`, `${(o)arr}`, `${(k)m}`)
-- **First-class value kinds** - Scalar / List / Map distinguished by the executor; no implicit list-to-string coercion (SEMANTICS §3.4); presentation operators (`[@]`, `[*]`, `[N]`) mandatory for list-in-scalar contexts (SEMANTICS §3.9)
-- **Extended globbing** - `?(pat)`, `*(pat)`, `+(pat)`, `@(pat)`, `!(pat)`
-- **Advanced redirections** - Compound command redirections (`{ cmd; } > file`, `while ...; done < input`)
-- **Hook functions** - `precmd`, `preexec`, `chpwd`, `periodic`
-
-### Context-Aware Error System (v1.5.0)
-
-Rust-style error reporting with source locations and suggestions:
+### Diagnostics
 
 ```
 error[E1001]: expected 'THEN', got 'FI'
@@ -124,7 +161,7 @@ error[E1001]: expected 'THEN', got 'FI'
    = help: 'if' requires 'then' before 'fi'
 ```
 
-Command-not-found errors include "did you mean?" suggestions using Unicode-aware fuzzy matching:
+Unknown commands get Unicode-aware fuzzy "did you mean?" suggestions:
 
 ```
 error[E1101]: gti: command not found
@@ -136,83 +173,100 @@ error[E1101]: gti: command not found
 
 ## Building
 
-### Requirements
-
-- C11 compiler (GCC 7+ or Clang 5+)
-- Meson build system
-- Ninja
-
-### Build
+**Requirements:** a C11 compiler (GCC 7+ or Clang 5+), Meson, and Ninja.
 
 ```bash
-git clone https://github.com/lush/lush.git
+git clone https://github.com/berrym/lush.git
 cd lush
 meson setup build
 meson compile -C build
 ./build/lush
 ```
 
-The build directory MUST be named `build` (the project's meson
-configuration assumes it). `-Werror` is enabled; verified clean on
-macOS clang, Ubuntu gcc 13.x, and Fedora gcc 16.x.
-
-### Test
+The build directory must be named `build` (the Meson configuration assumes
+it). `-Werror` is enabled; the tree builds clean on macOS clang and Ubuntu
+gcc.
 
 ```bash
-meson test -C build
+meson test -C build     # 176 tests across unit, integration, and real-world suites
 ```
 
-110 tests, zero memory leaks (verified with valgrind).
-
-### Platforms
-
-Linux (primary), macOS, BSD.
+**Platforms:** Linux and macOS are exercised regularly; BSD is intended but
+less tested.
 
 ---
 
-## Development Status
+## How it is tested
 
-| Component | Status |
-|-----------|--------|
+Correctness is pursued with more than unit tests:
+
+- A **mode-aware differential harness** runs lush and the matching reference
+  shell (dash / bash / zsh) on the same input and compares them. It is a *gap
+  finder*: each divergence is judged against lush's own philosophy — a bug
+  and internal inconsistency get fixed, while a deliberate, documented
+  difference is kept. Matching another shell byte-for-byte is not the goal.
+- **Coverage-guided fuzzers** exercise the tokenizer, parser, and executor.
+- CI builds under **AddressSanitizer + UBSan**; the LLE suites are enforced
+  with leak detection on. Making the remaining unit-suite tests leak-clean and
+  enforcing the same gate there is tracked work (issue #506), not a finished
+  claim.
+
+---
+
+## Status at a glance
+
+Read "Working" as "implemented and exercised by tests," not "proven complete
+for every edge case."
+
+| Area | Status |
+|------|--------|
 | Core shell / POSIX builtins | Working |
-| LLE — Emacs mode | Complete |
-| LLE — Vi mode | Framework only |
-| LLE customization (widget / hook / segment) | Complete |
-| Extended tests `[[ ]]` | Complete |
-| Brace expansion `{a,b}` `{1..10}` | Complete |
-| Extended globbing `?(pat)` `*(pat)` | Complete |
-| Parameter transformations `@Q` `@P` `@a` | Complete |
-| Zsh parameter flags `${(U)var}` `${(o)arr}` | Working (single flag); composition WIP |
-| Negative array indices `${arr[-1]}` | Complete |
-| First-class List / Map storage (SEMANTICS §7) | Complete |
-| No implicit list-to-string coercion (§3.4 / §3.9) | Complete |
-| Shell modes | Working |
-| Debugger — breakpoints, depth-aware stepping, kind-aware vars | Complete |
-| Debugger — predictive type analysis (`debug analyze`) | Complete |
-| Configuration system | Complete |
-| Context-aware error system | Complete |
-| Associative arrays | Complete |
-| Advanced redirections | Complete |
-| Arithmetic expansion | Complete |
+| Polyglot modes (posix / bash / zsh / lush) | Working |
+| First-class Scalar / List / Map value model | Working |
+| No implicit list-to-string coercion (SEMANTICS §3) | Working |
+| Arrays, associative arrays, negative indices | Working |
+| Extended tests `[[ ]]`, brace expansion, extended globbing | Working |
+| Parameter transformations (`@Q` `@P` `@a`) | Working |
+| Zsh parameter flags (`${(U)var}`, `${(o)arr}`) | Working (single flag); composition in progress |
+| Process substitution, compound-command redirections | Working |
+| Arithmetic expansion | Working |
+| LLE — Emacs editing, highlighting, completion, customization | Working |
+| LLE — vi mode | Framework only |
+| Integrated debugger — breakpoints, stepping, kind-aware vars, `debug analyze` | Working |
+| Configuration registry | Working |
+| Context-aware error/diagnostic system | Working |
 | User extensibility / plugins | Not yet implemented |
 
-The shell is functional for many use cases; the real-world script
-scorecard (`meson test "real-world scorecard"`) is at 100% as of
-v1.5.0 pre-release. Some edge cases remain.
+The differential real-world scorecard (`meson test "real-world scorecard"`)
+currently passes over the curated corpus, and the differential harness reports
+no unexpected divergences. Edge cases and rough surfaces remain — that is what
+the `0.x` line is for.
 
 ---
 
 ## Documentation
 
-- [Philosophy](docs/PHILOSOPHY.md) — design contracts (start here)
+- [Philosophy](docs/PHILOSOPHY.md) — the founding design contracts (start here)
 - [Vision](docs/VISION.md) — what lush is and why
-- [Semantics](docs/SEMANTICS.md) — engine spec (value model, scoping)
+- [Semantics](docs/SEMANTICS.md) — the engine spec (value model, scoping)
 - [User Guide](docs/USER_GUIDE.md) — feature reference
-- [LLE Guide](docs/LLE_GUIDE.md) — line editor
-- [Configuration](docs/CONFIGURATION.md) — modes, set, setopt, shopt, config
-- [Debugger Guide](docs/DEBUGGER_GUIDE.md) — debugging
-- [Builtin Commands](docs/BUILTIN_COMMANDS.md) — complete builtin reference
-- [Changelog](docs/CHANGELOG.md) — version history
+- [LLE Guide](docs/LLE_GUIDE.md) — the line editor
+- [Configuration](docs/CONFIGURATION.md) — `mode`, `set`, `setopt`/`shopt`, `config`
+- [Debugger Guide](docs/DEBUGGER_GUIDE.md) — debugging shell scripts
+- [Builtin Commands](docs/BUILTIN_COMMANDS.md) — the builtin reference
+
+Documentation is being audited and brought current alongside the code; if a
+doc and the shell disagree, trust the shell and please report it.
+
+---
+
+## Contributing
+
+Lush is early-stage and moving. If a shell that tries to be genuinely better —
+not just another POSIX clone — sounds interesting, try it, break it, and open
+an issue. Bug reports with a minimal reproduction are especially valuable, and
+the philosophy and semantics docs above explain the design constraints a
+change is expected to respect.
 
 ---
 
@@ -222,11 +276,8 @@ MIT License. See [LICENSE](LICENSE).
 
 ---
 
-**Lush** is a real shell, built from scratch, doing things differently.
-
-It's not finished. But it's not vaporware either — it's a complete
-POSIX engine, an integrated debugger held to a written contract,
-110 tests, zero leaks, a real-world scorecard at 100%, and years of
-development.
-
-If you're curious about what a shell could be, lush is worth watching.
+Lush is a real shell, built from scratch, deliberately doing some things
+differently. It is not finished and does not pretend to be — but it is a
+working polyglot engine with an integrated debugger, a native line editor, and
+a coherent design it is willing to be judged against. If you are curious about
+what a shell *could* be, it is worth a look.
