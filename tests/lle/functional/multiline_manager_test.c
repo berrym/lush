@@ -280,6 +280,13 @@ TEST(test_multiline_buffer_analysis_simple) {
     ASSERT_FALSE(buffer->multiline_active, "Not multiline active");
     ASSERT_TRUE(manager->analysis_count == 1, "One analysis");
 
+    /// analyze_buffer lazily allocates buffer->multiline_ctx (context +
+    /// core_state); lle_buffer_destroy only shallow-frees the outer struct, so
+    /// deep-destroy the context and clear the pointer to avoid a double free.
+    if (buffer->multiline_ctx) {
+        lle_multiline_context_destroy(buffer->multiline_ctx);
+        buffer->multiline_ctx = NULL;
+    }
     lle_buffer_destroy(buffer);
     lle_multiline_manager_destroy(manager);
 }
@@ -307,6 +314,13 @@ TEST(test_multiline_buffer_analysis_incomplete_quote) {
     /// Should be incomplete
     ASSERT_TRUE(buffer->multiline_active, "Multiline active");
 
+    /// analyze_buffer lazily allocates buffer->multiline_ctx (context +
+    /// core_state); lle_buffer_destroy only shallow-frees the outer struct, so
+    /// deep-destroy the context and clear the pointer to avoid a double free.
+    if (buffer->multiline_ctx) {
+        lle_multiline_context_destroy(buffer->multiline_ctx);
+        buffer->multiline_ctx = NULL;
+    }
     lle_buffer_destroy(buffer);
     lle_multiline_manager_destroy(manager);
 }
@@ -335,6 +349,13 @@ TEST(test_multiline_buffer_analysis_multiline_if) {
     /// Should be incomplete
     ASSERT_TRUE(buffer->multiline_active, "Multiline active for incomplete if");
 
+    /// analyze_buffer lazily allocates buffer->multiline_ctx (context +
+    /// core_state); lle_buffer_destroy only shallow-frees the outer struct, so
+    /// deep-destroy the context and clear the pointer to avoid a double free.
+    if (buffer->multiline_ctx) {
+        lle_multiline_context_destroy(buffer->multiline_ctx);
+        buffer->multiline_ctx = NULL;
+    }
     lle_buffer_destroy(buffer);
     lle_multiline_manager_destroy(manager);
 }

@@ -814,8 +814,7 @@ endif
   # Validates compliance with Spec 22 requirements
   if fs.exists('tests/lle/compliance/spec_22_history_buffer_compliance.c')
     test_spec22_compliance = executable('spec_22_compliance',
-                                        ['tests/lle/compliance/spec_22_history_buffer_compliance.c',
-                                         'tests/lle/functional/test_memory_mock.c'],
+                                        'tests/lle/compliance/spec_22_history_buffer_compliance.c',
                                         include_directories: inc,
                                         dependencies: [lle_dep])
     test('Spec 22 History-Buffer Integration Compliance', test_spec22_compliance,

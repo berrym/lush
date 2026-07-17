@@ -89,11 +89,19 @@ jobs:
         run: |
           meson compile -C build
 
-      - name: Run tests under sanitizers (leaks off)
+      - name: Run LLE suites under sanitizers (leaks enforced)
+        run: |
+          ASAN_OPTIONS=detect_leaks=1 meson test -C build --print-errorlogs \
+            --suite lle-unit --suite lle-functional \
+            --suite lle-integration --suite lle-compliance
+
+      # The unit suite still carries the production leaks tracked by the
+      # sanitizer sweep (#471-#480); leak detection stays off here until that
+      # series lands, then this step folds into the enforced run above.
+      - name: Run unit suite under sanitizers (leaks off, pending #471-#480)
         run: |
           ASAN_OPTIONS=detect_leaks=0 meson test -C build --print-errorlogs \
-            --suite unit --suite lle-unit --suite lle-functional \
-            --suite lle-integration --suite lle-compliance
+            --suite unit
 
   # Memory leak detection on Linux using Valgrind
   memory-check-linux:
