@@ -646,16 +646,21 @@ int main(void) {
 
     /// Direct renderer tests
     printf("--- Direct Renderer ---\n");
+    /// Only null_params and empty_segments share this outer fixture; tear it
+    /// down before the tests below, which each run their own setup()/teardown()
+    /// and would otherwise clobber (and leak) the builtin segments and themes
+    /// registered here.
     setup();
     RUN_TEST(powerline_render_null_params);
     RUN_TEST(powerline_render_empty_segments);
+    teardown();
+
     RUN_TEST(powerline_render_left_to_right_basic);
     RUN_TEST(powerline_render_right_to_left_basic);
     RUN_TEST(powerline_render_has_bg_colors);
     RUN_TEST(powerline_render_separator_count);
     RUN_TEST(powerline_render_segment_content_present);
     RUN_TEST(powerline_strips_segment_ansi);
-    teardown();
 
     /// Composer integration tests
     printf("\n--- Composer Integration ---\n");

@@ -56,6 +56,18 @@ static lle_result_t test_event_handler(lle_event_t *event, void *user_data) {
     return handler_return_value;
 }
 
+/// @brief Dequeue and destroy every event still queued, so a test that enqueues
+/// without consuming is leak-clean: lle_event_queue_destroy deliberately does
+/// NOT own queued events (see event_queue.c), so the consumer must drain them.
+/// A no-op on an empty/already-consumed queue.
+static void drain_events(lle_event_system_t *system) {
+    lle_event_t *event = NULL;
+    while (lle_event_dequeue(system, &event) == LLE_SUCCESS && event) {
+        lle_event_destroy(system, event);
+        event = NULL;
+    }
+}
+
 /* ========================================================================== */
 /// EVENT SYSTEM LIFECYCLE TESTS
 /* ========================================================================== */
@@ -73,7 +85,8 @@ TEST(event_system_init_success) {
     ASSERT_EQ(system->sequence_counter, 1,
               "Sequence counter should start at 1");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_system_init_null_system) {
@@ -100,6 +113,9 @@ TEST(event_system_stop_success) {
 
     ASSERT_EQ(result, LLE_SUCCESS, "Stop should succeed");
     ASSERT_EQ(system->active, false, "System should be inactive");
+
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_system_stop_null_system) {
@@ -129,7 +145,8 @@ TEST(event_create_success_no_data) {
     ASSERT_TRUE(event->timestamp > 0, "Timestamp should be set");
 
     lle_event_destroy(system, event);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_create_success_with_data) {
@@ -150,7 +167,8 @@ TEST(event_create_success_with_data) {
     ASSERT_EQ(strcmp(event->data, test_data), 0, "Data content should match");
 
     lle_event_destroy(system, event);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_create_sequence_numbers) {
@@ -170,7 +188,8 @@ TEST(event_create_sequence_numbers) {
     lle_event_destroy(system, event1);
     lle_event_destroy(system, event2);
     lle_event_destroy(system, event3);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_create_null_system) {
@@ -191,7 +210,8 @@ TEST(event_create_null_event_ptr) {
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject NULL event pointer");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_clone_success) {
@@ -216,7 +236,8 @@ TEST(event_clone_success) {
 
     lle_event_destroy(system, original);
     lle_event_destroy(system, clone);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 /* ========================================================================== */
@@ -235,7 +256,8 @@ TEST(event_enqueue_success) {
     ASSERT_EQ(result, LLE_SUCCESS, "Enqueue should succeed");
     ASSERT_EQ(system->queue->count, 1, "Queue count should be 1");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_enqueue_multiple) {
@@ -251,7 +273,8 @@ TEST(event_enqueue_multiple) {
 
     ASSERT_EQ(system->queue->count, 10, "Queue should contain 10 events");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_enqueue_null_system) {
@@ -271,7 +294,8 @@ TEST(event_enqueue_null_event) {
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER, "Should reject NULL event");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_dequeue_success) {
@@ -291,7 +315,8 @@ TEST(event_dequeue_success) {
     ASSERT_EQ(system->queue->count, 0, "Queue should be empty");
 
     lle_event_destroy(system, dequeued);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_dequeue_fifo_order) {
@@ -319,7 +344,8 @@ TEST(event_dequeue_fifo_order) {
     lle_event_destroy(system, d1);
     lle_event_destroy(system, d2);
     lle_event_destroy(system, d3);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_dequeue_empty_queue) {
@@ -332,7 +358,8 @@ TEST(event_dequeue_empty_queue) {
     ASSERT_EQ(result, LLE_ERROR_QUEUE_EMPTY, "Should return queue empty error");
     ASSERT_NULL(event, "Event should be NULL");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_queue_size) {
@@ -349,7 +376,8 @@ TEST(event_queue_size) {
     size = lle_event_queue_size(system);
     ASSERT_EQ(size, 1, "Queue size should be 1 after enqueue");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_queue_empty_check) {
@@ -366,7 +394,8 @@ TEST(event_queue_empty_check) {
     ASSERT_FALSE(lle_event_queue_empty(system),
                  "Queue should not be empty after enqueue");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 /* ========================================================================== */
@@ -384,7 +413,8 @@ TEST(handler_register_success) {
     ASSERT_EQ(result, LLE_SUCCESS, "Handler registration should succeed");
     ASSERT_EQ(system->handler_count, 1, "Handler count should be 1");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_register_multiple_types) {
@@ -401,7 +431,8 @@ TEST(handler_register_multiple_types) {
 
     ASSERT_EQ(system->handler_count, 3, "Should have 3 handlers registered");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_register_null_system) {
@@ -421,7 +452,8 @@ TEST(handler_register_null_function) {
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should reject NULL handler function");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_dispatch_success) {
@@ -443,7 +475,8 @@ TEST(handler_dispatch_success) {
               "Handler should receive correct event");
 
     lle_event_destroy(system, event);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_dispatch_no_matching_handler) {
@@ -464,7 +497,8 @@ TEST(handler_dispatch_no_matching_handler) {
     ASSERT_EQ(handler_call_count, 0, "Handler should not be called");
 
     lle_event_destroy(system, event);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_dispatch_user_data) {
@@ -487,7 +521,8 @@ TEST(handler_dispatch_user_data) {
               "User data content should be correct");
 
     lle_event_destroy(system, event);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_unregister_by_name) {
@@ -505,7 +540,8 @@ TEST(handler_unregister_by_name) {
     ASSERT_EQ(result, LLE_SUCCESS, "Unregister should succeed");
     ASSERT_EQ(system->handler_count, 0, "Should have 0 handlers");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(handler_unregister_not_found) {
@@ -517,7 +553,8 @@ TEST(handler_unregister_not_found) {
 
     ASSERT_EQ(result, LLE_ERROR_NOT_FOUND, "Should return not found error");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_process_queue_success) {
@@ -541,7 +578,8 @@ TEST(event_process_queue_success) {
     ASSERT_EQ(handler_call_count, 3, "Handler should be called 3 times");
     ASSERT_EQ(system->queue->count, 0, "Queue should be empty");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(event_process_queue_max_events) {
@@ -565,7 +603,8 @@ TEST(event_process_queue_max_events) {
     ASSERT_EQ(handler_call_count, 5, "Should process only 5 events");
     ASSERT_EQ(system->queue->count, 5, "Should have 5 events remaining");
 
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 /* ========================================================================== */
@@ -587,7 +626,8 @@ TEST(statistics_events_created) {
 
     lle_event_destroy(system, event1);
     lle_event_destroy(system, event2);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 TEST(statistics_events_dispatched) {
@@ -612,7 +652,8 @@ TEST(statistics_events_dispatched) {
 
     lle_event_destroy(system, event1);
     lle_event_destroy(system, event2);
-    lle_event_system_stop(system);
+    drain_events(system);
+    lle_event_system_destroy(system);
 }
 
 /* ========================================================================== */

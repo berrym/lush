@@ -829,9 +829,6 @@ const char *continuation_get_prompt(const continuation_state_t *state) {
     if (!state)
         return "> ";
 
-    /// Use PS2 from symbol table, with fallback
-    const char *ps2 = symtable_get_global_default("PS2", "> ");
-
     /// Quote state takes highest priority (not tracked in context stack)
     if (state->in_single_quote || state->in_double_quote) {
         return "quote> ";
@@ -877,5 +874,20 @@ const char *continuation_get_prompt(const continuation_state_t *state) {
         return "case> ";
     }
 
-    return ps2;
+    /// No construct-specific prompt applies; fall back to PS2. The lookup is
+    /// deferred to this path so the construct branches above never allocate.
+    /// symtable_get_global_default returns an owned copy, but the documented
+    /// contract is "static string, do not free"; cache the copy in a
+    /// function-static pointer released on the next call. The final cached
+    /// value remains reachable from the static root at exit, so it is not a
+    /// leak. The cache assumes single-threaded (main-thread render/prompt)
+    /// use, matching the surrounding continuation machinery.
+    static char *ps2_cache = NULL;
+    char *ps2 = symtable_get_global_default("PS2", "> ");
+    if (!ps2) {
+        return "> ";
+    }
+    free(ps2_cache);
+    ps2_cache = ps2;
+    return ps2_cache;
 }

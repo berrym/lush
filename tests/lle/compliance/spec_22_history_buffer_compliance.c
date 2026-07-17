@@ -194,6 +194,12 @@ static void test_subsystem_construction(void) {
                       "integration config is queryable");
 
     lle_history_buffer_integration_destroy(integration);
+
+    /// The history core owns a hashtable index allocated outside the arena
+    /// (libhashtable calloc), so it is not reclaimed by pool shutdown and
+    /// requires an explicit destroy. The remaining standalone subsystems are
+    /// pool-owned and released by lush_pool_shutdown() in main.
+    lle_history_core_destroy(history);
 }
 
 int main(void) {
@@ -212,5 +218,11 @@ int main(void) {
 
     printf("Spec 22 behavioral compliance: %d assertions passed\n",
            assertions_passed);
+
+    /// Subsystem lifetimes are pool-owned: the construction paths above
+    /// allocate internal buffers via the shared arena and delegate reclamation
+    /// to pool teardown rather than per-object frees. Shutting the pool down
+    /// releases them in bulk, matching production lifecycle.
+    lush_pool_shutdown();
     return 0;
 }

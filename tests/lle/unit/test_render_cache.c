@@ -194,6 +194,8 @@ TEST(display_cache_store_then_lookup_returns_exact_data) {
     ASSERT_EQ(memcmp(retrieved, expected, expected_len), 0,
               "bytes match what was stored");
 
+    /// lookup returns an owned copy (lle_pool_alloc'd); release it.
+    lle_pool_free(retrieved);
     lle_display_cache_cleanup(cache);
 }
 
@@ -216,6 +218,8 @@ TEST(display_cache_store_then_lookup_with_binary_data) {
     ASSERT_EQ(memcmp(retrieved, expected, expected_len), 0,
               "binary bytes round-trip exactly (including embedded NULs)");
 
+    /// lookup returns an owned copy (lle_pool_alloc'd); release it.
+    lle_pool_free(retrieved);
     lle_display_cache_cleanup(cache);
 }
 
@@ -239,6 +243,8 @@ TEST(display_cache_overwrite_same_key_returns_new_value) {
     ASSERT_EQ(memcmp(retrieved, second, strlen(second)), 0,
               "retrieved bytes are the new value, not the old");
 
+    /// lookup returns an owned copy (lle_pool_alloc'd); release it.
+    lle_pool_free(retrieved);
     lle_display_cache_cleanup(cache);
 }
 
@@ -260,6 +266,8 @@ TEST(display_cache_independent_keys_round_trip_independently) {
         ASSERT_EQ(retrieved_len, strlen(vals[i]), "each size matches");
         ASSERT_EQ(memcmp(retrieved, vals[i], strlen(vals[i])), 0,
                   "each value matches its key");
+        /// each lookup returns its own owned copy; release before next iter.
+        lle_pool_free(retrieved);
     }
     lle_display_cache_cleanup(cache);
 }
@@ -309,6 +317,8 @@ TEST(display_cache_invalidate_then_restore_works) {
     ASSERT_EQ(size, strlen(second), "size matches the restored value");
     ASSERT_EQ(memcmp(out, second, strlen(second)), 0,
               "bytes are the restored value");
+    /// lookup returns an owned copy (lle_pool_alloc'd); release it.
+    lle_pool_free(out);
     lle_display_cache_cleanup(cache);
 }
 
@@ -352,6 +362,8 @@ TEST(display_cache_invalidate_all_then_restore_works) {
     ASSERT_EQ(lle_display_cache_lookup(cache, 3, &out, &size), LLE_SUCCESS,
               "post-invalidate-all store looks up");
     ASSERT_EQ(memcmp(out, "new3", 4), 0, "post-invalidate-all data is correct");
+    /// lookup returns an owned copy (lle_pool_alloc'd); release it.
+    lle_pool_free(out);
     lle_display_cache_cleanup(cache);
 }
 

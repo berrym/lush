@@ -138,8 +138,15 @@ static lle_display_bridge_t *create_mock_display_bridge(void) {
 
 static void destroy_mock_display_bridge(lle_display_bridge_t *bridge) {
     if (bridge) {
-        /// Just cleanup bridge - display controller is managed separately
+        /// The bridge borrows (does not own) the mock display controller, and
+        /// lle_display_bridge_cleanup clears that reference without freeing it,
+        /// so capture the pointer before cleanup and destroy the mock here.
+        display_controller_t *display = bridge->display_controller;
         lle_display_bridge_cleanup(bridge);
+        destroy_mock_display_controller(display);
+        /// Cleanup releases the bridge's internal resources but not the bridge
+        /// struct itself (allocated via lle_pool_alloc in the init); free it.
+        lle_pool_free(bridge);
     }
 }
 
@@ -179,6 +186,8 @@ TEST(render_controller_init_success) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -243,6 +252,9 @@ TEST(render_controller_cleanup_success) {
     result = lle_render_controller_cleanup(controller);
     ASSERT_EQ(result, LLE_SUCCESS, "Render controller cleanup should succeed");
 
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
+
     /// Bridge cleanup
     destroy_mock_display_bridge(bridge);
 }
@@ -278,6 +290,9 @@ TEST(render_controller_double_cleanup) {
     ASSERT_EQ(result, LLE_SUCCESS,
               "Second cleanup should be idempotent and succeed");
 
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
+
     /// Bridge cleanup
     destroy_mock_display_bridge(bridge);
 }
@@ -306,6 +321,8 @@ TEST(render_controller_buffer_renderer_initialized) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -329,6 +346,8 @@ TEST(render_controller_cursor_renderer_initialized) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -354,6 +373,8 @@ TEST(render_controller_frame_scheduler_initialized) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -374,6 +395,8 @@ TEST(render_controller_render_cache_initialized) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -397,6 +420,8 @@ TEST(render_controller_render_metrics_initialized) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -459,6 +484,8 @@ TEST(render_buffer_content_success) {
     lle_render_output_free(output);
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -494,6 +521,8 @@ TEST(render_buffer_content_empty_buffer) {
     lle_render_output_free(output);
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -535,6 +564,8 @@ TEST(render_buffer_content_null_params) {
     /// Cleanup
     lle_buffer_destroy(buffer);
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -568,6 +599,8 @@ TEST(render_cursor_position_success) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 
@@ -601,6 +634,8 @@ TEST(render_cursor_position_hidden) {
 
     /// Cleanup
     lle_render_controller_cleanup(controller);
+    /// Cleanup frees the sub-components but not the controller struct itself.
+    lle_pool_free(controller);
     destroy_mock_display_bridge(bridge);
 }
 

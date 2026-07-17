@@ -105,6 +105,9 @@ static void test_controller_api(void) {
     if (detection->recommended_mode == LLE_ADAPTIVE_MODE_NONE) {
         COMPLIANCE_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE,
                           "NONE mode rejects context init");
+        /// Context init failed (context is NULL); only the detection result was
+        /// allocated here and must be released before returning.
+        lle_terminal_detection_result_destroy(detection);
         printf("  Controller API: PASS (non-interactive mode)\n");
         return;
     }
@@ -160,8 +163,13 @@ static void test_controller_api(void) {
             0,
         "FULL capability name");
 
+    /// Teardown in reverse creation order: interface (owns its own internal
+    /// context), then the context built from detection, then the detection
+    /// result itself. lle_initialize_adaptive_context copies the detection
+    /// result, so context destruction does not free the caller-owned original.
     lle_adaptive_interface_destroy(interface);
     lle_adaptive_context_destroy(context);
+    lle_terminal_detection_result_destroy(detection);
 
     printf("  Controller API: PASS\n");
 }

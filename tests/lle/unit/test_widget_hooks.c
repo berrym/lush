@@ -49,6 +49,19 @@ static void reset_test_state(void) {
     g_last_hook_type = 0;
 }
 
+/// @brief Tear down a fully-initialized fixture in reverse creation order.
+/// The hooks manager is destroyed first (it holds hook registrations that
+/// reference registry widgets), then the registry (which frees every widget
+/// registered into it -- so widgets are never freed separately), then the
+/// pool. All three destroy calls tolerate NULL.
+static void teardown_fixture(lle_widget_hooks_manager_t *manager,
+                             lle_widget_registry_t *registry,
+                             lle_memory_pool_t *pool) {
+    lle_widget_hooks_manager_destroy(manager);
+    lle_widget_registry_destroy(registry);
+    lle_pool_destroy(pool);
+}
+
 /// Test: Initialize hooks manager
 TEST(hooks_manager_init) {
     reset_test_state();
@@ -74,7 +87,7 @@ TEST(hooks_manager_init) {
     }
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Invalid parameter checks for init
@@ -102,7 +115,9 @@ TEST(hooks_manager_init_invalid_params) {
     result = lle_widget_hooks_manager_init(&manager, registry, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /// Cleanup
+    /// Cleanup: every manager init failed, so manager is still NULL and only
+    /// the registry needs destroying before the pool.
+    lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
 }
 
@@ -138,7 +153,7 @@ TEST(hook_register) {
     ASSERT(count == 1);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Register multiple hooks
@@ -187,7 +202,7 @@ TEST(hook_register_multiple) {
     ASSERT(count == 3);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Register duplicate hook
@@ -225,7 +240,7 @@ TEST(hook_register_duplicate) {
     ASSERT(count == 1);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Trigger hook
@@ -269,7 +284,7 @@ TEST(hook_trigger) {
     ASSERT(g_hook_editor_arg == &editor);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Trigger multiple hooks
@@ -322,7 +337,7 @@ TEST(hook_trigger_multiple) {
     ASSERT(g_hook_callback_count == 3);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Trigger hook with error widget (should continue)
@@ -379,7 +394,7 @@ TEST(hook_trigger_with_error) {
     ASSERT(g_hook_callback_count == 3);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Unregister hook
@@ -418,7 +433,7 @@ TEST(hook_unregister) {
     ASSERT(lle_widget_hook_get_count(manager, LLE_HOOK_HISTORY_SEARCH) == 0);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Enable/disable hooks globally
@@ -483,7 +498,7 @@ TEST(hook_enable_disable) {
     ASSERT(g_hook_callback_count == 1);
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Test: Hook count
@@ -520,7 +535,7 @@ TEST(hook_count) {
     }
 
     /// Cleanup
-    lle_pool_destroy(pool);
+    teardown_fixture(manager, registry, pool);
 }
 
 /// Main test runner
