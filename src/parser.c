@@ -3007,26 +3007,33 @@ static node_t *parse_redirection(parser_t *parser) {
         return redir_node;
     }
 
-    if (!target_token || !token_is_word_like(target_token->type)) {
-        if (node_type == NODE_REDIR_HEREDOC ||
-            node_type == NODE_REDIR_HEREDOC_STRIP) {
-            /// For here documents, the delimiter might be quoted or special
-            if (target_token && (target_token->type == TOK_STRING ||
-                                 target_token->type == TOK_EXPANDABLE_STRING ||
-                                 token_is_word_like(target_token->type))) {
-                /// Valid here document delimiter
-            } else {
-                parser_error_add(parser, SHELL_ERR_HEREDOC_DELIMITER,
-                                 "expected here-document delimiter");
-                free_node_tree(redir_node);
-                return NULL;
-            }
-        } else {
-            parser_error_add(parser, SHELL_ERR_INVALID_REDIRECT,
-                             "expected redirection target");
-            free_node_tree(redir_node);
-            return NULL;
-        }
+    bool is_heredoc_delim = (node_type == NODE_REDIR_HEREDOC ||
+                             node_type == NODE_REDIR_HEREDOC_STRIP);
+    /// A redirection or here-string operand accepts every word form a command
+    /// argument does -- bare $(...), $((...)), and `...` in addition to the
+    /// word-like set -- because the operand is expanded exactly like an
+    /// argument (handle_redirection_node -> expand_arg_node). The broader
+    /// tokens are already handled by the concatenation loop below; they just
+    /// need to pass this leading-token gate. Here-document delimiters keep the
+    /// narrower word/quoted-word set: a delimiter is matched literally, never
+    /// expanded, so a command substitution is not a valid delimiter.
+    bool target_acceptable =
+        target_token &&
+        (is_heredoc_delim ? (target_token->type == TOK_STRING ||
+                             target_token->type == TOK_EXPANDABLE_STRING ||
+                             token_is_word_like(target_token->type))
+                          : (token_is_word_like(target_token->type) ||
+                             target_token->type == TOK_ARITH_EXP ||
+                             target_token->type == TOK_COMMAND_SUB ||
+                             target_token->type == TOK_BACKQUOTE));
+    if (!target_acceptable) {
+        parser_error_add(parser,
+                         is_heredoc_delim ? SHELL_ERR_HEREDOC_DELIMITER
+                                          : SHELL_ERR_INVALID_REDIRECT,
+                         is_heredoc_delim ? "expected here-document delimiter"
+                                          : "expected redirection target");
+        free_node_tree(redir_node);
+        return NULL;
     }
 
     /// For here documents, DEFER body collection

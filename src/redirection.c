@@ -72,8 +72,6 @@ static int setup_here_document_with_processing(executor_t *executor,
                                                bool strip_tabs,
                                                bool expand_vars);
 static int setup_here_string(executor_t *executor, const char *content);
-static char *expand_redirection_target(executor_t *executor,
-                                       const char *target);
 static int setup_fd_redirection(executor_t *executor, const char *redir_text);
 static int setup_fd_alloc_redirection(executor_t *executor, node_t *redir_node);
 static int find_available_fd(int min_fd);
@@ -398,19 +396,15 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
         return 1; /// No target specified
     }
 
-    /// Expand the target. Single-quoted content (NODE_STRING_LITERAL)
-    /// gets NO expansion per POSIX -- no $VAR, no backticks, no
-    /// backslash escapes. The parser already stripped the surrounding
-    /// quotes, so val.str is the literal byte content that must reach
-    /// the target verbatim. Skipping expand_if_needed for this case
-    /// is what lets `read -r line <<< 'literal \n stays \\ here'`
-    /// preserve its backslashes the way bash and zsh do.
-    char *target = NULL;
-    if (target_node->type == NODE_STRING_LITERAL) {
-        target = strdup(target_node->val.str);
-    } else {
-        target = expand_redirection_target(executor, target_node->val.str);
-    }
+    /// Expand the operand through the shared per-node-type word expander so
+    /// a redirection or here-string target accepts exactly what a command
+    /// argument does: bare $(...) / $((...)) / `...`, double-quote rules for
+    /// a "..." operand, and $'...' ANSI-C decoding. A single-quoted
+    /// NODE_STRING_LITERAL still reaches the target verbatim -- no $VAR, no
+    /// backticks, no backslash escapes -- so `read -r line <<< 'literal \n
+    /// stays \\ here'` preserves its backslashes the way bash and zsh do;
+    /// expand_arg_node decodes only the ANSI-C $'...' literal form.
+    char *target = expand_arg_node(executor, target_node);
     if (!target) {
         return 1;
     }
@@ -1332,7 +1326,7 @@ static int setup_here_string(executor_t *executor, const char *content) {
     }
 
     /// IMPORTANT: do NOT re-expand here. handle_redirection_node has
-    /// already run expand_redirection_target on the value that the
+    /// already run expand_arg_node on the value that the
     /// parser produced; calling it again applied escape processing
     /// twice, which (combined with expand_if_needed's lossy
     /// behavior on single-quoted content) shredded backslashes in
@@ -1370,43 +1364,6 @@ static int setup_here_string(executor_t *executor, const char *content) {
     close(pipefd[0]);
 
     return 0;
-}
-
-/**
- * @brief Expand variables in redirection target
- *
- * Expands shell variables in the redirection target filename,
- * including special variables like $$, $?, $#, etc.
- *
- * @param executor Executor context for variable expansion
- * @param target Target string to expand
- * @return Expanded string (caller must free), or NULL on error
- */
-static char *expand_redirection_target(executor_t *executor,
-                                       const char *target) {
-    if (!target) {
-        return NULL;
-    }
-
-    if (getenv("LUSH_DEBUG_REDIR")) {
-        printf("DEBUG: expand_redirection_target called with: '%s'\n", target);
-    }
-
-    /// Use the comprehensive expansion function that handles all variable
-    /// types, including special variables like $$, $?, $#, etc.
-    char *result = expand_if_needed(executor, target);
-
-    /// If expansion failed, fall back to a copy of the original
-    if (!result) {
-        result = strdup(target);
-    }
-
-    if (getenv("LUSH_DEBUG_REDIR")) {
-        printf("DEBUG: expand_redirection_target result: '%s'\n",
-               result ? result : "NULL");
-    }
-
-    return result;
 }
 
 /**
@@ -1467,8 +1424,10 @@ static int setup_fd_redirection(executor_t *executor, const char *redir_text) {
         /// Literal digit
         target_fd = *p - '0';
     } else if (*p == '$') {
-        /// Variable expansion needed
-        char *expanded = expand_redirection_target(executor, p);
+        /// Variable expansion needed. This target is a raw `$name`/`${...}`
+        /// fd reference (not an AST node), so it expands at the string layer;
+        /// a NULL/empty result is reported as a bad fd just below.
+        char *expanded = expand_if_needed(executor, p);
         if (!expanded || *expanded == '\0') {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -1870,7 +1829,10 @@ static int setup_fd_alloc_redirection(executor_t *executor,
         target_node->type == NODE_PROC_SUB_OUT) {
         target = expand_process_substitution(executor, target_node);
     } else if (target_node->val.str) {
-        target = expand_redirection_target(executor, target_node->val.str);
+        /// Same shared per-node-type word expander the regular redirection
+        /// path uses, so `exec {fd}> $'ansi'` / `> $(cmd)` / a single-quoted
+        /// verbatim target all behave identically to `> target`.
+        target = expand_arg_node(executor, target_node);
     }
     if (!target) {
         shell_error_t *error = shell_error_create(
