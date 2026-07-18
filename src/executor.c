@@ -10813,8 +10813,13 @@ static int execute_function_call(executor_t *executor,
             return actual_return;
         }
 
-        if (result != 0) {
-            break; /// Stop on first error
+        /// set -e (errexit) aborts the function body on a failing command,
+        /// exactly as it does at the top level. Without set -e the body
+        /// continues past a non-zero command -- the POSIX/bash/zsh consensus
+        /// (a non-zero command is not fatal); an unconditional break here made
+        /// every function body abort on the first failure (#512).
+        if (result != 0 && shell_opts.exit_on_error) {
+            break;
         }
         command = command->next_sibling;
     }
