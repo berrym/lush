@@ -928,7 +928,22 @@ int init(int argc, char **argv, FILE **in) {
     symtable_set_global("$", shell_pid_str);
 
     /// Set shell name/script name and positional parameters
-    if (shell_type() == NORMAL_SHELL && optind > 0 && argv[optind]) {
+    if (shell_opts.command_mode) {
+        /// `sh -c string [name [arg...]]`: the first operand after the command
+        /// string is $0 (the command name), the rest are $1, $2, ... Without
+        /// operands there are no positional parameters and $0 is the shell
+        /// name. The full process argv still holds `-c` and the command string,
+        /// so it must not leak into the positional parameters.
+        if (optind > 0 && optind < (size_t)argc && argv[optind]) {
+            symtable_set_global("0", argv[optind]); /// command name -> $0
+            shell_argv = &argv[optind];             /// [name, arg1, arg2, ...]
+            shell_argc = argc - (int)optind;
+        } else {
+            symtable_set_global("0", argv[0]); /// shell name -> $0
+            shell_argv = &argv[0]; /// only $0; no positional parameters
+            shell_argc = 1;
+        }
+    } else if (shell_type() == NORMAL_SHELL && optind > 0 && argv[optind]) {
         /// Running a script - set up script arguments
         symtable_set_global("0", argv[optind]); /// Script name
 
@@ -937,7 +952,7 @@ int init(int argc, char **argv, FILE **in) {
             argc - optind; /// Number of script args (including script name)
         shell_argv = &argv[optind]; /// Pointer to script args
     } else {
-        /// Interactive or command mode - use shell arguments
+        /// Interactive - use shell arguments
         symtable_set_global("0", argv[0]);
     }
 
