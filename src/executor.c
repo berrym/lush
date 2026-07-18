@@ -10789,8 +10789,11 @@ static int execute_function_call(executor_t *executor,
             fire_err_trap();
         }
 
-        /// Check if this is a function return (special code 200-255)
-        if (result >= 200 && result <= 255) {
+        /// Check if this is a function return (special code 200-455).
+        /// bin_return encodes `return N` as 200 + (N & 0xFF), so the range is
+        /// 200-455; a <= 255 bound here dropped every return value above 55,
+        /// leaking the raw encoded code (return -1 -> 455 instead of 255).
+        if (result >= 200 && result <= 455) {
             /// Extract the actual return value from the special code
             int actual_return = result - 200;
 
