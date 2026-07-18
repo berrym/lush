@@ -391,14 +391,14 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_PUSHD] = false,         /// Optional
             [FEATURE_CDABLE_VARS] = false,        /// Optional
             [FEATURE_ERREXIT_IN_LOOPS] =
-                true, /* Curated lush-mode default: a loop body that fails
-                            on its first iteration is almost always a
-                            programmer error; aborting immediately catches the
-                            bug instantly instead of waiting for the
-                            failure-streak detector (#73 Layer 1) to fire after
-                            5+ seconds. Off in POSIX/bash/zsh modes for
-                            polyglot parity. Toggle per-script via
-                            `unsetopt errexit_in_loops`. */
+                false, /* Opt-in even in lush mode (#512). Aborting a loop or
+                            function body when a command fails is a useful way
+                            to catch silent failures, but on by default it
+                            breaks ordinary scripts -- `for f in *; do process
+                            "$f"; done` would halt the instant process returns
+                            non-zero -- and diverges from the universal
+                            POSIX/bash/zsh behavior of continuing. Reachable
+                            per-script via `setopt errexit_in_loops`. */
             [FEATURE_ASSIGN_ERROR_EXITS] =
                 false, /* Curated lush default: a readonly assignment error
                             aborts the current AND-OR list and is reported on
