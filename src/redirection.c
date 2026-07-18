@@ -94,8 +94,11 @@ int setup_redirections(executor_t *executor, node_t *command) {
     /// POSIX compliant: Process redirections left-to-right in order they appear
     node_t *child = command->first_child;
     while (child) {
-        if (child->type >= NODE_REDIR_IN &&
-            child->type <= NODE_REDIR_FD_ALLOC) {
+        /// NODE_REDIR_CLOBBER (>|) is the last redirection node type; a bound
+        /// of NODE_REDIR_FD_ALLOC silently skipped it, so `>|` never took
+        /// effect and its output leaked past the redirect. Matches
+        /// is_redirection_node's full range.
+        if (child->type >= NODE_REDIR_IN && child->type <= NODE_REDIR_CLOBBER) {
             int result = handle_redirection_node(executor, child);
             if (result != 0) {
                 return result;
