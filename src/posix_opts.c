@@ -879,9 +879,17 @@ int builtin_set(char **args) {
             /// Handle -- option: end of options, start of positional parameters
             i++; /// Move past the --
 
-            /// Clear existing positional parameters $1, $2, etc.
-            for (int param_num = 1; param_num <= 99; param_num++) {
-                char param_name[4];
+            /// Clear the previous positional parameters $1..$old_count. The
+            /// count is authoritative in $#; a fixed cap would leave stale
+            /// high-numbered parameters set after the list shrinks.
+            int old_argc = 0;
+            char *old_hash = symtable_get_global("#");
+            if (old_hash) {
+                old_argc = atoi(old_hash);
+                free(old_hash);
+            }
+            for (int param_num = 1; param_num <= old_argc; param_num++) {
+                char param_name[16];
                 snprintf(param_name, sizeof(param_name), "%d", param_num);
                 symtable_unset_global(param_name);
             }
@@ -909,11 +917,15 @@ int builtin_set(char **args) {
                 /// Set program name (shell_argv[0])
                 shell_argv[0] = strdup("lush");
 
-                /// Set new positional parameters in both symbol table and
-                /// global arrays
+                /// Set every new positional parameter in both the symbol table
+                /// and shell_argv. Each slot 1..new_argc must be written:
+                /// free_shell_argv() frees all shell_argc slots at exit, so any
+                /// slot left uninitialized here would be freed as a garbage
+                /// pointer -- the cap that formerly stopped at 99 corrupted the
+                /// heap and silently dropped parameters past $99.
                 int param_num = 1;
-                while (args[i] && param_num <= 99) {
-                    char param_name[4];
+                while (args[i]) {
+                    char param_name[16];
                     snprintf(param_name, sizeof(param_name), "%d", param_num);
                     symtable_set_global(param_name, args[i]);
 
