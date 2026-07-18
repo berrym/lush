@@ -164,6 +164,54 @@ static int add_to_argv_list(char ***argv_list, int *argv_count,
 static char **ifs_field_split(const char *text, const char *ifs, int *count);
 static void cleanup_procsub_fds(executor_t *executor);
 
+/// The parameter-expansion operator table. Longer operators precede the
+/// shorter ones they contain so the scalar detection loop resolves e.g.
+/// `##` before `#` and `:-` before `:`. Indexed by op_type throughout the
+/// expansion engine; the single source of truth shared by the scalar
+/// ${var op} detection, the array-element ${arr[k] op} detection, and the
+/// operator applier so no path carries a private copy of this list.
+static const char *const param_operators[] = {
+    ":-", /// 0: use default if unset or empty
+    ":+", /// 1: use alternative if set and non-empty
+    "##", /// 2: remove longest prefix pattern
+    "%%", /// 3: remove longest suffix pattern
+    "^^", /// 4: uppercase all
+    ",,", /// 5: lowercase all
+    "#",  /// 6: remove shortest prefix pattern
+    "%",  /// 7: remove shortest suffix pattern
+    "^",  /// 8: uppercase first
+    ",",  /// 9: lowercase first
+    "-",  /// 10: use default if unset
+    "+",  /// 11: use alternative if set
+    ":=", /// 12: assign default if unset or empty
+    "=",  /// 13: assign default if unset
+    ":",  /// 14: substring / zsh modifiers
+    "//", /// 15: replace all occurrences
+    "/",  /// 16: replace first occurrence
+    "@",  /// 17: transformations
+    ":?", /// 18: error if unset or null (POSIX)
+    "?",  /// 19: error if unset (POSIX)
+    NULL};
+
+/// Apply a resolved parameter-expansion operator to a scalar value.
+/// PURE: never mutates the symbol table. For the assign operators
+/// (:= / =) it returns the value to be assigned and sets *assign_back so
+/// the caller writes it to the correct lvalue -- a scalar variable for
+/// ${var:=x}, an array element for ${arr[k]:=x}. Shared by the scalar
+/// ${var op} path and the single-element ${arr[k] op} path. Neither
+/// var_value nor expanded_default is freed (caller owns them).
+static char *apply_param_operator(executor_t *executor, const char *var_name,
+                                  char *var_value, char *expanded_default,
+                                  int op_type, bool *assign_back);
+
+/// Identify the operator a trailing ${arr[k]OP...} suffix begins with.
+/// The suffix starts exactly at the operator, so the longest operator in
+/// param_operators[] that prefixes it wins (`:=` over `:`, `##` over `#`,
+/// `//` over `/`). Returns the op_type and points *rhs_out at the operand
+/// following the operator, or -1 when the suffix is not an operator.
+static int detect_param_operator_suffix(const char *suffix,
+                                        const char **rhs_out);
+
 /// Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 bool is_pipefail_enabled(void);
@@ -14679,55 +14727,82 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                     }
 
-                    /// Apply trailing parameter-expansion operator on an
-                    /// indexed/associative element: `${arr[key]:-default}`,
-                    /// `${arr[key]:+alt}`, etc. Without this, the array
-                    /// branch returned the (possibly empty) element value
-                    /// unconditionally, dropping the operator entirely
-                    /// (real_world/bash/200 fell back to "" instead of the
-                    /// `:-info` default for a missing assoc key). For
-                    /// arrays we can't distinguish unset from empty (a
-                    /// missing key reads as ""), so both `:-` and `-`
-                    /// behave identically here, as do `:+` and `+`. The
-                    /// default/alt RHS is variable-expanded so
-                    /// `${arr[k]:-$fallback}` works.
+                    /// Apply a trailing parameter-expansion operator on an
+                    /// indexed/associative element (`${arr[key]op...}`)
+                    /// through the SAME operator engine the scalar
+                    /// `${var op...}` path uses, so the full operator set --
+                    /// `##`, `%%`, `^^`, `,,`, `//`, `/`, substring,
+                    /// `@`-transforms -- applies uniformly to one element,
+                    /// not only `:-`/`:+` (issue #514). A single element
+                    /// can't distinguish unset from empty (a missing key
+                    /// reads as ""); an empty element is passed as NULL so
+                    /// the unset-keyed operators (`:-`/`-`/`:=`/`=`/`:?`/`?`)
+                    /// fire, matching the established array semantics.
                     const char *after_bracket = close + 1;
                     if (*after_bracket != '\0') {
-                        bool value_is_empty = (!result || !*result);
                         const char *rhs = NULL;
-                        bool want_default_when_empty = false; /// :- / -
-                        bool want_alt_when_nonempty = false;  /// :+ / +
-                        if (after_bracket[0] == ':' &&
-                            (after_bracket[1] == '-' ||
-                             after_bracket[1] == '+')) {
-                            rhs = after_bracket + 2;
-                            want_default_when_empty = (after_bracket[1] == '-');
-                            want_alt_when_nonempty = (after_bracket[1] == '+');
-                        } else if (after_bracket[0] == '-' ||
-                                   after_bracket[0] == '+') {
-                            rhs = after_bracket + 1;
-                            want_default_when_empty = (after_bracket[0] == '-');
-                            want_alt_when_nonempty = (after_bracket[0] == '+');
-                        }
-                        if (rhs) {
-                            char *expanded_rhs =
-                                expand_variables_in_string(executor, rhs);
-                            const char *rhs_final =
-                                expanded_rhs ? expanded_rhs : rhs;
-                            if (want_default_when_empty && value_is_empty) {
-                                free(result);
-                                result = strdup(rhs_final);
-                            } else if (want_alt_when_nonempty &&
-                                       !value_is_empty) {
-                                free(result);
-                                result = strdup(rhs_final);
-                            } else if (want_alt_when_nonempty) {
-                                free(result);
-                                result = strdup("");
+                        int el_op =
+                            detect_param_operator_suffix(after_bracket, &rhs);
+                        if (el_op >= 0) {
+                            char *el_default = expand_variables_in_string(
+                                executor, rhs ? rhs : "");
+                            char *elem_val =
+                                (result && *result) ? result : NULL;
+                            bool assign_back = false;
+                            char *applied = apply_param_operator(
+                                executor, arr_name, elem_val,
+                                el_default ? el_default : (char *)"", el_op,
+                                &assign_back);
+                            if (assign_back) {
+                                /// `:=`/`=` persist to the ELEMENT, not a
+                                /// scalar named arr_name. Resolve the
+                                /// key/index the same way the element read
+                                /// did: string key for a map, arithmetic
+                                /// subscript with the 1-based adjustment for
+                                /// a list. The low-level element setters
+                                /// bypass readonly enforcement, so refuse a
+                                /// write to a readonly array here (mirroring
+                                /// the direct-assignment guard) instead of
+                                /// silently mutating it.
+                                if (symtable_array_get_flags(arr_name) &
+                                    SYMVAR_READONLY) {
+                                    executor_error_report(
+                                        executor, SHELL_ERR_READONLY_VAR,
+                                        executor_current_loc(executor),
+                                        "%s: readonly variable", arr_name);
+                                    executor->expansion_error = true;
+                                    executor->expansion_exit_status = 1;
+                                } else if (array->is_associative) {
+                                    char *ek =
+                                        expand_variable(executor, subscript);
+                                    symtable_array_set_assoc(
+                                        array, ek ? ek : subscript, applied);
+                                    free(ek);
+                                } else {
+                                    arithm_clear_error();
+                                    char *ir = arithm_expand(subscript);
+                                    if (ir && !arithm_error_is_flagged()) {
+                                        long ix = strtoll(ir, NULL, 10);
+                                        bool one_based = !shell_mode_allows(
+                                            FEATURE_ARRAY_ZERO_INDEXED);
+                                        /// 1-based mode: index 0 is invalid
+                                        /// (the read returns empty and stores
+                                        /// nothing), so skip the write rather
+                                        /// than clobber physical index 0.
+                                        if (!(one_based && ix == 0)) {
+                                            if (one_based && ix > 0) {
+                                                ix--; /// 1-based -> 0-based
+                                            }
+                                            symtable_array_set_index(
+                                                array, (int)ix, applied);
+                                        }
+                                    }
+                                    free(ir);
+                                }
                             }
-                            if (expanded_rhs) {
-                                free(expanded_rhs);
-                            }
+                            free(el_default);
+                            free(result);
+                            result = applied;
                         }
                     }
 
@@ -14830,31 +14905,12 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("");
     }
 
-    /// Look for parameter expansion operators
+    /// Look for parameter expansion operators. The table is the shared
+    /// file-scope param_operators[]; order matters (longer operators
+    /// before the shorter ones they contain) so this detection loop
+    /// resolves e.g. `##` before `#` and `:-` before `:`.
     const char *op_pos = NULL;
-    /// Order matters: longer operators first, then shorter ones
-    /// 0-14: existing operators, 15-18: new operators
-    const char *operators[] = {":-", /// 0: use default if unset or empty
-                               ":+", /// 1: use alternative if set and non-empty
-                               "##", /// 2: remove longest prefix pattern
-                               "%%", /// 3: remove longest suffix pattern
-                               "^^", /// 4: uppercase all
-                               ",,", /// 5: lowercase all
-                               "#",  /// 6: remove shortest prefix pattern
-                               "%",  /// 7: remove shortest suffix pattern
-                               "^",  /// 8: uppercase first
-                               ",",  /// 9: lowercase first
-                               "-",  /// 10: use default if unset
-                               "+",  /// 11: use alternative if set
-                               ":=", /// 12: assign default if unset or empty
-                               "=",  /// 13: assign default if unset
-                               ":",  /// 14: substring
-                               "//", /// 15: replace all occurrences
-                               "/",  /// 16: replace first occurrence
-                               "@",  /// 17: transformations
-                               ":?", /// 18: error if unset or null (POSIX)
-                               "?",  /// 19: error if unset (POSIX)
-                               NULL};
+    const char *const *operators = param_operators;
     int op_type = -1;
 
     /// Special-parameter names at position 0 (@, *, #, ?, !, $, -, 0..9)
@@ -15353,364 +15409,17 @@ static char *parse_parameter_expansion(executor_t *executor,
             return result;
         }
 
-        switch (op_type) {
-        case 0: /// ${var:-default} - use default if var is unset or empty
-            if (is_empty_or_null(var_value)) {
-                result = strdup(expanded_default);
-            } else {
-                result = strdup(var_value);
-            }
-            break;
-
-        case 1: /// ${var:+alternative} - use alternative if var is set and
-                /// non-empty
-            if (!is_empty_or_null(var_value)) {
-                result = strdup(expanded_default);
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 2: /// ${var##pattern} - remove longest match of pattern from
-                /// beginning
-            if (var_value) {
-                int match_len =
-                    find_prefix_match(var_value, expanded_default, true);
-                result = strdup(var_value + match_len);
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 3: /// ${var%%pattern} - remove longest match of pattern from end
-            if (var_value) {
-                int str_len = strlen(var_value);
-                int match_len =
-                    find_suffix_match(var_value, expanded_default, true);
-                int result_len = str_len - match_len;
-                result = malloc(result_len + 1);
-                if (result) {
-                    strncpy(result, var_value, result_len);
-                    result[result_len] = '\0';
-                } else {
-                    result = strdup("");
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 4: /// ${var^^[pat]} - convert all characters to uppercase
-            if (var_value) {
-                /// Pattern restriction (issue #96): ${var^^[abc]} converts
-                /// only characters matching the glob pattern. Empty
-                /// pattern falls through to the UTF-8-aware path so
-                /// non-ASCII content is upper-cased correctly.
-                if (expanded_default && expanded_default[0]) {
-                    result = convert_case_pattern(var_value, expanded_default,
-                                                  true, false);
-                } else {
-                    result = convert_case_all_upper(var_value);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 5: /// ${var,,[pat]} - convert all characters to lowercase
-            if (var_value) {
-                if (expanded_default && expanded_default[0]) {
-                    result = convert_case_pattern(var_value, expanded_default,
-                                                  false, false);
-                } else {
-                    result = convert_case_all_lower(var_value);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 6: /// ${var#pattern} - remove shortest match of pattern from
-                /// beginning
-            if (var_value) {
-                int match_len =
-                    find_prefix_match(var_value, expanded_default, false);
-                result = strdup(var_value + match_len);
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 7: /// ${var%pattern} - remove shortest match of pattern from end
-            if (var_value) {
-                int str_len = strlen(var_value);
-                int match_len =
-                    find_suffix_match(var_value, expanded_default, false);
-                int result_len = str_len - match_len;
-                result = malloc(result_len + 1);
-                if (result) {
-                    strncpy(result, var_value, result_len);
-                    result[result_len] = '\0';
-                } else {
-                    result = strdup("");
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 8: /// ${var^[pat]} - convert first matching character to uppercase
-            if (var_value) {
-                if (expanded_default && expanded_default[0]) {
-                    result = convert_case_pattern(var_value, expanded_default,
-                                                  true, true);
-                } else {
-                    result = convert_case_first_upper(var_value);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 9: /// ${var,[pat]} - convert first matching character to lowercase
-            if (var_value) {
-                if (expanded_default && expanded_default[0]) {
-                    result = convert_case_pattern(var_value, expanded_default,
-                                                  false, true);
-                } else {
-                    result = convert_case_first_lower(var_value);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 10: /// ${var-default} - use default if var is unset (but not if
-                 /// empty)
-            if (!var_value) {
-                result = strdup(expanded_default);
-            } else {
-                result = strdup(var_value);
-            }
-            break;
-
-        case 11: /// ${var+alternative} - use alternative if var is set (even if
-                 /// empty)
-            if (var_value) {
-                result = strdup(expanded_default);
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 12: /// ${var:=default} - assign default if var is unset or empty
-                 /// and return it
-            if (is_empty_or_null(var_value)) {
-                symtable_set_var(executor->symtable, var_name, expanded_default,
-                                 SYMVAR_NONE);
-                result = strdup(expanded_default);
-            } else {
-                result = strdup(var_value);
-            }
-            break;
-
-        case 13: /// ${var=default} - assign default if var is unset and return
-                 /// it
-            if (!var_value) {
-                symtable_set_var(executor->symtable, var_name, expanded_default,
-                                 SYMVAR_NONE);
-                result = strdup(expanded_default);
-            } else {
-                result = strdup(var_value);
-            }
-            break;
-
-        case 14: /// ${var:offset:length} substring, or ${var:h...} modifiers
-            if (var_value && shell_mode_allows(FEATURE_ZSH_PARAM_MODIFIERS) &&
-                looks_like_zsh_modifier(expanded_default)) {
-                /// zsh modifier chain (:h, :t, :r, :e, :l, :u, :q, :s///,
-                /// :gs///). The leading char is a modifier letter, which is
-                /// never a valid substring offset (those are numeric).
-                result =
-                    apply_zsh_modifiers(executor, var_value, expanded_default);
-            } else if (var_value) {
-                /// Parse offset and optional length (with variable expansion)
-                char *expanded_offset_str =
-                    expand_variables_in_string(executor, expanded_default);
-                char *endptr;
-                int offset = strtol(expanded_offset_str, &endptr, 10);
-                int length = 0;
-                bool has_length = false;
-
-                if (*endptr == ':') {
-                    length = strtol(endptr + 1, NULL, 10);
-                    has_length = true;
-                }
-
-                result =
-                    extract_substring(var_value, offset, length, has_length);
-                free(expanded_offset_str);
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 15: /// ${var//pattern/replacement} - replace all occurrences
-        case 16: /// ${var/pattern/replacement} - replace first occurrence
-            /// Pattern/replacement split honoring backslash-escaped
-            /// slashes. ${path//\//.} has pattern `\/` (literal slash)
-            /// and replacement `.`; the prior strchr-based split took
-            /// the FIRST `/` as the separator even when it was preceded
-            /// by `\`, splitting pattern as `\` (nothing) and replacement
-            /// as `/.` -- silently producing the original string back.
-            /// Walk the spec and break at the first unescaped `/`.
-            /// Backslash-escapes other than `\/` pass through to
-            /// lush_pattern_match which handles them per glob spec.
-            /// Issue #96.
-            if (var_value) {
-                char *sep = NULL;
-                for (char *p = expanded_default; *p; p++) {
-                    if (*p == '\\' && p[1] == '/') {
-                        p++;
-                        continue;
-                    }
-                    if (*p == '/') {
-                        sep = p;
-                        break;
-                    }
-                }
-                bool global = (op_type == 15);
-                if (sep) {
-                    size_t pattern_len = sep - expanded_default;
-                    char *pattern = malloc(pattern_len + 1);
-                    if (pattern) {
-                        /// Strip `\/` -> `/` in the extracted pattern
-                        /// so downstream matchers see the canonical
-                        /// literal slash. Other backslash sequences
-                        /// pass through.
-                        size_t pj = 0;
-                        for (size_t pi = 0; pi < pattern_len; pi++) {
-                            if (expanded_default[pi] == '\\' &&
-                                pi + 1 < pattern_len &&
-                                expanded_default[pi + 1] == '/') {
-                                pattern[pj++] = '/';
-                                pi++;
-                            } else {
-                                pattern[pj++] = expanded_default[pi];
-                            }
-                        }
-                        pattern[pj] = '\0';
-                        const char *replacement = sep + 1;
-                        result = pattern_substitute(var_value, pattern,
-                                                    replacement, global);
-                        free(pattern);
-                    } else {
-                        result = strdup(var_value);
-                    }
-                } else {
-                    /// No replacement, just remove pattern. Same `\/`
-                    /// canonicalization as the pattern half.
-                    size_t plen = strlen(expanded_default);
-                    char *pattern = malloc(plen + 1);
-                    if (pattern) {
-                        size_t pj = 0;
-                        for (size_t pi = 0; pi < plen; pi++) {
-                            if (expanded_default[pi] == '\\' && pi + 1 < plen &&
-                                expanded_default[pi + 1] == '/') {
-                                pattern[pj++] = '/';
-                                pi++;
-                            } else {
-                                pattern[pj++] = expanded_default[pi];
-                            }
-                        }
-                        pattern[pj] = '\0';
-                        result =
-                            pattern_substitute(var_value, pattern, "", global);
-                        free(pattern);
-                    } else {
-                        result = strdup(var_value);
-                    }
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 17: /// ${var@op} - transformations
-            if (expanded_default[0]) {
-                char op = expanded_default[0];
-                /// The @a (attribute query) variant only inspects the
-                /// variable's metadata and doesn't need var_value to
-                /// be set. Arrays specifically have NULL var_value
-                /// (scalar lookup misses them), so the prior
-                /// `if (var_value && ...)` guard hid the attribute
-                /// for `declare -A arr; echo "${arr@a}"`. Issue #102.
-                /// Other @op flavors do still need a value; for those
-                /// fall through to the empty-result path.
-                if (op == 'a') {
-                    result = get_variable_attributes(var_name);
-                    break;
-                }
-                if (!var_value) {
-                    result = strdup("");
-                    break;
-                }
-                switch (op) {
-                case 'Q': /// Quote value for reuse as input
-                    result = transform_quote(var_value);
-                    break;
-                case 'E': /// Expand escape sequences (ANSI-C, like $'...')
-                    result = lush_expand_escapes(var_value, strlen(var_value),
-                                                 LUSH_ESC_ANSI_C);
-                    break;
-                case 'P': /// Expand as prompt string
-                    result = transform_prompt(var_value);
-                    break;
-                case 'A': /// Assignment statement form
-                    result = transform_assignment(var_name, var_value);
-                    break;
-                case 'U': /// Uppercase all
-                    result = convert_case_all_upper(var_value);
-                    break;
-                case 'u': /// Uppercase first
-                    result = convert_case_first_upper(var_value);
-                    break;
-                case 'L': /// Lowercase all
-                    result = convert_case_all_lower(var_value);
-                    break;
-                default:
-                    result = strdup(var_value);
-                    break;
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
-        case 18: /// ${var:?word} - error if var unset or null (POSIX)
-            if (is_empty_or_null(var_value)) {
-                result = handle_required_param_error(
-                    executor, var_name, expanded_default,
-                    "parameter null or not set");
-            } else {
-                result = strdup(var_value);
-            }
-            break;
-
-        case 19: /// ${var?word} - error if var unset (null permitted) (POSIX)
-            if (!var_value) {
-                result = handle_required_param_error(
-                    executor, var_name, expanded_default, "parameter not set");
-            } else {
-                result = strdup(var_value);
-            }
-            break;
+        bool op_assign_back = false;
+        result =
+            apply_param_operator(executor, var_name, var_value,
+                                 expanded_default, op_type, &op_assign_back);
+        if (op_assign_back) {
+            symtable_set_var(executor->symtable, var_name, result, SYMVAR_NONE);
         }
-
         free(var_name);
         free(var_value);
         free(expanded_default);
-        return result ? result : strdup("");
+        return result;
     }
 
     /// No operator found, just get the variable value
@@ -15910,6 +15619,385 @@ static char *parse_parameter_expansion(executor_t *executor,
 
     /// value is already strdup'd by symtable_get_var, don't strdup again
     return value ? value : strdup("");
+}
+
+static char *apply_param_operator(executor_t *executor, const char *var_name,
+                                  char *var_value, char *expanded_default,
+                                  int op_type, bool *assign_back) {
+    if (assign_back) {
+        *assign_back = false;
+    }
+    char *result = NULL;
+    switch (op_type) {
+    case 0: /// ${var:-default} - use default if var is unset or empty
+        if (is_empty_or_null(var_value)) {
+            result = strdup(expanded_default);
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+
+    case 1: /// ${var:+alternative} - use alternative if var is set and
+            /// non-empty
+        if (!is_empty_or_null(var_value)) {
+            result = strdup(expanded_default);
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 2: /// ${var##pattern} - remove longest match of pattern from
+            /// beginning
+        if (var_value) {
+            int match_len =
+                find_prefix_match(var_value, expanded_default, true);
+            result = strdup(var_value + match_len);
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 3: /// ${var%%pattern} - remove longest match of pattern from end
+        if (var_value) {
+            int str_len = strlen(var_value);
+            int match_len =
+                find_suffix_match(var_value, expanded_default, true);
+            int result_len = str_len - match_len;
+            result = malloc(result_len + 1);
+            if (result) {
+                strncpy(result, var_value, result_len);
+                result[result_len] = '\0';
+            } else {
+                result = strdup("");
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 4: /// ${var^^[pat]} - convert all characters to uppercase
+        if (var_value) {
+            /// Pattern restriction (issue #96): ${var^^[abc]} converts
+            /// only characters matching the glob pattern. Empty
+            /// pattern falls through to the UTF-8-aware path so
+            /// non-ASCII content is upper-cased correctly.
+            if (expanded_default && expanded_default[0]) {
+                result = convert_case_pattern(var_value, expanded_default, true,
+                                              false);
+            } else {
+                result = convert_case_all_upper(var_value);
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 5: /// ${var,,[pat]} - convert all characters to lowercase
+        if (var_value) {
+            if (expanded_default && expanded_default[0]) {
+                result = convert_case_pattern(var_value, expanded_default,
+                                              false, false);
+            } else {
+                result = convert_case_all_lower(var_value);
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 6: /// ${var#pattern} - remove shortest match of pattern from
+            /// beginning
+        if (var_value) {
+            int match_len =
+                find_prefix_match(var_value, expanded_default, false);
+            result = strdup(var_value + match_len);
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 7: /// ${var%pattern} - remove shortest match of pattern from end
+        if (var_value) {
+            int str_len = strlen(var_value);
+            int match_len =
+                find_suffix_match(var_value, expanded_default, false);
+            int result_len = str_len - match_len;
+            result = malloc(result_len + 1);
+            if (result) {
+                strncpy(result, var_value, result_len);
+                result[result_len] = '\0';
+            } else {
+                result = strdup("");
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 8: /// ${var^[pat]} - convert first matching character to uppercase
+        if (var_value) {
+            if (expanded_default && expanded_default[0]) {
+                result = convert_case_pattern(var_value, expanded_default, true,
+                                              true);
+            } else {
+                result = convert_case_first_upper(var_value);
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 9: /// ${var,[pat]} - convert first matching character to lowercase
+        if (var_value) {
+            if (expanded_default && expanded_default[0]) {
+                result = convert_case_pattern(var_value, expanded_default,
+                                              false, true);
+            } else {
+                result = convert_case_first_lower(var_value);
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 10: /// ${var-default} - use default if var is unset (but not if
+             /// empty)
+        if (!var_value) {
+            result = strdup(expanded_default);
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+
+    case 11: /// ${var+alternative} - use alternative if var is set (even if
+             /// empty)
+        if (var_value) {
+            result = strdup(expanded_default);
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 12: /// ${var:=default} - assign default if var is unset or empty
+             /// and return it
+        if (is_empty_or_null(var_value)) {
+            if (assign_back) {
+                *assign_back = true;
+            }
+            result = strdup(expanded_default);
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+
+    case 13: /// ${var=default} - assign default if var is unset and return
+             /// it
+        if (!var_value) {
+            if (assign_back) {
+                *assign_back = true;
+            }
+            result = strdup(expanded_default);
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+
+    case 14: /// ${var:offset:length} substring, or ${var:h...} modifiers
+        if (var_value && shell_mode_allows(FEATURE_ZSH_PARAM_MODIFIERS) &&
+            looks_like_zsh_modifier(expanded_default)) {
+            /// zsh modifier chain (:h, :t, :r, :e, :l, :u, :q, :s///,
+            /// :gs///). The leading char is a modifier letter, which is
+            /// never a valid substring offset (those are numeric).
+            result = apply_zsh_modifiers(executor, var_value, expanded_default);
+        } else if (var_value) {
+            /// Parse offset and optional length (with variable expansion)
+            char *expanded_offset_str =
+                expand_variables_in_string(executor, expanded_default);
+            char *endptr;
+            int offset = strtol(expanded_offset_str, &endptr, 10);
+            int length = 0;
+            bool has_length = false;
+
+            if (*endptr == ':') {
+                length = strtol(endptr + 1, NULL, 10);
+                has_length = true;
+            }
+
+            result = extract_substring(var_value, offset, length, has_length);
+            free(expanded_offset_str);
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 15: /// ${var//pattern/replacement} - replace all occurrences
+    case 16: /// ${var/pattern/replacement} - replace first occurrence
+        /// Pattern/replacement split honoring backslash-escaped
+        /// slashes. ${path//\//.} has pattern `\/` (literal slash)
+        /// and replacement `.`; the prior strchr-based split took
+        /// the FIRST `/` as the separator even when it was preceded
+        /// by `\`, splitting pattern as `\` (nothing) and replacement
+        /// as `/.` -- silently producing the original string back.
+        /// Walk the spec and break at the first unescaped `/`.
+        /// Backslash-escapes other than `\/` pass through to
+        /// lush_pattern_match which handles them per glob spec.
+        /// Issue #96.
+        if (var_value) {
+            char *sep = NULL;
+            for (char *p = expanded_default; *p; p++) {
+                if (*p == '\\' && p[1] == '/') {
+                    p++;
+                    continue;
+                }
+                if (*p == '/') {
+                    sep = p;
+                    break;
+                }
+            }
+            bool global = (op_type == 15);
+            if (sep) {
+                size_t pattern_len = sep - expanded_default;
+                char *pattern = malloc(pattern_len + 1);
+                if (pattern) {
+                    /// Strip `\/` -> `/` in the extracted pattern
+                    /// so downstream matchers see the canonical
+                    /// literal slash. Other backslash sequences
+                    /// pass through.
+                    size_t pj = 0;
+                    for (size_t pi = 0; pi < pattern_len; pi++) {
+                        if (expanded_default[pi] == '\\' &&
+                            pi + 1 < pattern_len &&
+                            expanded_default[pi + 1] == '/') {
+                            pattern[pj++] = '/';
+                            pi++;
+                        } else {
+                            pattern[pj++] = expanded_default[pi];
+                        }
+                    }
+                    pattern[pj] = '\0';
+                    const char *replacement = sep + 1;
+                    result = pattern_substitute(var_value, pattern, replacement,
+                                                global);
+                    free(pattern);
+                } else {
+                    result = strdup(var_value);
+                }
+            } else {
+                /// No replacement, just remove pattern. Same `\/`
+                /// canonicalization as the pattern half.
+                size_t plen = strlen(expanded_default);
+                char *pattern = malloc(plen + 1);
+                if (pattern) {
+                    size_t pj = 0;
+                    for (size_t pi = 0; pi < plen; pi++) {
+                        if (expanded_default[pi] == '\\' && pi + 1 < plen &&
+                            expanded_default[pi + 1] == '/') {
+                            pattern[pj++] = '/';
+                            pi++;
+                        } else {
+                            pattern[pj++] = expanded_default[pi];
+                        }
+                    }
+                    pattern[pj] = '\0';
+                    result = pattern_substitute(var_value, pattern, "", global);
+                    free(pattern);
+                } else {
+                    result = strdup(var_value);
+                }
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 17: /// ${var@op} - transformations
+        if (expanded_default[0]) {
+            char op = expanded_default[0];
+            /// The @a (attribute query) variant only inspects the
+            /// variable's metadata and doesn't need var_value to
+            /// be set. Arrays specifically have NULL var_value
+            /// (scalar lookup misses them), so the prior
+            /// `if (var_value && ...)` guard hid the attribute
+            /// for `declare -A arr; echo "${arr@a}"`. Issue #102.
+            /// Other @op flavors do still need a value; for those
+            /// fall through to the empty-result path.
+            if (op == 'a') {
+                result = get_variable_attributes(var_name);
+                break;
+            }
+            if (!var_value) {
+                result = strdup("");
+                break;
+            }
+            switch (op) {
+            case 'Q': /// Quote value for reuse as input
+                result = transform_quote(var_value);
+                break;
+            case 'E': /// Expand escape sequences (ANSI-C, like $'...')
+                result = lush_expand_escapes(var_value, strlen(var_value),
+                                             LUSH_ESC_ANSI_C);
+                break;
+            case 'P': /// Expand as prompt string
+                result = transform_prompt(var_value);
+                break;
+            case 'A': /// Assignment statement form
+                result = transform_assignment(var_name, var_value);
+                break;
+            case 'U': /// Uppercase all
+                result = convert_case_all_upper(var_value);
+                break;
+            case 'u': /// Uppercase first
+                result = convert_case_first_upper(var_value);
+                break;
+            case 'L': /// Lowercase all
+                result = convert_case_all_lower(var_value);
+                break;
+            default:
+                result = strdup(var_value);
+                break;
+            }
+        } else {
+            result = strdup("");
+        }
+        break;
+
+    case 18: /// ${var:?word} - error if var unset or null (POSIX)
+        if (is_empty_or_null(var_value)) {
+            result = handle_required_param_error(executor, var_name,
+                                                 expanded_default,
+                                                 "parameter null or not set");
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+
+    case 19: /// ${var?word} - error if var unset (null permitted) (POSIX)
+        if (!var_value) {
+            result = handle_required_param_error(
+                executor, var_name, expanded_default, "parameter not set");
+        } else {
+            result = strdup(var_value);
+        }
+        break;
+    }
+    return result ? result : strdup("");
+}
+
+static int detect_param_operator_suffix(const char *suffix,
+                                        const char **rhs_out) {
+    int best = -1;
+    size_t best_len = 0;
+    for (int i = 0; param_operators[i]; i++) {
+        size_t ol = strlen(param_operators[i]);
+        if (ol > best_len && strncmp(suffix, param_operators[i], ol) == 0) {
+            best = i;
+            best_len = ol;
+        }
+    }
+    if (best >= 0 && rhs_out) {
+        *rhs_out = suffix + best_len;
+    }
+    return best;
 }
 
 /**
