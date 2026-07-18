@@ -52,6 +52,7 @@
 #include <glob.h>
 #include <limits.h>
 #include <math.h>
+#include <poll.h>
 #include <pwd.h>
 #include <regex.h>
 #include <signal.h>
@@ -16871,40 +16872,63 @@ static char *expand_command_substitution(executor_t *executor,
         }
 
         ssize_t bytes_read;
-        char buffer[256];
+        char buffer[4096];
 
-        /// Wait for the command substitution, retrying past incidental EINTR;
-        /// a hangup terminates the shell.
-        int status = 0;
-        executor_wait_foreground(pid, &status);
-
-        /// Propagate child's exit status to executor for $? access
-        if (WIFEXITED(status)) {
-            executor->exit_status = WEXITSTATUS(status);
-        } else if (WIFSIGNALED(status)) {
-            executor->exit_status = 128 + WTERMSIG(status);
-        }
-
-        /// A hangup terminated the subshell (exit_flag set by the foreground
-        /// wait). Do not drain the pipe: the substituted command runs as a
-        /// grandchild of the just-killed subshell wrapper, so its write end of
-        /// the pipe stays open and the read below would block until it exits on
-        /// its own. The shell is terminating and the captured value is unused,
-        /// so abandon the read and return promptly.
-        if (exit_flag) {
-            free(output);
-            close(pipefd[0]);
-            return strdup("");
-        }
-
-        /// Then read all available output
-        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-            if (output_len + bytes_read >= output_size) {
-                output_size *= 2;
+        /// Drain the capture pipe to EOF BEFORE reaping the child. Reaping
+        /// first deadlocks on large output: a child whose stdout exceeds the
+        /// kernel pipe buffer (~64KB) blocks in write() on the full pipe while
+        /// the parent blocks in wait() on that same child. poll() keeps the
+        /// drain responsive to a hangup -- exit_flag is raised by the SIGHUP
+        /// cascade -- so a mid-capture hangup abandons the read promptly rather
+        /// than blocking on a grandchild that still holds the write end.
+        bool abandoned = false;
+        for (;;) {
+            /// A hangup during capture: forward it to the substitution child so
+            /// it stops writing, record the hangup status, and abandon the
+            /// read. Draining before reaping means executor_wait_foreground --
+            /// which formerly raised exit_flag off this same flag -- has not
+            /// run yet, so poll the raw sighup flag here directly.
+            if (sighup_was_received()) {
+                kill(pid, SIGHUP);
+                set_exit_status(128 + SIGHUP);
+                exit_flag = true;
+            }
+            if (exit_flag) {
+                abandoned = true;
+                break;
+            }
+            /// 100ms timeout bounds how long a hangup can go unobserved.
+            struct pollfd pfd = {.fd = pipefd[0], .events = POLLIN};
+            int pr = poll(&pfd, 1, 100);
+            if (pr < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                break; /// unexpected poll failure; stop draining
+            }
+            if (pr == 0) {
+                continue; /// timeout; loop back to re-check exit_flag
+            }
+            bytes_read = read(pipefd[0], buffer, sizeof(buffer));
+            if (bytes_read < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                break; /// read error; stop draining
+            }
+            if (bytes_read == 0) {
+                break; /// EOF: every write end of the pipe is closed
+            }
+            /// Keep at least one spare byte for the terminating NUL below.
+            if (output_len + (size_t)bytes_read + 1 > output_size) {
+                while (output_len + (size_t)bytes_read + 1 > output_size) {
+                    output_size *= 2;
+                }
                 char *new_output = realloc(output, output_size);
                 if (!new_output) {
                     free(output);
                     close(pipefd[0]);
+                    executor_wait_foreground(pid, NULL);
                     return strdup("");
                 }
                 output = new_output;
@@ -16915,16 +16939,26 @@ static char *expand_command_substitution(executor_t *executor,
 
         close(pipefd[0]);
 
-        /// Null-terminate the output buffer before string operations
-        if (output_len >= output_size) {
-            char *new_output = realloc(output, output_size + 1);
-            if (new_output) {
-                output = new_output;
-            }
+        /// A hangup abandoned the capture: the shell is terminating and the
+        /// captured value is unused. Leave the orphaned child for the
+        /// terminating shell to reap rather than risk blocking on it here.
+        if (abandoned) {
+            free(output);
+            return strdup("");
         }
-        output[output_len] = '\0';
 
-        /// Null terminate and remove trailing newlines
+        /// The child has closed its write end (EOF above), so reaping it now
+        /// cannot block. Propagate its exit status for $?.
+        int status = 0;
+        executor_wait_foreground(pid, &status);
+        if (WIFEXITED(status)) {
+            executor->exit_status = WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            executor->exit_status = 128 + WTERMSIG(status);
+        }
+
+        /// The drain loop always keeps a spare byte for the terminator, so
+        /// null-terminate directly, then strip trailing newlines.
         output[output_len] = '\0';
         while (output_len > 0 && (output[output_len - 1] == '\n' ||
                                   output[output_len - 1] == '\r')) {
