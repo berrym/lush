@@ -3794,6 +3794,83 @@ TEST(rt_array_elem_alt_missing) {
     ASSERT_STDOUT_EQ(r, "[]\n");
 }
 
+/// The full parameter-operator engine applies to a single element, not
+/// only :- / :+ (issue #514). Prior behavior dropped every other
+/// operator and returned the raw element value.
+
+TEST(rt_array_elem_strip_prefix_longest) {
+    run_result_t r = run_shell(
+        "declare -A m; m[name]=HelloWorld; echo \"[${m[name]##He}]\"");
+    ASSERT_STDOUT_EQ(r, "[lloWorld]\n");
+}
+
+TEST(rt_array_elem_strip_suffix) {
+    run_result_t r = run_shell(
+        "declare -A m; m[name]=HelloWorld; echo \"[${m[name]%rld}]\"");
+    ASSERT_STDOUT_EQ(r, "[HelloWo]\n");
+}
+
+TEST(rt_array_elem_upper_all) {
+    run_result_t r =
+        run_shell("declare -A m; m[name]=HelloWorld; echo \"[${m[name]^^}]\"");
+    ASSERT_STDOUT_EQ(r, "[HELLOWORLD]\n");
+}
+
+TEST(rt_array_elem_lower_all) {
+    run_result_t r =
+        run_shell("declare -A m; m[name]=HelloWorld; echo \"[${m[name],,}]\"");
+    ASSERT_STDOUT_EQ(r, "[helloworld]\n");
+}
+
+TEST(rt_array_elem_replace_all) {
+    run_result_t r = run_shell(
+        "declare -A m; m[path]=a/b/c/d; echo \"[${m[path]//\\//.}]\"");
+    ASSERT_STDOUT_EQ(r, "[a.b.c.d]\n");
+}
+
+TEST(rt_array_elem_substring) {
+    run_result_t r = run_shell(
+        "declare -A m; m[name]=HelloWorld; echo \"[${m[name]:2:3}]\"");
+    ASSERT_STDOUT_EQ(r, "[llo]\n");
+}
+
+TEST(rt_array_elem_transform_quote) {
+    run_result_t r =
+        run_shell("declare -A m; m[name]=HelloWorld; echo \"[${m[name]@Q}]\"");
+    ASSERT_STDOUT_EQ(r, "['HelloWorld']\n");
+}
+
+TEST(rt_array_elem_indexed_upper) {
+    run_result_t r =
+        run_shell("arr=(alpha beta gamma); echo \"[${arr[1]^^}]\"");
+    ASSERT_STDOUT_EQ(r, "[BETA]\n");
+}
+
+TEST(rt_array_elem_assign_persists) {
+    /// ${m[new]:=fresh} both yields and PERSISTS to the element.
+    run_result_t r = run_shell("declare -A m; echo \"[${m[new]:=fresh}]\"; "
+                               "echo \"[${m[new]}]\"");
+    ASSERT_STDOUT_EQ(r, "[fresh]\n[fresh]\n");
+}
+
+TEST(rt_array_elem_assign_readonly_refused) {
+    /// := on a readonly array must NOT mutate it: the low-level element
+    /// setters bypass readonly enforcement, so the operator path guards it.
+    run_result_t r =
+        run_shell("declare -A m; readonly m; : \"${m[new]:=CHANGED}\""
+                  "; echo \"[${m[new]}]\"");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_array_elem_assign_zsh_index0_skipped) {
+    /// zsh 1-based mode: index 0 is invalid; ${arr[0]:=Z} must not clobber
+    /// physical index 0 (which is arr[1] there).
+    run_result_t r = run_shell("mode zsh\narr=(a b c)\n: \"${arr[0]:=Z}\"\n"
+                               "echo \"[${arr[1]}]\"\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n");
+}
+
 /// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
@@ -5391,6 +5468,17 @@ int main(void) {
     RUN_TEST(rt_array_elem_default_present);
     RUN_TEST(rt_array_elem_alt_present);
     RUN_TEST(rt_array_elem_alt_missing);
+    RUN_TEST(rt_array_elem_strip_prefix_longest);
+    RUN_TEST(rt_array_elem_strip_suffix);
+    RUN_TEST(rt_array_elem_upper_all);
+    RUN_TEST(rt_array_elem_lower_all);
+    RUN_TEST(rt_array_elem_replace_all);
+    RUN_TEST(rt_array_elem_substring);
+    RUN_TEST(rt_array_elem_transform_quote);
+    RUN_TEST(rt_array_elem_indexed_upper);
+    RUN_TEST(rt_array_elem_assign_persists);
+    RUN_TEST(rt_array_elem_assign_readonly_refused);
+    RUN_TEST(rt_array_elem_assign_zsh_index0_skipped);
 
     printf("\nRegression: POSIX character classes:\n");
     RUN_TEST(rt_char_class_space);
