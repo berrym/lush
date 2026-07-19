@@ -3948,6 +3948,71 @@ TEST(rt_nullword_in_function_body) {
     ASSERT_STDOUT_EQ(r, "r=0\n");
 }
 
+/// --- quoted "$*" / "${a[*]}" join on the first char of IFS (#518) ------
+/// A quoted star expansion is ONE word; the elements are joined by IFS[0].
+/// Unquoted $* / ${a[*]} and every @ form are unaffected.
+
+TEST(rt_star_join_is_one_word) {
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; set -- a b c; c \"$*\"");
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+}
+
+TEST(rt_star_join_default_ifs_space) {
+    run_result_t r = run_shell("c(){ echo \"[$1]\"; }; set -- a b c; c \"$*\"");
+    ASSERT_STDOUT_EQ(r, "[a b c]\n");
+}
+
+TEST(rt_star_join_custom_ifs) {
+    run_result_t r = run_shell("IFS=,; set -- a b c; v=\"$*\"; echo \"[$v]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[a,b,c]\n");
+}
+
+TEST(rt_star_join_empty_ifs_concatenates) {
+    run_result_t r = run_shell("IFS=; set -- a b c; v=\"$*\"; echo \"[$v]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[abc]\n");
+}
+
+TEST(rt_star_join_array_custom_ifs) {
+    run_result_t r = run_shell("IFS=,; a=(a b c); echo \"[${a[*]}]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[a,b,c]\n");
+}
+
+TEST(rt_star_join_braced_positional) {
+    run_result_t r = run_shell("IFS=,; set -- a b c; echo \"[${*}]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[a,b,c]\n");
+}
+
+TEST(rt_star_join_empty_is_one_word) {
+    /// A quoted empty "$*" (no positionals) stays one empty word.
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; set --; c \"$*\"");
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+}
+
+TEST(rt_star_at_still_explodes) {
+    /// Regression: "$@" keeps N separate words; IFS join is star-only.
+    run_result_t r =
+        run_shell("c(){ echo \"n=$#\"; }; IFS=,; set -- a b c; c \"$@\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "n=3\n");
+}
+
+TEST(rt_star_array_at_still_explodes) {
+    run_result_t r =
+        run_shell("c(){ echo \"n=$#\"; }; IFS=,; a=(a b c); c \"${a[@]}\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "n=3\n");
+}
+
+TEST(rt_star_unquoted_not_joined) {
+    /// Regression: unquoted $* keeps the no-split explode (lush curation).
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; set -- a b c; c $*");
+    ASSERT_STDOUT_EQ(r, "n=3\n");
+}
+
 /// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
@@ -5571,6 +5636,18 @@ int main(void) {
     RUN_TEST(rt_nullword_array_zero_elements);
     RUN_TEST(rt_nullword_array_mixed_kept);
     RUN_TEST(rt_nullword_in_function_body);
+
+    printf("\nRegression: quoted star IFS-join (#518):\n");
+    RUN_TEST(rt_star_join_is_one_word);
+    RUN_TEST(rt_star_join_default_ifs_space);
+    RUN_TEST(rt_star_join_custom_ifs);
+    RUN_TEST(rt_star_join_empty_ifs_concatenates);
+    RUN_TEST(rt_star_join_array_custom_ifs);
+    RUN_TEST(rt_star_join_braced_positional);
+    RUN_TEST(rt_star_join_empty_is_one_word);
+    RUN_TEST(rt_star_at_still_explodes);
+    RUN_TEST(rt_star_array_at_still_explodes);
+    RUN_TEST(rt_star_unquoted_not_joined);
 
     printf("\nRegression: POSIX character classes:\n");
     RUN_TEST(rt_char_class_space);
