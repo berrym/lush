@@ -4013,6 +4013,63 @@ TEST(rt_star_unquoted_not_joined) {
     ASSERT_STDOUT_EQ(r, "n=3\n");
 }
 
+/// --- positional vector in command position (#529) ---------------------
+/// A positional-parameter vector as the command name expands: first word is
+/// the command, the rest are arguments. A named array keeps the SEMANTICS
+/// section 3.9 type error.
+
+TEST(rt_cmdvec_positional_at_expands) {
+    run_result_t r = run_shell("set -- echo hi; \"$@\"");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_cmdvec_positional_at_unquoted_expands) {
+    run_result_t r = run_shell("set -- echo hi; $@");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_cmdvec_multiword_boundaries) {
+    run_result_t r = run_shell("set -- echo A B; \"$@\"");
+    ASSERT_STDOUT_EQ(r, "A B\n");
+}
+
+TEST(rt_cmdvec_braced_positional_expands) {
+    run_result_t r = run_shell("set -- echo hi; \"${@}\"");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_cmdvec_empty_at_is_null_command) {
+    /// Empty "$@" as a command is a null command: exit 0, not 127.
+    run_result_t r = run_shell("set --; \"$@\"; echo \"rc=$?\"");
+    ASSERT_STDOUT_EQ(r, "rc=0\n");
+}
+
+TEST(rt_cmdvec_star_joins_one_word) {
+    /// "$*" joins to a single command name ("echo hi") -> not found (127).
+    run_result_t r = run_shell("set -- echo hi; \"$*\"; echo \"rc=$?\"");
+    ASSERT_STDOUT_EQ(r, "rc=127\n");
+}
+
+TEST(rt_cmdvec_named_array_keeps_type_error) {
+    /// A named array as a command name keeps the SEMANTICS 3.9 type error
+    /// (does not vector-expand as a command); no "hi" is printed.
+    run_result_t r = run_shell("a=(echo hi); \"${a[@]}\"");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
+TEST(rt_cmdvec_flag_form_not_spread) {
+    /// A zsh parameter-flag vector form as a command name must NOT be
+    /// spread as a command (it is a named list, not a positional vector);
+    /// it joins to one word and is looked up whole, so no "hi" is printed.
+    run_result_t r = run_shell("a=(echo hi); \"${(v)a}\"");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
+TEST(rt_cmdvec_normal_command_unchanged) {
+    run_result_t r = run_shell("echo hi");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
 /// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
@@ -5648,6 +5705,17 @@ int main(void) {
     RUN_TEST(rt_star_at_still_explodes);
     RUN_TEST(rt_star_array_at_still_explodes);
     RUN_TEST(rt_star_unquoted_not_joined);
+
+    printf("\nRegression: positional vector in command position (#529):\n");
+    RUN_TEST(rt_cmdvec_positional_at_expands);
+    RUN_TEST(rt_cmdvec_positional_at_unquoted_expands);
+    RUN_TEST(rt_cmdvec_multiword_boundaries);
+    RUN_TEST(rt_cmdvec_braced_positional_expands);
+    RUN_TEST(rt_cmdvec_empty_at_is_null_command);
+    RUN_TEST(rt_cmdvec_star_joins_one_word);
+    RUN_TEST(rt_cmdvec_named_array_keeps_type_error);
+    RUN_TEST(rt_cmdvec_flag_form_not_spread);
+    RUN_TEST(rt_cmdvec_normal_command_unchanged);
 
     printf("\nRegression: POSIX character classes:\n");
     RUN_TEST(rt_char_class_space);

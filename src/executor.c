@@ -117,7 +117,8 @@ static int execute_command_list(executor_t *executor, node_t *list);
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc);
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
-                                  char ***out_vec, int *out_count);
+                                  char ***out_vec, int *out_count,
+                                  bool positional_only);
 
 /* Context for ${!prefix*} / ${!prefix@} name collection. Callback
  * appends every variable whose name starts with `prefix` into a
@@ -3907,7 +3908,8 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                     /// as one iteration. Issue #99.
                     char **vec = NULL;
                     int vcount = 0;
-                    if (try_expand_vector_arg(executor, word, &vec, &vcount)) {
+                    if (try_expand_vector_arg(executor, word, &vec, &vcount,
+                                              /*positional_only=*/false)) {
                         for (int v = 0; v < vcount; v++) {
                             expanded_words =
                                 realloc(expanded_words,
@@ -5346,7 +5348,8 @@ static char *join_strings_with_sep(char **items, int count, const char *sep) {
 }
 
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
-                                  char ***out_vec, int *out_count) {
+                                  char ***out_vec, int *out_count,
+                                  bool positional_only) {
     if (!node || !node->val.str) {
         return false;
     }
@@ -5456,7 +5459,14 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         /// s:SEP: (split scalar NAME on SEP -- returns a list of
         /// substrings). Builds the vector directly and short-circuits
         /// the rest of try_expand_vector_arg. Issue #104 + #188.
-        if (*p == '(') {
+        ///
+        /// A parameter-flag form is never a positional-parameter vector, so
+        /// a positional_only caller (the command NAME position) skips it:
+        /// falling through leaves name_len==0 (the leading `(`), which
+        /// returns false, routing a named list/map flag form in command
+        /// position to the SEMANTICS section 3.9 scalar-slot type error
+        /// instead of silently spreading it as a command (#529 review).
+        if (*p == '(' && !positional_only) {
             const char *flag_start = p + 1;
             const char *flag_end = flag_start;
             int paren_depth = 1;
@@ -5852,6 +5862,15 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     }
 
 braced_bare_array_ready:;
+    /// A positional-only caller (the command NAME position) accepts a
+    /// positional-parameter vector ($@ / $* / ${@} / ${*}) but declines a
+    /// named list/map vector (${arr[@]}, bare ${arr}), which must reach the
+    /// SEMANTICS section 3.9 scalar-slot type error instead of silently
+    /// vector-expanding as a command. Positionals are argv, not a lush
+    /// list-kind value.
+    if (positional_only && !is_positional) {
+        return false;
+    }
     /// Now produce the element vector.
     char **vec = NULL;
     int vcount = 0;
@@ -6321,15 +6340,45 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         child = child->next_sibling;
     }
 
-    /// Add command name (no glob expansion for command names). Null-word
-    /// removal applies: an unquoted empty name `$x` contributes zero words
-    /// (a null command, exit 0), while a quoted empty name `"$x"` / `''`
-    /// stays one empty word (command not found).
+    /// Add command name (no glob expansion for command names). A positional
+    /// vector in command position ($@ / "$@" / $* / "$*" / ${@} / ${*})
+    /// expands like any other word vector: the first element becomes the
+    /// command and the rest lead the arguments; an empty positional set
+    /// contributes zero words (a null command, handled below via the
+    /// argc==0 path). A named list/map (${arr[@]}, bare ${arr}) is NOT a
+    /// vector here -- try_expand_vector_arg declines it under
+    /// positional_only, so it falls to the scalar path and raises the
+    /// SEMANTICS section 3.9 type error, since positionals are argv but a
+    /// named list value in a scalar slot is a type mismatch. For a plain
+    /// scalar name, null-word removal still applies: an unquoted empty
+    /// `$x` contributes zero words (a null command), while a quoted empty
+    /// `"$x"` / `''` stays one empty word (command not found).
     if (command->val.str) {
-        char *expanded_cmd = expand_if_needed(executor, command->val.str);
-        if (!argv_append_word(&argv_list, &argv_count, &argv_capacity,
-                              expanded_cmd, command->name_quoted)) {
-            goto cleanup_and_fail;
+        node_t cmd_word = {0};
+        cmd_word.type =
+            command->name_quoted ? NODE_STRING_EXPANDABLE : NODE_VAR;
+        cmd_word.val.str = command->val.str;
+        char **cvec = NULL;
+        int cvcount = 0;
+        if (try_expand_vector_arg(executor, &cmd_word, &cvec, &cvcount,
+                                  /*positional_only=*/true)) {
+            for (int j = 0; j < cvcount; j++) {
+                if (!add_to_argv_list(&argv_list, &argv_count, &argv_capacity,
+                                      cvec[j])) {
+                    for (int k = j; k < cvcount; k++) {
+                        free(cvec[k]);
+                    }
+                    free(cvec);
+                    goto cleanup_and_fail;
+                }
+            }
+            free(cvec);
+        } else {
+            char *expanded_cmd = expand_if_needed(executor, command->val.str);
+            if (!argv_append_word(&argv_list, &argv_count, &argv_capacity,
+                                  expanded_cmd, command->name_quoted)) {
+                goto cleanup_and_fail;
+            }
         }
     }
 
@@ -6367,7 +6416,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                     /// survive (issue #97).
                     char **vec = NULL;
                     int vcount = 0;
-                    if (try_expand_vector_arg(executor, child, &vec, &vcount)) {
+                    if (try_expand_vector_arg(executor, child, &vec, &vcount,
+                                              /*positional_only=*/false)) {
                         for (int j = 0; j < vcount; j++) {
                             if (!add_to_argv_list(&argv_list, &argv_count,
                                                   &argv_capacity, vec[j])) {
@@ -20380,8 +20430,8 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                     if (!is_associative) {
                         char **vec = NULL;
                         int vcount = 0;
-                        if (try_expand_vector_arg(executor, elem, &vec,
-                                                  &vcount)) {
+                        if (try_expand_vector_arg(executor, elem, &vec, &vcount,
+                                                  /*positional_only=*/false)) {
                             for (int vi = 0; vi < vcount; vi++) {
                                 if (vec[vi]) {
                                     symtable_array_set_index(array, index,
