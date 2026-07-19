@@ -2044,6 +2044,13 @@ static node_t *parse_simple_command(parser_t *parser) {
     /// Set command name
     command->val.str = strdup(current->text);
     command->val_type = VAL_STR;
+    /// Record whether the command-name word carried a quoted segment, so
+    /// null-word removal can tell an unquoted empty name `$x` (drop -> null
+    /// command, exit 0) from a quoted empty name `"$x"` / `''` (keep one
+    /// empty word -> command not found). Arguments carry this in their own
+    /// node type; the command name's token type is otherwise discarded here.
+    command->name_quoted =
+        (current->type == TOK_STRING || current->type == TOK_EXPANDABLE_STRING);
     tokenizer_advance(parser->tokenizer);
 
     if (!parse_command_suffix(parser, command)) {

@@ -3871,6 +3871,83 @@ TEST(rt_array_elem_assign_zsh_index0_skipped) {
     ASSERT_STDOUT_EQ(r, "[a]\n");
 }
 
+/// --- POSIX null-word removal (#517): an unquoted expansion that yields
+/// the empty string contributes zero words; a quoted empty stays one word.
+
+TEST(rt_nullword_empty_command) {
+    /// An unquoted empty command name is a null command: exit 0, not 127.
+    run_result_t r = run_shell("x=\"\"; $x; echo \"done=$?\"");
+    ASSERT_STDOUT_EQ(r, "done=0\n");
+}
+
+TEST(rt_nullword_unset_command) {
+    run_result_t r = run_shell("unset q; $q; echo \"done=$?\"");
+    ASSERT_STDOUT_EQ(r, "done=0\n");
+}
+
+TEST(rt_nullword_quoted_empty_command_kept) {
+    /// A quoted empty command name stays one empty word: command not found.
+    run_result_t r = run_shell("x=\"\"; \"$x\"; echo \"done=$?\"");
+    ASSERT_STDOUT_EQ(r, "done=127\n");
+}
+
+TEST(rt_nullword_command_promotion) {
+    /// Dropping an empty command name promotes the first surviving word.
+    run_result_t r = run_shell("x=\"\"; $x echo hi");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+}
+
+TEST(rt_nullword_arg_removed) {
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; x=\"\"; c $x");
+    ASSERT_STDOUT_EQ(r, "n=0\n");
+}
+
+TEST(rt_nullword_quoted_arg_kept) {
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; x=\"\"; c \"$x\" $x");
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+}
+
+TEST(rt_nullword_partial_word_kept) {
+    /// A fused word is not empty, so it is kept: a${x}b -> ab.
+    run_result_t r = run_shell("c(){ echo \"n=$# [$1]\"; }; x=\"\"; c a${x}b");
+    ASSERT_STDOUT_EQ(r, "n=1 [ab]\n");
+}
+
+TEST(rt_nullword_no_split_curation_preserved) {
+    /// lush's no-word-split curation is unaffected: a non-empty value stays
+    /// one word even unquoted (the predicate keys on the empty string only).
+    run_result_t r = run_shell("c(){ echo \"n=$#\"; }; x=\"a b c\"; c $x");
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+}
+
+TEST(rt_nullword_for_zero_iterations) {
+    run_result_t r =
+        run_shell("x=\"\"; for i in $x; do echo hit; done; echo end");
+    ASSERT_STDOUT_EQ(r, "end\n");
+}
+
+TEST(rt_nullword_for_quoted_empty_one_iter) {
+    run_result_t r = run_shell("x=\"\"; for i in \"$x\"; do echo hit; done");
+    ASSERT_STDOUT_EQ(r, "hit\n");
+}
+
+TEST(rt_nullword_array_zero_elements) {
+    run_result_t r = run_shell("x=\"\"; arr=($x); echo \"${#arr[@]}\"");
+    ASSERT_STDOUT_EQ(r, "0\n");
+}
+
+TEST(rt_nullword_array_mixed_kept) {
+    run_result_t r = run_shell("arr=(\"\" b); echo \"${#arr[@]}\"");
+    ASSERT_STDOUT_EQ(r, "2\n");
+}
+
+TEST(rt_nullword_in_function_body) {
+    /// name_quoted must survive the function-body deep copy (#488 lesson):
+    /// an unquoted empty command inside a function is still a null command.
+    run_result_t r = run_shell("f(){ x=\"\"; $x; echo \"r=$?\"; }; f");
+    ASSERT_STDOUT_EQ(r, "r=0\n");
+}
+
 /// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
@@ -5479,6 +5556,21 @@ int main(void) {
     RUN_TEST(rt_array_elem_assign_persists);
     RUN_TEST(rt_array_elem_assign_readonly_refused);
     RUN_TEST(rt_array_elem_assign_zsh_index0_skipped);
+
+    printf("\nRegression: POSIX null-word removal (#517):\n");
+    RUN_TEST(rt_nullword_empty_command);
+    RUN_TEST(rt_nullword_unset_command);
+    RUN_TEST(rt_nullword_quoted_empty_command_kept);
+    RUN_TEST(rt_nullword_command_promotion);
+    RUN_TEST(rt_nullword_arg_removed);
+    RUN_TEST(rt_nullword_quoted_arg_kept);
+    RUN_TEST(rt_nullword_partial_word_kept);
+    RUN_TEST(rt_nullword_no_split_curation_preserved);
+    RUN_TEST(rt_nullword_for_zero_iterations);
+    RUN_TEST(rt_nullword_for_quoted_empty_one_iter);
+    RUN_TEST(rt_nullword_array_zero_elements);
+    RUN_TEST(rt_nullword_array_mixed_kept);
+    RUN_TEST(rt_nullword_in_function_body);
 
     printf("\nRegression: POSIX character classes:\n");
     RUN_TEST(rt_char_class_space);
