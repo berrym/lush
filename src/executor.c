@@ -2185,8 +2185,26 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
     /// Build argument vector (excluding redirection nodes)
     int argc;
     char **argv = build_argv_from_ast(executor, command, &argc);
-    if (!argv || argc == 0) {
-        return 1;
+    if (!argv) {
+        return 1; /// allocation/expansion failure
+    }
+    if (argc == 0) {
+        /// Null command: every word was removed by null-word removal (an
+        /// unquoted empty expansion, e.g. `$x` with x=""). POSIX performs
+        /// any redirections, then the command succeeds with status 0.
+        free(argv);
+        if (has_redirections) {
+            redirection_state_t rs;
+            save_file_descriptors(&rs);
+            if (setup_redirections(executor, command) != 0) {
+                restore_file_descriptors(&rs);
+                set_exit_status(1);
+                return 1;
+            }
+            restore_file_descriptors(&rs);
+        }
+        set_exit_status(0);
+        return 0;
     }
 
     /// Parser-internal array-literal sentinel (\x1F) housekeeping:
@@ -4024,6 +4042,15 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                 free(
                                     fields); /// strings moved to expanded_words
                                 free(expanded);
+                            } else if (expanded[0] == '\0' &&
+                                       word->type != NODE_STRING_LITERAL &&
+                                       word->type != NODE_STRING_EXPANDABLE) {
+                                /// Null-word removal: an unquoted expansion
+                                /// that produced the empty string contributes
+                                /// zero iteration words (`for i in $x` with
+                                /// x="" runs zero iterations). A quoted empty
+                                /// "" stays one word via the branch below.
+                                free(expanded);
                             } else {
                                 /// Not split: keep the whole expansion as a
                                 /// single field, so a quoted empty "" yields
@@ -4503,8 +4530,13 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                     bool is_quoted = (word->type == NODE_STRING_LITERAL ||
                                       word->type == NODE_STRING_EXPANDABLE);
 
-                    if (is_quoted ||
-                        !shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
+                    if (!is_quoted && expanded[0] == '\0') {
+                        /// Null-word removal: an unquoted expansion that
+                        /// produced the empty string contributes zero menu
+                        /// items (a quoted empty "" stays one item below).
+                        free(expanded);
+                    } else if (is_quoted ||
+                               !shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
                         /// Quoted strings or no-word-split mode: keep as single
                         /// item
                         menu_items = realloc(menu_items,
@@ -6165,6 +6197,36 @@ static char *expand_array_unsubscripted(executor_t *executor,
     return strdup("");
 }
 
+/// Append a finished, fully-expanded scalar word to an argv-style list,
+/// applying POSIX null-word removal: an unquoted expansion that produced the
+/// empty string contributes ZERO words (so `$x` with x="" is a null command
+/// or contributes no argument), while a quoted empty (`"$x"`, `''`) stays one
+/// empty word. The predicate keys strictly on the empty string, never on
+/// whitespace, so lush's no-word-split curation (`x="a b c"; cmd $x` -> one
+/// word) is preserved. Takes ownership of `word`: it is freed whether the
+/// word is added or dropped. Returns false only on allocation failure (word
+/// already freed).
+static bool argv_append_word(char ***list, int *count, int *capacity,
+                             char *word, bool quoted) {
+    if (word && word[0] == '\0' && !quoted) {
+        free(word); /// null-word removal: contributes zero words
+        return true;
+    }
+    if (!add_to_argv_list(list, count, capacity, word)) {
+        free(word);
+        return false;
+    }
+    return true;
+}
+
+/// True when a word node carries a quoted segment (so an empty expansion must
+/// stay one empty word rather than be null-removed). NODE_VAR /
+/// NODE_COMMAND_SUB / NODE_ARITH_EXP are wholly-unquoted expansions.
+static inline bool word_node_is_quoted(const node_t *node) {
+    return node && (node->type == NODE_STRING_LITERAL ||
+                    node->type == NODE_STRING_EXPANDABLE);
+}
+
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc) {
     if (!executor || !command || !argc) {
@@ -6192,12 +6254,14 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         child = child->next_sibling;
     }
 
-    /// Add command name (no glob expansion for command names)
+    /// Add command name (no glob expansion for command names). Null-word
+    /// removal applies: an unquoted empty name `$x` contributes zero words
+    /// (a null command, exit 0), while a quoted empty name `"$x"` / `''`
+    /// stays one empty word (command not found).
     if (command->val.str) {
         char *expanded_cmd = expand_if_needed(executor, command->val.str);
-        if (!add_to_argv_list(&argv_list, &argv_count, &argv_capacity,
-                              expanded_cmd)) {
-            free(expanded_cmd);
+        if (!argv_append_word(&argv_list, &argv_count, &argv_capacity,
+                              expanded_cmd, command->name_quoted)) {
             goto cleanup_and_fail;
         }
     }
@@ -6583,29 +6647,28 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                     free(expanded_arg);
                                 } else {
                                     /// Field splitting failed, use original
-                                    if (!add_to_argv_list(
+                                    if (!argv_append_word(
                                             &argv_list, &argv_count,
-                                            &argv_capacity, expanded_arg)) {
-                                        free(expanded_arg);
+                                            &argv_capacity, expanded_arg,
+                                            word_node_is_quoted(child))) {
                                         goto cleanup_and_fail;
                                     }
                                 }
                             } else {
                                 /// No field splitting needed
                                 free(ifs_owned);
-                                if (!add_to_argv_list(&argv_list, &argv_count,
-                                                      &argv_capacity,
-                                                      expanded_arg)) {
-                                    free(expanded_arg);
+                                if (!argv_append_word(
+                                        &argv_list, &argv_count, &argv_capacity,
+                                        expanded_arg,
+                                        word_node_is_quoted(child))) {
                                     goto cleanup_and_fail;
                                 }
                             }
                         } else {
                             /// No field splitting for non-variables
-                            if (!add_to_argv_list(&argv_list, &argv_count,
-                                                  &argv_capacity,
-                                                  expanded_arg)) {
-                                free(expanded_arg);
+                            if (!argv_append_word(&argv_list, &argv_count,
+                                                  &argv_capacity, expanded_arg,
+                                                  word_node_is_quoted(child))) {
                                 goto cleanup_and_fail;
                             }
                         }
@@ -6617,9 +6680,22 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     }
 
     if (argv_count == 0) {
-        *argc = 0;
+        /// Legitimate null command: every word was removed by null-word
+        /// removal (an unquoted empty expansion contributes zero words).
+        /// Return a valid empty argv (argv[0] == NULL, *argc == 0) so the
+        /// caller can distinguish this from the failure path, which returns
+        /// NULL.
         free(argv_list);
-        goto cleanup_delimiters;
+        char **empty_argv = malloc(sizeof(char *));
+        if (!empty_argv) {
+            goto cleanup_delimiters;
+        }
+        empty_argv[0] = NULL;
+        *argc = 0;
+        for (int k = 0; k < delimiter_count; k++) {
+            free(heredoc_delimiters[k]);
+        }
+        return empty_argv;
     }
 
     /// Convert to final argv array
@@ -11155,6 +11231,7 @@ node_t *copy_ast_node(node_t *node) {
     }
 
     copy->glob_qualified = node->glob_qualified;
+    copy->name_quoted = node->name_quoted;
 
     /// The assignment-tilde provenance value must survive a deep copy (a
     /// function body is copied at definition time); otherwise a mixed-quote
@@ -17142,6 +17219,7 @@ static node_t *copy_node_simple(node_t *original) {
     }
 
     copy->glob_qualified = original->glob_qualified;
+    copy->name_quoted = original->name_quoted;
 
     /// Preserve the assignment-tilde provenance across the copy (#488), as
     /// copy_ast_node does -- a function body reaches here too.
@@ -20447,13 +20525,19 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                 }
                                 free(fields);
                             } else {
-                                /// Empty / NULL field set: store as-is so we
-                                /// don't silently drop the value on OOM or
-                                /// degenerate input.
                                 free(fields);
-                                symtable_array_set_index(array, index,
-                                                         final_value);
-                                index++;
+                                /// Null-word removal: an unquoted element that
+                                /// expanded to the empty string contributes
+                                /// zero array elements (`arr=($x)` with x=""
+                                /// yields an empty array). A non-empty but
+                                /// unsplittable value (whitespace-only, or a
+                                /// split-OOM fallback) is still stored so it
+                                /// is not silently dropped.
+                                if (final_value[0] != '\0') {
+                                    symtable_array_set_index(array, index,
+                                                             final_value);
+                                    index++;
+                                }
                             }
                         } else {
                             symtable_array_set_index(array, index, final_value);

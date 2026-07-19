@@ -159,6 +159,15 @@ typedef struct node {
     /// expanded value with the qualifier even though it came from quotes.
     bool glob_qualified;
 
+    /// For a NODE_COMMAND: the command-name word carried a quoted segment
+    /// (`"$x"`, `''`, `x"y"`). Set from the command word's token type at
+    /// parse time. Null-word removal keys on it: an unquoted command name
+    /// that expands empty (`$x`) contributes zero words (a null command,
+    /// exit 0), while a quoted empty name (`"$x"`) stays one empty word
+    /// (command not found). The argument words carry the same distinction
+    /// in their own node->type, so this bit only fills the gap for argv[0].
+    bool name_quoted;
+
     /// For an assignment-shaped word with a quoted segment (`E=~/a:"~/b"`), the
     /// same word with fine-grained quote provenance the assignment RHS carries:
     /// a double-quoted `~` escaped as `\~`, single-quoted spans re-wrapped

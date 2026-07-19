@@ -238,12 +238,35 @@ are different operations, and only one is a silent engine coercion:
   triggered by nothing visible. The engine forbids it.
 - word splitting is triggered by a *visible* syntactic choice (leaving
   an expansion unquoted) and is already a curated preset --
-  `FEATURE_WORD_SPLIT_DEFAULT`, on in POSIX/bash modes, off in zsh
-  mode.
+  `FEATURE_WORD_SPLIT_DEFAULT`, on in POSIX/bash modes, off in zsh mode
+  **and in the lush default profile**.
 
 The asymmetry is principled: one is the engine silently lying; the
 other is a configurable, syntactically-requested expansion. Word
 splitting stays exactly as it is, governed by the feature matrix.
+
+**Curation.** bash and dash split an unquoted non-empty expansion on
+`IFS`; zsh does not. lush curates the zsh behavior as its default, so
+`x="a b c"; cmd $x` passes **one** argument (`a b c`), not three. This
+is a documented divergence from bash/dash, reachable in the other
+direction via `set -o posix` / `mode bash` (or `setopt sh_word_split`),
+which turn `FEATURE_WORD_SPLIT_DEFAULT` on.
+
+**Null-word removal is a separate operation and is always on.** Word
+splitting turns a *non-empty* value into several words; null-word
+removal turns an *empty* one into *none*. An unquoted expansion that
+produces the empty string contributes **zero** words: `$x` with `x=""`
+is a null command (exit 0, no "command not found"), and `cmd $x` passes
+no argument. A **quoted** empty (`"$x"`, `''`) stays **one** empty word.
+Unlike word splitting this is bash/zsh/dash consensus (POSIX
+§2.6.5 field splitting removes a wholly-empty unquoted field), so it is
+the lush default in every profile, independent of
+`FEATURE_WORD_SPLIT_DEFAULT`. The removal keys on the empty string
+alone, never on whitespace -- so a whitespace-only value under the
+no-split default stays one word (matching zsh), rather than collapsing
+to zero (bash/dash). This rule applies uniformly in every
+word-collecting position: the command name, command arguments, `for`
+and `select` word lists, and array literals.
 
 ### 3.9 List and map values meeting a position
 
