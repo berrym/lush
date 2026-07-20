@@ -4070,6 +4070,56 @@ TEST(rt_cmdvec_normal_command_unchanged) {
     ASSERT_STDOUT_EQ(r, "hi\n");
 }
 
+/// --- scalar "$@" and keys join on the first char of IFS ---------------
+/// The scalar $@ join and the *-keys join use IFS[0] (matching zsh/dash);
+/// the @-keys form in a scalar slot is a type error (SEMANTICS 3.9).
+
+TEST(rt_at_scalar_join_custom_ifs) {
+    run_result_t r = run_shell("IFS=,; set -- x y z; v=\"$@\"; echo \"[$v]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[x,y,z]\n");
+}
+
+TEST(rt_at_scalar_join_empty_ifs) {
+    run_result_t r = run_shell("IFS=; set -- x y z; v=\"$@\"; echo \"[$v]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[xyz]\n");
+}
+
+TEST(rt_at_scalar_join_default_ifs) {
+    run_result_t r =
+        run_shell("unset IFS; set -- x y z; v=\"$@\"; echo \"[$v]\"");
+    ASSERT_STDOUT_EQ(r, "[x y z]\n");
+}
+
+TEST(rt_at_scalar_join_function_scope) {
+    run_result_t r =
+        run_shell("f(){ v=\"$@\"; echo \"[$v]\"; }; IFS=,; f x y z");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[x,y,z]\n");
+}
+
+TEST(rt_keys_star_join_custom_ifs) {
+    run_result_t r = run_shell("IFS=,; a=(x y z); echo \"[${!a[*]}]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[0,1,2]\n");
+}
+
+TEST(rt_keys_at_scalar_slot_type_error) {
+    /// @-keys in a scalar slot is a list value in a scalar position: a type
+    /// error (SEMANTICS 3.9), not a join; no keys are printed.
+    run_result_t r = run_shell("a=(x y z); echo \"[${!a[@]}]\"");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
+TEST(rt_keys_at_whole_word_explodes) {
+    /// Regression: whole-word "${!a[@]}" still explodes the keys as a
+    /// vector (unchanged; handled by the vector path).
+    run_result_t r =
+        run_shell("a=(x y z); c(){ echo \"n=$#\"; }; c \"${!a[@]}\"");
+    ASSERT_STDOUT_EQ(r, "n=3\n");
+}
+
 /// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
@@ -5716,6 +5766,15 @@ int main(void) {
     RUN_TEST(rt_cmdvec_named_array_keeps_type_error);
     RUN_TEST(rt_cmdvec_flag_form_not_spread);
     RUN_TEST(rt_cmdvec_normal_command_unchanged);
+
+    printf("\nRegression: scalar $@ / keys join on IFS[0] (#518 tail):\n");
+    RUN_TEST(rt_at_scalar_join_custom_ifs);
+    RUN_TEST(rt_at_scalar_join_empty_ifs);
+    RUN_TEST(rt_at_scalar_join_default_ifs);
+    RUN_TEST(rt_at_scalar_join_function_scope);
+    RUN_TEST(rt_keys_star_join_custom_ifs);
+    RUN_TEST(rt_keys_at_scalar_slot_type_error);
+    RUN_TEST(rt_keys_at_whole_word_explodes);
 
     printf("\nRegression: POSIX character classes:\n");
     RUN_TEST(rt_char_class_space);

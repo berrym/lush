@@ -6265,7 +6265,7 @@ static char *expand_array_unsubscripted(executor_t *executor,
     if (err) {
         shell_error_set_suggestion(
             err, "join the list explicitly to place it in a string position -- "
-                 "${name[*]} for space-joining, or an explicit join.");
+                 "${name[*]} for IFS-joining, or an explicit join.");
         shell_error_display(err, stderr, isatty(STDERR_FILENO));
         shell_error_free(err);
         if (executor) {
@@ -14276,30 +14276,57 @@ static char *parse_parameter_expansion(executor_t *executor,
             arr_name[arr_name_len] = '\0';
 
             array_value_t *array = symtable_get_array(arr_name);
+
+            if (array && bracket[1] == '@') {
+                /// ${!arr[@]} reaching this general parameter-expansion
+                /// fallthrough sits in a SCALAR-REQUIRING context (the
+                /// vector-accepting positions are handled earlier by
+                /// try_expand_vector_arg). The keys of a list or map are
+                /// themselves a list, so per SEMANTICS.md section 3.9 the @
+                /// keys form in a scalar slot is a type mismatch, exactly
+                /// as ${arr[@]} is. ${!arr[*]} joins on IFS instead.
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                    executor_current_loc(executor),
+                    "type mismatch: list value ${!%s[@]} in a scalar "
+                    "position",
+                    arr_name);
+                if (err) {
+                    shell_error_set_suggestion(
+                        err, "join the keys explicitly -- use ${!name[*]} for "
+                             "IFS-joining, or iterate ${!name[@]} as a "
+                             "vector.");
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                    executor->has_error = true;
+                } else {
+                    executor_error_report(executor, SHELL_ERR_TYPE_MISMATCH,
+                                          executor_current_loc(executor),
+                                          "type mismatch: list value "
+                                          "${!%s[@]} in a scalar position",
+                                          arr_name);
+                }
+                executor_request_posix_exit(executor, 1);
+                free(arr_name);
+                return strdup("");
+            }
             free(arr_name);
 
             if (array) {
-                /// Return array indices as space-separated string
+                /// ${!arr[*]} - array keys joined on the first char of IFS.
                 size_t count;
                 char **keys = symtable_array_get_keys(array, &count);
                 if (keys && count > 0) {
-                    size_t result_size = count * 12; /// Enough for integers
-                    char *result = malloc(result_size);
-                    if (result) {
-                        result[0] = '\0';
-                        for (size_t i = 0; i < count; i++) {
-                            if (i > 0)
-                                strcat(result, " ");
-                            strcat(result, keys[i]);
-                            free(keys[i]);
-                        }
-                        free(keys);
-                        return result;
-                    }
-                    for (size_t i = 0; i < count; i++)
+                    char sep[2];
+                    ifs_join_separator(executor, sep);
+                    char *result = join_strings_with_sep(keys, (int)count, sep);
+                    for (size_t i = 0; i < count; i++) {
                         free(keys[i]);
+                    }
                     free(keys);
+                    return result ? result : strdup("");
                 }
+                free(keys);
             }
             return strdup("");
         }
@@ -14698,7 +14725,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             shell_error_set_suggestion(
                                 err,
                                 "join the values explicitly -- use ${name[*]} "
-                                "for space-joining, or build a scalar from "
+                                "for IFS-joining, or build a scalar from "
                                 "the elements with an explicit join.");
                             shell_error_display(err, stderr,
                                                 isatty(STDERR_FILENO));
@@ -15699,33 +15726,15 @@ static char *parse_parameter_expansion(executor_t *executor,
             return result ? result : strdup("");
         }
 
-        case '@': /// $@ in a scalar context -- joined on a space (the $@
-                  /// scalar separator is a separate curation item; the
-                  /// whole-word "$@" vector form is handled earlier).
-            if (shell_argc > 1) {
-                size_t total_len = 0;
-                for (int i = 1; i < shell_argc; i++) {
-                    if (shell_argv[i]) {
-                        total_len += strlen(shell_argv[i]) + 1; /// +1 for space
-                    }
-                }
-                if (total_len > 0) {
-                    char *result = malloc(total_len);
-                    if (result) {
-                        result[0] = '\0';
-                        for (int i = 1; i < shell_argc; i++) {
-                            if (shell_argv[i]) {
-                                if (i > 1) {
-                                    strcat(result, " ");
-                                }
-                                strcat(result, shell_argv[i]);
-                            }
-                        }
-                        return result;
-                    }
-                }
-            }
-            return strdup("");
+        case '@': { /// $@ in a scalar context -- joined on the first char of
+                    /// IFS (zsh/dash majority; the whole-word "$@" vector
+                    /// form is handled earlier).
+            char sep[2];
+            ifs_join_separator(executor, sep);
+            char *result = join_strings_with_sep(
+                shell_argv + 1, shell_argc > 1 ? shell_argc - 1 : 0, sep);
+            return result ? result : strdup("");
+        }
 
         default:
             if (expansion[0] >= '0' && expansion[0] <= '9') {
@@ -16456,90 +16465,50 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         return result ? result : strdup("");
                     }
 
-                    case '@': /// All positional parameters as separate words
-                    {
-                        /// Check if we're in function scope - try to get $#
-                        /// from local scope
+                    case '@': { /// ${@} in a scalar context -- joined on the
+                                /// first char of IFS (the whole-word "${@}"
+                                /// vector form is handled earlier).
+                        char sep[2];
+                        ifs_join_separator(executor, sep);
+                        char *result = NULL;
                         char *func_argc_str =
                             symtable_get_var(executor->symtable, "#");
                         if (func_argc_str && executor->symtable) {
-                            /// We're in a function scope - use function
-                            /// parameters
+                            /// Function scope: local positional parameters.
                             int func_argc = atoi(func_argc_str);
-                            if (func_argc > 0) {
-                                size_t total_len = 0;
-                                /// Calculate total length needed
-                                for (int i = 1; i <= func_argc; i++) {
-                                    char param_name[16];
-                                    snprintf(param_name, sizeof(param_name),
-                                             "%d", i);
-                                    char *param_value = symtable_get_var(
-                                        executor->symtable, param_name);
-                                    if (param_value) {
-                                        total_len += strlen(param_value) +
-                                                     1; /// +1 for space
+                            char **items = NULL;
+                            int n = 0;
+                            for (int i = 1; i <= func_argc; i++) {
+                                char param_name[16];
+                                snprintf(param_name, sizeof(param_name), "%d",
+                                         i);
+                                char *v = symtable_get_var(executor->symtable,
+                                                           param_name);
+                                if (v) {
+                                    char **grown = realloc(
+                                        items, (n + 1) * sizeof(char *));
+                                    if (!grown) {
+                                        free(v);
+                                        break;
                                     }
-                                }
-                                if (total_len > 0) {
-                                    char *result = malloc(total_len);
-                                    if (result) {
-                                        result[0] = '\0';
-                                        for (int i = 1; i <= func_argc; i++) {
-                                            char param_name[16];
-                                            snprintf(param_name,
-                                                     sizeof(param_name), "%d",
-                                                     i);
-                                            char *param_value =
-                                                symtable_get_var(
-                                                    executor->symtable,
-                                                    param_name);
-                                            if (param_value) {
-                                                if (i > 1) {
-                                                    strcat(result, " ");
-                                                }
-                                                strcat(result, param_value);
-                                            }
-                                        }
-                                        free(name);
-                                        return result;
-                                    }
+                                    items = grown;
+                                    items[n++] = v;
                                 }
                             }
-                            free(name);
-                            return strdup("");
+                            result = join_strings_with_sep(items, n, sep);
+                            for (int i = 0; i < n; i++) {
+                                free(items[i]);
+                            }
+                            free(items);
                         } else {
-                            /// Use global shell parameters
-                            /// Note: This should ideally preserve word
-                            /// boundaries, but for now we'll implement it
-                            /// similarly to $* for compatibility
-                            if (shell_argc > 1) {
-                                size_t total_len = 0;
-                                for (int i = 1; i < shell_argc; i++) {
-                                    if (shell_argv[i]) {
-                                        total_len += strlen(shell_argv[i]) +
-                                                     1; /// +1 for space
-                                    }
-                                }
-                                if (total_len > 0) {
-                                    char *result = malloc(total_len);
-                                    if (result) {
-                                        result[0] = '\0';
-                                        for (int i = 1; i < shell_argc; i++) {
-                                            if (shell_argv[i]) {
-                                                if (i > 1) {
-                                                    strcat(result, " ");
-                                                }
-                                                strcat(result, shell_argv[i]);
-                                            }
-                                        }
-                                        free(name);
-                                        return result;
-                                    }
-                                }
-                            }
-                            free(name);
-                            return strdup("");
+                            /// Global positional parameters.
+                            result = join_strings_with_sep(
+                                shell_argv + 1,
+                                shell_argc > 1 ? shell_argc - 1 : 0, sep);
                         }
+                        free(func_argc_str);
+                        free(name);
+                        return result ? result : strdup("");
                     }
 
                     case '-': { /// Current option flags
