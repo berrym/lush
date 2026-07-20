@@ -5898,12 +5898,17 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
 
 braced_bare_array_ready:;
     /// A positional-only caller (the command NAME position) accepts a
-    /// positional-parameter vector ($@ / $* / ${@} / ${*}) but declines a
-    /// named list/map vector (${arr[@]}, bare ${arr}), which must reach the
-    /// SEMANTICS section 3.9 scalar-slot type error instead of silently
-    /// vector-expanding as a command. Positionals are argv, not a lush
-    /// list-kind value.
-    if (positional_only && !is_positional) {
+    /// positional-parameter vector ($@ / $* / ${@} / ${*}) but, under strict
+    /// value typing (lush default), declines a named list/map vector
+    /// (${arr[@]}, bare ${arr}), which must reach the SEMANTICS section 3.9
+    /// scalar-slot type error instead of silently vector-expanding as a
+    /// command. Positionals are argv, not a lush list-kind value. Under a
+    /// relaxed compat mode the boundary policy follows the oracle: bash and
+    /// zsh spread a named array in command position, so the vector is allowed
+    /// through (bash routes bare ${arr} to element 0 earlier, at the
+    /// braced-bare mode check above; zsh spreads it, matching the oracle).
+    if (positional_only && !is_positional &&
+        shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
         return false;
     }
     /// Now produce the element vector.
@@ -6389,12 +6394,14 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     /// expands like any other word vector: the first element becomes the
     /// command and the rest lead the arguments; an empty positional set
     /// contributes zero words (a null command, handled below via the
-    /// argc==0 path). A named list/map (${arr[@]}, bare ${arr}) is NOT a
-    /// vector here -- try_expand_vector_arg declines it under
-    /// positional_only, so it falls to the scalar path and raises the
-    /// SEMANTICS section 3.9 type error, since positionals are argv but a
-    /// named list value in a scalar slot is a type mismatch. For a plain
-    /// scalar name, null-word removal still applies: an unquoted empty
+    /// argc==0 path). A named list/map (${arr[@]}, bare ${arr}) is
+    /// mode-dependent: under strict value typing (lush mode)
+    /// try_expand_vector_arg declines it under positional_only, so it falls
+    /// to the scalar path and raises the SEMANTICS section 3.9 type error
+    /// (positionals are argv, but a named list value in a scalar slot is a
+    /// type mismatch); under a relaxed compat mode the vector is allowed
+    /// through and spreads into command words, matching the oracle. For a
+    /// plain scalar name, null-word removal still applies: an unquoted empty
     /// `$x` contributes zero words (a null command), while a quoted empty
     /// `"$x"` / `''` stays one empty word (command not found).
     if (command->val.str) {

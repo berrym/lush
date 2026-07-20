@@ -1425,6 +1425,132 @@ TEST(gate_lush_mode_still_strict_after_gating) {
 }
 
 /* ============================================================================
+ * SEMANTICS section 3.9 mode gating -- named list/map in COMMAND position
+ *
+ * Under strict value typing (lush mode) a named array/map used as the
+ * command word is a scalar-slot type error (positionals are argv, a named
+ * list is not). The compat modes relax it to the oracle: bash and zsh
+ * spread `${arr[@]}` into command words; bash reads a bare `${arr}` as
+ * element 0 while zsh spreads it. Uses run_shell_mode_gated so the arrays
+ * parse under lush and no mode/IFS leaks into later tests.
+ * ============================================================================
+ */
+
+TEST(gate_bash_mode_array_at_command_position_spreads) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// `${cmd[@]}` in command position runs `echo hi there` -> "hi there".
+    run_result_t r = run_shell_mode_gated(
+        exec, "cmd=(echo hi there)\nmode bash\n${cmd[@]}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "hi there");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_array_command_with_trailing_args) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The spread command word composes with literal arguments that follow.
+    run_result_t r = run_shell_mode_gated(
+        exec, "cmd=(echo one)\nmode bash\n${cmd[@]} two three\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "one two three");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_bare_array_command_is_element_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Bare ${cmd} in command position: bash reads element 0, so the
+    /// command word is `echo` and it runs with no arguments.
+    run_result_t r = run_shell_mode_gated(
+        exec, "cmd=(echo hi there)\nmode bash\n${cmd} && echo ran_elem0\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "ran_elem0");
+    /// element 0 is `echo`; running it with no args prints only a newline,
+    /// never the later elements.
+    ASSERT_TRUE(strstr(r.out, "hi there") == NULL,
+                "bare array is element 0, not the spread");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_bare_array_command_spreads) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// zsh spreads a bare array in command position (not element 0).
+    run_result_t r =
+        run_shell_mode_gated(exec, "cmd=(echo hi there)\nmode zsh\n${cmd}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "hi there");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_map_at_command_position_spreads_values) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A map in command position contributes its values (insertion order);
+    /// `${m[@]}` here is `echo hi`, which runs.
+    run_result_t r = run_shell_mode_gated(
+        exec, "declare -A m\nm[k]=echo\nm[j]=hi\nmode bash\n${m[@]}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "hi");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 for map command in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_empty_array_command_is_null_command) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// An empty array in command position is a null command (exit 0), the
+    /// same as an empty "$@", not a type error or a command-not-found.
+    run_result_t r =
+        run_shell_mode_gated(exec, "e=()\nmode bash\n${e[@]}\necho rc=$?\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "rc=0");
+    ASSERT_TRUE(strstr(r.err, "not found") == NULL,
+                "empty array command is a null command");
+
+    executor_free(exec);
+}
+
+TEST(gate_lush_mode_array_command_still_strict) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Regression: lush mode still rejects a named array in command
+    /// position with the E1134 type error.
+    run_result_t r =
+        run_shell_mode_gated(exec, "cmd=(echo hi)\n${cmd[@]}\necho saw_post\n");
+
+    ASSERT_TRUE(strstr(r.out, "saw_post") == NULL,
+                "lush mode aborts before the next command");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit in lush mode");
+
+    executor_free(exec);
+}
+
+/* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
  */
@@ -5629,6 +5755,16 @@ int main(void) {
     RUN_TEST(gate_posix_mode_arr_at_scalar_flattens_like_bash);
     RUN_TEST(gate_arr_star_scalar_joins_on_ifs_every_mode);
     RUN_TEST(gate_lush_mode_still_strict_after_gating);
+
+    printf(
+        "\nSEMANTICS 3.9 mode-gating: named array/map in command position:\n");
+    RUN_TEST(gate_bash_mode_array_at_command_position_spreads);
+    RUN_TEST(gate_bash_mode_array_command_with_trailing_args);
+    RUN_TEST(gate_bash_mode_bare_array_command_is_element_zero);
+    RUN_TEST(gate_zsh_mode_bare_array_command_spreads);
+    RUN_TEST(gate_bash_mode_map_at_command_position_spreads_values);
+    RUN_TEST(gate_bash_mode_empty_array_command_is_null_command);
+    RUN_TEST(gate_lush_mode_array_command_still_strict);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);
