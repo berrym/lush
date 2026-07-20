@@ -1829,6 +1829,107 @@ TEST(gate_lush_mode_readonly_array_still_strict) {
 }
 
 /* ============================================================================
+ * SEMANTICS section 3.9 mode gating -- vector-producing parameter-flag forms
+ *
+ * The (v)/(k)/(kv)/(@)/(s)-on-collection flag forms produce a list; in a
+ * scalar slot they are the same list-in-scalar crossing as ${arr[@]}: strict
+ * E1134 in lush mode, oracle flatten (bash/posix space, zsh IFS[0]) in the
+ * compat modes. Vector-accepting slots still spread (try_expand_vector_arg).
+ * The explicit (j:..:) join is scalar by design and never gated; (s:..:) on a
+ * genuine scalar is a legitimate list-from-scalar and is not gated. The
+ * kind-preserving transforms ((o)/(u)/(U)/(L)/(C)) are out of scope and keep
+ * their existing behavior.
+ * ============================================================================
+ */
+
+TEST(gate_lush_mode_flag_vector_forms_scalar_type_error) {
+    /// Each list-producing flag form in a scalar slot is E1134 in lush mode.
+    /// Fresh executor per form (the E1134 path posix-exits, whose state would
+    /// leak on a shared executor).
+    const char *srcs[] = {
+        "a=(echo hi there)\nv=\"${(v)a}\"\necho X\n",
+        "a=(x y z)\nv=\"${(k)a}\"\necho X\n",
+        "a=(x y z)\nv=\"${(@)a}\"\necho X\n",
+        "a=(x y z)\nv=\"${(s: :)a}\"\necho X\n",
+        "declare -A m=([x]=1 [y]=2)\nv=\"${(kv)m}\"\necho X\n",
+    };
+    for (size_t i = 0; i < sizeof(srcs) / sizeof(srcs[0]); i++) {
+        executor_t *exec = executor_new();
+        ASSERT_NOT_NULL(exec, "executor_new failed");
+        run_result_t r = run_shell_mode_gated(exec, srcs[i]);
+        ASSERT_STDERR_CONTAINS(r, "type mismatch");
+        executor_free(exec);
+    }
+}
+
+TEST(gate_bash_mode_flag_vector_flattens_on_space) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// bash mode: (v) in a scalar slot flattens on a literal space,
+    /// ignoring IFS.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\nIFS=,\na=(w x y)\nv=\"${(v)a}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w x y]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_flag_vector_flattens_on_ifs) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// zsh mode: (v) and (@) in a scalar slot flatten on IFS[0].
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode zsh\nIFS=:\na=(w x y)\nv=\"${(@)a}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w:x:y]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL, "no E1134 in zsh mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_flag_j_explicit_join_not_gated) {
+    /// (j:..:) is the sanctioned list->scalar collapse and must never be the
+    /// type error, in any mode.
+    run_result_t r =
+        run_shell("a=(echo hi there)\nv=\"${(j: :)a}\"\necho \"[$v]\"\n");
+
+    ASSERT_STDOUT_CONTAINS(r, "[echo hi there]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "(j) is not a type error");
+}
+
+TEST(gate_flag_s_on_scalar_not_gated) {
+    /// (s:..:) on a genuine scalar is a legitimate list-from-scalar, not a
+    /// collection-in-scalar crossing; it must not be gated.
+    run_result_t r =
+        run_shell("str=a.b.c\nv=\"${(s:.:)str}\"\necho \"[$v]\"\n");
+
+    ASSERT_STDOUT_CONTAINS(r, "[a b c]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "(s) on scalar not gated");
+}
+
+TEST(gate_flag_vector_slot_still_spreads) {
+    /// Regression: the flag forms still spread in vector-accepting slots
+    /// (argv, for-loop) -- the gate is scalar-slot only.
+    run_result_t r =
+        run_shell("a=(x y z)\nc(){ echo \"n=$#\"; }\nc ${(v)a}\n"
+                  "for w in ${(v)a}; do printf '<%s>' \"$w\"; done\necho\n");
+
+    ASSERT_STDOUT_CONTAINS(r, "n=3");
+    ASSERT_STDOUT_CONTAINS(r, "<x><y><z>");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "vector slot spreads, no type error");
+}
+
+/* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
  */
@@ -6063,6 +6164,15 @@ int main(void) {
     RUN_TEST(gate_bash_mode_readonly_binds_array_and_enforces);
     RUN_TEST(gate_lush_mode_export_array_still_strict);
     RUN_TEST(gate_lush_mode_readonly_array_still_strict);
+
+    printf("\nSEMANTICS 3.9 mode-gating: vector-producing parameter-flag "
+           "forms:\n");
+    RUN_TEST(gate_lush_mode_flag_vector_forms_scalar_type_error);
+    RUN_TEST(gate_bash_mode_flag_vector_flattens_on_space);
+    RUN_TEST(gate_zsh_mode_flag_vector_flattens_on_ifs);
+    RUN_TEST(gate_flag_j_explicit_join_not_gated);
+    RUN_TEST(gate_flag_s_on_scalar_not_gated);
+    RUN_TEST(gate_flag_vector_slot_still_spreads);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);

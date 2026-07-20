@@ -5382,6 +5382,60 @@ static char *flatten_bare_collection_relaxed(executor_t *executor,
     return strdup(first ? first : "");
 }
 
+/// SEMANTICS.md section 3.9 gate for a zsh parameter-FLAG form whose operand
+/// is a COLLECTION reaching a scalar slot -- the (v)/(k)/(kv)/(@)/(s)-on-array
+/// forms, and any transform flag applied to a collection. Mirrors the
+/// ${arr[@]} scalar-slot gate and the ${!arr[@]} keys gate: strict typing
+/// (lush default) is a runtime type error; a relaxed compat mode flattens to
+/// the oracle scalar.
+///
+/// `flags`  the flag characters between ( and ); `is_map` distinguishes a map
+/// from an indexed list for the diagnostic; `form` is the reconstructed source
+/// for the message; out_sep receives the separator the caller uses to build
+/// the flattened scalar in the relaxed path.
+///
+/// An explicit (j) collapse is the sanctioned list->scalar operator, so when
+/// 'j' is present the gate is a no-op: it returns true with out_sep=" " (the
+/// (j) handler re-joins on its own separator afterward, ignoring IFS). Under
+/// strict typing it emits E1134, requests a POSIX exit, and returns false --
+/// the caller frees its locals and returns strdup(""). Under a relaxed mode it
+/// returns true with out_sep set to the oracle separator (bash/posix space,
+/// zsh IFS[0]).
+static bool section39_flag_scalar_gate(executor_t *executor, const char *flags,
+                                       bool is_map, const char *form,
+                                       char out_sep[2]) {
+    if (strchr(flags, 'j') != NULL) { /// sanctioned explicit join
+        out_sep[0] = ' ';
+        out_sep[1] = '\0';
+        return true;
+    }
+    if (shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+            executor_current_loc(executor),
+            "type mismatch: %s value %s in a scalar position",
+            is_map ? "map" : "list", form);
+        if (err) {
+            shell_error_set_suggestion(
+                err, "join the elements explicitly -- add a (j:sep:) flag "
+                     "(e.g. ${(j: :)name}), or use the form as a vector.");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+            executor->has_error = true;
+        } else {
+            executor_error_report(
+                executor, SHELL_ERR_TYPE_MISMATCH,
+                executor_current_loc(executor),
+                "type mismatch: %s value %s in a scalar position",
+                is_map ? "map" : "list", form);
+        }
+        executor_request_posix_exit(executor, 1);
+        return false;
+    }
+    relaxed_flatten_sep(executor, out_sep); /// bash/posix space, zsh IFS[0]
+    return true;
+}
+
 /// Join `count` strings with `sep` between them into one owned string
 /// (NULL on allocation failure). An empty `sep` concatenates.
 static char *join_strings_with_sep(char **items, int count, const char *sep) {
@@ -13509,49 +13563,67 @@ static char *parse_parameter_expansion(executor_t *executor,
                             return strdup("");
                         }
                     }
-                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
-                        !array->is_associative) {
-                        /// zsh-mode special case: ${(kv)indexed_array}
-                        /// emits values only — zsh treats indexed arrays
-                        /// as having no meaningful "keys" so (kv) collapses
-                        /// to (v). lush mode keeps the interleaved
-                        /// indices+values form (curated pick: internally
-                        /// consistent with lush's (k)/(v) semantics).
-                        inner_result = symtable_array_expand(array, " ");
-                    } else if (array) {
-                        size_t kc = 0, vc = 0;
-                        char **keys = symtable_array_get_keys(array, &kc);
-                        char **values = symtable_array_get_values(array, &vc);
-                        size_t pairs = (kc < vc) ? kc : vc;
-                        if (keys && values && pairs > 0) {
-                            size_t total_len = 0;
-                            for (size_t i = 0; i < pairs; i++) {
-                                total_len +=
-                                    strlen(keys[i]) + 1 + strlen(values[i]) + 1;
-                            }
-                            inner_result = malloc(total_len + 1);
-                            if (inner_result) {
-                                inner_result[0] = '\0';
+                    if (array) {
+                        /// A collection reaching this scalar backend is the
+                        /// SEMANTICS section 3.9 list-in-scalar crossing:
+                        /// strict E1134 in lush mode, oracle flatten (into
+                        /// `sep`) in the compat modes. (j) short-circuits.
+                        char form[288];
+                        snprintf(form, sizeof(form), "${(%s)%s}", flags,
+                                 arr_name);
+                        char sep[2] = {' ', '\0'};
+                        if (!section39_flag_scalar_gate(executor, flags,
+                                                        array->is_associative,
+                                                        form, sep)) {
+                            free(arr_name);
+                            free(flags);
+                            return strdup("");
+                        }
+                        if (shell_mode_get() == SHELL_MODE_ZSH &&
+                            !array->is_associative) {
+                            /// zsh-mode special case: ${(kv)indexed_array}
+                            /// emits values only — zsh treats indexed arrays
+                            /// as having no meaningful "keys" so (kv) collapses
+                            /// to (v). lush mode keeps the interleaved
+                            /// indices+values form (curated pick: internally
+                            /// consistent with lush's (k)/(v) semantics).
+                            inner_result = symtable_array_expand(array, sep);
+                        } else {
+                            size_t kc = 0, vc = 0;
+                            char **keys = symtable_array_get_keys(array, &kc);
+                            char **values =
+                                symtable_array_get_values(array, &vc);
+                            size_t pairs = (kc < vc) ? kc : vc;
+                            if (keys && values && pairs > 0) {
+                                size_t total_len = 0;
                                 for (size_t i = 0; i < pairs; i++) {
-                                    if (i > 0)
-                                        strcat(inner_result, " ");
-                                    strcat(inner_result, keys[i]);
-                                    strcat(inner_result, " ");
-                                    strcat(inner_result, values[i]);
+                                    total_len += strlen(keys[i]) + 1 +
+                                                 strlen(values[i]) + 1;
+                                }
+                                inner_result = malloc(total_len + 1);
+                                if (inner_result) {
+                                    inner_result[0] = '\0';
+                                    for (size_t i = 0; i < pairs; i++) {
+                                        if (i > 0)
+                                            strcat(inner_result, sep);
+                                        strcat(inner_result, keys[i]);
+                                        strcat(inner_result, sep);
+                                        strcat(inner_result, values[i]);
+                                    }
                                 }
                             }
-                        }
-                        if (keys) {
-                            for (size_t i = 0; i < kc; i++) {
-                                free(keys[i]);
+                            if (keys) {
+                                for (size_t i = 0; i < kc; i++) {
+                                    free(keys[i]);
+                                }
+                                free(keys);
                             }
-                            free(keys);
-                        }
-                        if (values) {
-                            for (size_t i = 0; i < vc; i++) {
-                                free(values[i]);
+                            if (values) {
+                                for (size_t i = 0; i < vc; i++) {
+                                    free(values[i]);
+                                }
+                                free(values);
                             }
-                            free(values);
                         }
                     }
                     free(arr_name);
@@ -13593,38 +13665,55 @@ static char *parse_parameter_expansion(executor_t *executor,
                             return strdup("");
                         }
                     }
-                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
-                        !array->is_associative) {
-                        /// zsh-mode special case: ${(k)indexed_array} emits
-                        /// values only (zsh treats indexed-array indices as
-                        /// not meaningfully "keys" — `(k)` collapses to
-                        /// `(v)`). lush mode keeps the existing 0-based
-                        /// indices behavior (curated pick: more useful for
-                        /// iteration / debugging than redundantly emitting
-                        /// values which `(v)` and `${arr[@]}` already give).
-                        inner_result = symtable_array_expand(array, " ");
-                    } else if (array) {
-                        /// Get all keys from array (works for both indexed and
-                        /// associative)
-                        size_t count;
-                        char **keys = symtable_array_get_keys(array, &count);
-                        if (keys && count > 0) {
-                            /// Calculate total length needed
-                            size_t total_len = 0;
-                            for (size_t i = 0; i < count; i++) {
-                                total_len += strlen(keys[i]) + 1;
-                            }
-                            inner_result = malloc(total_len + 1);
-                            if (inner_result) {
-                                inner_result[0] = '\0';
+                    if (array) {
+                        /// A collection reaching this scalar backend is the
+                        /// SEMANTICS section 3.9 list-in-scalar crossing:
+                        /// strict E1134 in lush mode, oracle flatten (into
+                        /// `sep`) in the compat modes.
+                        char form[288];
+                        snprintf(form, sizeof(form), "${(%s)%s}", flags,
+                                 arr_name);
+                        char sep[2] = {' ', '\0'};
+                        if (!section39_flag_scalar_gate(executor, flags,
+                                                        array->is_associative,
+                                                        form, sep)) {
+                            free(arr_name);
+                            free(flags);
+                            return strdup("");
+                        }
+                        if (shell_mode_get() == SHELL_MODE_ZSH &&
+                            !array->is_associative) {
+                            /// zsh-mode special case: ${(k)indexed_array} emits
+                            /// values only (zsh treats indexed-array indices as
+                            /// not meaningfully "keys" — `(k)` collapses to
+                            /// `(v)`). lush mode keeps the existing 0-based
+                            /// indices behavior (curated pick: more useful for
+                            /// iteration / debugging than redundantly emitting
+                            /// values which `(v)` and `${arr[@]}` already
+                            /// give).
+                            inner_result = symtable_array_expand(array, sep);
+                        } else {
+                            /// Get all keys (works for indexed and assoc).
+                            size_t count;
+                            char **keys =
+                                symtable_array_get_keys(array, &count);
+                            if (keys && count > 0) {
+                                size_t total_len = 0;
                                 for (size_t i = 0; i < count; i++) {
-                                    if (i > 0)
-                                        strcat(inner_result, " ");
-                                    strcat(inner_result, keys[i]);
-                                    free(keys[i]);
+                                    total_len += strlen(keys[i]) + 1;
                                 }
+                                inner_result = malloc(total_len + 1);
+                                if (inner_result) {
+                                    inner_result[0] = '\0';
+                                    for (size_t i = 0; i < count; i++) {
+                                        if (i > 0)
+                                            strcat(inner_result, sep);
+                                        strcat(inner_result, keys[i]);
+                                        free(keys[i]);
+                                    }
+                                }
+                                free(keys);
                             }
-                            free(keys);
                         }
                     }
                     free(arr_name);
@@ -13698,13 +13787,46 @@ static char *parse_parameter_expansion(executor_t *executor,
                     arr_name ? symtable_get_array(arr_name) : NULL;
 
                 if (array) {
-                    /// Collection operand: extract elements as space-
-                    /// separated string. The flag handlers below iterate
-                    /// the words and apply per-element semantics for
+                    /// Collection operand: extract elements as a separator-
+                    /// joined string. The flag handlers below iterate the
+                    /// words and apply per-element semantics for
                     /// (U)(L)(C)(s)(o)(O)(u)(f), and (j:X:) joins them
-                    /// with the user-specified delimiter for the
-                    /// explicit list-to-scalar form.
-                    inner_result = symtable_array_expand(array, " ");
+                    /// with the user-specified delimiter for the explicit
+                    /// list-to-scalar form.
+                    ///
+                    /// A VECTOR-PRODUCING flag ((v)/(@)/(s)) applied to a
+                    /// collection here is the SEMANTICS section 3.9
+                    /// list-in-scalar crossing (the vector-accepting slots are
+                    /// handled earlier by try_expand_vector_arg): strict E1134
+                    /// in lush mode, oracle flatten (into `sep`) in the compat
+                    /// modes. The flag chars are read from the prefix before
+                    /// any ':' separator so a (j:X:) / (s:X:) delimiter cannot
+                    /// false-trigger; kind-preserving transforms ((U)/(L)/(C)/
+                    /// (f)) and the sanctioned explicit (j) join keep the space
+                    /// form and their existing per-word handling below.
+                    size_t flag_prefix = strcspn(flags, ":");
+                    bool vector_flag = false;
+                    for (size_t fi = 0; fi < flag_prefix; fi++) {
+                        char fc = flags[fi];
+                        if (fc == 'v' || fc == '@' || fc == 's') {
+                            vector_flag = true;
+                            break;
+                        }
+                    }
+                    char sep[2] = {' ', '\0'};
+                    if (vector_flag) {
+                        char form[288];
+                        snprintf(form, sizeof(form), "${(%s)%s}", flags,
+                                 arr_name);
+                        if (!section39_flag_scalar_gate(executor, flags,
+                                                        array->is_associative,
+                                                        form, sep)) {
+                            free(arr_name);
+                            free(flags);
+                            return strdup("");
+                        }
+                    }
+                    inner_result = symtable_array_expand(array, sep);
                     if (!inner_result) {
                         inner_result = strdup("");
                     }
