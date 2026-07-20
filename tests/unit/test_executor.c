@@ -4537,6 +4537,62 @@ TEST(rt_array_elem_assign_readonly_refused) {
     ASSERT_STDOUT_EQ(r, "[]\n");
 }
 
+/// Operators on an element of an entirely UNDECLARED array name (no prior
+/// declare/assignment) must apply, not be dropped -- the same operator engine
+/// the declared path uses (issue #527). Unique names for the persisting `:=`
+/// cases so the shared global symbol table does not leak an array binding.
+
+TEST(rt_undecl_elem_default) {
+    run_result_t r = run_shell("echo \"[${pr527_a[0]:-fallback}]\"");
+    ASSERT_STDOUT_EQ(r, "[fallback]\n");
+}
+
+TEST(rt_undecl_elem_alt_empty) {
+    /// :+ on an unset element yields empty (the element is unset).
+    run_result_t r = run_shell("echo \"[${pr527_b[0]:+alt}]\"");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_undecl_elem_strip_prefix_empty) {
+    /// A pattern operator on an unset element yields empty.
+    run_result_t r = run_shell("echo \"[${pr527_c[0]#x}]\"");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_undecl_elem_high_index_default) {
+    run_result_t r = run_shell("echo \"[${pr527_f[7]:-x}]\"");
+    ASSERT_STDOUT_EQ(r, "[x]\n");
+}
+
+TEST(rt_undecl_elem_assign_creates_array) {
+    /// := yields the default AND creates the array with the element set.
+    run_result_t r = run_shell("echo \"[${pr527_d[0]:=made}]\"; "
+                               "echo \"[${pr527_d[0]}] n=${#pr527_d[@]}\"");
+    ASSERT_STDOUT_EQ(r, "[made]\n[made] n=1\n");
+}
+
+TEST(rt_undecl_elem_assign_at_index) {
+    /// := at a non-zero index creates the array with that element populated.
+    run_result_t r = run_shell("echo \"[${pr527_g[2]:=z}]\"; "
+                               "echo \"e2=[${pr527_g[2]}] n=${#pr527_g[@]}\"");
+    ASSERT_STDOUT_EQ(r, "[z]\ne2=[z] n=1\n");
+}
+
+TEST(rt_scalar_slice_operator_out_of_range) {
+    /// A grapheme slice past the end of a scalar is empty, so :- fires --
+    /// the scalar-slice result feeds the same operator engine.
+    run_result_t r = run_shell("str=hi; echo \"[${str[9]:-x}]\"");
+    ASSERT_STDOUT_EQ(r, "[x]\n");
+}
+
+TEST(rt_scalar_slice_still_works) {
+    /// Regression: the grapheme-slice fallback for a scalar name is unchanged
+    /// by the operator unification -- ${str[N]} / ${str[N,M]} still slice.
+    run_result_t r = run_shell("str=hello; echo \"[${str[0]}][${str[1,3]}]"
+                               "[${str[-1]}]\"");
+    ASSERT_STDOUT_EQ(r, "[h][ell][o]\n");
+}
+
 TEST(rt_array_elem_assign_zsh_index0_skipped) {
     /// zsh 1-based mode: index 0 is invalid; ${arr[0]:=Z} must not clobber
     /// physical index 0 (which is arr[1] there).
@@ -6566,6 +6622,14 @@ int main(void) {
     RUN_TEST(rt_array_elem_indexed_upper);
     RUN_TEST(rt_array_elem_assign_persists);
     RUN_TEST(rt_array_elem_assign_readonly_refused);
+    RUN_TEST(rt_undecl_elem_default);
+    RUN_TEST(rt_undecl_elem_alt_empty);
+    RUN_TEST(rt_undecl_elem_strip_prefix_empty);
+    RUN_TEST(rt_undecl_elem_high_index_default);
+    RUN_TEST(rt_undecl_elem_assign_creates_array);
+    RUN_TEST(rt_undecl_elem_assign_at_index);
+    RUN_TEST(rt_scalar_slice_operator_out_of_range);
+    RUN_TEST(rt_scalar_slice_still_works);
     RUN_TEST(rt_array_elem_assign_zsh_index0_skipped);
 
     printf("\nRegression: POSIX null-word removal (#517):\n");
