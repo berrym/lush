@@ -30,7 +30,7 @@ Lush is a **superset shell**. It is not an emulator. It accepts both bash and zs
 - **Syntax is polyglot**: `${var^^}` and `${(U)var}` both uppercase a string
 - **Profiles are presets, not restrictions**: `mode bash` (or its alias `set -o bash`) loads defaults, but all features remain available
 - **When scripts don't work, lush knows why**: Compatibility database, static analyzer, debugger
-- **Value kinds are first-class**: Scalar / List / Map are distinguished by the executor; no implicit list-to-string coercion (SEMANTICS §3.4 / §3.9)
+- **Value kinds are first-class**: Scalar / List / Map are distinguished by the executor in every mode. In lush mode a list/map reaching a scalar slot is a type error (E1134) -- lush's flagship no-implicit-coercion safety (SEMANTICS §3.4 / §3.9). The compatibility modes (`bash`/`zsh`/`posix`) relax that boundary policy to the oracle's silent flatten via `FEATURE_STRICT_VALUE_TYPING` (off outside lush mode). The value *model* is uniform across modes; only the crossing policy (error vs flatten) moves -- **a list flattening under `mode bash` is correct, not §3.9 drift; do not "fix" it toward the strict error.**
 - **The debugger keeps pace with the language**: PHILOSOPHY §7 enforces this via an integration-test gate (`tests/unit/test_debug_integration.c`)
 
 Lush does NOT write different tokenizers/parsers/executors to match other shells. Lush is rich enough that its components encompass the older shells.

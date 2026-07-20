@@ -5344,6 +5344,22 @@ static void ifs_join_separator(executor_t *executor, char out[2]) {
     free(ifs);
 }
 
+/// The separator used to FLATTEN a list/map into a scalar in a scalar slot
+/// under a relaxed (non-strict-typing) mode, matching the active oracle: bash
+/// (and POSIX, curated to the bash family) joins a `[@]`-in-scalar flatten on
+/// a literal SPACE, ignoring IFS; zsh joins on the first character of IFS.
+/// This is the IMPLICIT `[@]` flatten only -- the explicit `[*]` / `$*` join
+/// is IFS[0] in every mode (SEMANTICS section 3.5) and uses
+/// ifs_join_separator directly. Writes out[0..1].
+static void relaxed_flatten_sep(executor_t *executor, char out[2]) {
+    if (shell_mode_get() == SHELL_MODE_ZSH) {
+        ifs_join_separator(executor, out);
+        return;
+    }
+    out[0] = ' '; /// bash / posix: space, IFS-independent
+    out[1] = '\0';
+}
+
 /// Join `count` strings with `sep` between them into one owned string
 /// (NULL on allocation failure). An empty `sep` concatenates.
 static char *join_strings_with_sep(char **items, int count, const char *sep) {
@@ -6262,20 +6278,29 @@ static char *expand_array_unsubscripted(executor_t *executor,
         return strdup("");
     }
     shell_mode_t mode = shell_mode_get();
-    if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
+    if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+        /// Relaxed compat mode: follow the oracle. bash and posix read a
+        /// bare ${arr} as its first element (subscript-0 convention); zsh
+        /// reads it as the whole array joined on the first char of IFS.
+        if (mode == SHELL_MODE_ZSH) {
+            char sep[2];
+            relaxed_flatten_sep(executor, sep); /// IFS[0] under zsh mode
+            char *joined = symtable_array_expand(array, sep);
+            return joined ? joined : strdup("");
+        }
         const char *first = symtable_array_get_index(array, 0);
         return strdup(first ? first : "");
     }
-    /// zsh/lush mode: per SEMANTICS.md section 3.9, a list/map value
-    /// reaching a scalar slot (or glued to text within a word) is a
-    /// runtime type error. We get here only AFTER try_expand_vector_arg
-    /// declined to handle the reference as vector-yielding -- which
-    /// means the surrounding context is scalar (variable assignment
-    /// RHS, case word, here-string, arithmetic operand, conditional-
-    /// expression operand, or a within-word "glued" position). Emit
-    /// the type-mismatch diagnostic via the structured-error system
-    /// and request a POSIX shell abort so a script halts before the
-    /// bad value reaches a downstream command.
+    /// Strict value typing (lush default): per SEMANTICS.md section 3.9, a
+    /// list/map value reaching a scalar slot (or glued to text within a
+    /// word) is a runtime type error. We get here only AFTER
+    /// try_expand_vector_arg declined to handle the reference as
+    /// vector-yielding -- which means the surrounding context is scalar
+    /// (variable assignment RHS, case word, here-string, arithmetic
+    /// operand, conditional-expression operand, or a within-word "glued"
+    /// position). Emit the type-mismatch diagnostic and request a POSIX
+    /// shell abort so a script halts before the bad value reaches a
+    /// downstream command.
     shell_error_t *err = shell_error_create(
         SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
         executor_current_loc(executor),
@@ -14301,9 +14326,27 @@ static char *parse_parameter_expansion(executor_t *executor,
                 /// fallthrough sits in a SCALAR-REQUIRING context (the
                 /// vector-accepting positions are handled earlier by
                 /// try_expand_vector_arg). The keys of a list or map are
-                /// themselves a list, so per SEMANTICS.md section 3.9 the @
-                /// keys form in a scalar slot is a type mismatch, exactly
-                /// as ${arr[@]} is. ${!arr[*]} joins on IFS instead.
+                /// themselves a list. Under strict value typing this @ keys
+                /// form in a scalar slot is a type mismatch, exactly as
+                /// ${arr[@]} is; under a relaxed compat mode it flattens the
+                /// keys to the oracle scalar (bash/posix space, zsh IFS[0]).
+                /// (${!arr[*]} joins on IFS[0] in every mode -- below.)
+                if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+                    size_t count;
+                    char **keys = symtable_array_get_keys(array, &count);
+                    char *result = NULL;
+                    if (keys && count > 0) {
+                        char sep[2];
+                        relaxed_flatten_sep(executor, sep);
+                        result = join_strings_with_sep(keys, (int)count, sep);
+                        for (size_t i = 0; i < count; i++) {
+                            free(keys[i]);
+                        }
+                    }
+                    free(keys);
+                    free(arr_name);
+                    return result ? result : strdup("");
+                }
                 shell_error_t *err = shell_error_create(
                     SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                     executor_current_loc(executor),
@@ -14733,44 +14776,52 @@ static char *parse_parameter_expansion(executor_t *executor,
                         result = symtable_array_expand(array, sep);
                     } else if (strcmp(subscript, "@") == 0) {
                         /// ${arr[@]} reaching this general parameter-
-                        /// expansion fallthrough means the expansion sits
-                        /// in a SCALAR-REQUIRING context (vector-accepting
-                        /// positions are handled earlier by
-                        /// try_expand_vector_arg). Per SEMANTICS.md section
-                        /// 3.9, this is a runtime type mismatch -- a list or
-                        /// map value cannot flow into a scalar slot.
-                        const char *kind =
-                            (array && array->is_associative) ? "map" : "list";
-                        shell_error_t *err = shell_error_create(
-                            SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
-                            executor_current_loc(executor),
-                            "type mismatch: %s value ${%s[@]} in a "
-                            "scalar position",
-                            kind, arr_name ? arr_name : "?");
-                        if (err) {
-                            shell_error_set_suggestion(
-                                err,
-                                "join the values explicitly -- use ${name[*]} "
-                                "for IFS-joining, or build a scalar from "
-                                "the elements with an explicit join.");
-                            shell_error_display(err, stderr,
-                                                isatty(STDERR_FILENO));
-                            shell_error_free(err);
-                            executor->has_error = true;
+                        /// expansion fallthrough sits in a SCALAR-REQUIRING
+                        /// context (vector-accepting positions are handled
+                        /// earlier by try_expand_vector_arg). Under strict
+                        /// value typing (lush default, SEMANTICS.md section
+                        /// 3.9) a list/map value in a scalar slot is a type
+                        /// mismatch; under a relaxed compat mode it flattens
+                        /// to the oracle scalar (bash/posix: space-join;
+                        /// zsh: IFS[0]-join).
+                        if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+                            char sep[2];
+                            relaxed_flatten_sep(executor, sep);
+                            result = symtable_array_expand(array, sep);
                         } else {
-                            executor_error_report(
-                                executor, SHELL_ERR_TYPE_MISMATCH,
+                            const char *kind = (array && array->is_associative)
+                                                   ? "map"
+                                                   : "list";
+                            shell_error_t *err = shell_error_create(
+                                SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                                 executor_current_loc(executor),
                                 "type mismatch: %s value ${%s[@]} in a "
                                 "scalar position",
                                 kind, arr_name ? arr_name : "?");
+                            if (err) {
+                                shell_error_set_suggestion(
+                                    err, "join the values explicitly -- use "
+                                         "${name[*]} for IFS-joining, or build "
+                                         "a scalar from the elements with an "
+                                         "explicit join.");
+                                shell_error_display(err, stderr,
+                                                    isatty(STDERR_FILENO));
+                                shell_error_free(err);
+                                executor->has_error = true;
+                            } else {
+                                executor_error_report(
+                                    executor, SHELL_ERR_TYPE_MISMATCH,
+                                    executor_current_loc(executor),
+                                    "type mismatch: %s value ${%s[@]} in a "
+                                    "scalar position",
+                                    kind, arr_name ? arr_name : "?");
+                            }
+                            /// In a script, a type mismatch aborts before the
+                            /// bad value can reach a downstream command;
+                            /// interactively, the prompt continues.
+                            executor_request_posix_exit(executor, 1);
+                            result = strdup("");
                         }
-                        /// SEMANTICS.md section 3.9 enforcement: in a
-                        /// script, a type mismatch aborts before the bad
-                        /// value can reach a downstream command;
-                        /// interactively, the prompt continues.
-                        executor_request_posix_exit(executor, 1);
-                        result = strdup("");
                     } else if ((strncmp(subscript, "(r)", 3) == 0 ||
                                 strncmp(subscript, "(R)", 3) == 0) &&
                                !array->is_associative) {

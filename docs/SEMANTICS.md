@@ -40,21 +40,34 @@ The dividing rule is absolute:
 
 > The preset layer configures the engine. It never redefines the
 > engine. No `mode`, no `setopt`, no `config` key changes what a value
-> *is*, the coercion rules, the presentation rule, or the scoping
-> discipline.
+> *is*, the presentation rule, or the scoping discipline. What a preset
+> *may* select is a **boundary policy** -- what happens when a value of
+> one kind reaches a slot expecting another -- exactly as it selects
+> word splitting.
 
 This is not a stylistic preference; it is what makes lush one shell.
 A preset that could fork the type system or the name-resolution rule
 would not produce a polyglot shell -- it would produce N shells
 sharing a parser. "Polyglot" means many syntactic front doors onto
 *one* engine (PHILOSOPHY §2: "not because it runs three engines under
-the hood"). The engine is uniform across every mode, by construction.
+the hood"). The **value model** -- the kinds (scalar/list/map), the
+`[@]`-vs-`[*]` presentation, name resolution, scoping -- is uniform
+across every mode, by construction. Whether a kind mismatch at a
+boundary is **diagnosed** (a type error) or **reconciled to the oracle**
+(a silent flatten) is a preset (§3.9): a list flattened by `mode bash`
+was still a list at the point of reference -- the flag changed only the
+crossing policy, not the value's nature.
 
 When a behavior feels like it could belong to either layer, apply the
 test: *does it change what a value is, or only how a value is spelled
 or defaulted?* The former is engine; the latter is preset. Word
-splitting (§3.8) is a preset because it gates an expansion behavior;
-the list/scalar distinction is engine because it is a value's nature.
+splitting (§3.8) is a preset because it gates an expansion behavior. The
+list/scalar *distinction* (a list is a list) is engine; the *boundary
+policy* for a list meeting a scalar slot -- strict type error vs oracle
+flatten -- is a preset (`FEATURE_STRICT_VALUE_TYPING`), strict by default
+in lush mode (its flagship safety feature) and relaxed to the oracle in
+the compatibility modes. Revised per explicit owner decision (2026-07):
+the value-nature is engine, the crossing policy is preset.
 
 ---
 
@@ -138,13 +151,13 @@ lives in functions. This is the same move as preferring an explicit
 `split()` over an implicit coercion -- power through named, visible
 operations rather than through type-system complexity.
 
-### 3.4 No implicit coercion: lists are never silently flattened
+### 3.4 No implicit coercion: lists are never silently flattened (lush mode)
 
-A list is never converted to a scalar string implicitly -- not by a
-double quote, not by an assignment, not by reaching a string-shaped
-slot. Joining a list into a string is always an operation the script
-*asks for* (the `[*]` subscript of §3.5, an explicit `join`, a `(j:)`
-flag).
+In lush mode, a list is never converted to a scalar string implicitly
+-- not by a double quote, not by an assignment, not by reaching a
+string-shaped slot. Joining a list into a string is always an operation
+the script *asks for* (the `[*]` subscript of §3.5, an explicit `join`,
+a `(j:)` flag).
 
 Implicit list-to-string coercion is one of the largest sources of
 silent bugs and quoting gymnastics in legacy shells. It violates least
@@ -152,8 +165,14 @@ surprise (a list the author built silently stops being a list), and it
 hides type errors (passing a list where a scalar was meant should be a
 clear, immediate diagnostic, not a quiet flatten).
 
-This is the engine's central safety property. Everything in §3.5 and
-§3.6 exists to uphold it.
+This is lush mode's central safety property -- its flagship type
+guarantee. Everything in §3.5 and §3.6 exists to uphold it. The
+compatibility modes (`bash`, `zsh`, `posix`) *relax* it back to the
+oracle's silent flatten so that legacy scripts run unchanged; this is a
+**boundary policy** selected by the preset (§3.9,
+`FEATURE_STRICT_VALUE_TYPING`), not a change to what a value is -- a
+list is a list in every mode, and the diagnostic-vs-flatten choice is
+the only thing the mode moves.
 
 ### 3.5 Transformation and presentation are orthogonal
 
@@ -274,6 +293,25 @@ and `select` word lists, and array literals.
 the subscript. This section completes the model: what a list or map
 value does when it reaches a position, and what is forbidden outright.
 
+**Mode gating (the boundary policy is a preset).** The strict behavior
+described below -- the type error a list or map raises when it reaches a
+scalar-requiring slot or violates the whole-word constraint -- is lush
+mode's default and its flagship safety feature. It is gated by
+`FEATURE_STRICT_VALUE_TYPING`: **on** in lush mode, **off** in the
+`bash`, `zsh`, and `posix` compatibility modes, where the same crossing
+is *reconciled to the oracle* instead of diagnosed. This is the §1
+engine-vs-preset split in action: the value model is uniform (a list is
+a list in every mode; `[@]`/`[*]` presentation is unchanged); only the
+**boundary policy** -- diagnose vs silently flatten -- moves with the
+mode, exactly as word splitting (§3.8) does. Under the relaxed policy
+the flatten follows the oracle precisely: a `${arr[@]}` in a scalar slot
+joins on a literal space (bash/posix, IFS-independent) or on IFS[0]
+(zsh); a bare `${arr}` yields element 0 (bash/posix) or the whole array
+joined on IFS[0] (zsh); a map yields its values in insertion order.
+`${arr[*]}` / `$*` are scalar in every mode and always join on IFS[0] --
+never gated. The rest of this section describes the strict (lush-mode)
+model; each strict clause below reads "in lush mode" implicitly.
+
 **The whole-word constraint.** A vector-yielding expansion -- a bare
 `${arr}` that resolves to a list/map, `${arr[@]}`, or a
 vector-producing map operator (`(k)`, `(v)`, `(kv)`) -- must occupy
@@ -384,11 +422,14 @@ error[E_TYPE]: type mismatch -- expected scalar string, got list
 structured-error registry, not invented here.
 
 **Enforcement.** The check is runtime (a variable's kind is runtime
-state). In a script, a type mismatch aborts with a non-zero exit
+state), and it is active only when `FEATURE_STRICT_VALUE_TYPING` is on
+(lush mode). In a script, a type mismatch aborts with a non-zero exit
 before the bad value can reach a downstream command. Interactively,
 the diagnostic prints to stderr, the current command line is
 abandoned, and control returns cleanly to the prompt and the
-debugger -- the session is not killed.
+debugger -- the session is not killed. In the compatibility modes the
+check is off and the value flattens to the oracle's result instead
+(see *Mode gating* above).
 
 This makes the bare `${arr}` fully defined: it is the first-class
 list (or map) value itself; `[@]` / `[*]` are operators *on* that
@@ -510,12 +551,22 @@ different statements about two different axes; do not conflate them.
 
 The four preset surfaces (`mode`, `set`, `setopt`/`shopt`, `config`)
 govern dialect spelling and curated defaults. They never govern the
-value kinds (§3.1), the no-coercion rule (§3.4), the
-transformation/presentation split (§3.5), or the scoping discipline
-(§5). Those are engine.
+value kinds (§3.1), the transformation/presentation split (§3.5), or
+the scoping discipline (§5). Those are engine. What they *may* govern is
+a **boundary policy** -- what happens when a value crosses into a slot
+of another kind -- which is a behavior, not a kind.
 
-`FEATURE_WORD_SPLIT_DEFAULT` is a legitimate preset: it gates an
-expansion *behavior*, not a value *kind* (§3.8).
+Two legitimate presets of this form exist:
+
+- `FEATURE_WORD_SPLIT_DEFAULT` gates an expansion *behavior*, not a
+  value *kind* (§3.8).
+- `FEATURE_STRICT_VALUE_TYPING` gates the boundary policy for a
+  list/map reaching a scalar slot (§3.4, §3.9): a diagnosed type error
+  (lush mode) versus an oracle flatten (compat modes). The value is a
+  list in both cases; only the crossing policy differs. This was an
+  explicit owner decision (2026-07) recorded here so the §3.4/§3.9
+  strictness is understood as lush mode's flagship default, not an
+  engine invariant.
 
 Deliberate divergences from bash/zsh are recorded in
 `tests/fuzz/differential/known_divergences.txt` with rationale, and

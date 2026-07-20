@@ -18,6 +18,7 @@
 #include "lle/completion/word_context.h"
 #include "lle/lle_editor.h"
 #include "lle/syntax_highlighting.h"
+#include "shell_mode.h"
 #include "symtable.h"
 #include "test_shell_harness.h"
 
@@ -1250,6 +1251,175 @@ TEST(arr_star_in_scalar_assignment_joins) {
     ASSERT_STDOUT_CONTAINS(r, "x=a b c");
     ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
                 "[*] join is conformant in scalar context");
+
+    executor_free(exec);
+}
+
+/* ============================================================================
+ * SEMANTICS section 3.9 mode gating: FEATURE_STRICT_VALUE_TYPING
+ *
+ * The strict list/scalar type error (E1134) is lush mode's flagship
+ * default. The bash/zsh/posix compatibility modes relax the boundary
+ * policy to the oracle's silent flatten. The value model is uniform in
+ * every mode; only the crossing policy (error vs flatten) moves.
+ *
+ * Shell mode is process-global, and the harness parses a whole script
+ * buffer before executing it -- so the array literal `arr=(...)` is
+ * recognized at PARSE time under whatever global mode is current when
+ * the buffer is submitted, while the mid-buffer `mode X` only takes
+ * effect at EXECUTION time (the expansion, where the gate is checked).
+ * run_shell_mode_gated() pins the parse-time mode to lush (so the array
+ * always parses as a list) and restores lush afterward (so no mode
+ * leaks into the strict tests that follow); the in-script `mode X`
+ * selects the execution-time boundary policy under test.
+ * ============================================================================
+ */
+
+static run_result_t run_shell_mode_gated(executor_t *exec, const char *src) {
+    /// executor_new() shares one process-global symbol table, so IFS set
+    /// by one test would otherwise leak into the next (and into the read
+    /// tests that assume the default IFS). Unset it before and after so
+    /// each script starts from the default and leaves nothing behind; a
+    /// script that needs a custom IFS assigns it inline.
+    apply_mode_preset(SHELL_MODE_LUSH); /// deterministic parse-time mode
+    symtable_unset_var(exec->symtable, "IFS");
+    run_result_t r = run_shell_with_executor(exec, src);
+    apply_mode_preset(SHELL_MODE_LUSH); /// restore; no global mode leak
+    symtable_unset_var(exec->symtable, "IFS");
+    return r;
+}
+
+TEST(gate_bash_mode_arr_at_scalar_flattens_on_space) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// bash mode relaxes E1134: ${arr[@]} in a scalar slot flattens on a
+    /// literal space, ignoring IFS (bash oracle behavior).
+    run_result_t r = run_shell_mode_gated(
+        exec,
+        "mode bash\nIFS=,\narr=(w x y)\nv=\"${arr[@]}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w x y]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_arr_at_scalar_flattens_on_ifs) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// zsh mode relaxes E1134 but joins on IFS[0], not a literal space.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode zsh\nIFS=,\narr=(w x y)\nv=\"${arr[@]}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w,x,y]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL, "no E1134 in zsh mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_bare_arr_scalar_yields_element_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Bare ${arr} in a scalar slot: bash yields element 0.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\narr=(w x y)\nv=\"${arr}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_bare_arr_scalar_yields_whole_join) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Bare ${arr} in a scalar slot: zsh yields the whole space-joined
+    /// list (its bare-array-name rule differs from bash's element 0).
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode zsh\narr=(w x y)\nv=\"${arr}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w x y]");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_keys_at_scalar_flattens) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// ${!arr[@]} keys in a scalar slot: bash flattens the index list on
+    /// a space rather than raising the strict type error.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\narr=(w x y)\nv=\"${!arr[@]}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[0 1 2]");
+
+    executor_free(exec);
+}
+
+TEST(gate_posix_mode_arr_at_scalar_flattens_like_bash) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// posix mode has no array literal of its own -- the harness parses
+    /// incrementally, so `arr=(w x y)` under an active `mode posix` would
+    /// run `w` as a command. The array is therefore built first (under the
+    /// default lush mode), then the mode is switched: the point under test
+    /// is that posix EXECUTION flattens a list in a scalar slot to the
+    /// bash-family literal space (IFS-independent) rather than raising
+    /// E1134.
+    run_result_t r = run_shell_mode_gated(
+        exec,
+        "arr=(w x y)\nmode posix\nIFS=,\nv=\"${arr[@]}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w x y]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in posix mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_arr_star_scalar_joins_on_ifs_every_mode) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// ${arr[*]} is the explicit scalar join and is never gated: it joins
+    /// on IFS[0] in every mode, including the relaxed compat modes.
+    run_result_t r = run_shell_mode_gated(
+        exec,
+        "mode bash\nIFS=,\narr=(w x y)\nv=\"${arr[*]}\"\necho \"[$v]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[w,x,y]");
+
+    executor_free(exec);
+}
+
+TEST(gate_lush_mode_still_strict_after_gating) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Regression: gating the compat modes must not weaken lush mode --
+    /// ${arr[@]} in a scalar slot is still the E1134 type error.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(a b c)\nx=${arr[@]}\necho saw_post_assign\n");
+
+    ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
+                "lush mode still aborts on type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit in lush mode");
 
     executor_free(exec);
 }
@@ -5448,6 +5618,17 @@ int main(void) {
     RUN_TEST(bare_arr_argv_yields_elements_one_to_one);
     RUN_TEST(at_paren_flag_alias_yields_vector);
     RUN_TEST(at_paren_flag_composes_with_sort);
+
+    printf(
+        "\nSEMANTICS 3.9 mode-gating tests (FEATURE_STRICT_VALUE_TYPING):\n");
+    RUN_TEST(gate_bash_mode_arr_at_scalar_flattens_on_space);
+    RUN_TEST(gate_zsh_mode_arr_at_scalar_flattens_on_ifs);
+    RUN_TEST(gate_bash_mode_bare_arr_scalar_yields_element_zero);
+    RUN_TEST(gate_zsh_mode_bare_arr_scalar_yields_whole_join);
+    RUN_TEST(gate_bash_mode_keys_at_scalar_flattens);
+    RUN_TEST(gate_posix_mode_arr_at_scalar_flattens_like_bash);
+    RUN_TEST(gate_arr_star_scalar_joins_on_ifs_every_mode);
+    RUN_TEST(gate_lush_mode_still_strict_after_gating);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);

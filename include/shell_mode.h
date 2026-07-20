@@ -105,14 +105,23 @@ typedef enum {
     FEATURE_TIME_KEYWORD,     ///< time command with TIMEFORMAT
 
     /// Behavior Defaults
-    FEATURE_WORD_SPLIT_DEFAULT, ///< Word splitting on by default (Bash)
-    FEATURE_AUTO_CD,            ///< Auto-cd to directories without cd command
-    FEATURE_AUTO_PUSHD,         ///< Auto-push directories to stack on cd
-    FEATURE_CDABLE_VARS,        ///< Treat unset vars as directory names for cd
-    FEATURE_ERREXIT_IN_LOOPS,   ///< Loop body's first non-zero exit aborts the
-                                ///< loop. Curated lush-mode default; off in
-                                ///< POSIX/bash/zsh modes for polyglot parity.
-                                ///< Toggleable per-script via setopt/unsetopt.
+    FEATURE_STRICT_VALUE_TYPING, ///< SEMANTICS section 3.9 list/scalar type
+                                 ///< safety: a list/map value in a scalar slot
+                                 ///< is a type error (E1134), not a silent
+                                 ///< flatten. The flagship lush-mode safety
+                                 ///< feature; ON in lush, OFF in posix/bash/zsh
+                                 ///< where the oracle flattens on IFS. Gates
+                                 ///< only the error-vs-flatten boundary policy;
+                                 ///< the value model (list is a list) is
+                                 ///< uniform in every mode.
+    FEATURE_WORD_SPLIT_DEFAULT,  ///< Word splitting on by default (Bash)
+    FEATURE_AUTO_CD,             ///< Auto-cd to directories without cd command
+    FEATURE_AUTO_PUSHD,          ///< Auto-push directories to stack on cd
+    FEATURE_CDABLE_VARS,         ///< Treat unset vars as directory names for cd
+    FEATURE_ERREXIT_IN_LOOPS,    ///< Loop body's first non-zero exit aborts the
+                                 ///< loop. Curated lush-mode default; off in
+                                 ///< POSIX/bash/zsh modes for polyglot parity.
+                                 ///< Toggleable per-script via setopt/unsetopt.
     FEATURE_XPG_ECHO, ///< echo interprets \n, \t, etc. by default (XSI/zsh
                       ///< behavior); when false, echo prints args literally
                       ///< unless `-e` is given (bash default). Bridged via
