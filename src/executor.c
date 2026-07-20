@@ -5265,6 +5265,22 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  *         populated; false otherwise.
  */
 
+/// True when a `:`-led subscript suffix (`spec` points just past the `:`)
+/// is an array element slice offset (${arr[@]:1:2}) rather than one of the
+/// `:-` / `:+` / `:=` / `:?` parameter operators. A slice offset is numeric,
+/// optionally a space-then-sign (`: -2`); the operator sigils -/+/=/? can
+/// never begin a slice, and strtol would otherwise consume the +/- of
+/// `:+N` / `:-N` and mis-read the operand as a slice offset (#530). Shared
+/// by the scalar-slot slice and the vector-slice paths so the two agree.
+static bool slice_spec_is_numeric(const char *spec) {
+    if (*spec == '-' || *spec == '+' || *spec == '=' || *spec == '?') {
+        return false;
+    }
+    char *endp = NULL;
+    (void)strtol(spec, &endp, 10);
+    return endp != spec;
+}
+
 /// Parse an optional `:N` / `:N:M` slice suffix shared by the array and
 /// positional vector forms. @p p points just past the subscript (the `]`
 /// of NAME[@], or the `@`/`*` of a positional ref); @p end is just past
@@ -5291,6 +5307,9 @@ static bool parse_vector_slice_suffix(const char *p, const char *end,
     }
     memcpy(spec, p, spec_len);
     spec[spec_len] = '\0';
+    if (!slice_spec_is_numeric(spec)) {
+        return false; /// a :- / :+ / := / :? operator, not a slice
+    }
     char *endp = NULL;
     *slice_offset = (int)strtol(spec, &endp, 10);
     if (!endp) {
@@ -14619,16 +14638,23 @@ static char *parse_parameter_expansion(executor_t *executor,
                     /// #97.
                     int slice_offset = 0;
                     int slice_length = -1; /// -1 = "to end"
-                    bool has_slice = (close[1] == ':' &&
-                                      (strcmp(subscript, "@") == 0 ||
-                                       strcmp(subscript, "*") == 0) &&
-                                      !array->is_associative);
-                    if (has_slice) {
+                    bool has_slice = false;
+                    if (close[1] == ':' &&
+                        (strcmp(subscript, "@") == 0 ||
+                         strcmp(subscript, "*") == 0) &&
+                        !array->is_associative) {
+                        /// A numeric offset is an array-element slice
+                        /// (${arr[@]:1:2}); the :- / :+ / := / :? operators
+                        /// also start with `:` but are applied after the
+                        /// subscript below, not treated as slices (#530).
                         const char *spec = close + 2;
-                        char *endp = NULL;
-                        slice_offset = (int)strtol(spec, &endp, 10);
-                        if (endp && *endp == ':') {
-                            slice_length = (int)strtol(endp + 1, NULL, 10);
+                        if (slice_spec_is_numeric(spec)) {
+                            char *endp = NULL;
+                            slice_offset = (int)strtol(spec, &endp, 10);
+                            has_slice = true;
+                            if (*endp == ':') {
+                                slice_length = (int)strtol(endp + 1, NULL, 10);
+                            }
                         }
                     }
 
@@ -14968,8 +14994,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                     /// reads as ""); an empty element is passed as NULL so
                     /// the unset-keyed operators (`:-`/`-`/`:=`/`=`/`:?`/`?`)
                     /// fire, matching the established array semantics.
+                    /// Apply a trailing parameter operator on the element
+                    /// value -- unless a numeric slice already consumed the
+                    /// `:offset:length` suffix (has_slice), which must not be
+                    /// re-applied as a substring operator (issue #530: the
+                    /// element slice and the substring operator both matched
+                    /// `:0:2`, double-slicing ${arr[*]:0:2}).
                     const char *after_bracket = close + 1;
-                    if (*after_bracket != '\0') {
+                    if (*after_bracket != '\0' && !has_slice) {
                         const char *rhs = NULL;
                         int el_op =
                             detect_param_operator_suffix(after_bracket, &rhs);
