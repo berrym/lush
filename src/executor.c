@@ -5360,6 +5360,28 @@ static void relaxed_flatten_sep(executor_t *executor, char out[2]) {
     out[1] = '\0';
 }
 
+/// Flatten a bare collection reference (${arr}, or a bare name meeting a
+/// scalar operator) to its mode-appropriate scalar under the SEMANTICS
+/// section 3.9 RELAXED policy (FEATURE_STRICT_VALUE_TYPING off): bash and
+/// posix read element 0 (the subscript-0 convention); zsh reads the whole
+/// array joined on the first char of IFS. Returns an OWNED string (empty,
+/// not NULL, for an empty/missing element; NULL only on allocation failure),
+/// matching symtable_get_var's ownership contract so callers free it
+/// uniformly. The single definition shared by expand_array_unsubscripted
+/// (bare ${arr}) and the bare-collection scalar-operator path keeps the two
+/// section 3.9 sites from drifting.
+static char *flatten_bare_collection_relaxed(executor_t *executor,
+                                             array_value_t *array) {
+    if (shell_mode_get() == SHELL_MODE_ZSH) {
+        char sep[2];
+        relaxed_flatten_sep(executor, sep); /// IFS[0] under zsh mode
+        char *joined = symtable_array_expand(array, sep);
+        return joined ? joined : strdup("");
+    }
+    const char *first = symtable_array_get_index(array, 0);
+    return strdup(first ? first : "");
+}
+
 /// Join `count` strings with `sep` between them into one owned string
 /// (NULL on allocation failure). An empty `sep` concatenates.
 static char *join_strings_with_sep(char **items, int count, const char *sep) {
@@ -6282,19 +6304,10 @@ static char *expand_array_unsubscripted(executor_t *executor,
     if (!array) {
         return strdup("");
     }
-    shell_mode_t mode = shell_mode_get();
     if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
-        /// Relaxed compat mode: follow the oracle. bash and posix read a
-        /// bare ${arr} as its first element (subscript-0 convention); zsh
-        /// reads it as the whole array joined on the first char of IFS.
-        if (mode == SHELL_MODE_ZSH) {
-            char sep[2];
-            relaxed_flatten_sep(executor, sep); /// IFS[0] under zsh mode
-            char *joined = symtable_array_expand(array, sep);
-            return joined ? joined : strdup("");
-        }
-        const char *first = symtable_array_get_index(array, 0);
-        return strdup(first ? first : "");
+        /// Relaxed compat mode: follow the oracle (bash/posix element 0,
+        /// zsh whole-join) via the shared bare-collection flatten.
+        return flatten_bare_collection_relaxed(executor, array);
     }
     /// Strict value typing (lush default): per SEMANTICS.md section 3.9, a
     /// list/map value reaching a scalar slot (or glued to text within a
@@ -15358,9 +15371,30 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// where get_variable_attributes handles every kind even when
         /// the scalar value lookup misses (arrays have a NULL scalar).
         bool attr_query = (op_type == 17 && op_pos[1] == 'a');
+        /// Under a relaxed compat mode a bare collection meeting a scalar
+        /// operator is flattened to its mode scalar (bash/posix element 0,
+        /// zsh whole-join) and the operator applies to that scalar.
+        /// relaxed_bare_value carries the pre-computed scalar past the
+        /// scalar re-lookup below; relaxed_bare_array retains the binding so
+        /// := / = can assign back to element 0 (preserving the array).
+        char *relaxed_bare_value = NULL;
+        array_value_t *relaxed_bare_array = NULL;
         if (var_len > 0 && !attr_query) {
             array_value_t *bare_array = symtable_get_array(var_name);
-            if (bare_array) {
+            if (bare_array && !shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+                /// Relaxed (bash/zsh/posix): the SEMANTICS section 3.9
+                /// boundary policy follows the oracle instead of the strict
+                /// type error. Flatten the collection to a scalar and let the
+                /// existing apply_param_operator run on it -- exact bash
+                /// element-0 parity for every operator, and zsh scalar-slot
+                /// parity via whole-join. zsh's unquoted element-wise pattern
+                /// ops and its element-slicing ${arr:o:l} are curated to this
+                /// single flatten-then-apply reading (documented divergence);
+                /// the explicit ${arr[@]op...} vector form stays available.
+                relaxed_bare_value =
+                    flatten_bare_collection_relaxed(executor, bare_array);
+                relaxed_bare_array = bare_array;
+            } else if (bare_array) {
                 const char *op_str = operators[op_type];
                 const char *kind_label =
                     bare_array->is_associative ? "map" : "list";
@@ -15432,7 +15466,15 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// (${${inner}:op}) is expanded first so the outer operator or
         /// modifier applies to the inner result, e.g. ${${p:t}:r}.
         char *var_value;
-        if (var_name[0] == '$' && var_name[1] == '{') {
+        if (relaxed_bare_array) {
+            /// The relaxed bare-collection path was taken (keyed on the array,
+            /// not the value, so an allocation failure that left
+            /// relaxed_bare_value NULL degrades to an empty operand rather
+            /// than silently re-looking up). Use the pre-computed mode scalar
+            /// rather than symtable_get_var, which returns NULL for an array
+            /// binding and would lose the flatten.
+            var_value = relaxed_bare_value;
+        } else if (var_name[0] == '$' && var_name[1] == '{') {
             var_value = expand_variable(executor, var_name);
         } else {
             var_value = symtable_get_var(executor->symtable, var_name);
@@ -15734,7 +15776,16 @@ static char *parse_parameter_expansion(executor_t *executor,
             apply_param_operator(executor, var_name, var_value,
                                  expanded_default, op_type, &op_assign_back);
         if (op_assign_back) {
-            symtable_set_var(executor->symtable, var_name, result, SYMVAR_NONE);
+            if (relaxed_bare_array) {
+                /// := / = on a bare array in a relaxed mode assigns element 0
+                /// and preserves the array shape (curated: the bash rule; a
+                /// scalar symtable_set_var would clobber the array binding,
+                /// and zsh's collapse-to-one-element is not adopted).
+                symtable_array_set_index(relaxed_bare_array, 0, result);
+            } else {
+                symtable_set_var(executor->symtable, var_name, result,
+                                 SYMVAR_NONE);
+            }
         }
         free(var_name);
         free(var_value);

@@ -309,8 +309,40 @@ joins on a literal space (bash/posix, IFS-independent) or on IFS[0]
 (zsh); a bare `${arr}` yields element 0 (bash/posix) or the whole array
 joined on IFS[0] (zsh); a map yields its values in insertion order.
 `${arr[*]}` / `$*` are scalar in every mode and always join on IFS[0] --
-never gated. The rest of this section describes the strict (lush-mode)
-model; each strict clause below reads "in lush mode" implicitly.
+never gated. A **named list or map in the command-name position** is the
+same crossing: strict in lush mode (a type error -- positionals are argv,
+a named list is not), relaxed in the compat modes to the oracle spread
+(bash/zsh expand `${cmd[@]}` into command words; bash reads a bare
+`${cmd}` as element 0, zsh spreads it). The rest of this section describes
+the strict (lush-mode) model; each strict clause below reads "in lush
+mode" implicitly.
+
+**Scalar operators on a bare collection.** A scalar parameter operator
+applied to a bare collection name -- `${arr:-default}`, `${arr#pat}`,
+`${arr^^}`, `${arr:o:l}`, `${arr@Q}`, and the rest -- is a scalar-slot
+crossing and is gated by the same flag. In lush mode it is the type error
+(use `${arr[0]:-default}` for an element operation or `${arr[@]op...}` to
+vectorize). In the compat modes it is relaxed by the uniform rule
+*flatten the collection to its mode scalar (bash/posix element 0, zsh
+whole-join), then apply the operator to that scalar* -- which is exact
+bash element-0 parity for every operator, and exact zsh parity for every
+operator in a scalar (quoted) slot. Two zsh behaviors are deliberately
+**not** cloned, and are curated to the flatten-then-apply reading (see the
+divergence registry, §6):
+
+- zsh reads bare `${arr:o:l}` as *element* slicing (`${arr:1:2}` = two
+  elements); lush keeps it a scalar substring of the joined value. The
+  explicit `${arr[@]:o:l}` is the element-slice spelling, so lush does not
+  add a second implicit one.
+- zsh's bare-name pattern operators are element-wise in an unquoted
+  context and its `${arr:=word}` collapses the array to one element; lush
+  applies the operator once to the joined scalar and, for `:=`/`=`, writes
+  element 0 while preserving the array shape (the less-destructive bash
+  rule), in both compat modes.
+
+`${#arr}` is not one of these operators -- it is length/count and keeps
+its own curation (bash/posix: codepoint length of element 0; zsh/lush:
+element count).
 
 **The whole-word constraint.** A vector-yielding expansion -- a bare
 `${arr}` that resolves to a list/map, `${arr[@]}`, or a

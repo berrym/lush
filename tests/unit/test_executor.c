@@ -1551,6 +1551,183 @@ TEST(gate_lush_mode_array_command_still_strict) {
 }
 
 /* ============================================================================
+ * SEMANTICS section 3.9 mode gating -- scalar operator on a bare collection
+ *
+ * A scalar parameter operator (:-  :+  :=  #  ##  %  /  substring  ^^  @Q ...)
+ * applied to a bare array/map name is a scalar-slot type error in lush mode.
+ * The compat modes relax it: the collection is flattened to its mode scalar
+ * (bash/posix element 0, zsh whole-join on IFS[0]) and the existing operator
+ * engine applies to that scalar -- exact bash element-0 parity, and zsh
+ * scalar-slot parity via the join. zsh's element-slicing ${arr:o:l} and its
+ * := array-collapse are curated to the flatten-then-apply reading (documented
+ * divergences). Uses run_shell_mode_gated (arrays parse under lush; no leak).
+ * ============================================================================
+ */
+
+TEST(gate_bash_mode_bare_op_uses_element_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// bash applies every scalar operator to element 0: ${arr#a} strips the
+    /// prefix of "apple"; ${arr^^} uppercases only element 0.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(apple berry cherry)\nmode bash\n"
+              "echo \"[${arr#a}][${arr^^}][${arr:1:2}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[pple][APPLE][pp]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_bare_default_operator_element_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// :- yields element 0 when the array is non-empty; the default when the
+    /// array (element 0) is empty/unset.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(apple berry)\nmode bash\n"
+              "echo \"[${arr:-DEF}]\"\ne=()\necho \"[${e:-DEF}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[apple]");
+    ASSERT_STDOUT_CONTAINS(r, "[DEF]");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_assign_operator_preserves_array) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// := on a bare array writes element 0 and preserves the array shape --
+    /// it must not clobber the binding into a scalar.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(a b c)\nmode bash\n: \"${arr:=X}\"\n"
+              "echo \"n=${#arr[@]} zero=${arr[0]} all=${arr[*]}\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    /// arr[0] was already set ("a"), so := does not change it; the array
+    /// stays three elements.
+    ASSERT_STDOUT_CONTAINS(r, "n=3 zero=a all=a b c");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_assign_operator_on_empty_sets_element_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// := on an empty array assigns the default to element 0.
+    run_result_t r =
+        run_shell_mode_gated(exec, "arr=()\nmode bash\n: \"${arr:=X}\"\n"
+                                   "echo \"n=${#arr[@]} zero=${arr[0]}\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "n=1 zero=X");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_bare_op_uses_whole_join) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// zsh's scalar-slot behavior is join-then-apply-once: ${arr#a} strips one
+    /// leading "a" from the joined "apple berry cherry"; ${arr##*e} removes the
+    /// longest *e prefix of the join.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(apple berry cherry)\nmode zsh\n"
+              "echo \"[${arr#a}]\"\necho \"[${arr##*e}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[pple berry cherry]");
+    ASSERT_STDOUT_CONTAINS(r, "[rry]");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_substring_is_curated_scalar_substr) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Documented divergence: zsh reads bare ${arr:1:2} as element slicing
+    /// (-> "berry cherry"); lush curates it to a scalar substring of the join
+    /// ("apple berry cherry"[1:2] -> "pp"). The explicit ${arr[@]:1:2} vector
+    /// form remains the way to slice elements.
+    run_result_t r = run_shell_mode_gated(
+        exec, "arr=(apple berry cherry)\nmode zsh\necho \"[${arr:1:2}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[pp]");
+    ASSERT_TRUE(
+        strstr(r.out, "berry cherry") == NULL,
+        "lush curates zsh substring to scalar substr, not element slice");
+
+    executor_free(exec);
+}
+
+TEST(gate_bare_op_numeric_operand_not_slice) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Regression: ${arr:-5} / ${arr:+3} must route as the default/alternate
+    /// operators, not be mis-read as a :5 / :3 slice.
+    run_result_t r = run_shell_mode_gated(
+        exec,
+        "mode bash\ne=()\necho \"[${e:-5}]\"\nx=(y)\necho \"[${x:+3}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[5]");
+    ASSERT_STDOUT_CONTAINS(r, "[3]");
+
+    executor_free(exec);
+}
+
+TEST(gate_bare_op_attribute_query_not_type_error) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The @a attribute query is metadata-only and must work on a collection
+    /// in every mode, including lush -- it is never the section 3.9 type
+    /// error.
+    run_result_t r =
+        run_shell_mode_gated(exec, "declare -a arr=(x)\necho \"[${arr@a}]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "[a]");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "@a query is not a type error");
+
+    executor_free(exec);
+}
+
+TEST(gate_lush_mode_bare_op_still_strict) {
+    /// Regression: lush mode still rejects a scalar operator on a bare
+    /// collection with E1134, for every operator class. A fresh executor per
+    /// operator -- the E1134 path calls executor_request_posix_exit, whose
+    /// abort/error state would otherwise leak into the next iteration on a
+    /// shared executor.
+    const char *ops[] = {"${arr:-D}",  "${arr#a}",   "${arr^^}",
+                         "${arr:1:2}", "${arr/a/b}", "${arr:=X}"};
+    for (size_t i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
+        executor_t *exec = executor_new();
+        ASSERT_NOT_NULL(exec, "executor_new failed");
+        char src[128];
+        snprintf(src, sizeof(src), "arr=(a b c)\nx=%s\necho saw_post\n",
+                 ops[i]);
+        run_result_t r = run_shell_mode_gated(exec, src);
+        ASSERT_TRUE(strstr(r.out, "saw_post") == NULL,
+                    "lush mode aborts on scalar-op-on-collection");
+        ASSERT_STDERR_CONTAINS(r, "type mismatch");
+        executor_free(exec);
+    }
+}
+
+/* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
  */
@@ -5765,6 +5942,18 @@ int main(void) {
     RUN_TEST(gate_bash_mode_map_at_command_position_spreads_values);
     RUN_TEST(gate_bash_mode_empty_array_command_is_null_command);
     RUN_TEST(gate_lush_mode_array_command_still_strict);
+
+    printf("\nSEMANTICS 3.9 mode-gating: scalar operator on a bare "
+           "collection:\n");
+    RUN_TEST(gate_bash_mode_bare_op_uses_element_zero);
+    RUN_TEST(gate_bash_mode_bare_default_operator_element_zero);
+    RUN_TEST(gate_bash_mode_assign_operator_preserves_array);
+    RUN_TEST(gate_bash_mode_assign_operator_on_empty_sets_element_zero);
+    RUN_TEST(gate_zsh_mode_bare_op_uses_whole_join);
+    RUN_TEST(gate_zsh_mode_substring_is_curated_scalar_substr);
+    RUN_TEST(gate_bare_op_numeric_operand_not_slice);
+    RUN_TEST(gate_bare_op_attribute_query_not_type_error);
+    RUN_TEST(gate_lush_mode_bare_op_still_strict);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);
