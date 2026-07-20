@@ -93,6 +93,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = false,
 
                             /// Behavior Defaults
+            [FEATURE_STRICT_VALUE_TYPING] =
+                false, /// no POSIX array oracle; curate to the bash-family
+                       /// flatten (element 0 / space-join) for compatibility
             [FEATURE_WORD_SPLIT_DEFAULT] =
                 true, /// POSIX requires word splitting
             [FEATURE_AUTO_CD] = false,
@@ -187,6 +190,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults
+            [FEATURE_STRICT_VALUE_TYPING] =
+                false, /// bash flattens a list in a scalar slot (space-join /
+                       /// element 0), does not diagnose it
             [FEATURE_WORD_SPLIT_DEFAULT] =
                 true,                  /// Bash does word splitting by default
             [FEATURE_AUTO_CD] = false, /// shopt autocd, off by default
@@ -287,6 +293,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults
+            [FEATURE_STRICT_VALUE_TYPING] =
+                false, /// zsh flattens a list in a scalar slot on IFS[0],
+                       /// does not diagnose it
             [FEATURE_WORD_SPLIT_DEFAULT] =
                 false,                 /// Zsh doesn't word-split by default
             [FEATURE_AUTO_CD] = false, /// AUTO_CD option, off by default
@@ -386,6 +395,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults - Zsh's safer defaults
+            [FEATURE_STRICT_VALUE_TYPING] =
+                true, /// flagship: a list/map in a scalar slot is a type error
+                      /// (SEMANTICS section 3.9), not a silent flatten
             [FEATURE_WORD_SPLIT_DEFAULT] = false, /// Zsh behavior: safer
             [FEATURE_AUTO_CD] = true,             /// Convenience feature
             [FEATURE_AUTO_PUSHD] = false,         /// Optional
@@ -530,6 +542,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_TIME_KEYWORD] = "time_keyword",
 
     /// Behavior Defaults
+    [FEATURE_STRICT_VALUE_TYPING] = "strict_value_typing",
     [FEATURE_WORD_SPLIT_DEFAULT] = "word_split",
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
