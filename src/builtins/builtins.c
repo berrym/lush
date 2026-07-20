@@ -327,6 +327,87 @@ void builtin_report_dirstack(void) {
     }
 }
 
+int builtin_bind_array_literal(const char *name, const char *literal,
+                               bool assoc, symvar_flags_t flags) {
+    array_value_t *arr = symtable_array_create(assoc);
+    if (!arr) {
+        executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                              builtin_get_source_location(),
+                              "failed to create array");
+        return 1;
+    }
+
+    /// Parse a parenthesized array literal `(elem1 elem2 [k]=v ...)`. Element
+    /// boundaries respect quotes so a quoted element may contain spaces; the
+    /// raw element bytes (quotes included, matching the assignment path) are
+    /// stored. `[idx]=value` / `[key]=value` set a specific slot, otherwise
+    /// elements fill sequential indices.
+    if (literal && literal[0] == '(') {
+        const char *p = literal + 1;
+        int idx = 0;
+        while (*p && *p != ')') {
+            while (*p && isspace((unsigned char)*p)) {
+                p++;
+            }
+            if (*p == ')' || !*p) {
+                break;
+            }
+            const char *elem_start = p;
+            bool in_quote = false;
+            char quote_char = 0;
+            while (*p &&
+                   (in_quote || (!isspace((unsigned char)*p) && *p != ')'))) {
+                if (!in_quote && (*p == '"' || *p == '\'')) {
+                    in_quote = true;
+                    quote_char = *p;
+                } else if (in_quote && *p == quote_char) {
+                    in_quote = false;
+                }
+                p++;
+            }
+            size_t elem_len = (size_t)(p - elem_start);
+            if (elem_len > 0) {
+                char *elem = malloc(elem_len + 1);
+                if (elem) {
+                    memcpy(elem, elem_start, elem_len);
+                    elem[elem_len] = '\0';
+                    if (elem[0] == '[') {
+                        char *bracket_end = strchr(elem, ']');
+                        if (bracket_end && bracket_end[1] == '=') {
+                            *bracket_end = '\0';
+                            const char *idx_str = elem + 1;
+                            const char *elem_val = bracket_end + 2;
+                            if (assoc) {
+                                symtable_array_set_assoc(arr, idx_str,
+                                                         elem_val);
+                            } else {
+                                symtable_array_set_index(arr, atoi(idx_str),
+                                                         elem_val);
+                            }
+                        }
+                    } else {
+                        symtable_array_set_index(arr, idx++, elem);
+                    }
+                    free(elem);
+                }
+            }
+        }
+    }
+
+    if (symtable_set_array(name, arr) != 0) {
+        executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                              builtin_get_source_location(),
+                              "failed to store array");
+        symtable_array_free(arr);
+        return 1;
+    }
+
+    if (flags != SYMVAR_NONE) {
+        symtable_array_add_flags(name, flags);
+    }
+    return 0;
+}
+
 /* ============================================================================
  * Shared Helper: identifier validation
  *

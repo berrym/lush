@@ -313,9 +313,14 @@ never gated. A **named list or map in the command-name position** is the
 same crossing: strict in lush mode (a type error -- positionals are argv,
 a named list is not), relaxed in the compat modes to the oracle spread
 (bash/zsh expand `${cmd[@]}` into command words; bash reads a bare
-`${cmd}` as element 0, zsh spreads it). The rest of this section describes
-the strict (lush-mode) model; each strict clause below reads "in lush
-mode" implicitly.
+`${cmd}` as element 0, zsh spreads it). **`export name=(...)` and
+`readonly name=(...)`** are the same crossing on the write side: a type
+error in lush mode, relaxed in the compat modes to the oracle, which binds
+an indexed array with the export/readonly attribute (an array is not an
+environment string, so the export attribute is a no-op for the process
+environment, exactly as in bash). The rest of this section describes the
+strict (lush-mode) model; each strict clause below reads "in lush mode"
+implicitly.
 
 **Scalar operators on a bare collection.** A scalar parameter operator
 applied to a bare collection name -- `${arr:-default}`, `${arr#pat}`,

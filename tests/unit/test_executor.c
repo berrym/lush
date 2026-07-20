@@ -1728,6 +1728,107 @@ TEST(gate_lush_mode_bare_op_still_strict) {
 }
 
 /* ============================================================================
+ * SEMANTICS section 3.9 mode gating -- export / readonly of an array literal
+ *
+ * `export a=(x y z)` / `readonly a=(x y z)` bind a list into an
+ * assignment-aware builtin. In lush mode that is the scalar-slot type
+ * error. The compat modes relax it to the oracle: bash binds the indexed
+ * array (marking it exported / readonly). A later bare $a read follows the
+ * mode section 3.9 flatten (element 0 for bash, whole-join for zsh) --
+ * already covered by the read-site gate.
+ * ============================================================================
+ */
+
+/// The shared global symbol table persists bindings across the
+/// fresh-executor tests, so each of these uses a unique variable name --
+/// especially the readonly cases, whose attribute cannot be unset and would
+/// otherwise poison a common name for the rest of the suite.
+
+TEST(gate_bash_mode_export_binds_array) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// bash creates the indexed array; $eb is element 0, ${eb[1]} the second,
+    /// and the count is three.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\nexport pr2c_eb=(x y z)\n"
+              "echo \"0=$pr2c_eb 1=${pr2c_eb[1]} n=${#pr2c_eb[@]}\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "0=x 1=y n=3");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no E1134 for export array in bash mode");
+
+    executor_free(exec);
+}
+
+TEST(gate_zsh_mode_export_binds_array_whole_join_read) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// zsh binds the array too; a bare $name reads the whole space-join.
+    run_result_t r =
+        run_shell_mode_gated(exec, "mode zsh\nexport pr2c_ez=(x y z)\n"
+                                   "echo \"bare=$pr2c_ez n=${#pr2c_ez[@]}\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "bare=x y z n=3");
+
+    executor_free(exec);
+}
+
+TEST(gate_bash_mode_readonly_binds_array_and_enforces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// readonly binds the indexed array and the readonly attribute is
+    /// enforced -- a later element write is rejected and the value is
+    /// unchanged.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\nreadonly pr2c_rb=(p q r)\npr2c_rb[0]=CHANGED\n"
+              "echo \"after=${pr2c_rb[0]} n=${#pr2c_rb[@]}\"\n");
+
+    ASSERT_STDOUT_CONTAINS(r, "after=p n=3");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+
+    executor_free(exec);
+}
+
+TEST(gate_lush_mode_export_array_still_strict) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Regression: lush mode still rejects export of an array literal with
+    /// the type error and binds nothing. (A failed builtin sets $? and the
+    /// script continues -- unlike the expansion-time aborts -- so the check
+    /// is the diagnostic plus the absence of a binding, not an abort.) The
+    /// unique name proves non-binding: it is empty only if the export did
+    /// not create the array.
+    run_result_t r = run_shell_mode_gated(
+        exec, "export pr2c_le=(x y z)\necho \"check=[${pr2c_le[0]}]\"\n");
+
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDOUT_CONTAINS(r, "check=[]");
+
+    executor_free(exec);
+}
+
+TEST(gate_lush_mode_readonly_array_still_strict) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Regression: lush mode still rejects readonly of an array literal with
+    /// the type error and binds nothing.
+    run_result_t r = run_shell_mode_gated(
+        exec, "readonly pr2c_lr=(p q r)\necho \"check=[${pr2c_lr[0]}]\"\n");
+
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDOUT_CONTAINS(r, "check=[]");
+
+    executor_free(exec);
+}
+
+/* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
  */
@@ -5954,6 +6055,14 @@ int main(void) {
     RUN_TEST(gate_bare_op_numeric_operand_not_slice);
     RUN_TEST(gate_bare_op_attribute_query_not_type_error);
     RUN_TEST(gate_lush_mode_bare_op_still_strict);
+
+    printf("\nSEMANTICS 3.9 mode-gating: export / readonly of an array "
+           "literal:\n");
+    RUN_TEST(gate_bash_mode_export_binds_array);
+    RUN_TEST(gate_zsh_mode_export_binds_array_whole_join_read);
+    RUN_TEST(gate_bash_mode_readonly_binds_array_and_enforces);
+    RUN_TEST(gate_lush_mode_export_array_still_strict);
+    RUN_TEST(gate_lush_mode_readonly_array_still_strict);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);

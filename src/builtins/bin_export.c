@@ -8,6 +8,7 @@
 
 #include "builtins.h"
 #include "lle/lle_pager.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <stdio.h>
@@ -55,14 +56,15 @@ int bin_export(int argc, char **argv) {
         /// Parser-internal array-literal sentinel (\x1F): an argv
         /// element with this prefix came from the unquoted `name=(...)`
         /// form. The process environment is a key=string map -- list
-        /// values cannot be exported. Per SEMANTICS section 3.4 (no
-        /// implicit list-to-string coercion) and section 3.9 (list in
-        /// a scalar-requiring slot is a runtime type error), reject
-        /// with the structured-error type-mismatch rather than
-        /// silently joining the elements into a string. bash silently
-        /// flattens; lush does not.
+        /// values cannot be exported. Under strict value typing (lush
+        /// mode), per SEMANTICS section 3.4 (no implicit list-to-string
+        /// coercion) and section 3.9 (list in a scalar-requiring slot is
+        /// a runtime type error), reject with the structured-error
+        /// type-mismatch rather than silently joining the elements into
+        /// a string. In the relaxed compat modes the section 3.9
+        /// boundary policy follows the oracle instead (see below).
         if (arg[0] == '\x1F') {
-            /// Recover the name for the diagnostic.
+            /// Recover the name for the diagnostic / for the relaxed bind.
             const char *name_start = arg + 1;
             const char *name_end = strchr(name_start, '=');
             size_t nlen =
@@ -73,6 +75,21 @@ int bin_export(int argc, char **argv) {
             }
             memcpy(namebuf, name_start, nlen);
             namebuf[nlen] = '\0';
+            if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+                /// Relaxed (bash/zsh/posix): bash creates the indexed array
+                /// and marks it exported. An array is not an environment
+                /// string, so the export attribute is a no-op for the env --
+                /// exactly as in bash; the value simply lives in the shell.
+                /// A later bare `$name` read follows the mode's section 3.9
+                /// flatten (element 0 for bash/posix, whole-join for zsh).
+                const char *literal = name_end ? name_end + 1 : NULL;
+                if (builtin_bind_array_literal(namebuf, literal,
+                                               /*assoc=*/false,
+                                               SYMVAR_EXPORTED) != 0) {
+                    return 1;
+                }
+                continue;
+            }
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                 builtin_get_source_location(),
