@@ -305,7 +305,7 @@ vector-accepting or scalar-requiring:
 
 | Slot category    | Positions |
 |------------------|-----------|
-| Vector-accepting | argv (command arguments); the command-name position; array initializer `( ... )`; for-loop word list |
+| Vector-accepting | argv (command arguments); the command-name position (positional-parameter vectors only -- see below); array initializer `( ... )`; for-loop word list |
 | Scalar-requiring | variable assignment RHS; `case` word (`case $x in`); redirect target (`>`, `>>`); here-string (`<<<`); arithmetic operand `$(( ... ))`; conditional-expression operand `[[ ... ]]` |
 
 This table states the model's intent; the engine must codify the
@@ -317,6 +317,23 @@ A list or map value -- bare `${arr}`, or a vector-producing operator
 exactly as `${arr[@]}` does. In a scalar-requiring slot it is a type
 error. `${arr[*]}` and explicit joins produce a scalar and are valid
 in scalar-requiring slots.
+
+**The command-name position is a curated exception.** It is
+vector-accepting for the **positional-parameter** vectors -- `$@` /
+`"$@"` / `$*` / `${@}` -- which are argv, not a lush list-kind value:
+`set -- ls -la; "$@"` runs `ls -la`, and an empty positional set is a
+null command (exit 0). But a **named list or map** value in the
+command-name slot -- `"${arr[@]}"`, bare `${arr}`, a vector-producing
+flag form `"${(v)arr}"` / `"${(k)m}"` -- is not a command vector, so it
+is never silently spread into a command word: it joins to one word (and
+is looked up whole) or, for the `[@]` forms, raises the type error. This
+keeps the value model strict. bash and zsh
+expand a named array in command position; lush curates the type error,
+so an array is executed as a command only through an explicit form
+(`"${arr[@]}"` as *arguments*, or a joined scalar name). The `*`
+subscript is scalar in either case: `"$*"` / `"${arr[*]}"` join to one
+word, so `set -- echo hi; "$*"` looks up the single command name
+`echo hi`.
 
 For a **map**, "its elements" are its **values** in insertion order --
 `${m}`, `${m[@]}`, and the vector sigil `@m` all contribute the values,
