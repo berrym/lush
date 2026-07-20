@@ -15309,26 +15309,37 @@ static char *parse_parameter_expansion(executor_t *executor,
                     return result ? result : strdup("");
                 }
 
-                /// Array doesn't exist - check if there are parameter expansion
-                /// operators after ]
-                /// For example: ${arr[0]:-default}
+                /// Array doesn't exist. Compute the element value, then feed
+                /// it through the shared operator engine so a trailing
+                /// ${name[N]op...} applies (issue #527) -- previously a
+                /// trailing operator was dropped by a no-op stub here. Two
+                /// element-value sources flow into the SAME operator apply:
+                ///   (a) arr_name names a scalar string ->
+                ///   ${str[N]}/${str[N,M]}
+                ///       is a grapheme-cluster slice (TR#29 boundaries), and
+                ///   (b) arr_name is fully unset -> the element is NULL.
                 const char *after_bracket = close + 1;
+                const char *el_rhs = NULL;
+                int el_op = -1;
                 if (*after_bracket != '\0') {
-                    /// There's more after ] - this might be a parameter
-                    /// expansion on an unset array element. For now, treat as
-                    /// empty.
+                    el_op =
+                        detect_param_operator_suffix(after_bracket, &el_rhs);
                 }
 
-                /// String-slicing fallback: ${var[N]} / ${var[N,M]} on a
-                /// scalar string slices grapheme clusters (TR#29 boundaries).
-                /// Honors FEATURE_ARRAY_ZERO_INDEXED: 1-based for zsh-mode,
-                /// 0-based for bash/lush-mode. Subscript "@" / "*" are
-                /// array-only and have already been handled above.
+                /// Grapheme-slice fallback for a scalar name. Honors
+                /// FEATURE_ARRAY_ZERO_INDEXED (1-based zsh, 0-based bash/lush).
+                /// Subscript "@" / "*" are array-only and handled above.
+                /// Sets elem_result (owned) on success; name_is_scalar tracks
+                /// whether arr_name resolved to a scalar so a `:=`/`=` does not
+                /// synthesize an array over a scalar binding.
+                char *elem_result = NULL;
+                bool name_is_scalar = false;
                 if (strcmp(subscript, "@") != 0 &&
                     strcmp(subscript, "*") != 0) {
                     char *str_value =
                         symtable_get_var(executor->symtable, arr_name);
                     if (str_value) {
+                        name_is_scalar = true;
                         int start_idx = 0, end_idx = -1;
                         char *comma = strchr(subscript, ',');
                         if (comma) {
@@ -15341,15 +15352,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                             end_idx = start_idx; /// single grapheme
                         }
                         size_t value_len = strlen(str_value);
+                        bool slice_empty = false;
 
                         /// Negative-index handling: ${str[-N]} counts from
-                        /// the end. zsh-mode (1-based): -1 = last grapheme
-                        /// (position total). lush/bash-mode (0-based):
-                        /// -1 = last (position total-1). Computes the
-                        /// grapheme count via lle_utf8_count_graphemes
-                        /// (TR#29-correct, same primitive
-                        /// slice_string_graphemes uses internally).
-                        /// (Issue #68.)
+                        /// the end (issue #68), via lle_utf8_count_graphemes.
                         if (start_idx < 0 || end_idx < 0) {
                             int total = (int)lle_utf8_count_graphemes(
                                 str_value, value_len);
@@ -15364,36 +15370,90 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                         }
 
-                        /// Convert from 1-based (zsh) to 0-based if needed
+                        /// Convert from 1-based (zsh) to 0-based if needed.
                         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
                             if (start_idx <= 0 || end_idx <= 0) {
-                                free(str_value);
-                                free(subscript);
-                                free(arr_name);
-                                return strdup("");
+                                slice_empty = true;
+                            } else {
+                                start_idx--;
+                                end_idx--;
                             }
-                            start_idx--;
-                            end_idx--;
                         }
 
-                        /// Inverted range yields empty (catches both user-
-                        /// written ${str[3,1]} and post-conversion
-                        /// overshoots in 0-based mode).
-                        if (end_idx < start_idx) {
-                            free(str_value);
-                            free(subscript);
-                            free(arr_name);
-                            return strdup("");
+                        /// Inverted range yields empty.
+                        if (!slice_empty && end_idx < start_idx) {
+                            slice_empty = true;
                         }
 
-                        int count = end_idx - start_idx + 1;
-                        char *result = slice_string_graphemes(
-                            str_value, value_len, start_idx, count);
+                        if (slice_empty) {
+                            elem_result = strdup("");
+                        } else {
+                            int count = end_idx - start_idx + 1;
+                            elem_result = slice_string_graphemes(
+                                str_value, value_len, start_idx, count);
+                            if (!elem_result) {
+                                elem_result = strdup("");
+                            }
+                        }
                         free(str_value);
-                        free(subscript);
-                        free(arr_name);
-                        return result ? result : strdup("");
                     }
+                }
+
+                if (el_op >= 0) {
+                    /// Apply the operator to the element value. A single
+                    /// element cannot distinguish unset from empty, so an
+                    /// empty value is passed as NULL: the unset-keyed operators
+                    /// (`:-`/`-`/`:=`/`=`/`:?`/`?`) fire, matching the declared
+                    /// array-element path.
+                    char *el_default = expand_variables_in_string(
+                        executor, el_rhs ? el_rhs : "");
+                    char *elem_val =
+                        (elem_result && *elem_result) ? elem_result : NULL;
+                    bool assign_back = false;
+                    char *applied = apply_param_operator(
+                        executor, arr_name, elem_val,
+                        el_default ? el_default : (char *)"", el_op,
+                        &assign_back);
+                    if (assign_back && !name_is_scalar) {
+                        /// `:=`/`=` on an element of an unset name creates the
+                        /// array and persists the element, matching bash
+                        /// (`${undef[0]:=x}` -> undef=(x)).
+                        array_value_t *new_arr = symtable_array_create(false);
+                        if (new_arr) {
+                            arithm_clear_error();
+                            char *ir = arithm_expand(subscript);
+                            if (ir && !arithm_error_is_flagged()) {
+                                long ix = strtoll(ir, NULL, 10);
+                                bool one_based = !shell_mode_allows(
+                                    FEATURE_ARRAY_ZERO_INDEXED);
+                                if (!(one_based && ix == 0)) {
+                                    if (one_based && ix > 0) {
+                                        ix--; /// 1-based -> 0-based
+                                    }
+                                    symtable_array_set_index(new_arr, (int)ix,
+                                                             applied);
+                                }
+                            }
+                            free(ir);
+                            /// symtable_set_array takes ownership on success;
+                            /// free the array ourselves if the store fails so
+                            /// it is not leaked.
+                            if (symtable_set_array(arr_name, new_arr) != 0) {
+                                symtable_array_free(new_arr);
+                            }
+                        }
+                    }
+                    free(el_default);
+                    free(elem_result);
+                    free(subscript);
+                    free(arr_name);
+                    return applied ? applied : strdup("");
+                }
+
+                if (elem_result) {
+                    free(subscript);
+                    free(arr_name);
+                    return elem_result;
                 }
 
                 free(subscript);
