@@ -4013,6 +4013,74 @@ TEST(rt_star_unquoted_not_joined) {
     ASSERT_STDOUT_EQ(r, "n=3\n");
 }
 
+/// --- array element slice ${a[*]:off:len} (#530) -----------------------
+/// The numeric element slice must not be re-applied as a byte substring
+/// operator (the double-slice bug); the :- / :+ operators must NOT be
+/// mistaken for slices.
+
+TEST(rt_slice_star_basic) {
+    run_result_t r = run_shell("a=(w x y z); echo \"[${a[*]:0:2}]\"");
+    ASSERT_STDOUT_EQ(r, "[w x]\n");
+}
+
+TEST(rt_slice_star_offset) {
+    run_result_t r = run_shell("a=(w x y z); echo \"[${a[*]:1:2}]\"");
+    ASSERT_STDOUT_EQ(r, "[x y]\n");
+}
+
+TEST(rt_slice_star_to_end) {
+    run_result_t r = run_shell("a=(w x y z); echo \"[${a[*]:1}]\"");
+    ASSERT_STDOUT_EQ(r, "[x y z]\n");
+}
+
+TEST(rt_slice_star_custom_ifs) {
+    run_result_t r = run_shell("IFS=,; a=(w x y z); echo \"[${a[*]:1:2}]\"");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[x,y]\n");
+}
+
+TEST(rt_slice_star_default_op_not_slice) {
+    /// :- on a set array is the default operator (array is non-empty), NOT
+    /// a slice -- it must yield the joined value, not a truncation.
+    run_result_t r = run_shell("a=(w x y); echo \"[${a[*]:-def}]\"");
+    ASSERT_STDOUT_EQ(r, "[w x y]\n");
+}
+
+TEST(rt_slice_star_alt_op_not_slice) {
+    run_result_t r = run_shell("a=(w x y); echo \"[${a[*]:+alt}]\"");
+    ASSERT_STDOUT_EQ(r, "[alt]\n");
+}
+
+TEST(rt_slice_star_plus_numeric_op) {
+    /// ${a[*]:+2} is the :+ operator with a NUMERIC operand, not a slice --
+    /// strtol must not consume the '+' sign and mis-read it as an offset.
+    run_result_t r = run_shell("a=(w x y); echo \"[${a[*]:+2}]\"");
+    ASSERT_STDOUT_EQ(r, "[2]\n");
+}
+
+TEST(rt_slice_star_minus_numeric_op) {
+    /// ${a[*]:-2} on a set array is the :- default operator (array is
+    /// non-empty -> the joined value), not a slice from offset -2.
+    run_result_t r = run_shell("a=(w x y); echo \"[${a[*]:-2}]\"");
+    ASSERT_STDOUT_EQ(r, "[w x y]\n");
+}
+
+TEST(rt_slice_at_numeric_still_explodes) {
+    /// A numeric slice on the @ vector presentation still explodes to N
+    /// words (it is vector-producing), unaffected by the operator guard.
+    run_result_t r =
+        run_shell("a=(w x y z); c(){ echo \"n=$#\"; }; c \"${a[@]:1:2}\"");
+    ASSERT_STDOUT_EQ(r, "n=2\n");
+}
+
+TEST(rt_slice_at_scalar_op_is_type_error) {
+    /// A scalar-producing operator (:+) on the @ vector presentation is a
+    /// SEMANTICS 3.9 type mismatch (@ = vector; use ${a[*]:+word} for the
+    /// scalar form) -- not a slice, not a silent flatten. No output.
+    run_result_t r = run_shell("a=(w x y); echo \"[${a[@]:+alt}]\"");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
 /// --- positional vector in command position (#529) ---------------------
 /// A positional-parameter vector as the command name expands: first word is
 /// the command, the rest are arguments. A named array keeps the SEMANTICS
@@ -5755,6 +5823,18 @@ int main(void) {
     RUN_TEST(rt_star_at_still_explodes);
     RUN_TEST(rt_star_array_at_still_explodes);
     RUN_TEST(rt_star_unquoted_not_joined);
+
+    printf("\nRegression: array element slice ${a[*]:off:len} (#530):\n");
+    RUN_TEST(rt_slice_star_basic);
+    RUN_TEST(rt_slice_star_offset);
+    RUN_TEST(rt_slice_star_to_end);
+    RUN_TEST(rt_slice_star_custom_ifs);
+    RUN_TEST(rt_slice_star_default_op_not_slice);
+    RUN_TEST(rt_slice_star_alt_op_not_slice);
+    RUN_TEST(rt_slice_star_plus_numeric_op);
+    RUN_TEST(rt_slice_star_minus_numeric_op);
+    RUN_TEST(rt_slice_at_numeric_still_explodes);
+    RUN_TEST(rt_slice_at_scalar_op_is_type_error);
 
     printf("\nRegression: positional vector in command position (#529):\n");
     RUN_TEST(rt_cmdvec_positional_at_expands);
