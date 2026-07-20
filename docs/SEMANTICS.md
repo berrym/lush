@@ -318,7 +318,15 @@ a named list is not), relaxed in the compat modes to the oracle spread
 error in lush mode, relaxed in the compat modes to the oracle, which binds
 an indexed array with the export/readonly attribute (an array is not an
 environment string, so the export attribute is a no-op for the process
-environment, exactly as in bash). The rest of this section describes the
+environment, exactly as in bash). The **vector-producing parameter-flag
+forms** -- `${(v)a}` (values), `${(k)a}` (keys), `${(kv)m}` (pairs),
+`${(@)a}` (the `[@]` alias), and `${(s:x:)a}` splitting a collection -- are
+likewise the crossing: they spread in a vector slot (`try_expand_vector_arg`)
+but in a scalar slot they raise the type error in lush mode and flatten to
+the oracle (space / IFS[0]) in the compat modes, matching `${a[@]}`. The
+explicit join `${(j:x:)a}` is the sanctioned list-to-scalar collapse and is
+never the error; `${(s:x:)str}` splitting a *scalar* is a legitimate
+list-from-scalar and is not gated. The rest of this section describes the
 strict (lush-mode) model; each strict clause below reads "in lush mode"
 implicitly.
 
