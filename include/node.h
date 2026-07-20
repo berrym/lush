@@ -72,7 +72,19 @@ typedef enum {
     NODE_ARRAY_APPEND,  ///< arr+=(a b c) - append elements to array
 
     /// Extended language features (Extended Tests)
-    NODE_EXTENDED_TEST, ///< [[ expr ]] - extended test command
+    NODE_EXTENDED_TEST, ///< [[ expr ]] - extended test command (wrapper; its
+                        ///< single child is the conditional expression tree,
+                        ///< or zero children for an empty [[ ]])
+    /// Conditional-expression tree inside [[ ]]. Operands are ordinary
+    /// word-nodes (NODE_STRING_*/VAR/ARITH_EXP/COMMAND_SUB) carrying
+    /// quote_prov; operators are structure (the operator string lives in
+    /// val.str for the BINARY/UNARY forms). A bare word-node child is a
+    /// truthiness primary.
+    NODE_COND_OR,     ///< [[ a || b ]] - two children (left, right)
+    NODE_COND_AND,    ///< [[ a && b ]] - two children (left, right)
+    NODE_COND_NOT,    ///< [[ ! a ]]    - one child
+    NODE_COND_BINARY, ///< word <op> word - val.str=op, two word-node children
+    NODE_COND_UNARY,  ///< <op> word      - val.str=op, one word-node child
 
     /// Extended language features (Process Substitution)
     NODE_PROC_SUB_IN,  ///< <(cmd) - process substitution input

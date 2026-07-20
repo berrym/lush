@@ -3172,6 +3172,101 @@ TEST(extended_test_pattern_match) {
 }
 
 /* ============================================================================
+ * Extended-test [[ ]] Conditional-AST: quoted-pattern literals (issue #515)
+ * and the curated bash/zsh-consensus corrections that fall out of the AST.
+ *
+ * The engine builds a real conditional AST (operands are word-nodes carrying
+ * quote_prov) and tree-walks it, so a quoted/escaped glob metacharacter in the
+ * ==/!= RHS is literal while an unquoted one (including an unquoted $var
+ * expansion) stays active. Exit 0 = true, non-zero = false.
+ * ============================================================================
+ */
+
+/// Each entry is a [[ ]] command and its expected truth (true -> exit 0).
+static void dbracket_expect(const char *src, bool truth) {
+    executor_t *exec = executor_new();
+    run_result_t r = run_shell_with_executor(exec, src);
+    if (truth) {
+        ASSERT_EXIT_STATUS(r, 0);
+    } else {
+        ASSERT_TRUE(r.exit_status != 0, src);
+    }
+    executor_free(exec);
+}
+
+TEST(dbracket_quoted_metachars_are_literal) {
+    /// #515: quoted / escaped / single-quoted glob metacharacters in the RHS
+    /// pattern match literally, so `abc` does NOT match a literal `a*`.
+    dbracket_expect("[[ abc == \"a*\" ]]", false);
+    dbracket_expect("[[ abc == a\\* ]]", false);
+    dbracket_expect("[[ abc == 'a*' ]]", false);
+    dbracket_expect("[[ axc == \"a?c\" ]]", false);
+    dbracket_expect("[[ abc != \"a*\" ]]", true);
+    /// A literal pattern still matches the identical literal subject.
+    dbracket_expect("[[ \"a*\" == \"a*\" ]]", true);
+    dbracket_expect("[[ \"a*b\" == \"a*b\" ]]", true);
+    /// Quoted / escaped bracket class is a literal.
+    dbracket_expect("[[ \"a[b]\" == \"a[b]\" ]]", true);
+    dbracket_expect("[[ \"a[b]\" == a\\[b\\] ]]", true);
+}
+
+TEST(dbracket_quoted_var_pattern_is_literal) {
+    /// A double-quoted variable expansion in the RHS is a literal pattern.
+    dbracket_expect("y=\"a*\"; [[ abc == \"$y\" ]]", false);
+    dbracket_expect("y=\"a*\"; [[ \"a*\" == \"$y\" ]]", true);
+}
+
+TEST(dbracket_unquoted_metachars_stay_active) {
+    /// Unquoted metacharacters are an active glob; an unquoted $var expansion
+    /// stays active too (the curated bash/zsh consensus).
+    dbracket_expect("[[ abc == a* ]]", true);
+    dbracket_expect("[[ axc == a?c ]]", true);
+    dbracket_expect("[[ aXc == a[xX]c ]]", true);
+    dbracket_expect("p=\"a*\"; [[ abc == $p ]]", true);
+    /// Control: proves the unquoted-$var pattern is genuinely glob-active,
+    /// not vacuously true.
+    dbracket_expect("p=\"a*\"; [[ xyz == $p ]]", false);
+}
+
+TEST(dbracket_paren_patterns_and_regex) {
+    /// Unquoted paren patterns / regex groups are active and preserved by the
+    /// AST operand collection.
+    dbracket_expect("[[ abc == @(abc|xyz) ]]", true);
+    dbracket_expect("[[ abc =~ (abc|xyz) ]]", true);
+    dbracket_expect("[[ abc =~ ^a.c$ ]]", true);
+    dbracket_expect("[[ hello123 =~ ^([a-z]+)([0-9]+)$ ]]", true);
+    dbracket_expect("[[ aXc == [a-z]X[a-z] ]]", true);
+}
+
+TEST(dbracket_curated_precedence_and_negation) {
+    /// The AST gives && higher precedence than || (left-assoc), the bash/zsh
+    /// consensus: `a || (f && f)` is the OR short-circuit -> true, where the
+    /// old flat re-parse wrongly grouped `(a || f) && f` -> false.
+    dbracket_expect("[[ a == a || f == x && f == x ]]", true);
+    /// && binds tighter: `(t && f) || t` -> true.
+    dbracket_expect("[[ t == t && f == x || t == t ]]", true);
+    /// `!` composes over a parenthesized group (the old engine broke this).
+    dbracket_expect("[[ ! ( -z x ) ]]", true);
+    dbracket_expect("[[ ! ( -n x ) ]]", false);
+    dbracket_expect("[[ ! ( a == b ) ]]", true);
+}
+
+TEST(dbracket_empty_is_false) {
+    /// An empty [[ ]] is false (exit 1).
+    executor_t *exec = executor_new();
+    run_result_t r = run_shell_with_executor(exec, "[[ ]]");
+    ASSERT_TRUE(r.exit_status != 0, "empty [[ ]] is false");
+    executor_free(exec);
+}
+
+TEST(dbracket_no_word_split_of_operands) {
+    /// Operands are scalar-expanded with no word splitting -- a spaced value
+    /// stays one operand.
+    dbracket_expect("x=\"a b\"; [[ $x == \"a b\" ]]", true);
+    dbracket_expect("x=\"a b\"; [[ $x == a ]]", false);
+}
+
+/* ============================================================================
  * PARAMETER EXPANSION TESTS
  * ============================================================================
  */
@@ -6374,6 +6469,13 @@ int main(void) {
 
     printf("\nExtended test [[ ]] tests:\n");
     RUN_TEST(extended_test_string_equal);
+    RUN_TEST(dbracket_quoted_metachars_are_literal);
+    RUN_TEST(dbracket_quoted_var_pattern_is_literal);
+    RUN_TEST(dbracket_unquoted_metachars_stay_active);
+    RUN_TEST(dbracket_paren_patterns_and_regex);
+    RUN_TEST(dbracket_curated_precedence_and_negation);
+    RUN_TEST(dbracket_empty_is_false);
+    RUN_TEST(dbracket_no_word_split_of_operands);
     RUN_TEST(extended_test_string_not_equal);
     RUN_TEST(extended_test_regex_match);
     RUN_TEST(extended_test_and);

@@ -20154,495 +20154,316 @@ static bool extended_test_file_test(const char *op, const char *path) {
 /**
  * @brief Execute an extended test command [[ expression ]]
  *
- * Evaluates the conditional expression within [[ ]].
- * Supports string comparisons, pattern matching, regex matching,
- * file tests, and logical operators.
+ * Tree-walks the conditional-expression AST built by parse_extended_test
+ * (NODE_COND_OR / _AND / _NOT / _BINARY / _UNARY with word-node operands).
+ * Operands are expanded per node with expand_arg_node (scalar, provenance
+ * aware, no word-splitting, no globbing); operators dispatch on the canonical
+ * spelling stored in val.str.
  *
  * @param executor Executor context
- * @param test_node Extended test node with expression in val.str
- * @return 0 if test passes (true), 1 if fails (false)
+ * @param test_node NODE_EXTENDED_TEST wrapper (0 children = empty = false)
+ * @return 0 if the test passes (true), 1 if it fails (false)
  */
 
-/// Forward declaration for recursive evaluation
-static bool evaluate_simple_test(executor_t *executor, const char *expr);
+/// Forward declaration for the recursive conditional evaluator.
+static bool cond_eval(executor_t *executor, node_t *node);
 
-/**
- * @brief Find a logical operator (&& or ||) at the top level
- *
- * Scans for && or || that is not inside parentheses.
- * Returns pointer to the operator or NULL if not found.
- * Also sets op_len to 2 if found.
- */
-static char *find_logical_operator(char *expr, int *op_len, char *op_type) {
-    int paren_depth = 0;
-    char *p = expr;
-
-    while (*p) {
-        if (*p == '(') {
-            paren_depth++;
-        } else if (*p == ')') {
-            paren_depth--;
-        } else if (paren_depth == 0) {
-            /// Check for || first (lower precedence, so we want to split on it
-            /// first)
-            if (p[0] == '|' && p[1] == '|') {
-                *op_len = 2;
-                *op_type = '|';
-                return p;
-            }
-            /// Check for &&
-            if (p[0] == '&' && p[1] == '&') {
-                *op_len = 2;
-                *op_type = '&';
-                return p;
-            }
-        }
-        p++;
+/// Expand a conditional operand word-node to a scalar string (no split, no
+/// glob), honoring quote provenance. Never returns NULL.
+static char *cond_expand_operand(executor_t *executor, node_t *node) {
+    char *v = expand_arg_node(executor, node);
+    if (!v) {
+        v = strdup("");
     }
-    return NULL;
+    return v;
 }
 
-/**
- * @brief Evaluate an extended test expression with && and ||
- *
- * Recursively evaluates expressions, handling:
- * - || (OR) with lowest precedence
- * - && (AND) with higher precedence
- * - Parentheses for grouping
- * - Simple test expressions
- */
-static bool evaluate_extended_expr(executor_t *executor, char *expr) {
-    /// Trim whitespace
-    while (*expr && isspace(*expr))
-        expr++;
-    char *end = expr + strlen(expr) - 1;
-    while (end > expr && isspace(*end))
-        *end-- = '\0';
+/// The glob metacharacters lush_pattern_match treats as active on the [[ ]]
+/// path -- basic glob (`* ? [ ]`), the extglob introducers (`+ @ !` before a
+/// `(`), and grouping/alternation (`( )`), plus the escape byte itself.
+/// Emitting a backslash before one makes the shared matcher match it literally.
+static bool cond_pattern_meta(char c) {
+    return c != '\0' && strchr("*?[]()+@!\\", c) != NULL;
+}
 
-    if (*expr == '\0') {
+/// Copy `expanded` into a new owned string, backslash-escaping every
+/// metacharacter (used when the whole RHS operand is literal -- a single- or
+/// fully double-quoted pattern). Frees `expanded`; returns it unchanged only on
+/// allocation failure.
+static char *cond_escape_all_meta(char *expanded) {
+    size_t n = strlen(expanded);
+    char *out = malloc(n * 2 + 1);
+    if (!out) {
+        return expanded;
+    }
+    size_t j = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (cond_pattern_meta(expanded[i])) {
+            out[j++] = '\\';
+        }
+        out[j++] = expanded[i];
+    }
+    out[j] = '\0';
+    free(expanded);
+    return out;
+}
+
+/// Expand the RHS of `==` / `!=` as a glob pattern with SEMANTICS section 3.9 /
+/// issue #515 quoting: a metacharacter that came from a quoted or
+/// backslash-escaped source is literal (emitted `\<meta>` for the shared
+/// matcher); an unquoted metacharacter -- including one produced by an unquoted
+/// `$var` expansion -- stays active (the curated bash/zsh consensus). Returns
+/// an owned string; never NULL (empty on allocation failure).
+static char *cond_expand_rhs_pattern(executor_t *executor, node_t *rhs) {
+    char *expanded = cond_expand_operand(executor, rhs);
+
+    /// Single-quoted operand: every character is literal.
+    if (rhs->type == NODE_STRING_LITERAL) {
+        return cond_escape_all_meta(expanded);
+    }
+
+    /// Double-quoted (possibly a fused mixed-quote word): the per-character
+    /// quote_prov map is aligned to the source. When the source expanded
+    /// without changing length (no `$`/`` ` `` expansion, no dequoting) escape
+    /// per character -- only the quoted (non-U) metacharacters, so a fused
+    /// `abc"*"def` keeps its unquoted parts active. Otherwise the operand is a
+    /// double-quoted string whose content is protected: escape every
+    /// metacharacter (a lone quoted `"$var"` is uniformly protected, so this is
+    /// exact for it).
+    if (rhs->type == NODE_STRING_EXPANDABLE) {
+        const char *prov = rhs->quote_prov;
+        const char *src = rhs->val.str;
+        size_t elen = strlen(expanded);
+        if (prov && src && strlen(src) == elen) {
+            char *out = malloc(elen * 2 + 1);
+            if (!out) {
+                return expanded;
+            }
+            size_t j = 0;
+            for (size_t i = 0; i < elen; i++) {
+                if (cond_pattern_meta(expanded[i]) &&
+                    prov[i] != QUOTE_PROV_UNQUOTED) {
+                    out[j++] = '\\';
+                }
+                out[j++] = expanded[i];
+            }
+            out[j] = '\0';
+            free(expanded);
+            return out;
+        }
+        return cond_escape_all_meta(expanded);
+    }
+
+    /// Unquoted operand (NODE_VAR / arithmetic / command sub): metacharacters
+    /// are active -- including those introduced by an unquoted `$var`
+    /// expansion (the curated consensus) and the extglob/regex parens the
+    /// parser gathered as an all-unquoted pattern. The one literal case is a
+    /// backslash-escaped metacharacter written directly in the source (`a\*`),
+    /// which expand_arg_node strips: rebuild from the source keeping
+    /// `\<meta>` literal. A source that mixes a backslash with an expansion is
+    /// exotic and is left as the plain (active) expansion.
+    if (rhs->val.str && strchr(rhs->val.str, '\\') &&
+        !strchr(rhs->val.str, '$') && !strchr(rhs->val.str, '`')) {
+        free(expanded);
+        const char *s = rhs->val.str;
+        size_t n = strlen(s);
+        char *out = malloc(n * 2 + 1);
+        if (!out) {
+            return strdup(s);
+        }
+        size_t j = 0;
+        for (size_t i = 0; i < n; i++) {
+            if (s[i] == '\\' && s[i + 1] != '\0') {
+                char c = s[i + 1];
+                if (cond_pattern_meta(c)) {
+                    out[j++] = '\\';
+                }
+                out[j++] = c;
+                i++;
+            } else {
+                out[j++] = s[i];
+            }
+        }
+        out[j] = '\0';
+        return out;
+    }
+    return expanded;
+}
+
+/// Test whether -v's operand names a set variable or a set array element.
+///   -v NAME       -- true if any binding (scalar or array) named NAME is set.
+///   -v NAME[KEY]  -- true if the associative key / indexed slot is set.
+/// Bash semantics: -v on an unset element or unset scalar is false (#97).
+static bool cond_var_set(const char *operand) {
+    if (!operand) {
         return false;
     }
-
-    /// Check if entire expression is wrapped in parentheses
-    if (*expr == '(' && *(expr + strlen(expr) - 1) == ')') {
-        /// Check if they match (not just opening and closing from different
-        /// groups)
-        int depth = 0;
-        bool matched = true;
-        for (char *p = expr; *p; p++) {
-            if (*p == '(')
-                depth++;
-            else if (*p == ')')
-                depth--;
-            if (depth == 0 && *(p + 1) != '\0') {
-                matched = false;
-                break;
-            }
-        }
-        if (matched) {
-            /// Strip outer parentheses
-            char *inner = expr + 1;
-            expr[strlen(expr) - 1] = '\0';
-            return evaluate_extended_expr(executor, inner);
-        }
+    char *arg = strdup(operand);
+    if (!arg) {
+        return false;
     }
-
-    /// Look for || first (lowest precedence)
-    int op_len = 0;
-    char op_type = 0;
-    char *op_pos = find_logical_operator(expr, &op_len, &op_type);
-
-    if (op_pos && op_type == '|') {
-        /// Split on ||
-        *op_pos = '\0';
-        char *left = expr;
-        char *right = op_pos + 2;
-
-        /// Short-circuit: if left is true, don't evaluate right
-        if (evaluate_extended_expr(executor, left)) {
-            return true;
-        }
-        return evaluate_extended_expr(executor, right);
+    /// Trim trailing whitespace defensively (operand is scalar-expanded).
+    char *end = arg + strlen(arg);
+    while (end > arg && isspace((unsigned char)end[-1])) {
+        *--end = '\0';
     }
-
-    /// Look for && (higher precedence than ||)
-    op_pos = NULL;
-    op_len = 0;
-    op_type = 0;
-
-    /// Re-scan for && only
-    int paren_depth = 0;
-    for (char *p = expr; *p; p++) {
-        if (*p == '(')
-            paren_depth++;
-        else if (*p == ')')
-            paren_depth--;
-        else if (paren_depth == 0 && p[0] == '&' && p[1] == '&') {
-            op_pos = p;
-            op_len = 2;
-            op_type = '&';
-            break;
-        }
-    }
-
-    if (op_pos && op_type == '&') {
-        /// Split on &&
-        *op_pos = '\0';
-        char *left = expr;
-        char *right = op_pos + 2;
-
-        /// Short-circuit: if left is false, don't evaluate right
-        if (!evaluate_extended_expr(executor, left)) {
-            return false;
-        }
-        return evaluate_extended_expr(executor, right);
-    }
-
-    /// No logical operators at this level - evaluate as simple test
-    return evaluate_simple_test(executor, expr);
-}
-
-/// @brief Evaluate a simple test expression (no && or ||)
-static bool evaluate_simple_test(executor_t *executor, const char *expr) {
-    char *p = (char *)expr;
-
-    /// Skip leading whitespace
-    while (*p && isspace(*p))
-        p++;
-
-    /// Check for negation
-    bool negate = false;
-    if (*p == '!') {
-        negate = true;
-        p++;
-        while (*p && isspace(*p))
-            p++;
-    }
-
     bool result = false;
-
-    /// Check for unary file/string tests
-    if (*p == '-' && p[1] && isalpha(p[1])) {
-        /// Extract operator
-        char op[4] = {0};
-        int op_len = 0;
-        while (*p && !isspace(*p) && op_len < 3) {
-            op[op_len++] = *p++;
-        }
-        op[op_len] = '\0';
-
-        /// Skip whitespace
-        while (*p && isspace(*p))
-            p++;
-
-        /// String tests
-        if (strcmp(op, "-z") == 0) {
-            result = (*p == '\0');
-        } else if (strcmp(op, "-n") == 0) {
-            result = (*p != '\0');
-        } else if (strcmp(op, "-v") == 0) {
-            /// -v NAME -- true if scalar variable NAME is set.
-            /// -v NAME[KEY] / NAME[N] -- true if the array element
-            /// is set (associative key present, indexed slot has a
-            /// value). Bash semantics: -v on an unset arr[k] returns
-            /// false; on an unset scalar also false. Issue #97.
-            char *arg = strdup(p);
-            if (arg) {
-                char *end = arg + strlen(arg) - 1;
-                while (end > arg && isspace(*end)) {
-                    *end-- = '\0';
-                }
-                char *bracket = strchr(arg, '[');
-                if (bracket) {
-                    *bracket = '\0';
-                    char *close = strchr(bracket + 1, ']');
-                    if (close) {
-                        *close = '\0';
-                        const char *key = bracket + 1;
-                        array_value_t *array = symtable_get_array(arg);
-                        if (array) {
-                            if (array->is_associative) {
-                                result = symtable_array_get_assoc(array, key) !=
-                                         NULL;
-                            } else {
-                                char *endp = NULL;
-                                long idx = strtol(key, &endp, 10);
-                                if (endp && *endp == '\0') {
-                                    result = symtable_array_get_index(
-                                                 array, (int)idx) != NULL;
-                                }
-                            }
-                        }
-                    }
+    char *bracket = strchr(arg, '[');
+    if (bracket) {
+        *bracket = '\0';
+        char *close = strchr(bracket + 1, ']');
+        if (close) {
+            *close = '\0';
+            const char *key = bracket + 1;
+            array_value_t *array = symtable_get_array(arg);
+            if (array) {
+                if (array->is_associative) {
+                    result = symtable_array_get_assoc(array, key) != NULL;
                 } else {
-                    /// -v NAME without subscript: true for any kind of
-                    /// binding (scalar OR array). Pre-migration this
-                    /// only checked symtable_get_var, missing arrays --
-                    /// `arr=(a); [[ -v arr ]]` was false in lush but
-                    /// true in bash. The unified view fixes that by
-                    /// returning true on any LUSH_VALUE_* hit.
-                    lush_value_view_t view = {0};
-                    result = symtable_lookup(arg, &view);
-                    lush_value_view_clear(&view);
+                    char *endp = NULL;
+                    long idx = strtol(key, &endp, 10);
+                    if (endp && *endp == '\0') {
+                        result =
+                            symtable_array_get_index(array, (int)idx) != NULL;
+                    }
                 }
-                free(arg);
-            }
-        } else if (strcmp(op, "-o") == 0) {
-            /// `[[ -o NAME ]]` -- query named shell option state.
-            /// Single unified entry point in shell_is_option_set walks
-            /// POSIX options, feature matrix names + aliases, noop-alias
-            /// recorded state, and the `interactive` pseudo-option.
-            char *name = strdup(p);
-            if (name) {
-                char *end = name + strlen(name) - 1;
-                while (end > name && isspace(*end)) {
-                    *end-- = '\0';
-                }
-                result = shell_is_option_set(name);
-                free(name);
-            }
-        } else {
-            /// File tests - get the path (rest of line, trimmed)
-            char *path = strdup(p);
-            if (path) {
-                char *end = path + strlen(path) - 1;
-                while (end > path && isspace(*end))
-                    *end-- = '\0';
-                result = extended_test_file_test(op, path);
-                free(path);
             }
         }
     } else {
-        /// Binary expression: lhs op rhs
-        char *lhs_start = p;
-        char *op_start = NULL;
-        char op_type[4] = {0};
-
-        /// Scan for binary operator
-        char *scan = p;
-        int paren_depth = 0;
-
-        while (*scan) {
-            if (*scan == '(')
-                paren_depth++;
-            else if (*scan == ')')
-                paren_depth--;
-            else if (paren_depth == 0) {
-                if (scan[0] == '=' && scan[1] == '=') {
-                    op_start = scan;
-                    strcpy(op_type, "==");
-                    break;
-                } else if (scan[0] == '!' && scan[1] == '=') {
-                    op_start = scan;
-                    strcpy(op_type, "!=");
-                    break;
-                } else if (scan[0] == '=' && scan[1] == '~') {
-                    op_start = scan;
-                    strcpy(op_type, "=~");
-                    break;
-                } else if (scan[0] == '=' && scan[1] != '=' && scan[1] != '~') {
-                    /// Single `=` -- bash/zsh alias for `==`. Recognized
-                    /// even when scan == lhs_start because empty LHS
-                    /// (e.g. `[[ "$EMPTY" = "y" ]]` after expansion) is
-                    /// a real-world case where the binary-op scan must
-                    /// still split off the operator and RHS. Without
-                    /// this, `[[ "" = X ]]` falls through to the "no
-                    /// operator -- non-empty string is true" branch and
-                    /// reports equality regardless of RHS value.
-                    if (g_debug_context) {
-                        debug_trace_printf(
-                            g_debug_context,
-                            "extended-test = recognized at offset %zd\n",
-                            (ssize_t)(scan - lhs_start));
-                    }
-                    op_start = scan;
-                    strcpy(op_type, "==");
-                    break;
-                } else if (scan[0] == '<' && scan[1] != '<') {
-                    op_start = scan;
-                    strcpy(op_type, "<");
-                    break;
-                } else if (scan[0] == '>' && scan[1] != '>') {
-                    op_start = scan;
-                    strcpy(op_type, ">");
-                    break;
-                } else if (scan[0] == '-' && isalpha(scan[1])) {
-                    if (strncmp(scan, "-eq", 3) == 0 &&
-                        (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-eq");
-                        break;
-                    } else if (strncmp(scan, "-ne", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-ne");
-                        break;
-                    } else if (strncmp(scan, "-lt", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-lt");
-                        break;
-                    } else if (strncmp(scan, "-le", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-le");
-                        break;
-                    } else if (strncmp(scan, "-gt", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-gt");
-                        break;
-                    } else if (strncmp(scan, "-ge", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-ge");
-                        break;
-                    } else if (strncmp(scan, "-nt", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-nt");
-                        break;
-                    } else if (strncmp(scan, "-ot", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-ot");
-                        break;
-                    } else if (strncmp(scan, "-ef", 3) == 0 &&
-                               (isspace(scan[3]) || scan[3] == '\0')) {
-                        op_start = scan;
-                        strcpy(op_type, "-ef");
-                        break;
-                    }
-                }
-            }
-            scan++;
-        }
-
-        if (op_start && op_type[0]) {
-            /// Extract LHS
-            size_t lhs_len = op_start - lhs_start;
-            char *lhs = malloc(lhs_len + 1);
-            if (lhs) {
-                strncpy(lhs, lhs_start, lhs_len);
-                lhs[lhs_len] = '\0';
-                char *end = lhs + strlen(lhs) - 1;
-                while (end >= lhs && isspace(*end))
-                    *end-- = '\0';
-            }
-
-            /// Extract RHS
-            char *rhs_start = op_start + strlen(op_type);
-            while (*rhs_start && isspace(*rhs_start))
-                rhs_start++;
-            char *rhs = strdup(rhs_start);
-            if (rhs) {
-                char *end = rhs + strlen(rhs) - 1;
-                while (end >= rhs && isspace(*end))
-                    *end-- = '\0';
-            }
-
-            /// Evaluate based on operator
-            if (strcmp(op_type, "==") == 0) {
-                result = extended_test_pattern_match(lhs, rhs);
-            } else if (strcmp(op_type, "!=") == 0) {
-                result = !extended_test_pattern_match(lhs, rhs);
-            } else if (strcmp(op_type, "=~") == 0) {
-                result = extended_test_regex_match(executor, lhs, rhs);
-            } else if (strcmp(op_type, "<") == 0) {
-                result = (strcmp(lhs ? lhs : "", rhs ? rhs : "") < 0);
-            } else if (strcmp(op_type, ">") == 0) {
-                result = (strcmp(lhs ? lhs : "", rhs ? rhs : "") > 0);
-            } else if (strcmp(op_type, "-eq") == 0) {
-                result = (atoll(lhs ? lhs : "0") == atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-ne") == 0) {
-                result = (atoll(lhs ? lhs : "0") != atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-lt") == 0) {
-                result = (atoll(lhs ? lhs : "0") < atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-le") == 0) {
-                result = (atoll(lhs ? lhs : "0") <= atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-gt") == 0) {
-                result = (atoll(lhs ? lhs : "0") > atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-ge") == 0) {
-                result = (atoll(lhs ? lhs : "0") >= atoll(rhs ? rhs : "0"));
-            } else if (strcmp(op_type, "-nt") == 0) {
-                /// File1 newer than file2
-                struct stat st1, st2;
-                if (lhs && rhs && stat(lhs, &st1) == 0 &&
-                    stat(rhs, &st2) == 0) {
-                    result = (st1.st_mtime > st2.st_mtime);
-                } else {
-                    result = false;
-                }
-            } else if (strcmp(op_type, "-ot") == 0) {
-                /// File1 older than file2
-                struct stat st1, st2;
-                if (lhs && rhs && stat(lhs, &st1) == 0 &&
-                    stat(rhs, &st2) == 0) {
-                    result = (st1.st_mtime < st2.st_mtime);
-                } else {
-                    result = false;
-                }
-            } else if (strcmp(op_type, "-ef") == 0) {
-                /// File1 and file2 are same file (same device and inode)
-                struct stat st1, st2;
-                if (lhs && rhs && stat(lhs, &st1) == 0 &&
-                    stat(rhs, &st2) == 0) {
-                    result =
-                        (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino);
-                } else {
-                    result = false;
-                }
-            }
-
-            free(lhs);
-            free(rhs);
-        } else {
-            /// No operator - non-empty string is true
-            result = (*p != '\0');
-        }
+        /// Bare NAME: true for any kind of binding (scalar OR array).
+        lush_value_view_t view = {0};
+        result = symtable_lookup(arg, &view);
+        lush_value_view_clear(&view);
     }
+    free(arg);
+    return result;
+}
 
-    return negate ? !result : result;
+/// Evaluate a NODE_COND_UNARY: `op operand`.
+static bool cond_eval_unary(executor_t *executor, node_t *node) {
+    const char *op = node->val.str;
+    node_t *word = node->first_child;
+    if (!op || !word) {
+        return false;
+    }
+    char *operand = cond_expand_operand(executor, word);
+    bool result;
+    if (strcmp(op, "-z") == 0) {
+        result = (operand[0] == '\0');
+    } else if (strcmp(op, "-n") == 0) {
+        result = (operand[0] != '\0');
+    } else if (strcmp(op, "-v") == 0) {
+        result = cond_var_set(operand);
+    } else if (strcmp(op, "-o") == 0) {
+        result = shell_is_option_set(operand);
+    } else {
+        /// File tests -e/-f/-d/.../-O/-G (and unimplemented -t/-a/-N/-R ->
+        /// false).
+        result = extended_test_file_test(op, operand);
+    }
+    free(operand);
+    return result;
+}
+
+/// Evaluate a NODE_COND_BINARY: `lhs op rhs`.
+static bool cond_eval_binary(executor_t *executor, node_t *node) {
+    const char *op = node->val.str;
+    node_t *lnode = node->first_child;
+    node_t *rnode = lnode ? lnode->next_sibling : NULL;
+    if (!op || !lnode || !rnode) {
+        return false;
+    }
+    char *lhs = cond_expand_operand(executor, lnode);
+    /// The ==/!= RHS is a glob PATTERN whose quoted/escaped metacharacters must
+    /// be literal (issue #515), so it is expanded with the provenance-aware
+    /// escape. Every other operator -- including the =~ regex, whose
+    /// metacharacter set differs -- takes the plain scalar RHS.
+    char *rhs = (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0)
+                    ? cond_expand_rhs_pattern(executor, rnode)
+                    : cond_expand_operand(executor, rnode);
+    bool result = false;
+    if (strcmp(op, "=~") == 0) {
+        result = extended_test_regex_match(executor, lhs, rhs);
+    } else if (strcmp(op, "==") == 0) {
+        result = extended_test_pattern_match(lhs, rhs);
+    } else if (strcmp(op, "!=") == 0) {
+        result = !extended_test_pattern_match(lhs, rhs);
+    } else if (strcmp(op, "<") == 0) {
+        result = (strcmp(lhs, rhs) < 0);
+    } else if (strcmp(op, ">") == 0) {
+        result = (strcmp(lhs, rhs) > 0);
+    } else if (strcmp(op, "-eq") == 0) {
+        result = (atoll(lhs) == atoll(rhs));
+    } else if (strcmp(op, "-ne") == 0) {
+        result = (atoll(lhs) != atoll(rhs));
+    } else if (strcmp(op, "-lt") == 0) {
+        result = (atoll(lhs) < atoll(rhs));
+    } else if (strcmp(op, "-le") == 0) {
+        result = (atoll(lhs) <= atoll(rhs));
+    } else if (strcmp(op, "-gt") == 0) {
+        result = (atoll(lhs) > atoll(rhs));
+    } else if (strcmp(op, "-ge") == 0) {
+        result = (atoll(lhs) >= atoll(rhs));
+    } else if (strcmp(op, "-nt") == 0) {
+        struct stat s1, s2;
+        result = (stat(lhs, &s1) == 0 && stat(rhs, &s2) == 0 &&
+                  s1.st_mtime > s2.st_mtime);
+    } else if (strcmp(op, "-ot") == 0) {
+        struct stat s1, s2;
+        result = (stat(lhs, &s1) == 0 && stat(rhs, &s2) == 0 &&
+                  s1.st_mtime < s2.st_mtime);
+    } else if (strcmp(op, "-ef") == 0) {
+        struct stat s1, s2;
+        result = (stat(lhs, &s1) == 0 && stat(rhs, &s2) == 0 &&
+                  s1.st_dev == s2.st_dev && s1.st_ino == s2.st_ino);
+    }
+    free(lhs);
+    free(rhs);
+    return result;
+}
+
+/// Recursively evaluate one conditional-expression node. OR/AND short-circuit
+/// via C's && / ||; NOT inverts; BINARY/UNARY dispatch on the operator; any
+/// other node is a bare word-operand tested for truthiness (non-empty after
+/// scalar expansion).
+static bool cond_eval(executor_t *executor, node_t *node) {
+    if (!node) {
+        return false;
+    }
+    switch (node->type) {
+    case NODE_COND_OR: {
+        node_t *l = node->first_child;
+        node_t *r = l ? l->next_sibling : NULL;
+        return cond_eval(executor, l) || cond_eval(executor, r);
+    }
+    case NODE_COND_AND: {
+        node_t *l = node->first_child;
+        node_t *r = l ? l->next_sibling : NULL;
+        return cond_eval(executor, l) && cond_eval(executor, r);
+    }
+    case NODE_COND_NOT:
+        return !cond_eval(executor, node->first_child);
+    case NODE_COND_UNARY:
+        return cond_eval_unary(executor, node);
+    case NODE_COND_BINARY:
+        return cond_eval_binary(executor, node);
+    default: {
+        char *v = cond_expand_operand(executor, node);
+        bool result = (v[0] != '\0');
+        free(v);
+        return result;
+    }
+    }
 }
 
 static int execute_extended_test(executor_t *executor, node_t *test_node) {
-    if (!test_node || !test_node->val.str) {
+    if (!test_node) {
         return 1;
     }
-
-    const char *expr = test_node->val.str;
-
-    if (executor->debug) {
-        printf("DEBUG: Executing extended test: [[ %s ]]\n", expr);
-    }
-
-    /// First, expand variables in the expression
-    char *expanded = expand_if_needed(executor, expr);
-    if (!expanded) {
-        expanded = strdup(expr);
-    }
-    if (!expanded) {
-        return 1;
-    }
-
-    if (executor->debug) {
-        printf("DEBUG: Expanded extended test: [[ %s ]]\n", expanded);
-    }
-
-    /// Evaluate the expression using recursive evaluator
-    /// This handles &&, ||, parentheses, and simple tests
-    bool result = evaluate_extended_expr(executor, expanded);
-
-    free(expanded);
-
-    /// Update exit status
+    /// Empty `[[ ]]` (no children) is false.
+    node_t *expr = test_node->first_child;
+    bool result = expr ? cond_eval(executor, expr) : false;
     executor->exit_status = result ? 0 : 1;
-
-    if (executor->debug) {
-        printf("DEBUG: Extended test result: %s, exit status: %d\n",
-               result ? "true" : "false", executor->exit_status);
-    }
-
     return result ? 0 : 1;
 }
 
