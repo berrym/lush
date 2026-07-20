@@ -413,96 +413,14 @@ int bin_declare(int argc, char **argv) {
             continue;
         }
 
-        /// Handle array declarations
+        /// Handle array declarations. The array-literal parse + store +
+        /// attribute-flag application lives in the shared
+        /// builtin_bind_array_literal (also used by export/readonly in the
+        /// section 3.9 relaxed modes). declare -ar / -Ar / -ax / -Ax thread
+        /// the requested attribute onto the array record so subsequent
+        /// element writes honor it (the array record carries its own flags
+        /// field, which the scalar SYMVAR_READONLY check does not see).
         if (opt_indexed_array || opt_assoc_array) {
-            array_value_t *arr = symtable_array_create(opt_assoc_array);
-            if (!arr) {
-                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
-                                      builtin_get_source_location(),
-                                      "failed to create array");
-                free(name);
-                return 1;
-            }
-
-            /// If value is provided and starts with (, parse as array literal
-            if (value && value[0] == '(') {
-                /// Parse array literal (elem1 elem2 ...)
-                const char *p = value + 1;
-                int idx = 0;
-
-                while (*p && *p != ')') {
-                    /// Skip whitespace
-                    while (*p && isspace(*p))
-                        p++;
-                    if (*p == ')' || !*p)
-                        break;
-
-                    /// Find end of element
-                    const char *elem_start = p;
-                    bool in_quote = false;
-                    char quote_char = 0;
-
-                    while (*p && (in_quote || (!isspace(*p) && *p != ')'))) {
-                        if (!in_quote && (*p == '"' || *p == '\'')) {
-                            in_quote = true;
-                            quote_char = *p;
-                        } else if (in_quote && *p == quote_char) {
-                            in_quote = false;
-                        }
-                        p++;
-                    }
-
-                    size_t elem_len = p - elem_start;
-                    if (elem_len > 0) {
-                        char *elem = malloc(elem_len + 1);
-                        if (elem) {
-                            strncpy(elem, elem_start, elem_len);
-                            elem[elem_len] = '\0';
-
-                            /// Check for [n]=value syntax
-                            if (elem[0] == '[') {
-                                char *bracket_end = strchr(elem, ']');
-                                if (bracket_end && bracket_end[1] == '=') {
-                                    *bracket_end = '\0';
-                                    const char *idx_str = elem + 1;
-                                    const char *elem_val = bracket_end + 2;
-
-                                    if (opt_assoc_array) {
-                                        symtable_array_set_assoc(arr, idx_str,
-                                                                 elem_val);
-                                    } else {
-                                        int parsed_idx = atoi(idx_str);
-                                        symtable_array_set_index(
-                                            arr, parsed_idx, elem_val);
-                                    }
-                                }
-                            } else {
-                                /// Regular element
-                                symtable_array_set_index(arr, idx++, elem);
-                            }
-                            free(elem);
-                        }
-                    }
-                }
-            }
-
-            if (symtable_set_array(name, arr) != 0) {
-                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
-                                      builtin_get_source_location(),
-                                      "failed to store array");
-                symtable_array_free(arr);
-                free(name);
-                return 1;
-            }
-
-            /// declare -ar / -Ar / -ax / -Ax: thread the requested
-            /// attribute flags onto the array record so subsequent
-            /// element writes (arr[idx]=value) and bulk assignments
-            /// honor the attribute. The scalar branch builds `flags`
-            /// the same way; this branch routes them at the array
-            /// layer because the array record carries its own flags
-            /// field (the scalar SYMVAR_READONLY check at
-            /// symtable_set_var doesn't see element writes).
             symvar_flags_t array_flags = SYMVAR_NONE;
             if (opt_readonly) {
                 array_flags |= SYMVAR_READONLY;
@@ -510,8 +428,10 @@ int bin_declare(int argc, char **argv) {
             if (opt_export) {
                 array_flags |= SYMVAR_EXPORTED;
             }
-            if (array_flags != SYMVAR_NONE) {
-                symtable_array_add_flags(name, array_flags);
+            if (builtin_bind_array_literal(name, value, opt_assoc_array,
+                                           array_flags) != 0) {
+                free(name);
+                return 1;
             }
         }
         /// Handle integer declaration

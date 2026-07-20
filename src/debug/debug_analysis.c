@@ -18,6 +18,7 @@
 #include "lle/unicode_compare.h"
 #include "node.h"
 #include "parser.h"
+#include "shell_mode.h"
 #include "tokenizer.h"
 
 #include <ctype.h>
@@ -694,7 +695,12 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                                            &has_vector, &end_pos)) {
                     continue;
                 }
-                if (has_vector) {
+                /// Only a runtime type error under strict value typing (lush
+                /// mode). In the relaxed compat modes the same RHS flattens to
+                /// the oracle scalar (SEMANTICS section 3.9), so predicting a
+                /// type error there would be a false positive.
+                if (has_vector &&
+                    shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
                     debug_add_analysis_issue(
                         ctx, file, line_num, "warning", "type",
                         "list value (`${...[@]}`) reaches a scalar "

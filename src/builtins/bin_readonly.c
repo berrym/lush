@@ -8,6 +8,7 @@
 
 #include "builtins.h"
 #include "lle/lle_pager.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <stdio.h>
@@ -87,13 +88,12 @@ int bin_readonly(int argc, char **argv) {
         char *arg = argv[i];
         /// Parser-internal array-literal sentinel (\x1F): an argv
         /// element with this prefix came from the unquoted `name=(...)`
-        /// form. Per SEMANTICS section 3.4 (no implicit list-to-string
-        /// coercion) and section 3.9 (list in a scalar-requiring slot
-        /// is a runtime type error), reject rather than silently
-        /// join the elements into a string. bash supports readonly
-        /// arrays via the `-a` flag; lush will add that surface
-        /// alongside; for now the unflagged `readonly arr=(...)` is
-        /// a type error rather than a silent scalar coercion.
+        /// form. Under strict value typing (lush mode), per SEMANTICS
+        /// section 3.4 (no implicit list-to-string coercion) and section
+        /// 3.9 (list in a scalar-requiring slot is a runtime type error),
+        /// reject rather than silently join the elements into a string.
+        /// In the relaxed compat modes the section 3.9 boundary policy
+        /// follows the oracle: bash binds a readonly indexed array.
         if (arg[0] == '\x1F') {
             const char *name_start = arg + 1;
             const char *name_end = strchr(name_start, '=');
@@ -105,6 +105,19 @@ int bin_readonly(int argc, char **argv) {
             }
             memcpy(namebuf, name_start, nlen);
             namebuf[nlen] = '\0';
+            if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
+                /// Relaxed (bash/zsh/posix): bind the indexed array with the
+                /// readonly attribute, matching bash's `readonly arr=(...)`.
+                /// A later bare `$name` read follows the mode's section 3.9
+                /// flatten (element 0 for bash/posix, whole-join for zsh).
+                const char *literal = name_end ? name_end + 1 : NULL;
+                if (builtin_bind_array_literal(namebuf, literal,
+                                               /*assoc=*/false,
+                                               SYMVAR_READONLY) != 0) {
+                    return 1;
+                }
+                continue;
+            }
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                 builtin_get_source_location(),

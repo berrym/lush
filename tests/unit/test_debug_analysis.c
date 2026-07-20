@@ -8,6 +8,7 @@
  */
 
 #include "debug.h"
+#include "shell_mode.h"
 
 #include "test_framework.h"
 #include <stdio.h>
@@ -561,6 +562,46 @@ TEST(analyze_script_type_at_subscript_in_scalar_assignment) {
     cleanup_test_dir();
 }
 
+/* The predictive section 3.9 type warning is mode-gated: in the relaxed
+ * compat modes `x=${arr[@]}` flattens to the oracle scalar rather than
+ * raising a runtime error, so predicting a type error there would be a
+ * false positive. Under bash mode the analyzer must stay silent on the
+ * scalar-assignment RHS. */
+TEST(analyze_script_type_at_subscript_suppressed_in_bash_mode) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    apply_mode_preset(SHELL_MODE_BASH);
+
+    const char *script = "#!/bin/sh\n"
+                         "arr=(a b c)\n"
+                         "x=${arr[@]}\n"
+                         "y=\"${arr[@]}\"\n";
+    char *path = create_test_script("type_at_scalar_bash.sh", script);
+
+    debug_analyze_script(ctx, path);
+
+    int type_issue_count = 0;
+    analysis_issue_t *issue = ctx->analysis_issues;
+    while (issue) {
+        if (strcmp(issue->category, "type") == 0) {
+            type_issue_count++;
+        }
+        issue = issue->next;
+    }
+
+    /// Restore the default before asserting so a failure cannot leak the
+    /// mode into later tests (shell mode is process-global).
+    apply_mode_preset(SHELL_MODE_LUSH);
+
+    ASSERT_EQ(type_issue_count, 0,
+              "no predictive type warning in bash mode (relaxed flatten)");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_sigil_pct_on_scalar_is_error) {
     setup_test_dir();
     debug_context_t *ctx = debug_init();
@@ -1006,6 +1047,7 @@ int main(void) {
     RUN_TEST(analyze_script_portability_source);
     RUN_TEST(analyze_script_portability_echo_e);
     RUN_TEST(analyze_script_type_at_subscript_in_scalar_assignment);
+    RUN_TEST(analyze_script_type_at_subscript_suppressed_in_bash_mode);
     RUN_TEST(analyze_script_sigil_pct_on_scalar_is_error);
     RUN_TEST(analyze_script_sigil_at_on_scalar_is_warning);
     RUN_TEST(analyze_script_sigil_unicode_name_full_extent);

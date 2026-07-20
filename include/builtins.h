@@ -80,6 +80,25 @@ source_location_t builtin_get_source_location(void);
 void builtin_report_dirstack(void);
 
 /**
+ * @brief Create an array from a parenthesized array-literal and bind it
+ *
+ * Parses `(elem1 elem2 [k]=v ...)` (as carried by the parser's `\x1F`
+ * `name=(...)` sentinel), creates an indexed or associative array, binds it
+ * to @p name, and applies @p flags (SYMVAR_EXPORTED / SYMVAR_READONLY). When
+ * @p literal does not begin with '(', an empty array is bound. Shared by
+ * `declare`/`local`, and by `export`/`readonly` in the section 3.9 relaxed
+ * modes, so array-literal creation has a single definition.
+ *
+ * @param name    Variable name to bind
+ * @param literal Value string; parsed as a literal when it starts with '('
+ * @param assoc   true for an associative array, false for indexed
+ * @param flags   Attribute flags to add (SYMVAR_NONE for none)
+ * @return 0 on success, 1 on error (diagnostic already reported)
+ */
+int builtin_bind_array_literal(const char *name, const char *literal,
+                               bool assoc, symvar_flags_t flags);
+
+/**
  * @brief Shared implementation for `break` and `continue`
  *
  * Both builtins parse an optional positive-integer level, validate that
