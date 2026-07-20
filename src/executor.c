@@ -5458,6 +5458,49 @@ static char *join_strings_with_sep(char **items, int count, const char *sep) {
     return result;
 }
 
+/// Gather the positional parameters ($1..$N) for the CURRENT scope into a
+/// freshly-allocated argv-style array. In function scope reads the local
+/// "1".."N" symbols (bounded by "#"); otherwise reads the global
+/// shell_argv[1..]. Every element and the array itself are owned by the
+/// caller (free each element, then the array). *out_count receives N. Returns
+/// NULL with *out_count == 0 for an empty positional set or on allocation
+/// failure -- join_strings_with_sep(NULL, 0, sep) is a valid empty join, so
+/// callers need not special-case NULL. The single scope-aware accessor keeps
+/// the braced (${@}/${*}) and unbraced ($@/$*) positional forms resolving
+/// through one path.
+static char **collect_positional_params(executor_t *executor, int *out_count) {
+    bool in_fn = symtable_in_function_scope(executor->symtable);
+    int count;
+    if (in_fn) {
+        char *argc_str = symtable_get_var(executor->symtable, "#");
+        count = argc_str ? atoi(argc_str) : 0;
+        free(argc_str);
+    } else {
+        count = shell_argc > 1 ? shell_argc - 1 : 0;
+    }
+    if (count <= 0) {
+        *out_count = 0;
+        return NULL;
+    }
+    char **params = malloc(sizeof(char *) * (size_t)count);
+    if (!params) {
+        *out_count = 0;
+        return NULL;
+    }
+    for (int i = 0; i < count; i++) {
+        if (in_fn) {
+            char name[16];
+            snprintf(name, sizeof(name), "%d", i + 1);
+            char *v = symtable_get_var(executor->symtable, name);
+            params[i] = v ? v : strdup("");
+        } else {
+            params[i] = strdup(shell_argv[i + 1] ? shell_argv[i + 1] : "");
+        }
+    }
+    *out_count = count;
+    return params;
+}
+
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                                   char ***out_vec, int *out_count,
                                   bool positional_only) {
@@ -15981,21 +16024,36 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup(flags);
         }
 
-        case '*': { /// $* -- positionals joined on the first char of IFS
+        case '*': { /// $* / ${*} -- positionals joined on the first char of
+                    /// IFS. Scope-aware (local positionals in function scope)
+                    /// so the braced ${*} matches the unbraced $* and the
+                    /// numeric $N form.
             char sep[2];
             ifs_join_separator(executor, sep);
-            char *result = join_strings_with_sep(
-                shell_argv + 1, shell_argc > 1 ? shell_argc - 1 : 0, sep);
+            int n = 0;
+            char **params = collect_positional_params(executor, &n);
+            char *result = join_strings_with_sep(params, n, sep);
+            for (int i = 0; i < n; i++) {
+                free(params[i]);
+            }
+            free(params);
             return result ? result : strdup("");
         }
 
-        case '@': { /// $@ in a scalar context -- joined on the first char of
-                    /// IFS (zsh/dash majority; the whole-word "$@" vector
-                    /// form is handled earlier).
+        case '@': { /// $@ / ${@} in a scalar context -- joined on the first
+                    /// char of IFS (zsh/dash majority; the whole-word "$@"
+                    /// vector form is handled earlier). Scope-aware, so the
+                    /// braced ${@} reaches a function's local positionals
+                    /// rather than the global argv.
             char sep[2];
             ifs_join_separator(executor, sep);
-            char *result = join_strings_with_sep(
-                shell_argv + 1, shell_argc > 1 ? shell_argc - 1 : 0, sep);
+            int n = 0;
+            char **params = collect_positional_params(executor, &n);
+            char *result = join_strings_with_sep(params, n, sep);
+            for (int i = 0; i < n; i++) {
+                free(params[i]);
+            }
+            free(params);
             return result ? result : strdup("");
         }
 

@@ -4661,6 +4661,52 @@ TEST(rt_star_join_braced_positional) {
     ASSERT_STDOUT_EQ(r, "[a,b,c]\n");
 }
 
+TEST(rt_braced_at_function_scope) {
+    /// #534: braced ${@} in a scalar slot must reach a function's local
+    /// positional parameters, not the global argv (which is empty here).
+    run_result_t r = run_shell("f(){ v=\"${@}\"; echo \"[$v]\"; }; f x y z\n");
+    ASSERT_STDOUT_EQ(r, "[x y z]\n");
+}
+
+TEST(rt_braced_star_function_scope) {
+    /// The braced ${*} peer, likewise scope-aware.
+    run_result_t r = run_shell("f(){ v=\"${*}\"; echo \"[$v]\"; }; f x y z\n");
+    ASSERT_STDOUT_EQ(r, "[x y z]\n");
+}
+
+TEST(rt_braced_at_function_scope_empty) {
+    /// No positionals -> the empty string, matching bash.
+    run_result_t r = run_shell("f(){ v=\"${@}\"; echo \"[$v]\"; }; f\n");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_braced_at_function_scope_nested) {
+    /// Each frame resolves its own positionals; the inner frame does not
+    /// leak the outer frame's arguments.
+    run_result_t r = run_shell("g(){ echo \"g=[${@}]\"; }; f(){ g \"$@\"; "
+                               "echo \"f=[${@}]\"; }; f a b\n");
+    ASSERT_STDOUT_EQ(r, "g=[a b]\nf=[a b]\n");
+}
+
+TEST(rt_braced_at_function_scope_ifs_curated) {
+    /// Scope-aware ${@} keeps the curated lush $@-scalar join on IFS[0]
+    /// (the same behavior global-scope ${@} already has), so a function's
+    /// braced ${@} under IFS=, joins on the comma.
+    run_result_t r =
+        run_shell("f(){ v=\"${@}\"; echo \"[$v]\"; }; IFS=,; f x y z\n");
+    run_shell("unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[x,y,z]\n");
+}
+
+TEST(rt_braced_at_function_scope_vector_still_spreads) {
+    /// Regression: the whole-word "${@}" vector form still spreads to N
+    /// words in function scope (handled by the vector path, unchanged).
+    run_result_t r = run_shell(
+        "f(){ for w in \"${@}\"; do printf '<%s>' \"$w\"; done; echo; }; "
+        "f a b c\n");
+    ASSERT_STDOUT_EQ(r, "<a><b><c>\n");
+}
+
 TEST(rt_star_join_empty_is_one_word) {
     /// A quoted empty "$*" (no positionals) stays one empty word.
     run_result_t r = run_shell("c(){ echo \"n=$#\"; }; set --; c \"$*\"");
@@ -6544,6 +6590,12 @@ int main(void) {
     RUN_TEST(rt_star_join_empty_ifs_concatenates);
     RUN_TEST(rt_star_join_array_custom_ifs);
     RUN_TEST(rt_star_join_braced_positional);
+    RUN_TEST(rt_braced_at_function_scope);
+    RUN_TEST(rt_braced_star_function_scope);
+    RUN_TEST(rt_braced_at_function_scope_empty);
+    RUN_TEST(rt_braced_at_function_scope_nested);
+    RUN_TEST(rt_braced_at_function_scope_ifs_curated);
+    RUN_TEST(rt_braced_at_function_scope_vector_still_spreads);
     RUN_TEST(rt_star_join_empty_is_one_word);
     RUN_TEST(rt_star_at_still_explodes);
     RUN_TEST(rt_star_array_at_still_explodes);
