@@ -660,6 +660,179 @@ TEST(arith_ternary_false) {
     teardown_executor(exec);
 }
 
+/// Compound bit/shift assignment operators (<<= >>= &= |= ^=). Each yields
+/// the new value and updates the target; the 3-char <<=/>>= must not be
+/// mis-read as <</>> followed by a stray =. Issue #563.
+TEST(arith_shift_left_assign) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=8", 1);
+    executor_execute_command_line(exec, "RESULT=$((X <<= 2))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "32", "8 <<= 2 = 32");
+    free(result);
+
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_NOT_NULL(x, "X should be set");
+    ASSERT_STR_EQ(x, "32", "X updated to 32");
+    free(x);
+
+    teardown_executor(exec);
+}
+
+TEST(arith_shift_right_assign) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=64", 1);
+    executor_execute_command_line(exec, "RESULT=$((X >>= 2))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "16", "64 >>= 2 = 16");
+    free(result);
+
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_NOT_NULL(x, "X should be set");
+    ASSERT_STR_EQ(x, "16", "X updated to 16");
+    free(x);
+
+    teardown_executor(exec);
+}
+
+TEST(arith_bitand_assign) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=12", 1);
+    executor_execute_command_line(exec, "RESULT=$((X &= 10))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "8", "12 &= 10 = 8");
+    free(result);
+
+    teardown_executor(exec);
+}
+
+TEST(arith_bitor_assign) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=5", 1);
+    executor_execute_command_line(exec, "RESULT=$((X |= 2))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "7", "5 |= 2 = 7");
+    free(result);
+
+    teardown_executor(exec);
+}
+
+TEST(arith_bitxor_assign) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=6", 1);
+    executor_execute_command_line(exec, "RESULT=$((X ^= 3))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "5", "6 ^= 3 = 5");
+    free(result);
+
+    teardown_executor(exec);
+}
+
+/// The bare bit/shift operators must still parse as their binary selves
+/// after the compound forms were added.
+TEST(arith_bitshift_binary_unaffected) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(
+        exec, "RESULT=$(( (1<<4) + (256>>2) + (6&3) + (4|1) + (5^1) ))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    /// 16 + 64 + 2 + 5 + 4 = 91
+    ASSERT_STR_EQ(result, "91", "binary << >> & | ^ intact");
+    free(result);
+
+    teardown_executor(exec);
+}
+
+/// Right-associative chaining: A >>= (B += 1). B becomes 2, then A >>= 2.
+TEST(arith_compound_assign_right_assoc) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "A=8", 1);
+    executor_execute_command_line(exec, "B=1", 1);
+    executor_execute_command_line(exec, "RESULT=$((A >>= B += 1))", 1);
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "2", "8 >>= (1+=1 -> 2) = 2");
+    free(result);
+
+    char *a = symtable_get_var(exec->symtable, "A");
+    ASSERT_STR_EQ(a, "2", "A updated to 2");
+    free(a);
+
+    char *b = symtable_get_var(exec->symtable, "B");
+    ASSERT_STR_EQ(b, "2", "B updated to 2");
+    free(b);
+
+    teardown_executor(exec);
+}
+
+/// The (( )) command form reaches the arithmetic engine through a separate
+/// token re-joiner than $(( )); the compound operators must work on that
+/// surface too. Regression guard for the `^=` gap (the re-joiner's
+/// space-insertion list omitted `^`, so `x ^= 3` reached the engine as
+/// `x ^ = 3`). Issue #563.
+TEST(arith_compound_assign_command_form) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=6", 1);
+    executor_execute_command_line(exec, "(( X ^= 3 ))", 1);
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_NOT_NULL(x, "X should be set");
+    ASSERT_STR_EQ(x, "5", "(( X ^= 3 )) -> 5");
+    free(x);
+
+    executor_execute_command_line(exec, "Y=8", 1);
+    executor_execute_command_line(exec, "(( Y <<= 2 ))", 1);
+    char *y = symtable_get_var(exec->symtable, "Y");
+    ASSERT_STR_EQ(y, "32", "(( Y <<= 2 )) -> 32");
+    free(y);
+
+    teardown_executor(exec);
+}
+
+/// A literal on the left of a compound assignment is not an assignable
+/// target: the operator is rejected without mutating anything or crashing,
+/// and the engine recovers for the next expression. Issue #563.
+TEST(arith_compound_assign_non_lvalue) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "X=99", 1);
+    executor_execute_command_line(exec, "RESULT=$((5 <<= 2))", 1);
+
+    /// The unrelated variable is untouched by the rejected attempt.
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_STR_EQ(x, "99", "non-lvalue attempt must not mutate other vars");
+    free(x);
+
+    /// The engine still works after the error.
+    executor_execute_command_line(exec, "Z=4", 1);
+    executor_execute_command_line(exec, "RESULT2=$((Z <<= 1))", 1);
+    char *r2 = symtable_get_var(exec->symtable, "RESULT2");
+    ASSERT_NOT_NULL(r2, "RESULT2 should be set");
+    ASSERT_STR_EQ(r2, "8", "engine recovers after a non-lvalue error");
+    free(r2);
+
+    teardown_executor(exec);
+}
+
 /* ============================================================================
  * SPECIAL VARIABLE TESTS
  * ============================================================================
@@ -921,6 +1094,15 @@ int main(void) {
     RUN_TEST(arith_decrement);
     RUN_TEST(arith_ternary);
     RUN_TEST(arith_ternary_false);
+    RUN_TEST(arith_shift_left_assign);
+    RUN_TEST(arith_shift_right_assign);
+    RUN_TEST(arith_bitand_assign);
+    RUN_TEST(arith_bitor_assign);
+    RUN_TEST(arith_bitxor_assign);
+    RUN_TEST(arith_bitshift_binary_unaffected);
+    RUN_TEST(arith_compound_assign_right_assoc);
+    RUN_TEST(arith_compound_assign_command_form);
+    RUN_TEST(arith_compound_assign_non_lvalue);
 
     printf("\n--- Special Variable Tests ---\n");
     RUN_TEST(special_var_question_mark);

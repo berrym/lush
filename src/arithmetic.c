@@ -8,7 +8,7 @@
  * - Comparison operators (<, <=, >, >=, ==, !=)
  * - Logical operators (&&, ||, !)
  * - Bitwise operators (&, |, ^, ~, <<, >>)
- * - Assignment operators (=, +=, -=, *=, /=, %=)
+ * - Assignment operators (=, +=, -=, *=, /=, %=, <<=, >>=, &=, |=, ^=)
  * - Increment/decrement (++, --)
  * - Exponentiation (**)
  * - Variable references and command substitution
@@ -434,7 +434,7 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
     symtable_set_global(item->var_name, value_str);
 }
 
-/* Helper for the six assignment operators that share the same lvalue
+/* Helper for the eleven assignment operators that share the same lvalue
  * check. The `op` argument is the operator token used in the while:
  * line ("=", "+=", etc.). */
 #define ARITHM_REQUIRE_LVALUE(item, op)                                        \
@@ -524,6 +524,60 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t result = arithm_safe_mod(current_value, mod_value);
+
+    set_var_value_scoped(a1, result);
+    return result;
+}
+
+/// @brief Left-shift assignment operator (<<=)
+static ssize_t eval_shleq(stack_item_t *a1, stack_item_t *a2) {
+    ARITHM_REQUIRE_LVALUE(a1, "<<=");
+
+    ssize_t current_value = get_var_value_scoped(a1);
+    ssize_t shift_value = long_value(a2);
+    ssize_t result = arithm_wrap_lsh(current_value, shift_value);
+
+    set_var_value_scoped(a1, result);
+    return result;
+}
+
+/// @brief Right-shift assignment operator (>>=)
+static ssize_t eval_shreq(stack_item_t *a1, stack_item_t *a2) {
+    ARITHM_REQUIRE_LVALUE(a1, ">>=");
+
+    ssize_t current_value = get_var_value_scoped(a1);
+    ssize_t shift_value = long_value(a2);
+    ssize_t result = arithm_wrap_rsh(current_value, shift_value);
+
+    set_var_value_scoped(a1, result);
+    return result;
+}
+
+/// @brief Bitwise-AND assignment operator (&=)
+static ssize_t eval_andeq(stack_item_t *a1, stack_item_t *a2) {
+    ARITHM_REQUIRE_LVALUE(a1, "&=");
+
+    ssize_t result = get_var_value_scoped(a1) & long_value(a2);
+
+    set_var_value_scoped(a1, result);
+    return result;
+}
+
+/// @brief Bitwise-OR assignment operator (|=)
+static ssize_t eval_oreq(stack_item_t *a1, stack_item_t *a2) {
+    ARITHM_REQUIRE_LVALUE(a1, "|=");
+
+    ssize_t result = get_var_value_scoped(a1) | long_value(a2);
+
+    set_var_value_scoped(a1, result);
+    return result;
+}
+
+/// @brief Bitwise-XOR assignment operator (^=)
+static ssize_t eval_xoreq(stack_item_t *a1, stack_item_t *a2) {
+    ARITHM_REQUIRE_LVALUE(a1, "^=");
+
+    ssize_t result = get_var_value_scoped(a1) ^ long_value(a2);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -647,6 +701,11 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
 #define CH_TERNARY_Q 0x14 /// ? part of ternary
 #define CH_TERNARY_C 0x15 /// : part of ternary
 #define CH_COMMA 0x16     /// comma operator
+#define CH_SHLEQ 0x17     /// <<= left-shift assignment
+#define CH_SHREQ 0x18     /// >>= right-shift assignment
+#define CH_ANDEQ 0x19     /// &= bitwise-AND assignment
+#define CH_OREQ 0x1A      /// |= bitwise-OR assignment
+#define CH_XOREQ 0x1B     /// ^= bitwise-XOR assignment
 
 /// Operator definitions (only binary operators in main table)
 static op_t operators[] = {
@@ -681,6 +740,11 @@ static op_t operators[] = {
     {    CH_MULEQ, 15, ASSOC_RIGHT, 0, 2,            eval_muleq},
     {    CH_DIVEQ, 15, ASSOC_RIGHT, 0, 2,            eval_diveq},
     {    CH_MODEQ, 15, ASSOC_RIGHT, 0, 2,            eval_modeq},
+    {    CH_SHLEQ, 15, ASSOC_RIGHT, 0, 3,            eval_shleq},
+    {    CH_SHREQ, 15, ASSOC_RIGHT, 0, 3,            eval_shreq},
+    {    CH_ANDEQ, 15, ASSOC_RIGHT, 0, 2,            eval_andeq},
+    {     CH_OREQ, 15, ASSOC_RIGHT, 0, 2,             eval_oreq},
+    {    CH_XOREQ, 15, ASSOC_RIGHT, 0, 2,            eval_xoreq},
     {    CH_COMMA, 16,  ASSOC_LEFT, 0, 1,            eval_comma},
     {           0,  0,           0, 0, 0,                  NULL}
 };
@@ -870,6 +934,20 @@ static op_t *get_op(const char *expr) {
         return OP_PREDEC; /// Will be handled as pre/post in main parsing
     }
 
+    /// Check three-character operators before two-character ones so `<<=`
+    /// and `>>=` are not mis-read as `<<` / `>>` followed by a stray `=`.
+    for (op_t *op = operators; op->op; op++) {
+        if (op->chars == 3) {
+            if (op->op == CH_SHLEQ && expr[0] == '<' && expr[1] == '<' &&
+                expr[2] == '=') {
+                return op;
+            } else if (op->op == CH_SHREQ && expr[0] == '>' && expr[1] == '>' &&
+                       expr[2] == '=') {
+                return op;
+            }
+        }
+    }
+
     /// Check two-character operators first to avoid conflicts
     for (op_t *op = operators; op->op; op++) {
         if (op->chars == 2) {
@@ -900,6 +978,12 @@ static op_t *get_op(const char *expr) {
             } else if (op->op == CH_DIVEQ && expr[0] == '/' && expr[1] == '=') {
                 return op;
             } else if (op->op == CH_MODEQ && expr[0] == '%' && expr[1] == '=') {
+                return op;
+            } else if (op->op == CH_ANDEQ && expr[0] == '&' && expr[1] == '=') {
+                return op;
+            } else if (op->op == CH_OREQ && expr[0] == '|' && expr[1] == '=') {
+                return op;
+            } else if (op->op == CH_XOREQ && expr[0] == '^' && expr[1] == '=') {
                 return op;
             }
         }
