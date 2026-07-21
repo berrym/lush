@@ -5807,25 +5807,36 @@ TEST(rt_sigil_pair_on_scalar_type_mismatch) {
     ASSERT_STDERR_CONTAINS(r, "%x: pair sigil on scalar");
 }
 
-TEST(rt_sigil_unset_name_is_literal) {
-    /// A kind sigil on a never-declared name is literal text (bash/zsh have no
-    /// sigil), not an empty expansion -- returning empty would silently drop
-    /// the word after null-word removal (issue #545).
-    run_result_t r = run_shell("echo %q\n");
-    ASSERT_STDOUT_EQ(r, "%q\n");
-    run_result_t r2 = run_shell("echo @nope\n");
-    ASSERT_STDOUT_EQ(r2, "@nope\n");
+TEST(rt_sigil_unset_name_contributes_nothing) {
+    /// A kind sigil on an undeclared name contributes nothing, exactly as an
+    /// undeclared name does in every other expansion context ($q, "${q[@]}").
+    /// The sigil presents a collection; an absent name is an empty collection.
+    /// (This is lush's uniform unset=empty model, not the bash spelling: bash
+    /// has no sigil at all.) Issue #545.
+    run_result_t r = run_shell("echo %q end\n");
+    ASSERT_STDOUT_EQ(r, "end\n");
+    run_result_t r2 = run_shell("echo @nope end\n");
+    ASSERT_STDOUT_EQ(r2, "end\n");
 }
 
-TEST(rt_sigil_unset_in_array_literal_not_dropped) {
-    /// The data-loss form: an `arr=(%q x)` element must not vanish.
+TEST(rt_sigil_unset_in_array_literal_contributes_nothing) {
+    /// In an array literal an undeclared sigil operand contributes no element,
+    /// exactly as `arr=(${q[@]} x)` yields just `x`.
     run_result_t r =
         run_shell("arr=(%q x)\nprintf '(%s)' \"${arr[@]}\"\necho\n");
-    ASSERT_STDOUT_EQ(r, "(%q)(x)\n");
+    ASSERT_STDOUT_EQ(r, "(x)\n");
     /// Mid-position too.
     run_result_t r2 =
-        run_shell("arr=(a %q c)\nprintf '(%s)' \"${arr[@]}\"\necho\n");
-    ASSERT_STDOUT_EQ(r2, "(a)(%q)(c)\n");
+        run_shell("arr=(a @q c)\nprintf '(%s)' \"${arr[@]}\"\necho\n");
+    ASSERT_STDOUT_EQ(r2, "(a)(c)\n");
+}
+
+TEST(rt_sigil_scalar_still_type_error) {
+    /// The real type case is unchanged: a `%` on a declared scalar is E1134 --
+    /// a value that exists but has no pair component, which is an error, not an
+    /// absence.
+    run_result_t r = run_shell("x=hi\necho %x\n");
+    ASSERT_STDERR_CONTAINS(r, "pair sigil on scalar");
 }
 
 TEST(rt_sigil_compat_user_at_host) {
@@ -6861,8 +6872,9 @@ int main(void) {
     RUN_TEST(rt_sigil_pair_on_list);
     RUN_TEST(rt_sigil_pair_on_map);
     RUN_TEST(rt_sigil_pair_on_scalar_type_mismatch);
-    RUN_TEST(rt_sigil_unset_name_is_literal);
-    RUN_TEST(rt_sigil_unset_in_array_literal_not_dropped);
+    RUN_TEST(rt_sigil_unset_name_contributes_nothing);
+    RUN_TEST(rt_sigil_unset_in_array_literal_contributes_nothing);
+    RUN_TEST(rt_sigil_scalar_still_type_error);
     RUN_TEST(rt_sigil_compat_user_at_host);
     RUN_TEST(rt_sigil_compat_at_invalid_identifier);
     RUN_TEST(rt_sigil_literal_in_double_quotes);

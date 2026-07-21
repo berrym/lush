@@ -7036,14 +7036,20 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
 
     lush_value_view_t view;
     if (!symtable_lookup(name, &view)) {
-        /// Unset name: the kind sigil is a presentation operator for a
-        /// collection, and a never-declared name is not one, so the token is
-        /// literal text (`%q` / `@q`). bash and zsh have no kind sigil and keep
-        /// such a word literal; returning empty here would silently DROP the
-        /// word after null-word removal (e.g. an `arr=(%q x)` element would
-        /// vanish). The pair/vector presentation still applies to a set list or
-        /// map below.
-        return strdup(text);
+        /// Undeclared name: lush treats an absent name as empty in every
+        /// expansion context -- `$q`, `"${q[@]}"`, and a bare `${q[@]}` in an
+        /// array literal all contribute nothing -- so a kind sigil on an
+        /// undeclared name likewise contributes nothing. The sigil presents a
+        /// collection, and an absent name is an empty collection, exactly as a
+        /// declared-but-empty list gives `%l` / `@l` -> nothing. It is a
+        /// value-model decision, not a spelling one: this is `@q`/`%q`, the
+        /// vector/pair operators, applied to no collection.
+        ///
+        /// A *scalar* under `%` is the different, real case handled below: a
+        /// scalar is a value that exists but has no pair component, which is a
+        /// type error (E1134), not an absence. Absence is empty; a wrong-shaped
+        /// value is the error.
+        return strdup("");
     }
 
     char *result = NULL;
