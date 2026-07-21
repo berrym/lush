@@ -2140,6 +2140,33 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
                     /// Peek at the input directly to see if ( follows
                     if (assign_end < parser->tokenizer->input_length &&
                         parser->tokenizer->input[assign_end] == '(') {
+                        /// An array literal `name=(...)` is only meaningful as
+                        /// an assignment or as an operand to an
+                        /// assignment-aware builtin
+                        /// (declare/local/typeset/export/readonly). As an
+                        /// argument to any other command the unquoted `(` is a
+                        /// syntax error -- bash, zsh, and POSIX sh all reject
+                        /// it. lush rejects it too, with a diagnostic, rather
+                        /// than silently accepting and flattening the word:
+                        /// lush reports why a construct is invalid instead of
+                        /// guessing an interpretation the writer did not
+                        /// intend.
+                        if (!is_assignment_builtin(command->val.str)) {
+                            source_location_t loc = token_to_source_location(
+                                arg_token, parser->source_name);
+                            parser_error_add_with_help_at(
+                                parser, SHELL_ERR_UNEXPECTED_TOKEN, loc,
+                                "assign an array with `name=(...)`, declare "
+                                "one "
+                                "with `declare name=(...)`, or quote the word "
+                                "to "
+                                "pass it literally",
+                                "unexpected `(`: an array literal is not valid "
+                                "as an argument to `%s`",
+                                command->val.str ? command->val.str
+                                                 : "this command");
+                            return false;
+                        }
                         /// This is an array literal argument: name=(...) or
                         /// name+=(...)
                         char *var_name = strdup(arg_token->text);
