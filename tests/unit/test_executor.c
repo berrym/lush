@@ -2244,6 +2244,102 @@ TEST(rt_declare_array_quoted_paren_in_element) {
     executor_free(exec);
 }
 
+TEST(rt_declare_array_append_extends) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// `declare NAME+=(...)` extends the existing array rather than being
+    /// rejected as an invalid identifier `NAME+` (issue #549): the sentinel
+    /// name split lands on the `=` of `+=`, which the consumer now detects.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -a p549a=(x y)\ndeclare p549a+=(p q)\n"
+              "printf '(%s)' \"${p549a[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(x)(y)(p)(q)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_array_append_to_absent_creates) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Appending to a name with no array yet creates one (bash parity).
+    run_result_t r = run_shell_with_executor(
+        exec, "declare p549b+=(m n)\nprintf '(%s)' \"${p549b[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(m)(n)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_array_plain_assign_replaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A plain `NAME=(...)` still replaces; only `+=` appends.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -a p549c=(1 2 3)\ndeclare p549c=(9)\n"
+              "printf '(%s)' \"${p549c[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(9)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_local_array_append_extends) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// local delegates to declare, so the append form works function-scoped;
+    /// a quoted spaced element stays one slot (shared with the #546 channel).
+    run_result_t r = run_shell_with_executor(
+        exec, "f549() { local q=(a); local q+=(\"b c\" d); "
+              "printf '(%s)' \"${q[@]}\"; echo; }\nf549\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(a)(b c)(d)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_readonly_array_append_relaxed) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The relaxed-mode readonly path shares the binder; append extends.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\ndeclare -a p549r=(x y)\nreadonly p549r+=(z)\n"
+              "printf '(%s)' \"${p549r[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "(x)(y)(z)");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_array_append_readonly_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The array binder refuses to mutate an existing readonly array, for
+    /// both the append and the replace forms (issue #549 review): bash rejects
+    /// `declare a=(...)` and `a+=(...)` on a readonly `a`. The array is left
+    /// intact. Unique name -- readonly poisons the shared global symtable.
+    run_result_t r = run_shell_mode_gated(
+        exec, "mode bash\ndeclare -ar p549ro=(x y)\ndeclare p549ro+=(z)\n"
+              "printf '(%s)' \"${p549ro[@]}\"\necho\n");
+
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_CONTAINS(r, "(x)(y)");
+    ASSERT_TRUE(strstr(r.out, "(z)") == NULL, "readonly array must not append");
+
+    executor_free(exec);
+}
+
 TEST(rt_local_array_quoted_element_keeps_spaces) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6604,6 +6700,12 @@ int main(void) {
     RUN_TEST(rt_array_literal_word_quoted_is_a_literal);
     RUN_TEST(rt_array_literal_in_command_sub_rejected);
     RUN_TEST(rt_declare_array_quoted_paren_in_element);
+    RUN_TEST(rt_declare_array_append_extends);
+    RUN_TEST(rt_declare_array_append_to_absent_creates);
+    RUN_TEST(rt_declare_array_plain_assign_replaces);
+    RUN_TEST(rt_local_array_append_extends);
+    RUN_TEST(rt_readonly_array_append_relaxed);
+    RUN_TEST(rt_declare_array_append_readonly_refused);
     RUN_TEST(rt_local_array_quoted_element_keeps_spaces);
     RUN_TEST(rt_readonly_relaxed_quoted_element_keeps_spaces);
     RUN_TEST(local_quoted_paren_value_stays_scalar);

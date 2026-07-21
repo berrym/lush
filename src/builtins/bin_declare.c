@@ -327,8 +327,10 @@ int bin_declare(int argc, char **argv) {
         /// (indexed array) case unless -A is set. The same value
         /// shape from a quoted scalar `declare data="(...)"` does
         /// NOT carry the sentinel and stays a scalar.
+        bool from_sentinel = false;
         if (arg[0] == '\x1F') {
             arg++;
+            from_sentinel = true;
             if (!opt_indexed_array && !opt_assoc_array) {
                 opt_indexed_array = true;
             }
@@ -360,6 +362,15 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
             value = NULL;
+        }
+
+        /// The `\x1F name+=(...)` array-append sentinel leaves the name
+        /// ending in `+` (the value split lands on the `=` of `+=`). Strip
+        /// it and remember to append, before identifier validation would
+        /// reject `name+`. Only the sentinel path carries this marker.
+        bool array_append = false;
+        if (from_sentinel && name) {
+            array_append = builtin_array_name_is_append(name);
         }
 
         /// Validate variable name via the central lush identifier
@@ -429,7 +440,7 @@ int bin_declare(int argc, char **argv) {
                 array_flags |= SYMVAR_EXPORTED;
             }
             if (builtin_bind_array_literal(name, value, opt_assoc_array,
-                                           array_flags) != 0) {
+                                           array_flags, array_append) != 0) {
                 free(name);
                 return 1;
             }

@@ -93,10 +93,27 @@ void builtin_report_dirstack(void);
  * @param literal Value string; parsed as a literal when it starts with '('
  * @param assoc   true for an associative array, false for indexed
  * @param flags   Attribute flags to add (SYMVAR_NONE for none)
+ * @param append  true for the `name+=(...)` form: extend the existing array
+ *                (creating it if absent) instead of replacing it
  * @return 0 on success, 1 on error (diagnostic already reported)
  */
 int builtin_bind_array_literal(const char *name, const char *literal,
-                               bool assoc, symvar_flags_t flags);
+                               bool assoc, symvar_flags_t flags, bool append);
+
+/**
+ * @brief Detect and strip the `+=` array-append marker from a sentinel name
+ *
+ * The parser's `\x1F name+=(...)` array-append sentinel leaves the name
+ * segment ending in `+` (the value/name split lands on the `=` of `+=`).
+ * If @p name ends with `+`, remove it in place and return true; otherwise
+ * return false. Shared by declare/local/export/readonly so the append form
+ * is recognized identically, before identifier validation. Only call on a
+ * name that came from the array-literal sentinel.
+ *
+ * @param name Mutable name buffer (modified in place when it ends with '+')
+ * @return true if the append marker was present and stripped
+ */
+bool builtin_array_name_is_append(char *name);
 
 /**
  * @brief Shared implementation for `break` and `continue`

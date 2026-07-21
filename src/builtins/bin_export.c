@@ -75,6 +75,10 @@ int bin_export(int argc, char **argv) {
             }
             memcpy(namebuf, name_start, nlen);
             namebuf[nlen] = '\0';
+            /// `name+=(...)` append leaves a trailing `+` on the name; strip
+            /// it (and remember to append) so both the relaxed bind and the
+            /// strict diagnostic use the clean name.
+            bool array_append = builtin_array_name_is_append(namebuf);
             if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)) {
                 /// Relaxed (bash/zsh/posix): bash creates the indexed array
                 /// and marks it exported. An array is not an environment
@@ -84,8 +88,8 @@ int bin_export(int argc, char **argv) {
                 /// flatten (element 0 for bash/posix, whole-join for zsh).
                 const char *literal = name_end ? name_end + 1 : NULL;
                 if (builtin_bind_array_literal(namebuf, literal,
-                                               /*assoc=*/false,
-                                               SYMVAR_EXPORTED) != 0) {
+                                               /*assoc=*/false, SYMVAR_EXPORTED,
+                                               array_append) != 0) {
                     return 1;
                 }
                 continue;
