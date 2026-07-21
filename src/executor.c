@@ -2182,7 +2182,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
     /// Check if command has redirections
     bool has_redirections = count_redirections(command) > 0;
 
-    /// Build argument vector (excluding redirection nodes)
+    /// Build argument vector (excluding redirection nodes). Track whether a
+    /// command substitution runs during this expansion so a resulting null
+    /// command can tell "adopt the cmdsub status" from "no cmdsub -> 0".
+    executor->word_cmdsub_ran = false;
     int argc;
     char **argv = build_argv_from_ast(executor, command, &argc);
     if (!argv) {
@@ -2190,8 +2193,17 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
     }
     if (argc == 0) {
         /// Null command: every word was removed by null-word removal (an
-        /// unquoted empty expansion, e.g. `$x` with x=""). POSIX performs
-        /// any redirections, then the command succeeds with status 0.
+        /// unquoted empty expansion, e.g. `$x` with x="", or a command
+        /// substitution `$(cmd)` whose output was empty). POSIX: perform any
+        /// redirections, then the status is that of the LAST command
+        /// substitution run while expanding the (now-empty) words -- `$(false)`
+        /// yields 1 -- or 0 if no command substitution ran. word_cmdsub_ran
+        /// distinguishes the two: executor->exit_status alone cannot, since a
+        /// prior command may have left a non-zero status that no substitution
+        /// in THIS command touched. Without this, `while $(false)` looped
+        /// forever and `set -e; $(false)` did not exit, while `false; $x`
+        /// (empty $x) must still be 0.
+        int null_status = executor->word_cmdsub_ran ? executor->exit_status : 0;
         free(argv);
         if (has_redirections) {
             redirection_state_t rs;
@@ -2203,8 +2215,8 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
             }
             restore_file_descriptors(&rs);
         }
-        set_exit_status(0);
-        return 0;
+        set_exit_status(null_status);
+        return null_status;
     }
 
     /// The parser only builds the `\x1F name=(...)` array-literal sentinel
@@ -17537,6 +17549,11 @@ static char *expand_command_substitution(executor_t *executor,
     if (!executor || !cmd_text) {
         return strdup("");
     }
+
+    /// Record that a command substitution ran during the current word
+    /// expansion; a resulting null command adopts its status (see the argc==0
+    /// path in execute_command_dispatch).
+    executor->word_cmdsub_ran = true;
 
     /// Extract command from $(command) or `command` format
     char *command = NULL;

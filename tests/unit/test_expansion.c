@@ -356,6 +356,83 @@ TEST(cmdsub_fast_read_missing_and_fallthrough) {
     teardown_executor(exec);
 }
 
+TEST(cmdsub_in_command_name_position) {
+    /// A command substitution or backtick as the FIRST word is expanded and
+    /// becomes the command word (issue #565); it was previously a parse error.
+    /// bash, zsh, and dash all run it. (Each inner command is captured through
+    /// an outer substitution so the result is observable via a variable.)
+    executor_t *exec = setup_executor();
+
+    /// $(echo echo) marker runs `echo marker`.
+    executor_execute_command_line(exec, "R1=$($(echo echo) marker)", 1);
+    char *r1 = symtable_get_var(exec->symtable, "R1");
+    ASSERT_NOT_NULL(r1, "R1 should be set");
+    ASSERT_STR_EQ(r1, "marker", "$(echo echo) marker runs echo marker");
+    free(r1);
+
+    /// Backtick spelling in command-name position, with several arguments.
+    executor_execute_command_line(exec, "R2=$(`echo echo` a b c)", 1);
+    char *r2 = symtable_get_var(exec->symtable, "R2");
+    ASSERT_NOT_NULL(r2, "R2 should be set");
+    ASSERT_STR_EQ(r2, "a b c", "`echo echo` a b c runs echo a b c");
+    free(r2);
+
+    /// An empty command substitution is a null command: no parse error, the
+    /// shell continues and the following command runs.
+    executor_execute_command_line(exec, "$(true); R3=continued", 1);
+    char *r3 = symtable_get_var(exec->symtable, "R3");
+    ASSERT_NOT_NULL(r3, "R3 should be set");
+    ASSERT_STR_EQ(r3, "continued",
+                  "empty $(...) is a null command; the shell continues");
+    free(r3);
+
+    teardown_executor(exec);
+}
+
+TEST(cmdsub_command_name_null_exit_status) {
+    /// A null command formed from an empty command substitution adopts the
+    /// exit status of the last command substitution (issue #565): $(false)
+    /// yields 1, not 0. A hardcoded 0 made `while $(false)` loop forever and
+    /// `set -e; $(false)` not exit. bash, zsh, and dash all agree.
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "$(false)", 1);
+    ASSERT_EQ(exec->exit_status, 1, "$(false) null command -> status 1");
+
+    executor_execute_command_line(exec, "$(true)", 1);
+    ASSERT_EQ(exec->exit_status, 0, "$(true) null command -> status 0");
+
+    executor_execute_command_line(exec, "$(exit 7)", 1);
+    ASSERT_EQ(exec->exit_status, 7, "$(exit 7) null command -> status 7");
+
+    /// The last command substitution wins when several are present.
+    executor_execute_command_line(exec, "$(true) $(false)", 1);
+    ASSERT_EQ(exec->exit_status, 1, "last cmdsub wins -> status 1");
+
+    /// A null command with NO command substitution stays 0, even after a
+    /// failed command (there is no cmdsub status to adopt).
+    executor_execute_command_line(exec, "false", 1);
+    executor_execute_command_line(exec, "$EMPTY_UNSET_565", 1);
+    ASSERT_EQ(exec->exit_status, 0, "empty-var null command -> status 0");
+
+    teardown_executor(exec);
+}
+
+TEST(cmdsub_command_name_with_prefix) {
+    /// A cmd_prefix assignment before a command-substitution command word is
+    /// scoped to the command, not persisted or exported (issue #565).
+    /// Previously the prefix fell through to the pure-assignment path and
+    /// leaked into the environment.
+    executor_t *exec = setup_executor();
+
+    /// `$(echo true)` runs `true` (no stdout) with A565 applied transiently.
+    executor_execute_command_line(exec, "A565=transient $(echo true)", 1);
+    char *a = symtable_get_var(exec->symtable, "A565");
+    ASSERT_NULL(a, "cmd_prefix before a cmdsub command word does not persist");
+
+    teardown_executor(exec);
+}
+
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
@@ -1142,6 +1219,9 @@ int main(void) {
     RUN_TEST(cmdsub_with_case_pattern_paren);
     RUN_TEST(cmdsub_fast_read_file);
     RUN_TEST(cmdsub_fast_read_missing_and_fallthrough);
+    RUN_TEST(cmdsub_in_command_name_position);
+    RUN_TEST(cmdsub_command_name_null_exit_status);
+    RUN_TEST(cmdsub_command_name_with_prefix);
     RUN_TEST(unset_var_expands_empty);
 
     printf("\n--- Parameter Expansion Tests ---\n");

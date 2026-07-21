@@ -2032,7 +2032,14 @@ static node_t *parse_simple_command(parser_t *parser) {
         return NULL;
     }
 
-    if (!token_is_word_like(current->type) && current->type != TOK_LBRACKET) {
+    /// A command substitution or backtick may stand in command-name position
+    /// (`$(echo echo) hi`, `` `echo echo` hi ``): its output is expanded first
+    /// and becomes the command word (empty output -> null command, exit 0),
+    /// exactly as in argument position. The value-kind command-name gate for
+    /// named list/map words (SEMANTICS 3.9) is a separate, kind-scoped rule
+    /// applied later at expansion; a scalar command substitution is unaffected.
+    if (!token_is_word_like(current->type) && current->type != TOK_LBRACKET &&
+        current->type != TOK_COMMAND_SUB && current->type != TOK_BACKQUOTE) {
         parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
                          "expected command name, got '%s'",
                          current->text ? current->text
@@ -2657,9 +2664,14 @@ static node_t *finish_assignment_or_prefix(parser_t *parser,
         break;
     }
 
-    /// Optional command word + cmd_suffix.
+    /// Optional command word + cmd_suffix. A command substitution or backtick
+    /// may be the command word after a cmd_prefix (`A=1 $(echo echo) hi`),
+    /// mirroring the command-name gate in parse_simple_command; without this
+    /// the prefix would fall through to the pure-assignment path and persist
+    /// (and export) instead of scoping to the command.
     token_t *w = tokenizer_current(parser->tokenizer);
-    if (w && (token_is_word_like(w->type) || w->type == TOK_LBRACKET)) {
+    if (w && (token_is_word_like(w->type) || w->type == TOK_LBRACKET ||
+              w->type == TOK_COMMAND_SUB || w->type == TOK_BACKQUOTE)) {
         source_location_t loc =
             token_to_source_location(w, parser->source_name);
         cmd->loc = loc;
