@@ -2158,6 +2158,27 @@ TEST(rt_declare_array_plain_elements_regression) {
     executor_free(exec);
 }
 
+TEST(rt_scalar_value_with_unit_separator_no_crash) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A scalar holding a literal 0x1F -- the byte lush uses internally as
+    /// the symtable value/metadata separator -- must store and expand without
+    /// corrupting the binding. Previously the value was mis-typed as an array
+    /// and dereferenced as a pointer, crashing on expansion and on exit
+    /// (issue #550). $'\x1f' produces the byte; length 3 proves it survived
+    /// the round-trip, and the trailing marker proves expansion did not crash.
+    run_result_t r = run_shell_with_executor(
+        exec, "p550us=$'1\\x1f2'\necho \"len=${#p550us}\"\necho \"[$p550us]\" "
+              ">/dev/null\necho survived\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "len=3");
+    ASSERT_STDOUT_CONTAINS(r, "survived");
+
+    executor_free(exec);
+}
+
 TEST(rt_array_literal_word_to_nonassignment_command) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6551,6 +6572,7 @@ int main(void) {
     RUN_TEST(rt_declare_array_quoted_element_keeps_spaces);
     RUN_TEST(rt_declare_assoc_quoted_value_keeps_spaces);
     RUN_TEST(rt_declare_array_plain_elements_regression);
+    RUN_TEST(rt_scalar_value_with_unit_separator_no_crash);
     RUN_TEST(rt_array_literal_word_to_nonassignment_command);
     RUN_TEST(rt_array_literal_word_in_command_substitution);
     RUN_TEST(rt_declare_array_quoted_paren_in_element);
