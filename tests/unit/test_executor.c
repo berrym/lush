@@ -4917,6 +4917,46 @@ TEST(rt_printf_flags) {
     ASSERT_STDOUT_EQ(r, " 42\n");
 }
 
+TEST(rt_echo_xsi_escapes) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// echo interprets the full XSI set in lush mode: \xHH hex, \0NNN octal,
+    /// \e -> ESC, and \c terminates (suppressing the trailing newline). A
+    /// bare \NNN without the leading 0 stays literal (bash+zsh consensus).
+    /// mode-gated so a leaked xpg_echo state from another test cannot flip
+    /// echo's escape-interpretation default off.
+    run_result_t hex = run_shell_mode_gated(exec, "echo \"\\x41\"\n");
+    ASSERT_STDOUT_EQ(hex, "A\n");
+    run_result_t oct = run_shell_mode_gated(exec, "echo \"\\0101\"\n");
+    ASSERT_STDOUT_EQ(oct, "A\n");
+    run_result_t lit = run_shell_mode_gated(exec, "echo \"\\101\"\n");
+    ASSERT_STDOUT_EQ(lit, "\\101\n");
+    run_result_t term = run_shell_mode_gated(exec, "echo \"a\\cbXY\"\n");
+    ASSERT_STDOUT_EQ(term, "a");
+
+    executor_free(exec);
+}
+
+TEST(rt_printf_b_conversion) {
+    /// %b interprets echo-style escapes in the argument (was unimplemented and
+    /// printed the literal "%b"): \xHH, \0NNN octal, and \c terminates.
+    run_result_t r = run_shell("printf '%b' '\\x41\\0102'\n");
+    ASSERT_STDOUT_EQ(r, "AB");
+    run_result_t term = run_shell("printf '%b more' 'a\\cbX'\n");
+    ASSERT_STDOUT_EQ(term, "a");
+}
+
+TEST(rt_printf_format_octal_and_no_reparse) {
+    /// printf format uses \NNN octal (no leading 0 required); an octal escape
+    /// that produces a '%' byte is emitted literally, never re-parsed as a
+    /// conversion specifier.
+    run_result_t oct = run_shell("printf '\\101\\n'\n");
+    ASSERT_STDOUT_EQ(oct, "A\n");
+    run_result_t pct = run_shell("printf '\\045d\\n'\n");
+    ASSERT_STDOUT_EQ(pct, "%d\n");
+}
+
 /// --- brace expansion --------------------------------------------------
 
 TEST(rt_brace_nested) {
@@ -7157,6 +7197,9 @@ int main(void) {
 
     printf("\nRegression: printf flags:\n");
     RUN_TEST(rt_printf_flags);
+    RUN_TEST(rt_echo_xsi_escapes);
+    RUN_TEST(rt_printf_b_conversion);
+    RUN_TEST(rt_printf_format_octal_and_no_reparse);
 
     printf("\nRegression: brace expansion:\n");
     RUN_TEST(rt_brace_nested);

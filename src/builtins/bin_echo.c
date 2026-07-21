@@ -56,17 +56,22 @@ int bin_echo(int argc, char **argv) {
     /// Clear any previous error state on stdout
     clearerr(stdout);
 
-    /// Print arguments
-    for (int i = arg_start; i < argc; i++) {
+    /// Print arguments. A `\c` in any interpreted argument terminates the
+    /// whole echo: no further arguments, no trailing newline (XSI). The
+    /// decoded text can hold embedded NULs (\0, \xHH), so it is written by
+    /// its true byte length, not as a C string.
+    bool terminated = false;
+    for (int i = arg_start; i < argc && !terminated; i++) {
         if (i > arg_start) {
             printf(" ");
         }
 
         if (interpret_escapes) {
-            char *processed =
-                lush_expand_escapes(argv[i], strlen(argv[i]), LUSH_ESC_SIMPLE);
+            size_t out_len = 0;
+            char *processed = lush_expand_escapes_ex(
+                argv[i], strlen(argv[i]), LUSH_ESC_XSI, &terminated, &out_len);
             if (processed) {
-                printf("%s", processed);
+                fwrite(processed, 1, out_len, stdout);
                 free(processed);
             } else {
                 printf("%s", argv[i]);
@@ -76,7 +81,7 @@ int bin_echo(int argc, char **argv) {
         }
     }
 
-    if (!no_newline) {
+    if (!no_newline && !terminated) {
         printf("\n");
     }
 

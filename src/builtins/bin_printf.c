@@ -109,10 +109,14 @@ int bin_printf(int argc, char **argv) {
     /// the remaining arguments. If the format string contains no conversion
     /// specifications, and there are arguments, the format is used once and
     /// subsequent arguments are ignored.
+    ///
+    /// A `\c` in the format string or in a `%b` argument terminates all
+    /// output immediately (no further characters, no further reuse passes).
+    bool printf_terminated = false;
     do {
         int args_used_this_pass = 0;
 
-        for (int i = 0; format[i] != '\0'; i++) {
+        for (int i = 0; format[i] != '\0' && !printf_terminated; i++) {
             if (format[i] == '%' && format[i + 1] != '\0') {
                 int spec_start = i; /// points at '%' for forwarding to libc
                 i++;                /// Skip the %
@@ -240,6 +244,36 @@ int bin_printf(int argc, char **argv) {
                     }
                     break;
                 }
+                case 'b': {
+                    /// %b: interpret backslash escapes in the argument with the
+                    /// XSI echo set (\n \t \xHH \0NNN \e ...); a \c terminates
+                    /// all printf output. Decoded bytes may include NULs, so
+                    /// write by length rather than as a C string.
+                    ///
+                    /// Octal here is the POSIX form `\0NNN`; a bare `\NNN`
+                    /// stays literal. This is POSIX-conformant and matches zsh;
+                    /// bash and dash additionally accept a bare `\NNN` in %b,
+                    /// so lush is stricter than those two by curation (one
+                    /// coherent XSI octal rule shared with echo), not by
+                    /// consensus.
+                    size_t out_len = 0;
+                    bool arg_terminated = false;
+                    char *decoded = lush_expand_escapes_ex(
+                        format_arg, strlen(format_arg), LUSH_ESC_XSI,
+                        &arg_terminated, &out_len);
+                    if (decoded) {
+                        fwrite(decoded, 1, out_len, stdout);
+                        free(decoded);
+                    }
+                    if (arg_index < argc) {
+                        arg_index++;
+                        args_used_this_pass++;
+                    }
+                    if (arg_terminated) {
+                        printf_terminated = true;
+                    }
+                    break;
+                }
                 case 'd':
                 case 'i': {
                     int value = (arg_index < argc) ? atoi(format_arg) : 0;
@@ -313,16 +347,21 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
             } else if (format[i] == '\\' && format[i + 1] != '\0') {
-                /// Handle escaped characters via the canonical decoder.
-                i++;
-                int decoded = lush_escape_basic_char(format[i]);
-                if (decoded >= 0) {
-                    putchar(decoded);
-                } else {
-                    /// Unknown escape - print as literal
-                    putchar('\\');
-                    putchar(format[i]);
+                /// Decode one escape via the shared engine in the printf
+                /// format dialect (\NNN octal, \xHH, \e, \uHHHH, and \c which
+                /// terminates output). Advance past exactly what it consumed.
+                char dec[8];
+                size_t dn = 0;
+                bool esc_terminated = false;
+                size_t consumed = lush_decode_one_escape(
+                    &format[i], strlen(&format[i]), LUSH_ESC_PRINTF_FMT, dec,
+                    &dn, &esc_terminated);
+                fwrite(dec, 1, dn, stdout);
+                if (esc_terminated) {
+                    printf_terminated = true;
                 }
+                /// The loop's own i++ advances one; consume the rest here.
+                i += (int)consumed - 1;
             } else {
                 /// Regular character
                 putchar(format[i]);
@@ -335,7 +374,7 @@ int bin_printf(int argc, char **argv) {
             break;
         }
 
-    } while (arg_index < argc);
+    } while (arg_index < argc && !printf_terminated);
 
     if (assign_var) {
         fflush(stdout);
