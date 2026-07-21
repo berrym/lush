@@ -327,14 +327,49 @@ void builtin_report_dirstack(void) {
     }
 }
 
+bool builtin_array_name_is_append(char *name) {
+    if (!name) {
+        return false;
+    }
+    size_t len = strlen(name);
+    if (len > 0 && name[len - 1] == '+') {
+        name[len - 1] = '\0';
+        return true;
+    }
+    return false;
+}
+
 int builtin_bind_array_literal(const char *name, const char *literal,
-                               bool assoc, symvar_flags_t flags) {
-    array_value_t *arr = symtable_array_create(assoc);
-    if (!arr) {
-        executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                               bool assoc, symvar_flags_t flags, bool append) {
+    /// Refuse to mutate an existing readonly array, for both the append and
+    /// the replace forms -- bash rejects `declare a=(...)` and `a+=(...)` on a
+    /// readonly `a`. symtable_array_get_flags returns SYMVAR_NONE when no
+    /// array is bound, so the initial `declare -ar a=(...)` (a does not exist
+    /// yet) is not blocked; the readonly attribute is applied afterward. The
+    /// element-write API guards its own writes, but this create/append path
+    /// did not, so a readonly array could be silently overwritten.
+    if (symtable_array_get_flags(name) & SYMVAR_READONLY) {
+        executor_error_report(current_executor, SHELL_ERR_READONLY_VAR,
                               builtin_get_source_location(),
-                              "failed to create array");
+                              "%s: readonly variable", name);
         return 1;
+    }
+
+    /// Append (`name+=(...)`) extends the existing array in place; a plain
+    /// assignment (`name=(...)`) replaces it. Appending to a name that has no
+    /// array yet creates one, matching bash. A newly created array is stored
+    /// at the end; an existing one is mutated through the live pointer, so
+    /// only the fresh case calls symtable_set_array.
+    array_value_t *arr = append ? symtable_get_array(name) : NULL;
+    bool new_array = (arr == NULL);
+    if (new_array) {
+        arr = symtable_array_create(assoc);
+        if (!arr) {
+            executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                  builtin_get_source_location(),
+                                  "failed to create array");
+            return 1;
+        }
     }
 
     /// Parse a parenthesized array literal `(elem0\x1Felem1\x1F[k]=v ...)`.
@@ -381,6 +416,10 @@ int builtin_bind_array_literal(const char *name, const char *literal,
                                                          elem_val);
                             }
                         }
+                    } else if (append) {
+                        /// Regular element in append mode: extend past the
+                        /// current length rather than overwrite from index 0.
+                        symtable_array_append(arr, elem);
                     } else {
                         symtable_array_set_index(arr, idx++, elem);
                     }
@@ -390,7 +429,7 @@ int builtin_bind_array_literal(const char *name, const char *literal,
         }
     }
 
-    if (symtable_set_array(name, arr) != 0) {
+    if (new_array && symtable_set_array(name, arr) != 0) {
         executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
                               builtin_get_source_location(),
                               "failed to store array");
