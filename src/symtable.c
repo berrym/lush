@@ -801,6 +801,47 @@ int symtable_set_global_var(symtable_manager_t *manager, const char *name,
     return result;
 }
 
+/// The scope that owns the positional parameters ($1..$N, $#): the nearest
+/// enclosing function frame, or the global scope if none. Loop / conditional
+/// frames are transparent to positionals (they inherit and mutate the
+/// function's or shell's set), so `set --` inside a loop body must target
+/// this scope, not the innermost frame -- otherwise the write vanishes when
+/// the loop scope pops. (Subshells fork, so their positionals are isolated by
+/// the process boundary, not a scope.)
+static symtable_scope_t *positional_home_scope(symtable_manager_t *manager) {
+    for (symtable_scope_t *scope = manager->current_scope; scope;
+         scope = scope->parent) {
+        if (scope->scope_type == SCOPE_FUNCTION) {
+            return scope;
+        }
+    }
+    return manager->global_scope;
+}
+
+int symtable_set_positional_var(symtable_manager_t *manager, const char *name,
+                                const char *value) {
+    if (!manager || !name) {
+        return -1;
+    }
+    symtable_scope_t *old_scope = manager->current_scope;
+    manager->current_scope = positional_home_scope(manager);
+    int result = symtable_set_var(manager, name, value, SYMVAR_NONE);
+    manager->current_scope = old_scope;
+    return result;
+}
+
+int symtable_unset_positional_var(symtable_manager_t *manager,
+                                  const char *name) {
+    if (!manager || !name) {
+        return -1;
+    }
+    symtable_scope_t *old_scope = manager->current_scope;
+    manager->current_scope = positional_home_scope(manager);
+    int result = symtable_unset_var(manager, name);
+    manager->current_scope = old_scope;
+    return result;
+}
+
 int symtable_assign_var(symtable_manager_t *manager, const char *name,
                         const char *value) {
     if (!manager || !name) {

@@ -879,11 +879,24 @@ int builtin_set(char **args) {
             /// Handle -- option: end of options, start of positional parameters
             i++; /// Move past the --
 
-            /// Clear the previous positional parameters $1..$old_count. The
-            /// count is authoritative in $#; a fixed cap would leave stale
-            /// high-numbered parameters set after the list shrinks.
+            /// `set --` rebinds the positional parameters in their HOME scope:
+            /// the nearest enclosing function frame, or the global scope when
+            /// not in a function. Loop and conditional frames are transparent,
+            /// so a `set --` in a loop body still targets the enclosing
+            /// function's (or the shell's) $1..$N and $#. Inside a function
+            /// this neither reads a stale count from nor leaks into the global
+            /// positionals, and shell_argv -- which holds the process/global
+            /// positionals -- is left untouched until the function returns. At
+            /// global scope it updates the global positionals and shell_argv
+            /// together. Issue #562.
+            symtable_manager_t *pos_mgr = symtable_get_global_manager();
+            bool in_fn = symtable_in_function_scope(pos_mgr);
+
+            /// Clear the previous positional parameters $1..$old_count in this
+            /// scope. $# is authoritative for the count; a fixed cap would
+            /// leave stale high-numbered parameters set after the list shrinks.
             int old_argc = 0;
-            char *old_hash = symtable_get_global("#");
+            char *old_hash = symtable_get_var(pos_mgr, "#");
             if (old_hash) {
                 old_argc = atoi(old_hash);
                 free(old_hash);
@@ -891,7 +904,7 @@ int builtin_set(char **args) {
             for (int param_num = 1; param_num <= old_argc; param_num++) {
                 char param_name[16];
                 snprintf(param_name, sizeof(param_name), "%d", param_num);
-                symtable_unset_global(param_name);
+                symtable_unset_positional_var(pos_mgr, param_name);
             }
 
             /// Count how many new parameters we have
@@ -902,48 +915,52 @@ int builtin_set(char **args) {
                 temp_i++;
             }
 
-            /// Free existing shell_argv if it was dynamically allocated
-            if (shell_argv && shell_argv_is_dynamic) {
-                for (int j = 0; j < shell_argc; j++) {
-                    free(shell_argv[j]);
+            /// Rebuild the process-level shell_argv only at global scope; a
+            /// function's `set --` must not disturb the caller's positionals.
+            /// Allocate the replacement before releasing the old array so an
+            /// allocation failure leaves shell_argv and shell_argc intact and
+            /// mutually consistent, rather than a freed NULL paired with the
+            /// stale old count (a later $N read would then dereference NULL).
+            char **new_shell_argv = NULL;
+            if (!in_fn) {
+                /// One extra slot for the program name at index 0.
+                new_shell_argv =
+                    malloc((size_t)(new_argc + 1) * sizeof(char *));
+                if (new_shell_argv && shell_argv && shell_argv_is_dynamic) {
+                    for (int j = 0; j < shell_argc; j++) {
+                        free(shell_argv[j]);
+                    }
+                    free(shell_argv);
+                    shell_argv = NULL;
                 }
-                free(shell_argv);
             }
 
-            /// Allocate new shell_argv (include space for program name)
-            shell_argc = new_argc + 1;
-            shell_argv = malloc(shell_argc * sizeof(char *));
-            if (shell_argv) {
-                /// Set program name (shell_argv[0])
-                shell_argv[0] = strdup("lush");
-
-                /// Set every new positional parameter in both the symbol table
-                /// and shell_argv. Each slot 1..new_argc must be written:
-                /// free_shell_argv() frees all shell_argc slots at exit, so any
-                /// slot left uninitialized here would be freed as a garbage
-                /// pointer -- the cap that formerly stopped at 99 corrupted the
-                /// heap and silently dropped parameters past $99.
-                int param_num = 1;
-                while (args[i]) {
-                    char param_name[16];
-                    snprintf(param_name, sizeof(param_name), "%d", param_num);
-                    symtable_set_global(param_name, args[i]);
-
-                    /// Also update global shell_argv
-                    shell_argv[param_num] = strdup(args[i]);
-
-                    i++;
-                    param_num++;
+            /// Set every new positional parameter in the current scope, and in
+            /// shell_argv when rebuilding it. Each shell_argv slot 1..new_argc
+            /// must be written: free_shell_argv() frees all slots at exit, so
+            /// an uninitialized slot would be freed as a garbage pointer.
+            int param_num = 1;
+            while (args[i]) {
+                char param_name[16];
+                snprintf(param_name, sizeof(param_name), "%d", param_num);
+                symtable_set_positional_var(pos_mgr, param_name, args[i]);
+                if (new_shell_argv) {
+                    new_shell_argv[param_num] = strdup(args[i]);
                 }
-
-                /// Mark shell_argv as dynamically allocated
+                i++;
+                param_num++;
+            }
+            if (new_shell_argv) {
+                new_shell_argv[0] = strdup("lush");
+                shell_argv = new_shell_argv;
+                shell_argc = new_argc + 1;
                 shell_argv_is_dynamic = true;
             }
 
-            /// Update $# (number of positional parameters)
+            /// Update $# (number of positional parameters) in the home scope
             char argc_str[16];
             snprintf(argc_str, sizeof(argc_str), "%d", new_argc);
-            symtable_set_global("#", argc_str);
+            symtable_set_positional_var(pos_mgr, "#", argc_str);
 
             break; /// Process no more arguments after --
         } else if (arg[0] == '-' && arg[1] != '-') {
