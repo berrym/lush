@@ -428,6 +428,27 @@ int symtable_set_global_var(symtable_manager_t *manager, const char *name,
                             const char *value);
 
 /**
+ * @brief Set/unset a positional parameter in its home scope
+ *
+ * The positional parameters ($1..$N, $#) live in the nearest enclosing
+ * function frame, or the global scope if not in a function. Loop and
+ * conditional frames are transparent to them, so `set --` must write to
+ * this home scope rather than the innermost current scope -- otherwise a
+ * `set --` inside a loop body would land in the loop frame and be lost when
+ * it pops (issue #562, and its loop-scope regression). Subshells fork, so
+ * their positionals are isolated by the process boundary.
+ *
+ * @param manager Symbol table manager
+ * @param name    Parameter name ("1".."N" or "#")
+ * @param value   Value (set only)
+ * @return 0 on success, non-zero on failure
+ */
+int symtable_set_positional_var(symtable_manager_t *manager, const char *name,
+                                const char *value);
+int symtable_unset_positional_var(symtable_manager_t *manager,
+                                  const char *name);
+
+/**
  * @brief Assign a value using POSIX scope-chain semantics
  *
  * The correct write path for unprefixed `name=value` assignments. Walks

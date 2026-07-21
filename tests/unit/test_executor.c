@@ -3267,6 +3267,34 @@ TEST(builtin_set_positional) {
     executor_free(exec);
 }
 
+TEST(rt_set_dashdash_function_scope) {
+    /// `set --` inside a function rebinds the function's local positionals, so
+    /// $#/$*/$1.. reflect the new list and `shift` works; it does NOT leak to
+    /// the caller's positionals after the function returns (issue #562).
+    /// Wrapped in a subshell so the baseline `set --` does not pollute the
+    /// shared global positionals of other tests.
+    run_result_t r = run_shell(
+        "( f() { set -- a b c; echo \"$# $*\"; shift; echo \"$# $*\"; }\n"
+        "  set -- G1 G2; f x y; echo \"after $# $1 $2\" )\n");
+    ASSERT_STDOUT_EQ(r, "3 a b c\n2 b c\nafter 2 G1 G2\n");
+}
+
+TEST(rt_set_dashdash_loop_scope_consistent) {
+    /// A loop body is a transparent scope for positionals: `set --` inside it
+    /// writes the enclosing function's (or the shell's) positionals, so $#,
+    /// $*, $1.. and "$@" stay in agreement after the loop -- they must not
+    /// desync (the loop-scope regression of the first #562 fix). And an
+    /// in-function loop `set --` persists after the loop, as in bash.
+    run_result_t g =
+        run_shell("( set -- a b c; for i in 1; do set -- x y; done\n"
+                  "  printf '%s|' \"$# $*\"; printf '<%s>' \"$@\"; echo )\n");
+    ASSERT_STDOUT_EQ(g, "2 x y|<x><y>\n");
+
+    run_result_t f = run_shell(
+        "f() { for i in 1; do set -- a b; done; echo \"$# $*\"; }\nf x y z\n");
+    ASSERT_STDOUT_EQ(f, "2 a b\n");
+}
+
 /* ============================================================================
  * COMMAND LIST TESTS
  * ============================================================================
@@ -6936,6 +6964,8 @@ int main(void) {
     RUN_TEST(builtin_eval);
     RUN_TEST(builtin_shift);
     RUN_TEST(builtin_set_positional);
+    RUN_TEST(rt_set_dashdash_function_scope);
+    RUN_TEST(rt_set_dashdash_loop_scope_consistent);
 
     printf("\nCommand list tests:\n");
     RUN_TEST(command_list_semicolon);
