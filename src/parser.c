@@ -6042,23 +6042,25 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
 
         /// Add space between tokens for readability (except at start)
         /// But don't add space before operator characters that might form
-        /// multi-character operators (==, !=, <=, >=, &&, ||, +=, -=, *=, /=,
-        /// %=, ++, --, etc.)
+        /// multi-character operators (==, !=, <=, >=, <<=, >>=, &&, ||, +=,
+        /// -=, *=, /=, %=, &=, |=, ^=, ++, --, etc.). Every char that can lead
+        /// or trail a multi-character operator must appear in both lists;
+        /// `^` is here for `^=` (binary `^` is unaffected either way).
         bool is_operator_char =
             (current->text[0] == '=' || current->text[0] == '!' ||
              current->text[0] == '<' || current->text[0] == '>' ||
              current->text[0] == '&' || current->text[0] == '|' ||
-             current->text[0] == '+' || current->text[0] == '-' ||
-             current->text[0] == '*' || current->text[0] == '/' ||
-             current->text[0] == '%');
+             current->text[0] == '^' || current->text[0] == '+' ||
+             current->text[0] == '-' || current->text[0] == '*' ||
+             current->text[0] == '/' || current->text[0] == '%');
         bool prev_is_operator =
             (expr_len > 0 &&
              (expr[expr_len - 1] == '=' || expr[expr_len - 1] == '!' ||
               expr[expr_len - 1] == '<' || expr[expr_len - 1] == '>' ||
               expr[expr_len - 1] == '&' || expr[expr_len - 1] == '|' ||
-              expr[expr_len - 1] == '+' || expr[expr_len - 1] == '-' ||
-              expr[expr_len - 1] == '*' || expr[expr_len - 1] == '/' ||
-              expr[expr_len - 1] == '%'));
+              expr[expr_len - 1] == '^' || expr[expr_len - 1] == '+' ||
+              expr[expr_len - 1] == '-' || expr[expr_len - 1] == '*' ||
+              expr[expr_len - 1] == '/' || expr[expr_len - 1] == '%'));
 
         if (expr_len > 0 && expr[expr_len - 1] != ' ' &&
             current->type != TOK_RPAREN && expr[expr_len - 1] != '(' &&
