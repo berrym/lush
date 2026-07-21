@@ -3982,17 +3982,22 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                             }
                         } else {
                             /// Field splitting follows the same rule as
-                            /// command argv (build_argv_from_ast): command
-                            /// substitution always splits; an unquoted
-                            /// parameter expansion splits only when
+                            /// command argv (build_argv_from_ast): an unquoted
+                            /// command substitution splits when
+                            /// FEATURE_CMDSUB_WORD_SPLIT is on, an unquoted
+                            /// parameter expansion when
                             /// FEATURE_WORD_SPLIT_DEFAULT is on; quoted strings
-                            /// (NODE_STRING_LITERAL / NODE_STRING_EXPANDABLE)
-                            /// never split. This keeps a quoted empty "" as one
-                            /// empty iteration word and "$x" as a single word,
-                            /// unlike the old strtok path that dropped empty
-                            /// fields and split quoted strings. Issue #127.
+                            /// never split. The two flags differ by mode -- zsh
+                            /// splits command subs but not bare $var -- and in
+                            /// lush mode BOTH are off, so neither implicitly
+                            /// splits (SEMANTICS section 4.1: no implicit
+                            /// IFS-driven splitting of command output). This
+                            /// keeps a quoted empty "" as one empty iteration
+                            /// word and "$x" as a single word. Issue #127.
                             bool should_word_split =
-                                (word->type == NODE_COMMAND_SUB) ||
+                                (word->type == NODE_COMMAND_SUB &&
+                                 shell_mode_allows(
+                                     FEATURE_CMDSUB_WORD_SPLIT)) ||
                                 (word->type == NODE_VAR &&
                                  shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT));
 
@@ -4517,14 +4522,25 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                     /// Check if this was a quoted string (no IFS splitting)
                     bool is_quoted = (word->type == NODE_STRING_LITERAL ||
                                       word->type == NODE_STRING_EXPANDABLE);
+                    /// Same rule as the for-list / argv sites: an unquoted
+                    /// command substitution splits under
+                    /// FEATURE_CMDSUB_WORD_SPLIT and an unquoted parameter
+                    /// under FEATURE_WORD_SPLIT_DEFAULT (both off in lush
+                    /// mode), so `select` stays consistent with `for` --
+                    /// previously it split neither in lush mode but also never
+                    /// split a command sub in zsh mode.
+                    bool should_word_split =
+                        (word->type == NODE_COMMAND_SUB &&
+                         shell_mode_allows(FEATURE_CMDSUB_WORD_SPLIT)) ||
+                        (word->type == NODE_VAR &&
+                         shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT));
 
                     if (!is_quoted && expanded[0] == '\0') {
                         /// Null-word removal: an unquoted expansion that
                         /// produced the empty string contributes zero menu
                         /// items (a quoted empty "" stays one item below).
                         free(expanded);
-                    } else if (is_quoted ||
-                               !shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
+                    } else if (!should_word_split) {
                         /// Quoted strings or no-word-split mode: keep as single
                         /// item
                         menu_items = realloc(menu_items,
@@ -6843,25 +6859,26 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         free(expanded_arg); /// We copied the strings or used
                                             /// them
                     } else {
-                        /// Check if this needs field splitting
-                        /// - Command substitution $(cmd): always split (all
-                        /// shells do this)
-                        /// - Parameter expansion $var: only split if
-                        /// FEATURE_WORD_SPLIT_DEFAULT enabled
-                        /// - Quoted strings: never split
-                        bool should_word_split = false;
-                        if (child->type == NODE_COMMAND_SUB) {
-                            /// Command substitution always gets word split
-                            should_word_split = true;
-                        } else if (child->type == NODE_VAR &&
-                                   shell_mode_allows(
-                                       FEATURE_WORD_SPLIT_DEFAULT)) {
-                            /// Parameter expansion only splits if feature
-                            /// enabled
-                            should_word_split = true;
-                        }
-                        /// Quoted strings (NODE_STRING_LITERAL,
-                        /// NODE_STRING_EXPANDABLE) never split
+                        /// Check if this needs field splitting. An unquoted
+                        /// command substitution $(cmd)/`cmd` splits when
+                        /// FEATURE_CMDSUB_WORD_SPLIT is on; an unquoted
+                        /// parameter expansion $var splits when
+                        /// FEATURE_WORD_SPLIT_DEFAULT is on. The two flags
+                        /// diverge by mode (zsh splits command subs but not
+                        /// bare $var), and in lush mode both are off, so
+                        /// neither implicitly splits: SEMANTICS section 4.1
+                        /// promises no implicit IFS-driven splitting of command
+                        /// output, and leaving `$(cmd)` unsplit gives the same
+                        /// mental model as `$var` (`set -- $(echo a b)` and
+                        /// `set -- $x` both yield one word). The compat modes
+                        /// restore the traditional split. Explicit splitting
+                        /// stays available via an array literal `arr=( $(cmd)
+                        /// )`. Quoted strings never split.
+                        bool should_word_split =
+                            (child->type == NODE_COMMAND_SUB &&
+                             shell_mode_allows(FEATURE_CMDSUB_WORD_SPLIT)) ||
+                            (child->type == NODE_VAR &&
+                             shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT));
 
                         if (should_word_split) {
 

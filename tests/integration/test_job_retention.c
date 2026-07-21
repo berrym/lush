@@ -187,8 +187,12 @@ int main(int argc, char **argv) {
     /// the cap; at most BACKSTOP_CAP remain listed as Done.
     {
         char out[8192];
+        /// {1..40} brace expansion rather than `$(seq 1 40)`: an unquoted
+        /// command substitution does not word-split in lush mode (SEMANTICS
+        /// section 4.1 / FEATURE_CMDSUB_WORD_SPLIT off), so the loop needs a
+        /// construct that yields 40 words directly.
         if (!run_script(lush,
-                        "for i in $(seq 1 40); do /usr/bin/true & done; sleep "
+                        "for i in {1..40}; do /usr/bin/true & done; sleep "
                         "0.5; jobs",
                         out, sizeof(out))) {
             fprintf(stderr, "FAIL %s [backstop bound]: shell did not exit\n",

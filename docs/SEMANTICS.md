@@ -271,6 +271,19 @@ is a documented divergence from bash/dash, reachable in the other
 direction via `set -o posix` / `mode bash` (or `setopt sh_word_split`),
 which turn `FEATURE_WORD_SPLIT_DEFAULT` on.
 
+**Command substitution splits under its own preset.** An unquoted
+`$(cmd)` / `` `cmd` `` splits on `IFS` when `FEATURE_CMDSUB_WORD_SPLIT`
+is on -- a *separate* flag from `FEATURE_WORD_SPLIT_DEFAULT`, because the
+two diverge by mode: bash, zsh, and dash all split command output, but
+zsh alone does **not** split a bare `$var`. lush's default profile turns
+`FEATURE_CMDSUB_WORD_SPLIT` off as well, so `set -- $(echo a b c)` passes
+**one** argument, exactly like `set -- $x` -- one consistent mental model
+(no implicit `IFS`-driven splitting of command output, §4.1). The compat
+modes restore each reference's behavior: `mode bash` / `mode posix` split
+both a bare `$var` and a command sub, `mode zsh` splits only the command
+sub. Explicit splitting stays available via an array literal
+`arr=( $(cmd) )` or a native splitter (§4.1).
+
 **Null-word removal is a separate operation and is always on.** Word
 splitting turns a *non-empty* value into several words; null-word
 removal turns an *empty* one into *none*. An unquoted expansion that
@@ -502,7 +515,10 @@ because lines-of-text is the actual Unix interchange convention and it
 is whitespace-safe. A trailing newline is a *terminator*, not a
 separator: `"a\nb\n"` splits to two elements, not three. Other shapes
 (custom delimiter, NUL-delimited, CSV, JSON) are explicit helpers or
-flags. There is no implicit `IFS`-driven splitting of command output.
+flags. In the lush profile there is no implicit `IFS`-driven splitting of
+command output -- gated by `FEATURE_CMDSUB_WORD_SPLIT` (off in lush, on
+in the bash/zsh/posix compat modes; see §3.8), so `set -- $(echo a b c)`
+yields one argument, the same as `set -- $x`.
 
 ### 4.2 Maps preserve insertion order
 
