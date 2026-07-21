@@ -141,14 +141,19 @@ int bin_read(int argc, char **argv) {
             /// -s: Silent mode (don't echo input)
             silent_mode = true;
         } else if (strcmp(arg, "-a") == 0 || strcmp(arg, "-ra") == 0 ||
-                   strcmp(arg, "-ar") == 0) {
-            /// -a NAME: split input on IFS and assign to array NAME.
-            /// Combined `-ra` / `-ar` flips raw mode on as well so
-            /// the common `read -ra parts <<< "..."` idiom works.
+                   strcmp(arg, "-ar") == 0 || strcmp(arg, "-A") == 0 ||
+                   strcmp(arg, "-rA") == 0 || strcmp(arg, "-Ar") == 0) {
+            /// -a NAME: split input on IFS and assign to array NAME. `-A` is
+            /// the zsh spelling of the same read-into-indexed-array behavior
+            /// (spelling is polyglot; behavior is canonical lush, PHILOSOPHY
+            /// 2) -- both fill an indexed array. Combined `-ra` / `-ar` /
+            /// `-rA` / `-Ar` flip raw mode on as well so the common
+            /// `read -ra parts <<< "..."` idiom works in either spelling.
             if (opt_index + 1 >= argc) {
-                executor_error_report(
-                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
-                    builtin_get_source_location(), "-a requires an array name");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "%s requires an array name", arg);
                 return 1;
             }
             if (arg[1] == 'r' || arg[2] == 'r') {

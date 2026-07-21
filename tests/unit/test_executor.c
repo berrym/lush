@@ -357,6 +357,27 @@ TEST(rt_case_continue_polyglot_spellings) {
     ASSERT_STDOUT_EQ(plain, "one\n");
 }
 
+TEST(rt_read_array_polyglot_spellings) {
+    /// read into an indexed array has two spellings -- bash's `-a` and zsh's
+    /// `-A` -- and lush accepts both for the one canonical behavior (spelling
+    /// is polyglot; behavior is canonical lush). Both fill the same 0-indexed
+    /// array; the combined raw forms `-rA` / `-Ar` also enable raw mode.
+    run_result_t bash_spelling = run_shell(
+        "printf 'a b c' | { read -a arr; echo \"${arr[0]}-${arr[1]}-${arr[2]} "
+        "n=${#arr[@]}\"; }\n");
+    ASSERT_STDOUT_EQ(bash_spelling, "a-b-c n=3\n");
+
+    run_result_t zsh_spelling = run_shell(
+        "printf 'a b c' | { read -A arr; echo \"${arr[0]}-${arr[1]}-${arr[2]} "
+        "n=${#arr[@]}\"; }\n");
+    ASSERT_STDOUT_EQ(zsh_spelling, "a-b-c n=3\n");
+
+    /// -rA keeps the backslash raw.
+    run_result_t raw = run_shell("printf 'x\\\\y z' | { read -rA arr; echo "
+                                 "\"${arr[0]}-${arr[1]}\"; }\n");
+    ASSERT_STDOUT_EQ(raw, "x\\y-z\n");
+}
+
 TEST(case_wildcard) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6592,6 +6613,7 @@ int main(void) {
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
     RUN_TEST(rt_case_continue_polyglot_spellings);
+    RUN_TEST(rt_read_array_polyglot_spellings);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
     RUN_TEST(rt_case_extglob_alternation);
