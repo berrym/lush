@@ -338,6 +338,25 @@ TEST(case_statement) {
     executor_free(exec);
 }
 
+TEST(rt_case_continue_polyglot_spellings) {
+    /// The "test the remaining patterns" case terminator has two spellings --
+    /// bash's `;;&` and zsh's `;|` -- and lush accepts both for the one
+    /// canonical behavior (spelling is polyglot; behavior is canonical lush).
+    /// Both must fall through to re-test the next pattern.
+    run_result_t bash_spelling =
+        run_shell("case x in x) echo one;;& x) echo two;; esac\n");
+    ASSERT_STDOUT_EQ(bash_spelling, "one\ntwo\n");
+
+    run_result_t zsh_spelling =
+        run_shell("case x in x) echo one;| x) echo two;; esac\n");
+    ASSERT_STDOUT_EQ(zsh_spelling, "one\ntwo\n");
+
+    /// The plain `;;` terminator still stops after the first match.
+    run_result_t plain =
+        run_shell("case x in x) echo one;; x) echo two;; esac\n");
+    ASSERT_STDOUT_EQ(plain, "one\n");
+}
+
 TEST(case_wildcard) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6572,6 +6591,7 @@ int main(void) {
     RUN_TEST(while_loop);
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
+    RUN_TEST(rt_case_continue_polyglot_spellings);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
     RUN_TEST(rt_case_extglob_alternation);
