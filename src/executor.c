@@ -17363,6 +17363,175 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
  * @param cmd_text Command text in $(...) or `...` format
  * @return Command output (caller must free)
  */
+/**
+ * @brief The $(<file) / `<file` fast read.
+ *
+ * When a command-substitution body is a lone input redirection with no
+ * command (`< file`), expand to the file's contents directly, without
+ * forking a capturing subshell -- the "no subshell" idiom
+ * ADVANCED_SCRIPTING_GUIDE.md advertises, and the behavior bash and zsh
+ * share (a lone `< file` command otherwise produces no output, so the
+ * substitution was silently empty).
+ *
+ * The body must be exactly a plain `<` input redirection: a leading `<`
+ * (not `<<`, `<<<`, `<&`, `<>`, `<(...)`) followed by a single filename word.
+ * lush's parser does not accept a redirection with no command, so the redirect
+ * is attached to a synthetic no-op `:` and the resulting AST is required to be
+ * that `:` carrying exactly one `<` redirection child and nothing else; the
+ * filename then expands through the same expand_arg_node the redirection path
+ * uses. Anything else (a real command, additional redirections, a here-doc,
+ * an fd dup, a process substitution) returns false to fall through to the
+ * normal captured subshell.
+ *
+ * @return true if handled (result set to an owned string, possibly ""),
+ *         false to fall through to the subshell path (result untouched).
+ */
+static bool cmdsub_try_fast_read(executor_t *executor, const char *command,
+                                 char **result) {
+    /// Fast reject: the body must begin with a plain `<` input redirect.
+    /// Leading whitespace -- including the newlines of a multi-line spelling
+    /// such as `$(\n  <file\n)` -- is skipped so that form is still read (bash
+    /// and zsh read it) rather than silently falling through to empty.
+    const char *p = command;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == '\v' ||
+           *p == '\f') {
+        p++;
+    }
+    if (p[0] != '<' || p[1] == '<' || p[1] == '&' || p[1] == '>' ||
+        p[1] == '(') {
+        return false;
+    }
+
+    /// Attach the redirect to a no-op `:` so it parses as a well-formed
+    /// command (a bare redirection is otherwise a parse error), letting the
+    /// filename reuse the redirection-target expansion. Build from the trimmed
+    /// `p`, not the raw body, so leading newlines do not push the redirect
+    /// onto a second line of the synthetic (which would parse as its own
+    /// command and defeat the detection).
+    size_t syn_len = strlen(p) + 3;
+    char *synthetic = malloc(syn_len);
+    if (!synthetic) {
+        return false;
+    }
+    snprintf(synthetic, syn_len, ": %s", p);
+
+    parser_t *parser =
+        parser_new_with_source(synthetic, "<command substitution>", 1);
+    if (!parser) {
+        free(synthetic);
+        return false;
+    }
+    node_t *ast = parser_parse(parser);
+    node_t *target_node = NULL;
+    if (ast && !parser_has_error(parser) && !ast->next_sibling &&
+        ast->type == NODE_COMMAND) {
+        node_t *child = ast->first_child;
+        if (child && child->type == NODE_REDIR_IN && !child->next_sibling &&
+            child->first_child &&
+            child->first_child->type != NODE_PROC_SUB_IN) {
+            target_node = child->first_child;
+        }
+    }
+    if (!target_node) {
+        if (ast) {
+            free_node_tree(ast);
+        }
+        parser_free(parser);
+        free(synthetic);
+        return false;
+    }
+
+    /// Expand the filename exactly as a redirection target does (#505).
+    char *path = expand_arg_node(executor, target_node);
+    source_location_t loc = target_node->loc;
+    free_node_tree(ast);
+    parser_free(parser);
+    free(synthetic);
+    if (!path) {
+        *result = strdup("");
+        return true;
+    }
+
+    /// Honor the same privileged-mode restriction the real redirection path
+    /// applies to a redirect target (redirection.c), so the fast read is not a
+    /// way around it.
+    if (!is_privileged_redirection_allowed(path)) {
+        fprintf(stderr,
+                "lush: %s: restricted redirection target in privileged mode\n",
+                path);
+        executor->exit_status = 1;
+        free(path);
+        *result = strdup("");
+        return true;
+    }
+
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
+                               loc, "%s: %s", path, strerror(errno));
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        shell_error_free(error);
+        executor->exit_status = 1;
+        free(path);
+        *result = strdup("");
+        return true;
+    }
+
+    char *buf = NULL;
+    size_t cap = 0, len = 0;
+    char chunk[4096];
+    ssize_t n;
+    bool read_error = false;
+    while ((n = read(fd, chunk, sizeof(chunk))) != 0) {
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            read_error = true;
+            break; /// I/O error (e.g. EISDIR on a directory target)
+        }
+        if (len + (size_t)n + 1 > cap) {
+            size_t newcap = cap ? cap : 4096;
+            while (len + (size_t)n + 1 > newcap) {
+                newcap *= 2;
+            }
+            char *nb = realloc(buf, newcap);
+            if (!nb) {
+                free(buf);
+                close(fd);
+                free(path);
+                *result = strdup("");
+                return true;
+            }
+            buf = nb;
+            cap = newcap;
+        }
+        memcpy(buf + len, chunk, (size_t)n);
+        len += (size_t)n;
+    }
+    close(fd);
+    free(path);
+    /// A read failure (a directory target, or a mid-file I/O error) is
+    /// signalled through $? rather than silently reported as success with
+    /// truncated data -- the silent-empty-on-failure footgun this fast read
+    /// exists to remove. This curates toward zsh's honest failure over bash's
+    /// silent success.
+    executor->exit_status = read_error ? 1 : 0;
+
+    if (!buf) {
+        *result = strdup(""); /// empty file (or an unreadable directory)
+        return true;
+    }
+    buf[len] = '\0';
+    /// Strip trailing newlines, like a normal command substitution.
+    while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r')) {
+        buf[--len] = '\0';
+    }
+    *result = buf;
+    return true;
+}
+
 static char *expand_command_substitution(executor_t *executor,
                                          const char *cmd_text) {
     if (!executor || !cmd_text) {
@@ -17396,6 +17565,15 @@ static char *expand_command_substitution(executor_t *executor,
         if (!command) {
             return strdup("");
         }
+    }
+
+    /// The $(<file) fast read: a lone input redirection expands to the file's
+    /// contents without forking a capturing subshell (see
+    /// cmdsub_try_fast_read).
+    char *fast_result = NULL;
+    if (cmdsub_try_fast_read(executor, command, &fast_result)) {
+        free(command);
+        return fast_result;
     }
 
     /// Pre-fork variable expansion of the command text was removed in

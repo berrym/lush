@@ -281,6 +281,81 @@ TEST(cmdsub_with_case_pattern_paren) {
     teardown_executor(exec);
 }
 
+TEST(cmdsub_fast_read_file) {
+    /// $(<file) / `<file` reads the file's contents without forking a
+    /// subshell (issue #564): a lone `<` input redirection in a command
+    /// substitution expands to the file, trailing newlines stripped like
+    /// any command substitution. bash and zsh agree; the idiom is
+    /// advertised in ADVANCED_SCRIPTING_GUIDE.md.
+    executor_t *exec = setup_executor();
+
+    const char *path = "/tmp/lush_fastread_test_564.txt";
+    FILE *f = fopen(path, "w");
+    ASSERT_NOT_NULL(f, "temp file should open for write");
+    fputs("hello\nworld\n", f);
+    fclose(f);
+
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "RESULT=$(<%s)", path);
+    executor_execute_command_line(exec, cmd, 1);
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_NOT_NULL(result, "RESULT should be set");
+    ASSERT_STR_EQ(result, "hello\nworld",
+                  "$(<file) reads contents, trailing newline stripped");
+    free(result);
+
+    /// Backtick spelling reads the same file.
+    snprintf(cmd, sizeof(cmd), "BT=`<%s`", path);
+    executor_execute_command_line(exec, cmd, 1);
+    char *bt = symtable_get_var(exec->symtable, "BT");
+    ASSERT_NOT_NULL(bt, "BT should be set");
+    ASSERT_STR_EQ(bt, "hello\nworld", "`<file` reads contents");
+    free(bt);
+
+    /// The filename expands like a redirection target: a variable works.
+    executor_execute_command_line(exec, "F=/tmp/lush_fastread_test_564.txt", 1);
+    executor_execute_command_line(exec, "VR=$(<$F)", 1);
+    char *vr = symtable_get_var(exec->symtable, "VR");
+    ASSERT_NOT_NULL(vr, "VR should be set");
+    ASSERT_STR_EQ(vr, "hello\nworld", "$(<$var) expands the filename");
+    free(vr);
+
+    /// The multi-line spelling -- newlines before/after the redirection --
+    /// is still recognized (must not fall through to an empty result).
+    snprintf(cmd, sizeof(cmd), "ML=$(\n  <%s\n)", path);
+    executor_execute_command_line(exec, cmd, 1);
+    char *ml = symtable_get_var(exec->symtable, "ML");
+    ASSERT_NOT_NULL(ml, "ML should be set");
+    ASSERT_STR_EQ(ml, "hello\nworld", "multi-line $(<file) reads the file");
+    free(ml);
+
+    remove(path);
+    teardown_executor(exec);
+}
+
+TEST(cmdsub_fast_read_missing_and_fallthrough) {
+    executor_t *exec = setup_executor();
+
+    /// A missing file yields an empty substitution (an error is reported to
+    /// stderr; the shell continues), like bash/zsh.
+    executor_execute_command_line(exec,
+                                  "MISS=$(</tmp/lush_nonexistent_564_zzzz)", 1);
+    char *miss = symtable_get_var(exec->symtable, "MISS");
+    ASSERT_NOT_NULL(miss, "MISS should be set");
+    ASSERT_STR_EQ(miss, "", "$(<missing) expands empty");
+    free(miss);
+
+    /// A body that is not a lone input redirection still runs as a normal
+    /// (forked) command substitution.
+    executor_execute_command_line(exec, "OUT=$(echo forked)", 1);
+    char *out = symtable_get_var(exec->symtable, "OUT");
+    ASSERT_NOT_NULL(out, "OUT should be set");
+    ASSERT_STR_EQ(out, "forked", "non-fast-read body still forks");
+    free(out);
+
+    teardown_executor(exec);
+}
+
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
@@ -874,8 +949,8 @@ TEST(special_var_dollar) {
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
     /// $$ expands to the shell PID. The unit harness does not initialize
-    /// shell_pid to getpid(), but the result must still be a non-empty run of
-    /// decimal digits -- never the literal "$$" nor an empty string.
+    /// shell_pid to getpid(), but the result must still be a non-empty run
+    /// of decimal digits -- never the literal "$$" nor an empty string.
     ASSERT(result[0] != '\0', "$$ should not expand to empty");
     for (const char *p = result; *p; p++) {
         ASSERT(*p >= '0' && *p <= '9', "$$ should expand to digits only");
@@ -967,7 +1042,8 @@ TEST(double_quotes_with_expansion) {
 }
 
 TEST(escaped_dollar) {
-    /// A backslash-escaped dollar is a literal $ (issue #60-adjacent, fixed).
+    /// A backslash-escaped dollar is a literal $ (issue #60-adjacent,
+    /// fixed).
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "VAR=value", 1);
@@ -1064,6 +1140,8 @@ int main(void) {
     RUN_TEST(cmdsub_leading_with_trailing_text);
     RUN_TEST(cmdsub_with_quoted_paren);
     RUN_TEST(cmdsub_with_case_pattern_paren);
+    RUN_TEST(cmdsub_fast_read_file);
+    RUN_TEST(cmdsub_fast_read_missing_and_fallthrough);
     RUN_TEST(unset_var_expands_empty);
 
     printf("\n--- Parameter Expansion Tests ---\n");
