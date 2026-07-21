@@ -50,6 +50,25 @@ static void strbuf_append(strbuf_t *buf, const char *str) {
 /// Forward declaration
 static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth);
 
+/// Emit a conditional-expression subtree, wrapping a compound child
+/// (COND_OR / _AND / _NOT / _BINARY) in parentheses so the regenerated
+/// source re-parses to an equivalent tree. Word-node operands pass through
+/// unwrapped.
+static void cond_to_source_operand(node_t *node, strbuf_t *buf, int depth) {
+    if (!node) {
+        return;
+    }
+    bool wrap = (node->type == NODE_COND_OR || node->type == NODE_COND_AND ||
+                 node->type == NODE_COND_NOT || node->type == NODE_COND_BINARY);
+    if (wrap) {
+        strbuf_append(buf, "( ");
+    }
+    node_to_source_impl(node, buf, depth);
+    if (wrap) {
+        strbuf_append(buf, " )");
+    }
+}
+
 /// @brief Check if node is a redirection type
 static int is_redirection(node_t *node) {
     if (!node)
@@ -498,9 +517,51 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
         break;
 
     case NODE_EXTENDED_TEST:
+        /// The conditional expression is the single child (or none for an
+        /// empty `[[ ]]`); val.str no longer carries the flattened text.
         strbuf_append(buf, "[[ ");
-        strbuf_append(buf, str);
+        if (node->first_child) {
+            node_to_source_impl(node->first_child, buf, depth);
+        }
         strbuf_append(buf, " ]]");
+        break;
+
+    case NODE_COND_OR:
+    case NODE_COND_AND: {
+        node_t *l = node->first_child;
+        node_t *r = l ? l->next_sibling : NULL;
+        cond_to_source_operand(l, buf, depth);
+        strbuf_append(buf, node->type == NODE_COND_OR ? " || " : " && ");
+        cond_to_source_operand(r, buf, depth);
+        break;
+    }
+
+    case NODE_COND_NOT:
+        strbuf_append(buf, "! ");
+        cond_to_source_operand(node->first_child, buf, depth);
+        break;
+
+    case NODE_COND_BINARY: {
+        node_t *l = node->first_child;
+        node_t *r = l ? l->next_sibling : NULL;
+        if (l) {
+            node_to_source_impl(l, buf, depth);
+        }
+        strbuf_append(buf, " ");
+        strbuf_append(buf, str); /// canonical operator
+        strbuf_append(buf, " ");
+        if (r) {
+            node_to_source_impl(r, buf, depth);
+        }
+        break;
+    }
+
+    case NODE_COND_UNARY:
+        strbuf_append(buf, str); /// operator
+        strbuf_append(buf, " ");
+        if (node->first_child) {
+            node_to_source_impl(node->first_child, buf, depth);
+        }
         break;
 
     case NODE_PROC_SUB_IN:

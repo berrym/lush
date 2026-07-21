@@ -65,6 +65,13 @@ static node_t *parse_array_literal(parser_t *parser);
 /// Forward declarations for extended language features
 static node_t *parse_extended_test(parser_t *parser);
 
+/// Forward declarations for the extended-test [[ ]] conditional-expression
+/// recursive-descent grammar (or -> and -> not -> primary).
+static node_t *cond_or_expr(parser_t *parser);
+static node_t *cond_and_expr(parser_t *parser);
+static node_t *cond_not_expr(parser_t *parser);
+static node_t *cond_primary(parser_t *parser);
+
 /// Forward declarations for extended language features
 static node_t *parse_process_substitution(parser_t *parser);
 
@@ -6242,28 +6249,478 @@ static node_t *parse_array_literal(parser_t *parser) {
     return array_node;
 }
 
+/* ============================================================================
+ * Extended-test [[ ]] conditional-expression parser
+ *
+ * parse_extended_test builds a real conditional AST (NODE_COND_OR / _AND /
+ * _NOT / _BINARY / _UNARY) instead of flattening tokens into a string that is
+ * re-parsed at execution time. Operands are ordinary word-nodes built by
+ * collect_word_argument (carrying per-character quote provenance); operators
+ * are structure. The executor tree-walks the result.
+ *
+ * Grammar (recursive descent, bash/zsh consensus precedence):
+ *
+ *   or_expr  := and_expr ( '||' and_expr )*     // left-assoc, lowest
+ *   and_expr := not_expr ( '&&' not_expr )*      // left-assoc, tighter
+ *   not_expr := '!' not_expr | primary           // right-recursive
+ *   primary  := '(' or_expr ')'                   // grouping (primary start)
+ *             | unary_op word                     // -z/-n/.../-G  then operand
+ *             | word binary_op word               // == = != =~ < > -eq..-nt..
+ *             | word                              // truthiness
+ *
+ * The AST fixes two quirks of the former string flattener that both matched
+ * bash and zsh: `a && b || c` now groups `(a && b) || c` (was `a && (b||c)`),
+ * and `! ( expr )` now negates the group (was always false).
+ * ============================================================================
+ */
+
+/// True when a word token's text is one of the binary word-operators
+/// (arithmetic comparisons and file relations). Such a word is an operator at
+/// the operator position, never a unary operator or a bare operand.
+static bool cond_is_binary_word_op(const char *text) {
+    static const char *const ops[] = {"-eq", "-ne", "-lt", "-le", "-gt",
+                                      "-ge", "-nt", "-ot", "-ef"};
+    if (!text) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
+        if (strcmp(text, ops[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// True when the token at a PRIMARY position is a unary operator: a bare word
+/// token whose text is '-' followed by an alphabetic character and which is
+/// not one of the binary word-operators. A quoted operand (`"-z"`) is a string,
+/// never an operator.
+static bool cond_is_unary_op(token_t *tok) {
+    if (!tok || tok->type != TOK_WORD || !tok->text) {
+        return false;
+    }
+    if (tok->text[0] != '-' || !isalpha((unsigned char)tok->text[1])) {
+        return false;
+    }
+    return !cond_is_binary_word_op(tok->text);
+}
+
+/// True when the token is a standalone '!' (negation), distinct from '!='
+/// (TOK_NOT_EQUAL) and from extglob '!(...)' (which tokenizes as a word).
+static bool cond_is_bang(token_t *tok) {
+    return tok && tok->type == TOK_WORD && tok->text && tok->text[0] == '!' &&
+           tok->text[1] == '\0';
+}
+
+/// Collect one fused word-node operand via collect_word_argument (the single
+/// source of truth for word acceptance, adjacency concatenation, node-type
+/// classification and quote provenance). Returns the detached child node, or
+/// NULL if the current token does not begin a word or on allocation failure.
+static node_t *cond_collect_operand(parser_t *parser) {
+    node_t temp;
+    memset(&temp, 0, sizeof(temp));
+    if (!collect_word_argument(parser, &temp)) {
+        return NULL;
+    }
+    node_t *child = temp.first_child;
+    if (child) {
+        child->prev_sibling = NULL;
+        child->next_sibling = NULL;
+    }
+    return child;
+}
+
+/// Collect the raw text of a paren/regex pattern run for the RHS of ==/!=/=~.
+/// At an RHS-operand position `(`, `)` and `|` are pattern content, not
+/// grouping, so the run is gathered as raw concatenated token text tracking
+/// paren depth. A top-level `)` (depth 0) belongs to an enclosing group and
+/// stops the run; a whitespace gap at depth 0 also ends the operand. On return
+/// *balanced is false if a `(` was left open (caller reports a parse error).
+/// Consumes every token gathered. Returns a heap string (owner), or NULL on
+/// allocation failure.
+static char *cond_collect_paren_run(parser_t *parser, bool *balanced) {
+    char *buf = NULL;
+    size_t len = 0;
+    size_t cap = 0;
+    int depth = 0;
+    size_t last_end = 0;
+    bool first = true;
+
+    for (;;) {
+        token_t *tok = tokenizer_current(parser->tokenizer);
+        if (!tok || tok->type == TOK_EOF) {
+            break;
+        }
+        if (!first && depth == 0) {
+            /// Top-level boundary: a whitespace gap or a structural terminator
+            /// ends the operand; a `)` here closes an enclosing group.
+            if (tok->position != last_end || tok->type == TOK_DOUBLE_RBRACKET ||
+                tok->type == TOK_LOGICAL_AND || tok->type == TOK_LOGICAL_OR ||
+                tok->type == TOK_RPAREN) {
+                break;
+            }
+        }
+        size_t tlen = strlen(tok->text);
+        if (len + tlen + 1 > cap) {
+            size_t ncap = (len + tlen + 1) * 2;
+            char *nb = realloc(buf, ncap);
+            if (!nb) {
+                free(buf);
+                if (balanced) {
+                    *balanced = false;
+                }
+                return NULL;
+            }
+            buf = nb;
+            cap = ncap;
+        }
+        memcpy(buf + len, tok->text, tlen);
+        len += tlen;
+        buf[len] = '\0';
+
+        if (tok->type == TOK_LPAREN) {
+            depth++;
+        } else if (tok->type == TOK_RPAREN) {
+            depth--;
+        }
+        last_end = tok->end_position;
+        first = false;
+        tokenizer_advance(parser->tokenizer);
+    }
+
+    if (!buf) {
+        buf = strdup("");
+    }
+    if (balanced) {
+        *balanced = (depth == 0);
+    }
+    return buf;
+}
+
+/// Build a bare NODE_VAR word-node from raw pattern text (quote_prov NULL: an
+/// all-unquoted pattern). Frees `text` on failure. Returns NULL on error.
+static node_t *cond_make_pattern_node(parser_t *parser, char *text) {
+    node_t *node = new_node(NODE_VAR);
+    if (!node) {
+        free(text);
+        parser->has_error = true;
+        return NULL;
+    }
+    node->val.str = text;
+    node->val_type = VAL_STR;
+    return node;
+}
+
+/// Collect the RHS operand of a ==/!=/=~ comparison. A quoted operand
+/// (`"@(a|b)"`, `"a b"`) goes through collect_word_argument so its quote
+/// provenance survives. An unquoted operand whose contiguous run involves
+/// parens or `|` is a pattern/regex whose parens are content, not grouping
+/// (`(a|b)`, `^([a-z]+)([0-9]+)$`, `a|b`); it is gathered as raw text with no
+/// quote provenance. `@(a|b)` and `[a-z]*` already fuse as ordinary words.
+static node_t *cond_collect_rhs(parser_t *parser) {
+    token_t *tok = tokenizer_current(parser->tokenizer);
+    if (!tok) {
+        return NULL;
+    }
+    /// Quoted RHS: ordinary collection preserves quote_prov.
+    if (tok->type == TOK_STRING || tok->type == TOK_EXPANDABLE_STRING) {
+        return cond_collect_operand(parser);
+    }
+    /// RHS begins with a bare `(`: the whole operand is a paren pattern/regex.
+    if (tok->type == TOK_LPAREN) {
+        bool balanced = true;
+        char *text = cond_collect_paren_run(parser, &balanced);
+        if (!text) {
+            parser->has_error = true;
+            return NULL;
+        }
+        if (!balanced) {
+            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                             "unbalanced '(' in extended-test pattern");
+            free(text);
+            return NULL;
+        }
+        return cond_make_pattern_node(parser, text);
+    }
+    /// Collect the leading word run.
+    node_t *node = cond_collect_operand(parser);
+    if (!node) {
+        return NULL;
+    }
+    /// A contiguous `(` or `|` after the leading word means the operand is a
+    /// pattern/regex whose parens/alternation are content (e.g. the leading
+    /// `^` of `^([a-z]+)([0-9]+)$`). Append the raw run and drop quote
+    /// provenance -- an all-unquoted pattern; NULL provenance means no quoting.
+    tok = tokenizer_current(parser->tokenizer);
+    if (tok && (tok->type == TOK_LPAREN || tok->type == TOK_PIPE)) {
+        bool balanced = true;
+        char *run = cond_collect_paren_run(parser, &balanced);
+        if (!run) {
+            free_node_tree(node);
+            parser->has_error = true;
+            return NULL;
+        }
+        if (!balanced) {
+            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                             "unbalanced '(' in extended-test pattern");
+            free(run);
+            free_node_tree(node);
+            return NULL;
+        }
+        const char *base = node->val.str ? node->val.str : "";
+        size_t nl = strlen(base) + strlen(run) + 1;
+        char *combined = malloc(nl);
+        if (!combined) {
+            free(run);
+            free_node_tree(node);
+            parser->has_error = true;
+            return NULL;
+        }
+        snprintf(combined, nl, "%s%s", base, run);
+        free(run);
+        free(node->val.str);
+        node->val.str = combined;
+        node->val_type = VAL_STR;
+        node->type = NODE_VAR;
+        free(node->quote_prov);
+        node->quote_prov = NULL;
+        free(node->magic_equal_value);
+        node->magic_equal_value = NULL;
+        node->glob_qualified = false;
+    }
+    return node;
+}
+
+/// Recognize and consume a binary operator at the operator position (after an
+/// LHS operand). Returns the canonical operator spelling (heap, owner), or NULL
+/// if the current token is not a binary operator. `=` and `==` both
+/// canonicalize to "==".
+static char *cond_binary_op(parser_t *parser) {
+    token_t *tok = tokenizer_current(parser->tokenizer);
+    if (!tok) {
+        return NULL;
+    }
+    switch (tok->type) {
+    case TOK_REGEX_MATCH:
+        tokenizer_advance(parser->tokenizer);
+        return strdup("=~");
+    case TOK_NOT_EQUAL:
+        tokenizer_advance(parser->tokenizer);
+        return strdup("!=");
+    case TOK_REDIRECT_IN:
+        tokenizer_advance(parser->tokenizer);
+        return strdup("<");
+    case TOK_REDIRECT_OUT:
+        tokenizer_advance(parser->tokenizer);
+        return strdup(">");
+    case TOK_ASSIGN:
+        /// `==` arrives as two adjacent TOK_ASSIGN; a lone `=` aliases to `==`.
+        tokenizer_advance(parser->tokenizer);
+        if (tokenizer_match(parser->tokenizer, TOK_ASSIGN)) {
+            tokenizer_advance(parser->tokenizer);
+        }
+        return strdup("==");
+    default:
+        if (tok->type == TOK_WORD && cond_is_binary_word_op(tok->text)) {
+            char *op = strdup(tok->text);
+            tokenizer_advance(parser->tokenizer);
+            return op;
+        }
+        return NULL;
+    }
+}
+
+static node_t *cond_primary(parser_t *parser) {
+    token_t *tok = tokenizer_current(parser->tokenizer);
+    if (!tok || tok->type == TOK_EOF || tok->type == TOK_DOUBLE_RBRACKET) {
+        parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                         "expected operand in extended test");
+        return NULL;
+    }
+
+    source_location_t loc = token_to_source_location(tok, parser->source_name);
+
+    /// Grouping: '(' or_expr ')' -- only at a primary start. The group node is
+    /// transparent (the inner subtree is returned directly).
+    if (tok->type == TOK_LPAREN) {
+        tokenizer_advance(parser->tokenizer);
+        node_t *inner = cond_or_expr(parser);
+        if (!inner) {
+            return NULL;
+        }
+        if (!tokenizer_match(parser->tokenizer, TOK_RPAREN)) {
+            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                             "expected ')' to close group in extended test");
+            free_node_tree(inner);
+            return NULL;
+        }
+        tokenizer_advance(parser->tokenizer);
+        return inner;
+    }
+
+    /// Unary operator: -z/-n/-v/-o/-e/-f/.../-G  then one operand.
+    if (cond_is_unary_op(tok)) {
+        char *op = strdup(tok->text);
+        if (!op) {
+            parser->has_error = true;
+            return NULL;
+        }
+        tokenizer_advance(parser->tokenizer);
+        node_t *operand = cond_collect_operand(parser);
+        if (!operand) {
+            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                             "expected operand after unary operator '%s'", op);
+            free(op);
+            return NULL;
+        }
+        node_t *node = new_node_at(NODE_COND_UNARY, loc);
+        if (!node) {
+            free(op);
+            free_node_tree(operand);
+            parser->has_error = true;
+            return NULL;
+        }
+        node->val.str = op;
+        node->val_type = VAL_STR;
+        add_child_node(node, operand);
+        return node;
+    }
+
+    /// LHS operand.
+    node_t *lhs = cond_collect_operand(parser);
+    if (!lhs) {
+        parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                         "expected operand in extended test");
+        return NULL;
+    }
+
+    /// Binary comparison?
+    char *op = cond_binary_op(parser);
+    if (op) {
+        node_t *rhs = cond_collect_rhs(parser);
+        if (!rhs) {
+            if (!parser->has_error) {
+                parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                                 "expected operand after '%s'", op);
+            }
+            free(op);
+            free_node_tree(lhs);
+            return NULL;
+        }
+        node_t *node = new_node_at(NODE_COND_BINARY, loc);
+        if (!node) {
+            free(op);
+            free_node_tree(lhs);
+            free_node_tree(rhs);
+            parser->has_error = true;
+            return NULL;
+        }
+        node->val.str = op;
+        node->val_type = VAL_STR;
+        add_child_node(node, lhs);
+        add_child_node(node, rhs);
+        return node;
+    }
+
+    /// Bare word -- truthiness primary.
+    return lhs;
+}
+
+static node_t *cond_not_expr(parser_t *parser) {
+    token_t *tok = tokenizer_current(parser->tokenizer);
+    if (cond_is_bang(tok)) {
+        source_location_t loc =
+            token_to_source_location(tok, parser->source_name);
+        tokenizer_advance(parser->tokenizer);
+        node_t *sub = cond_not_expr(parser);
+        if (!sub) {
+            return NULL;
+        }
+        node_t *node = new_node_at(NODE_COND_NOT, loc);
+        if (!node) {
+            free_node_tree(sub);
+            parser->has_error = true;
+            return NULL;
+        }
+        add_child_node(node, sub);
+        return node;
+    }
+    return cond_primary(parser);
+}
+
+static node_t *cond_and_expr(parser_t *parser) {
+    node_t *left = cond_not_expr(parser);
+    if (!left) {
+        return NULL;
+    }
+    while (tokenizer_match(parser->tokenizer, TOK_LOGICAL_AND)) {
+        source_location_t loc = token_to_source_location(
+            tokenizer_current(parser->tokenizer), parser->source_name);
+        tokenizer_advance(parser->tokenizer);
+        node_t *right = cond_not_expr(parser);
+        if (!right) {
+            free_node_tree(left);
+            return NULL;
+        }
+        node_t *node = new_node_at(NODE_COND_AND, loc);
+        if (!node) {
+            free_node_tree(left);
+            free_node_tree(right);
+            parser->has_error = true;
+            return NULL;
+        }
+        add_child_node(node, left);
+        add_child_node(node, right);
+        left = node;
+    }
+    return left;
+}
+
+static node_t *cond_or_expr(parser_t *parser) {
+    node_t *left = cond_and_expr(parser);
+    if (!left) {
+        return NULL;
+    }
+    while (tokenizer_match(parser->tokenizer, TOK_LOGICAL_OR)) {
+        source_location_t loc = token_to_source_location(
+            tokenizer_current(parser->tokenizer), parser->source_name);
+        tokenizer_advance(parser->tokenizer);
+        node_t *right = cond_and_expr(parser);
+        if (!right) {
+            free_node_tree(left);
+            return NULL;
+        }
+        node_t *node = new_node_at(NODE_COND_OR, loc);
+        if (!node) {
+            free_node_tree(left);
+            free_node_tree(right);
+            parser->has_error = true;
+            return NULL;
+        }
+        add_child_node(node, left);
+        add_child_node(node, right);
+        left = node;
+    }
+    return left;
+}
+
 /**
  * @brief Parse an extended test command [[ expression ]]
  *
- * Parses Bash/Zsh-style extended test expressions. These support:
- * - String comparisons: ==, !=, <, >
- * - Pattern matching: == with glob patterns (unquoted RHS)
- * - Regex matching: =~ with POSIX extended regex
- * - Logical operators: &&, ||, !
- * - Grouping: ( expression )
- * - File tests: -f, -d, -e, -r, -w, -x, etc.
- * - String tests: -z, -n
+ * Parses Bash/Zsh-style extended test expressions into a conditional AST.
+ * Supports string comparisons (== = != < >), pattern matching (== with
+ * globs), regex matching (=~), logical operators (&& || !), grouping
+ * ( expr ), and file/string unary tests (-f -d -e -z -n -v -o ...).
  *
- * Unlike [ ], extended tests:
- * - Don't perform word splitting on variables
- * - Don't perform glob expansion on arguments
- * - Support && and || directly (not -a and -o)
- * - Support < and > for string comparison without escaping
+ * Unlike [ ], extended tests do not word-split or glob-expand operands and
+ * spell logical connectives &&/||/! directly.
  *
- * Grammar: [[ conditional_expression ]]
+ * Grammar: [[ conditional_expression ]]. An empty `[[ ]]` yields a wrapper
+ * node with zero children (evaluates false).
  *
  * @param parser Parser instance
- * @return Extended test AST node with expression in val.str
+ * @return NODE_EXTENDED_TEST wrapping the conditional expression tree, or NULL
+ *         on a grammar violation (a parse error is reported).
  */
 static node_t *parse_extended_test(parser_t *parser) {
     token_t *current = tokenizer_current(parser->tokenizer);
@@ -6272,14 +6729,13 @@ static node_t *parse_extended_test(parser_t *parser) {
         return NULL;
     }
 
-    /// Capture source location BEFORE advancing (advance frees current token)
+    /// Capture source location BEFORE advancing (advance frees current token).
     source_location_t loc =
         token_to_source_location(current, parser->source_name);
 
     /// Consume [[
     tokenizer_advance(parser->tokenizer);
 
-    /// Create extended test node with source location
     node_t *test_node = new_node_at(NODE_EXTENDED_TEST, loc);
     if (!test_node) {
         parser_error_add(parser, SHELL_ERR_OUT_OF_MEMORY,
@@ -6287,163 +6743,28 @@ static node_t *parse_extended_test(parser_t *parser) {
         return NULL;
     }
 
-    /// Collect the test expression until ]]
-    /// We need to handle nested (( )) for grouping within [[ ]]
-    char *expr = NULL;
-    size_t expr_len = 0;
-    size_t expr_capacity = 256;
-    int paren_depth = 0;
-    int bracket_depth = 0; /// Track [...] for glob char classes (#104)
-    bool in_regex = false; /// Track if we're parsing a regex pattern after =~
+    /// Empty `[[ ]]` -> wrapper with zero children (evaluates false).
+    if (tokenizer_match(parser->tokenizer, TOK_DOUBLE_RBRACKET)) {
+        tokenizer_advance(parser->tokenizer);
+        return test_node;
+    }
 
-    expr = malloc(expr_capacity);
+    node_t *expr = cond_or_expr(parser);
     if (!expr) {
         free_node_tree(test_node);
         return NULL;
     }
-    expr[0] = '\0';
 
-    /// Parse tokens until we find ]] at depth 0
-    while (!tokenizer_match(parser->tokenizer, TOK_EOF)) {
-        current = tokenizer_current(parser->tokenizer);
-        if (!current) {
-            break;
-        }
-
-        /// Check for ]] - end of extended test
-        if (current->type == TOK_DOUBLE_RBRACKET && paren_depth == 0) {
-            break;
-        }
-
-        /// Check for logical operators that end regex context
-        /// && and || are expression separators in [[ ]]
-        if ((current->type == TOK_LOGICAL_AND ||
-             current->type == TOK_LOGICAL_OR) &&
-            paren_depth == 0) {
-            in_regex = false;
-        }
-
-        /// Track nested parentheses for grouping
-        if (current->type == TOK_LPAREN) {
-            paren_depth++;
-        } else if (current->type == TOK_RPAREN) {
-            if (paren_depth > 0) {
-                paren_depth--;
-            }
-        }
-
-        /// Track [...] bracket depth so a glob char-class is preserved
-        /// intact in the expression buffer; otherwise [a-z]* would arrive
-        /// at the matcher as "[ a-z ] *" and never match.  Issue #104.
-        if (current->type == TOK_LBRACKET) {
-            bracket_depth++;
-        }
-
-        /// Append token text to expression
-        size_t token_len = strlen(current->text);
-        if (expr_len + token_len + 2 > expr_capacity) {
-            expr_capacity = (expr_len + token_len + 2) * 2;
-            char *new_expr = realloc(expr, expr_capacity);
-            if (!new_expr) {
-                free(expr);
-                free_node_tree(test_node);
-                return NULL;
-            }
-            expr = new_expr;
-        }
-
-        /// Determine if we should skip adding a space before this token
-        bool skip_space = false;
-
-        if (in_regex) {
-            /// In regex mode: don't add spaces between regex tokens
-            /// This keeps ^hello$ as one unit instead of ^ hello $
-            skip_space = true;
-        } else if (bracket_depth > 0 ||
-                   (expr_len > 0 && expr[expr_len - 1] == ']' &&
-                    !token_is_operator(current->type))) {
-            /// Inside a glob char-class or immediately after one: no spaces
-            /// so [a-z]* stays glued. Issue #104.
-            skip_space = true;
-        } else if (paren_depth > 0 &&
-                   (current->type == TOK_PIPE ||
-                    (expr_len > 0 && expr[expr_len - 1] == '|'))) {
-            /// Pattern-alternation `|` inside `(...)` (zsh bare or extglob
-            /// `@(a|b)`-style) must stay glued: spaces would land in the
-            /// pattern text and ruin the match. Logical OR is TOK_LOGICAL_OR
-            /// so `||` is not affected.
-            skip_space = true;
-        } else {
-            /// Normal mode: add spaces between tokens with some exceptions
-            bool is_operator_char =
-                (current->text[0] == '=' || current->text[0] == '!' ||
-                 current->text[0] == '<' || current->text[0] == '>' ||
-                 current->text[0] == '&' || current->text[0] == '|' ||
-                 current->text[0] == '~');
-            bool prev_is_operator =
-                (expr_len > 0 &&
-                 (expr[expr_len - 1] == '=' || expr[expr_len - 1] == '!' ||
-                  expr[expr_len - 1] == '<' || expr[expr_len - 1] == '>' ||
-                  expr[expr_len - 1] == '&' || expr[expr_len - 1] == '|'));
-
-            /// Don't add space:
-            /// - Before ) or after (
-            /// - After ) when followed by ( (for regex groups like )(
-            /// - Between consecutive operators
-            skip_space = (current->type == TOK_RPAREN) ||
-                         (expr_len > 0 && expr[expr_len - 1] == '(') ||
-                         (expr_len > 0 && expr[expr_len - 1] == ')' &&
-                          current->type == TOK_LPAREN) ||
-                         (is_operator_char && prev_is_operator);
-        }
-
-        if (expr_len > 0 && expr[expr_len - 1] != ' ' && !skip_space) {
-            expr[expr_len++] = ' ';
-            expr[expr_len] = '\0';
-        }
-
-        strcat(expr, current->text);
-        expr_len = strlen(expr);
-
-        /// Check if we just added the =~ operator - next tokens are regex
-        if (current->type == TOK_REGEX_MATCH) {
-            in_regex = true;
-        }
-
-        /// Close bracket AFTER append so the ']' itself doesn't get a leading
-        /// space from the bracket_depth>0 rule.
-        if (current->type == TOK_RBRACKET && bracket_depth > 0) {
-            bracket_depth--;
-        }
-
-        tokenizer_advance(parser->tokenizer);
-    }
-
-    /// Expect ]]
     if (!tokenizer_match(parser->tokenizer, TOK_DOUBLE_RBRACKET)) {
         parser_error_add(parser, SHELL_ERR_UNCLOSED_CONTROL,
                          "expected ']]' to close extended test");
-        free(expr);
+        free_node_tree(expr);
         free_node_tree(test_node);
         return NULL;
     }
     tokenizer_advance(parser->tokenizer); /// consume ]]
 
-    /// Trim whitespace from expression
-    while (expr_len > 0 && expr[expr_len - 1] == ' ') {
-        expr[--expr_len] = '\0';
-    }
-    char *start = expr;
-    while (*start == ' ') {
-        start++;
-    }
-    if (start != expr) {
-        memmove(expr, start, strlen(start) + 1);
-    }
-
-    test_node->val.str = expr;
-    test_node->val_type = VAL_STR;
-
+    add_child_node(test_node, expr);
     return test_node;
 }
 
