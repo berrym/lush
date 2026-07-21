@@ -337,35 +337,31 @@ int builtin_bind_array_literal(const char *name, const char *literal,
         return 1;
     }
 
-    /// Parse a parenthesized array literal `(elem1 elem2 [k]=v ...)`. Element
-    /// boundaries respect quotes so a quoted element may contain spaces; the
-    /// raw element bytes (quotes included, matching the assignment path) are
-    /// stored. `[idx]=value` / `[key]=value` set a specific slot, otherwise
-    /// elements fill sequential indices.
+    /// Parse a parenthesized array literal `(elem0\x1Felem1\x1F[k]=v ...)`.
+    /// The parser wraps the already-tokenized elements, separated by the \x1F
+    /// element separator, in '(' ... ')' (see src/parser.c). \x1F never appears
+    /// in a value, so it is the sole element delimiter -- whitespace is part of
+    /// an element (a quoted element may contain spaces) and a ')' inside a
+    /// value is ordinary text, not the terminator. The interior therefore runs
+    /// from just past the leading '(' to the producer's trailing ')', located
+    /// by length rather than by scanning for ')'. `[idx]=value` / `[key]=value`
+    /// set a specific slot, otherwise elements fill sequential indices.
     if (literal && literal[0] == '(') {
+        size_t llen = strlen(literal);
+        const char *end = (llen >= 2 && literal[llen - 1] == ')')
+                              ? literal + llen - 1
+                              : literal + llen;
         const char *p = literal + 1;
         int idx = 0;
-        while (*p && *p != ')') {
-            while (*p && isspace((unsigned char)*p)) {
-                p++;
-            }
-            if (*p == ')' || !*p) {
-                break;
-            }
+        while (p < end) {
             const char *elem_start = p;
-            bool in_quote = false;
-            char quote_char = 0;
-            while (*p &&
-                   (in_quote || (!isspace((unsigned char)*p) && *p != ')'))) {
-                if (!in_quote && (*p == '"' || *p == '\'')) {
-                    in_quote = true;
-                    quote_char = *p;
-                } else if (in_quote && *p == quote_char) {
-                    in_quote = false;
-                }
+            while (p < end && *p != '\x1F') {
                 p++;
             }
             size_t elem_len = (size_t)(p - elem_start);
+            if (p < end && *p == '\x1F') {
+                p++; /// consume the separator; the next element follows
+            }
             if (elem_len > 0) {
                 char *elem = malloc(elem_len + 1);
                 if (elem) {

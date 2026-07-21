@@ -2110,6 +2110,136 @@ TEST(local_array_literal_builds_indexed_array) {
     executor_free(exec);
 }
 
+TEST(rt_declare_array_quoted_element_keeps_spaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A quoted array-literal element that contains spaces must survive as one
+    /// element through the declare sentinel channel (issue #546). The old
+    /// space-joined sentinel re-split the quoted value into separate words.
+    run_result_t r =
+        run_shell_with_executor(exec, "declare -a p546a=(\"x y\" z)\n"
+                                      "printf '(%s)' \"${p546a[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(x y)(z)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_assoc_quoted_value_keeps_spaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The same boundary loss corrupted an associative `[key]="a b"` slot into
+    /// key `a` plus a stray index; the value must stay intact.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A p546m=([k]=\"a b\" [j]=c)\n"
+              "printf '(%s)' \"${p546m[k]}\" \"${p546m[j]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(a b)(c)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_array_plain_elements_regression) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// Guard: ordinary space-separated elements still become distinct slots.
+    run_result_t r =
+        run_shell_with_executor(exec, "declare -a p546p=(one two three)\n"
+                                      "printf '(%s)' \"${p546p[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(one)(two)(three)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_array_literal_word_to_nonassignment_command) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A `name=(...)` word reaching a command that is NOT one of the
+    /// assignment-aware builtins has no array meaning: the internal \x1F
+    /// element separators must be rendered back to spaces, never leaked into
+    /// argv (a passthrough of the raw byte previously crashed on `"$1"`).
+    run_result_t r = run_shell_with_executor(
+        exec, "f546n() { echo \"$1\"; }\nf546n a=(1 2)\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a=(1 2)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_array_literal_word_in_command_substitution) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The same word captured through `$(...)` must carry no \x1F byte, so the
+    /// captured length and value are the readable flat form.
+    run_result_t r = run_shell_with_executor(
+        exec, "p546s=$(echo q=(1 2))\necho \"len=${#p546s} val=[$p546s]\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "len=7 val=[q=(1 2)]\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_declare_array_quoted_paren_in_element) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// A ')' inside a quoted element is ordinary text, not the array
+    /// terminator; the \x1F-delimited channel matches bash/zsh and the shell's
+    /// own bare-assignment path (which never truncated here).
+    run_result_t r =
+        run_shell_with_executor(exec, "declare -a p546c=(\"a )\" b)\n"
+                                      "printf '(%s)' \"${p546c[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(a ))(b)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_local_array_quoted_element_keeps_spaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// local delegates to declare, so the boundary fix flows through the same
+    /// sentinel channel for a function-scoped array.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "f546() { local q=(\"p q\" r); printf '(%s)' \"${q[@]}\"; echo; }\n"
+        "f546\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "(p q)(r)\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_readonly_relaxed_quoted_element_keeps_spaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The relaxed-mode readonly/export paths share builtin_bind_array_literal,
+    /// so the fix applies there too: a spaced quoted element stays one slot.
+    run_result_t r =
+        run_shell_mode_gated(exec, "mode bash\nreadonly p546r=(\"x y\" z)\n"
+                                   "printf '(%s)' \"${p546r[@]}\"\necho\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "(x y)(z)");
+
+    executor_free(exec);
+}
+
 TEST(local_quoted_paren_value_stays_scalar) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6418,6 +6548,14 @@ int main(void) {
     RUN_TEST(local_plus_equals_append);
     RUN_TEST(local_while_loop_counter);
     RUN_TEST(local_array_literal_builds_indexed_array);
+    RUN_TEST(rt_declare_array_quoted_element_keeps_spaces);
+    RUN_TEST(rt_declare_assoc_quoted_value_keeps_spaces);
+    RUN_TEST(rt_declare_array_plain_elements_regression);
+    RUN_TEST(rt_array_literal_word_to_nonassignment_command);
+    RUN_TEST(rt_array_literal_word_in_command_substitution);
+    RUN_TEST(rt_declare_array_quoted_paren_in_element);
+    RUN_TEST(rt_local_array_quoted_element_keeps_spaces);
+    RUN_TEST(rt_readonly_relaxed_quoted_element_keeps_spaces);
     RUN_TEST(local_quoted_paren_value_stays_scalar);
     RUN_TEST(local_array_dies_with_function_scope);
 
