@@ -67,6 +67,42 @@ TEST(set_get_variable) {
     symtable_manager_free(mgr);
 }
 
+TEST(value_with_unit_separator_roundtrips) {
+    /// A shell value may legally contain 0x1F, the byte used internally as
+    /// the value/metadata separator. Deserialization must locate the
+    /// metadata trailer from the right so the value round-trips byte-for-
+    /// byte. Left-scanning previously truncated the value at the first 0x1F
+    /// and, when a digit followed, mis-typed the binding as SYMVAR_ARRAY and
+    /// dereferenced the truncated value as a pointer (issue #550).
+    symtable_manager_t *mgr = symtable_manager_new();
+    ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
+
+    /// `1<US>2` -- the exact crash shape (the digit after <US> parsed as
+    /// type 2 == SYMVAR_ARRAY).
+    const char *raw = "1\x1f"
+                      "2";
+    ASSERT_EQ(symtable_set_var(mgr, "US1", raw, SYMVAR_NONE), 0,
+              "set_var with a 0x1F value should succeed");
+    char *v = symtable_get_var(mgr, "US1");
+    ASSERT_NOT_NULL(v, "get_var should return the value");
+    ASSERT_EQ((int)strlen(v), 3, "value length must be 3 (0x1F preserved)");
+    ASSERT_EQ(memcmp(v, raw, 3), 0, "value bytes must round-trip exactly");
+    free(v);
+
+    /// Multiple and trailing separators.
+    const char *raw2 = "p\x1f"
+                       "q\x1f\x1f";
+    ASSERT_EQ(symtable_set_var(mgr, "US2", raw2, SYMVAR_NONE), 0,
+              "set_var US2 should succeed");
+    char *v2 = symtable_get_var(mgr, "US2");
+    ASSERT_NOT_NULL(v2, "get_var US2 should return the value");
+    ASSERT_EQ((int)strlen(v2), 5, "US2 length must be 5");
+    ASSERT_EQ(memcmp(v2, raw2, 5), 0, "US2 bytes must round-trip exactly");
+    free(v2);
+
+    symtable_manager_free(mgr);
+}
+
 TEST(set_overwrite_variable) {
     symtable_manager_t *mgr = symtable_manager_new();
     ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
@@ -602,6 +638,7 @@ int main(void) {
 
     printf("\nBasic variable tests:\n");
     RUN_TEST(set_get_variable);
+    RUN_TEST(value_with_unit_separator_roundtrips);
     RUN_TEST(set_overwrite_variable);
     RUN_TEST(get_nonexistent_variable);
     RUN_TEST(unset_variable);

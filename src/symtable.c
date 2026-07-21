@@ -62,16 +62,21 @@ static int current_lineno = 0;       /// For $LINENO
 /// Constants
 #define MAX_SCOPE_DEPTH 256
 /// Separator between value and metadata fields in the serialized
-/// per-binding storage string. Must be a byte that can never appear
-/// inside a shell variable value, because the deserializer locates
-/// the fields by strstr-scanning for the first occurrence. The
-/// previous choice `"|"` was unsafe: any value containing `|`
-/// (`x="a|b"`, command substitution capturing tool output with
-/// pipes, etc.) was silently truncated at the first pipe on
-/// readback. ASCII Unit Separator (0x1F) is the canonical
-/// "separator-inside-data" control character per ISO/IEC 6429,
-/// reserved by POSIX shells for exactly this purpose and never
-/// legal in a shell variable's literal text. Issue #211.
+/// per-binding storage string, format
+/// `value <SEP> type <SEP> flags <SEP> scope_level`. ASCII Unit
+/// Separator (0x1F) is the canonical "separator-inside-data" control
+/// character per ISO/IEC 6429; the earlier choice `"|"` truncated any
+/// value containing a pipe (`x="a|b"`, command substitution capturing
+/// tool output) on readback (issue #211).
+///
+/// A shell value can nonetheless legally contain 0x1F -- `$'\x1f'`,
+/// command substitution of binary data, `read` of a control byte -- so
+/// the separator is NOT assumed absent from the value. The metadata
+/// trailer is exactly three numeric fields that never contain 0x1F, so
+/// deserialize_variable locates them by the three RIGHTMOST separators,
+/// leaving the value byte-transparent (issue #550). Left-to-right
+/// first-occurrence scanning previously mis-split such values into a
+/// bogus SYMVAR_ARRAY and dereferenced the truncated value as a pointer.
 #define METADATA_SEPARATOR "\x1f"
 #define METADATA_BUFFER_SIZE 64
 
@@ -170,27 +175,36 @@ static symvar_t *deserialize_variable(const char *name,
         return NULL;
     }
 
-    /// Find the separators manually to handle empty fields
-    char *pos = serialized_copy;
-    char *sep1 = strstr(pos, METADATA_SEPARATOR);
-    if (sep1) {
-        *sep1 = '\0';
-        var->value = strdup(pos);
-
-        pos = sep1 + strlen(METADATA_SEPARATOR);
-        char *sep2 = strstr(pos, METADATA_SEPARATOR);
-        if (sep2) {
-            *sep2 = '\0';
-            var->type = (symvar_type_t)atoi(pos);
-
-            pos = sep2 + strlen(METADATA_SEPARATOR);
-            char *sep3 = strstr(pos, METADATA_SEPARATOR);
-            if (sep3) {
-                *sep3 = '\0';
-                var->flags = (symvar_flags_t)atoi(pos);
-
-                pos = sep3 + strlen(METADATA_SEPARATOR);
-                var->scope_level = (size_t)atoi(pos);
+    /// Locate the field separators from the RIGHT. The serialized form is
+    /// `value <US> type <US> flags <US> scope_level` (see
+    /// serialize_variable), and the value may itself contain <US> bytes: a
+    /// shell variable can legally hold any byte, including 0x1F (via
+    /// `$'\x1f'`, command substitution capturing binary data, a `read` of a
+    /// control byte, etc.). The metadata trailer is exactly three
+    /// <US>-delimited numeric fields that never contain <US>, so the three
+    /// RIGHTMOST separators always delimit type/flags/scope; everything
+    /// before the leftmost of those three is the value, verbatim.
+    ///
+    /// Scanning from the LEFT (the first <US>) truncated any value holding a
+    /// 0x1F at that byte and -- worse -- re-read the following digit as the
+    /// type: a value like `1<US>2` deserialized to value `1`, type
+    /// SYMVAR_ARRAY, whereupon the value string was reinterpreted as a raw
+    /// array pointer (see below), an arbitrary-pointer dereference on the
+    /// next access or free. Issue #550.
+    const char sep_ch = METADATA_SEPARATOR[0];
+    char *sep_scope = strrchr(serialized_copy, sep_ch);
+    if (sep_scope) {
+        var->scope_level = (size_t)atoi(sep_scope + 1);
+        *sep_scope = '\0';
+        char *sep_flags = strrchr(serialized_copy, sep_ch);
+        if (sep_flags) {
+            var->flags = (symvar_flags_t)atoi(sep_flags + 1);
+            *sep_flags = '\0';
+            char *sep_type = strrchr(serialized_copy, sep_ch);
+            if (sep_type) {
+                var->type = (symvar_type_t)atoi(sep_type + 1);
+                *sep_type = '\0';
+                var->value = strdup(serialized_copy);
             }
         }
     }
