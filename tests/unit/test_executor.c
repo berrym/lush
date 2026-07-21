@@ -5640,6 +5640,27 @@ TEST(rt_sigil_pair_on_scalar_type_mismatch) {
     ASSERT_STDERR_CONTAINS(r, "%x: pair sigil on scalar");
 }
 
+TEST(rt_sigil_unset_name_is_literal) {
+    /// A kind sigil on a never-declared name is literal text (bash/zsh have no
+    /// sigil), not an empty expansion -- returning empty would silently drop
+    /// the word after null-word removal (issue #545).
+    run_result_t r = run_shell("echo %q\n");
+    ASSERT_STDOUT_EQ(r, "%q\n");
+    run_result_t r2 = run_shell("echo @nope\n");
+    ASSERT_STDOUT_EQ(r2, "@nope\n");
+}
+
+TEST(rt_sigil_unset_in_array_literal_not_dropped) {
+    /// The data-loss form: an `arr=(%q x)` element must not vanish.
+    run_result_t r =
+        run_shell("arr=(%q x)\nprintf '(%s)' \"${arr[@]}\"\necho\n");
+    ASSERT_STDOUT_EQ(r, "(%q)(x)\n");
+    /// Mid-position too.
+    run_result_t r2 =
+        run_shell("arr=(a %q c)\nprintf '(%s)' \"${arr[@]}\"\necho\n");
+    ASSERT_STDOUT_EQ(r2, "(a)(%q)(c)\n");
+}
+
 TEST(rt_sigil_compat_user_at_host) {
     /// `user@host` is a bare word -- `@` is mid-token, not at word start.
     run_result_t r = run_shell("echo user@host\n");
@@ -6663,6 +6684,8 @@ int main(void) {
     RUN_TEST(rt_sigil_pair_on_list);
     RUN_TEST(rt_sigil_pair_on_map);
     RUN_TEST(rt_sigil_pair_on_scalar_type_mismatch);
+    RUN_TEST(rt_sigil_unset_name_is_literal);
+    RUN_TEST(rt_sigil_unset_in_array_literal_not_dropped);
     RUN_TEST(rt_sigil_compat_user_at_host);
     RUN_TEST(rt_sigil_compat_at_invalid_identifier);
     RUN_TEST(rt_sigil_literal_in_double_quotes);

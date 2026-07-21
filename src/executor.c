@@ -7050,9 +7050,14 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
 
     lush_value_view_t view;
     if (!symtable_lookup(name, &view)) {
-        /// Unset name: empty expansion -- matches bash `${var:-}` shape for an
-        /// unset variable in unquoted context.
-        return strdup("");
+        /// Unset name: the kind sigil is a presentation operator for a
+        /// collection, and a never-declared name is not one, so the token is
+        /// literal text (`%q` / `@q`). bash and zsh have no kind sigil and keep
+        /// such a word literal; returning empty here would silently DROP the
+        /// word after null-word removal (e.g. an `arr=(%q x)` element would
+        /// vanish). The pair/vector presentation still applies to a set list or
+        /// map below.
+        return strdup(text);
     }
 
     char *result = NULL;
