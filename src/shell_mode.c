@@ -98,6 +98,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                        /// flatten (element 0 / space-join) for compatibility
             [FEATURE_WORD_SPLIT_DEFAULT] =
                 true, /// POSIX requires word splitting
+            [FEATURE_CMDSUB_WORD_SPLIT] =
+                true, /// POSIX splits unquoted command output too
             [FEATURE_AUTO_CD] = false,
                             [FEATURE_AUTO_PUSHD] = false,
                             [FEATURE_CDABLE_VARS] = false,
@@ -194,7 +196,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 false, /// bash flattens a list in a scalar slot (space-join /
                        /// element 0), does not diagnose it
             [FEATURE_WORD_SPLIT_DEFAULT] =
-                true,                  /// Bash does word splitting by default
+                true, /// Bash does word splitting by default
+            [FEATURE_CMDSUB_WORD_SPLIT] =
+                true,                  /// Bash splits command substitution
             [FEATURE_AUTO_CD] = false, /// shopt autocd, off by default
             [FEATURE_AUTO_PUSHD] = false,
                             [FEATURE_CDABLE_VARS] = false,
@@ -297,7 +301,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 false, /// zsh flattens a list in a scalar slot on IFS[0],
                        /// does not diagnose it
             [FEATURE_WORD_SPLIT_DEFAULT] =
-                false,                 /// Zsh doesn't word-split by default
+                false, /// Zsh doesn't word-split bare $var by default
+            [FEATURE_CMDSUB_WORD_SPLIT] =
+                true, /// but Zsh DOES split unquoted command substitution
             [FEATURE_AUTO_CD] = false, /// AUTO_CD option, off by default
             [FEATURE_AUTO_PUSHD] = false,
                             [FEATURE_CDABLE_VARS] = false,
@@ -399,9 +405,11 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 true, /// flagship: a list/map in a scalar slot is a type error
                       /// (SEMANTICS section 3.9), not a silent flatten
             [FEATURE_WORD_SPLIT_DEFAULT] = false, /// Zsh behavior: safer
-            [FEATURE_AUTO_CD] = true,             /// Convenience feature
-            [FEATURE_AUTO_PUSHD] = false,         /// Optional
-            [FEATURE_CDABLE_VARS] = false,        /// Optional
+            [FEATURE_CMDSUB_WORD_SPLIT] =
+                false, /// flagship: no implicit IFS-split of command output
+            [FEATURE_AUTO_CD] = true,      /// Convenience feature
+            [FEATURE_AUTO_PUSHD] = false,  /// Optional
+            [FEATURE_CDABLE_VARS] = false, /// Optional
             [FEATURE_ERREXIT_IN_LOOPS] =
                 false, /* Opt-in even in lush mode (#512). Aborting a loop or
                             function body when a command fails is a useful way
@@ -544,6 +552,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     /// Behavior Defaults
     [FEATURE_STRICT_VALUE_TYPING] = "strict_value_typing",
     [FEATURE_WORD_SPLIT_DEFAULT] = "word_split",
+    [FEATURE_CMDSUB_WORD_SPLIT] = "cmdsub_word_split",
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
     [FEATURE_PUSHD_MINUS] = "pushd_minus",

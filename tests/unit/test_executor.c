@@ -786,7 +786,8 @@ TEST(rt_pushd_popd_rotation) {
         "( d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c \"$d\"/e\n"
         "  cd \"$d/a\"; pushd \"$d/b\" >/dev/null; "
         "pushd \"$d/c\" >/dev/null; pushd \"$d/e\" >/dev/null\n"
-        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "  db() { dl=( $(dirs) ); for x in \"${dl[@]}\"; do printf '%s ' "
+        "\"${x##*/}\"; done; echo; "
         "}\n"
         "  printf 'A '; ( pushd +1 >/dev/null; db )\n"
         "  printf 'B '; ( pushd +2 >/dev/null; db )\n"
@@ -820,7 +821,8 @@ TEST(rt_pushdminus_option) {
         "  unsetopt pushdminus; [[ -o pushdminus ]] || echo unset-off\n"
         "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c\n"
         "  cd \"$d/a\"; pushd \"$d/b\" >/dev/null; pushd \"$d/c\" >/dev/null\n"
-        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "  db() { dl=( $(dirs) ); for x in \"${dl[@]}\"; do printf '%s ' "
+        "\"${x##*/}\"; done; echo; "
         "}\n"
         "  printf 'pm '; ( setopt pushdminus; pushd +1 >/dev/null; db )\n"
         "  printf 'df '; ( pushd -1 >/dev/null; db )\n"
@@ -883,7 +885,8 @@ TEST(rt_pushd_ignore_dups_option) {
         "  unsetopt pushd_ignore_dups; [[ -o pushd_ignore_dups ]] || "
         "echo unset-off\n"
         "  d=$(mktemp -d); mkdir -p \"$d\"/a \"$d\"/b \"$d\"/c\n"
-        "  db() { for x in $(dirs); do printf '%s ' \"${x##*/}\"; done; echo; "
+        "  db() { dl=( $(dirs) ); for x in \"${dl[@]}\"; do printf '%s ' "
+        "\"${x##*/}\"; done; echo; "
         "}\n"
         "  printf 'df '; ( cd \"$d/a\"; pushd \"$d/b\" >/dev/null; "
         "pushd \"$d/c\" >/dev/null; pushd \"$d/b\" >/dev/null; db )\n"
@@ -1327,6 +1330,97 @@ static run_result_t run_shell_mode_gated(executor_t *exec, const char *src) {
     apply_mode_preset(SHELL_MODE_LUSH); /// restore; no global mode leak
     symtable_unset_var(exec->symtable, "IFS");
     return r;
+}
+
+TEST(rt_cmdsub_no_split_in_lush_mode) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// lush mode: an unquoted command substitution does NOT implicitly split
+    /// (SEMANTICS section 4.1), matching the mental model of an unquoted $var.
+    /// Both $(...) and a backtick, in argv and in a for-list, stay one word.
+    run_result_t r =
+        run_shell_mode_gated(exec, "set -- $(echo a b c)\necho $#\n");
+    ASSERT_STDOUT_EQ(r, "1\n");
+
+    run_result_t bt =
+        run_shell_mode_gated(exec, "set -- `echo a b c`\necho $#\n");
+    ASSERT_STDOUT_EQ(bt, "1\n");
+
+    run_result_t forl = run_shell_mode_gated(
+        exec, "for w in $(echo a b c); do printf '[%s]' \"$w\"; done\necho\n");
+    ASSERT_STDOUT_EQ(forl, "[a b c]\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_cmdsub_split_in_compat_modes) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The compat modes restore the traditional command-sub split. zsh is the
+    /// asymmetric case that proves the two flags are genuinely distinct: it
+    /// splits $(cmd) but NOT bare $var, matching real zsh.
+    run_result_t bash = run_shell_mode_gated(
+        exec, "mode bash\nset -- $(echo a b c)\necho $#\n");
+    ASSERT_STDOUT_EQ(bash, "3\n");
+
+    run_result_t posix = run_shell_mode_gated(
+        exec, "mode posix\nset -- $(echo a b c)\necho $#\n");
+    ASSERT_STDOUT_EQ(posix, "3\n");
+
+    run_result_t zsh_cs =
+        run_shell_mode_gated(exec, "mode zsh\nset -- $(echo a b c)\necho $#\n");
+    ASSERT_STDOUT_EQ(zsh_cs, "3\n");
+
+    run_result_t zsh_var = run_shell_mode_gated(
+        exec, "mode zsh\nx=\"a b c\"\nset -- $x\necho $#\n");
+    ASSERT_STDOUT_EQ(zsh_var, "1\n");
+
+    executor_free(exec);
+}
+
+TEST(rt_cmdsub_split_select_matches_for) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// `select` word-splits a command substitution under the same per-mode
+    /// rule as `for` / argv. Feeding the selection `1` and reading $w tells the
+    /// two apart: in lush mode `$(echo a b c)` is one menu item (its whole
+    /// text), in the compat modes it splits so item 1 is `a`.
+    run_result_t lush = run_shell_mode_gated(
+        exec, "printf '1\\n' | { select w in $(echo a b c); do echo \"[$w]\"; "
+              "break; done; }\n");
+    ASSERT_STDOUT_CONTAINS(lush, "[a b c]");
+
+    run_result_t bash = run_shell_mode_gated(
+        exec, "mode bash\nprintf '1\\n' | { select w in $(echo a b c); do echo "
+              "\"[$w]\"; break; done; }\n");
+    ASSERT_STDOUT_CONTAINS(bash, "[a]");
+
+    run_result_t zsh = run_shell_mode_gated(
+        exec, "mode zsh\nprintf '1\\n' | { select w in $(echo a b c); do echo "
+              "\"[$w]\"; break; done; }\n");
+    ASSERT_STDOUT_CONTAINS(zsh, "[a]");
+
+    executor_free(exec);
+}
+
+TEST(rt_cmdsub_explicit_split_via_array_literal) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The explicit-split escape hatch still works in lush mode: an array
+    /// literal splits the command output; a quoted "$(...)" never splits.
+    run_result_t arr =
+        run_shell_mode_gated(exec, "arr=( $(echo a b c) )\necho ${#arr[@]}\n");
+    ASSERT_STDOUT_EQ(arr, "3\n");
+
+    run_result_t q =
+        run_shell_mode_gated(exec, "set -- \"$(echo a b c)\"\necho $#\n");
+    ASSERT_STDOUT_EQ(q, "1\n");
+
+    executor_free(exec);
 }
 
 TEST(gate_bash_mode_arr_at_scalar_flattens_on_space) {
@@ -6660,6 +6754,10 @@ int main(void) {
 
     printf(
         "\nSEMANTICS 3.9 mode-gating tests (FEATURE_STRICT_VALUE_TYPING):\n");
+    RUN_TEST(rt_cmdsub_no_split_in_lush_mode);
+    RUN_TEST(rt_cmdsub_split_in_compat_modes);
+    RUN_TEST(rt_cmdsub_split_select_matches_for);
+    RUN_TEST(rt_cmdsub_explicit_split_via_array_literal);
     RUN_TEST(gate_bash_mode_arr_at_scalar_flattens_on_space);
     RUN_TEST(gate_zsh_mode_arr_at_scalar_flattens_on_ifs);
     RUN_TEST(gate_bash_mode_bare_arr_scalar_yields_element_zero);
