@@ -2210,12 +2210,16 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
     /// Parser-internal array-literal sentinel (\x1F) housekeeping:
     /// the parser prefixes any unquoted `name=(...)` argv element with
-    /// \x1F so assignment-aware builtins (local, declare, typeset,
-    /// readonly, export) can distinguish it from a quoted scalar.
-    /// External commands and non-assignment builtins must not see
-    /// that internal byte. Strip it from EVERY argv element when the
-    /// command is NOT one of the assignment-aware set; the targeted
-    /// builtins handle the sentinel themselves.
+    /// \x1F, and separates the elements inside the parentheses with
+    /// interior \x1F bytes, so assignment-aware builtins (local, declare,
+    /// typeset, readonly, export) can split it back into the exact element
+    /// list. External commands and non-assignment builtins must not see
+    /// that internal byte at all -- not the prefix and not the interior
+    /// separators, which would otherwise leak into argv, command output,
+    /// or a captured `$(...)` expansion. For the non-assignment set, drop
+    /// the prefix and render each interior separator as the single space
+    /// it stands in for, reproducing the flat `name=(a b c)` word (this
+    /// syntax has no array meaning outside the assignment builtins).
     if (argc > 0 && argv[0]) {
         bool sentinel_aware = is_assignment_builtin(argv[0]);
         if (!sentinel_aware) {
@@ -2225,6 +2229,11 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                     /// byte; the allocation came from build_argv_from_ast
                     /// and is owned by us, so an in-place shift is safe.
                     memmove(argv[i], argv[i] + 1, strlen(argv[i]));
+                    for (char *q = argv[i]; *q; q++) {
+                        if (*q == '\x1F') {
+                            *q = ' ';
+                        }
+                    }
                 }
             }
         }

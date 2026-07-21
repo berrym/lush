@@ -2178,8 +2178,9 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
                         node_t *elem = array_node->first_child;
                         while (elem) {
                             if (elem->val.str) {
-                                total_len += strlen(elem->val.str) +
-                                             1; /// element + space
+                                total_len +=
+                                    strlen(elem->val.str) +
+                                    1; /// element + \x1F element separator
                             }
                             elem = elem->next_sibling;
                         }
@@ -2190,12 +2191,24 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
                             arg_str[1] = '\0';
                             strcat(arg_str, var_name);
                             strcat(arg_str, is_append ? "+=(" : "=(");
+                            /// Join the already-parsed elements with the \x1F
+                            /// element separator, not whitespace. The tokenizer
+                            /// has stripped the quotes from each element, so a
+                            /// quoted element that contained spaces (`"x y"`)
+                            /// is now the bare value `x y`; joining with a
+                            /// space would fuse it back into the neighbouring
+                            /// elements and the consumer could not recover the
+                            /// boundary.
+                            /// \x1F is the same byte reserved for the outer
+                            /// sentinel and never appears in real argv, so the
+                            /// consumer (builtin_bind_array_literal) splits on
+                            /// it to reproduce the exact element list.
                             elem = array_node->first_child;
                             bool first = true;
                             while (elem) {
                                 if (elem->val.str) {
                                     if (!first) {
-                                        strcat(arg_str, " ");
+                                        strcat(arg_str, "\x1F");
                                     }
                                     strcat(arg_str, elem->val.str);
                                     first = false;
