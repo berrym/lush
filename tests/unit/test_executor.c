@@ -2179,16 +2179,33 @@ TEST(rt_scalar_value_with_unit_separator_no_crash) {
     executor_free(exec);
 }
 
-TEST(rt_array_literal_word_to_nonassignment_command) {
+TEST(rt_array_literal_word_to_nonassignment_command_rejected) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /// A `name=(...)` word reaching a command that is NOT one of the
-    /// assignment-aware builtins has no array meaning: the internal \x1F
-    /// element separators must be rendered back to spaces, never leaked into
-    /// argv (a passthrough of the raw byte previously crashed on `"$1"`).
+    /// An array literal `name=(...)` is only valid as an assignment or as an
+    /// operand to an assignment-aware builtin. As an argument to any other
+    /// command the unquoted `(` is a syntax error -- bash, zsh, and POSIX sh
+    /// all reject it, and lush reports why rather than silently flattening the
+    /// word into a string (which is what it used to do).
     run_result_t r = run_shell_with_executor(
         exec, "f546n() { echo \"$1\"; }\nf546n a=(1 2)\n");
+
+    ASSERT_STDERR_CONTAINS(r, "not valid as an argument");
+    ASSERT_TRUE(strstr(r.out, "a=(1 2)") == NULL,
+                "the invalid word must not be flattened and executed");
+
+    executor_free(exec);
+}
+
+TEST(rt_array_literal_word_quoted_is_a_literal) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /// The escape hatch: a quoted `"name=(...)"` is an ordinary literal word
+    /// and is passed through unchanged (no array meaning, no rejection).
+    run_result_t r = run_shell_with_executor(
+        exec, "f546q() { echo \"$1\"; }\nf546q \"a=(1 2)\"\n");
 
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "a=(1 2)\n");
@@ -2196,17 +2213,16 @@ TEST(rt_array_literal_word_to_nonassignment_command) {
     executor_free(exec);
 }
 
-TEST(rt_array_literal_word_in_command_substitution) {
+TEST(rt_array_literal_in_command_sub_rejected) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /// The same word captured through `$(...)` must carry no \x1F byte, so the
-    /// captured length and value are the readable flat form.
+    /// The same rejection applies inside `$(...)`: the invalid construct fails
+    /// to parse, so the capture is empty rather than a flattened `q=(1 2)`.
     run_result_t r = run_shell_with_executor(
-        exec, "p546s=$(echo q=(1 2))\necho \"len=${#p546s} val=[$p546s]\"\n");
+        exec, "p546s=$(echo q=(1 2))\necho \"val=[$p546s]\"\n");
 
-    ASSERT_EXIT_STATUS(r, 0);
-    ASSERT_STDOUT_EQ(r, "len=7 val=[q=(1 2)]\n");
+    ASSERT_STDOUT_CONTAINS(r, "val=[]");
 
     executor_free(exec);
 }
@@ -6573,8 +6589,9 @@ int main(void) {
     RUN_TEST(rt_declare_assoc_quoted_value_keeps_spaces);
     RUN_TEST(rt_declare_array_plain_elements_regression);
     RUN_TEST(rt_scalar_value_with_unit_separator_no_crash);
-    RUN_TEST(rt_array_literal_word_to_nonassignment_command);
-    RUN_TEST(rt_array_literal_word_in_command_substitution);
+    RUN_TEST(rt_array_literal_word_to_nonassignment_command_rejected);
+    RUN_TEST(rt_array_literal_word_quoted_is_a_literal);
+    RUN_TEST(rt_array_literal_in_command_sub_rejected);
     RUN_TEST(rt_declare_array_quoted_paren_in_element);
     RUN_TEST(rt_local_array_quoted_element_keeps_spaces);
     RUN_TEST(rt_readonly_relaxed_quoted_element_keeps_spaces);

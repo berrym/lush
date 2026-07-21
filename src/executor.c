@@ -248,7 +248,6 @@ static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
 static char *colon_segmented_tilde_expand(const char *value);
 static char *magic_equal_tilde_expand(const char *word);
-static bool is_assignment_builtin(const char *cmd);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static char **apply_glob_qualifier_to_literal(const char *value, int *count);
 static bool needs_glob_expansion(const char *str);
@@ -2208,36 +2207,14 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         return 0;
     }
 
-    /// Parser-internal array-literal sentinel (\x1F) housekeeping:
-    /// the parser prefixes any unquoted `name=(...)` argv element with
-    /// \x1F, and separates the elements inside the parentheses with
-    /// interior \x1F bytes, so assignment-aware builtins (local, declare,
-    /// typeset, readonly, export) can split it back into the exact element
-    /// list. External commands and non-assignment builtins must not see
-    /// that internal byte at all -- not the prefix and not the interior
-    /// separators, which would otherwise leak into argv, command output,
-    /// or a captured `$(...)` expansion. For the non-assignment set, drop
-    /// the prefix and render each interior separator as the single space
-    /// it stands in for, reproducing the flat `name=(a b c)` word (this
-    /// syntax has no array meaning outside the assignment builtins).
-    if (argc > 0 && argv[0]) {
-        bool sentinel_aware = is_assignment_builtin(argv[0]);
-        if (!sentinel_aware) {
-            for (int i = 0; i < argc; i++) {
-                if (argv[i] && argv[i][0] == '\x1F') {
-                    /// Shift the string left by one to drop the prefix
-                    /// byte; the allocation came from build_argv_from_ast
-                    /// and is owned by us, so an in-place shift is safe.
-                    memmove(argv[i], argv[i] + 1, strlen(argv[i]));
-                    for (char *q = argv[i]; *q; q++) {
-                        if (*q == '\x1F') {
-                            *q = ' ';
-                        }
-                    }
-                }
-            }
-        }
-    }
+    /// The parser only builds the `\x1F name=(...)` array-literal sentinel
+    /// for an operand of an assignment-aware builtin (declare / local /
+    /// typeset / export / readonly); an array literal as an argument to any
+    /// other command is rejected at parse time. So a sentinel argv element
+    /// only ever reaches those builtins, which consume it. Nothing needs to
+    /// be stripped here for other commands -- and stripping a leading \x1F
+    /// unconditionally would corrupt a legitimate value that merely begins
+    /// with 0x1F (e.g. `x=$'\x1f'foo; echo "$x"`).
 
     /// Privileged mode security check
     if (argc > 0 && !is_privileged_command_allowed(argv[0])) {
@@ -17247,11 +17224,8 @@ static char *colon_segmented_tilde_expand(const char *value) {
 /// each unquoted `:`, exactly like a real assignment RHS (POSIX 2.6.1; bash and
 /// zsh agree). This is independent of the zsh magic_equal_subst option, which
 /// extends the same treatment to every command's arguments.
-static bool is_assignment_builtin(const char *cmd) {
-    return cmd && (strcmp(cmd, "export") == 0 || strcmp(cmd, "local") == 0 ||
-                   strcmp(cmd, "declare") == 0 || strcmp(cmd, "typeset") == 0 ||
-                   strcmp(cmd, "readonly") == 0);
-}
+/// is_assignment_builtin lives in src/shell_mode.c so the parser (which uses
+/// it at parse time) can link it without pulling in the executor.
 
 /// For magic_equal_subst: tilde-expand the value of an assignment-style word
 /// via the shared colon_segmented_tilde_expand primitive -- the same rule a

@@ -1155,3 +1155,13 @@ int shell_feature_describe(shell_feature_t feature, char *buffer, size_t size) {
                         enabled ? "on" : "off");
     }
 }
+
+/// True if a command name is one of the assignment-aware builtins that accept
+/// a `name=(...)` array-literal operand. Defined here (rather than in the
+/// executor) so the parser can call it at parse time without linking the
+/// executor. See the declaration in shell_mode.h for the full contract.
+bool is_assignment_builtin(const char *cmd) {
+    return cmd && (strcmp(cmd, "export") == 0 || strcmp(cmd, "local") == 0 ||
+                   strcmp(cmd, "declare") == 0 || strcmp(cmd, "typeset") == 0 ||
+                   strcmp(cmd, "readonly") == 0);
+}

@@ -586,6 +586,20 @@ bool shell_mode_is_strict(void);
  */
 bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode);
 
+/**
+ * @brief True if a command name is one of the assignment-aware builtins
+ *
+ * declare / local / typeset / export / readonly are the builtins that accept
+ * a `name=(...)` array-literal operand. Every other command treats an
+ * unquoted `(` in argument position as a syntax error. Shared by the parser's
+ * argument gate (which rejects the construct at parse time) and the executor's
+ * dispatch, so the set has a single definition.
+ *
+ * @param cmd Command name (may be NULL)
+ * @return true if @p cmd accepts an array-literal operand
+ */
+bool is_assignment_builtin(const char *cmd);
+
 /* ============================================================================
  * Debugging and Introspection
  * ============================================================================
