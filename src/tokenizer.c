@@ -1723,6 +1723,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_CASE_CONTINUE, ";;&", 3, start_line,
                                  start_column, start_pos);
             }
+            /// Check for ;| -- the zsh spelling of ;;& (continue testing the
+            /// remaining patterns). lush accepts both spellings for the one
+            /// canonical "test next pattern" terminator: spelling is polyglot,
+            /// behavior is canonical lush (PHILOSOPHY 2), the same law that
+            /// makes ${var^^} and ${(U)var} interchangeable.
+            if (tokenizer->position + 1 < tokenizer->input_length &&
+                tokenizer->input[tokenizer->position + 1] == '|') {
+                tokenizer->position += 2;
+                tokenizer->column += 2;
+                return token_new(TOK_CASE_CONTINUE, ";|", 2, start_line,
+                                 start_column, start_pos);
+            }
             /// Check for ;& (case fall-through - execute next without test)
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '&') {
