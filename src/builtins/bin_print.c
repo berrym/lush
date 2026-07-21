@@ -275,9 +275,14 @@ int bin_print(int argc, char **argv) {
         return 1;
     }
 
-    for (int k = arg_start; k < argc; k++) {
+    /// A `\c` in an interpreted argument terminates print: the arg's text up
+    /// to the `\c` is emitted, then no further args and no trailing newline.
+    bool terminated = false;
+    for (int k = arg_start; k < argc && !terminated; k++) {
         const char *src = argv[k];
         char *processed = NULL;
+        size_t xsi_len = 0;
+        bool xsi_processed = false;
         char prompt_buf[PRINT_PROMPT_BUF_SIZE];
 
         if (prompt_expand_flag) {
@@ -301,16 +306,19 @@ int bin_print(int argc, char **argv) {
             /// On failure fall through and emit the raw argument so
             /// the user at least sees something.
         } else if (!raw) {
-            /// Default: process \n, \t, \xNN, etc. like bin_echo's
-            /// XPG-mode path.
-            processed =
-                lush_expand_escapes(argv[k], strlen(argv[k]), LUSH_ESC_SIMPLE);
+            /// Default: process \n, \t, \xNN, \0NNN, \e, \c, etc. through the
+            /// XSI echo dialect (the same set as bin_echo's XPG path). The
+            /// decoded bytes may include embedded NULs, so the true length is
+            /// captured rather than recomputed with strlen.
+            processed = lush_expand_escapes_ex(
+                argv[k], strlen(argv[k]), LUSH_ESC_XSI, &terminated, &xsi_len);
             if (processed) {
                 src = processed;
+                xsi_processed = true;
             }
         }
 
-        size_t src_len = strlen(src);
+        size_t src_len = xsi_processed ? xsi_len : strlen(src);
         size_t sep_chunk = (k > arg_start) ? sep_len : 0;
         size_t need = total_len + sep_chunk + src_len + 1 /* trailing NL */ + 1;
         while (need > total_cap) {
@@ -337,7 +345,7 @@ int bin_print(int argc, char **argv) {
         free(processed);
     }
 
-    if (!no_newline) {
+    if (!no_newline && !terminated) {
         buf[total_len++] = '\n';
     }
 
