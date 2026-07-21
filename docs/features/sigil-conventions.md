@@ -157,6 +157,17 @@ everyday literal text: `printf "%s\n" "$x"`, `"user@host"`,
 unchanged. List interpolation inside quotes uses the `$` form,
 `"${arr[@]}"`.
 
+**Quote `printf` format strings.** A `printf` conversion is a leading
+`%` followed by an identifier-like letter (`%s`, `%d`, `%q`), which is
+exactly the pair-sigil shape. Written bare, `printf %s "$x"` parses `%s`
+as the pair sigil on `s`, not as a format string -- an undeclared `s`
+makes it empty, and a declared scalar `s` makes it an `E1134` type
+error. Always quote the format: `printf "%s\n" "$x"` or `printf '%q'
+"$x"`. This is the same rule as everywhere else -- an unquoted leading
+`%`/`@` is a sigil; quotes make it literal -- applied to the one place
+it most often surprises people coming from bash, where `%` has no
+special meaning.
+
 **On SEMANTICS.md §3.6.** §3.6 ("quoting is irrelevant to
 presentation") governs *list structure*: `${arr[@]}` is a vector and
 `${arr[*]}` a joined scalar whether quoted or not. It does **not**

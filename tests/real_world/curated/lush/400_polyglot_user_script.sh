@@ -5,7 +5,7 @@
 # Bash-style associative array for config
 declare -A settings
 settings[shell]="lush"
-settings[version]="1.5.0"
+settings[version]="0.3.0-dev"
 settings[mode]="polyglot"
 
 # Bash-style ${var^^} uppercase
@@ -16,7 +16,7 @@ echo "shell: ${shell_name^^}"
 echo "shell-zsh: ${(U)shell_name}"
 
 # Bash array indexed
-versions=(0.9 1.0 1.1 1.5.0)
+versions=(0.9 1.0 1.1 0.3.0)
 echo "bash-last: ${versions[-1]}"   # bash 4.3+: negative index
 echo "zsh-last: ${versions[-1]}"     # zsh: same syntax, native support
 
@@ -31,9 +31,10 @@ done
 slice=(${versions[1,3]})
 echo "slice count: ${#slice[@]}"
 
-# Bash-style printf %q quoting
+# printf quoting -- the format string is quoted, as lush requires: an
+# unquoted leading `%` is the pair sigil, not a literal format character.
 text="hello world; rm -rf /"
-echo "bash-quoted: $(printf %q "$text")"
+echo "bash-quoted: $(printf '%q' "$text")"
 
 # Zsh ${(q)var} same idea
 echo "zsh-quoted: ${(q)text}"
