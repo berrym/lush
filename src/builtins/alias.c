@@ -16,6 +16,7 @@
 #include "executor.h"
 #include "ht.h"
 #include "identifier.h"
+#include "init.h"
 #include "lle/lle_pager.h"
 #include "shell_error.h"
 #include "tokenizer.h"
@@ -51,13 +52,24 @@ void init_aliases(void) {
             ht_strstr_create(&(ht_str_options_t){.case_insensitive = true});
     }
 
-    /// set some example aliases
+    /// The default convenience aliases are set only for an interactive
+    /// session. POSIX makes alias substitution an interactive feature; a
+    /// non-interactive `-c`/script run must keep `ls`, `command -v ls`, and a
+    /// piped `ls | ...` resolving to the real command (the hash tables above
+    /// are still created so a script may define its own aliases).
+    /// `--color=auto` colors only when stdout is a terminal, so a piped
+    /// `ls | ...` gets no color escapes even in an interactive session --
+    /// unlike `--color=force`/`always`, which inject ANSI into pipes.
+    if (!is_interactive_shell()) {
+        return;
+    }
+
     set_alias("..", "cd ../");
     set_alias("...", "cd ../../");
     set_alias("l", "ls --color=auto");
-    set_alias("la", "ls -a --color=force");
-    set_alias("ll", "ls -alF --color=force");
-    set_alias("ls", "ls --color=force");
+    set_alias("la", "ls -a --color=auto");
+    set_alias("ll", "ls -alF --color=auto");
+    set_alias("ls", "ls --color=auto");
 }
 
 /**

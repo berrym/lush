@@ -72,6 +72,22 @@ TEST(init_aliases_basic) {
     free_aliases();
 }
 
+TEST(default_aliases_interactive_only) {
+    /// The default convenience aliases (`ls`, `ll`, `..`, ...) are seeded only
+    /// in an interactive session (POSIX makes alias substitution interactive).
+    /// This test binary is non-interactive, so init_aliases creates the table
+    /// but seeds no defaults -- a non-interactive `-c`/script run keeps
+    /// `command -v ls` resolving to the real binary and injects no color into
+    /// pipes. Issue #568.
+    free_aliases();
+    init_aliases();
+    ASSERT_NOT_NULL(aliases, "table is still created non-interactively");
+    ASSERT_NULL(lookup_alias("ls"), "ls default not seeded non-interactively");
+    ASSERT_NULL(lookup_alias("ll"), "ll default not seeded non-interactively");
+    ASSERT_NULL(lookup_alias(".."), ".. default not seeded non-interactively");
+    free_aliases();
+}
+
 TEST(free_aliases_null) {
     /// Calling free before init must be a safe no-op that leaves the table
     /// NULL.
@@ -736,6 +752,7 @@ int main(void) {
 
     printf("Initialization Tests:\n");
     RUN_TEST(init_aliases_basic);
+    RUN_TEST(default_aliases_interactive_only);
     RUN_TEST(free_aliases_null);
     RUN_TEST(init_free_cycle);
 
