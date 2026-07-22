@@ -105,11 +105,11 @@ A profile sets **default values** for the feature matrix:
 [FEATURE_EXTENDED_GLOB]      = false,  // extglob off by default
 [FEATURE_NULL_GLOB]          = false,  // nullglob off
 
-// SHELL_MODE_ZSH defaults  
-[FEATURE_ARRAY_ZERO_INDEXED] = false,  // Arrays start at 1
-[FEATURE_WORD_SPLIT]         = false,  // Word splitting off
-[FEATURE_EXTENDED_GLOB]      = true,   // extglob on by default
-[FEATURE_NULL_GLOB]          = true,   // nullglob on
+// SHELL_MODE_ZSH defaults (lush's zsh PRESET, not byte-for-byte zsh)
+[FEATURE_ARRAY_ZERO_INDEXED] = false,  // Arrays start at 1 (matches zsh)
+[FEATURE_WORD_SPLIT]         = false,  // Word splitting off (matches zsh)
+[FEATURE_EXTENDED_GLOB]      = true,   // lush curation; real zsh KSH_GLOB is off
+[FEATURE_NULL_GLOB]          = true,   // lush curation; real zsh defaults NOMATCH
 ```
 
 ### User Customization

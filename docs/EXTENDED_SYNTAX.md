@@ -331,10 +331,13 @@ if [[ $version =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
     patch="${BASH_REMATCH[3]}"
 fi
 
-# Pattern must be unquoted
+# In lush the =~ right-hand side is a regex whether or not it is quoted:
+# a quoted regex stays active (matching zsh). bash differs -- it treats a
+# quoted =~ RHS as a literal string -- so portable bash scripts keep the
+# pattern unquoted.
 pattern='^[0-9]+$'
-[[ $str =~ $pattern ]]    # Works
-[[ $str =~ "^[0-9]+$" ]]  # Literal string, not regex!
+[[ $str =~ $pattern ]]      # regex from a variable
+[[ $str =~ "^[0-9]+$" ]]    # still an active regex in lush (literal in bash)
 ```
 
 ### Logical Operators

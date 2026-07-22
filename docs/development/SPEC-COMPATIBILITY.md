@@ -161,8 +161,9 @@ When `set -o bash` is executed:
 ```bash
 set -o bash                    # Load bash profile
 setopt null_glob               # Override: enable nullglob (bash has it off)
-config set shell.null_glob on  # Same thing via config registry
-config save                    # Persist for future sessions
+# null_glob is a shell option, not a config-registry key (there is no
+# `shell.null_glob`); add the `setopt` line to your lushrc to keep it
+# across sessions.
 ```
 
 ---
