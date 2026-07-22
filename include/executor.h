@@ -186,6 +186,11 @@ typedef struct executor {
     /// Expansion error tracking
     bool expansion_error;      ///< True if error occurred during expansion
     int expansion_exit_status; ///< Exit status from expansion errors
+    /// True if a command substitution ran while expanding the current
+    /// command's words. A null command (all words removed) adopts the last
+    /// command substitution's status only when one actually ran; otherwise it
+    /// is 0 (POSIX). Reset before each command's word expansion.
+    bool word_cmdsub_ran;
 
     /* POSIX-required shell-level exit. A handful of error sites are
      * defined by IEEE 1003.1 to cause a non-interactive shell to exit
