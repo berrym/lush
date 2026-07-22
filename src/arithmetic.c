@@ -434,18 +434,39 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
     char value_str[32];
     snprintf(value_str, sizeof(value_str), "%zd", value);
 
-    /// Use executor context if available for scoped variable assignment
-    if (item->executor_context) {
+    /// An arithmetic assignment and a plain `name=value` assignment are two
+    /// spellings of the same operation, so they must resolve the target scope
+    /// identically: update the variable where it already lives, otherwise
+    /// create it globally (the POSIX default for an unprefixed write). Route
+    /// through symtable_assign_var -- the same scope-chain-walking primitive
+    /// the executor uses for plain assignment -- rather than symtable_set_var,
+    /// which enforces readonly and writes against the current scope only and
+    /// would silently shadow an outer binding from inside a function. That
+    /// scope walk is also what makes readonly enforcement span the chain:
+    /// symtable_assign_var returns SYMTABLE_ERR_READONLY when the matching
+    /// entry in any scope carries the readonly attribute. The global fallback
+    /// (no executor context) enforces readonly in the sole global scope.
+    int rc;
+    if (item->executor_context &&
+        ((executor_t *)item->executor_context)->symtable) {
         executor_t *exec = (executor_t *)item->executor_context;
-        if (exec && exec->symtable) {
-            symtable_set_var(exec->symtable, item->var_name, value_str,
-                             SYMVAR_NONE);
-            return;
-        }
+        rc = symtable_assign_var(exec->symtable, item->var_name, value_str);
+    } else {
+        rc = symtable_set_global(item->var_name, value_str);
     }
 
-    /// Fallback to global
-    symtable_set_global(item->var_name, value_str);
+    /// A readonly binding is a hard constraint in lush's value model: an
+    /// arithmetic assignment that would mutate it is surfaced as a targeted
+    /// evaluation error rather than silently dropped. The error flag
+    /// propagates through the operator-application loop (checked after every
+    /// eval), aborting the expression -- the same mechanism as a division by
+    /// zero.
+    if (rc == SYMTABLE_ERR_READONLY) {
+        arithm_set_error(
+            SHELL_ERR_READONLY_VAR, "assigning in an arithmetic expression",
+            "the variable is read-only and cannot be reassigned",
+            "cannot assign to readonly variable '%s'", item->var_name);
+    }
 }
 
 /* Helper for the eleven assignment operators that share the same lvalue

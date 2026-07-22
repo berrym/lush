@@ -20229,12 +20229,29 @@ static int execute_arithmetic_command(executor_t *executor,
     arithm_clear_error();
     char *result_str = arithm_expand_with_executor(executor, expr);
 
-    if (!result_str || arithm_error_is_flagged()) {
-        /// Arithmetic error - could be syntax error or division by zero
-        /// Create structured error with help suggestion
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR, arith_node->loc,
-            "arithmetic syntax error in expression: %s", expr);
+    bool arith_flagged = arithm_error_is_flagged();
+    if (!result_str || arith_flagged) {
+        /// When the evaluator flagged a specific diagnostic (division by
+        /// zero, readonly assignment, operand underflow, a tokenizing syntax
+        /// error, ...), surface THAT targeted error so the (( )) command form
+        /// reports the same precise cause as the $(( )) expansion form.
+        /// Masking every flagged failure behind the generic "expects
+        /// arithmetic expressions, not shell commands" syntax error -- as this
+        /// handler previously did -- is both inaccurate and unhelpful. The
+        /// evaluator flags an error on every NULL return, so the else branch
+        /// is a defensive fallback for a NULL result with no flagged cause; it
+        /// must not read arithm_error_message() (NULL when unflagged).
+        shell_error_t *error;
+        if (arith_flagged) {
+            error = shell_error_create(
+                arithm_error_code(), SHELL_SEVERITY_ERROR, arith_node->loc,
+                "arithmetic: %s", arithm_error_message());
+        } else {
+            error = shell_error_create(
+                SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR,
+                arith_node->loc, "arithmetic syntax error in expression: %s",
+                expr);
+        }
         if (error) {
             /// Build the source line: (( expr ))
             char *source_line = NULL;
@@ -20257,13 +20274,28 @@ static int execute_arithmetic_command(executor_t *executor,
                                              executor->context_stack[i]);
                 }
             }
-            /// Add specific context for arithmetic command
-            shell_error_push_context(
-                error, "evaluating arithmetic command (( %s ))", expr);
-            /// Add help suggestion
-            shell_error_set_suggestion(
-                error,
-                "(( )) expects arithmetic expressions, not shell commands");
+            if (arith_flagged) {
+                /// Preserve the evaluator's own while-context and help so the
+                /// command form reads identically to the expansion form.
+                const char *wc = arithm_error_while();
+                if (wc) {
+                    shell_error_push_context(error, "%s", wc);
+                }
+                shell_error_push_context(
+                    error, "evaluating arithmetic command (( %s ))", expr);
+                const char *help = arithm_error_help();
+                if (help) {
+                    shell_error_set_suggestion(error, help);
+                }
+            } else {
+                /// Add specific context for arithmetic command
+                shell_error_push_context(
+                    error, "evaluating arithmetic command (( %s ))", expr);
+                /// Add help suggestion
+                shell_error_set_suggestion(error,
+                                           "(( )) expects arithmetic "
+                                           "expressions, not shell commands");
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
         }
