@@ -1236,6 +1236,40 @@ TEST(arith_assignment_scope_resolution) {
     teardown_executor(exec);
 }
 
+/// Referencing an undefined variable in an arithmetic expression is a pure
+/// read that resolves to 0; it must not materialize the variable as a side
+/// effect. A first-time arithmetic assignment creates the target globally,
+/// the same as a plain assignment, rather than a function-local shadow that
+/// is lost when the frame pops. Issue #601.
+TEST(arith_undefined_read_no_leak) {
+    executor_t *exec = setup_executor();
+
+    /// An undefined operand reads as 0 and is not created.
+    executor_execute_command_line(exec, "(( y = x + 1 ))", 1);
+    char *y = symtable_get_var(exec->symtable, "y");
+    ASSERT_STR_EQ(y, "1", "undefined x reads 0: y = x + 1 = 1");
+    free(y);
+    char *x = symtable_get_var(exec->symtable, "x");
+    ASSERT_NULL(x, "reading undefined x does not create it");
+
+    /// A bare undefined reference in $(( )) leaves no binding behind.
+    executor_execute_command_line(exec, "ECHOED=$(( z ))", 1);
+    char *echoed = symtable_get_var(exec->symtable, "ECHOED");
+    ASSERT_STR_EQ(echoed, "0", "$(( z )) reads 0");
+    free(echoed);
+    char *z = symtable_get_var(exec->symtable, "z");
+    ASSERT_NULL(z, "reading undefined z does not create it");
+
+    /// A first-time arithmetic assignment inside a function creates the
+    /// variable globally (POSIX default), not as a function-local shadow.
+    executor_execute_command_line(exec, "mk() { (( nv = 7 )); }; mk", 1);
+    char *nv = symtable_get_var(exec->symtable, "nv");
+    ASSERT_STR_EQ(nv, "7", "(( nv = 7 )) in fn creates nv globally");
+    free(nv);
+
+    teardown_executor(exec);
+}
+
 /* ============================================================================
  * SPECIAL VARIABLE TESTS
  * ============================================================================
@@ -1518,6 +1552,7 @@ int main(void) {
     RUN_TEST(arith_compound_assign_non_lvalue);
     RUN_TEST(arith_readonly_assignment);
     RUN_TEST(arith_assignment_scope_resolution);
+    RUN_TEST(arith_undefined_read_no_leak);
 
     printf("\n--- Special Variable Tests ---\n");
     RUN_TEST(special_var_question_mark);
