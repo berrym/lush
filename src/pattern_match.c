@@ -419,7 +419,10 @@ static bool match(const char *s, const char *p, unsigned flags) {
                 synth[2 + atom_len] = ')';
                 memcpy(synth + 3 + atom_len, rest, rest_len);
                 synth[3 + atom_len + rest_len] = '\0';
-                bool r = match(s, synth, flags);
+                /// The synthesized `*(atom)` / `+(atom)` is an extglob group;
+                /// the zsh `#`/`##` feature reuses that engine, so enable it
+                /// for this recursion regardless of the caller's extglob flag.
+                bool r = match(s, synth, flags | LUSH_PATTERN_EXTGLOB);
                 free(synth);
                 return r;
             }
@@ -427,12 +430,17 @@ static bool match(const char *s, const char *p, unsigned flags) {
 
         char op = 0;
         const char *paren_inside = NULL;
-        if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
+        if ((flags & LUSH_PATTERN_EXTGLOB) &&
+            (*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
             p[1] == '(') {
+            /// bash extglob group, gated by FEATURE_EXTENDED_GLOB. When the
+            /// feature is off the sigil is left to literal-token handling
+            /// below, so `@(foo|bar)` matches the literal `@` and the `(...)`
+            /// falls to the bare-alternation branch.
             op = *p;
             paren_inside = p + 2;
         } else if (*p == '(') {
-            op = '@'; /// zsh bare-alternation = @
+            op = '@'; /// zsh bare-alternation = @ (separate feature, not #567)
             paren_inside = p + 1;
         }
 

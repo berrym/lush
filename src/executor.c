@@ -289,6 +289,30 @@ static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment,
                               source_location_t loc);
 
+/// Pattern-matcher flags derived from the active shell mode: bash extglob
+/// (?( *( +( @( !() when FEATURE_EXTENDED_GLOB is enabled, and the zsh
+/// extended-glob operators (`x#`/`x##`, leading `^`) when
+/// FEATURE_ZSH_EXTENDED_GLOB is enabled. Central builder so every shell
+/// pattern-matching site gates these dialects consistently on the mode.
+static unsigned shell_pattern_flags(void) {
+    unsigned f = 0;
+    if (shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
+        f |= LUSH_PATTERN_EXTGLOB;
+    }
+    if (shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB)) {
+        f |= LUSH_PATTERN_ZSH_EXTENDED;
+    }
+    return f;
+}
+
+/// Mode-aware shell pattern match. Case patterns, parameter-expansion
+/// matchers (`${v#p}` / `${v%p}` / `${v/p/r}`), `[[ == ]]`, and array/value
+/// filters route through here so extglob and the zsh operators are gated by
+/// the current mode's feature flags rather than always active.
+static bool shell_pattern_match(const char *str, const char *pattern) {
+    return lush_pattern_match_ex(str, pattern, shell_pattern_flags());
+}
+
 /**
  * @brief Check if command is allowed in privileged mode
  *
@@ -8503,9 +8527,7 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
     /// or # must stay literal rather than ride in on the alternation route
     /// (#448). Passing the LUSH_PATTERN_ZSH_EXTENDED flag conditionally keeps
     /// # literal in the matcher; gating is_negated keeps a leading ^ literal.
-    unsigned match_flags = shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB)
-                               ? LUSH_PATTERN_ZSH_EXTENDED
-                               : 0;
+    unsigned match_flags = shell_pattern_flags();
 
     /// Check for ^pattern negation
     bool is_negated =
@@ -8694,7 +8716,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
             }
         }
 
-        if (lush_pattern_match(entry->d_name, file_pattern)) {
+        if (shell_pattern_match(entry->d_name, file_pattern)) {
             /// Resize array if needed
             if (count >= capacity) {
                 capacity = capacity ? capacity * 2 : 16;
@@ -9043,7 +9065,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
         }
         /// lush_pattern_match has no FNM_PERIOD analogue: `*` matches
         /// leading-dot names, which is exactly the D-qualifier semantics.
-        if (!lush_pattern_match(entry->d_name, filepat)) {
+        if (!shell_pattern_match(entry->d_name, filepat)) {
             continue;
         }
         /// Build the path as the caller would see it.
@@ -9199,7 +9221,9 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     }
 
     /// Try bash-style extglob expansion if pattern contains extglob syntax
-    /// (only if we didn't already strip a glob qualifier)
+    /// (only if we didn't already strip a glob qualifier). has_extglob_pattern
+    /// already returns false when FEATURE_EXTENDED_GLOB is off, so `@(a|b)` in
+    /// a filename is an ordinary literal in the modes where extglob is off.
     if (!spec_has_qualifier(&qualifier) &&
         has_extglob_pattern(pattern_to_expand)) {
         /// Free base_pattern if it was allocated by parse_glob_qualifier
@@ -10885,7 +10909,7 @@ static int execute_case(executor_t *executor, node_t *node) {
                     if (case_numeric_range_match(test_word, expanded_pattern,
                                                  &is_range)) {
                         matched = true;
-                    } else if (!is_range && lush_pattern_match(
+                    } else if (!is_range && shell_pattern_match(
                                                 test_word, expanded_pattern)) {
                         matched = true;
                     }
@@ -11732,7 +11756,7 @@ static int find_prefix_match(const char *str, const char *pattern,
         strncpy(substr, str, i);
         substr[i] = '\0';
 
-        if (lush_pattern_match(substr, pattern)) {
+        if (shell_pattern_match(substr, pattern)) {
             match_len = i;
             if (!longest) {
                 free(substr);
@@ -11767,7 +11791,7 @@ static int find_suffix_match(const char *str, const char *pattern,
 
     for (int i = 0; i <= str_len; i++) {
         const char *suffix = str + str_len - i;
-        if (lush_pattern_match(suffix, pattern)) {
+        if (shell_pattern_match(suffix, pattern)) {
             match_len = i;
             if (!longest) {
                 break; /// Return first (shortest) match
@@ -11929,7 +11953,7 @@ static char *convert_case_pattern(const char *str, const char *pattern,
                 should_convert = false;
             } else {
                 utf8_buf[enc] = '\0';
-                should_convert = lush_pattern_match(utf8_buf, pattern);
+                should_convert = shell_pattern_match(utf8_buf, pattern);
             }
         }
 
@@ -12179,7 +12203,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 }
                 memcpy(substr, str, try_len);
                 substr[try_len] = '\0';
-                if (lush_pattern_match(substr, pattern)) {
+                if (shell_pattern_match(substr, pattern)) {
                     matched = true;
                     match_len = try_len;
                     /// For glob with *, prefer longest match.
@@ -12192,7 +12216,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                             }
                             memcpy(l, str, longer);
                             l[longer] = '\0';
-                            if (lush_pattern_match(l, pattern)) {
+                            if (shell_pattern_match(l, pattern)) {
                                 match_len = longer;
                             }
                             free(l);
@@ -12239,7 +12263,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 }
                 memcpy(substr, str + start, try_len);
                 substr[try_len] = '\0';
-                if (lush_pattern_match(substr, pattern)) {
+                if (shell_pattern_match(substr, pattern)) {
                     matched = true;
                     match_len = try_len;
                     free(substr);
@@ -12294,7 +12318,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 if (substr) {
                     strncpy(substr, str + i, try_len);
                     substr[try_len] = '\0';
-                    if (lush_pattern_match(substr, pattern)) {
+                    if (shell_pattern_match(substr, pattern)) {
                         matched = true;
                         match_len = try_len;
                         /// For greedy matching with *, keep trying longer
@@ -12305,8 +12329,8 @@ static char *pattern_substitute(const char *str, const char *pattern,
                                 if (longer_substr) {
                                     strncpy(longer_substr, str + i, longer);
                                     longer_substr[longer] = '\0';
-                                    if (lush_pattern_match(longer_substr,
-                                                           pattern)) {
+                                    if (shell_pattern_match(longer_substr,
+                                                            pattern)) {
                                         match_len = longer;
                                     }
                                     free(longer_substr);
@@ -15076,7 +15100,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             bool match;
                             if (is_glob) {
-                                match = lush_pattern_match(elem, pat);
+                                match = shell_pattern_match(elem, pat);
                             } else {
                                 match = (strcmp(elem, pat) == 0);
                             }
@@ -15111,7 +15135,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             bool match;
                             if (is_glob) {
-                                match = lush_pattern_match(elem, pat);
+                                match = shell_pattern_match(elem, pat);
                             } else {
                                 match = (strcmp(elem, pat) == 0);
                             }
@@ -20251,7 +20275,7 @@ static int execute_arithmetic_command(executor_t *executor,
  * @return true if matches, false otherwise
  */
 static bool extended_test_pattern_match(const char *str, const char *pattern) {
-    return lush_pattern_match(str, pattern);
+    return shell_pattern_match(str, pattern);
 }
 
 /**

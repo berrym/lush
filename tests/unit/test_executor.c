@@ -444,6 +444,27 @@ TEST(rt_read_array_ifs_nonws_empty_fields) {
     run_shell("unset IFS\n");
 }
 
+TEST(extglob_gated_by_feature_extended_glob) {
+    /// The bash extglob operators ?( *( +( @( !( match only when
+    /// FEATURE_EXTENDED_GLOB is enabled; when it is off they are ordinary
+    /// literal characters, so the pattern does not match. The unsetopt/setopt
+    /// knob -- previously a dead no-op -- now toggles it. Issue #567.
+    ///
+    /// The pattern lives in a function body parsed once (extglob on at
+    /// definition), so the gate is exercised at match time as the option is
+    /// toggled; the tokenizer's separate parse-time gating of `@(` is not what
+    /// is under test here.
+    run_result_t r = run_shell(
+        "mode lush\nsetopt extended_glob\n"
+        "em() { case \"$1\" in @(foo|bar)) echo M;; *) echo n;; esac; }\n"
+        "em foo\n" /// extglob on  -> M
+        "unsetopt extended_glob\n"
+        "em foo\n" /// extglob off -> literal, no match -> n
+        "setopt extended_glob\n"
+        "em foo\n"); /// extglob on  -> M
+    ASSERT_STDOUT_EQ(r, "M\nn\nM\n");
+}
+
 TEST(case_wildcard) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6845,6 +6866,7 @@ int main(void) {
     RUN_TEST(for_loop_ifs_nonws_empty_fields_posix);
     RUN_TEST(rt_read_ifs_nonws_empty_fields);
     RUN_TEST(rt_read_array_ifs_nonws_empty_fields);
+    RUN_TEST(extglob_gated_by_feature_extended_glob);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
     RUN_TEST(rt_case_extglob_alternation);

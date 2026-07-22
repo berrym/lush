@@ -74,58 +74,65 @@ TEST(escape_metacharacter) {
  * ============================================================================
  */
 
+/// Extglob operators are gated behind LUSH_PATTERN_EXTGLOB (issue #567);
+/// the engine tests below exercise the operators directly, so match with
+/// the flag enabled.
+static bool eg_match(const char *s, const char *p) {
+    return lush_pattern_match_ex(s, p, LUSH_PATTERN_EXTGLOB);
+}
+
 TEST(extglob_at_exact_one) {
-    ASSERT(lush_pattern_match("abc", "@(abc|def)"), "first alt");
-    ASSERT(lush_pattern_match("def", "@(abc|def)"), "second alt");
-    ASSERT(!lush_pattern_match("xyz", "@(abc|def)"), "no alt matches");
-    ASSERT(!lush_pattern_match("abcdef", "@(abc|def)"), "concatenation banned");
+    ASSERT(eg_match("abc", "@(abc|def)"), "first alt");
+    ASSERT(eg_match("def", "@(abc|def)"), "second alt");
+    ASSERT(!eg_match("xyz", "@(abc|def)"), "no alt matches");
+    ASSERT(!eg_match("abcdef", "@(abc|def)"), "concatenation banned");
 }
 
 TEST(extglob_at_with_empty_alt) {
-    ASSERT(lush_pattern_match("abc", "@(abc|)"), "non-empty alt");
-    ASSERT(lush_pattern_match("", "@(abc|)"), "empty alt matches empty");
-    ASSERT(!lush_pattern_match("ab", "@(abc|)"), "partial non-match");
+    ASSERT(eg_match("abc", "@(abc|)"), "non-empty alt");
+    ASSERT(eg_match("", "@(abc|)"), "empty alt matches empty");
+    ASSERT(!eg_match("ab", "@(abc|)"), "partial non-match");
 }
 
 TEST(extglob_question_zero_or_one) {
-    ASSERT(lush_pattern_match("", "?(abc)"), "zero occurrences");
-    ASSERT(lush_pattern_match("abc", "?(abc)"), "one occurrence");
-    ASSERT(!lush_pattern_match("abcabc", "?(abc)"), "two occurrences banned");
+    ASSERT(eg_match("", "?(abc)"), "zero occurrences");
+    ASSERT(eg_match("abc", "?(abc)"), "one occurrence");
+    ASSERT(!eg_match("abcabc", "?(abc)"), "two occurrences banned");
 }
 
 TEST(extglob_star_zero_or_more) {
-    ASSERT(lush_pattern_match("", "*(abc)"), "zero");
-    ASSERT(lush_pattern_match("abc", "*(abc)"), "one");
-    ASSERT(lush_pattern_match("abcabc", "*(abc)"), "two");
-    ASSERT(lush_pattern_match("abcabcabc", "*(abc)"), "three");
-    ASSERT(!lush_pattern_match("abcab", "*(abc)"), "trailing partial");
+    ASSERT(eg_match("", "*(abc)"), "zero");
+    ASSERT(eg_match("abc", "*(abc)"), "one");
+    ASSERT(eg_match("abcabc", "*(abc)"), "two");
+    ASSERT(eg_match("abcabcabc", "*(abc)"), "three");
+    ASSERT(!eg_match("abcab", "*(abc)"), "trailing partial");
 }
 
 TEST(extglob_plus_one_or_more) {
-    ASSERT(!lush_pattern_match("", "+(abc)"), "zero banned");
-    ASSERT(lush_pattern_match("abc", "+(abc)"), "one");
-    ASSERT(lush_pattern_match("abcabc", "+(abc)"), "two");
+    ASSERT(!eg_match("", "+(abc)"), "zero banned");
+    ASSERT(eg_match("abc", "+(abc)"), "one");
+    ASSERT(eg_match("abcabc", "+(abc)"), "two");
 }
 
 TEST(extglob_negation) {
-    ASSERT(lush_pattern_match("xyz", "!(abc)"), "non-matching content");
-    ASSERT(!lush_pattern_match("abc", "!(abc)"), "matching content excluded");
-    ASSERT(lush_pattern_match("", "!(abc)"), "empty does not match abc");
-    ASSERT(lush_pattern_match("ab", "!(abc)"), "prefix is not exact");
+    ASSERT(eg_match("xyz", "!(abc)"), "non-matching content");
+    ASSERT(!eg_match("abc", "!(abc)"), "matching content excluded");
+    ASSERT(eg_match("", "!(abc)"), "empty does not match abc");
+    ASSERT(eg_match("ab", "!(abc)"), "prefix is not exact");
 }
 
 TEST(extglob_with_outer_suffix) {
     /// `@(foo|bar).txt`: composition with literal suffix
-    ASSERT(lush_pattern_match("foo.txt", "@(foo|bar).txt"), "first + suffix");
-    ASSERT(lush_pattern_match("bar.txt", "@(foo|bar).txt"), "second + suffix");
-    ASSERT(!lush_pattern_match("baz.txt", "@(foo|bar).txt"), "non-alt");
-    ASSERT(!lush_pattern_match("foo.tx", "@(foo|bar).txt"), "wrong suffix");
+    ASSERT(eg_match("foo.txt", "@(foo|bar).txt"), "first + suffix");
+    ASSERT(eg_match("bar.txt", "@(foo|bar).txt"), "second + suffix");
+    ASSERT(!eg_match("baz.txt", "@(foo|bar).txt"), "non-alt");
+    ASSERT(!eg_match("foo.tx", "@(foo|bar).txt"), "wrong suffix");
 }
 
 TEST(extglob_nested) {
     /// Nested @(...) inside @(...)
-    ASSERT(lush_pattern_match("foo", "@(@(foo)|bar)"), "inner first");
-    ASSERT(lush_pattern_match("bar", "@(@(foo)|bar)"), "outer alt");
+    ASSERT(eg_match("foo", "@(@(foo)|bar)"), "inner first");
+    ASSERT(eg_match("bar", "@(@(foo)|bar)"), "outer alt");
 }
 
 /* ============================================================================
