@@ -828,6 +828,53 @@ TEST(arith_nested_depth_cap) {
     teardown_executor(exec);
 }
 
+TEST(param_subst_extglob) {
+    /// ${v/pat/repl} applies bash extglob groups when FEATURE_EXTENDED_GLOB is
+    /// on. The glob detection previously missed the @( +( !( sigils, so an
+    /// extglob pattern matched literally and never fired -- even though lush's
+    /// own removal ${v#@(...)} already applied it. Issue #589.
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "V=foobar", 1);
+    executor_execute_command_line(exec, "A=${V/@(foo)/X}", 1);
+    char *a = symtable_get_var(exec->symtable, "A");
+    ASSERT_STR_EQ(a, "Xbar", "${V/@(foo)/X} = Xbar");
+    free(a);
+
+    /// A greedy quantifier takes the longest match at its position.
+    executor_execute_command_line(exec, "W=fooo", 1);
+    executor_execute_command_line(exec, "B=${W/+(o)/X}", 1);
+    char *b = symtable_get_var(exec->symtable, "B");
+    ASSERT_STR_EQ(b, "fX", "${W/+(o)/X} greedy = fX");
+    free(b);
+
+    /// Global substitution.
+    executor_execute_command_line(exec, "G=${V//@(o)/_}", 1);
+    char *g = symtable_get_var(exec->symtable, "G");
+    ASSERT_STR_EQ(g, "f__bar", "${V//@(o)/_} = f__bar");
+    free(g);
+
+    /// Alternation takes the longest match (lush's longest-leftmost rule --
+    /// the same rule it applies to `*`; POSIX/bash agree, zsh takes shortest).
+    executor_execute_command_line(exec, "AL=foobarbaz", 1);
+    executor_execute_command_line(exec, "C=${AL/@(foo|foobar)/X}", 1);
+    char *c = symtable_get_var(exec->symtable, "C");
+    ASSERT_STR_EQ(c, "Xbaz", "${.../@(foo|foobar)/X} longest = Xbaz");
+    free(c);
+
+    /// A `?(...)` group with unequal-length branches is longest too, and stays
+    /// consistent with the removal form `${v##?(a|abc)}` (which is also
+    /// longest). `?()`'s sigil is not `@`/`+`/`!`, so the longest-match gate
+    /// must recognize it explicitly.
+    executor_execute_command_line(exec, "Q=abcd", 1);
+    executor_execute_command_line(exec, "D=${Q/?(a|abc)/X}", 1);
+    char *d = symtable_get_var(exec->symtable, "D");
+    ASSERT_STR_EQ(d, "Xd", "${Q/?(a|abc)/X} longest = Xd");
+    free(d);
+
+    teardown_executor(exec);
+}
+
 TEST(arith_comparison_true) {
     executor_t *exec = setup_executor();
 
@@ -1363,6 +1410,7 @@ int main(void) {
     RUN_TEST(arith_var_hex_octal_base);
     RUN_TEST(arith_nested_expansion);
     RUN_TEST(arith_nested_depth_cap);
+    RUN_TEST(param_subst_extglob);
     RUN_TEST(arith_comparison_true);
     RUN_TEST(arith_comparison_false);
     RUN_TEST(arith_negative);

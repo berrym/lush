@@ -12132,6 +12132,29 @@ static char *convert_case_capitalize_words(const char *str) {
     return result;
 }
 
+/// True when a pattern opens any bash extglob group -- `?(`, `*(`, `+(`,
+/// `@(`, `!(` -- and the feature is enabled. Two callers rely on this:
+///   - the glob routing test needs it for `@(`/`+(`/`!(`, whose sigils are
+///     not plain glob metacharacters (`*(` and `?(` also route via their
+///     leading `*`/`?`, but detecting all five here is harmless);
+///   - the longest-match test needs it for every VARIABLE-LENGTH group
+///     including `?(a|abc)` and `+(o)` -- there `?` is not enough, since a
+///     plain `?` is a single-character wildcard that needs no longest-match.
+/// Gated on FEATURE_EXTENDED_GLOB, the same gate the matcher uses (#567), so
+/// with the feature off the sigils stay literal.
+static bool pattern_opens_extglob_group(const char *pattern) {
+    if (!pattern || !shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
+        return false;
+    }
+    for (const char *p = pattern; *p; p++) {
+        if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
+            p[1] == '(') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * @brief Pattern substitution for ${var/pattern/replacement}
  *
@@ -12186,7 +12209,8 @@ static char *pattern_substitute(const char *str, const char *pattern,
     /// the literal string never contained `[bd]`. lush_pattern_match
     /// supports character classes natively.
     bool is_glob =
-        (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '['));
+        (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '[') ||
+         pattern_opens_extglob_group(pattern));
 
     /// Anchored-start: match pattern once at position 0, then copy the
     /// remainder. Anchored-end: match pattern once at the suffix, copy
@@ -12206,8 +12230,11 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 if (shell_pattern_match(substr, pattern)) {
                     matched = true;
                     match_len = try_len;
-                    /// For glob with *, prefer longest match.
-                    if (strchr(pattern, '*')) {
+                    /// Variable-length patterns (`*`, and extglob groups like
+                    /// `+(o)` / `@(a|abc)`) take the longest match at this
+                    /// position, matching lush's own longest-leftmost rule.
+                    if (strchr(pattern, '*') ||
+                        pattern_opens_extglob_group(pattern)) {
                         for (size_t longer = try_len + 1; longer <= str_len;
                              longer++) {
                             char *l = malloc(longer + 1);
@@ -12321,8 +12348,12 @@ static char *pattern_substitute(const char *str, const char *pattern,
                     if (shell_pattern_match(substr, pattern)) {
                         matched = true;
                         match_len = try_len;
-                        /// For greedy matching with *, keep trying longer
-                        if (strchr(pattern, '*')) {
+                        /// Variable-length patterns (`*`, and extglob groups
+                        /// like `+(o)` / `@(a|abc)`) take the longest match at
+                        /// this position, matching lush's own longest-leftmost
+                        /// rule.
+                        if (strchr(pattern, '*') ||
+                            pattern_opens_extglob_group(pattern)) {
                             for (size_t longer = try_len + 1;
                                  longer <= str_len - i; longer++) {
                                 char *longer_substr = malloc(longer + 1);
@@ -15091,7 +15122,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         size_t total = symtable_array_length(array);
                         const char *found = NULL;
                         bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
-                                        strchr(pat, '['));
+                                        strchr(pat, '[') ||
+                                        pattern_opens_extglob_group(pat));
                         for (size_t k = 0; k < total; k++) {
                             const char *elem =
                                 symtable_array_get_index(array, (int)k);
@@ -15126,7 +15158,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         int found = last_index ? 0 : (int)(total + 1);
                         bool any_match = false;
                         bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
-                                        strchr(pat, '['));
+                                        strchr(pat, '[') ||
+                                        pattern_opens_extglob_group(pat));
                         for (size_t k = 0; k < total; k++) {
                             const char *elem =
                                 symtable_array_get_index(array, (int)k);
