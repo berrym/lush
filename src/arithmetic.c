@@ -388,7 +388,12 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
         if (exec && exec->symtable) {
             char *value = symtable_get_var(exec->symtable, item->var_name);
             if (value) {
-                ssize_t result = strtol(value, NULL, 10);
+                /// Base 0: a variable holding a based integer literal
+                /// (`0x1f` hex, `010` octal, else decimal) reads the same as
+                /// the inline literal parser get_num, so `x=0x10; $((x))` is
+                /// 16 and `x=010; $((x))` is 8 -- matching POSIX arithmetic
+                /// (leading 0 is octal) and lush's own `$((0x10))`/`$((010))`.
+                ssize_t result = strtol(value, NULL, 0);
                 free(value);
                 return result;
             }
@@ -398,7 +403,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
     /// Fallback to global
     char *value = symtable_get_global(item->var_name);
     if (value) {
-        return strtol(value, NULL, 10);
+        return strtol(value, NULL, 0);
     }
     return 0;
 }
@@ -794,7 +799,12 @@ static ssize_t long_value(stack_item_t *item) {
                     char *value =
                         symtable_get_var(exec->symtable, item->var_name);
                     if (value) {
-                        long result = atol(value);
+                        /// Base 0: read a based integer literal held in the
+                        /// variable (`0x1f` hex, `010` octal, else decimal)
+                        /// the same way as an inline literal (get_num) and the
+                        /// compound-assign lvalue read (get_var_value_scoped),
+                        /// so `x=0x10; $((x+1))` is 17, not 1.
+                        long result = strtol(value, NULL, 0);
                         free(value);
                         return result;
                     }
@@ -806,7 +816,7 @@ static ssize_t long_value(stack_item_t *item) {
             if (manager) {
                 char *value = symtable_get_var(manager, item->var_name);
                 if (value) {
-                    long result = atol(value);
+                    long result = strtol(value, NULL, 0);
                     free(value);
                     return result;
                 }

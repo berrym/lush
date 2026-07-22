@@ -713,6 +713,43 @@ TEST(arith_parentheses) {
     teardown_executor(exec);
 }
 
+TEST(arith_var_hex_octal_base) {
+    /// A variable holding a based integer literal reads with its base in
+    /// arithmetic: hex `0x..`, octal `0..` (POSIX leading-zero octal), else
+    /// decimal -- the same as an inline literal (get_num) and across the
+    /// simple-read and compound-assignment paths. Issue #578.
+    executor_t *exec = setup_executor();
+
+    /// Simple read: hex.
+    executor_execute_command_line(exec, "X=0x10", 1);
+    executor_execute_command_line(exec, "RX=$((X + 1))", 1);
+    char *rx = symtable_get_var(exec->symtable, "RX");
+    ASSERT_STR_EQ(rx, "17", "hex 0x10 + 1 = 17");
+    free(rx);
+
+    /// Simple read: octal (leading zero).
+    executor_execute_command_line(exec, "O=010", 1);
+    executor_execute_command_line(exec, "RO=$((O + 1))", 1);
+    char *ro = symtable_get_var(exec->symtable, "RO");
+    ASSERT_STR_EQ(ro, "9", "octal 010 + 1 = 9");
+    free(ro);
+
+    /// Compound assignment reads the based value too.
+    executor_execute_command_line(exec, "H=0xff", 1);
+    executor_execute_command_line(exec, "RH=$((H <<= 1))", 1);
+    char *rh = symtable_get_var(exec->symtable, "RH");
+    ASSERT_STR_EQ(rh, "510", "hex 0xff <<= 1 = 510");
+    free(rh);
+
+    /// Variable reads match the inline literal (internal consistency).
+    executor_execute_command_line(exec, "LITHEX=$((0x10))", 1);
+    char *lithex = symtable_get_var(exec->symtable, "LITHEX");
+    ASSERT_STR_EQ(lithex, "16", "literal 0x10 = 16 (matches the var read)");
+    free(lithex);
+
+    teardown_executor(exec);
+}
+
 TEST(arith_comparison_true) {
     executor_t *exec = setup_executor();
 
@@ -1245,6 +1282,7 @@ int main(void) {
     RUN_TEST(arith_modulo);
     RUN_TEST(arith_with_vars);
     RUN_TEST(arith_parentheses);
+    RUN_TEST(arith_var_hex_octal_base);
     RUN_TEST(arith_comparison_true);
     RUN_TEST(arith_comparison_false);
     RUN_TEST(arith_negative);
