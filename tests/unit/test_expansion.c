@@ -750,6 +750,84 @@ TEST(arith_var_hex_octal_base) {
     teardown_executor(exec);
 }
 
+TEST(arith_nested_expansion) {
+    /// A $((...)) nested inside another $((...)) evaluates the inner
+    /// expression rather than yielding 0 (issue #576): previously the inner
+    /// `$((` was mis-read as a `$(` command substitution.
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "R1=$(( $((2+3)) + 1 ))", 1);
+    char *r1 = symtable_get_var(exec->symtable, "R1");
+    ASSERT_STR_EQ(r1, "6", "$(( $((2+3)) + 1 )) = 6");
+    free(r1);
+
+    /// Inner expression with its own parentheses.
+    executor_execute_command_line(exec, "R2=$(( $(( (1+2)*3 )) ))", 1);
+    char *r2 = symtable_get_var(exec->symtable, "R2");
+    ASSERT_STR_EQ(r2, "9", "nested with inner parens = 9");
+    free(r2);
+
+    /// Two nested expansions in one expression.
+    executor_execute_command_line(exec, "R3=$(( $((2)) * $((3)) ))", 1);
+    char *r3 = symtable_get_var(exec->symtable, "R3");
+    ASSERT_STR_EQ(r3, "6", "$(( $((2)) * $((3)) )) = 6");
+    free(r3);
+
+    /// Triple nesting exercises the recursion.
+    executor_execute_command_line(exec, "R4=$(( $(( $((4)) )) ))", 1);
+    char *r4 = symtable_get_var(exec->symtable, "R4");
+    ASSERT_STR_EQ(r4, "4", "triple nested = 4");
+    free(r4);
+
+    /// A variable inside the nested expansion resolves.
+    executor_execute_command_line(exec, "V=5", 1);
+    executor_execute_command_line(exec, "R5=$(( $((V)) + 1 ))", 1);
+    char *r5 = symtable_get_var(exec->symtable, "R5");
+    ASSERT_STR_EQ(r5, "6", "variable in nested expansion");
+    free(r5);
+
+    teardown_executor(exec);
+}
+
+TEST(arith_nested_depth_cap) {
+    /// A pathologically deep nest errors cleanly instead of overflowing the
+    /// stack (the recursion is depth-capped); a moderate nest still
+    /// evaluates. Issue #576 crash-hardening.
+    executor_t *exec = setup_executor();
+
+    /// $(( $(( ... 7 ... )) )) nested 300 deep (> MAX_ARITH_NEST_DEPTH). The
+    /// test running to completion is the no-crash assertion.
+    char deep[4096];
+    size_t pos = 0;
+    pos += (size_t)snprintf(deep + pos, sizeof(deep) - pos, "DEEP=");
+    for (int i = 0; i < 300; i++) {
+        pos += (size_t)snprintf(deep + pos, sizeof(deep) - pos, "$(( ");
+    }
+    pos += (size_t)snprintf(deep + pos, sizeof(deep) - pos, "7");
+    for (int i = 0; i < 300; i++) {
+        pos += (size_t)snprintf(deep + pos, sizeof(deep) - pos, " ))");
+    }
+    executor_execute_command_line(exec, deep, 1);
+
+    /// A nest within the cap still evaluates.
+    char ok[512];
+    pos = 0;
+    pos += (size_t)snprintf(ok + pos, sizeof(ok) - pos, "OK=");
+    for (int i = 0; i < 20; i++) {
+        pos += (size_t)snprintf(ok + pos, sizeof(ok) - pos, "$(( ");
+    }
+    pos += (size_t)snprintf(ok + pos, sizeof(ok) - pos, "7");
+    for (int i = 0; i < 20; i++) {
+        pos += (size_t)snprintf(ok + pos, sizeof(ok) - pos, " ))");
+    }
+    executor_execute_command_line(exec, ok, 1);
+    char *okv = symtable_get_var(exec->symtable, "OK");
+    ASSERT_STR_EQ(okv, "7", "20-deep nest evaluates to 7");
+    free(okv);
+
+    teardown_executor(exec);
+}
+
 TEST(arith_comparison_true) {
     executor_t *exec = setup_executor();
 
@@ -1283,6 +1361,8 @@ int main(void) {
     RUN_TEST(arith_with_vars);
     RUN_TEST(arith_parentheses);
     RUN_TEST(arith_var_hex_octal_base);
+    RUN_TEST(arith_nested_expansion);
+    RUN_TEST(arith_nested_depth_cap);
     RUN_TEST(arith_comparison_true);
     RUN_TEST(arith_comparison_false);
     RUN_TEST(arith_negative);

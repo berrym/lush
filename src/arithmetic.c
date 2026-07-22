@@ -42,6 +42,15 @@
 #define MAXOPSTACK 64
 #define MAXNUMSTACK 64
 #define MAXBASE 36
+/// Cap on nested `$((...))` recursion depth. Each level recurses into
+/// arithm_expand_internal with a ~2 KB stack frame; without a bound a
+/// pathologically deep expression would overflow the stack. Real
+/// expressions never nest more than a handful deep, so 128 is generous.
+#define MAX_ARITH_NEST_DEPTH 128
+
+/// Live nesting depth of the `$((...))` recursion in arithm_expand_internal;
+/// incremented only around the recursive call (see MAX_ARITH_NEST_DEPTH).
+static int s_arith_nest_depth = 0;
 
 /// Stack item for arithmetic evaluation
 typedef struct {
@@ -1559,6 +1568,85 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
             last_op = NULL;
             current += nchars;
+        } else if (*current == '$' && *(current + 1) == '(' &&
+                   *(current + 2) == '(') {
+            /// Nested arithmetic expansion $((expr)) inside the expression:
+            /// evaluate the inner expression and push its value. Without this
+            /// case the `$(` command-substitution branch below mis-reads
+            /// `$((...))` as `$(` + `(...)` and yields 0 (issue #576).
+            const char *scan = current + 3; /// after `$((`
+            int balance = 2;                /// the two open parens of `$((`
+            const char *expr_end = NULL; /// end (exclusive) of the inner expr
+            const char *after = NULL;    /// first char past the closing `))`
+            while (*scan) {
+                if (*scan == '(') {
+                    balance++;
+                } else if (*scan == ')') {
+                    balance--;
+                    if (balance == 1 && !expr_end) {
+                        expr_end = scan; /// first `)` of the closing `))`
+                    }
+                    if (balance == 0) {
+                        after = scan + 1; /// past the second `)`
+                        break;
+                    }
+                }
+                scan++;
+            }
+            if (after && expr_end) {
+                size_t inner_len = (size_t)(expr_end - (current + 3));
+                char *inner = malloc(inner_len + 1);
+                if (!inner) {
+                    arithm_set_error(
+                        SHELL_ERR_OUT_OF_MEMORY, "nested arithmetic expansion",
+                        "out of memory", "memory allocation failed");
+                    break;
+                }
+                memcpy(inner, current + 3, inner_len);
+                inner[inner_len] = '\0';
+                /// Bound the recursion so a pathologically deep nest errors
+                /// cleanly rather than overflowing the stack. The counter is
+                /// incremented only around the recursive call, so it tracks
+                /// the live nesting depth.
+                if (s_arith_nest_depth >= MAX_ARITH_NEST_DEPTH) {
+                    arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                                     "nested arithmetic expansion",
+                                     "reduce the nesting depth",
+                                     "arithmetic expansion nested too deeply");
+                    free(inner);
+                    ctx.errflag = true;
+                    break;
+                }
+                s_arith_nest_depth++;
+                char *inner_result =
+                    arithm_expand_internal(ctx.executor, inner);
+                s_arith_nest_depth--;
+                free(inner);
+                if (!inner_result) {
+                    /// The inner expansion failed (e.g. division by zero, or a
+                    /// malformed inner expression); its arithmetic error is
+                    /// already set. Propagate it now instead of pushing 0 and
+                    /// continuing -- a later nested $((...)) would clear the
+                    /// error state (arithm_clear_error on entry) and mask the
+                    /// failure, yielding a silent wrong result.
+                    ctx.errflag = true;
+                    break;
+                }
+                /// A leading `-` result parses via base 0 too.
+                push_numstackl(&ctx, strtol(inner_result, NULL, 0));
+                free(inner_result);
+                if (ctx.errflag) {
+                    break;
+                }
+                last_op = NULL;
+                current = after;
+            } else {
+                arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                                 "scanning $((...)) in arithmetic expression",
+                                 "every '$((' needs a matching '))'",
+                                 "malformed nested arithmetic expansion");
+                break;
+            }
         } else if (*current == '$' && *(current + 1) == '(') {
             /// Handle command substitution $(command) in arithmetic expressions
             /// Find the matching closing parenthesis
