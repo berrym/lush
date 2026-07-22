@@ -1147,6 +1147,95 @@ TEST(arith_compound_assign_non_lvalue) {
     teardown_executor(exec);
 }
 
+/// A readonly binding is a hard constraint in lush's value model: an
+/// arithmetic assignment that would mutate it is refused and surfaced as a
+/// targeted error, never silently dropped. Every assigning form honors the
+/// attribute -- simple `=`, compound `+=`, post/pre increment -- across both
+/// the (( )) command form and the $(( )) expansion form. Issue #577.
+TEST(arith_readonly_assignment) {
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "readonly R=5", 1);
+
+    /// (( )) command form: simple assignment refused, value unchanged.
+    executor_execute_command_line(exec, "(( R = 9 ))", 1);
+    char *r1 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r1, "5", "(( R = 9 )) refused: R stays 5");
+    free(r1);
+
+    /// Compound assignment refused.
+    executor_execute_command_line(exec, "(( R += 3 ))", 1);
+    char *r2 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r2, "5", "(( R += 3 )) refused: R stays 5");
+    free(r2);
+
+    /// Post-increment refused.
+    executor_execute_command_line(exec, "(( R++ ))", 1);
+    char *r3 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r3, "5", "(( R++ )) refused: R stays 5");
+    free(r3);
+
+    /// Pre-increment refused.
+    executor_execute_command_line(exec, "(( ++R ))", 1);
+    char *r4 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r4, "5", "(( ++R )) refused: R stays 5");
+    free(r4);
+
+    /// $(( )) expansion form honors the readonly attribute too.
+    executor_execute_command_line(exec, "SINK=$(( R = 9 ))", 1);
+    char *r5 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r5, "5", "$(( R = 9 )) refused: R stays 5");
+    free(r5);
+
+    /// A writable variable is unaffected by the readonly gate, and the
+    /// engine recovers cleanly after the refused writes.
+    executor_execute_command_line(exec, "W=5", 1);
+    executor_execute_command_line(exec, "(( W = 9 ))", 1);
+    char *w = symtable_get_var(exec->symtable, "W");
+    ASSERT_STR_EQ(w, "9", "(( W = 9 )) writable succeeds: W = 9");
+    free(w);
+
+    /// The readonly attribute is enforced across the scope chain: a write
+    /// from inside a function must not silently shadow the outer readonly
+    /// binding. The evaluator resolves the target scope the same way a plain
+    /// assignment does, so the outer readonly R is found and the write is
+    /// refused rather than creating a local shadow.
+    executor_execute_command_line(exec, "fn_ro() { (( R = 42 )); }; fn_ro", 1);
+    char *r6 = symtable_get_var(exec->symtable, "R");
+    ASSERT_STR_EQ(r6, "5",
+                  "cross-scope: (( R = 42 )) in fn refused: R stays 5");
+    free(r6);
+
+    teardown_executor(exec);
+}
+
+/// An arithmetic assignment to a variable that already exists in an outer
+/// scope updates that outer binding, matching plain `X=9` -- both route
+/// through the same scope-chain-walking primitive rather than shadowing the
+/// outer variable with a function-local copy. Issue #577 (sibling of the
+/// cross-scope readonly gap: the same symtable_set_var-writes-current-scope
+/// root cause the readonly fix addresses).
+TEST(arith_assignment_scope_resolution) {
+    executor_t *exec = setup_executor();
+
+    /// A write from inside a function updates the outer binding, matching
+    /// plain `X=9` (which routes through the same scope-walking primitive).
+    executor_execute_command_line(exec, "X=1", 1);
+    executor_execute_command_line(exec, "up() { (( X = 9 )); }; up", 1);
+    char *x = symtable_get_var(exec->symtable, "X");
+    ASSERT_STR_EQ(x, "9", "(( X = 9 )) in fn updates the outer X");
+    free(x);
+
+    /// A plain assignment and an arithmetic assignment resolve the same outer
+    /// binding: after the arithmetic write, a plain write sees the same X.
+    executor_execute_command_line(exec, "reset() { X=1; }; reset", 1);
+    char *x2 = symtable_get_var(exec->symtable, "X");
+    ASSERT_STR_EQ(x2, "1", "plain X=1 in fn also updates the outer X");
+    free(x2);
+
+    teardown_executor(exec);
+}
+
 /* ============================================================================
  * SPECIAL VARIABLE TESTS
  * ============================================================================
@@ -1427,6 +1516,8 @@ int main(void) {
     RUN_TEST(arith_compound_assign_right_assoc);
     RUN_TEST(arith_compound_assign_command_form);
     RUN_TEST(arith_compound_assign_non_lvalue);
+    RUN_TEST(arith_readonly_assignment);
+    RUN_TEST(arith_assignment_scope_resolution);
 
     printf("\n--- Special Variable Tests ---\n");
     RUN_TEST(special_var_question_mark);
