@@ -452,17 +452,18 @@ int bin_read(int argc, char **argv) {
             return 1;
         }
 
-        /// Walk the line collecting IFS-delimited fields. Leading and
-        /// trailing IFS whitespace is dropped; runs of IFS-whitespace
-        /// coalesce. This matches the standard read field-splitting.
+        /// Two-class POSIX field splitting (same rule as the scalar read path
+        /// and ifs_field_split): leading and trailing IFS white space is
+        /// dropped, IFS white-space runs collapse to one delimiter, and each
+        /// IFS non-white-space character is its own delimiter (with adjacent
+        /// white space), so adjacent non-white-space delimiters yield empty
+        /// array elements (`a::b` -> a, "", b). A trailing non-white-space
+        /// delimiter does not add a trailing empty element.
         int idx = 0;
+        while (*src && read_is_ifs_white(*src, ifs)) {
+            src++;
+        }
         while (*src) {
-            while (*src && strchr(ifs, *src)) {
-                src++;
-            }
-            if (!*src) {
-                break;
-            }
             const char *field_start = src;
             while (*src && !strchr(ifs, *src)) {
                 src++;
@@ -479,6 +480,21 @@ int bin_read(int argc, char **argv) {
             field[flen] = '\0';
             symtable_array_set_index(array, idx++, field);
             free(field);
+
+            if (!*src) {
+                break;
+            }
+            /// Consume one delimiter: an IFS white-space run, at most one IFS
+            /// non-white-space character, and a trailing IFS white-space run.
+            while (*src && read_is_ifs_white(*src, ifs)) {
+                src++;
+            }
+            if (*src && strchr(ifs, *src)) { /// a non-white-space IFS char
+                src++;
+            }
+            while (*src && read_is_ifs_white(*src, ifs)) {
+                src++;
+            }
         }
 
         symtable_set_array(array_name, array);
@@ -532,11 +548,17 @@ int bin_read(int argc, char **argv) {
         char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
         const char *ifs = ifs_val ? ifs_val : " \t\n";
 
+        /// POSIX field splitting is two-class: a run of IFS white space is a
+        /// single delimiter, while each IFS non-white-space character is its
+        /// own delimiter (together with adjacent IFS white space), so adjacent
+        /// non-white-space delimiters produce empty fields. Leading IFS white
+        /// space on the whole line is discarded first; a leading
+        /// non-white-space delimiter is kept so it yields a leading empty
+        /// field.
+        while (*src && read_is_ifs_white(*src, ifs)) {
+            src++;
+        }
         for (int i = 0; i < n_varnames - 1; i++) {
-            /// Skip leading IFS whitespace before each field.
-            while (*src && strchr(ifs, *src)) {
-                src++;
-            }
             const char *field_start = src;
             while (*src && !strchr(ifs, *src)) {
                 src++;
@@ -552,16 +574,58 @@ int bin_read(int argc, char **argv) {
             field[flen] = '\0';
             symtable_set_global(argv[opt_index + i], field);
             free(field);
+
+            /// Consume exactly one delimiter: an IFS white-space run, at most
+            /// one IFS non-white-space character, and a trailing IFS
+            /// white-space run. Only one non-white-space char is consumed, so
+            /// the next field (or the final variable's raw remainder) keeps any
+            /// further adjacent delimiters.
+            while (*src && read_is_ifs_white(*src, ifs)) {
+                src++;
+            }
+            if (*src && strchr(ifs, *src)) { /// a non-white-space IFS char
+                src++;
+            }
+            while (*src && read_is_ifs_white(*src, ifs)) {
+                src++;
+            }
         }
-        /// Last variable: skip the leading inter-field delimiter run,
-        /// keep internal IFS chars, but strip trailing IFS white space
+        /// Last variable: the remainder verbatim (internal and leading
+        /// non-white-space delimiters kept -- the inter-field delimiter was
+        /// already consumed above), with trailing IFS white space stripped
         /// (POSIX trims trailing IFS white space from the line).
-        while (*src && strchr(ifs, *src)) {
-            src++;
-        }
         const char *end = src + strlen(src);
         while (end > src && read_is_ifs_white(end[-1], ifs)) {
             end--;
+        }
+        /// A single trailing non-white-space IFS delimiter that merely
+        /// terminates the final field is dropped (bash/dash drop the trailing
+        /// empty field): `a:b:` -> "b", ":" -> "". A run of trailing delimiters
+        /// represents empty fields and is kept verbatim: `a:::` -> "::",
+        /// `a:b:c:` -> "b:c:". So the trailing delimiter is removed only when
+        /// no other IFS delimiter precedes it in the remainder.
+        if (end > src && strchr(ifs, end[-1]) &&
+            !read_is_ifs_white(end[-1], ifs)) {
+            /// The IFS white space immediately left of this trailing
+            /// non-white-space delimiter belongs to the same delimiter unit
+            /// (`<ws><delim>`), not a separate delimiter. Skip it before
+            /// deciding whether an earlier delimiter precedes the final field,
+            /// and drop it together with the delimiter so `bar ,` (IFS=', ')
+            /// yields `bar`, consistent with ifs_field_split and read -a.
+            const char *unit = end - 1;
+            while (unit > src && read_is_ifs_white(unit[-1], ifs)) {
+                unit--;
+            }
+            bool has_other_ifs = false;
+            for (const char *q = src; q < unit; q++) {
+                if (strchr(ifs, *q)) {
+                    has_other_ifs = true;
+                    break;
+                }
+            }
+            if (!has_other_ifs) {
+                end = unit;
+            }
         }
         size_t vlen = (size_t)(end - src);
         char *val = malloc(vlen + 1);

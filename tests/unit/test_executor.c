@@ -378,6 +378,72 @@ TEST(rt_read_array_polyglot_spellings) {
     ASSERT_STDOUT_EQ(raw, "x\\y-z\n");
 }
 
+TEST(for_loop_ifs_nonws_empty_fields_posix) {
+    /// POSIX two-class field splitting: a non-whitespace IFS delimiter yields
+    /// empty fields for adjacent/leading occurrences (`a::b` -> a, "", b;
+    /// `:a:b` -> "", a, b), while a trailing non-whitespace delimiter does not
+    /// add a trailing empty field (`a:b:` -> a, b). Issue #566.
+    run_result_t mid = run_shell("mode posix\nIFS=:\nx=a::b\n"
+                                 "for w in $x; do printf '[%s]' \"$w\"; done\n"
+                                 "echo\n");
+    ASSERT_STDOUT_EQ(mid, "[a][][b]\n");
+
+    run_result_t lead = run_shell("IFS=:\nx=:a:b\n"
+                                  "for w in $x; do printf '[%s]' \"$w\"; done\n"
+                                  "echo\n");
+    ASSERT_STDOUT_EQ(lead, "[][a][b]\n");
+
+    run_result_t trail =
+        run_shell("IFS=:\nx=a:b:\n"
+                  "for w in $x; do printf '[%s]' \"$w\"; done\n"
+                  "echo\n");
+    ASSERT_STDOUT_EQ(trail, "[a][b]\n");
+
+    /// run_shell shares global state; restore the mode and default IFS.
+    run_shell("mode lush\nunset IFS\n");
+}
+
+TEST(rt_read_ifs_nonws_empty_fields) {
+    /// read with a non-whitespace IFS produces empty fields for adjacent
+    /// delimiters; the final variable keeps the raw remainder (internal
+    /// delimiters preserved). Issue #566.
+    run_result_t mid =
+        run_shell("printf 'a::b' | { IFS=: read x y z; "
+                  "printf '[%s]' \"$x\" \"$y\" \"$z\"; echo; }\n");
+    ASSERT_STDOUT_EQ(mid, "[a][][b]\n");
+
+    run_result_t trail =
+        run_shell("printf 'a:b:' | { IFS=: read x y z; "
+                  "printf '[%s]' \"$x\" \"$y\" \"$z\"; echo; }\n");
+    ASSERT_STDOUT_EQ(trail, "[a][b][]\n");
+
+    run_result_t rest =
+        run_shell("printf 'a::b:c' | { IFS=: read x y z; "
+                  "printf '[%s]' \"$x\" \"$y\" \"$z\"; echo; }\n");
+    ASSERT_STDOUT_EQ(rest, "[a][][b:c]\n");
+
+    /// With a mixed IFS, a trailing `<whitespace><non-ws-delim>` unit that
+    /// merely terminates the final field is dropped (the whitespace belongs to
+    /// the delimiter unit, not a separate delimiter): `foo, bar ,` -> foo, bar.
+    run_result_t mixed_tail =
+        run_shell("printf 'foo, bar ,' | { IFS=', ' read k v; "
+                  "printf '[%s]' \"$k\" \"$v\"; echo; }\n");
+    ASSERT_STDOUT_EQ(mixed_tail, "[foo][bar]\n");
+
+    run_shell("unset IFS\n");
+}
+
+TEST(rt_read_array_ifs_nonws_empty_fields) {
+    /// read -a produces empty array elements for adjacent non-whitespace IFS
+    /// delimiters. Issue #566.
+    run_result_t r =
+        run_shell("printf 'a::b' | { IFS=: read -a arr; "
+                  "printf '[%s]' \"${arr[@]}\"; echo \" n=${#arr[@]}\"; }\n");
+    ASSERT_STDOUT_EQ(r, "[a][][b] n=3\n");
+
+    run_shell("unset IFS\n");
+}
+
 TEST(case_wildcard) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -6776,6 +6842,9 @@ int main(void) {
     RUN_TEST(case_statement);
     RUN_TEST(rt_case_continue_polyglot_spellings);
     RUN_TEST(rt_read_array_polyglot_spellings);
+    RUN_TEST(for_loop_ifs_nonws_empty_fields_posix);
+    RUN_TEST(rt_read_ifs_nonws_empty_fields);
+    RUN_TEST(rt_read_array_ifs_nonws_empty_fields);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
     RUN_TEST(rt_case_extglob_alternation);
