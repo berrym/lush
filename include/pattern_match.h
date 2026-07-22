@@ -51,6 +51,14 @@ bool lush_pattern_match(const char *str, const char *pattern);
 /// negation.
 #define LUSH_PATTERN_ZSH_EXTENDED 0x1u
 
+/// Enable the bash extended-glob operators in lush_pattern_match_ex: the
+/// prefix-triggered groups `?(...)`, `*(...)`, `+(...)`, `@(...)`, `!(...)`.
+/// When this flag is clear, those sigils are ordinary literal/glob
+/// characters (bash treats them as a syntax error only because it never
+/// parses them; lush parses the syntax always and reverts to literal
+/// matching when the feature is off). Gated by FEATURE_EXTENDED_GLOB.
+#define LUSH_PATTERN_EXTGLOB 0x2u
+
 /**
  * @brief Match `str` against `pattern` with extended options
  *
