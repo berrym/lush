@@ -1136,14 +1136,17 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     strncpy(name, start, *nchars);
     name[*nchars] = '\0';
 
-    /// Always ensure variable exists in global symbol table with default value
-    /// "0" The actual value resolution will happen during evaluation using
-    /// executor context
-    symtable_manager_t *manager = symtable_get_global_manager();
-    if (manager && !symtable_var_exists(manager, name)) {
-        symtable_set_var(manager, name, "0", SYMVAR_NONE);
-    }
-
+    /// Return the name only -- do not create the variable. Referencing an
+    /// undefined variable in an arithmetic expression is a pure read that
+    /// resolves to 0 (long_value and get_var_value_scoped both return 0 on a
+    /// symbol-table miss); it must not have the side effect of materializing
+    /// the variable. Pre-seeding a "0" here wrote into the current scope for
+    /// every referenced name, which leaked an undefined read as a persistent
+    /// binding (`$((z))` left z=0) and, inside a function, captured a
+    /// first-time arithmetic assignment as a function-local shadow instead of
+    /// the global a plain assignment produces. Creation is the assignment
+    /// path's responsibility (set_var_value_scoped -> symtable_assign_var,
+    /// which creates an absent target globally, the POSIX default).
     return name;
 }
 
