@@ -274,13 +274,21 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_INDIRECT_EXPANSION] = true,
                             [FEATURE_PARAM_TRANSFORMATION] = true,
 
-                            /// Extended Globbing - on by default in Zsh
+                            /// Extended globbing. lush's zsh preset enables it
+            /// as a curation; real zsh defaults KSH_GLOB OFF
+            /// (opt-in via setopt kshglob), so this is lush's
+            /// own default, not a zsh default.
             [FEATURE_EXTENDED_GLOB] = true,
                             /// zsh EXTENDED_GLOB (bare #/^ operators) is OFF by
             /// default in real zsh -- reachable via setopt
             [FEATURE_ZSH_EXTENDED_GLOB] = false,
-                            [FEATURE_NULL_GLOB] = true, /// CSH_NULL_GLOB behavior
-            [FEATURE_DOT_GLOB] = false, /// GLOB_DOTS off by default
+                            /// null_glob (empty expansion for a non-matching
+            /// glob). lush's zsh preset enables it; real zsh
+            /// defaults NOMATCH (error on no match) with
+            /// NULL_GLOB off -- so this too is lush curation,
+            /// not a zsh default.
+            [FEATURE_NULL_GLOB] = true,
+                            [FEATURE_DOT_GLOB] = false, /// GLOB_DOTS off by default
             [FEATURE_GLOBSTAR] = true,  /* ** recursive glob on by default */
 
             /// Brace Expansion
