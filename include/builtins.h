@@ -95,10 +95,14 @@ void builtin_report_dirstack(void);
  * @param flags   Attribute flags to add (SYMVAR_NONE for none)
  * @param append  true for the `name+=(...)` form: extend the existing array
  *                (creating it if absent) instead of replacing it
+ * @param global  true for `declare -g`/`typeset -g`: force a newly created
+ *                array into the global scope; false keeps it in the current
+ *                scope (function-local inside a function, matching bash)
  * @return 0 on success, 1 on error (diagnostic already reported)
  */
 int builtin_bind_array_literal(const char *name, const char *literal,
-                               bool assoc, symvar_flags_t flags, bool append);
+                               bool assoc, symvar_flags_t flags, bool append,
+                               bool global);
 
 /**
  * @brief Detect and strip the `+=` array-append marker from a sentinel name

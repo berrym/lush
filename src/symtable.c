@@ -3159,6 +3159,100 @@ int symtable_set_array(const char *name, array_value_t *array) {
 }
 
 /**
+ * @brief Force-write an array binding into the GLOBAL scope.
+ *
+ * The array analog of symtable_set_global_var: temporarily retarget
+ * current_scope to the global scope, write via the current-scope writer
+ * symtable_set_array, then restore. Used by symtable_assign_array's
+ * miss-fallback and by the `declare -g` / `typeset -g` array path.
+ */
+int symtable_set_array_global(const char *name, array_value_t *array) {
+    if (!name || !array || !global_manager || !global_manager->global_scope) {
+        return -1;
+    }
+    symtable_scope_t *old_scope = global_manager->current_scope;
+    global_manager->current_scope = global_manager->global_scope;
+    int result = symtable_set_array(name, array);
+    global_manager->current_scope = old_scope;
+    return result;
+}
+
+/**
+ * @brief Resolve the scope for a bare (unprefixed) array assignment.
+ *
+ * The array analog of symtable_assign_var (which arrays previously lacked --
+ * the root of #614). Walk the scope chain from the current scope upward; if
+ * the name is already bound in some scope, write the array into THAT owning
+ * scope (nearest wins, so a `local -a` shadow keeps the write local and a
+ * global binding is updated in place). If the name is unbound in every scope,
+ * create it in the GLOBAL scope -- the bash/zsh consensus for an unprefixed
+ * assignment, mirroring the scalar resolver's global fallback.
+ *
+ * Readonly is enforced across the chain. Unlike scalars, an array's readonly
+ * bit lives in array->flags, not the serialized symvar flags (arrays serialize
+ * with SYMVAR_NONE, see symtable_set_array), so the check reads the
+ * deserialized array's own flags rather than the symvar flags the scalar
+ * resolver inspects. deserialize_variable parses the hex pointer back into the
+ * live array_value_t, and free_symvar releases only the wrapper (not ->array),
+ * exactly as symtable_get_array relies on.
+ */
+int symtable_assign_array(const char *name, array_value_t *array) {
+    if (!name || !array || !global_manager || !global_manager->current_scope) {
+        return -1;
+    }
+
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+
+    symtable_scope_t *scope = global_manager->current_scope;
+    while (scope) {
+        const char *serialized = ht_strstr_get(scope->vars_ht, canon);
+        if (serialized) {
+            bool readonly_blocked = false;
+            symvar_t *existing = deserialize_variable(canon, serialized);
+            if (existing) {
+                /// A readonly ARRAY carries its readonly bit in array->flags
+                /// (arrays serialize with SYMVAR_NONE symvar flags); a readonly
+                /// SCALAR being promoted to an array carries it in the symvar
+                /// flags. Refuse both, mirroring symtable_assign_var so a bare
+                /// array assignment cannot clobber a readonly binding of either
+                /// kind in an enclosing scope.
+                if ((existing->type == SYMVAR_ARRAY && existing->array &&
+                     (existing->array->flags & SYMVAR_READONLY)) ||
+                    (existing->flags & SYMVAR_READONLY)) {
+                    readonly_blocked = true;
+                }
+                free_symvar(existing);
+            }
+            if (readonly_blocked) {
+                free(canon);
+                return SYMTABLE_ERR_READONLY;
+            }
+
+            /// Retarget current_scope so symtable_set_array writes to the scope
+            /// that owns the binding, then restore. This also runs
+            /// symtable_set_array's shadow/double-free guard at the OWNING
+            /// scope, freeing exactly that scope's prior array.
+            symtable_scope_t *old_scope = global_manager->current_scope;
+            global_manager->current_scope = scope;
+            int result = symtable_set_array(canon, array);
+            global_manager->current_scope = old_scope;
+            free(canon);
+            return result;
+        }
+        scope = scope->parent;
+    }
+
+    /// Unbound in every scope -> create globally (bash/zsh consensus for a
+    /// bare assignment), matching the scalar resolver's global fallback.
+    int result = symtable_set_array_global(canon, array);
+    free(canon);
+    return result;
+}
+
+/**
  * @brief Get an array variable
  */
 array_value_t *symtable_get_array(const char *name) {
@@ -3177,14 +3271,13 @@ array_value_t *symtable_get_array(const char *name) {
     }
 
     /// Single source of truth: the scope chain. Arrays live in
-    /// per-scope vars_ht the same way scalars do (storage
-    /// unification phase B), so a local array defined in a function
-    /// dies when the function scope is popped -- matching bash. The
-    /// global array_storage side-table is still allocated (set_array
-    /// also writes there for the lle_shell_hooks PROMPT_COMMAND walk
-    /// and the shutdown cleanup that frees array_value_t backing
-    /// memory) but is no longer consulted as a get fallback: that
-    /// fallback was leaking local arrays out of their function scope.
+    /// per-scope vars_ht the same way scalars do (storage unification
+    /// phase B), so a local array defined in a function dies when the
+    /// function scope is popped -- matching bash. Each array_value_t is
+    /// owned solely by the scope's vars_ht entry and reclaimed by
+    /// free_arrays_in_scope at scope pop/teardown; the old global
+    /// array_storage side-table has been removed (see the note at
+    /// symtable_set_array), so there is no second owner.
     symvar_t *var = find_var(global_manager->current_scope, canon);
     free(canon);
     if (!var) {
@@ -3286,12 +3379,16 @@ int symtable_set_array_element(const char *name, const char *subscript,
         return SYMTABLE_ERR_READONLY;
     }
     if (!array) {
-        /// Create new indexed array
+        /// Create new indexed array. Resolve scope like a bare assignment
+        /// (#614): a fresh element write inside a function must create the
+        /// array in the enclosing/global scope, not the transient function
+        /// frame, exactly as an unprefixed scalar assignment does. This also
+        /// covers the arithmetic element writer `(( a[i]=v ))`.
         array = symtable_array_create(false);
         if (!array) {
             return -1;
         }
-        if (symtable_set_array(name, array) < 0) {
+        if (symtable_assign_array(name, array) < 0) {
             symtable_array_free(array);
             return -1;
         }

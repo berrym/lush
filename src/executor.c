@@ -15539,10 +15539,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 }
                             }
                             free(ir);
-                            /// symtable_set_array takes ownership on success;
-                            /// free the array ourselves if the store fails so
-                            /// it is not leaked.
-                            if (symtable_set_array(arr_name, new_arr) != 0) {
+                            /// symtable_assign_array takes ownership on success
+                            /// and resolves scope like a bare assignment (#614:
+                            /// `${undef[i]:=x}` in a function persists to the
+                            /// enclosing/global scope); free on failure so it
+                            /// is not leaked.
+                            if (symtable_assign_array(arr_name, new_arr) != 0) {
                                 symtable_array_free(new_arr);
                             }
                         }
@@ -20827,8 +20829,11 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     /// paths set SYMVAR_READONLY on the array's own flags field;
     /// element-level writes from this function bypass
     /// symtable_set_array_element's enforcement, so the check has to
-    /// run here too. Match the scalar diagnostic for consistency.
-    if (symtable_array_get_flags(var_name) & SYMVAR_READONLY) {
+    /// run here too. A readonly SCALAR promoted to an array is refused
+    /// too -- its readonly bit lives in the symvar flags, not array->flags,
+    /// so check both. Match the scalar diagnostic for consistency.
+    if ((symtable_array_get_flags(var_name) & SYMVAR_READONLY) ||
+        (symtable_get_flags(executor->symtable, var_name) & SYMVAR_READONLY)) {
         executor_error_report(executor, SHELL_ERR_READONLY_VAR,
                               assign_node->loc, "%s: readonly variable",
                               var_name);
@@ -21120,8 +21125,11 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             elem = elem->next_sibling;
         }
 
-        /// Store the array in the symbol table
-        if (symtable_set_array(var_name, array) != 0) {
+        /// Store the array in the symbol table. A bare `a=(...)` resolves
+        /// scope like a scalar assignment (#614): inside a function it updates
+        /// an existing outer binding in place or, if unbound, creates the array
+        /// in the global scope rather than the transient function frame.
+        if (symtable_assign_array(var_name, array) != 0) {
             symtable_array_free(array);
             set_executor_error(executor, "Failed to store array");
             return 1;
@@ -21170,7 +21178,9 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             set_executor_error(executor, "Failed to create array");
             return 1;
         }
-        if (symtable_set_array(var_name, array) != 0) {
+        /// A fresh `a[i]=v` resolves scope like a scalar assignment (#614):
+        /// created in the enclosing/global scope, not the function frame.
+        if (symtable_assign_array(var_name, array) != 0) {
             symtable_array_free(array);
             if (expanded_value)
                 free(expanded_value);
@@ -21299,6 +21309,19 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         printf("DEBUG: Executing array append for: %s\n", var_name);
     }
 
+    /// Readonly enforcement, mirroring execute_array_assignment: a bare
+    /// `arr+=(...)` must refuse when arr is a readonly array (whose readonly
+    /// bit is in array->flags) or a readonly scalar being promoted (bit in the
+    /// symvar flags). Without this the in-place append path silently extends a
+    /// readonly array and the create path could clobber a readonly scalar.
+    if ((symtable_array_get_flags(var_name) & SYMVAR_READONLY) ||
+        (symtable_get_flags(executor->symtable, var_name) & SYMVAR_READONLY)) {
+        executor_error_report(executor, SHELL_ERR_READONLY_VAR,
+                              append_node->loc, "%s: readonly variable",
+                              var_name);
+        return 1;
+    }
+
     /// Get existing array or create new one
     array_value_t *array = symtable_get_array(var_name);
     bool new_array = false;
@@ -21334,9 +21357,10 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         elem = elem->next_sibling;
     }
 
-    /// Store the array if newly created
+    /// Store the array if newly created. A fresh `a+=(...)` resolves scope
+    /// like a scalar assignment (#614): enclosing/global, not the frame.
     if (new_array) {
-        if (symtable_set_array(var_name, array) != 0) {
+        if (symtable_assign_array(var_name, array) != 0) {
             symtable_array_free(array);
             set_executor_error(executor, "Failed to store array");
             return 1;
