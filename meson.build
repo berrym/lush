@@ -59,6 +59,8 @@ libhashtable_dep = dependency('libhashtable',
                               default_options: ['default_library=static'])
 
 src = ['src/arithmetic.c',
+       'src/arithmetic_lex.c',
+       'src/arithmetic_parse.c',
        'src/autocorrect.c',
        'src/autoload.c',
        'src/builtins/alias.c',
@@ -1635,6 +1637,25 @@ if fs.exists('tests/unit/test_expansion.c')
                               include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep, libm])
   test('Expansion', test_expansion,
+       suite: 'unit',
+       timeout: 60)
+endif
+
+if fs.exists('tests/unit/test_arith_ast.c')
+  # AST arithmetic engine front-end (lexer + parser), issue #607 stage 2.
+  test_arith_ast_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_arith_ast_sources += s
+    endif
+  endforeach
+  test_arith_ast = executable('test_arith_ast',
+                              'tests/unit/test_arith_ast.c',
+                              'tests/unit/test_executor_stubs.c',
+                              test_arith_ast_sources + lle_shell_sources,
+                              include_directories: [inc, include_directories('tests')],
+                              dependencies: [lle_dep, libm])
+  test('Arithmetic AST', test_arith_ast,
        suite: 'unit',
        timeout: 60)
 endif
