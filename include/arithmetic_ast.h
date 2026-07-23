@@ -141,6 +141,18 @@ typedef enum {
 } arith_ast_kind_t;
 
 /**
+ * @brief Kind of an lvalue the evaluator resolves before a mutation.
+ *
+ * The evaluator materializes one of these (resolving an array subscript to a
+ * concrete integer index exactly once) so assignment / increment / decrement
+ * operate on an already-resolved target.
+ */
+typedef enum {
+    LVAL_SCALAR,      ///< A scalar variable
+    LVAL_ARRAY_INDEX, ///< An indexed array element (name + resolved index)
+} lvalue_kind_t;
+
+/**
  * @brief An AST node. Children not used by a given kind are NULL.
  */
 typedef struct arith_ast {
@@ -196,6 +208,27 @@ arith_ast_t *arith_parse(const arith_token_t *tokens, size_t count,
  * @brief Recursively free an AST.
  */
 void arith_ast_free(arith_ast_t *node);
+
+/**
+ * @brief Evaluate a parsed AST to an integer value.
+ *
+ * The evaluator is the only layer coupled to the symbol table: it resolves
+ * variable reads (recursively, so `x="y+1"; y=5` yields 6, depth-capped) and
+ * performs assignments (honoring the readonly attribute). It short-circuits
+ * `&&`/`||` and evaluates only the taken ternary branch, so side effects in an
+ * unreached subexpression do not occur.
+ *
+ * @param ast      Root AST from arith_parse; a NULL ast evaluates to 0.
+ * @param executor Opaque executor context (executor_t *) for variable
+ *                 resolution and mutation; NULL falls back to the global scope.
+ * @param out      Receives the result on success (untouched on failure).
+ * @param diag     Diagnostic filled on an evaluation error (division by zero,
+ *                 readonly assignment, variable-resolution depth exceeded,
+ * ...).
+ * @return true on success, false on an evaluation error.
+ */
+bool arith_ast_eval(const arith_ast_t *ast, void *executor, ssize_t *out,
+                    arith_diag_t *diag);
 
 /**
  * @brief Serialize an AST to a canonical parenthesized S-expression.

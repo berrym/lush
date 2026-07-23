@@ -59,6 +59,7 @@ libhashtable_dep = dependency('libhashtable',
                               default_options: ['default_library=static'])
 
 src = ['src/arithmetic.c',
+       'src/arithmetic_eval.c',
        'src/arithmetic_lex.c',
        'src/arithmetic_parse.c',
        'src/autocorrect.c',
@@ -1656,6 +1657,25 @@ if fs.exists('tests/unit/test_arith_ast.c')
                               include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep, libm])
   test('Arithmetic AST', test_arith_ast,
+       suite: 'unit',
+       timeout: 60)
+endif
+
+if fs.exists('tests/unit/test_arith_eval.c')
+  # AST arithmetic engine evaluator, issue #607 stage 3.
+  test_arith_eval_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_arith_eval_sources += s
+    endif
+  endforeach
+  test_arith_eval = executable('test_arith_eval',
+                               'tests/unit/test_arith_eval.c',
+                               'tests/unit/test_executor_stubs.c',
+                               test_arith_eval_sources + lle_shell_sources,
+                               include_directories: [inc, include_directories('tests')],
+                               dependencies: [lle_dep, libm])
+  test('Arithmetic AST Evaluator', test_arith_eval,
        suite: 'unit',
        timeout: 60)
 endif
