@@ -5995,6 +5995,10 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
     source_location_t arith_loc =
         token_to_source_location(current, parser->source_name);
 
+    /// Byte offset just past the `((`; the body is sliced from the raw
+    /// source starting here (captured before the token is advanced past).
+    size_t body_start = current->end_position;
+
     /// Consume ((
     tokenizer_advance(parser->tokenizer);
 
@@ -6004,109 +6008,85 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
         return NULL;
     }
 
-    /// Collect the arithmetic expression until ))
-    /// We need to handle nested parentheses within the expression
-    char *expr = NULL;
-    size_t expr_len = 0;
-    size_t expr_capacity = 256;
+    /// Advance over the body tokens -- tracking nested parentheses -- only to
+    /// locate the terminating )) at depth 0. The expression is NOT
+    /// reassembled from individual token text: it is captured as the raw
+    /// source span between (( and )), so operators, array subscripts, and
+    /// spacing reach the arithmetic evaluator exactly as written --
+    /// byte-identical to how the $(( )) expansion form is captured. The old
+    /// token re-joiner reconstructed the string with heuristic spacing, which
+    /// shredded multi-character operators (the `^=` fix, #563) and bracketed
+    /// subscripts (`a[0]` -> `a [ 0 ]`, blocking #603); raw capture unifies the
+    /// two arithmetic surfaces onto one evaluator input.
     int paren_depth = 0;
-
-    expr = malloc(expr_capacity);
-    if (!expr) {
-        free_node_tree(arith_node);
-        return NULL;
-    }
-    expr[0] = '\0';
-
-    /// Parse tokens until we find )) at depth 0
     while (!tokenizer_match(parser->tokenizer, TOK_EOF)) {
         current = tokenizer_current(parser->tokenizer);
         if (!current) {
             break;
         }
 
-        /// Check for )) - end of arithmetic command
+        /// Check for )) - end of arithmetic command (only at depth 0)
         if (current->type == TOK_DOUBLE_RPAREN && paren_depth == 0) {
             break;
         }
 
-        /// Track nested parentheses
+        /// Track nested parentheses. Inside the arithmetic context the
+        /// tokenizer emits `((`/`))` as TOK_DOUBLE_LPAREN/TOK_DOUBLE_RPAREN, so
+        /// a nested grouping like `((1+2))` must be balanced against the
+        /// double-paren tokens as well as the single ones -- otherwise the
+        /// first inner `))` is mistaken for the command terminator.
         if (current->type == TOK_LPAREN) {
             paren_depth++;
+        } else if (current->type == TOK_DOUBLE_LPAREN) {
+            paren_depth += 2;
         } else if (current->type == TOK_RPAREN) {
             if (paren_depth > 0) {
                 paren_depth--;
             }
-        }
-
-        /// Append token text to expression
-        size_t token_len = strlen(current->text);
-        if (expr_len + token_len + 2 > expr_capacity) {
-            expr_capacity = (expr_len + token_len + 2) * 2;
-            char *new_expr = realloc(expr, expr_capacity);
-            if (!new_expr) {
-                free(expr);
-                free_node_tree(arith_node);
-                return NULL;
+        } else if (current->type == TOK_DOUBLE_RPAREN) {
+            /// A nested `))` at depth > 0 closes two levels.
+            if (paren_depth > 0) {
+                paren_depth -= (paren_depth >= 2) ? 2 : 1;
             }
-            expr = new_expr;
         }
-
-        /// Add space between tokens for readability (except at start)
-        /// But don't add space before operator characters that might form
-        /// multi-character operators (==, !=, <=, >=, <<=, >>=, &&, ||, +=,
-        /// -=, *=, /=, %=, &=, |=, ^=, ++, --, etc.). Every char that can lead
-        /// or trail a multi-character operator must appear in both lists;
-        /// `^` is here for `^=` (binary `^` is unaffected either way).
-        bool is_operator_char =
-            (current->text[0] == '=' || current->text[0] == '!' ||
-             current->text[0] == '<' || current->text[0] == '>' ||
-             current->text[0] == '&' || current->text[0] == '|' ||
-             current->text[0] == '^' || current->text[0] == '+' ||
-             current->text[0] == '-' || current->text[0] == '*' ||
-             current->text[0] == '/' || current->text[0] == '%');
-        bool prev_is_operator =
-            (expr_len > 0 &&
-             (expr[expr_len - 1] == '=' || expr[expr_len - 1] == '!' ||
-              expr[expr_len - 1] == '<' || expr[expr_len - 1] == '>' ||
-              expr[expr_len - 1] == '&' || expr[expr_len - 1] == '|' ||
-              expr[expr_len - 1] == '^' || expr[expr_len - 1] == '+' ||
-              expr[expr_len - 1] == '-' || expr[expr_len - 1] == '*' ||
-              expr[expr_len - 1] == '/' || expr[expr_len - 1] == '%'));
-
-        if (expr_len > 0 && expr[expr_len - 1] != ' ' &&
-            current->type != TOK_RPAREN && expr[expr_len - 1] != '(' &&
-            !(is_operator_char && prev_is_operator)) {
-            expr[expr_len++] = ' ';
-            expr[expr_len] = '\0';
-        }
-
-        strcat(expr, current->text);
-        expr_len = strlen(expr);
 
         tokenizer_advance(parser->tokenizer);
     }
 
     /// Expect ))
-    if (!tokenizer_match(parser->tokenizer, TOK_DOUBLE_RPAREN)) {
+    current = tokenizer_current(parser->tokenizer);
+    if (!current || current->type != TOK_DOUBLE_RPAREN) {
         parser_error_add(parser, SHELL_ERR_UNCLOSED_SUBST, "expected '))'");
-        free(expr);
         free_node_tree(arith_node);
         return NULL;
     }
+    size_t body_end = current->position;  /// byte offset of the ))
     tokenizer_advance(parser->tokenizer); /// consume ))
 
-    /// Trim whitespace from expression
-    while (expr_len > 0 && expr[expr_len - 1] == ' ') {
-        expr[--expr_len] = '\0';
+    /// Slice the raw body [body_start, body_end) and trim surrounding
+    /// whitespace (including newlines from a multi-line command).
+    const char *src = parser->tokenizer->input;
+    if (body_end < body_start) {
+        body_end = body_start;
     }
-    char *start = expr;
-    while (*start == ' ') {
-        start++;
+    const char *b = src + body_start;
+    size_t raw_len = body_end - body_start;
+    while (raw_len > 0 &&
+           (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r')) {
+        b++;
+        raw_len--;
     }
-    if (start != expr) {
-        memmove(expr, start, strlen(start) + 1);
+    while (raw_len > 0 && (b[raw_len - 1] == ' ' || b[raw_len - 1] == '\t' ||
+                           b[raw_len - 1] == '\n' || b[raw_len - 1] == '\r')) {
+        raw_len--;
     }
+    char *expr = malloc(raw_len + 1);
+    if (!expr) {
+        free_node_tree(arith_node);
+        return NULL;
+    }
+    memcpy(expr, b, raw_len);
+    expr[raw_len] = '\0';
 
     arith_node->val.str = expr;
     arith_node->val_type = VAL_STR;
