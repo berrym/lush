@@ -789,6 +789,30 @@ TEST(arith_nested_expansion) {
     teardown_executor(exec);
 }
 
+TEST(arith_nested_error_not_masked) {
+    /// A failure in a nested $((...)) must not be masked by a later sibling
+    /// nested expansion. Each nested $((...)) re-enters the arithmetic module;
+    /// only the outermost call clears the error state, so the div-by-zero flag
+    /// set by `$((1/0))` survives the following `$((5))` and the whole
+    /// expression fails rather than silently producing 6. Regression for the
+    /// AST-engine cutover (#607).
+    executor_t *exec = setup_executor();
+
+    executor_execute_command_line(exec, "R=$(( 1 + $((1/0)) + $((5)) ))", 1);
+    char *r = symtable_get_var(exec->symtable, "R");
+    ASSERT_TRUE(r == NULL || strcmp(r, "6") != 0,
+                "a nested div-by-zero is not masked to a wrong value");
+    free(r);
+
+    /// The engine still evaluates a valid nested expression after the failure.
+    executor_execute_command_line(exec, "OK=$(( $((2+3)) * $((4)) ))", 1);
+    char *ok = symtable_get_var(exec->symtable, "OK");
+    ASSERT_STR_EQ(ok, "20", "engine recovers after a nested error");
+    free(ok);
+
+    teardown_executor(exec);
+}
+
 TEST(arith_nested_depth_cap) {
     /// A pathologically deep nest errors cleanly instead of overflowing the
     /// stack (the recursion is depth-capped); a moderate nest still
@@ -1532,6 +1556,7 @@ int main(void) {
     RUN_TEST(arith_parentheses);
     RUN_TEST(arith_var_hex_octal_base);
     RUN_TEST(arith_nested_expansion);
+    RUN_TEST(arith_nested_error_not_masked);
     RUN_TEST(arith_nested_depth_cap);
     RUN_TEST(param_subst_extglob);
     RUN_TEST(arith_comparison_true);

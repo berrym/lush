@@ -12779,7 +12779,7 @@ static char *get_variable_attributes(const char *name) {
  * @param str String containing variables to expand
  * @return Fully expanded string (caller must free)
  */
-static char *expand_variables_in_string(executor_t *executor, const char *str) {
+char *expand_variables_in_string(executor_t *executor, const char *str) {
     if (!str || !executor) {
         return strdup("");
     }
@@ -17389,6 +17389,15 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
     char *result = arithm_expand_with_executor(executor, arith_text);
     if (result) {
         return result;
+    }
+
+    /// A nested $((...)) expanded during an enclosing arithmetic expression's
+    /// Layer-0 pre-pass: leave the error flagged for the enclosing expression
+    /// to detect and report exactly once. Rendering it here would both
+    /// double-report the same diagnostic and let the enclosing expansion clear
+    /// it, so return an empty string without touching the executor state.
+    if (arithm_expansion_in_progress()) {
+        return strdup("");
     }
 
     /// Drain the typed error state from arithmetic.c and emit a fully
