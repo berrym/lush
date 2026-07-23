@@ -607,6 +607,22 @@ bool executor_reject_mixed_script_ident(executor_t *executor, const char *name,
 char *expand_if_needed(executor_t *executor, const char *text);
 
 /**
+ * @brief Expand a string's $-forms to a plain string, without word-splitting
+ *        or globbing.
+ *
+ * Resolves parameter expansions (`$var`, `${...}`), command substitutions
+ * (`$(...)`), and arithmetic expansions (`$((...))`) in @p str, leaving all
+ * other text untouched. Used to expand parameter-expansion default values and
+ * as the Layer-0 pre-pass of the AST arithmetic engine (the expression reaches
+ * the lexer as pure arithmetic).
+ *
+ * @param executor Executor context
+ * @param str String to expand
+ * @return Newly allocated expanded string (caller must free)
+ */
+char *expand_variables_in_string(executor_t *executor, const char *str);
+
+/**
  * @brief Expand a single word/argument AST node to its string value.
  *
  * Dispatches by node type: ANSI-C decode for a `$'...'` NODE_STRING_LITERAL,

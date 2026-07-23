@@ -111,6 +111,16 @@ void arithm_clear_error(void);
 /** @brief Returns true if the arithmetic error flag is set. */
 bool arithm_error_is_flagged(void);
 
+/**
+ * @brief True while a nested arithmetic expansion is in progress.
+ *
+ * A nested $((...)) is expanded during another arithmetic expression's Layer-0
+ * pre-pass. The executor's arithmetic-expansion path uses this to leave a
+ * nested failure flagged for the enclosing expression to report once, rather
+ * than rendering it (which would double-report the same error).
+ */
+bool arithm_expansion_in_progress(void);
+
 /** @brief Returns the structured code for the current error. */
 shell_error_code_t arithm_error_code(void);
 
