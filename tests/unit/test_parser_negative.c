@@ -528,10 +528,17 @@ TEST(alternating_unclosed) { ASSERT_PARSE_FAILS("({({({"); }
  * stack overflow without the depth limit.
  */
 TEST(recursion_depth_limit) {
-    /// Generate deeply nested subshells: ((( ... )))
-    /// PARSER_MAX_RECURSION_DEPTH is 256, so we need more than that
+    /// Generate deeply nested subshells: ( ( ( ... echo ... ) ) )
+    /// PARSER_MAX_RECURSION_DEPTH is 256, so we need more than that.
+    ///
+    /// The opening parens are SPACE-SEPARATED on purpose: an unspaced `((`
+    /// is the arithmetic-command opener, which parse_arithmetic_command
+    /// consumes iteratively (no parser recursion, bounded at evaluation) --
+    /// it would not exercise the recursion guard this test targets. Genuine
+    /// nested subshells force parse_subshell to recurse, tripping
+    /// PARSER_MAX_RECURSION_DEPTH.
     const int depth = 300;
-    size_t len = depth * 2 + 10; /// ( * depth + echo + ) * depth
+    size_t len = depth * 4 + 16; /// "( " * depth + echo + " )" * depth + NUL
     char *input = malloc(len);
     if (!input)
         return;
@@ -539,12 +546,14 @@ TEST(recursion_depth_limit) {
     char *p = input;
     for (int i = 0; i < depth; i++) {
         *p++ = '(';
+        *p++ = ' ';
     }
     *p++ = 'e';
     *p++ = 'c';
     *p++ = 'h';
     *p++ = 'o';
     for (int i = 0; i < depth; i++) {
+        *p++ = ' ';
         *p++ = ')';
     }
     *p = '\0';
