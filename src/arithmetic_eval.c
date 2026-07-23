@@ -160,19 +160,16 @@ static bool parse_pure_integer(const char *s, ssize_t *out) {
 }
 
 /**
- * @brief Resolve a scalar variable to its integer value (recursively).
+ * @brief Resolve an owned value string to its integer value (recursively).
  *
- * An unset variable is 0 and is NOT created (issue #601). A value that is a
- * pure integer literal reads by base 0 (0x hex, 0 octal, decimal -- issue
- * #578). Any other value is itself evaluated as an arithmetic expression,
- * depth-capped to bound cycles.
+ * Takes ownership of @p value (always non-NULL) and frees it. A pure integer
+ * literal reads by base 0 (0x hex, 0 octal, decimal -- issue #578); an empty /
+ * all-whitespace value is 0; any other value is itself evaluated as an
+ * arithmetic expression, depth-capped to bound cycles. Shared by scalar reads
+ * (read_scalar) and array-element reads (lvalue_read), so `a[0]="b+1"; b=5`
+ * resolves a[0] to 6 exactly as a scalar would.
  */
-static ssize_t read_scalar(eval_ctx_t *ctx, const char *name) {
-    char *value = read_var_string(ctx, name);
-    if (!value) {
-        return 0;
-    }
-
+static ssize_t resolve_value_string(eval_ctx_t *ctx, char *value) {
     ssize_t literal = 0;
     if (parse_pure_integer(value, &literal)) {
         free(value);
@@ -230,6 +227,19 @@ static ssize_t read_scalar(eval_ctx_t *ctx, const char *name) {
 }
 
 /**
+ * @brief Resolve a scalar variable to its integer value (recursively).
+ *
+ * An unset variable is 0 and is NOT created (issue #601).
+ */
+static ssize_t read_scalar(eval_ctx_t *ctx, const char *name) {
+    char *value = read_var_string(ctx, name);
+    if (!value) {
+        return 0;
+    }
+    return resolve_value_string(ctx, value);
+}
+
+/**
  * @brief Resolve an lvalue node to a handle, evaluating a subscript once.
  *
  * The parser guarantees @p n is AST_VAR or AST_INDEX.
@@ -237,6 +247,24 @@ static ssize_t read_scalar(eval_ctx_t *ctx, const char *name) {
 static lvalue_t eval_lvalue(eval_ctx_t *ctx, const arith_ast_t *n) {
     lvalue_t lv = {.kind = LVAL_SCALAR, .name = n->name, .index = 0};
     if (n->kind == AST_INDEX) {
+        /// Associative-array subscripts are literal string keys, not arithmetic
+        /// (bash and zsh agree: `m[foo]` keys on "foo", never on the value of
+        /// foo). Supporting that needs the raw subscript text, which the engine
+        /// does not yet thread through -- issue #603 scopes indexed arrays
+        /// first. Decline associative targets with a specific error rather than
+        /// arithmetic-evaluating the key and writing under the wrong subscript.
+        /// The check precedes subscript evaluation so a key side effect
+        /// (`m[i++]`) does not fire on the unsupported path.
+        array_value_t *arr = symtable_get_array(n->name);
+        if (arr && arr->is_associative) {
+            eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX,
+                      "resolving an array subscript",
+                      "associative arrays in arithmetic are not yet supported",
+                      "associative array subscripts are not supported in "
+                      "arithmetic yet",
+                      n->pos);
+            return lv;
+        }
         lv.kind = LVAL_ARRAY_INDEX;
         lv.index = eval_node(ctx, n->a); /// subscript evaluated exactly once
     }
@@ -250,36 +278,53 @@ static ssize_t lvalue_read(eval_ctx_t *ctx, const lvalue_t *lv) {
     if (lv->kind == LVAL_SCALAR) {
         return read_scalar(ctx, lv->name);
     }
-    /// Array-element read is delivered in stage 4 with issue #603; until then
-    /// the parser accepts a[i] but the evaluator declines it, preserving the
-    /// legacy engine's "no array subscripts in arithmetic" behavior.
-    eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX, "reading an array element",
-              "array elements in arithmetic are not yet supported",
-              "array subscripts are not yet supported in arithmetic", 0);
-    return 0;
+    /// Array element (issue #603). The subscript was evaluated once by
+    /// eval_lvalue; render it as a decimal string for the symtable API, which
+    /// applies the mode's index base (zsh 1-indexed vs 0-indexed). An unset or
+    /// out-of-range element is 0 and is NOT created, matching an unset scalar;
+    /// a set value resolves recursively exactly as a scalar value does.
+    char subscript[32];
+    snprintf(subscript, sizeof(subscript), "%zd", lv->index);
+    char *value = symtable_get_array_element(lv->name, subscript);
+    if (!value) {
+        return 0;
+    }
+    return resolve_value_string(ctx, value);
 }
 
 /**
  * @brief Write a value to a resolved lvalue, honoring the readonly attribute.
  */
 static void lvalue_write(eval_ctx_t *ctx, const lvalue_t *lv, ssize_t value) {
-    if (lv->kind != LVAL_SCALAR) {
-        eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX,
-                  "assigning an array element",
-                  "array elements in arithmetic are not yet supported",
-                  "array subscripts are not yet supported in arithmetic", 0);
-        return;
-    }
-
     char buf[32];
     snprintf(buf, sizeof(buf), "%zd", value);
 
     int rc;
-    if (ctx->executor && ctx->executor->symtable) {
+    if (lv->kind == LVAL_ARRAY_INDEX) {
+        /// Array element (issue #603). The subscript was evaluated once by
+        /// eval_lvalue; symtable_set_array_element auto-creates an indexed
+        /// array on first write and applies the mode's index base. A subscript
+        /// out of the mode's valid range (e.g. negative in 0-indexed mode)
+        /// returns -1; report it rather than silently dropping the write.
+        char subscript[32];
+        snprintf(subscript, sizeof(subscript), "%zd", lv->index);
+        rc = symtable_set_array_element(lv->name, subscript, buf);
+        if (rc == -1) {
+            char msg[96];
+            snprintf(msg, sizeof(msg),
+                     "array subscript %zd out of range for '%s'", lv->index,
+                     lv->name);
+            eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX,
+                      "assigning an array element",
+                      "the subscript is out of range for this array", msg, 0);
+            return;
+        }
+    } else if (ctx->executor && ctx->executor->symtable) {
         rc = symtable_assign_var(ctx->executor->symtable, lv->name, buf);
     } else {
         rc = symtable_set_global(lv->name, buf);
     }
+
     if (rc == SYMTABLE_ERR_READONLY) {
         char msg[96];
         snprintf(msg, sizeof(msg), "cannot assign to readonly variable '%s'",
@@ -407,6 +452,9 @@ static ssize_t eval_node(eval_ctx_t *ctx, const arith_ast_t *n) {
 
     case AST_INDEX: {
         lvalue_t lv = eval_lvalue(ctx, n);
+        if (ctx->failed) {
+            return 0;
+        }
         return lvalue_read(ctx, &lv);
     }
 

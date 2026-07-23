@@ -183,6 +183,103 @@ TEST(eval_increment_decrement) {
 }
 
 /* ==========================================================================
+ * Array element lvalues (issue #603). The subscript is evaluated exactly once
+ * by eval_lvalue, so every array-lvalue operation (read, assign, compound
+ * assign, pre/post inc/dec) flows through lvalue_read / lvalue_write. Each test
+ * uses a distinct array name because the symbol table is process-global here.
+ * ========================================================================== */
+
+TEST(eval_array_read) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "ar_r[0]=5", 1);
+    executor_execute_command_line(exec, "ar_r[1]=10", 1);
+    ASSERT_EVAL(exec, "ar_r[0] + ar_r[1]", 15);
+    ASSERT_EVAL(exec, "ar_r[0] * 2", 10);
+    /// An unset element reads 0 and is NOT created, matching an unset scalar.
+    ASSERT_EVAL(exec, "ar_r[9] + 1", 1);
+    char *missing = symtable_get_array_element("ar_r", "9");
+    ASSERT_NULL(missing, "reading an unset element does not create it");
+    teardown_executor(exec);
+}
+
+TEST(eval_array_write) {
+    executor_t *exec = setup_executor();
+    /// Assigning an element auto-creates the array and persists the value.
+    ASSERT_EVAL(exec, "ar_w[2] = 6 * 7", 42);
+    char *v = symtable_get_array_element("ar_w", "2");
+    ASSERT_STR_EQ(v, "42", "an arithmetic array assignment persists");
+    free(v);
+    teardown_executor(exec);
+}
+
+TEST(eval_array_compound_and_incdec) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "ar_c[0]=10", 1);
+    ASSERT_EVAL(exec, "ar_c[0] += 5", 15);
+    ASSERT_EVAL(exec, "ar_c[0]++", 15); /// post returns the old value
+    ASSERT_EVAL(exec, "++ar_c[0]", 17); /// pre returns the new value
+    char *v = symtable_get_array_element("ar_c", "0");
+    ASSERT_STR_EQ(v, "17", "compound / increment on an element persist");
+    free(v);
+    teardown_executor(exec);
+}
+
+TEST(eval_array_subscript_evaluated_once) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "ar_i[0]=100", 1);
+    executor_execute_command_line(exec, "idx=0", 1);
+    /// The subscript i++ is evaluated exactly once: index 0 is used for both
+    /// the read and the write, idx advances by one, and ar_i[1] is untouched.
+    ASSERT_EVAL(exec, "ar_i[idx++]++", 100);
+    char *elem = symtable_get_array_element("ar_i", "0");
+    ASSERT_STR_EQ(elem, "101", "the single resolved element was incremented");
+    free(elem);
+    char *idx = symtable_get_var(exec->symtable, "idx");
+    ASSERT_STR_EQ(idx, "1", "the subscript side effect ran exactly once");
+    free(idx);
+    char *untouched = symtable_get_array_element("ar_i", "1");
+    ASSERT_NULL(untouched, "no second element was created by re-evaluation");
+    teardown_executor(exec);
+}
+
+TEST(eval_array_recursive_element) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "rb=5", 1);
+    executor_execute_command_line(exec, "ar_x[0]='rb + 1'", 1);
+    /// An element whose value is itself an expression resolves recursively,
+    /// exactly as a scalar value does.
+    ASSERT_EVAL(exec, "ar_x[0]", 6);
+    ASSERT_EVAL(exec, "ar_x[0] * 2", 12);
+    teardown_executor(exec);
+}
+
+TEST(eval_array_readonly_element) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "declare -ar ar_ro=(1 2 3)", 1);
+    ASSERT_TRUE(eval_fails(exec, "ar_ro[0] = 9", SHELL_ERR_READONLY_VAR),
+                "assigning an element of a readonly array is refused");
+    char *v = symtable_get_array_element("ar_ro", "0");
+    ASSERT_STR_EQ(v, "1", "the readonly element is unchanged");
+    free(v);
+    teardown_executor(exec);
+}
+
+TEST(eval_array_associative_declined) {
+    executor_t *exec = setup_executor();
+    executor_execute_command_line(exec, "declare -A ar_as", 1);
+    /// Associative subscripts are literal keys, not arithmetic; until the raw
+    /// subscript text is threaded through (issue #603 defers this), the engine
+    /// declines rather than keying on the arithmetic value of the subscript.
+    ASSERT_TRUE(eval_fails(exec, "ar_as[foo] = 9", SHELL_ERR_ARITHMETIC_SYNTAX),
+                "an associative-array write is declined, not mis-keyed");
+    char *foo = symtable_get_array_element("ar_as", "foo");
+    ASSERT_NULL(foo, "the declined write did not store anything");
+    char *zero = symtable_get_array_element("ar_as", "0");
+    ASSERT_NULL(zero, "the key was not mis-evaluated to index 0");
+    teardown_executor(exec);
+}
+
+/* ==========================================================================
  * Curation 1: recursive variable resolution
  * ========================================================================== */
 
@@ -297,6 +394,15 @@ int main(void) {
     RUN_TEST(eval_undefined_is_zero_no_materialize);
     RUN_TEST(eval_assignment);
     RUN_TEST(eval_increment_decrement);
+
+    printf("\n--- Array Element Reads and Writes ---\n");
+    RUN_TEST(eval_array_read);
+    RUN_TEST(eval_array_write);
+    RUN_TEST(eval_array_compound_and_incdec);
+    RUN_TEST(eval_array_subscript_evaluated_once);
+    RUN_TEST(eval_array_recursive_element);
+    RUN_TEST(eval_array_readonly_element);
+    RUN_TEST(eval_array_associative_declined);
 
     printf("\n--- Recursive Variable Resolution ---\n");
     RUN_TEST(eval_recursive_variable);
