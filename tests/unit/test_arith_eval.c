@@ -264,18 +264,32 @@ TEST(eval_array_readonly_element) {
     teardown_executor(exec);
 }
 
-TEST(eval_array_associative_declined) {
+TEST(eval_array_associative_key) {
     executor_t *exec = setup_executor();
     executor_execute_command_line(exec, "declare -A ar_as", 1);
-    /// Associative subscripts are literal keys, not arithmetic; until the raw
-    /// subscript text is threaded through (issue #603 defers this), the engine
-    /// declines rather than keying on the arithmetic value of the subscript.
-    ASSERT_TRUE(eval_fails(exec, "ar_as[foo] = 9", SHELL_ERR_ARITHMETIC_SYNTAX),
-                "an associative-array write is declined, not mis-keyed");
+    executor_execute_command_line(exec, "ar_as[foo]=5", 1);
+    /// An associative subscript is a LITERAL key, never arithmetic (issue
+    /// #615): ar_as[foo] keys on "foo", not the arithmetic value of foo, and is
+    /// stored/read under that key. Read, then compound-assign.
+    ASSERT_EVAL(exec, "ar_as[foo]", 5);
+    ASSERT_EVAL(exec, "ar_as[foo] += 1", 6);
     char *foo = symtable_get_array_element("ar_as", "foo");
-    ASSERT_NULL(foo, "the declined write did not store anything");
+    ASSERT_STR_EQ(foo, "6",
+                  "the compound assignment stored under the key 'foo'");
+    free(foo);
+    /// The write never mis-keyed to index 0.
     char *zero = symtable_get_array_element("ar_as", "0");
     ASSERT_NULL(zero, "the key was not mis-evaluated to index 0");
+    free(zero);
+    /// A non-arithmetic-character key (which would fail arithmetic lexing)
+    /// works, because the subscript is captured raw and used verbatim.
+    executor_execute_command_line(exec, "ar_as[a.b]=7", 1);
+    ASSERT_EVAL(exec, "ar_as[a.b]", 7);
+    /// A missing key reads 0 and is not created.
+    ASSERT_EVAL(exec, "ar_as[nope]", 0);
+    char *nope = symtable_get_array_element("ar_as", "nope");
+    ASSERT_NULL(nope, "a missing-key read did not create the key");
+    free(nope);
     teardown_executor(exec);
 }
 
@@ -402,7 +416,7 @@ int main(void) {
     RUN_TEST(eval_array_subscript_evaluated_once);
     RUN_TEST(eval_array_recursive_element);
     RUN_TEST(eval_array_readonly_element);
-    RUN_TEST(eval_array_associative_declined);
+    RUN_TEST(eval_array_associative_key);
 
     printf("\n--- Recursive Variable Resolution ---\n");
     RUN_TEST(eval_recursive_variable);

@@ -65,9 +65,11 @@ void arith_tokens_free(arith_token_t *tokens, size_t count) {
         return;
     }
     for (size_t i = 0; i < count; i++) {
-        if (tokens[i].kind == ATK_IDENT) {
-            free(tokens[i].text);
-        }
+        /// Free any token that owns heap text: ATK_IDENT (identifier) and
+        /// ATK_SUBSCRIPT (the raw `[...]` interior, issue #615). Every other
+        /// kind initializes .text to NULL, so an unconditional free is a safe
+        /// no-op there and stays correct if a future kind adds owned text.
+        free(tokens[i].text);
     }
     free(tokens);
 }
@@ -348,6 +350,54 @@ bool arith_lex(const char *expr, arith_token_t **out_tokens, size_t *out_count,
                 return LEX_OOM(diag, pos);
             }
             p = id_end;
+            continue;
+        }
+
+        /// Array subscript: capture the whole `[...]` interior RAW, without
+        /// lexing it (issue #615). An associative-array key may contain any
+        /// characters (m[foo.bar], m[a@b], m[a b]); the evaluator uses this
+        /// text as a literal key for an associative array and re-lexes it as an
+        /// arithmetic expression for an indexed array. Bracket depth is tracked
+        /// so a nested subscript (a[b[1]]) captures correctly. In arithmetic a
+        /// '[' only ever opens a subscript, so this is unconditional.
+        if (*p == '[') {
+            const char *interior = p + 1;
+            const char *q = interior;
+            int depth = 1;
+            while (*q) {
+                if (*q == '[') {
+                    depth++;
+                } else if (*q == ']') {
+                    depth--;
+                    if (depth == 0) {
+                        break;
+                    }
+                }
+                q++;
+            }
+            if (depth != 0) {
+                arith_tokens_free(tokens, count);
+                return lex_fail(diag, SHELL_ERR_ARITHMETIC_SYNTAX,
+                                "every '[' needs a matching ']'", pos, 1,
+                                "unmatched '['");
+            }
+            size_t raw_len = (size_t)(q - interior);
+            char *raw = malloc(raw_len + 1);
+            if (!raw) {
+                arith_tokens_free(tokens, count);
+                return LEX_OOM(diag, pos);
+            }
+            memcpy(raw, interior, raw_len);
+            raw[raw_len] = '\0';
+            tok.kind = ATK_SUBSCRIPT;
+            tok.text = raw;
+            tok.len = (size_t)(q - p + 1); /// span of the whole [...]
+            if (!push_token(&tokens, &count, &cap, tok)) {
+                free(raw);
+                arith_tokens_free(tokens, count);
+                return LEX_OOM(diag, pos);
+            }
+            p = q + 1; /// past ']'
             continue;
         }
 

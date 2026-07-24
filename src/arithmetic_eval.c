@@ -45,6 +45,12 @@ _Static_assert(
 /// (`x="y"; y="x"`) and pathological nesting; overflow is a clean error.
 #define ARITH_MAX_VAR_DEPTH 16
 
+/// Maximum lex-captured-subscript nesting depth (a[b[c[...]]]). Each level is
+/// a full re-lex/parse/eval C-recursion frame, so this bounds the stack;
+/// overflow is a clean SHELL_ERR_ARITH_STACK_OVERFLOW rather than a SIGSEGV.
+/// Generous for real code (matches the $(( )) nesting cap in arithmetic.c).
+#define ARITH_MAX_SUBSCRIPT_DEPTH 128
+
 /**
  * @brief Evaluation context threaded through the tree walk.
  */
@@ -53,6 +59,7 @@ typedef struct {
     arith_diag_t *diag;   ///< Diagnostic filled on failure
     bool failed;          ///< True once an evaluation error has occurred
     int var_depth;        ///< Current recursive variable-resolution depth
+    int sub_depth;        ///< Current lex-captured-subscript nesting depth
 } eval_ctx_t;
 
 /**
@@ -60,9 +67,10 @@ typedef struct {
  *        assignment / increment / decrement. `name` is borrowed from the AST.
  */
 typedef struct {
-    lvalue_kind_t kind; ///< LVAL_SCALAR or LVAL_ARRAY_INDEX
+    lvalue_kind_t kind; ///< LVAL_SCALAR / LVAL_ARRAY_INDEX / LVAL_ASSOC_KEY
     const char *name;   ///< Variable name (borrowed)
     ssize_t index;      ///< Resolved integer index (LVAL_ARRAY_INDEX)
+    const char *key;    ///< Literal key (LVAL_ASSOC_KEY; borrows AST index_raw)
 } lvalue_t;
 
 static ssize_t eval_node(eval_ctx_t *ctx, const arith_ast_t *n);
@@ -244,29 +252,72 @@ static ssize_t read_scalar(eval_ctx_t *ctx, const char *name) {
  *
  * The parser guarantees @p n is AST_VAR or AST_INDEX.
  */
+/**
+ * @brief Evaluate a raw subscript string as an arithmetic expression (the
+ *        indexed-array path of a lex-captured subscript, issue #615).
+ *
+ * The subscript was captured whole and unlexed by the lexer, so an indexed
+ * array evaluates it here by re-running the engine on the raw text, sharing the
+ * evaluation context (so a subscript side effect like `a[i++]` mutates the same
+ * symbol table, and errors propagate). Called exactly once per lvalue, so the
+ * single-evaluation guarantee (`a[i++]++`) is preserved.
+ */
+static ssize_t eval_subscript(eval_ctx_t *ctx, const char *raw) {
+    if (!raw) {
+        return 0;
+    }
+    /// A lex-captured subscript is evaluated by re-running the engine on the
+    /// raw text, so each nesting level (a[b[c[...]]]) is a C-recursion level
+    /// carrying a full lex+parse+eval frame. Bound the nesting and raise a
+    /// clean stack-overflow error, mirroring the depth cap resolve_value_string
+    /// applies to recursive variable resolution, rather than crashing on a
+    /// pathologically deep subscript.
+    if (ctx->sub_depth >= ARITH_MAX_SUBSCRIPT_DEPTH) {
+        eval_fail(ctx, SHELL_ERR_ARITH_STACK_OVERFLOW,
+                  "resolving an array subscript",
+                  "array subscripts are nested too deeply",
+                  "arithmetic subscript nesting exceeded the depth limit", 0);
+        return 0;
+    }
+    arith_token_t *tokens = NULL;
+    size_t count = 0;
+    if (!arith_lex(raw, &tokens, &count, ctx->diag)) {
+        ctx->failed = true;
+        return 0;
+    }
+    arith_ast_t *ast = arith_parse(tokens, count, ctx->diag);
+    arith_tokens_free(tokens, count);
+    if (!ast) {
+        ctx->failed = true;
+        return 0;
+    }
+    ctx->sub_depth++;
+    ssize_t result = eval_node(ctx, ast);
+    ctx->sub_depth--;
+    arith_ast_free(ast);
+    return result;
+}
+
 static lvalue_t eval_lvalue(eval_ctx_t *ctx, const arith_ast_t *n) {
-    lvalue_t lv = {.kind = LVAL_SCALAR, .name = n->name, .index = 0};
+    lvalue_t lv = {
+        .kind = LVAL_SCALAR, .name = n->name, .index = 0, .key = NULL};
     if (n->kind == AST_INDEX) {
-        /// Associative-array subscripts are literal string keys, not arithmetic
-        /// (bash and zsh agree: `m[foo]` keys on "foo", never on the value of
-        /// foo). Supporting that needs the raw subscript text, which the engine
-        /// does not yet thread through -- issue #603 scopes indexed arrays
-        /// first. Decline associative targets with a specific error rather than
-        /// arithmetic-evaluating the key and writing under the wrong subscript.
-        /// The check precedes subscript evaluation so a key side effect
-        /// (`m[i++]`) does not fire on the unsupported path.
+        /// An ASSOCIATIVE-array subscript is a LITERAL string key, never
+        /// arithmetic (issue #615). bash and zsh agree: m[foo] keys on "foo",
+        /// m[a+b] on "a+b". The parser captured the raw subscript text; use it
+        /// verbatim as the key -- do NOT arithmetic-evaluate it -- so keys with
+        /// non-arithmetic characters work and no key side effect fires. An
+        /// INDEXED array evaluates the raw subscript as arithmetic, exactly
+        /// once. An unbound name takes the indexed path (a fresh indexed
+        /// array).
         array_value_t *arr = symtable_get_array(n->name);
         if (arr && arr->is_associative) {
-            eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX,
-                      "resolving an array subscript",
-                      "associative arrays in arithmetic are not yet supported",
-                      "associative array subscripts are not supported in "
-                      "arithmetic yet",
-                      n->pos);
+            lv.kind = LVAL_ASSOC_KEY;
+            lv.key = n->index_raw;
             return lv;
         }
         lv.kind = LVAL_ARRAY_INDEX;
-        lv.index = eval_node(ctx, n->a); /// subscript evaluated exactly once
+        lv.index = eval_subscript(ctx, n->index_raw); /// evaluated exactly once
     }
     return lv;
 }
@@ -278,14 +329,21 @@ static ssize_t lvalue_read(eval_ctx_t *ctx, const lvalue_t *lv) {
     if (lv->kind == LVAL_SCALAR) {
         return read_scalar(ctx, lv->name);
     }
-    /// Array element (issue #603). The subscript was evaluated once by
-    /// eval_lvalue; render it as a decimal string for the symtable API, which
-    /// applies the mode's index base (zsh 1-indexed vs 0-indexed). An unset or
-    /// out-of-range element is 0 and is NOT created, matching an unset scalar;
-    /// a set value resolves recursively exactly as a scalar value does.
-    char subscript[32];
-    snprintf(subscript, sizeof(subscript), "%zd", lv->index);
-    char *value = symtable_get_array_element(lv->name, subscript);
+    /// Array element. For an associative array (issue #615) the literal key is
+    /// passed to the symtable API verbatim; for an indexed array the subscript
+    /// was evaluated once by eval_lvalue and is rendered as a decimal string
+    /// (the API applies the mode's index base, zsh 1-indexed vs 0-indexed, and
+    /// resolves a negative from the end, #616). An unset or out-of-range
+    /// element is 0 and is NOT created, matching an unset scalar; a set value
+    /// resolves recursively exactly as a scalar value does.
+    char *value;
+    if (lv->kind == LVAL_ASSOC_KEY) {
+        value = symtable_get_array_element(lv->name, lv->key);
+    } else {
+        char subscript[32];
+        snprintf(subscript, sizeof(subscript), "%zd", lv->index);
+        value = symtable_get_array_element(lv->name, subscript);
+    }
     if (!value) {
         return 0;
     }
@@ -365,6 +423,32 @@ static void lvalue_write(eval_ctx_t *ctx, const lvalue_t *lv, ssize_t value) {
             eval_fail(ctx, SHELL_ERR_ARITHMETIC_SYNTAX,
                       "assigning an array element",
                       "the subscript is out of range for this array", msg, 0);
+            return;
+        }
+    } else if (lv->kind == LVAL_ASSOC_KEY) {
+        /// Associative array element (issue #615): the literal key is passed to
+        /// the symtable API verbatim. A readonly associative array is refused;
+        /// the target is already an associative array, so there is no
+        /// scalar->array promotion and no numeric out-of-range case.
+        if (symtable_array_get_flags(lv->name) & SYMVAR_READONLY) {
+            char msg[96];
+            snprintf(msg, sizeof(msg),
+                     "cannot assign to readonly variable '%s'", lv->name);
+            eval_fail(ctx, SHELL_ERR_READONLY_VAR,
+                      "assigning in an arithmetic expression",
+                      "the variable is read-only and cannot be reassigned", msg,
+                      0);
+            return;
+        }
+        rc = symtable_set_array_element(lv->name, lv->key, buf);
+        if (rc < 0 && rc != SYMTABLE_ERR_READONLY) {
+            char msg[96];
+            snprintf(msg, sizeof(msg),
+                     "failed to store associative array element '%s'",
+                     lv->name);
+            eval_fail(
+                ctx, SHELL_ERR_ARITHMETIC_SYNTAX, "assigning an array element",
+                "the associative array element could not be stored", msg, 0);
             return;
         }
     } else if (ctx->executor && ctx->executor->symtable) {
@@ -639,6 +723,7 @@ bool arith_ast_eval(const arith_ast_t *ast, void *executor, ssize_t *out,
         .diag = diag,
         .failed = false,
         .var_depth = 0,
+        .sub_depth = 0,
     };
     ssize_t result = eval_node(&ctx, ast);
     if (ctx.failed) {

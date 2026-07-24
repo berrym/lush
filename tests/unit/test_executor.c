@@ -3261,6 +3261,193 @@ TEST(rt_arith_neg_blast_radius_rematch) {
     executor_free(exec);
 }
 
+/* ==========================================================================
+ * #615: associative-array element keys in arithmetic. The lexer captures the
+ * whole [...] subscript raw; the evaluator uses it as a LITERAL key for an
+ * associative array (never arithmetic-evaluated), so any key works -- matching
+ * lush's own ${m[...]} surface and the bash/zsh consensus. Associative keys
+ * are index-base-agnostic, so behavior is mode-independent (a zsh-mode case
+ * confirms it). Indexed arrays are unaffected (the raw subscript is re-lexed
+ * and arithmetic-evaluated), including single-evaluation of a[i++]++.
+ * ========================================================================== */
+
+TEST(rt_arith_assoc_literal_key) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m1\nm1[foo]=5\necho \"$(( m1[foo] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_compound_assign) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "declare -A m2\nm2[foo]=5\n(( m2[foo]+=1 ))\necho \"${m2[foo]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "6\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_key_not_arithmetic) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The key 'a+b' is literal, not arithmetic: it is stable after a/b change.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m3\na=1\nb=2\nm3[a+b]=7\na=100\nb=200\n"
+              "echo \"$(( m3[a+b] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_nonlexable_key) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Keys with characters the arithmetic lexer rejects (., @, /) work,
+    /// because the subscript is captured raw and used verbatim -- full parity
+    /// with the plain ${m[foo.bar]} surface.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m4\nm4[foo.bar]=5\nm4[a@b]=3\nm4[a/b]=9\n"
+              "echo \"$(( m4[foo.bar] )) $(( m4[a@b] )) $(( m4[a/b] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5 3 9\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_numeric_key_literal) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A numeric-looking associative key is the literal string "10", NOT index
+    /// 10; m[0] and m[10] are distinct keys.
+    run_result_t r =
+        run_shell_with_executor(exec, "declare -A m5\nm5[10]=42\nm5[0]=99\n"
+                                      "echo \"$(( m5[10] )) $(( m5[0] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "42 99\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_negativelike_key_literal) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A negative-looking associative key is the literal string "-1", NOT a
+    /// from-end index (from-end resolution is indexed-only).
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m6\nm6[-1]=7\necho \"$(( m6[-1] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_missing_key_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A missing key reads 0 and is NOT created (no autovivification on read).
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m7\nm7[foo]=5\n"
+              "printf 'r=%s n=%s\\n' \"$(( m7[bar] ))\" \"${#m7[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "r=0 n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_expanded_key) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Layer-0 expands $k before the lexer, so m[$k] keys on the value of k.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A m8\nk=foo\nm8[foo]=5\necho \"$(( m8[$k] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_readonly_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A readonly associative array refuses an arithmetic element write with
+    /// the readonly diagnostic; the element is unchanged.
+    run_result_t r =
+        run_shell_with_executor(exec, "declare -Ar m9=([k]=v)\n(( m9[k]=9 ))\n"
+                                      "printf 'after=[%s]\\n' \"${m9[k]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_CONTAINS(r, "after=[v]");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_zsh_mode) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Associative keys are index-base-agnostic: the literal-key path is not
+    /// affected by the 1-indexed guard.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode zsh\ndeclare -A m10\nm10[foo]=5\necho \"$(( m10[foo] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_indexed_unaffected_by_lex_capture) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Regression: an indexed array still arithmetic-evaluates the (now
+    /// lex-captured) subscript, including an expression index, a nested
+    /// subscript, and single-evaluation of a[i++]++.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nai=(10 20 30)\nix=1\nprintf '%s %s\\n' "
+              "\"$(( ai[ix+1] ))\" \"$(( ai[ai[0]-8] ))\"\n"
+              "ac=(100)\nj=0\n(( ac[j++]++ ))\n"
+              "printf 'a0=%s j=%s\\n' \"${ac[0]}\" \"$j\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "30 30\na0=101 j=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_assoc_empty_key) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The empty string is a valid associative key in lush's value model (a
+    /// bare m[$k] with k="" stores and reads a value under it), so the
+    /// arithmetic surface reads that key consistently -- it is not an error.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -A me\nk=\nme[$k]=9\necho \"$(( me[$k] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "9\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_subscript_depth_capped) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A pathologically deep subscript nesting (a[a[a[...]]]) raises a clean
+    /// stack-overflow error and continues (the arithmetic error channel is
+    /// non-fatal), rather than crashing -- mirroring lush's recursive-variable
+    /// depth cap. This is a regression guard against a SIGSEGV.
+    char sub[2048];
+    size_t off = 0;
+    const int depth = 300; /// well past ARITH_MAX_SUBSCRIPT_DEPTH (128)
+    for (int i = 0; i < depth; i++) {
+        sub[off++] = 'a';
+        sub[off++] = '[';
+    }
+    sub[off++] = '0';
+    for (int i = 0; i < depth; i++) {
+        sub[off++] = ']';
+    }
+    sub[off] = '\0';
+    char script[4096];
+    snprintf(script, sizeof(script),
+             "ad=(0 1 2)\necho \"$(( %s ))\"\necho POST\n", sub);
+    run_result_t r = run_shell_with_executor(exec, script);
+    ASSERT_STDOUT_CONTAINS(r, "POST"); /// survived: no crash, error was clean
+    executor_free(exec);
+}
+
 TEST(rt_local_array_append_extends) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -7808,6 +7995,19 @@ int main(void) {
     RUN_TEST(rt_arith_neg_surface_consistency);
     RUN_TEST(rt_arith_neg_zsh_mode_still_rejected);
     RUN_TEST(rt_arith_neg_blast_radius_rematch);
+    RUN_TEST(rt_arith_assoc_literal_key);
+    RUN_TEST(rt_arith_assoc_compound_assign);
+    RUN_TEST(rt_arith_assoc_key_not_arithmetic);
+    RUN_TEST(rt_arith_assoc_nonlexable_key);
+    RUN_TEST(rt_arith_assoc_numeric_key_literal);
+    RUN_TEST(rt_arith_assoc_negativelike_key_literal);
+    RUN_TEST(rt_arith_assoc_missing_key_zero);
+    RUN_TEST(rt_arith_assoc_expanded_key);
+    RUN_TEST(rt_arith_assoc_readonly_refused);
+    RUN_TEST(rt_arith_assoc_zsh_mode);
+    RUN_TEST(rt_arith_indexed_unaffected_by_lex_capture);
+    RUN_TEST(rt_arith_assoc_empty_key);
+    RUN_TEST(rt_arith_subscript_depth_capped);
     RUN_TEST(rt_local_array_append_extends);
     RUN_TEST(rt_readonly_array_append_relaxed);
     RUN_TEST(rt_declare_array_append_readonly_refused);
