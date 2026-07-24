@@ -146,6 +146,38 @@ typedef struct lush_value_view {
 #define SYMTABLE_ERR_READONLY (-2)
 
 /**
+ * @brief Classification of an array-element/append write whose target is not
+ * currently an array (the create branch). Produced by
+ * symtable_scalar_promotion, consumed by the three promotion sites.
+ */
+typedef enum {
+    SCALAR_PROMO_NONE, ///< Unbound name: create a fresh array (no kind change)
+    SCALAR_PROMO_PRESERVE, ///< Existing scalar, relaxed mode: promote, keep the
+                           ///< scalar as the base element (non-lossy)
+    SCALAR_PROMO_REFUSE,   ///< Existing scalar, strict mode: refuse the re-kind
+} scalar_promo_t;
+
+/**
+ * @brief Classify a scalar->array kind transition for @p name (issue #621).
+ *
+ * Call only when the name is not currently bound as an array (the create
+ * branch). Returns SCALAR_PROMO_NONE for an unbound name (a fresh array is not
+ * a kind change); for an existing scalar, SCALAR_PROMO_REFUSE under strict
+ * value typing (lush mode) or SCALAR_PROMO_PRESERVE under a relaxed mode.
+ */
+scalar_promo_t symtable_scalar_promotion(const char *name);
+
+/**
+ * @brief Seed a freshly created empty indexed array with @p name's current
+ * scalar value at the base index, so promotion is non-lossy (issue #621).
+ *
+ * Must be called while @p name is still bound as a scalar (before the store
+ * that overwrites it). No-op unless @p array is a fresh, empty, indexed array
+ * and @p name currently reads as a scalar.
+ */
+void symtable_seed_promoted_scalar(const char *name, array_value_t *array);
+
+/**
  * @brief Apply SYMVAR_LOWERCASE / SYMVAR_UPPERCASE to a value
  *
  * If `flags` carries SYMVAR_LOWERCASE, returns a malloc'd lowercased

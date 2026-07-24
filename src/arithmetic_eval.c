@@ -301,13 +301,61 @@ static void lvalue_write(eval_ctx_t *ctx, const lvalue_t *lv, ssize_t value) {
 
     int rc;
     if (lv->kind == LVAL_ARRAY_INDEX) {
-        /// Array element (issue #603). The subscript was evaluated once by
-        /// eval_lvalue; symtable_set_array_element auto-creates an indexed
-        /// array on first write and applies the mode's index base. A subscript
-        /// out of the mode's valid range (e.g. negative in 0-indexed mode)
-        /// returns -1; report it rather than silently dropping the write.
         char subscript[32];
         snprintf(subscript, sizeof(subscript), "%zd", lv->index);
+
+        /// Readonly precedence (mirror the executor array-assignment paths,
+        /// #614/#620): a readonly array, or a readonly scalar being re-kinded,
+        /// is refused with the readonly diagnostic before the kind policy.
+        symvar_flags_t ro = symtable_array_get_flags(lv->name);
+        if (ctx->executor && ctx->executor->symtable) {
+            ro |= symtable_get_flags(ctx->executor->symtable, lv->name);
+        }
+        if (ro & SYMVAR_READONLY) {
+            char msg[96];
+            snprintf(msg, sizeof(msg),
+                     "cannot assign to readonly variable '%s'", lv->name);
+            eval_fail(ctx, SHELL_ERR_READONLY_VAR,
+                      "assigning in an arithmetic expression",
+                      "the variable is read-only and cannot be reassigned", msg,
+                      0);
+            return;
+        }
+
+        /// Scalar->array kind transition (#621) for the user `(( s[i]=v ))`
+        /// surface. Applied HERE, at the user surface -- not in the low-level
+        /// symtable_set_array_element, which shell-internal writers also use.
+        /// If the name is not yet an array, strict value typing (lush mode)
+        /// refuses the implicit re-kind (the §3.9 mirror); a relaxed mode
+        /// preserve-promotes, seeding the former scalar as the base element. An
+        /// unbound name is a fresh array with no kind change.
+        if (!symtable_get_array(lv->name)) {
+            scalar_promo_t promo = symtable_scalar_promotion(lv->name);
+            if (promo == SCALAR_PROMO_REFUSE) {
+                char msg[96];
+                snprintf(msg, sizeof(msg),
+                         "cannot apply an array subscript to scalar '%s'",
+                         lv->name);
+                eval_fail(
+                    ctx, SHELL_ERR_TYPE_MISMATCH, "assigning an array element",
+                    "declare it a list first (declare -a NAME) or unset it",
+                    msg, 0);
+                return;
+            }
+            if (promo == SCALAR_PROMO_PRESERVE) {
+                array_value_t *arr = symtable_array_create(false);
+                if (arr) {
+                    symtable_seed_promoted_scalar(lv->name, arr);
+                    symtable_assign_array(lv->name, arr);
+                }
+            }
+        }
+
+        /// Array element (issue #603). The subscript was evaluated once by
+        /// eval_lvalue; symtable_set_array_element applies the mode's index
+        /// base. A subscript out of the mode's valid range (e.g. negative in
+        /// 0-indexed mode) returns -1; report it rather than dropping the
+        /// write.
         rc = symtable_set_array_element(lv->name, subscript, buf);
         if (rc == -1) {
             char msg[96];

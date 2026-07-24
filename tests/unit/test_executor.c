@@ -2590,12 +2590,16 @@ TEST(rt_array_fn_scope_scalar_promotion) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
     /// A bare element write to an existing global SCALAR promotes it to an
-    /// array in the scope the scalar lives in (global), not the frame -- the
-    /// resolver finds the scalar binding and overwrites it in place.
+    /// array in the scope the scalar lives in (global), not the frame. Under
+    /// the #621 kind-transition policy this promotion is a relaxed-mode
+    /// behavior (lush mode refuses the implicit re-kind), so this runs in bash
+    /// mode: the former scalar is preserved as the base element (#621) and the
+    /// promoted array lands in the owning/global scope (#614).
     run_result_t r = run_shell_with_executor(
-        exec, "s614p=hello\nf(){ s614p[1]=7; }\nf\necho \"${s614p[1]}\"\n");
+        exec, "mode bash\ns614p=hello\nf(){ s614p[1]=7; }\nf\n"
+              "echo \"${s614p[0]}:${s614p[1]}\"\n");
     ASSERT_EXIT_STATUS(r, 0);
-    ASSERT_STDOUT_EQ(r, "7\n");
+    ASSERT_STDOUT_EQ(r, "hello:7\n");
     executor_free(exec);
 }
 
@@ -2837,6 +2841,329 @@ TEST(rt_unset_repeated_local_preserves_global) {
               "unset arr620d; }\nf\necho \"[${arr620d[*]}]\"\n");
     ASSERT_EXIT_STATUS(r2, 0);
     ASSERT_STDOUT_EQ(r2, "[x y z]\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
+ * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
+ * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
+ * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
+ * TYPING. Strict (lush mode) REFUSES the implicit re-kind; a relaxed mode
+ * (bash/zsh) PRESERVE-PROMOTEs, keeping the former scalar as the base element.
+ * An unbound name is a fresh array (no kind change); whole-assign replaces.
+ * POSIX has arrays disabled at the parser, so it never reaches these paths.
+ * Distinct names (process-global symbol table); index 1 keeps the array tests
+ * decoupled from lush's 0-index default where possible.
+ * ========================================================================== */
+
+// --- lush mode (strict): refuse the implicit re-kind ---
+
+TEST(rt_promote_lush_element_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nsp_a=hello\nsp_a[1]=7\necho POST\n");
+    ASSERT_TRUE(strstr(r.out, "POST") == NULL,
+                "execution aborted after the kind mismatch");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on kind mismatch");
+    char *v = symtable_get_var(exec->symtable, "sp_a");
+    ASSERT_STR_EQ(v, "hello", "scalar unchanged after refused re-kind");
+    free(v);
+    executor_free(exec);
+}
+
+TEST(rt_promote_lush_append_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nsp_b=hello\nsp_b+=(x)\necho POST\n");
+    ASSERT_TRUE(strstr(r.out, "POST") == NULL, "aborted after kind mismatch");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on kind mismatch");
+    char *v = symtable_get_var(exec->symtable, "sp_b");
+    ASSERT_STR_EQ(v, "hello", "scalar unchanged after refused append re-kind");
+    free(v);
+    executor_free(exec);
+}
+
+TEST(rt_promote_lush_arith_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The arithmetic writer reports the kind mismatch through the arithmetic
+    /// error channel (which fails the command but does not abort, like other
+    /// arith errors), leaving the scalar unchanged.
+    run_result_t r =
+        run_shell_with_executor(exec, "mode lush\nsp_c=hello\n(( sp_c[2]=9 "
+                                      "))\nprintf 's=[%s]\\n' \"$sp_c\"\n");
+    /// The arithmetic error channel renders "arithmetic: <message>" rather than
+    /// the executor's "type mismatch: <message>"; both share this phrase.
+    ASSERT_STDERR_CONTAINS(r, "cannot apply an array subscript");
+    ASSERT_STDOUT_CONTAINS(r, "s=[hello]");
+    executor_free(exec);
+}
+
+TEST(rt_promote_lush_unbound_creates_fresh) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: an UNBOUND name is not a kind change -- a fresh array is
+    /// created in all modes, no error.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nunset sp_d\nsp_d[1]=7\necho \"n=${#sp_d[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_lush_declared_array_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: an explicitly-declared array accepts element writes (no scalar
+    /// to re-kind).
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode lush\ndeclare -a sp_e\nsp_e[1]=7\necho \"n=${#sp_e[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_lush_whole_assign_replaces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: whole-array assignment is an explicit re-declaration, not an
+    /// implicit index/append re-kind -- it replaces, no error, in lush mode.
+    run_result_t r =
+        run_shell_with_executor(exec, "mode lush\nsp_f=hello\nsp_f=(a b)\necho "
+                                      "\"n=${#sp_f[@]} i0=${sp_f[0]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "n=2 i0=a\n");
+    executor_free(exec);
+}
+
+// --- bash mode (relaxed): preserve-promote ---
+
+TEST(rt_promote_bash_element) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_g=hello\nsp_g[1]=7\n"
+              "printf 'i0=[%s] i1=[%s] n=%s\\n' \"${sp_g[0]}\" \"${sp_g[1]}\" "
+              "\"${#sp_g[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hello] i1=[7] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_element_index0_overwrites) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// An explicit base-index write overwrites the seed (no stacking).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_h=hello\nsp_h[0]=7\n"
+              "printf 'i0=[%s] n=%s\\n' \"${sp_h[0]}\" \"${#sp_h[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[7] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_sparse) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_i=hello\nsp_i[5]=7\n"
+              "printf 'i0=[%s] i5=[%s] n=%s\\n' \"${sp_i[0]}\" \"${sp_i[5]}\" "
+              "\"${#sp_i[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hello] i5=[7] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_append) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_j=hello\nsp_j+=(x)\n"
+              "printf 'i0=[%s] i1=[%s] n=%s\\n' \"${sp_j[0]}\" \"${sp_j[1]}\" "
+              "\"${#sp_j[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hello] i1=[x] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_element_plus_equal_reads_seed) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Strongest check: s[0]+=x reads the seed BACK through the array API and
+    /// appends to it, proving the promoted value is retrievable.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_k=hello\nsp_k[0]+=x\n"
+              "printf 'i0=[%s] n=%s\\n' \"${sp_k[0]}\" \"${#sp_k[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hellox] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_empty_scalar_seeds) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A bound-but-empty scalar seeds "" at the base index (count parity).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_l=\nsp_l[1]=7\n"
+              "printf 'i0=[%s] i1=[%s] n=%s\\n' \"${sp_l[0]}\" \"${sp_l[1]}\" "
+              "\"${#sp_l[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[] i1=[7] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_arith) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_m=hello\n(( sp_m[2]=9 ))\n"
+              "printf 'i0=[%s] i2=[%s] n=%s\\n' \"${sp_m[0]}\" \"${sp_m[2]}\" "
+              "\"${#sp_m[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hello] i2=[9] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_negative_index) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The seed sets max_index=0, so s[-1] resolves to the base slot and
+    /// overwrites the seed.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_n=hi\nsp_n[-1]=7\n"
+              "printf 'i0=[%s] n=%s\\n' \"${sp_n[0]}\" \"${#sp_n[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[7] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_whole_replace_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: whole-assign replaces (seed must NOT leak to the shared store).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_o=hello\nsp_o=(a b)\n"
+              "printf 'i0=[%s] n=%s\\n' \"${sp_o[0]}\" \"${#sp_o[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[a] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_whole_empty_clears_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: s=() clears to n=0; the seed must not live in the shared store.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode bash\nsp_p=hello\nsp_p=()\nprintf 'n=%s\\n' \"${#sp_p[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "n=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_read_a_replaces_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: read -a has replace semantics; the seed must no-op (it clears
+    /// the name first), so a pre-existing scalar is not stacked in.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_q=hello\nread -a sp_q <<< \"a b\"\n"
+              "printf 'i0=[%s] n=%s\\n' \"${sp_q[0]}\" \"${#sp_q[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[a] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_rematch_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: BASH_REMATCH (a site-3 co-user) writes index 0 first, so a
+    /// pre-bound scalar is clobbered, not seeded -- no regression.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nBASH_REMATCH=hello\n[[ abcd =~ (b)(c) ]]\n"
+              "printf 'n=%s i0=[%s]\\n' \"${#BASH_REMATCH[@]}\" "
+              "\"${BASH_REMATCH[0]}\"\n");
+    ASSERT_STDOUT_EQ(r, "n=3 i0=[bc]\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_function_scope) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A global scalar promoted from inside a function (#614 resolver) reads
+    /// the seed from and lands in the same owning scope.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nsp_r=hello\nf(){ sp_r[1]=7; }\nf\n"
+              "printf 'i0=[%s] i1=[%s] n=%s\\n' \"${sp_r[0]}\" \"${sp_r[1]}\" "
+              "\"${#sp_r[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i0=[hello] i1=[7] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_bash_readonly_scalar_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Readonly precedence (#614/#620): a readonly scalar is refused with the
+    /// readonly diagnostic BEFORE the kind check; the scalar is unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nreadonly sp_s=hi\nsp_s[1]=7\nprintf 'after=[%s]\\n' "
+              "\"$sp_s\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_CONTAINS(r, "after=[hi]");
+    executor_free(exec);
+}
+
+// --- zsh mode (relaxed, lush kinds: preserve at base, NOT char-subst) ---
+
+TEST(rt_promote_zsh_index2_preserves_base) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// zsh mode is 1-indexed: user index 2 maps to internal 1, so the seed at
+    /// internal 0 (user index 1) survives -- preserve-at-base, not char-subst.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode zsh\nsp_t=hello\nsp_t[2]=7\n"
+              "printf 'i1=[%s] i2=[%s] n=%s\\n' \"${sp_t[1]}\" \"${sp_t[2]}\" "
+              "\"${#sp_t[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i1=[hello] i2=[7] n=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_zsh_index1_overwrites_base) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// zsh mode: user index 1 IS the base slot, so the write overwrites the
+    /// seed (n=1).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode zsh\nsp_u=hello\nsp_u[1]=7\n"
+              "printf 'i1=[%s] n=%s\\n' \"${sp_u[1]}\" \"${#sp_u[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "i1=[7] n=1\n");
+    executor_free(exec);
+}
+
+// --- policy is confined to the user surfaces (internal writers bypass it) ---
+
+TEST(rt_promote_strict_rematch_no_regress) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Shell-internal special-array writers (BASH_REMATCH, coproc, mapfile) go
+    /// through the low-level element primitive, which does NOT apply the user
+    /// kind policy -- so a regex match onto a name that currently holds a
+    /// scalar still replaces it, even in lush (strict) mode. The policy governs
+    /// only the user s[i]= / s+=(...) / (( s[i]=v )) surfaces.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nBASH_REMATCH=foo\n[[ abcd =~ (a)(bc) ]]\n"
+              "printf '0=%s 1=%s n=%s\\n' \"${BASH_REMATCH[0]}\" "
+              "\"${BASH_REMATCH[1]}\" \"${#BASH_REMATCH[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "0=abc 1=a n=3\n");
+    executor_free(exec);
+}
+
+TEST(rt_promote_readonly_arith_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Readonly precedence on the arithmetic writer: a readonly scalar re-kind
+    /// is refused with the readonly diagnostic (E1117), NOT the kind error, and
+    /// the scalar is unchanged. Non-fatal (arith error channel), so the
+    /// following command runs.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nreadonly sp_rr=5\n(( sp_rr[0]=9 ))\n"
+              "printf 'r=[%s]\\n' \"$sp_rr\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_CONTAINS(r, "r=[5]");
     executor_free(exec);
 }
 
@@ -7356,6 +7683,30 @@ int main(void) {
     RUN_TEST(rt_unset_local_global_survives);
     RUN_TEST(rt_unset_nonexistent_ok);
     RUN_TEST(rt_unset_repeated_local_preserves_global);
+    RUN_TEST(rt_promote_lush_element_refused);
+    RUN_TEST(rt_promote_lush_append_refused);
+    RUN_TEST(rt_promote_lush_arith_refused);
+    RUN_TEST(rt_promote_lush_unbound_creates_fresh);
+    RUN_TEST(rt_promote_lush_declared_array_ok);
+    RUN_TEST(rt_promote_lush_whole_assign_replaces);
+    RUN_TEST(rt_promote_bash_element);
+    RUN_TEST(rt_promote_bash_element_index0_overwrites);
+    RUN_TEST(rt_promote_bash_sparse);
+    RUN_TEST(rt_promote_bash_append);
+    RUN_TEST(rt_promote_bash_element_plus_equal_reads_seed);
+    RUN_TEST(rt_promote_bash_empty_scalar_seeds);
+    RUN_TEST(rt_promote_bash_arith);
+    RUN_TEST(rt_promote_bash_negative_index);
+    RUN_TEST(rt_promote_bash_whole_replace_control);
+    RUN_TEST(rt_promote_bash_whole_empty_clears_control);
+    RUN_TEST(rt_promote_bash_read_a_replaces_control);
+    RUN_TEST(rt_promote_bash_rematch_control);
+    RUN_TEST(rt_promote_bash_function_scope);
+    RUN_TEST(rt_promote_bash_readonly_scalar_refused);
+    RUN_TEST(rt_promote_zsh_index2_preserves_base);
+    RUN_TEST(rt_promote_zsh_index1_overwrites_base);
+    RUN_TEST(rt_promote_strict_rematch_no_regress);
+    RUN_TEST(rt_promote_readonly_arith_refused);
     RUN_TEST(rt_local_array_append_extends);
     RUN_TEST(rt_readonly_array_append_relaxed);
     RUN_TEST(rt_declare_array_append_readonly_refused);

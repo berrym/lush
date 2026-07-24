@@ -3397,6 +3397,46 @@ void lush_value_view_clear(lush_value_view_t *view) {
     view->kind = LUSH_VALUE_NONE;
 }
 
+/*
+ * Classify a scalar->array kind transition (issue #621). Contract in
+ * symtable.h. Call only in a create branch (name not currently an array).
+ * symtable_get_var returns the scalar value for a scalar binding and NULL for
+ * an array or unbound name (find_var skips UNSET tombstones), so a non-NULL
+ * result means "an existing scalar is being re-kinded": refuse it under strict
+ * value typing (lush mode), otherwise preserve-promote.
+ */
+scalar_promo_t symtable_scalar_promotion(const char *name) {
+    char *v = symtable_get_var(symtable_manager(), name);
+    if (!v) {
+        return SCALAR_PROMO_NONE;
+    }
+    free(v);
+    return shell_mode_allows(FEATURE_STRICT_VALUE_TYPING)
+               ? SCALAR_PROMO_REFUSE
+               : SCALAR_PROMO_PRESERVE;
+}
+
+/*
+ * Seed a fresh empty indexed array with the name's current scalar value at the
+ * base index (issue #621). Contract in symtable.h. Self-guards to a no-op for
+ * an associative or non-empty array and for a name that does not currently read
+ * as a scalar. Uses internal index 0 (the base slot in every mode: user index 0
+ * in lush/bash/posix, user index 1 in zsh mode); an explicit write to the base
+ * index then overwrites the seed. symtable_get_var returns an independent copy
+ * and symtable_array_set_index copies again, so there is no aliasing with the
+ * scalar's ht-owned bytes (which are freed only later by the store).
+ */
+void symtable_seed_promoted_scalar(const char *name, array_value_t *array) {
+    if (!array || array->is_associative || array->count != 0) {
+        return;
+    }
+    char *v = symtable_get_var(symtable_manager(), name);
+    if (v) {
+        symtable_array_set_index(array, 0, v);
+        free(v);
+    }
+}
+
 /**
  * @brief Set an array element using shell syntax
  *
@@ -3423,8 +3463,12 @@ int symtable_set_array_element(const char *name, const char *subscript,
         /// Create new indexed array. Resolve scope like a bare assignment
         /// (#614): a fresh element write inside a function must create the
         /// array in the enclosing/global scope, not the transient function
-        /// frame, exactly as an unprefixed scalar assignment does. This also
-        /// covers the arithmetic element writer `(( a[i]=v ))`.
+        /// frame, exactly as an unprefixed scalar assignment does. This is a
+        /// low-level primitive shared by shell-internal array writers
+        /// (BASH_REMATCH, coproc, mapfile) and the user element API, so the
+        /// scalar->array kind policy (#621) is NOT applied here -- it lives at
+        /// the user surfaces (execute_array_assignment / execute_array_append
+        /// and the arithmetic writer), which classify and seed before creating.
         array = symtable_array_create(false);
         if (!array) {
             return -1;
