@@ -2735,6 +2735,111 @@ TEST(rt_array_fn_scope_read_a_readonly_refused) {
     executor_free(exec);
 }
 
+/* ==========================================================================
+ * #620: `unset` inside a function must honor the scope that owns the binding.
+ * Previously it freed a parent-owned array while stamping the UNSET tombstone
+ * into the function frame, leaving the owning scope's serialized entry
+ * dangling -- a use-after-free on the next read (the array cases here would
+ * SIGABRT under ASan). Fixed by resolving the owning scope for both the free
+ * and the tombstone. Distinct names (process-global symbol table).
+ * ========================================================================== */
+
+TEST(rt_unset_array_from_fn_no_uaf) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The regression case: unset a global array from a function, then read it
+    /// -- must unset the global (0) and NOT use-after-free (caught under ASan).
+    run_result_t r = run_shell_with_executor(
+        exec, "arr620=(g1 g2 g3)\nf(){ unset arr620; }\nf\n"
+              "echo \"n=${#arr620[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "n=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_scalar_from_fn_unsets_global) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "x620=v\nf(){ unset x620; }\nf\necho \"[${x620-UNSET}]\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[UNSET]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_then_reassign_from_fn) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// After unsetting the global from a function, a bare reassignment resolves
+    /// back to the global (the tombstone lives in the owning scope now).
+    run_result_t r = run_shell_with_executor(
+        exec, "s620=hi\nf(){ unset s620; s620=bye; }\nf\necho \"$s620\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "bye\n");
+    executor_free(exec);
+}
+
+TEST(rt_mapfile_from_fn_persists) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// mapfile unsets the target first; with the owning-scope fix that unset no
+    /// longer mis-plants a tombstone in the frame, so the created array reaches
+    /// the enclosing/global scope.
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ mapfile -t m620 < <(printf 'a\\nb\\nc\\n'); "
+              "echo \"in=${#m620[@]}\"; }\nf\necho \"out=${#m620[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "in=3\nout=3\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_local_global_survives) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: unsetting a LOCAL array does not touch the global binding
+    /// (the free/tombstone target the function scope, which pops).
+    run_result_t r = run_shell_with_executor(
+        exec, "arr620s=(x y z)\nf(){ local -a arr620s=(1 2); unset arr620s; }\n"
+              "f\necho \"${arr620s[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "x y z\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_nonexistent_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: unsetting an unbound name is a silent no-op success and does
+    /// not plant a spurious tombstone.
+    run_result_t r =
+        run_shell_with_executor(exec, "unset NEVERSET620\necho \"rc=$?\"\n");
+    ASSERT_STDOUT_EQ(r, "rc=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_repeated_local_preserves_global) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A repeated `unset` of a locally-shadowed name must NOT reach through the
+    /// local tombstone and destroy the outer/global binding: the second unset
+    /// is a no-op (bash/zsh consensus). Scalar and array forms.
+    run_result_t r = run_shell_with_executor(
+        exec, "g620d=CFG\nf(){ local g620d=L; unset g620d; unset g620d; }\nf\n"
+              "echo \"[${g620d-U}]\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[CFG]\n");
+    executor_free(exec);
+
+    exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r2 = run_shell_with_executor(
+        exec, "arr620d=(x y z)\nf(){ local -a arr620d=(1 2); unset arr620d; "
+              "unset arr620d; }\nf\necho \"[${arr620d[*]}]\"\n");
+    ASSERT_EXIT_STATUS(r2, 0);
+    ASSERT_STDOUT_EQ(r2, "[x y z]\n");
+    executor_free(exec);
+}
+
 TEST(rt_local_array_append_extends) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -7244,6 +7349,13 @@ int main(void) {
     RUN_TEST(rt_array_fn_scope_readonly_scalar_element_refused);
     RUN_TEST(rt_array_fn_scope_readonly_array_append_refused);
     RUN_TEST(rt_array_fn_scope_read_a_readonly_refused);
+    RUN_TEST(rt_unset_array_from_fn_no_uaf);
+    RUN_TEST(rt_unset_scalar_from_fn_unsets_global);
+    RUN_TEST(rt_unset_then_reassign_from_fn);
+    RUN_TEST(rt_mapfile_from_fn_persists);
+    RUN_TEST(rt_unset_local_global_survives);
+    RUN_TEST(rt_unset_nonexistent_ok);
+    RUN_TEST(rt_unset_repeated_local_preserves_global);
     RUN_TEST(rt_local_array_append_extends);
     RUN_TEST(rt_readonly_array_append_relaxed);
     RUN_TEST(rt_declare_array_append_readonly_refused);
