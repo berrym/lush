@@ -124,7 +124,7 @@ static int lbp(arith_token_kind_t k) {
         return 14;
     case ATK_INC:
     case ATK_DEC:
-    case ATK_LBRACKET:
+    case ATK_SUBSCRIPT:
         return 16;
     default:
         return 0;
@@ -174,6 +174,7 @@ void arith_ast_free(arith_ast_t *node) {
     arith_ast_free(node->b);
     arith_ast_free(node->c);
     free(node->name);
+    free(node->index_raw);
     free(node);
 }
 
@@ -316,8 +317,11 @@ static arith_ast_t *led(ap_t *p, arith_ast_t *left) {
         return n;
     }
 
-    /// Array subscript: name '[' index ']'.
-    if (k == ATK_LBRACKET) {
+    /// Array subscript: name ATK_SUBSCRIPT. The lexer captured the whole
+    /// `[...]` interior as raw text (issue #615); the evaluator interprets it
+    /// per the array's kind (literal key for associative, arithmetic for
+    /// indexed), so the parser only records it -- it never parses the interior.
+    if (k == ATK_SUBSCRIPT) {
         if (left->kind != AST_VAR) {
             arith_ast_free(left);
             return parse_fail(p, SHELL_ERR_ARITHMETIC_SYNTAX,
@@ -325,25 +329,17 @@ static arith_ast_t *led(ap_t *p, arith_ast_t *left) {
                               "a subscript applies to an array name",
                               "invalid subscript target", pos, t->len);
         }
-        advance(p);
-        arith_ast_t *index = parse_expr(p, 0);
-        if (!index) {
+        char *raw = strdup(t->text ? t->text : "");
+        if (!raw) {
             arith_ast_free(left);
-            return NULL;
+            return parse_fail(p, SHELL_ERR_OUT_OF_MEMORY,
+                              "parsing an array subscript", "out of memory",
+                              "memory allocation failed", pos, 1);
         }
-        if (cur_kind(p) != ATK_RBRACKET) {
-            arith_ast_free(left);
-            arith_ast_free(index);
-            return parse_fail(p, SHELL_ERR_ARITHMETIC_SYNTAX,
-                              "parsing an array subscript",
-                              "every '[' needs a matching ']'", "expected ']'",
-                              cur(p)->pos, cur(p)->len);
-        }
-        advance(p);
         arith_ast_t *n = new_node(AST_INDEX, left->pos);
         if (!n) {
+            free(raw);
             arith_ast_free(left);
-            arith_ast_free(index);
             return parse_fail(p, SHELL_ERR_OUT_OF_MEMORY,
                               "parsing an array subscript", "out of memory",
                               "memory allocation failed", pos, 1);
@@ -351,7 +347,8 @@ static arith_ast_t *led(ap_t *p, arith_ast_t *left) {
         n->name = left->name; /// transfer ownership of the array name
         left->name = NULL;
         arith_ast_free(left);
-        n->a = index;
+        n->index_raw = raw;
+        advance(p); /// consume the ATK_SUBSCRIPT token
         return n;
     }
 
@@ -611,10 +608,10 @@ static void sx_write(const arith_ast_t *n, char *buf, size_t bufsize,
         sx_append(buf, bufsize, off, "%s", n->name ? n->name : "<noname>");
         break;
     case AST_INDEX:
-        sx_append(buf, bufsize, off, "(index %s ",
-                  n->name ? n->name : "<noname>");
-        sx_write(n->a, buf, bufsize, off);
-        sx_append(buf, bufsize, off, ")");
+        /// The subscript is raw text (lex-captured, #615), not a sub-AST.
+        sx_append(buf, bufsize, off, "(index %s [%s])",
+                  n->name ? n->name : "<noname>",
+                  n->index_raw ? n->index_raw : "");
         break;
     case AST_UNOP:
         sx_append(buf, bufsize, off, "(%s ", op_sym(n->op));

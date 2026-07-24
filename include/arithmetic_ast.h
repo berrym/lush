@@ -37,10 +37,13 @@ typedef enum {
     ATK_NUM,     ///< Integer literal; value in arith_token_t.num
     ATK_IDENT,   ///< Bare identifier; name in arith_token_t.text
 
-    ATK_LPAREN,   ///< (
-    ATK_RPAREN,   ///< )
-    ATK_LBRACKET, ///< [
-    ATK_RBRACKET, ///< ]
+    ATK_LPAREN,    ///< (
+    ATK_RPAREN,    ///< )
+    ATK_LBRACKET,  ///< [ (retained for a stray-']' error; a real subscript is
+                   ///< captured whole as ATK_SUBSCRIPT)
+    ATK_RBRACKET,  ///< ]
+    ATK_SUBSCRIPT, ///< A whole `[...]` array subscript; the raw interior text
+                   ///< (never lexed as arithmetic) is in arith_token_t.text
 
     ATK_PLUS,    ///< +
     ATK_MINUS,   ///< -
@@ -150,6 +153,7 @@ typedef enum {
 typedef enum {
     LVAL_SCALAR,      ///< A scalar variable
     LVAL_ARRAY_INDEX, ///< An indexed array element (name + resolved index)
+    LVAL_ASSOC_KEY,   ///< An associative array element (name + literal key)
 } lvalue_kind_t;
 
 /**
@@ -160,6 +164,10 @@ typedef struct arith_ast {
     arith_token_kind_t op; ///< Operator token (AST_UNOP/AST_BINOP/AST_ASSIGN)
     long num;              ///< Integer value (AST_NUM)
     char *name;            ///< Owned variable name (AST_VAR/AST_INDEX)
+    char *index_raw;       ///< Owned raw subscript text (AST_INDEX only): the
+                           ///< literal `[...]` interior, arithmetic-evaluated
+                           ///< for an indexed array and used as a literal key
+                           ///< for an associative array (issue #615)
     struct arith_ast *a;   ///< First child / lvalue / condition
     struct arith_ast *b;   ///< Second child / rhs / then-branch
     struct arith_ast *c;   ///< Third child / else-branch (AST_TERNARY)

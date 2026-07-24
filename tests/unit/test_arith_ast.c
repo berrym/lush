@@ -219,18 +219,25 @@ TEST(parse_compound_assign) {
 
 TEST(parse_subscript) {
     char s[256];
+    /// The subscript is captured whole and raw by the lexer (issue #615), so an
+    /// index node carries the literal `[...]` interior text, not a parsed
+    /// sub-AST -- the evaluator interprets it per the array's kind.
     ASSERT_TRUE(parse_sexpr("a[0]", s, sizeof(s)) &&
-                    strcmp(s, "(index a 0)") == 0,
+                    strcmp(s, "(index a [0])") == 0,
                 "simple subscript");
     ASSERT_TRUE(parse_sexpr("a[i + 1] = 9", s, sizeof(s)) &&
-                    strcmp(s, "(= (index a (+ i 1)) 9)") == 0,
-                "subscript is an lvalue with an expression index");
+                    strcmp(s, "(= (index a [i + 1]) 9)") == 0,
+                "subscript is an lvalue with a raw index");
     ASSERT_TRUE(parse_sexpr("a[b[0]]", s, sizeof(s)) &&
-                    strcmp(s, "(index a (index b 0))") == 0,
-                "nested subscript is a nested index node");
+                    strcmp(s, "(index a [b[0]])") == 0,
+                "nested subscript is captured whole (raw text)");
     ASSERT_TRUE(parse_sexpr("a[i]++", s, sizeof(s)) &&
-                    strcmp(s, "(post++ (index a i))") == 0,
+                    strcmp(s, "(post++ (index a [i]))") == 0,
                 "an array element is a postfix-increment target");
+    /// A non-arithmetic associative key survives lex-capture unchanged.
+    ASSERT_TRUE(parse_sexpr("m[foo.bar]", s, sizeof(s)) &&
+                    strcmp(s, "(index m [foo.bar])") == 0,
+                "a non-arithmetic key is captured as raw text");
 }
 
 /* ==========================================================================
