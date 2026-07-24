@@ -117,7 +117,8 @@ int bin_readonly(int argc, char **argv) {
                 const char *literal = name_end ? name_end + 1 : NULL;
                 if (builtin_bind_array_literal(namebuf, literal,
                                                /*assoc=*/false, SYMVAR_READONLY,
-                                               array_append) != 0) {
+                                               array_append,
+                                               /*global=*/false) != 0) {
                     return 1;
                 }
                 continue;

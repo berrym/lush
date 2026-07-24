@@ -497,7 +497,23 @@ int bin_read(int argc, char **argv) {
             }
         }
 
-        symtable_set_array(array_name, array);
+        /// An unprefixed `read -a arr` resolves scope like a bare assignment
+        /// (#614): inside a function it persists to the enclosing/global scope.
+        /// Unlike the executor array-assignment paths there is no up-front
+        /// readonly guard here, so surface the resolver's readonly refusal with
+        /// a targeted diagnostic rather than silently overwriting or no-oping.
+        int store_rc = symtable_assign_array(array_name, array);
+        if (store_rc != 0) {
+            if (store_rc == SYMTABLE_ERR_READONLY) {
+                executor_error_report(current_executor, SHELL_ERR_READONLY_VAR,
+                                      builtin_get_source_location(),
+                                      "%s: readonly variable", array_name);
+            }
+            symtable_array_free(array);
+            free(ifs_val);
+            free(line);
+            return 1;
+        }
         free(ifs_val);
         if (line) {
             free(line);

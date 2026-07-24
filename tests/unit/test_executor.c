@@ -2511,6 +2511,230 @@ TEST(rt_declare_array_plain_assign_replaces) {
     executor_free(exec);
 }
 
+/* ==========================================================================
+ * #614: a bare / declare -g array assignment inside a function resolves scope
+ * the same way a scalar assignment does -- an existing outer binding is
+ * updated in place, an undeclared name persists to the enclosing/global scope
+ * (not the function frame), and `local -a` still stays local. Distinct array
+ * names per test because the symbol table is process-global here. Element
+ * cases use index 1 so the scope behavior is independent of the array's
+ * 0-vs-1 index base. Verified identical in bash 5.3 and zsh 5.9.
+ * ========================================================================== */
+
+TEST(rt_array_fn_scope_bare_whole) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ s614a=(x y z); }\nf\necho \"${s614a[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "x y z\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_bare_element) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ s614b[1]=7; }\nf\necho \"${s614b[1]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_bare_append) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ s614c+=(x y); }\nf\necho \"${s614c[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "x y\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_arith_element) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The arithmetic element writer (( a[i]=v )) routes through the same
+    /// element-create path, so it must persist to global too.
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ (( s614d[1] = 5 )); }\nf\necho \"${s614d[1]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_declare_g_indexed) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// declare -g -a forces the array global; the later element write finds it.
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ declare -g -a s614g; s614g[1]=7; }\nf\n"
+              "echo \"${s614g[1]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_declare_g_assoc) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ declare -gA s614h; s614h[k]=v; }\nf\n"
+              "echo \"${s614h[k]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "v\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_scalar_promotion) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A bare element write to an existing global SCALAR promotes it to an
+    /// array in the scope the scalar lives in (global), not the frame -- the
+    /// resolver finds the scalar binding and overwrites it in place.
+    run_result_t r = run_shell_with_executor(
+        exec, "s614p=hello\nf(){ s614p[1]=7; }\nf\necho \"${s614p[1]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "7\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_whole_replace_global) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "s614r=(x y z)\nf(){ s614r=(P Q); }\nf\necho \"${s614r[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "P Q\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_nested_outer_local) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The load-bearing resolver case: a bare array assignment in an INNER
+    /// function updates the OUTER function's local (dynamic scope), it does
+    /// NOT fall through to global. A naive current-scope-miss-to-global fix
+    /// would wrongly create a global here. Mirrors the scalar resolver.
+    run_result_t r = run_shell_with_executor(
+        exec, "inner(){ s614n=(P Q); }\n"
+              "g(){ local -a s614n; s614n=(init); inner; "
+              "echo \"outer:${s614n[*]}\"; }\n"
+              "g\necho \"global-n:${#s614n[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "outer:P Q\nglobal-n:0\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_scalar_control_unchanged) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: the scalar path is untouched -- a bare scalar assignment in a
+    /// function still persists to global exactly as before.
+    run_result_t r = run_shell_with_executor(
+        exec, "f(){ s614s=hi; }\nf\necho \"${s614s}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "hi\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_local_stays_local) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: an explicit `local -a` (no -g) still stays frame-local and is
+    /// gone after the function returns.
+    run_result_t r =
+        run_shell_with_executor(exec, "f(){ local -a s614l; s614l[1]=7; }\nf\n"
+                                      "echo \"n:${#s614l[@]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "n:0\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_inplace_mutation) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: mutating a PRE-EXISTING global array in place from a function
+    /// still persists (read side already walked the chain; unchanged).
+    run_result_t r = run_shell_with_executor(
+        exec, "s614m=(x y z)\nf(){ s614m[2]=CHG; }\nf\necho \"${s614m[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "x y CHG\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_local_shadow_not_clobbered) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: a `local -a` shadow of a global array keeps element writes
+    /// local; the global is not clobbered (proves the shadow/double-free
+    /// protection in symtable_set_array is preserved at the owning scope).
+    run_result_t r = run_shell_with_executor(
+        exec, "s614q=(x y z)\nf(){ local -a s614q; s614q[1]=Z; }\nf\n"
+              "echo \"${s614q[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "x y z\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_readonly_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// No-regression: reassigning a readonly array from a function is still
+    /// refused (up-front guard), the array is unchanged, and the resolver's
+    /// chain readonly check does not weaken this.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -ar s614ro=(x y z)\nf(){ s614ro=(P Q); }\nf\n"
+              "echo \"${s614ro[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "x y z\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_readonly_scalar_not_clobbered) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The resolver must not let a bare array assignment in a function clobber
+    /// a readonly SCALAR in an enclosing scope (its readonly bit is in the
+    /// symvar flags, not array->flags). Whole-replace form.
+    run_result_t r = run_shell_with_executor(
+        exec, "readonly s614rs=5\nf(){ s614rs=(9 9); }\nf\necho \"$s614rs\"\n");
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_readonly_scalar_element_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Element-write form of the same: readonly scalar is not promoted.
+    run_result_t r = run_shell_with_executor(
+        exec, "readonly s614re=5\nf(){ s614re[0]=9; }\nf\necho \"$s614re\"\n");
+    ASSERT_STDOUT_EQ(r, "5\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_readonly_array_append_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A bare `arr+=(...)` onto a readonly array is refused (the append path
+    /// gained an up-front readonly guard); the array is unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -ar s614ra=(x y)\ns614ra+=(z)\necho \"${s614ra[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "x y\n");
+    executor_free(exec);
+}
+
+TEST(rt_array_fn_scope_read_a_readonly_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// `read -a` onto a readonly array is refused via the resolver's readonly
+    /// return surfaced by bin_read's targeted diagnostic; array unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "declare -ar s614rr=(1 2)\nread -a s614rr <<< \"p q\"\n"
+              "echo \"${s614rr[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "1 2\n");
+    executor_free(exec);
+}
+
 TEST(rt_local_array_append_extends) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -7002,6 +7226,24 @@ int main(void) {
     RUN_TEST(rt_declare_array_append_extends);
     RUN_TEST(rt_declare_array_append_to_absent_creates);
     RUN_TEST(rt_declare_array_plain_assign_replaces);
+    RUN_TEST(rt_array_fn_scope_bare_whole);
+    RUN_TEST(rt_array_fn_scope_bare_element);
+    RUN_TEST(rt_array_fn_scope_bare_append);
+    RUN_TEST(rt_array_fn_scope_arith_element);
+    RUN_TEST(rt_array_fn_scope_declare_g_indexed);
+    RUN_TEST(rt_array_fn_scope_declare_g_assoc);
+    RUN_TEST(rt_array_fn_scope_scalar_promotion);
+    RUN_TEST(rt_array_fn_scope_whole_replace_global);
+    RUN_TEST(rt_array_fn_scope_nested_outer_local);
+    RUN_TEST(rt_array_fn_scope_scalar_control_unchanged);
+    RUN_TEST(rt_array_fn_scope_local_stays_local);
+    RUN_TEST(rt_array_fn_scope_inplace_mutation);
+    RUN_TEST(rt_array_fn_scope_local_shadow_not_clobbered);
+    RUN_TEST(rt_array_fn_scope_readonly_refused);
+    RUN_TEST(rt_array_fn_scope_readonly_scalar_not_clobbered);
+    RUN_TEST(rt_array_fn_scope_readonly_scalar_element_refused);
+    RUN_TEST(rt_array_fn_scope_readonly_array_append_refused);
+    RUN_TEST(rt_array_fn_scope_read_a_readonly_refused);
     RUN_TEST(rt_local_array_append_extends);
     RUN_TEST(rt_readonly_array_append_relaxed);
     RUN_TEST(rt_declare_array_append_readonly_refused);

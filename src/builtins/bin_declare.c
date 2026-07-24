@@ -440,7 +440,8 @@ int bin_declare(int argc, char **argv) {
                 array_flags |= SYMVAR_EXPORTED;
             }
             if (builtin_bind_array_literal(name, value, opt_assoc_array,
-                                           array_flags, array_append) != 0) {
+                                           array_flags, array_append,
+                                           opt_global) != 0) {
                 free(name);
                 return 1;
             }

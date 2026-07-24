@@ -340,7 +340,8 @@ bool builtin_array_name_is_append(char *name) {
 }
 
 int builtin_bind_array_literal(const char *name, const char *literal,
-                               bool assoc, symvar_flags_t flags, bool append) {
+                               bool assoc, symvar_flags_t flags, bool append,
+                               bool global) {
     /// Refuse to mutate an existing readonly array, for both the append and
     /// the replace forms -- bash rejects `declare a=(...)` and `a+=(...)` on a
     /// readonly `a`. symtable_array_get_flags returns SYMVAR_NONE when no
@@ -429,12 +430,21 @@ int builtin_bind_array_literal(const char *name, const char *literal,
         }
     }
 
-    if (new_array && symtable_set_array(name, arr) != 0) {
-        executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
-                              builtin_get_source_location(),
-                              "failed to store array");
-        symtable_array_free(arr);
-        return 1;
+    /// `declare -g`/`typeset -g` forces the array into the global scope;
+    /// without -g a `declare -a`/`local -a` inside a function stays in the
+    /// current (function) scope, matching bash (#614). A bare `a=(...)` does
+    /// not reach this builtin -- it goes through execute_array_assignment,
+    /// which resolves scope via symtable_assign_array.
+    if (new_array) {
+        int rc = global ? symtable_set_array_global(name, arr)
+                        : symtable_set_array(name, arr);
+        if (rc != 0) {
+            executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                  builtin_get_source_location(),
+                                  "failed to store array");
+            symtable_array_free(arr);
+            return 1;
+        }
     }
 
     if (flags != SYMVAR_NONE) {

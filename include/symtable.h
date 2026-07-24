@@ -1358,13 +1358,45 @@ char *symtable_array_expand(array_value_t *array, const char *sep);
 /// Array Variable Management
 
 /**
- * @brief Set a variable as an array
+ * @brief Set a variable as an array in the CURRENT scope.
+ *
+ * Low-level current-scope writer (the array analog of symtable_set_var). Use
+ * for explicit-scope writes (`local -a` / `declare -a` without -g, typed-
+ * function parameter binding) and internal specials (PIPESTATUS). For an
+ * unprefixed user assignment use symtable_assign_array so the write resolves
+ * to the owning/global scope.
  *
  * @param name Variable name
  * @param array Array value (ownership transferred)
  * @return 0 on success, -1 on error
  */
 int symtable_set_array(const char *name, array_value_t *array);
+
+/**
+ * @brief Force-write an array binding into the GLOBAL scope.
+ *
+ * Array analog of symtable_set_global_var: used by the `declare -g` array path
+ * and by symtable_assign_array's miss-fallback.
+ *
+ * @param name Variable name
+ * @param array Array value (ownership transferred)
+ * @return 0 on success, -1 on error
+ */
+int symtable_set_array_global(const char *name, array_value_t *array);
+
+/**
+ * @brief Resolve the scope for a bare (unprefixed) array assignment (#614).
+ *
+ * Array analog of symtable_assign_var: walk the scope chain, update the owning
+ * scope in place if the name is already bound (nearest wins), otherwise create
+ * in the global scope. Enforces readonly across the chain via array->flags.
+ *
+ * @param name Variable name
+ * @param array Array value (ownership transferred)
+ * @return 0 on success, -1 on error, SYMTABLE_ERR_READONLY if a bound array in
+ *         the chain is readonly
+ */
+int symtable_assign_array(const char *name, array_value_t *array);
 
 /**
  * @brief Get an array variable
