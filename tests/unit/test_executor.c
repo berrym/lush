@@ -3167,6 +3167,100 @@ TEST(rt_promote_readonly_arith_refused) {
     executor_free(exec);
 }
 
+/* ==========================================================================
+ * #616: negative array subscripts in arithmetic. The arith engine evaluates
+ * a[-1] to -1; the symtable element wrappers previously rejected a negative
+ * in 0-indexed mode before the from-end-aware index primitives. With the
+ * rejection removed, the arithmetic surface resolves negatives from the end,
+ * consistent with lush's own ${a[-1]} and plain a[-1]=v surfaces (and the
+ * bash/zsh consensus). zsh 1-indexed mode still rejects native negatives.
+ * ========================================================================== */
+
+TEST(rt_arith_neg_read_in_range) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "an1=(10 20 30)\nprintf '%s %s\\n' \"$(( an1[-1] ))\" "
+              "\"$(( an1[-2] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "30 20\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_write_in_range) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "an2=(10 20 30)\n(( an2[-1]=99 ))\necho \"${an2[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "10 20 99\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_compound_and_incr) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// compound += and post-increment both fold through lvalue_read+write on
+    /// the resolved-once negative subscript.
+    run_result_t r = run_shell_with_executor(
+        exec, "an3=(10 20 30)\n(( an3[-1]+=5 ))\necho \"${an3[*]}\"\n"
+              "an4=(10 20 30)\nr=$(( an4[-1]++ ))\necho \"$r ${an4[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "10 20 35\n30 10 20 31\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_oob_read_zero) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// An out-of-range negative reads 0, matching lush's unset-element model
+    /// and the plain ${a[-9]} surface (both empty/0).
+    run_result_t r = run_shell_with_executor(
+        exec, "an5=(10 20 30)\nprintf 'a=%s b=[%s]\\n' \"$(( an5[-9] ))\" "
+              "\"${an5[-9]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "a=0 b=[]\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_surface_consistency) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A plain negative write is read back by the arithmetic surface: the two
+    /// surfaces agree.
+    run_result_t r = run_shell_with_executor(
+        exec, "an6=(10 20 30)\nan6[-1]=77\necho \"$(( an6[-1] ))\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "77\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_zsh_mode_still_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Scope boundary / no regression: zsh 1-indexed mode still rejects a
+    /// native negative subscript (the retained zsh guard), matching the plain
+    /// executor path.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode zsh\nan7=(10 20 30)\n(( an7[-1]=1 ))\necho POST\n");
+    ASSERT_STDERR_CONTAINS(r, "out of range");
+    ASSERT_STDOUT_CONTAINS(r, "POST");
+    executor_free(exec);
+}
+
+TEST(rt_arith_neg_blast_radius_rematch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Blast-radius control: a non-negative wrapper caller (BASH_REMATCH) is
+    /// unaffected by removing the negative-rejection branch.
+    run_result_t r = run_shell_with_executor(
+        exec, "[[ abcd =~ (b)(c) ]]\n"
+              "echo \"${BASH_REMATCH[1]}${BASH_REMATCH[2]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "bc\n");
+    executor_free(exec);
+}
+
 TEST(rt_local_array_append_extends) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -7707,6 +7801,13 @@ int main(void) {
     RUN_TEST(rt_promote_zsh_index1_overwrites_base);
     RUN_TEST(rt_promote_strict_rematch_no_regress);
     RUN_TEST(rt_promote_readonly_arith_refused);
+    RUN_TEST(rt_arith_neg_read_in_range);
+    RUN_TEST(rt_arith_neg_write_in_range);
+    RUN_TEST(rt_arith_neg_compound_and_incr);
+    RUN_TEST(rt_arith_neg_oob_read_zero);
+    RUN_TEST(rt_arith_neg_surface_consistency);
+    RUN_TEST(rt_arith_neg_zsh_mode_still_rejected);
+    RUN_TEST(rt_arith_neg_blast_radius_rematch);
     RUN_TEST(rt_local_array_append_extends);
     RUN_TEST(rt_readonly_array_append_relaxed);
     RUN_TEST(rt_declare_array_append_readonly_refused);
