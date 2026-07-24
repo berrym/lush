@@ -1099,20 +1099,61 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
     }
     name = canon;
 
-    /// For array bindings: free the underlying array_value_t. Read
-    /// the binding via find_var so we honor the scope chain (locals
-    /// shadow globals) and so we can drop the array's backing memory
-    /// before the scope entry gets overwritten with the UNSET marker.
-    if (manager->current_scope) {
-        symvar_t *var = find_var(manager->current_scope, name);
-        if (var && var->type == SYMVAR_ARRAY && var->array) {
-            symtable_array_free(var->array);
+    /// Resolve the scope that OWNS the binding (nearest non-unset entry),
+    /// mirroring find_var and the assignment resolvers. Both the array free
+    /// AND the UNSET tombstone must land in that scope. Freeing a parent's
+    /// array (find_var walks the chain, so it can return a global array) while
+    /// stamping the tombstone into the current (function) frame leaves the
+    /// parent's serialized entry pointing at freed memory -- a use-after-free
+    /// on the next read (issue #620). Writing the tombstone in the owning scope
+    /// also gives unset its correct scope semantics: `unset` of a global from a
+    /// function unsets the global, and a following bare reassignment resolves
+    /// back to that scope.
+    symtable_scope_t *owner = NULL;
+    symvar_t *var = NULL;
+    for (symtable_scope_t *s = manager->current_scope; s; s = s->parent) {
+        const char *serialized = ht_strstr_get(s->vars_ht, name);
+        if (!serialized) {
+            continue;
         }
-        free_symvar(var);
+        /// Stop at the FIRST scope that holds the name -- that is the binding
+        /// `unset` acts on. If it is already an UNSET tombstone the name is
+        /// unset at this level, so unset is a no-op: do NOT reach through a
+        /// local tombstone to a shadowed outer binding. Skipping the tombstone
+        /// (like find_var does on reads) would let a repeated `unset` of a
+        /// locally-shadowed name destroy the outer/global binding -- bash and
+        /// zsh both stop at the local level.
+        symvar_t *probe = deserialize_variable(name, serialized);
+        if (probe && !(probe->flags & SYMVAR_UNSET)) {
+            owner = s;
+            var = probe;
+        } else {
+            free_symvar(probe);
+        }
+        break;
     }
 
-    /// Mark as unset rather than removing
+    /// Not bound anywhere, or the nearest binding is already an UNSET
+    /// tombstone: unset is a no-op (bash succeeds silently). Do NOT stamp a
+    /// tombstone into the current frame -- that would mis-target a subsequent
+    /// create (e.g. mapfile's unset-then-recreate) to the frame and lose it
+    /// when the frame pops.
+    if (!owner) {
+        free(canon);
+        return 0;
+    }
+
+    /// Drop the array's backing before the owning entry is overwritten.
+    if (var->type == SYMVAR_ARRAY && var->array) {
+        symtable_array_free(var->array);
+    }
+    free_symvar(var);
+
+    /// Mark as unset rather than removing, in the OWNING scope.
+    symtable_scope_t *old_scope = manager->current_scope;
+    manager->current_scope = owner;
     int rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
+    manager->current_scope = old_scope;
     free(canon);
     return rc;
 }
