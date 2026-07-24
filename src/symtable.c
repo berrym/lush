@@ -3491,16 +3491,21 @@ int symtable_set_array_element(const char *name, const char *subscript,
             return -1;
         }
 
-        /// Adjust for 1-indexed arrays (zsh mode)
-        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        /// internal 0
+        /// Adjust for 1-indexed arrays (zsh mode). When FEATURE_ARRAY_ZERO_
+        /// INDEXED is false, user index 1 maps to internal 0. In 0-indexed
+        /// mode a negative subscript is NOT rejected here (issue #616): it
+        /// falls through to symtable_array_set_index, which resolves it from
+        /// the end (index = max_index + 1 + index) -- the same negative-aware
+        /// primitive that already powers ${a[-1]} and plain a[-1]=v. This keeps
+        /// the arithmetic surface (which reaches this wrapper via the
+        /// (( a[i]=v )) writer) consistent with the plain index surface. Native
+        /// zsh 1-indexed negatives stay rejected below, matching the plain
+        /// executor path (a separate curation).
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
                 return -1; /// In 1-indexed mode, index 0 and below are invalid
             }
             index--; /// Convert 1-indexed to 0-indexed internally
-        } else if (index < 0) {
-            return -1; /// 0-indexed mode doesn't allow negative here
         }
 
         return symtable_array_set_index(array, (int)index, value);
@@ -3534,17 +3539,17 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
             return NULL;
         }
 
-        /// Adjust for 1-indexed arrays (zsh mode)
-        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        /// internal 0
+        /// Adjust for 1-indexed arrays (zsh mode). A negative subscript in
+        /// 0-indexed mode is NOT rejected here (issue #616): it falls through
+        /// to symtable_array_get_index for from-end resolution, matching
+        /// ${a[-1]} and the set-side wrapper. Native zsh 1-indexed negatives
+        /// stay rejected below.
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
                 return NULL; /// In 1-indexed mode, index 0 and below are
                              /// invalid
             }
             index--; /// Convert 1-indexed to 0-indexed internally
-        } else if (index < 0) {
-            return NULL; /// 0-indexed mode doesn't allow negative here
         }
 
         result = symtable_array_get_index(array, (int)index);
