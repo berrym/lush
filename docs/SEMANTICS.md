@@ -495,6 +495,36 @@ value, not type switches; the value flows into vector-accepting
 positions and is a diagnosed type error in scalar-requiring ones.
 There is no implicit join, ever.
 
+**The write-side mirror: a list operation on a scalar-kind variable.**
+§3.9 above governs a list or map *value* reaching a scalar *slot*. The
+mirror is a list *operation* -- an element write `s[i]=v`, an append
+`s+=(...)`, or the arithmetic writer `(( s[i]=v ))` -- applied to a
+variable that currently holds a *scalar* value. This is a kind transition
+(scalar → list), gated by the same `FEATURE_STRICT_VALUE_TYPING` flag. In
+lush mode it is the type error (`E1134`): a scalar is not a list, and the
+implicit re-kind is refused with the guidance to `declare -a name` (or
+`unset name`) first, exactly as the value-side crossing is refused. In the
+compatibility modes the flag is off and the operation *preserve-promotes*:
+the variable becomes a one-element list whose base element is the former
+scalar value (a scalar is, in the value model, the single element of a
+one-element list), and the write then proceeds -- non-lossy, so the
+scalar's data is never silently dropped. An explicit write to the base
+index overwrites the seeded value; a whole-array assignment (`s=(...)`,
+`s=()`) is an explicit re-declaration, not an implicit re-kind, and
+replaces in every mode; an *unbound* name is a fresh array with no
+existing kind to violate. (POSIX mode has indexed arrays disabled at the
+parser, so `s[i]=v` there is not an array operation at all.) The relaxed
+preserve-promote is the bash/zsh consensus for append and lush's curated
+choice for the bracket write; zsh's alternative -- in-place character
+substitution on the scalar string -- is incompatible with lush's
+first-class value kinds and is deliberately not adopted. The strict error
+is fatal for the assignment-word (`s[i]=v`) and append (`s+=(...)`) forms
+-- the command aborts, like the value-side crossing -- while the
+arithmetic-writer form `(( s[i]=v ))` reports it through the
+arithmetic-command exit status (non-fatal, consistent with other
+arithmetic errors such as division by zero); in both the write is refused
+and the scalar is unchanged.
+
 ---
 
 ## 4. The three boundary rules

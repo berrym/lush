@@ -20807,6 +20807,34 @@ static int execute_extended_test(executor_t *executor, node_t *test_node) {
  * @param assign_node Array assignment node
  * @return 0 on success, 1 on error
  */
+/// Report a scalar->array kind-transition error (issue #621) -- the mirror of
+/// the §3.9 list->scalar E1134. Emitted only under strict value typing (lush
+/// mode), when an array element write or append would implicitly re-kind an
+/// existing scalar into a list. Requests a POSIX exit like the §3.9 gate.
+static void report_scalar_kind_error(executor_t *executor,
+                                     source_location_t loc, const char *name) {
+    shell_error_t *err = shell_error_create(
+        SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR, loc,
+        "type mismatch: cannot apply an array subscript to scalar '%s'", name);
+    if (err) {
+        char sugg[192];
+        snprintf(sugg, sizeof(sugg),
+                 "'%s' holds a scalar value; declare it a list first "
+                 "(declare -a %s) or unset it before indexing.",
+                 name, name);
+        shell_error_set_suggestion(err, sugg);
+        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+        shell_error_free(err);
+        executor->has_error = true;
+    } else {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, loc,
+            "type mismatch: cannot apply an array subscript to scalar '%s'",
+            name);
+    }
+    executor_request_posix_exit(executor, 1);
+}
+
 static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     if (!assign_node || !assign_node->val.str) {
         return 1;
@@ -21170,6 +21198,17 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     /// Get or create the array
     array_value_t *array = symtable_get_array(var_name);
     if (!array) {
+        /// A scalar->array kind transition (issue #621): strict value typing
+        /// (lush mode) refuses the implicit re-kind; a relaxed mode promotes
+        /// non-lossily, keeping the former scalar as the base element. An
+        /// unbound name is a fresh array (no kind change).
+        scalar_promo_t promo = symtable_scalar_promotion(var_name);
+        if (promo == SCALAR_PROMO_REFUSE) {
+            if (expanded_value)
+                free(expanded_value);
+            report_scalar_kind_error(executor, assign_node->loc, var_name);
+            return 1;
+        }
         /// Create new array if it doesn't exist
         array = symtable_array_create(false);
         if (!array) {
@@ -21177,6 +21216,10 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                 free(expanded_value);
             set_executor_error(executor, "Failed to create array");
             return 1;
+        }
+        /// Seed the base index BEFORE the store overwrites the scalar binding.
+        if (promo == SCALAR_PROMO_PRESERVE) {
+            symtable_seed_promoted_scalar(var_name, array);
         }
         /// A fresh `a[i]=v` resolves scope like a scalar assignment (#614):
         /// created in the enclosing/global scope, not the function frame.
@@ -21327,11 +21370,24 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
     bool new_array = false;
 
     if (!array) {
+        /// A scalar->array kind transition (issue #621): strict value typing
+        /// (lush mode) refuses the implicit re-kind; a relaxed mode promotes
+        /// non-lossily, keeping the former scalar as the base element (appended
+        /// elements then land at index 1+). An unbound name is a fresh array.
+        scalar_promo_t promo = symtable_scalar_promotion(var_name);
+        if (promo == SCALAR_PROMO_REFUSE) {
+            report_scalar_kind_error(executor, append_node->loc, var_name);
+            return 1;
+        }
         /// Create new array if it doesn't exist
         array = symtable_array_create(false);
         if (!array) {
             set_executor_error(executor, "Failed to create array");
             return 1;
+        }
+        /// Seed the base index BEFORE the append loop and the store.
+        if (promo == SCALAR_PROMO_PRESERVE) {
+            symtable_seed_promoted_scalar(var_name, array);
         }
         new_array = true;
     }
