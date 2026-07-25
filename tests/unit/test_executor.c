@@ -2976,6 +2976,159 @@ TEST(rt_unset_readonly_nameref_target_refused) {
 }
 
 /* ==========================================================================
+ * #625: the child environment (the flat process environ handed to execvp) is a
+ * mirror of the exported-scalar bindings. Any operation that removes a name
+ * from that set -- unset, or a scalar being replaced by an array (which has no
+ * exported-scalar form: element promotion, whole s=(...), read -a, mapfile) --
+ * must drop the stale entry from the mirror, the DROP counterpart to export's
+ * setenv ADD. symtable_environ_resync re-materializes the entry from the
+ * currently-visible binding, so a shadowed exported binding is re-exposed
+ * rather than lost. Verified against a real child: `env` is external, so it
+ * reads the process environ through execvp. Distinct names per test (the
+ * process environ is shared across the whole test binary).
+ * ========================================================================== */
+
+TEST(rt_env625_unset_drops_export) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The reported bug: an unset exported variable lingered in the child
+    /// environ. Now the child sees no e625u.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nexport e625u=hi\nunset e625u\n"
+              "env | grep -c '^e625u=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_unset_shadow_preserves_global) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The row that must NOT regress: unsetting a non-exported local shadow
+    /// re-exposes the exported global, which stays in the child environ with
+    /// its original value. resync reads the visible binding to get this right.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nexport e625sh=gv\n"
+              "f(){ local e625sh=lv; unset e625sh; }\nf\n"
+              "env | grep '^e625sh=' || echo NONE\n");
+    ASSERT_STDOUT_EQ(r, "e625sh=gv\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_promote_element_drops) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A relaxed-mode element promotion turns the exported scalar into an
+    /// array; the stale scalar entry is dropped from the child environ.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nexport e625pe=hi\ne625pe[1]=x\n"
+              "env | grep -c '^e625pe=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_promote_whole_assign_drops) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Whole-array reassignment over an exported scalar drops it too (same
+    /// chokepoint, symtable_assign_array).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nexport e625pw=hi\ne625pw=(a b)\n"
+              "env | grep -c '^e625pw=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_promote_reada_drops) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// read -a materializes an array through the same chokepoint, so an
+    /// exported scalar target is dropped from the child environ.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nexport e625pr=hi\nread -a e625pr <<< 'x y'\n"
+              "env | grep -c '^e625pr=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_lush_refused_keeps_export) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// In lush mode the kind transition is refused (#621), so no array is
+    /// stored, resync never fires, and the exported scalar is untouched in the
+    /// child environ. The arithmetic form is non-fatal (its E1134 goes to
+    /// stderr), so the script continues to the env check.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nexport e625lr=hi\n(( e625lr[1]=7 ))\n"
+              "env | grep '^e625lr=' || echo NONE\n");
+    ASSERT_STDOUT_EQ(r, "e625lr=hi\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_reexport_after_unset) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The mirror is not left in a broken state: re-exporting a name after
+    /// unsetting it makes the new value visible to the child.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nexport e625re=1\nunset e625re\nexport e625re=2\n"
+              "env | grep '^e625re=' || echo NONE\n");
+    ASSERT_STDOUT_EQ(r, "e625re=2\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_nonexported_unset_noop) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: unsetting a never-exported variable neither errors nor adds a
+    /// spurious child environ entry.
+    run_result_t r =
+        run_shell_with_executor(exec, "mode lush\ne625ne=v\nunset e625ne\n"
+                                      "env | grep -c '^e625ne=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_local_array_shadow_preserves_global_element) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A LOCAL array shadowing an exported global must NOT touch the mirror:
+    /// the resync is gated to global-scope stores, so after the frame pops the
+    /// exported global is still visible to children (it was never dropped).
+    /// Element form.
+    run_result_t r =
+        run_shell_with_executor(exec, "mode bash\nexport e625ls=g\n"
+                                      "f(){ local e625ls=l; e625ls[0]=x; }\nf\n"
+                                      "env | grep '^e625ls=' || echo NONE\n");
+    ASSERT_STDOUT_EQ(r, "e625ls=g\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_local_array_shadow_preserves_global_reada) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Same, via read -a into a local shadow of an exported global.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nexport e625lr2=g\n"
+              "f(){ local e625lr2=l; read -a e625lr2 <<< 'p q'; }\nf\n"
+              "env | grep '^e625lr2=' || echo NONE\n");
+    ASSERT_STDOUT_EQ(r, "e625lr2=g\n");
+    executor_free(exec);
+}
+
+TEST(rt_env625_promote_mapfile_drops) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// mapfile materializes an array through the same global-scope chokepoint,
+    /// so an exported global scalar target is dropped from the child environ.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nexport e625mf=hi\n"
+              "mapfile -t e625mf < <(printf 'a\\nb\\n')\n"
+              "env | grep -c '^e625mf=' || true\n");
+    ASSERT_STDOUT_EQ(r, "0\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
  * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
@@ -8104,6 +8257,17 @@ int main(void) {
     RUN_TEST(rt_unset_readonly_partial_continues);
     RUN_TEST(rt_unset_writable_still_works_control);
     RUN_TEST(rt_unset_readonly_nameref_target_refused);
+    RUN_TEST(rt_env625_unset_drops_export);
+    RUN_TEST(rt_env625_unset_shadow_preserves_global);
+    RUN_TEST(rt_env625_promote_element_drops);
+    RUN_TEST(rt_env625_promote_whole_assign_drops);
+    RUN_TEST(rt_env625_promote_reada_drops);
+    RUN_TEST(rt_env625_lush_refused_keeps_export);
+    RUN_TEST(rt_env625_reexport_after_unset);
+    RUN_TEST(rt_env625_nonexported_unset_noop);
+    RUN_TEST(rt_env625_local_array_shadow_preserves_global_element);
+    RUN_TEST(rt_env625_local_array_shadow_preserves_global_reada);
+    RUN_TEST(rt_env625_promote_mapfile_drops);
     RUN_TEST(rt_promote_lush_element_refused);
     RUN_TEST(rt_promote_lush_append_refused);
     RUN_TEST(rt_promote_lush_arith_refused);
