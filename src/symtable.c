@@ -2662,7 +2662,7 @@ array_value_t *symtable_array_create(bool is_associative) {
         /// Allocate initial capacity for indexed array
         array->capacity = ARRAY_INITIAL_CAPACITY;
         array->elements = calloc(array->capacity, sizeof(char *));
-        array->indices = calloc(array->capacity, sizeof(int));
+        array->indices = calloc(array->capacity, sizeof(int64_t));
         if (!array->elements || !array->indices) {
             free(array->elements);
             free(array->indices);
@@ -2710,7 +2710,7 @@ void symtable_array_free(array_value_t *array) {
  * @param found Output: true if index exists
  * @return Position in indices array
  */
-static size_t array_find_index_pos(array_value_t *array, int index,
+static size_t array_find_index_pos(array_value_t *array, int64_t index,
                                    bool *found) {
     *found = false;
 
@@ -2743,7 +2743,8 @@ static int array_ensure_capacity(array_value_t *array) {
 
         char **new_elements =
             realloc(array->elements, new_capacity * sizeof(char *));
-        int *new_indices = realloc(array->indices, new_capacity * sizeof(int));
+        int64_t *new_indices =
+            realloc(array->indices, new_capacity * sizeof(int64_t));
 
         if (!new_elements || !new_indices) {
             /// Restore on partial failure
@@ -2774,15 +2775,24 @@ static int array_ensure_capacity(array_value_t *array) {
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
-int symtable_array_set_index(array_value_t *array, int index,
+int symtable_array_set_index(array_value_t *array, int64_t index,
                              const char *value) {
     if (!array || array->is_associative) {
         return -1;
     }
 
-    /// Handle negative indices (Bash-style: -1 = last element)
+    /// A subscript is a 64-bit sparse key: from-end negatives resolve in 64-bit
+    /// (never truncated to int, issue #618), and a positive index up to
+    /// INT64_MAX is a native key, not an over-allocation (the store is sparse).
+    /// The only rejection is a from-end negative that resolves below 0.
     if (index < 0) {
-        index = (int)(array->max_index + 1) + index;
+        if (array->count == 0) {
+            return -1; /// No elements to count back from
+        }
+        /// resolved = max_index + 1 + index, computed as max_index + (index +
+        /// 1) so the `+ 1` does not overflow when max_index == INT64_MAX (index
+        /// is negative, so index + 1 <= 0 and cannot overflow either).
+        index = array->max_index + (index + 1);
         if (index < 0) {
             return -1; /// Still negative = out of bounds
         }
@@ -2812,8 +2822,8 @@ int symtable_array_set_index(array_value_t *array, int index,
         array->count++;
     }
 
-    if ((size_t)index > array->max_index) {
-        array->max_index = (size_t)index;
+    if (index > array->max_index) {
+        array->max_index = index;
     }
 
     return 0;
@@ -2825,14 +2835,18 @@ int symtable_array_set_index(array_value_t *array, int index,
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
-const char *symtable_array_get_index(array_value_t *array, int index) {
+const char *symtable_array_get_index(array_value_t *array, int64_t index) {
     if (!array || array->is_associative) {
         return NULL;
     }
 
-    /// Handle negative indices (Bash-style: -1 = last element)
+    /// Handle negative indices (Bash-style: -1 = last element) in 64-bit,
+    /// matching the set path (issue #618); overflow-safe at INT64_MAX.
     if (index < 0) {
-        index = (int)(array->max_index + 1) + index;
+        if (array->count == 0) {
+            return NULL;
+        }
+        index = array->max_index + (index + 1);
         if (index < 0) {
             return NULL; /// Still negative = out of bounds
         }
@@ -2919,14 +2933,18 @@ const char *symtable_array_get_assoc(array_value_t *array, const char *key) {
 /**
  * @brief Append a value to an indexed array
  */
-int symtable_array_append(array_value_t *array, const char *value) {
+int64_t symtable_array_append(array_value_t *array, const char *value) {
     if (!array || array->is_associative) {
         return -1;
     }
 
-    int new_index = (int)(array->max_index + 1);
+    int64_t new_index;
     if (array->count == 0) {
         new_index = 0;
+    } else if (array->max_index == INT64_MAX) {
+        return -1; /// Cannot append past the maximum representable index
+    } else {
+        new_index = array->max_index + 1;
     }
 
     if (symtable_array_set_index(array, new_index, value) < 0) {
@@ -2952,14 +2970,18 @@ size_t symtable_array_length(array_value_t *array) {
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
-int symtable_array_unset_index(array_value_t *array, int index) {
+int symtable_array_unset_index(array_value_t *array, int64_t index) {
     if (!array || array->is_associative) {
         return -1;
     }
 
-    /// Handle negative indices (Bash-style: -1 = last element)
+    /// Handle negative indices (Bash-style: -1 = last element) in 64-bit,
+    /// matching the set/get paths (issue #618); overflow-safe at INT64_MAX.
     if (index < 0) {
-        index = (int)(array->max_index + 1) + index;
+        if (array->count == 0) {
+            return -1;
+        }
+        index = array->max_index + (index + 1);
         if (index < 0) {
             return -1; /// Still negative = out of bounds
         }
@@ -2983,8 +3005,8 @@ int symtable_array_unset_index(array_value_t *array, int index) {
     array->count--;
 
     /// Recalculate max_index if we removed the max
-    if ((size_t)index == array->max_index && array->count > 0) {
-        array->max_index = (size_t)array->indices[array->count - 1];
+    if (index == array->max_index && array->count > 0) {
+        array->max_index = array->indices[array->count - 1];
     } else if (array->count == 0) {
         array->max_index = 0;
     }
@@ -3051,7 +3073,7 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
         /// Convert indices to strings
         for (size_t i = 0; i < array->count; i++) {
             char buf[32];
-            snprintf(buf, sizeof(buf), "%d", array->indices[i]);
+            snprintf(buf, sizeof(buf), "%lld", (long long)array->indices[i]);
             keys[i] = strdup(buf);
         }
     }
@@ -3558,7 +3580,7 @@ int symtable_set_array_element(const char *name, const char *subscript,
             index--; /// Convert 1-indexed to 0-indexed internally
         }
 
-        return symtable_array_set_index(array, (int)index, value);
+        return symtable_array_set_index(array, index, value);
     }
 }
 
@@ -3602,7 +3624,7 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
             index--; /// Convert 1-indexed to 0-indexed internally
         }
 
-        result = symtable_array_get_index(array, (int)index);
+        result = symtable_array_get_index(array, index);
     }
 
     return result ? strdup(result) : NULL;

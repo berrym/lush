@@ -72,7 +72,9 @@ int bin_unset(int argc, char **argv) {
                         if (array->is_associative) {
                             symtable_array_unset_assoc(array, sub_buf);
                         } else {
-                            int idx = (int)strtol(sub_buf, NULL, 10);
+                            /// Full-width subscript so a 64-bit index is unset,
+                            /// not truncated to a wrong element (issue #618).
+                            long long idx = strtoll(sub_buf, NULL, 10);
                             symtable_array_unset_index(array, idx);
                         }
                         continue;

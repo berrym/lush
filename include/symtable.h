@@ -15,6 +15,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 /// Forward declaration for libhashtable
@@ -71,10 +72,13 @@ typedef enum {
  */
 typedef struct array_value {
     char **elements;     ///< Sparse array of element values (indexed)
-    int *indices;        ///< Parallel array of actual indices (for sparse)
+    int64_t *indices;    ///< Parallel array of actual indices (for sparse).
+                         ///< 64-bit so a subscript up to INT64_MAX is a native
+                         ///< sparse key -- never truncated/aliased (issue #618)
     size_t count;        ///< Number of elements currently stored
     size_t capacity;     ///< Allocated capacity for elements/indices
-    size_t max_index;    ///< Highest index used (for ${#arr[@]})
+    int64_t max_index;   ///< Highest index used (for ${#arr[@]}); 64-bit to
+                         ///< match `indices` and the arithmetic engine
     bool is_associative; ///< True if associative array (declare -A)
     /**
      * Variable attributes carried by the array itself. Mirrors the
@@ -1290,7 +1294,7 @@ void symtable_array_free(array_value_t *array);
  * @param value Element value (will be copied)
  * @return 0 on success, -1 on error
  */
-int symtable_array_set_index(array_value_t *array, int index,
+int symtable_array_set_index(array_value_t *array, int64_t index,
                              const char *value);
 
 /**
@@ -1300,7 +1304,7 @@ int symtable_array_set_index(array_value_t *array, int index,
  * @param index Element index (0-based internally)
  * @return Element value or NULL if not set
  */
-const char *symtable_array_get_index(array_value_t *array, int index);
+const char *symtable_array_get_index(array_value_t *array, int64_t index);
 
 /**
  * @brief Set an element in an associative array
@@ -1329,7 +1333,7 @@ const char *symtable_array_get_assoc(array_value_t *array, const char *key);
  * @param value Value to append
  * @return New element index, or -1 on error
  */
-int symtable_array_append(array_value_t *array, const char *value);
+int64_t symtable_array_append(array_value_t *array, const char *value);
 
 /**
  * @brief Get the number of elements in an array
@@ -1346,7 +1350,7 @@ size_t symtable_array_length(array_value_t *array);
  * @param index Element index to unset
  * @return 0 on success, -1 on error
  */
-int symtable_array_unset_index(array_value_t *array, int index);
+int symtable_array_unset_index(array_value_t *array, int64_t index);
 
 /**
  * @brief Unset an element in an associative array

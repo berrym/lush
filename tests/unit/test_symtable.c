@@ -409,6 +409,66 @@ TEST(array_indexed_operations) {
     symtable_array_free(arr);
 }
 
+TEST(array_index_int64_no_truncation) {
+    /// #618: a subscript beyond INT_MAX is a native 64-bit sparse key -- stored
+    /// and read back at its true index, never truncated to alias a low element.
+    array_value_t *arr = symtable_array_create(false);
+    ASSERT_NOT_NULL(arr, "symtable_array_create failed");
+
+    ASSERT_EQ(symtable_array_set_index(arr, 0, "zero"), 0, "set 0");
+    ASSERT_EQ(symtable_array_set_index(arr, 4294967296LL, "big"), 0,
+              "set 2^32 should succeed");
+    ASSERT_EQ(symtable_array_set_index(arr, 1099511627776LL, "huge"), 0,
+              "set 2^40 should succeed");
+
+    ASSERT_STR_EQ(symtable_array_get_index(arr, 4294967296LL), "big",
+                  "2^32 round-trips");
+    ASSERT_STR_EQ(symtable_array_get_index(arr, 1099511627776LL), "huge",
+                  "2^40 round-trips");
+    /// No aliasing: index 0 keeps its own value (the old (int) cast of 2^32
+    /// would have overwritten it).
+    ASSERT_STR_EQ(symtable_array_get_index(arr, 0), "zero", "0 not aliased");
+    ASSERT_NULL(symtable_array_get_index(arr, 5), "low alias target unset");
+
+    symtable_array_free(arr);
+
+    /// A from-end negative that resolves below 0 is out of range. Use a small
+    /// array so the negative genuinely underflows (on the sparse array above,
+    /// -999 would resolve to a large positive index off max_index).
+    array_value_t *small = symtable_array_create(false);
+    ASSERT_NOT_NULL(small, "symtable_array_create failed");
+    ASSERT_EQ(symtable_array_set_index(small, 0, "a"), 0, "set 0");
+    ASSERT_EQ(symtable_array_set_index(small, 1, "b"), 0, "set 1");
+    ASSERT_EQ(symtable_array_set_index(small, -1, "Z"), 0,
+              "from-end -1 resolves to last (valid)");
+    ASSERT_STR_EQ(symtable_array_get_index(small, 1), "Z", "-1 hit index 1");
+    ASSERT_EQ(symtable_array_set_index(small, -999, "x"), -1,
+              "deep negative is out of range");
+    /// From-end on an empty array is out of range (count==0 base arm).
+    array_value_t *empty = symtable_array_create(false);
+    ASSERT_NOT_NULL(empty, "symtable_array_create failed");
+    ASSERT_EQ(symtable_array_set_index(empty, -1, "x"), -1,
+              "from-end on empty is out of range");
+    ASSERT_NULL(symtable_array_get_index(empty, -1),
+                "from-end read on empty is NULL");
+    symtable_array_free(empty);
+    symtable_array_free(small);
+
+    /// INT64_MAX is a valid key, but appending past it is refused (no
+    /// max_index+1 overflow / wrap to a low index).
+    array_value_t *edge = symtable_array_create(false);
+    ASSERT_NOT_NULL(edge, "symtable_array_create failed");
+    ASSERT_EQ(symtable_array_set_index(edge, INT64_MAX, "max"), 0,
+              "INT64_MAX is a valid index");
+    ASSERT_EQ(symtable_array_append(edge, "ovf"), -1,
+              "append past INT64_MAX is refused");
+    ASSERT_NULL(symtable_array_get_index(edge, 0),
+                "no wrap-to-0 corruption on append past max");
+    ASSERT_STR_EQ(symtable_array_get_index(edge, INT64_MAX), "max",
+                  "INT64_MAX element intact");
+    symtable_array_free(edge);
+}
+
 TEST(array_append) {
     array_value_t *arr = symtable_array_create(false);
     ASSERT_NOT_NULL(arr, "symtable_array_create failed");
@@ -669,6 +729,7 @@ int main(void) {
     RUN_TEST(value_view_none_on_miss);
     RUN_TEST(value_view_clear_idempotent);
     RUN_TEST(array_indexed_operations);
+    RUN_TEST(array_index_int64_no_truncation);
     RUN_TEST(array_append);
     RUN_TEST(array_associative);
 

@@ -14752,7 +14752,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             arithm_clear_error();
                             char *idx_result = arithm_expand(subscript);
                             if (idx_result && !arithm_error_is_flagged()) {
-                                int idx = (int)strtoll(idx_result, NULL, 10);
+                                long long idx = strtoll(idx_result, NULL, 10);
                                 free(idx_result);
 
                                 /// Same indexing convention as ${arr[n]}:
@@ -15289,7 +15289,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         arithm_clear_error();
                         char *idx_result = arithm_expand(subscript);
                         if (idx_result && !arithm_error_is_flagged()) {
-                            int idx = (int)strtoll(idx_result, NULL, 10);
+                            long long idx = strtoll(idx_result, NULL, 10);
                             free(idx_result);
 
                             /// zsh-mode (1-based): 0 is invalid (returns
@@ -15534,7 +15534,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     if (one_based && ix > 0) {
                                         ix--; /// 1-based -> 0-based
                                     }
-                                    symtable_array_set_index(new_arr, (int)ix,
+                                    symtable_array_set_index(new_arr, ix,
                                                              applied);
                                 }
                             }
@@ -20650,8 +20650,7 @@ static bool cond_var_set(const char *operand) {
                     char *endp = NULL;
                     long idx = strtol(key, &endp, 10);
                     if (endp && *endp == '\0') {
-                        result =
-                            symtable_array_get_index(array, (int)idx) != NULL;
+                        result = symtable_array_get_index(array, idx) != NULL;
                     }
                 }
             }
@@ -20975,18 +20974,32 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                 /// arrays
                                 arithm_clear_error();
                                 char *idx_result = arithm_expand(idx_str);
-
+                                long long idx_val = -1;
                                 if (idx_result && !arithm_error_is_flagged()) {
-                                    long long idx_val =
-                                        strtoll(idx_result, NULL, 10);
-                                    if (idx_val >= 0) {
+                                    idx_val = strtoll(idx_result, NULL, 10);
+                                }
+                                free(idx_result);
+
+                                if (idx_val >= 0) {
+                                    /// Explicit non-negative index: store at
+                                    /// the full-width index (set_index is
+                                    /// int64, issue #618 -- no (int)
+                                    /// truncation) and advance the positional
+                                    /// counter to follow when it fits the
+                                    /// counter's width.
+                                    symtable_array_set_index(array, idx_val,
+                                                             final_value);
+                                    if (idx_val <= INT_MAX) {
                                         index = (int)idx_val;
                                     }
-                                    free(idx_result);
+                                } else {
+                                    /// Unparseable / arithmetic error /
+                                    /// negative falls back to the running
+                                    /// positional index (pre-existing
+                                    /// behavior).
+                                    symtable_array_set_index(array, index,
+                                                             final_value);
                                 }
-
-                                symtable_array_set_index(array, index,
-                                                         final_value);
                             }
 
                             free(idx_str);
@@ -21362,23 +21375,39 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             idx--; /// Convert 1-indexed to 0-indexed internally
         }
 
+        int set_rc = 0;
         if (is_append) {
             /// Append to existing element
-            const char *existing = symtable_array_get_index(array, (int)idx);
+            const char *existing = symtable_array_get_index(array, idx);
             if (existing) {
                 size_t new_len = strlen(existing) + strlen(final_value) + 1;
                 char *combined = malloc(new_len);
                 if (combined) {
                     strcpy(combined, existing);
                     strcat(combined, final_value);
-                    symtable_array_set_index(array, (int)idx, combined);
+                    set_rc = symtable_array_set_index(array, idx, combined);
                     free(combined);
                 }
             } else {
-                symtable_array_set_index(array, (int)idx, final_value);
+                set_rc = symtable_array_set_index(array, idx, final_value);
             }
         } else {
-            symtable_array_set_index(array, (int)idx, final_value);
+            set_rc = symtable_array_set_index(array, idx, final_value);
+        }
+
+        /// A from-end negative subscript that resolves below 0 is out of range.
+        /// Report it (matching the arithmetic path) rather than silently
+        /// no-oping, so the plain surface has the same error/status (issue
+        /// #618). A positive subscript is a native 64-bit key and never fails
+        /// here.
+        if (set_rc < 0) {
+            executor_error_report_with_help(
+                executor, SHELL_ERR_INVALID_SUBSCRIPT, assign_node->loc,
+                "the subscript is out of range for this array",
+                "array subscript %lld out of range for '%s'", idx, var_name);
+            if (expanded_value)
+                free(expanded_value);
+            return 1;
         }
     }
 
