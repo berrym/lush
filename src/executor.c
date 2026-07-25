@@ -14750,7 +14750,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         } else {
                             /// ${#arr[n]} - length of element at index n
                             arithm_clear_error();
-                            char *idx_result = arithm_expand(subscript);
+                            char *idx_result = arithm_expand_with_executor(
+                                executor, subscript);
                             if (idx_result && !arithm_error_is_flagged()) {
                                 long long idx = strtoll(idx_result, NULL, 10);
                                 free(idx_result);
@@ -15287,7 +15288,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                     } else {
                         /// Indexed array - ${arr[n]} - specific element
                         arithm_clear_error();
-                        char *idx_result = arithm_expand(subscript);
+                        char *idx_result =
+                            arithm_expand_with_executor(executor, subscript);
                         if (idx_result && !arithm_error_is_flagged()) {
                             long long idx = strtoll(idx_result, NULL, 10);
                             free(idx_result);
@@ -15382,7 +15384,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     free(ek);
                                 } else {
                                     arithm_clear_error();
-                                    char *ir = arithm_expand(subscript);
+                                    char *ir = arithm_expand_with_executor(
+                                        executor, subscript);
                                     if (ir && !arithm_error_is_flagged()) {
                                         long ix = strtoll(ir, NULL, 10);
                                         bool one_based = !shell_mode_allows(
@@ -15525,7 +15528,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         array_value_t *new_arr = symtable_array_create(false);
                         if (new_arr) {
                             arithm_clear_error();
-                            char *ir = arithm_expand(subscript);
+                            char *ir = arithm_expand_with_executor(executor,
+                                                                   subscript);
                             if (ir && !arithm_error_is_flagged()) {
                                 long ix = strtoll(ir, NULL, 10);
                                 bool one_based = !shell_mode_allows(
@@ -20973,7 +20977,8 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                 /// Evaluate index as arithmetic for indexed
                                 /// arrays
                                 arithm_clear_error();
-                                char *idx_result = arithm_expand(idx_str);
+                                char *idx_result = arithm_expand_with_executor(
+                                    executor, idx_str);
                                 long long idx_val = -1;
                                 if (idx_result && !arithm_error_is_flagged()) {
                                     idx_val = strtoll(idx_result, NULL, 10);
@@ -21347,7 +21352,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     } else {
         /// Indexed array - evaluate subscript as arithmetic expression
         arithm_clear_error();
-        char *idx_result = arithm_expand(subscript);
+        char *idx_result = arithm_expand_with_executor(executor, subscript);
 
         if (!idx_result || arithm_error_is_flagged()) {
             if (idx_result)
