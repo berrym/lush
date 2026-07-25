@@ -1075,6 +1075,33 @@ static char *symtable_get_var_impl(symtable_manager_t *manager,
     return result;
 }
 
+/*
+ * Re-materialize the flat process environ entry for `name` from the binding
+ * now visible in the scope chain (issue #625). Children are handed the process
+ * environ (execvp), a mirror of the exported-scalar bindings that
+ * symtable_export_var populates via setenv. Any operation that removes a name
+ * from that set -- unset, or a scalar replaced by an array (which has no
+ * exported-scalar form) -- must update the mirror, the DROP counterpart to
+ * export's ADD. Reading the currently-visible binding rather than a blind
+ * unsetenv keeps a shadowed exported binding correct: unsetting a non-exported
+ * local shadow re-exposes the exported global. find_var skips UNSET tombstones,
+ * so after a tombstone or an array store it returns the next visible binding.
+ * `name` is expected already NFC-canonical (callers pass their canonical key).
+ * Idempotent; a no-op for names that were never exported.
+ */
+static void symtable_environ_resync(symtable_manager_t *manager,
+                                    const char *name) {
+    if (!manager || !name) {
+        return;
+    }
+    unsetenv(name);
+    symvar_t *v = find_var(manager->current_scope, name);
+    if (v && (v->flags & SYMVAR_EXPORTED) && v->type != SYMVAR_ARRAY) {
+        setenv(name, v->value ? v->value : "", 1);
+    }
+    free_symvar(v);
+}
+
 /**
  * @brief Unset a variable
  *
@@ -1154,6 +1181,9 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
     manager->current_scope = owner;
     int rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
     manager->current_scope = old_scope;
+    /// Sync the child environ mirror: drop the unset name, re-exposing any
+    /// shadowed exported binding now visible (issue #625).
+    symtable_environ_resync(manager, name);
     free(canon);
     return rc;
 }
@@ -3280,6 +3310,23 @@ int symtable_assign_array(const char *name, array_value_t *array) {
             global_manager->current_scope = scope;
             int result = symtable_set_array(canon, array);
             global_manager->current_scope = old_scope;
+            /// A name that was an exported scalar has no exported-scalar form
+            /// once it holds an array; drop the stale child environ entry
+            /// (issue #625). Gate to a GLOBAL-scope store: a mirror-drop is
+            /// only needed where a store replaces a GLOBAL exported scalar. A
+            /// LOCAL array shadowing an exported global must not touch the
+            /// mirror -- resync would drop the global (the live local array is
+            /// opaque to find_var's exported-scalar re-add) and, with no
+            /// scope-teardown resync, strand it after the frame pops. unset's
+            /// resync is unaffected: it re-resolves through the tombstone to
+            /// the visible binding. The process environ is mutated by setenv
+            /// from any scope, so a `local -x` scalar promoted to an array can
+            /// still leave a stale entry -- a pre-existing local-export
+            /// scope-pop gap, deliberately out of scope here. No-op when the
+            /// name was never exported.
+            if (result >= 0 && scope == global_manager->global_scope) {
+                symtable_environ_resync(global_manager, canon);
+            }
             free(canon);
             return result;
         }
@@ -3289,6 +3336,9 @@ int symtable_assign_array(const char *name, array_value_t *array) {
     /// Unbound in every scope -> create globally (bash/zsh consensus for a
     /// bare assignment), matching the scalar resolver's global fallback.
     int result = symtable_set_array_global(canon, array);
+    if (result >= 0) {
+        symtable_environ_resync(global_manager, canon);
+    }
     free(canon);
     return result;
 }
