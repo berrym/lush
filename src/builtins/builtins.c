@@ -409,6 +409,26 @@ int builtin_bind_array_literal(const char *name, const char *literal,
                             *bracket_end = '\0';
                             const char *idx_str = elem + 1;
                             const char *elem_val = bracket_end + 2;
+                            /// declare/typeset/local/readonly -A m=([@]=v) and
+                            /// -a a=([@]=x) are the compound-literal spelling
+                            /// of assigning to the aggregate selector: rejected
+                            /// in every context (issue #627), matching the bare
+                            /// name=(...) and name[@]= paths. A fresh array
+                            /// (the replace form) is discarded so an existing
+                            /// binding is left untouched; the in-place append
+                            /// form keeps what it applied before the bad
+                            /// element.
+                            if (strcmp(idx_str, "@") == 0 ||
+                                strcmp(idx_str, "*") == 0) {
+                                report_aggregate_subscript_error(
+                                    current_executor,
+                                    builtin_get_source_location(), idx_str);
+                                free(elem);
+                                if (new_array) {
+                                    symtable_array_free(arr);
+                                }
+                                return 1;
+                            }
                             if (assoc) {
                                 symtable_array_set_assoc(arr, idx_str,
                                                          elem_val);
