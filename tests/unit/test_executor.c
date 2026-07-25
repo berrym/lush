@@ -2845,6 +2845,137 @@ TEST(rt_unset_repeated_local_preserves_global) {
 }
 
 /* ==========================================================================
+ * #626: `unset` honors the readonly immutability invariant. A readonly binding
+ * may be neither reassigned nor destroyed; the write surfaces already refuse
+ * with E1117 (#614/#620/#621), so `unset` -- also a mutation surface -- must
+ * refuse a readonly scalar, indexed array, associative, or an element of a
+ * readonly array, leaving the binding intact and returning non-zero. The
+ * invariant is mode-independent (readonly is enforced in every mode), so one
+ * case is exercised under `mode bash` to prove universality.
+ * ========================================================================== */
+
+TEST(rt_unset_readonly_scalar_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Was silently protected with rc=0 and no diagnostic; now E1117 + non-zero
+    /// and the scalar survives.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nreadonly ro626s=5\nunset ro626s\necho \"rc=$? "
+              "v=[${ro626s}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 v=[5]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_array_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Was silently DESTROYED (freed outright); now refused and intact.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\ndeclare -ar ro626a=(1 2 3)\nunset ro626a\n"
+              "echo \"rc=$? n=${#ro626a[@]} v=[${ro626a[*]}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=3 v=[1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_assoc_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Associative was silently destroyed; now refused and intact.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\ndeclare -Ar ro626m=([k]=v)\nunset ro626m\n"
+              "echo \"rc=$? v=[${ro626m[k]}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 v=[v]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_element_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Removing one element mutates the readonly array -- refused, all elements
+    /// intact.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\ndeclare -ar ro626e=(a b c)\nunset \"ro626e[0]\"\n"
+              "echo \"rc=$? n=${#ro626e[@]} v=[${ro626e[*]}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=3 v=[a b c]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_global_from_fn_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The readonly check is scope-chain aware: unsetting a readonly GLOBAL
+    /// from within a function scope is refused and the global survives.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nreadonly ro626g=7\nf(){ unset ro626g; }\nf\n"
+              "echo \"v=[${ro626g}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "v=[7]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_universal_bash_mode) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The immutability invariant is mode-independent: a readonly unset is
+    /// refused under `mode bash` exactly as under lush mode.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nreadonly ro626b=9\nunset ro626b\necho \"rc=$? "
+              "v=[${ro626b}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 v=[9]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_partial_continues) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// `unset ro plain` refuses the readonly name (non-zero) but still unsets
+    /// the remaining writable name -- builtin argument-loop discipline.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nreadonly ro626p=5\nplain626=keep\n"
+              "unset ro626p plain626\n"
+              "echo \"rc=$? ro=[${ro626p}] plain=[${plain626-U}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 ro=[5] plain=[U]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_writable_still_works_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: without the readonly attribute the whole matrix still unsets
+    /// cleanly (scalar, whole array, single element) with rc=0.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nw626s=v\nw626a=(a b c)\nw626e=(x y z)\n"
+              "unset w626s\nunset w626a\nunset \"w626e[1]\"\n"
+              "echo \"rc=$? s=[${w626s-U}] a=${#w626a[@]} e=[${w626e[*]}]\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "rc=0 s=[U] a=0 e=[x z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_unset_readonly_nameref_target_refused) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// `unset` resolves a nameref to its target, so a nameref pointing at a
+    /// readonly binding is refused on the resolved TARGET (the diagnostic names
+    /// the target, not the nameref) and the target survives. This is the only
+    /// path that reaches the readonly branch after the nameref-resolution
+    /// allocation, so it also guards that owned string's ownership.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\nreadonly ro626n=5\ndeclare -n ref626=ro626n\n"
+              "unset ref626\necho \"rc=$? v=[${ro626n}]\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDERR_CONTAINS(r, "ro626n");
+    ASSERT_STDOUT_EQ(r, "rc=1 v=[5]\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
  * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
@@ -7964,6 +8095,15 @@ int main(void) {
     RUN_TEST(rt_unset_local_global_survives);
     RUN_TEST(rt_unset_nonexistent_ok);
     RUN_TEST(rt_unset_repeated_local_preserves_global);
+    RUN_TEST(rt_unset_readonly_scalar_refused);
+    RUN_TEST(rt_unset_readonly_array_refused);
+    RUN_TEST(rt_unset_readonly_assoc_refused);
+    RUN_TEST(rt_unset_readonly_element_refused);
+    RUN_TEST(rt_unset_readonly_global_from_fn_refused);
+    RUN_TEST(rt_unset_readonly_universal_bash_mode);
+    RUN_TEST(rt_unset_readonly_partial_continues);
+    RUN_TEST(rt_unset_writable_still_works_control);
+    RUN_TEST(rt_unset_readonly_nameref_target_refused);
     RUN_TEST(rt_promote_lush_element_refused);
     RUN_TEST(rt_promote_lush_append_refused);
     RUN_TEST(rt_promote_lush_arith_refused);

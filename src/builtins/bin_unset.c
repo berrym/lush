@@ -24,6 +24,11 @@ int bin_unset(int argc, char **argv) {
         return 0;
     }
 
+    /// Accumulated status: a readonly target is refused (non-zero) while the
+    /// remaining names are still processed, matching builtin argument-loop
+    /// discipline.
+    int rc = 0;
+
     /// Unset each variable specified
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
@@ -50,6 +55,20 @@ int bin_unset(int argc, char **argv) {
                     sub_buf[sub_len] = '\0';
                     array_value_t *array = symtable_get_array(name_buf);
                     if (array) {
+                        /// A readonly binding is immutable: it may be neither
+                        /// reassigned nor destroyed. Removing an element
+                        /// mutates the array, so refuse it the same way the
+                        /// write surfaces refuse element writes (E1117),
+                        /// leaving the array intact. Uniform readonly
+                        /// diagnostic across all mutation surfaces.
+                        if (array->flags & SYMVAR_READONLY) {
+                            executor_error_report(
+                                current_executor, SHELL_ERR_READONLY_VAR,
+                                builtin_get_source_location(),
+                                "%s: readonly variable", name_buf);
+                            rc = 1;
+                            continue;
+                        }
                         if (array->is_associative) {
                             symtable_array_unset_assoc(array, sub_buf);
                         } else {
@@ -74,9 +93,27 @@ int bin_unset(int argc, char **argv) {
             }
         }
 
+        /// A readonly binding is immutable across every mutation surface, so
+        /// `unset` must refuse it the way assignment/append/element/arithmetic
+        /// already do (E1117), leaving the binding intact -- otherwise a
+        /// readonly array or associative would be silently destroyed and a
+        /// readonly scalar protected only incidentally and without diagnostic.
+        /// Both queries are scope-chain aware, so a readonly outer/global
+        /// binding is caught from within a function scope. Checked on the
+        /// nameref-resolved target, matching where the unset itself lands.
+        if ((symtable_array_get_flags(var_name) & SYMVAR_READONLY) ||
+            (mgr && (symtable_get_flags(mgr, var_name) & SYMVAR_READONLY))) {
+            executor_error_report(current_executor, SHELL_ERR_READONLY_VAR,
+                                  builtin_get_source_location(),
+                                  "%s: readonly variable", var_name);
+            rc = 1;
+            free(resolved_owned);
+            continue;
+        }
+
         /// Use legacy API function for unsetting variables
         symtable_unset_global(var_name);
         free(resolved_owned);
     }
-    return 0;
+    return rc;
 }
