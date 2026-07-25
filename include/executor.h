@@ -540,6 +540,24 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
 /**
+ * @brief Reject an assignment to the aggregate subscript [@]/[*] (issue #627).
+ *
+ * Emits the targeted SHELL_ERR_INVALID_SUBSCRIPT diagnostic. Shared by every
+ * syntactic entry point that can write an array element target so the reject
+ * is uniform: the element assignment and the array-literal element in
+ * execute_array_assignment, and the declare/typeset/local/readonly compound
+ * literal in builtin_bind_array_literal. Non-fatal; the caller returns
+ * non-zero.
+ *
+ * @param executor Executor context
+ * @param loc Source location of the offending subscript
+ * @param subscript The literal subscript text ("@" or "*")
+ */
+void report_aggregate_subscript_error(executor_t *executor,
+                                      source_location_t loc,
+                                      const char *subscript);
+
+/**
  * @brief Terminate the current process, correctly for a forked child.
  *
  * A forked child (getpid() != shell_pid) terminates with _exit() so stdio

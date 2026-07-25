@@ -20835,6 +20835,45 @@ static void report_scalar_kind_error(executor_t *executor,
     executor_request_posix_exit(executor, 1);
 }
 
+/*
+ * Reject an assignment whose subscript is the aggregate selector [@]/[*]
+ * (issue #627). [@]/[*] select the whole array (all elements) in read
+ * contexts (${a[@]}, ${#a[*]}); they are not a single writable element
+ * address, so they are not a valid assignment target -- uniformly for indexed
+ * and associative arrays (bash+zsh reject the indexed form; zsh rejects the
+ * associative form too, while bash reinterprets it as a literal key, which
+ * would make [@] mean "all" on read but "the @ key" on write -- an overload
+ * lush declines). Non-fatal, mirroring the readonly-target reject: the
+ * assignment fails with a non-zero status and the script continues. Shared
+ * (prototype in executor.h) by all three write entry points: element
+ * assignment and array-literal element here, and the declare/typeset/local/
+ * readonly compound literal in builtin_bind_array_literal.
+ */
+void report_aggregate_subscript_error(executor_t *executor,
+                                      source_location_t loc,
+                                      const char *subscript) {
+    shell_error_t *err = shell_error_create(
+        SHELL_ERR_INVALID_SUBSCRIPT, SHELL_SEVERITY_ERROR, loc,
+        "invalid array subscript '[%s]': the aggregate selector is not a "
+        "writable element",
+        subscript);
+    if (err) {
+        shell_error_set_suggestion(
+            err,
+            "[@] and [*] select all elements for reading and cannot be an "
+            "assignment target; replace the whole array with 'name=(...)', or "
+            "assign to a specific index or key. A literal @ or * associative "
+            "key "
+            "needs a variable subscript: k='@'; name[$k]=value.");
+        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+        shell_error_free(err);
+        executor->has_error = true;
+    } else {
+        executor_error_report(executor, SHELL_ERR_INVALID_SUBSCRIPT, loc,
+                              "invalid array subscript '[%s]'", subscript);
+    }
+}
+
 static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     if (!assign_node || !assign_node->val.str) {
         return 1;
@@ -20900,6 +20939,22 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         if (idx_str) {
                             strncpy(idx_str, elem_str + 1, idx_len);
                             idx_str[idx_len] = '\0';
+
+                            /// a=([@]=x) is the array-literal spelling of
+                            /// a[@]=x: the aggregate selector is not a writable
+                            /// element target, so reject it here too (issue
+                            /// #627, uniform in every context). Fail the whole
+                            /// literal -- the fresh array is discarded and the
+                            /// existing binding, stored only after this loop,
+                            /// is left untouched -- matching the element path.
+                            if (strcmp(idx_str, "@") == 0 ||
+                                strcmp(idx_str, "*") == 0) {
+                                report_aggregate_subscript_error(
+                                    executor, assign_node->loc, idx_str);
+                                free(idx_str);
+                                symtable_array_free(array);
+                                return 1;
+                            }
 
                             /// Get value after ]=
                             const char *value = bracket_end + 2;
@@ -21184,6 +21239,20 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     const char *subscript = subscript_node->val.str;
     const char *value = value_node ? value_node->val.str : "";
 
+    /// The aggregate selector [@]/[*] denotes the whole array (all elements)
+    /// for reading; it is not a single writable element address, so it is not
+    /// a valid assignment target -- uniformly for indexed and associative
+    /// arrays (issue #627). Reject the literal @ or * before any value-expand
+    /// or scalar->array promotion side effect, so `s[@]=x` never promotes a
+    /// scalar. The check is syntactic (matching how reads recognize the
+    /// aggregate); a dynamic subscript (`name[$k]=v` with k=@) is a distinct
+    /// literal-key write and is left alone. Runs after the readonly guard
+    /// above, so a readonly target reports readonly first (#621 precedence).
+    if (strcmp(subscript, "@") == 0 || strcmp(subscript, "*") == 0) {
+        report_aggregate_subscript_error(executor, assign_node->loc, subscript);
+        return 1;
+    }
+
     /// Check for append operation (value starts with "+=")
     bool is_append = false;
     if (value && strlen(value) >= 2 && value[0] == '+' && value[1] == '=') {
@@ -21232,11 +21301,9 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         }
     }
 
-    /// Handle subscript - could be "@", "*", string key, or numeric index
-    if (strcmp(subscript, "@") == 0 || strcmp(subscript, "*") == 0) {
-        /// Append to array
-        symtable_array_append(array, final_value);
-    } else if (array->is_associative) {
+    /// Handle subscript - a string key (associative) or a numeric index. The
+    /// aggregate selector [@]/[*] was rejected up front (issue #627).
+    if (array->is_associative) {
         /// Associative array - use subscript as string key
         /// First expand any variables in the subscript
         char *expanded_subscript = expand_variable(executor, subscript);

@@ -3129,6 +3129,238 @@ TEST(rt_env625_promote_mapfile_drops) {
 }
 
 /* ==========================================================================
+ * #627: the aggregate selector [@]/[*] denotes the whole array (all elements)
+ * in read contexts and is not a single writable element address, so it is
+ * rejected as an assignment target -- uniformly for indexed and associative
+ * arrays, in every mode. The check is syntactic (the literal @ or *), fires
+ * any value-expand or #621 scalar->array promotion, and is non-fatal (the
+ * assignment fails with a non-zero status; the script continues). A readonly
+ * target reports readonly first (#621 precedence). A dynamic subscript
+ * (name[$k]=v with k=@) is a distinct literal-key write and is left alone.
+ * ========================================================================== */
+
+TEST(rt_sub627_indexed_at_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Distinct names per test: symtable_assign_array uses the process-global
+    /// manager, so array bindings (esp. the readonly one below) leak across the
+    /// shared test binary.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627a=(1 2 3)\ns627a[@]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627a[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_indexed_star_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627b=(1 2 3)\ns627b[*]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627b[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_indexed_append_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The `+=` element form routes through the same path; also rejected.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627c=(1 2 3)\ns627c[@]+=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627c[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_assoc_at_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Uniform: rejected for associative too (lush declines bash's reinterpret-
+    /// as-literal-key, which would overload [@] read-vs-write). Map unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -A m627d\nm627d[k]=v\nm627d[@]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${m627d[k]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [v]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_scalar_not_promoted) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Rejected before the #621 promote path, so the scalar is left a scalar.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627e=hi\ns627e[@]=x\n"
+              "printf 'rc=%s s=[%s]\\n' \"$?\" \"$s627e\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 s=[hi]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_uniform_in_lush_mode) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Target validity is not gated by FEATURE_STRICT_VALUE_TYPING: rejected in
+    /// lush mode too.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode lush\ns627f=(1 2 3)\ns627f[@]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627f[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_readonly_precedence) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A readonly target reports readonly (E1117) first, before the subscript
+    /// check -- consistent with #621 readonly precedence. Array unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nreadonly s627g=(1 2 3)\ns627g[@]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627g[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly");
+    ASSERT_STDOUT_EQ(r, "rc=1 [1 2 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_control_normal_index_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: a normal numeric index still assigns.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627h=(1 2 3)\ns627h[1]=x\nprintf '[%s]\\n' "
+              "\"${s627h[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[1 x 3]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_control_normal_key_and_varkey_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: a normal associative key assigns, and the variable escape hatch
+    /// for a literal @ key (k=@; m[$k]=x) works -- the dynamic subscript is not
+    /// the syntactic aggregate.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -A m627i\nm627i[k]=v\nk=@\nm627i[$k]=x\n"
+              "printf '[%s][%s]\\n' \"${m627i[k]}\" \"${m627i[$k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[v][x]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_control_aggregate_read_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: [@]/[*] READS are untouched.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627j=(1 2 3)\n"
+              "printf 'star=[%s] n=%s\\n' \"${s627j[*]}\" \"${#s627j[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "star=[1 2 3] n=3\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_array_literal_at_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// a=([@]=x) is the array-literal spelling of a[@]=x: rejected in every
+    /// context, so the array is not created.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627k=([@]=x)\n"
+              "printf 'rc=%s n=%s\\n' \"$?\" \"${#s627k[@]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_array_literal_star_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627l=([*]=x)\n"
+              "printf 'rc=%s n=%s\\n' \"$?\" \"${#s627l[@]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_array_literal_mixed_rejected_atomic) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A bad aggregate element fails the whole literal atomically: the leading
+    /// `z` is not partially stored (the fresh array is discarded).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns627m=(z [@]=x)\n"
+              "printf 'rc=%s n=%s\\n' \"$?\" \"${#s627m[@]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=0\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_assoc_append_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The associative `+=` element form is rejected too; map unchanged.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -A s627n\ns627n[k]=v\ns627n[@]+=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627n[k]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 [v]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_declare_assoc_literal_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// declare -A m=([@]=v): the compound-literal spelling through
+    /// builtin_bind_array_literal is rejected too -- the associative form is
+    /// where bash silently creates the @-key overload lush declines.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -A s627o=([@]=v)\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627o[@]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 []\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_declare_indexed_literal_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -a s627p=([*]=x [1]=y)\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627p[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 []\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_local_assoc_literal_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// local -A m=([@]=v) routes through the same helper.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\nf(){ local -A s627q=([@]=v); "
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s627q[@]}\"; }\nf\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid array subscript");
+    ASSERT_STDOUT_EQ(r, "rc=1 []\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub627_declare_control_literal_ok) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: normal declare compound literals still bind (indexed + assoc).
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode bash\ndeclare -a s627s=([2]=x)\ndeclare -A s627t=([kk]=vv)\n"
+        "printf '[%s][%s]\\n' \"${s627s[2]}\" \"${s627t[kk]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x][vv]\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
  * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
@@ -8268,6 +8500,24 @@ int main(void) {
     RUN_TEST(rt_env625_local_array_shadow_preserves_global_element);
     RUN_TEST(rt_env625_local_array_shadow_preserves_global_reada);
     RUN_TEST(rt_env625_promote_mapfile_drops);
+    RUN_TEST(rt_sub627_indexed_at_rejected);
+    RUN_TEST(rt_sub627_indexed_star_rejected);
+    RUN_TEST(rt_sub627_indexed_append_rejected);
+    RUN_TEST(rt_sub627_assoc_at_rejected);
+    RUN_TEST(rt_sub627_scalar_not_promoted);
+    RUN_TEST(rt_sub627_uniform_in_lush_mode);
+    RUN_TEST(rt_sub627_readonly_precedence);
+    RUN_TEST(rt_sub627_control_normal_index_ok);
+    RUN_TEST(rt_sub627_control_normal_key_and_varkey_ok);
+    RUN_TEST(rt_sub627_control_aggregate_read_ok);
+    RUN_TEST(rt_sub627_array_literal_at_rejected);
+    RUN_TEST(rt_sub627_array_literal_star_rejected);
+    RUN_TEST(rt_sub627_array_literal_mixed_rejected_atomic);
+    RUN_TEST(rt_sub627_assoc_append_rejected);
+    RUN_TEST(rt_sub627_declare_assoc_literal_rejected);
+    RUN_TEST(rt_sub627_declare_indexed_literal_rejected);
+    RUN_TEST(rt_sub627_local_assoc_literal_rejected);
+    RUN_TEST(rt_sub627_declare_control_literal_ok);
     RUN_TEST(rt_promote_lush_element_refused);
     RUN_TEST(rt_promote_lush_append_refused);
     RUN_TEST(rt_promote_lush_arith_refused);
