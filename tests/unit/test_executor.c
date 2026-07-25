@@ -3361,6 +3361,181 @@ TEST(rt_sub627_declare_control_literal_ok) {
 }
 
 /* ==========================================================================
+ * #618: an array subscript is a native 64-bit sparse key. The index store
+ * (int64_t *indices) and the set/get/unset/append primitives are int64, and
+ * every user-subscript call site passes the full width -- so a subscript like
+ * 2^32 or 2^40 is stored and read back at its true index, never truncated by an
+ * (int) cast to alias a wrong element. A from-end negative that resolves below
+ * 0 is out of range and reported (E1116) on both the plain and arithmetic
+ * surfaces. Distinct names (process-global symtable). 4294967296 = 2^32,
+ * 4294967301 = 2^32+5, 2147483648 = 2^31, 1099511627776 = 2^40.
+ * ========================================================================== */
+
+TEST(rt_sub618_no_alias_plain) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The reported bug: a[2^32] used to alias a[0]. Now a[0] is untouched and
+    /// the 2^32 index round-trips.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode bash\ns618a=(1 2 3)\ns618a[0]=zero\ns618a[4294967296]=big\n"
+        "printf '[%s][%s]\\n' \"${s618a[0]}\" \"${s618a[4294967296]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[zero][big]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_no_alias_arith) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The #603 arithmetic subscript path routes through the same store.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode bash\ns618b=(1 2 3)\n(( s618b[4294967296] = 777 ))\n"
+        "printf '[%s][%s]\\n' \"${s618b[0]}\" \"${s618b[4294967296]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[1][777]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_2p40_roundtrip) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618c[1099511627776]=huge\n"
+              "printf '[%s] n=%s\\n' \"${s618c[1099511627776]}\" "
+              "\"${#s618c[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[huge] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_2p31_native_not_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// 2^31 truncated to INT_MIN under the old (int) cast and was wrongly
+    /// rejected as negative; now it is a native index.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "mode bash\ns618d[2147483648]=x\n"
+        "printf '[%s] n=%s\\n' \"${s618d[2147483648]}\" \"${#s618d[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_distinct_big_no_alias) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Two large indices in the former aliasing band stay distinct, and the
+    /// low-32-bit alias target (5) is untouched.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618e[4294967296]=x\ns618e[4294967301]=y\n"
+              "printf '[%s][%s][%s]\\n' \"${s618e[4294967296]}\" "
+              "\"${s618e[4294967301]}\" \"${s618e[5]-unset}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x][y][unset]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_keys_and_length_full_width) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// ${!a[@]} lists the full-width index and ${#a[idx]} measures the element.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618f[4294967296]=hello\n"
+              "printf 'key=%s len=%s\\n' \"${!s618f[@]}\" "
+              "\"${#s618f[4294967296]}\"\n");
+    ASSERT_STDOUT_EQ(r, "key=4294967296 len=5\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_neg_oob_plain_reports) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A from-end negative resolving below 0 is out of range: reported on the
+    /// plain path (was a silent no-op), array unchanged, non-zero status.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618h=(p q)\ns618h[-99]=x\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s618h[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "out of range");
+    ASSERT_STDOUT_EQ(r, "rc=1 [p q]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_neg_oob_arith_reports) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Parity: the arithmetic path also reports out of range.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618i=(p q)\n(( s618i[-99] = x ))\n"
+              "printf 'rc=%s [%s]\\n' \"$?\" \"${s618i[*]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "out of range");
+    ASSERT_STDOUT_EQ(r, "rc=1 [p q]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_from_end_control) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: valid from-end negatives still resolve (unchanged by the
+    /// widening).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618g=(p q r)\ns618g[-1]=Z\ns618g[-3]=A\n"
+              "printf '[%s]\\n' \"${s618g[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[A q Z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_declare_and_literal_big) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The declare compound literal (strtoll, not atoi) and the bare array
+    /// literal both store a big explicit index at full width without aliasing.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ndeclare -a s618j=([4294967296]=lit)\n"
+              "s618k=(z0 [4294967296]=big)\n"
+              "printf '[%s][%s][%s]\\n' \"${s618j[4294967296]}\" "
+              "\"${s618k[0]}\" \"${s618k[4294967296]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[lit][z0][big]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_unset_big_index) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// unset of a big element (bin_unset now uses strtoll, not (int)strtol).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618l[4294967296]=x\nunset \"s618l[4294967296]\"\n"
+              "printf 'n=%s [%s]\\n' \"${#s618l[@]}\" "
+              "\"${s618l[4294967296]-gone}\"\n");
+    ASSERT_STDOUT_EQ(r, "n=0 [gone]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_int64max_append_no_corruption) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Appending past INT64_MAX would overflow max_index+1; it is refused, not
+    /// wrapped to index 0 (which used to silently corrupt element 0).
+    /// 9223372036854775807 = INT64_MAX.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618m[9223372036854775807]=max\ns618m+=(ovf)\n"
+              "printf 'n=%s a0=[%s] max=[%s]\\n' \"${#s618m[@]}\" "
+              "\"${s618m[0]-unset}\" \"${s618m[9223372036854775807]}\"\n");
+    ASSERT_STDOUT_EQ(r, "n=1 a0=[unset] max=[max]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub618_empty_from_end_rejects) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// From-end on an empty array (the count==0 base arm) is out of range: no
+    /// element to count back from.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns618n=()\ns618n[-1]=x\n"
+              "printf 'rc=%s n=%s\\n' \"$?\" \"${#s618n[@]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "out of range");
+    ASSERT_STDOUT_EQ(r, "rc=1 n=0\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
  * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
@@ -8518,6 +8693,19 @@ int main(void) {
     RUN_TEST(rt_sub627_declare_indexed_literal_rejected);
     RUN_TEST(rt_sub627_local_assoc_literal_rejected);
     RUN_TEST(rt_sub627_declare_control_literal_ok);
+    RUN_TEST(rt_sub618_no_alias_plain);
+    RUN_TEST(rt_sub618_no_alias_arith);
+    RUN_TEST(rt_sub618_2p40_roundtrip);
+    RUN_TEST(rt_sub618_2p31_native_not_rejected);
+    RUN_TEST(rt_sub618_distinct_big_no_alias);
+    RUN_TEST(rt_sub618_keys_and_length_full_width);
+    RUN_TEST(rt_sub618_neg_oob_plain_reports);
+    RUN_TEST(rt_sub618_neg_oob_arith_reports);
+    RUN_TEST(rt_sub618_from_end_control);
+    RUN_TEST(rt_sub618_declare_and_literal_big);
+    RUN_TEST(rt_sub618_unset_big_index);
+    RUN_TEST(rt_sub618_int64max_append_no_corruption);
+    RUN_TEST(rt_sub618_empty_from_end_rejects);
     RUN_TEST(rt_promote_lush_element_refused);
     RUN_TEST(rt_promote_lush_append_refused);
     RUN_TEST(rt_promote_lush_arith_refused);

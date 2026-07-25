@@ -433,8 +433,11 @@ int builtin_bind_array_literal(const char *name, const char *literal,
                                 symtable_array_set_assoc(arr, idx_str,
                                                          elem_val);
                             } else {
-                                symtable_array_set_index(arr, atoi(idx_str),
-                                                         elem_val);
+                                /// strtoll (not atoi) so a 64-bit explicit
+                                /// index in a declare/local literal is not
+                                /// truncated (issue #618).
+                                symtable_array_set_index(
+                                    arr, strtoll(idx_str, NULL, 10), elem_val);
                             }
                         }
                     } else if (append) {
