@@ -3536,6 +3536,131 @@ TEST(rt_sub618_empty_from_end_rejects) {
 }
 
 /* ==========================================================================
+ * #642: an array subscript is an arithmetic-expression context, and lush's
+ * arithmetic engine resolves $-parameters in its Layer-0 pre-pass -- but that
+ * pre-pass needs the executor. The ${a[SUB]} / ${#a[SUB]} reads and the
+ * a[SUB]=v writes called the executor-less arithm_expand, so a $-bearing
+ * subscript reached the arith lexer raw and failed, while $((...)) / (( ))
+ * (which carry the executor) resolved it -- lush inconsistent with itself.
+ * Threading the executor through the subscript arithmetic context makes every
+ * spelling of the same index resolve identically. Distinct names.
+ * ========================================================================== */
+
+TEST(rt_sub642_read_dollar_forms_parity) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The $-bearing subscript spellings now read the same element as the bare
+    /// and $((...)) spellings that already worked (the internal invariant).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642a=(x y z)\ni=1\n"
+              "printf '[%s][%s][%s][%s][%s]\\n' \"${s642a[$i]}\" "
+              "\"${s642a[${i}]}\" \"${s642a[$i+0]}\" \"${s642a[i]}\" "
+              "\"${s642a[$((i))]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[y][y][y][y][y]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_length_dollar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r =
+        run_shell_with_executor(exec, "mode bash\ns642b=(xx yyy z)\ni=1\n"
+                                      "printf 'len=%s\\n' \"${#s642b[$i]}\"\n");
+    ASSERT_STDOUT_EQ(r, "len=3\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_write_dollar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642c=(x y z)\ni=1\ns642c[$i]=W\n"
+              "printf '[%s]\\n' \"${s642c[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x W z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_write_braces) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642d=(x y z)\ni=1\ns642d[${i}]=W\n"
+              "printf '[%s]\\n' \"${s642d[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x W z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_write_computed_and_cmdsub) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A $-arith and a command-substitution subscript both resolve through the
+    /// same pre-pass.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642e=(x y z)\ni=1\ns642e[$((i + 1))]=P\n"
+              "s642e[$(printf 0)]=Q\nprintf '[%s]\\n' \"${s642e[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[Q y P]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_append_dollar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642f=(x y z)\ni=1\ns642f[$i]+=X\n"
+              "printf '[%s]\\n' \"${s642f[*]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x yX z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_array_literal_dollar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The array-literal [SUB]=value element resolves a $-subscript too.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ni=2\ns642g=([$i]=W)\n"
+              "printf '2=[%s] n=%s\\n' \"${s642g[2]}\" \"${#s642g[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "2=[W] n=1\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_control_no_dollar_unchanged) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// Control: a subscript with no $ is unaffected (the pre-pass has nothing
+    /// to expand), and the already-working (( )) / $(( )) surfaces still work.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642h=(x y z)\ni=1\n(( s642h[$i] = 99 ))\n"
+              "printf '[%s] bare=[%s]\\n' \"${s642h[*]}\" \"${s642h[1]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[x 99 z] bare=[99]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_element_modify_dollar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The element-modify read paths (pattern substitution, default, trim) also
+    /// resolve a $-subscript.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ns642i=(x yy zZ)\ni=1\n"
+              "printf '[%s][%s][%s]\\n' \"${s642i[$i]/y/Y}\" "
+              "\"${s642i[$i]:-D}\" \"${s642i[2]#z}\"\n");
+    ASSERT_STDOUT_EQ(r, "[Yy][yy][Z]\n");
+    executor_free(exec);
+}
+
+TEST(rt_sub642_large_index_dollar_write) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// A $-subscript that expands to a 64-bit index writes and reads at the
+    /// full index (#642 resolution composing with the #618 int64 store).
+    run_result_t r = run_shell_with_executor(
+        exec, "mode bash\ni=4294967296\ns642k[$i]=big\n"
+              "printf '[%s] n=%s\\n' \"${s642k[$i]}\" \"${#s642k[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[big] n=1\n");
+    executor_free(exec);
+}
+
+/* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
  * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
@@ -8706,6 +8831,16 @@ int main(void) {
     RUN_TEST(rt_sub618_unset_big_index);
     RUN_TEST(rt_sub618_int64max_append_no_corruption);
     RUN_TEST(rt_sub618_empty_from_end_rejects);
+    RUN_TEST(rt_sub642_read_dollar_forms_parity);
+    RUN_TEST(rt_sub642_length_dollar);
+    RUN_TEST(rt_sub642_write_dollar);
+    RUN_TEST(rt_sub642_write_braces);
+    RUN_TEST(rt_sub642_write_computed_and_cmdsub);
+    RUN_TEST(rt_sub642_append_dollar);
+    RUN_TEST(rt_sub642_array_literal_dollar);
+    RUN_TEST(rt_sub642_control_no_dollar_unchanged);
+    RUN_TEST(rt_sub642_element_modify_dollar);
+    RUN_TEST(rt_sub642_large_index_dollar_write);
     RUN_TEST(rt_promote_lush_element_refused);
     RUN_TEST(rt_promote_lush_append_refused);
     RUN_TEST(rt_promote_lush_arith_refused);
