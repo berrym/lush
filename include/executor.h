@@ -641,6 +641,22 @@ char *expand_if_needed(executor_t *executor, const char *text);
 char *expand_variables_in_string(executor_t *executor, const char *str);
 
 /**
+ * @brief Expand a dequoted array-subscript key (text + provenance).
+ *
+ * Applies the provenance-driven double-quote / `$`-expansion rules to a
+ * `(text, prov)` pair already produced by lush_dequote_span, with tilde
+ * expansion suppressed (a subscript keys on a literal `~`). The single source
+ * of truth for turning a normalized subscript into its associative key (#631).
+ *
+ * @param executor Executor context.
+ * @param text     Dequoted subscript text (from lush_dequote_span).
+ * @param prov     Parallel U/S/D/E provenance map, or NULL.
+ * @return Newly allocated key (caller frees).
+ */
+char *expand_dequoted_key(executor_t *executor, const char *text,
+                          const char *prov);
+
+/**
  * @brief Expand a single word/argument AST node to its string value.
  *
  * Dispatches by node type: ANSI-C decode for a `$'...'` NODE_STRING_LITERAL,

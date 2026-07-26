@@ -277,7 +277,8 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
 /// expand_quoted_string; a map lets a fused mixed-quote word expand each
 /// character by its own quote context (#498).
 static char *expand_quoted_string_prov(executor_t *executor, const char *str,
-                                       bool in_double_quotes, const char *prov);
+                                       bool in_double_quotes, const char *prov,
+                                       bool allow_tilde);
 /// expand_arg_node is declared in executor.h -- it is the shared per-node-type
 /// word expander, also consumed by the redirection/here-string target path.
 static char *expand_array_unsubscripted(executor_t *executor,
@@ -6417,7 +6418,7 @@ char *expand_arg_node(executor_t *executor, node_t *node) {
         /// contexts, node->quote_prov drives per-character decisions (#498);
         /// NULL keeps the whole-string double-quote policy.
         return expand_quoted_string_prov(executor, node->val.str, true,
-                                         node->quote_prov);
+                                         node->quote_prov, true);
     case NODE_ARITH_EXP:
         return expand_arithmetic(executor, node->val.str);
     case NODE_COMMAND_SUB:
@@ -18004,12 +18005,23 @@ static node_t *copy_node_simple(node_t *original) {
 /// Thin wrapper: the whole-string double-quote policy, no per-character map.
 static char *expand_quoted_string(executor_t *executor, const char *str,
                                   bool in_double_quotes) {
-    return expand_quoted_string_prov(executor, str, in_double_quotes, NULL);
+    return expand_quoted_string_prov(executor, str, in_double_quotes, NULL,
+                                     true);
+}
+
+char *expand_dequoted_key(executor_t *executor, const char *text,
+                          const char *prov) {
+    /// Array-subscript key normalization: the text/prov already came through
+    /// lush_dequote_span, so apply the double-quote/`$`-expansion rules the
+    /// provenance map encodes -- but a subscript is a single-word key context,
+    /// not a word, so a leading `~` keys on the literal `~`
+    /// (allow_tilde=false).
+    return expand_quoted_string_prov(executor, text, false, prov, false);
 }
 
 static char *expand_quoted_string_prov(executor_t *executor, const char *str,
-                                       bool in_double_quotes,
-                                       const char *prov) {
+                                       bool in_double_quotes, const char *prov,
+                                       bool allow_tilde) {
     if (!executor || !str) {
         return strdup("");
     }
@@ -18041,7 +18053,10 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
     /// `~/a"b"`). Only fires when the first character is genuinely unquoted; a
     /// quoted or non-`~` first character keeps the legacy behavior. A `~` after
     /// a `:` is NOT expanded here -- that is the assignment/magic_equal path.
-    if (prov && str[0] == '~' && prov[0] == QUOTE_PROV_UNQUOTED) {
+    /// Callers that are not a word context (an array subscript key, which keys
+    /// on a literal `~`) pass allow_tilde=false to suppress it.
+    if (allow_tilde && prov && str[0] == '~' &&
+        prov[0] == QUOTE_PROV_UNQUOTED) {
         size_t tprefix = 1; /// consume `~` and any `~user` up to `/` or end
         while (tprefix < len && str[tprefix] != '/' &&
                prov[tprefix] == QUOTE_PROV_UNQUOTED) {
