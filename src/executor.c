@@ -42,6 +42,7 @@
 #include "restricted_mode.h"
 #include "shell_mode.h"
 #include "signals.h"
+#include "subscript_key.h"
 #include "symtable.h"
 #include "tokenizer.h" /// QUOTE_PROV_* byte values for node_t.quote_prov (#498)
 
@@ -14902,7 +14903,11 @@ static char *parse_parameter_expansion(executor_t *executor,
     ///     belongs to something else and the existing block handles
     ///     non-array names correctly).
     if (bracket) {
-        const char *close = strchr(bracket, ']');
+        /// Same quote/escape/nested-aware span the write path uses (#631), so
+        /// the per-element `[@]`/`[*]` detection sees the true closing `]`.
+        subscript_span_t espan =
+            scan_subscript_bounds(bracket, strlen(bracket));
+        const char *close = espan.is_valid ? bracket + espan.close : NULL;
         if (close && close[1] != '\0' && close[1] != ':') {
             char op_char = close[1];
             bool is_per_element_op =
@@ -14931,7 +14936,14 @@ static char *parse_parameter_expansion(executor_t *executor,
         strncpy(arr_name, expansion, name_len);
         arr_name[name_len] = '\0';
 
-        const char *close = strchr(bracket, ']');
+        /// Delimit the subscript with the same span finder the write store and
+        /// the array-element-assignment parser use (#631). strchr(']') stopped
+        /// at the first `]`, so a key with an escaped/quoted/nested `]`
+        /// (m[x\]y], m["a]b"], m[$(f)]) truncated on read and missed the value
+        /// the write -- now quote/escape/nested-aware -- stored.
+        subscript_span_t rspan =
+            scan_subscript_bounds(bracket, strlen(bracket));
+        const char *close = rspan.is_valid ? bracket + rspan.close : NULL;
         if (close) {
             size_t sub_len = close - bracket - 1;
             char *subscript = malloc(sub_len + 1);
@@ -15276,9 +15288,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                         }
                     } else if (array->is_associative) {
-                        /// Associative array - use subscript as string key
-                        char *expanded_subscript =
-                            expand_variable(executor, subscript);
+                        /// Associative array - use subscript as string key.
+                        /// Same canonicalization as the store path (#631) so
+                        /// the read keys on the identical bytes the write
+                        /// produced.
+                        char *expanded_subscript = subscript_normalize_key(
+                            executor, subscript, strlen(subscript));
                         const char *key =
                             expanded_subscript ? expanded_subscript : subscript;
                         const char *elem = symtable_array_get_assoc(array, key);
@@ -21322,9 +21337,12 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     /// Handle subscript - a string key (associative) or a numeric index. The
     /// aggregate selector [@]/[*] was rejected up front (issue #627).
     if (array->is_associative) {
-        /// Associative array - use subscript as string key
-        /// First expand any variables in the subscript
-        char *expanded_subscript = expand_variable(executor, subscript);
+        /// Associative array - use subscript as string key. Canonicalize the
+        /// raw interior (remove one level of quoting/escaping, $-expand) so a
+        /// key written m["a b"]=v / m[a\ b]=v is stored under the same bytes a
+        /// later ${m[a b]} reads back (#631).
+        char *expanded_subscript =
+            subscript_normalize_key(executor, subscript, strlen(subscript));
         const char *key = expanded_subscript ? expanded_subscript : subscript;
 
         if (is_append) {

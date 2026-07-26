@@ -357,6 +357,92 @@ TEST(rt_case_continue_polyglot_spellings) {
     ASSERT_STDOUT_EQ(plain, "one\n");
 }
 
+/// #631 Phase 3 C1: an associative-array key is canonicalized identically on
+/// the write store and the read extractor, so a key written with an escaped or
+/// quoted space is read back by the space-bearing form. Before the shared
+/// subscript_normalize_key, the write stored the raw bytes (`a\ b`) while the
+/// read looked up the space-bearing form, so the round-trip never matched.
+/// Distinct array names per case: the process-global symtable persists arrays
+/// across run_shell() calls within this test binary.
+TEST(subscript_c1_assoc_escaped_key_roundtrip) {
+    /// Escaped-space write, plain-space read -- the reported #631 failure.
+    run_result_t r =
+        run_shell("declare -A mA631; mA631[a\\ b]=9; echo \"${mA631[a b]}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_c1_assoc_escaped_write_escaped_read) {
+    /// Escaped write, escaped read: canonicalizes on both sides to the same
+    /// `a b`, so this keeps matching (regression guard).
+    run_result_t r = run_shell(
+        "declare -A mB631; mB631[a\\ b]=9; echo \"${mB631[a\\ b]}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_c1_assoc_singlequoted_read_matches) {
+    /// A single-quoted read key normalizes to the same `a b` the escaped write
+    /// stored -- the read-side quote stripping the old path lacked.
+    run_result_t r = run_shell(
+        "declare -A mC631; mC631[a\\ b]=9; echo \"${mC631['a b']}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_c1_assoc_key_stored_canonical_length) {
+    /// The stored key is the canonical 3-byte `a b`, not the 4-byte raw `a\ b`.
+    /// Byte-length equality is the guard the atomic write+read fix must hold.
+    run_result_t r = run_shell("declare -A mD631; mD631[a\\ b]=9; "
+                               "for k in \"${!mD631[@]}\"; do echo \"${#k}\"; "
+                               "done\n");
+    ASSERT_STDOUT_EQ(r, "3\n");
+}
+
+TEST(subscript_c1_assoc_plain_key_unchanged) {
+    /// A key with no quote/escape/$ normalizes to itself: no regression on the
+    /// common case.
+    run_result_t r =
+        run_shell("declare -A mE631; mE631[key]=v; echo \"${mE631[key]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v\n");
+}
+
+TEST(subscript_c1_assoc_dollar_key_roundtrip) {
+    /// `$`-expansion of the key survives on both sides (the normalizer subsumes
+    /// the old expand_variable): the write keys on `foo`, and both a `$k` read
+    /// and a literal `foo` read hit it.
+    run_result_t r =
+        run_shell("declare -A mF631; k=foo; mF631[$k]=v; "
+                  "echo \"${mF631[foo]}\"; echo \"${mF631[$k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v\nv\n");
+}
+
+TEST(subscript_c1_indexed_roundtrip_untouched) {
+    /// The indexed path is untouched by C1 (only the associative branch routes
+    /// through the normalizer): a variable index still round-trips.
+    run_result_t r = run_shell(
+        "declare -a nG631; i=1; nG631[$i]=z; echo \"${nG631[$i]}\"\n");
+    ASSERT_STDOUT_EQ(r, "z\n");
+}
+
+TEST(subscript_c1_assoc_bracket_in_key_roundtrip) {
+    /// A key containing an escaped `]` must round-trip: the write span
+    /// (parser) and the read span (executor) both use scan_subscript_bounds,
+    /// so neither truncates at the escaped `]`. Before the read-span migration
+    /// the write stored `x]y` while the read's strchr truncated to `x\`.
+    run_result_t r = run_shell(
+        "declare -A mH631; mH631[x\\]y]=9; echo \"${mH631[x\\]y]}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_c1_assoc_dollar_anywhere) {
+    /// The normalizer expands `$`-units anywhere in the subscript (not only a
+    /// whole-string `$name`, which is all the old expand_variable did). Write
+    /// and read agree because both route through the one normalizer, so the
+    /// key `pre$x` is stored and read as `prefoo`.
+    run_result_t r = run_shell("declare -A mI631; x=foo; mI631[pre$x]=v; "
+                               "echo \"${mI631[prefoo]}\"; "
+                               "echo \"${mI631[pre$x]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v\nv\n");
+}
+
 TEST(rt_read_array_polyglot_spellings) {
     /// read into an indexed array has two spellings -- bash's `-a` and zsh's
     /// `-A` -- and lush accepts both for the one canonical behavior (spelling
@@ -8615,6 +8701,15 @@ int main(void) {
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
     RUN_TEST(rt_case_continue_polyglot_spellings);
+    RUN_TEST(subscript_c1_assoc_escaped_key_roundtrip);
+    RUN_TEST(subscript_c1_assoc_escaped_write_escaped_read);
+    RUN_TEST(subscript_c1_assoc_singlequoted_read_matches);
+    RUN_TEST(subscript_c1_assoc_key_stored_canonical_length);
+    RUN_TEST(subscript_c1_assoc_plain_key_unchanged);
+    RUN_TEST(subscript_c1_assoc_dollar_key_roundtrip);
+    RUN_TEST(subscript_c1_indexed_roundtrip_untouched);
+    RUN_TEST(subscript_c1_assoc_bracket_in_key_roundtrip);
+    RUN_TEST(subscript_c1_assoc_dollar_anywhere);
     RUN_TEST(rt_read_array_polyglot_spellings);
     RUN_TEST(for_loop_ifs_nonws_empty_fields_posix);
     RUN_TEST(rt_read_ifs_nonws_empty_fields);
