@@ -845,6 +845,35 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
     return tok;
 }
 
+/// Advance the tokenizer cursor to byte offset `to`, keeping line/column
+/// bookkeeping correct across a span that scan_subscript_bounds delimited (the
+/// primitive owns span-finding; line/column tracking is caller policy). One
+/// visual column per codepoint (as the main word-character loop counts, more
+/// correct than the byte-based advance the replaced subscript loops used), and
+/// a newline resets the column -- so a multi-byte key or a newline inside a
+/// command-substitution subscript columns and lines correctly. The span's
+/// codepoints are re-walked here rather than taken from the primitive because
+/// the newline column reset needs the per-byte pass anyway. Assumes `to` is
+/// within the buffer and lands on a codepoint boundary (both guaranteed by the
+/// primitive).
+static void tokenizer_advance_subscript(tokenizer_t *tokenizer, size_t to) {
+    size_t p = tokenizer->position;
+    while (p < to) {
+        if (tokenizer->input[p] == '\n') {
+            tokenizer->line++;
+            tokenizer->column = 0;
+            p++;
+        } else {
+            uint32_t cp = 0;
+            int n =
+                lle_utf8_decode_codepoint(&tokenizer->input[p], to - p, &cp);
+            p += (n > 0) ? (size_t)n : 1;
+            tokenizer->column++;
+        }
+    }
+    tokenizer->position = to;
+}
+
 static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
     if (!tokenizer || tokenizer->position >= tokenizer->input_length) {
         return token_new(TOK_EOF, NULL, 0, tokenizer ? tokenizer->line : 1,
@@ -1557,22 +1586,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 }
                 if (tokenizer->position < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position] == '[') {
-                    int depth = 0;
-                    while (tokenizer->position < tokenizer->input_length) {
-                        char curr = tokenizer->input[tokenizer->position];
-                        if (curr == '[') {
-                            depth++;
-                        } else if (curr == ']') {
-                            depth--;
-                            tokenizer->position++;
-                            tokenizer->column++;
-                            if (depth == 0) {
-                                break;
-                            }
-                            continue;
-                        }
-                        tokenizer->position++;
-                        tokenizer->column++;
+                    /// Absorb the [...] subscript into the $+NAME[...] token
+                    /// via the canonical span-finder (issue #631 Phase 2a).
+                    /// Only a balanced subscript commits -- an unbalanced [ no
+                    /// longer over-absorbs to end of input (the old loop had no
+                    /// closed guard), and quotes/escapes/nested subexpressions
+                    /// are now honored.
+                    subscript_span_t sub = scan_subscript_bounds(
+                        &tokenizer->input[tokenizer->position],
+                        tokenizer->input_length - tokenizer->position);
+                    if (sub.is_valid) {
+                        tokenizer_advance_subscript(
+                            tokenizer, tokenizer->position + sub.close + 1);
                     }
                 }
                 size_t length = tokenizer->position - start;
@@ -1635,34 +1660,19 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     if (tokenizer->position < tokenizer->input_length &&
                         tokenizer->input[tokenizer->position] == '[' &&
                         shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
-                        size_t scan = tokenizer->position;
-                        size_t scan_col = tokenizer->column;
-                        size_t scan_line = tokenizer->line;
-                        int depth = 0;
-                        bool closed = false;
-                        while (scan < tokenizer->input_length) {
-                            char sc = tokenizer->input[scan];
-                            if (sc == '[') {
-                                depth++;
-                            } else if (sc == ']') {
-                                depth--;
-                                if (depth == 0) {
-                                    scan++;
-                                    scan_col++;
-                                    closed = true;
-                                    break;
-                                }
-                            } else if (sc == '\n') {
-                                scan_line++;
-                                scan_col = 0;
-                            }
-                            scan++;
-                            scan_col++;
-                        }
-                        if (closed) {
-                            tokenizer->position = scan;
-                            tokenizer->column = scan_col;
-                            tokenizer->line = scan_line;
+                        /// Absorb the whole [...] into the $var[...] token via
+                        /// the canonical span-finder (issue #631 Phase 2a),
+                        /// which now honors quotes/escapes/nested
+                        /// subexpressions the old depth loop did not. An
+                        /// unbalanced [ leaves position untouched (is_valid
+                        /// false) so the parser re-dispatches it as the [ test
+                        /// builtin (issue #58).
+                        subscript_span_t sub = scan_subscript_bounds(
+                            &tokenizer->input[tokenizer->position],
+                            tokenizer->input_length - tokenizer->position);
+                        if (sub.is_valid) {
+                            tokenizer_advance_subscript(
+                                tokenizer, tokenizer->position + sub.close + 1);
                         }
                     }
                 }
