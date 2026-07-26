@@ -192,6 +192,7 @@ src = ['src/arithmetic.c',
        'src/escape.c',
        'src/brace_match.c',
        'src/subscript_key.c',
+       'src/dequote.c',
        'src/identifier.c',
        'src/completion_bridge.c',
        'src/completion_filter.c',
@@ -1459,6 +1460,24 @@ if fs.exists('tests/unit/test_tokenizer.c')
                               include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep])
   test('Tokenizer', test_tokenizer,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
+# Dequote Primitive Tests (#631 quote-removal consolidation)
+# Differential parity vs the tokenizer's quoted-string reader + direct units
+if fs.exists('tests/unit/test_dequote.c')
+  test_dequote = executable('test_dequote',
+                            'tests/unit/test_dequote.c',
+                            'src/dequote.c',
+                            'src/tokenizer.c',
+                            'src/brace_match.c',
+                            'src/identifier.c',
+                            'src/shell_mode.c',
+                            include_directories: [inc, include_directories('tests')],
+                            dependencies: [lle_dep])
+  test('Dequote', test_dequote,
        suite: 'unit',
        timeout: 30)
 endif
