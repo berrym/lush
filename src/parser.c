@@ -11,6 +11,7 @@
 
 #include "parser.h"
 
+#include "brace_match.h"
 #include "debug.h"
 #include "executor.h"
 #include "identifier.h"
@@ -1860,7 +1861,15 @@ static node_t *parse_simple_command(parser_t *parser) {
         /// or: arr[n] (WORD) + += (PLUS_ASSIGN) + value (WORD)
         if (shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
             const char *bracket = strchr(current->text, '[');
-            const char *close_bracket = bracket ? strchr(bracket, ']') : NULL;
+            /// Delimit the subscript with the canonical span finder so a `]`
+            /// inside quotes / a nested $(...) / ${...} does not close it
+            /// early (#631). The interior is kept raw here; the executor
+            /// canonicalizes it to the key/index.
+            subscript_span_t span =
+                bracket ? scan_subscript_bounds(bracket, strlen(bracket))
+                        : (subscript_span_t){0, 0, false, false};
+            const char *close_bracket =
+                (bracket && span.is_valid) ? bracket + span.close : NULL;
 
             /// Check for arr[...] followed by = or +=
             if (bracket && close_bracket && next &&
