@@ -443,6 +443,17 @@ TEST(subscript_c1_assoc_dollar_anywhere) {
     ASSERT_STDOUT_EQ(r, "v\nv\n");
 }
 
+TEST(subscript_c1_assoc_tilde_key_literal) {
+    /// A subscript keys on a LITERAL `~` -- key normalization is not a word
+    /// context, so no tilde expansion (the Phase-1 fold onto the shared
+    /// expander suppresses it). Write and read agree on the literal `~x` key.
+    run_result_t r = run_shell("declare -A mJ631; mJ631[~x]=v; "
+                               "echo \"${mJ631[~x]}\"; "
+                               "for k in \"${!mJ631[@]}\"; do echo \"$k\"; "
+                               "done\n");
+    ASSERT_STDOUT_EQ(r, "v\n~x\n");
+}
+
 TEST(rt_read_array_polyglot_spellings) {
     /// read into an indexed array has two spellings -- bash's `-a` and zsh's
     /// `-A` -- and lush accepts both for the one canonical behavior (spelling
@@ -8710,6 +8721,7 @@ int main(void) {
     RUN_TEST(subscript_c1_indexed_roundtrip_untouched);
     RUN_TEST(subscript_c1_assoc_bracket_in_key_roundtrip);
     RUN_TEST(subscript_c1_assoc_dollar_anywhere);
+    RUN_TEST(subscript_c1_assoc_tilde_key_literal);
     RUN_TEST(rt_read_array_polyglot_spellings);
     RUN_TEST(for_loop_ifs_nonws_empty_fields_posix);
     RUN_TEST(rt_read_ifs_nonws_empty_fields);
