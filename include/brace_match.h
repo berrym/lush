@@ -91,4 +91,50 @@
  */
 bool lush_find_matching_brace(const char *s, size_t len, size_t *out_offset);
 
+/**
+ * @brief A resolved array-subscript span (`[...]`) and its metadata.
+ *
+ * Byte offsets are relative to `s[0]` (the opening `[`). `close`,
+ * `codepoints`, and `has_ws` are meaningful only when `is_valid` is true.
+ */
+typedef struct {
+    size_t close; /**< byte offset of the matching `]`                     */
+    size_t codepoints; /**< codepoint count over [0, close] inclusive, so a
+                        *   caller advances its column by whole codepoints */
+    bool has_ws;       /**< an unquoted, unescaped ASCII space/tab is present in
+                        *   the interior (a caller uses this e.g. to reject a
+                        *   whitespace-bearing indexed-array index)              */
+    bool is_valid;     /**< `s[0]=='['` and a matching `]` was found within
+                        *   `[s, s+len)`                                         */
+} subscript_span_t;
+
+/**
+ * @brief Find the `]` that closes the array subscript `[` at `s[0]`.
+ *
+ * The subscript-opener sibling of `lush_find_matching_brace`: it shares the
+ * same quote/escape/multi-byte core (`'...'`, `"..."`, `` `...` ``, `$'...'`,
+ * atomic `\X`, codepoint-atomic UTF-8) and adds depth-counted nested `[...]`
+ * plus a subexpression skip -- a `]` inside a nested `$(...)`, `${...}`, or
+ * `$((...))` (and, via the shared quote core, a `` `...` ``) does NOT close the
+ * subscript. Composition, not duplication: nested `$(`/`${` spans are skipped
+ * by delegating to `lush_find_matching_brace`.
+ *
+ * This is a PURE span-finder. It decides nothing about meaning -- whether the
+ * `[` opens a subscript at all (glob vs subscript, feature gating), whether the
+ * interior is an associative key or an arithmetic index, `[@]`/`[*]` aggregate
+ * handling, and the caller's error-vs-leave-vs-consume choice on an invalid
+ * span all stay caller policy.
+ *
+ * If `len == 0` the scan falls back to `strlen(s)` (as
+ * `lush_find_matching_brace` does) so NUL-reliant callers can migrate
+ * incrementally.
+ *
+ * @param s   Source pointer; a valid span requires `s[0] == '['`.
+ * @param len Bytes of `s` to scan, or 0 to use `strlen(s)`.
+ * @return A `subscript_span_t`; `is_valid` is false on a bad opener, an
+ *         unterminated quote, or an unbalanced subscript (in which case the
+ *         other fields are 0/false and the caller must not consume the span).
+ */
+subscript_span_t scan_subscript_bounds(const char *s, size_t len);
+
 #endif /* LUSH_BRACE_MATCH_H */

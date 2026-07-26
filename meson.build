@@ -2630,6 +2630,17 @@ if fs.exists('tests/unit/test_brace_match.c')
        timeout: 30)
 endif
 
+if fs.exists('tests/unit/test_subscript_scanner.c')
+  test_subscript_scanner = executable('test_subscript_scanner',
+                                'tests/unit/test_subscript_scanner.c',
+                                'src/brace_match.c',
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep])
+  test('Subscript Scanner', test_subscript_scanner,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Compatibility Database Tests
 if fs.exists('tests/unit/test_compat.c')
   test_compat_sources = []
