@@ -454,6 +454,68 @@ TEST(subscript_c1_assoc_tilde_key_literal) {
     ASSERT_STDOUT_EQ(r, "v\n~x\n");
 }
 
+/// #631 Phase 2c: a QUOTED subscript in command/assignment position now
+/// tokenizes as one word (the tokenizer absorbs the `[...]` span), so the
+/// quoted-write forms reach the C1 normalizer, while an argument-position
+/// quoted subscript is dequoted and glob-suppressed by the parser.
+TEST(subscript_2c_quoted_write_roundtrip) {
+    run_result_t r =
+        run_shell("declare -A m2A; m2A[\"a b\"]=9; echo \"${m2A[a b]}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_2c_singlequoted_write_roundtrip) {
+    run_result_t r =
+        run_shell("declare -A m2B; m2B['a b']=9; echo \"${m2B[a b]}\"\n");
+    ASSERT_STDOUT_EQ(r, "9\n");
+}
+
+TEST(subscript_2c_quoted_append) {
+    run_result_t r =
+        run_shell("declare -A m2C; m2C[\"a b\"]=1; m2C[\"a b\"]+=2; "
+                  "echo \"${m2C[a b]}\"\n");
+    ASSERT_STDOUT_EQ(r, "12\n");
+}
+
+TEST(subscript_2c_arg_glob_suppressed) {
+    /// A quoted subscript in argument position is a quoted word: it stays
+    /// literal (no globbing). If globbing were NOT suppressed, the `[a b]`
+    /// character class with no on-disk match would vanish under NULLGLOB.
+    run_result_t r = run_shell("echo m[\"a b\"]\n");
+    ASSERT_STDOUT_EQ(r, "m[a b]\n");
+    run_result_t r2 = run_shell("echo m['a b']\n");
+    ASSERT_STDOUT_EQ(r2, "m[a b]\n");
+}
+
+TEST(subscript_2c_unquoted_arg_stays_broken) {
+    /// Curation: an UNQUOTED spaced subscript is NOT absorbed (has_ws), so it
+    /// splits at the space exactly as before -- quoting is required.
+    run_result_t r = run_shell("echo m[a b]=v\n");
+    ASSERT_STDOUT_EQ(r, "b]=v\n");
+}
+
+TEST(subscript_2c_undeclared_no_phantom) {
+    /// Companion fix A: a quoted key on an UNDECLARED name reaches indexed
+    /// assignment, the non-integer index is a targeted error, and no phantom
+    /// empty array is left behind. Detect via declare -p's output (a phantom
+    /// would print `declare -a mK2c=(...)`); the failing assignment's own error
+    /// goes to stderr and does not affect the asserted stdout.
+    run_result_t r = run_shell(
+        "unset mK2c; mK2c[\"a b\"]=9; d=$(declare -p mK2c 2>/dev/null); "
+        "if [ -n \"$d\" ]; then echo PHANTOM; else echo clean; fi\n");
+    ASSERT_STDOUT_EQ(r, "clean\n");
+}
+
+TEST(subscript_2c_promoted_scalar_survives_bad_index) {
+    /// The phantom rollback must roll back only a truly-fresh binding, never a
+    /// scalar being promoted to an array (relaxed mode): unsetting the name
+    /// would destroy the user's scalar on the error path. Subshell isolates the
+    /// mode change from other tests.
+    run_result_t r = run_shell(
+        "( mode bash; mS2c=keepme; mS2c[\"a b\"]=9; echo \"[${mS2c[0]}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[keepme]\n");
+}
+
 TEST(rt_read_array_polyglot_spellings) {
     /// read into an indexed array has two spellings -- bash's `-a` and zsh's
     /// `-A` -- and lush accepts both for the one canonical behavior (spelling
@@ -8722,6 +8784,13 @@ int main(void) {
     RUN_TEST(subscript_c1_assoc_bracket_in_key_roundtrip);
     RUN_TEST(subscript_c1_assoc_dollar_anywhere);
     RUN_TEST(subscript_c1_assoc_tilde_key_literal);
+    RUN_TEST(subscript_2c_quoted_write_roundtrip);
+    RUN_TEST(subscript_2c_singlequoted_write_roundtrip);
+    RUN_TEST(subscript_2c_quoted_append);
+    RUN_TEST(subscript_2c_arg_glob_suppressed);
+    RUN_TEST(subscript_2c_unquoted_arg_stays_broken);
+    RUN_TEST(subscript_2c_undeclared_no_phantom);
+    RUN_TEST(subscript_2c_promoted_scalar_survives_bad_index);
     RUN_TEST(rt_read_array_polyglot_spellings);
     RUN_TEST(for_loop_ifs_nonws_empty_fields_posix);
     RUN_TEST(rt_read_ifs_nonws_empty_fields);
