@@ -507,3 +507,87 @@ bool lush_find_matching_brace(const char *s, size_t len, size_t *out_offset) {
     }
     return false;
 }
+
+/// Count codepoints over the first `nbytes` of `s` (a whole-codepoint walk via
+/// the same atomic-advance rule as the scan), for a caller's column math.
+static size_t count_codepoints(const char *s, size_t nbytes) {
+    size_t n = 0, i = 0;
+    while (i < nbytes) {
+        i += step_one(s, nbytes, i);
+        n++;
+    }
+    return n;
+}
+
+subscript_span_t scan_subscript_bounds(const char *s, size_t len) {
+    /// Every failure returns this crisp 0/false span so an invalid result never
+    /// carries a stale offset or has_ws (the header promises 0/false there).
+    const subscript_span_t invalid = {0, 0, false, false};
+    subscript_span_t span = {0, 0, false, false};
+    if (!s) {
+        return invalid;
+    }
+    if (len == 0) {
+        len = strlen(s);
+    }
+    if (len < 2 || s[0] != '[') {
+        return invalid;
+    }
+
+    /// Depth-counted `[`/`]` match over the SAME quote/escape/multi-byte core
+    /// (`skip_span`) the brace matcher uses. `skip_span` already handles the
+    /// four quote dialects, atomic `\X`, and multi-byte codepoints, so a `]`
+    /// inside `'...'`/`"..."`/`` `...` ``/`$'...'` or after a `\` never closes.
+    int depth = 1;
+    size_t i = 1;
+    while (i < len) {
+        span_result_t r = skip_span(s, len, &i);
+        if (r == SPAN_UNTERMINATED) {
+            return invalid; ///< unterminated quote: no valid span
+        }
+        if (r == SPAN_CONSUMED) {
+            continue; ///< quoted/escaped/multi-byte run: not a bracket or ws
+        }
+        unsigned char c = (unsigned char)s[i];
+
+        /// Skip a nested command-substitution / parameter-expansion /
+        /// arithmetic span so a `]` inside `$(...)`, `${...}`, or `$((...))`
+        /// does not close the subscript. Compose with the canonical matcher
+        /// rather than re-implement its quote/escape/nesting logic; `$((expr))`
+        /// resolves correctly by anchoring at the first `(` (depth reaches 0 at
+        /// the final
+        /// `)`). (`` `...` `` is already consumed by skip_span above.)
+        if (c == '$' && i + 1 < len && (s[i + 1] == '(' || s[i + 1] == '{')) {
+            size_t sub = 0;
+            if (lush_find_matching_brace(s + i + 1, len - (i + 1), &sub)) {
+                i = i + 1 + sub + 1; ///< past the matched `)` or `}`
+                continue;
+            }
+            /// Unbalanced nested `$(...)`/`${...}`: the construct swallows to
+            /// end of buffer, so the subscript cannot be validly closed. Report
+            /// invalid rather than recovering -- otherwise a later `]` that is
+            /// semantically INSIDE the unterminated construct would falsely
+            /// close the span (mirrors the SPAN_UNTERMINATED quote path).
+            return invalid;
+        }
+
+        if (c == '[') {
+            depth++;
+        } else if (c == ']') {
+            depth--;
+            if (depth == 0) {
+                span.close = i;
+                span.codepoints = count_codepoints(s, i + 1);
+                span.is_valid = true;
+                return span;
+            }
+        } else if (c == ' ' || c == '\t') {
+            /// Unquoted, unescaped interior whitespace (an escaped `\ ` or a
+            /// quoted space is consumed by skip_span above, so it is not
+            /// flagged -- only the whitespace that would break an outer word).
+            span.has_ws = true;
+        }
+        i += 1;
+    }
+    return invalid; ///< no matching `]` within [s, s+len)
+}
