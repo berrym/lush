@@ -874,6 +874,24 @@ static void tokenizer_advance_subscript(tokenizer_t *tokenizer, size_t to) {
     tokenizer->position = to;
 }
 
+/// True when the interior of a `[...]` subscript span (s[0]=='[',
+/// s[close]==']') contains a real (non-backslash-escaped) `'` or `"`. This is
+/// the gate for absorbing a quoted subscript into a word (#631 Phase 2c): it
+/// fires ONLY on the case the word loop currently mis-splits at the quote. An
+/// unquoted subscript (no quote) tokenizes exactly as before.
+static bool subscript_span_has_quote(const char *s, size_t close) {
+    for (size_t i = 1; i < close; i++) {
+        if (s[i] == '\\') {
+            i++; /// skip the escaped character
+            continue;
+        }
+        if (s[i] == '\'' || s[i] == '"') {
+            return true;
+        }
+    }
+    return false;
+}
+
 static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
     if (!tokenizer || tokenizer->position >= tokenizer->input_length) {
         return token_new(TOK_EOF, NULL, 0, tokenizer ? tokenizer->line : 1,
@@ -2620,6 +2638,34 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             if (curr_char_len > 0) {
                 /// Valid UTF-8 character - check if it's a word character
                 if (is_word_codepoint(curr_codepoint)) {
+                    /// A QUOTED subscript opening mid-word: absorb the whole
+                    /// `[...]` span so a quoted interior space or a quoted `]`
+                    /// does not split the word (#631 Phase 2c). Only fires when
+                    /// the span is balanced, has no UNQUOTED interior space
+                    /// (`has_ws` -- the curated require-quoting boundary that
+                    /// keeps `echo m[a b]=v` splitting as before), and actually
+                    /// contains a quote (so unquoted `arr[0]` / `f[abc]` globs
+                    /// and #58's unbalanced `[` are untouched). The delimiters
+                    /// stay in the raw token text; the parser dequotes an
+                    /// argument via lush_dequote_span (glob-suppressed) and the
+                    /// assignment path normalizes the key -- both consume the
+                    /// raw span.
+                    if (curr_codepoint == '[' &&
+                        shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
+                        subscript_span_t sub = scan_subscript_bounds(
+                            &tokenizer->input[tokenizer->position],
+                            tokenizer->input_length - tokenizer->position);
+                        if (sub.is_valid && !sub.has_ws &&
+                            subscript_span_has_quote(
+                                &tokenizer->input[tokenizer->position],
+                                sub.close)) {
+                            is_numeric = false;
+                            tokenizer_advance_subscript(
+                                tokenizer, tokenizer->position + sub.close + 1);
+                            continue;
+                        }
+                    }
+
                     /// Special case: stop at ] ONLY inside array literals
                     /// For arr[n]=value, we want arr[n] as ONE token (element
                     /// assignment) For [idx]=value inside =(...), we want idx

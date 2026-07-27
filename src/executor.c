@@ -20907,6 +20907,36 @@ void report_aggregate_subscript_error(executor_t *executor,
     }
 }
 
+/// An indexed-array subscript that does not evaluate to an integer (e.g. a
+/// non-numeric key on an array that was never `declare -A`'d). Rust-style
+/// targeted diagnostic that points at the likely intent -- an associative key
+/// -- replacing the bare "Invalid array index" string. Paired with a rollback
+/// of any array the failing assignment just auto-created (#631 Phase 2c).
+static void report_invalid_index_error(executor_t *executor,
+                                       source_location_t loc,
+                                       const char *subscript) {
+    shell_error_t *err = shell_error_create(
+        SHELL_ERR_INVALID_SUBSCRIPT, SHELL_SEVERITY_ERROR, loc,
+        "invalid array subscript '[%s]': an indexed-array subscript must "
+        "evaluate to an integer",
+        subscript);
+    if (err) {
+        char suggestion[256];
+        snprintf(
+            suggestion, sizeof(suggestion),
+            "'[%s]' is not a valid arithmetic index; to key on it as a "
+            "string, declare the array associative first: declare -A name.",
+            subscript);
+        shell_error_set_suggestion(err, suggestion);
+        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+        shell_error_free(err);
+        executor->has_error = true;
+    } else {
+        executor_error_report(executor, SHELL_ERR_INVALID_SUBSCRIPT, loc,
+                              "invalid array subscript '[%s]'", subscript);
+    }
+}
+
 static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     if (!assign_node || !assign_node->val.str) {
         return 1;
@@ -21312,7 +21342,13 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     char *expanded_value = expand_variable(executor, value);
     const char *final_value = expanded_value ? expanded_value : value;
 
-    /// Get or create the array
+    /// Get or create the array. Only a truly-fresh binding may be rolled back
+    /// when the index turns out invalid (#631 Phase 2c): `m["a b"]=9` on an
+    /// UNDECLARED name would otherwise leave a phantom empty indexed array
+    /// behind. A scalar being promoted to an array (SCALAR_PROMO_PRESERVE) must
+    /// NOT be rolled back -- unsetting the name would destroy the user's scalar
+    /// on the error path -- and a pre-existing array is never touched.
+    bool rollback_on_fail = false;
     array_value_t *array = symtable_get_array(var_name);
     if (!array) {
         /// A scalar->array kind transition (issue #621): strict value typing
@@ -21326,6 +21362,8 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             report_scalar_kind_error(executor, assign_node->loc, var_name);
             return 1;
         }
+        /// Roll back only an unbound-name fresh array; never a promoted scalar.
+        rollback_on_fail = (promo == SCALAR_PROMO_NONE);
         /// Create new array if it doesn't exist
         array = symtable_array_create(false);
         if (!array) {
@@ -21392,7 +21430,12 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                 free(idx_result);
             if (expanded_value)
                 free(expanded_value);
-            set_executor_error(executor, "Invalid array index");
+            /// Roll back a just-auto-created array so a failed non-integer
+            /// index leaves no phantom binding, then report a targeted error.
+            if (rollback_on_fail) {
+                symtable_unset_global(var_name);
+            }
+            report_invalid_index_error(executor, assign_node->loc, subscript);
             return 1;
         }
 
@@ -21406,6 +21449,10 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             if (idx <= 0) {
                 if (expanded_value)
                     free(expanded_value);
+                /// Same phantom-array rollback as the non-integer path.
+                if (rollback_on_fail) {
+                    symtable_unset_global(var_name);
+                }
                 set_executor_error(executor,
                                    "Array index must be positive in zsh mode");
                 return 1;

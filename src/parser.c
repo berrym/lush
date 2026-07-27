@@ -13,6 +13,7 @@
 
 #include "brace_match.h"
 #include "debug.h"
+#include "dequote.h"
 #include "executor.h"
 #include "identifier.h"
 #include "lle/unicode_compare.h"
@@ -1269,6 +1270,35 @@ static bool prov_reencode_append(char **buf, size_t *len, size_t *cap,
     return true;
 }
 
+/// True when a collected token is a word-like token carrying a real
+/// (non-escaped) `'` or `"` -- i.e. the tokenizer absorbed a quoted `[...]`
+/// subscript into the word (#631 Phase 2c). A normal word token never contains
+/// an unescaped quote (the word loop breaks at one), and the reader's quoted
+/// tokens (TOK_STRING / TOK_EXPANDABLE_STRING / ...) already stripped their
+/// delimiters, so this uniquely identifies the absorbed bracket word. Such a
+/// word must be dequoted via lush_dequote_span and typed NODE_STRING_EXPANDABLE
+/// so its quotes suppress globbing, exactly like any other quoted word.
+static bool word_token_has_quote(token_type_t type, const char *text) {
+    if (type == TOK_STRING || type == TOK_EXPANDABLE_STRING ||
+        type == TOK_ARITH_EXP || type == TOK_COMMAND_SUB ||
+        type == TOK_BACKQUOTE || type == TOK_VARIABLE) {
+        return false;
+    }
+    if (!text) {
+        return false;
+    }
+    for (const char *p = text; *p; p++) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            continue;
+        }
+        if (*p == '\'' || *p == '"') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * @brief Try to consume one shell-style word argument from the current token.
  *
@@ -1382,6 +1412,12 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
     /// Build a single arg node from collected tokens.
     if (token_count == 1) {
+        /// A word token carrying a quote is an absorbed quoted `[...]`
+        /// subscript
+        /// (#631 Phase 2c): dequote it and type it EXPANDABLE so its quotes
+        /// suppress globbing like any other quoted word.
+        bool word_quote = word_token_has_quote(collected_tokens[0].type,
+                                               collected_tokens[0].text);
         node_t *arg_node = NULL;
         switch (collected_tokens[0].type) {
         case TOK_STRING:
@@ -1398,17 +1434,33 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             arg_node = new_node(NODE_COMMAND_SUB);
             break;
         default:
-            arg_node = new_node(NODE_VAR);
+            arg_node = new_node(word_quote ? NODE_STRING_EXPANDABLE : NODE_VAR);
             break;
         }
         if (arg_node) {
-            arg_node->val.str = strdup(collected_tokens[0].text);
+            if (word_quote) {
+                /// Strip one level of quoting from the absorbed bracket word,
+                /// keeping the provenance map so the expander protects
+                /// single-quoted / escaped bytes.
+                char *dtext = NULL, *dprov = NULL;
+                dequote_flags_t f;
+                if (lush_dequote_span(collected_tokens[0].text,
+                                      strlen(collected_tokens[0].text), &dtext,
+                                      &dprov, &f)) {
+                    arg_node->val.str = dtext;
+                    arg_node->quote_prov = dprov;
+                } else {
+                    arg_node->val.str = strdup(collected_tokens[0].text);
+                }
+            } else {
+                arg_node->val.str = strdup(collected_tokens[0].text);
+            }
             arg_node->val_type = VAL_STR;
             arg_node->glob_qualified = collected_tokens[0].glob_qualified;
             /// A fused mixed-quote word (`'$x'y`, `"b":~/c`) arrives as one
             /// TOK_EXPANDABLE_STRING with a per-character quote map; carry it
             /// onto the node so the word expander decides per character (#498).
-            if (arg_node->type == NODE_STRING_EXPANDABLE &&
+            if (arg_node->type == NODE_STRING_EXPANDABLE && !word_quote &&
                 collected_tokens[0].quote_prov && arg_node->val.str) {
                 size_t qn = strlen(arg_node->val.str);
                 char *qp = malloc(qn + 1);
@@ -1510,11 +1562,22 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 }
                 break;
             default:
-                /// Word-like tokens: word-context backslashes collapse; the
-                /// companion emits the parallel provenance (bare U, de-escaped
-                /// E).
-                dequoted[i] = posix_unquoted_dequote_prov(
-                    collected_tokens[i].text, &dequoted_prov[i]);
+                if (word_token_has_quote(collected_tokens[i].type,
+                                         collected_tokens[i].text)) {
+                    /// Absorbed quoted `[...]` subscript word (#631 Phase 2c):
+                    /// strip one quote level via the shared primitive, keeping
+                    /// provenance so a fused segment protects/expands per byte.
+                    dequote_flags_t f;
+                    lush_dequote_span(collected_tokens[i].text,
+                                      strlen(collected_tokens[i].text),
+                                      &dequoted[i], &dequoted_prov[i], &f);
+                } else {
+                    /// Word-like tokens: word-context backslashes collapse; the
+                    /// companion emits the parallel provenance (bare U,
+                    /// de-escaped E).
+                    dequoted[i] = posix_unquoted_dequote_prov(
+                        collected_tokens[i].text, &dequoted_prov[i]);
+                }
                 break;
             }
             if (!dequoted[i] || !dequoted_prov[i]) {
@@ -1557,7 +1620,9 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             bool any_quoted = false;
             for (int i = 0; i < token_count; i++) {
                 if (collected_tokens[i].type == TOK_STRING ||
-                    collected_tokens[i].type == TOK_EXPANDABLE_STRING) {
+                    collected_tokens[i].type == TOK_EXPANDABLE_STRING ||
+                    word_token_has_quote(collected_tokens[i].type,
+                                         collected_tokens[i].text)) {
                     any_quoted = true;
                     break;
                 }
