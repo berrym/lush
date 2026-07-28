@@ -24,7 +24,6 @@
 /// Internal recursive helpers.
 
 static word_part_t *word_part_copy(const word_part_t *p);
-static void word_part_free(word_part_t *p);
 
 /// Duplicate a possibly-NULL string. Returns NULL for NULL input; the caller
 /// distinguishes "was NULL" from "alloc failed" via the source pointer.
@@ -111,7 +110,7 @@ void word_free(word_t *w) {
 
 /// Free a part and everything it owns. The switch has NO default: a new WP_*
 /// kind must be handled here or the build fails.
-static void word_part_free(word_part_t *p) {
+void word_part_free(word_part_t *p) {
     if (!p) {
         return;
     }
