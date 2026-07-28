@@ -1518,6 +1518,61 @@ if fs.exists('tests/unit/test_word_parse.c')
 endif
 
 # ============================================================================
+# Word Evaluator Tests (Step 1c: word_eval word_t -> argv fields)
+if fs.exists('tests/unit/test_word_eval.c')
+  test_word_eval = executable('test_word_eval',
+                              'tests/unit/test_word_eval.c',
+                              'src/word_eval.c',
+                              'src/word_parse.c',
+                              'src/word.c',
+                              'src/field_split.c',
+                              'src/tokenizer.c',
+                              'src/brace_match.c',
+                              'src/dequote.c',
+                              'src/identifier.c',
+                              'src/shell_mode.c',
+                              include_directories: [inc, include_directories('tests')],
+                              dependencies: [lle_dep])
+  test('Word Evaluator', test_word_eval,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
+# Word CST differential harness (Step 1c): wordtool (candidate) + word_diff.
+# wordtool expands one word via parse_word + word_eval; word_diff compares its
+# NUL-free count-prefixed field vector against current lush (the parity bar),
+# with bash/zsh as triage references. Proves wordtool == current-lush on the
+# covered subset.
+if fs.exists('tools/wordtool.c') and fs.exists('tests/fuzz/word_diff.c')
+  wordtool = executable('wordtool',
+                        'tools/wordtool.c',
+                        'src/word_eval.c',
+                        'src/word_parse.c',
+                        'src/word.c',
+                        'src/field_split.c',
+                        'src/tokenizer.c',
+                        'src/brace_match.c',
+                        'src/dequote.c',
+                        'src/identifier.c',
+                        'src/shell_mode.c',
+                        include_directories: inc,
+                        dependencies: [lle_dep],
+                        build_by_default: false)
+  word_diff = executable('word_diff',
+                         'tests/fuzz/word_diff.c',
+                         include_directories: inc,
+                         build_by_default: false)
+  test('Word Differential',
+       word_diff,
+       args: [meson.project_source_root() / 'tests/fuzz/word_corpus/1c1.txt',
+              wordtool.full_path(),
+              lush_exe.full_path()],
+       suite: 'differential',
+       timeout: 120)
+endif
+
+# ============================================================================
 # Parser Unit Tests
 # Tests shell parser: commands, pipelines, control structures, redirections
 if fs.exists('tests/unit/test_parser.c')

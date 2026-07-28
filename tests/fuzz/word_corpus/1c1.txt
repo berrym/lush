@@ -1,0 +1,28 @@
+# Step 1c-1 differential corpus: the lush-mode covered subset.
+# Variables preset by word_diff: X="a b c", Y="cd", E="" (default IFS).
+# Deterministic only: no globs, no non-deterministic specials, no cmdsub.
+# Parity bar: wordtool == current-lush (lush mode). bash/zsh are triage only.
+hello
+a.b.c
+'a b'
+''
+"a b"
+"$X"
+"$E"
+"pre$X"
+pre$X
+$X
+$E
+$X"$Y"
+a'b'c
+"one two"three
+"a  b"
+'$X'
+"literal$Y end"
+$Y$Y
+$UNSET
+"$X$Y"
+# Multi-token lines: wordtool requires the whole input to be ONE word, so these
+# bucket as not-covered rather than false-passing on a partially-consumed line.
+two words
+abc 2>/dev/null
