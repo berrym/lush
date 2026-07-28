@@ -1568,6 +1568,10 @@ if fs.exists('tools/wordtool.c') and fs.exists('tests/fuzz/word_diff.c')
        args: [meson.project_source_root() / 'tests/fuzz/word_corpus/1c1.txt',
               wordtool.full_path(),
               lush_exe.full_path()],
+       # wordtool and lush are passed as path ARGS, which does not create a
+       # build dependency; without depends they are not built (wordtool is
+       # build_by_default:false) and the test exec's a missing binary (rc=127).
+       depends: [wordtool, lush_exe],
        suite: 'differential',
        timeout: 120)
 endif
