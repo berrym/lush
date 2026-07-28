@@ -99,7 +99,7 @@ static int store_function(executor_t *executor, const char *function_name,
 static int validate_function_parameters(executor_t *executor,
                                         function_def_t *func, char **argv,
                                         int argc, source_location_t loc);
-node_t *copy_ast_node(node_t *node);
+node_t *node_copy(node_t *node);
 static node_t *copy_ast_chain(node_t *node);
 static int execute_if(executor_t *executor, node_t *if_node);
 static int execute_while(executor_t *executor, node_t *while_node);
@@ -267,7 +267,6 @@ static void initialize_job_control(executor_t *executor);
 static char *expand_arithmetic(executor_t *executor, const char *arith_text);
 static char *expand_command_substitution(executor_t *executor,
                                          const char *cmd_text);
-static node_t *copy_node_simple(node_t *original);
 static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
 static char *expand_quoted_string(executor_t *executor, const char *str,
@@ -11551,15 +11550,21 @@ static int store_function(executor_t *executor, const char *function_name,
 }
 
 /**
- * @brief Copy an AST node recursively
+ * @brief Deep-copy a single AST node and its children (the canonical node copy)
  *
- * Creates a deep copy of an AST node including all children.
- * Does not copy siblings - use copy_ast_chain for that.
+ * Creates a deep copy of an AST node including all children. Does not copy
+ * siblings - use copy_ast_chain for a sibling chain.
+ *
+ * This is the single AST deep-copy path. It replaced two near-identical
+ * walkers (the former copy_ast_node and copy_node_simple) that had drifted:
+ * one guarded the val union on val_type and the other did not, and neither
+ * carried node->loc. Consolidating removes that duplicate-logic hazard -- a
+ * field added to node_t is now handled in exactly one place.
  *
  * @param node Node to copy
  * @return Deep copy of node, or NULL on failure
  */
-node_t *copy_ast_node(node_t *node) {
+node_t *node_copy(node_t *node) {
     if (!node) {
         return NULL;
     }
@@ -11569,17 +11574,25 @@ node_t *copy_ast_node(node_t *node) {
         return NULL;
     }
 
-    /// Copy value
+    /// Copy the type-tagged payload. Copy the whole union by value first (so a
+    /// non-string val -- number, char -- is carried), then deep-copy the string
+    /// when VAL_STR owns one. Guarding on val_type is mandatory: the union
+    /// overlaps a long double, so testing val.str without it can strdup the
+    /// bytes of a non-pointer member.
     copy->val_type = node->val_type;
-    if (node->val.str) {
+    copy->val = node->val;
+    if (node->val_type == VAL_STR && node->val.str) {
         copy->val.str = strdup(node->val.str);
         if (!copy->val.str) {
             free_node_tree(copy);
             return NULL;
         }
-    } else {
-        copy->val = node->val;
     }
+
+    /// Source location must survive the copy: a function body is deep-copied at
+    /// definition time, and dropping loc leaves errors raised inside the body
+    /// with no location.
+    copy->loc = node->loc;
 
     copy->glob_qualified = node->glob_qualified;
     copy->name_quoted = node->name_quoted;
@@ -11604,10 +11617,10 @@ node_t *copy_ast_node(node_t *node) {
         }
     }
 
-    /// Copy children
+    /// Copy children (recursively). Siblings are not copied here.
     node_t *child = node->first_child;
     while (child) {
-        node_t *child_copy = copy_ast_node(child);
+        node_t *child_copy = node_copy(child);
         if (!child_copy) {
             free_node_tree(copy);
             return NULL;
@@ -11633,7 +11646,7 @@ static node_t *copy_ast_chain(node_t *node) {
         return NULL;
     }
 
-    node_t *first_copy = copy_ast_node(node);
+    node_t *first_copy = node_copy(node);
     if (!first_copy) {
         return NULL;
     }
@@ -11642,7 +11655,7 @@ static node_t *copy_ast_chain(node_t *node) {
     node_t *current_orig = node->next_sibling;
 
     while (current_orig) {
-        node_t *sibling_copy = copy_ast_node(current_orig);
+        node_t *sibling_copy = node_copy(current_orig);
         if (!sibling_copy) {
             free_node_tree(first_copy);
             return NULL;
@@ -17907,8 +17920,8 @@ static void copy_function_definitions(executor_t *dest, executor_t *src) {
             break;
         }
 
-        /// Create a simple copy of the function body AST
-        new_func->body = copy_node_simple(src_func->body);
+        /// Deep-copy the function body AST
+        new_func->body = node_copy(src_func->body);
         if (!new_func->body) {
             free(new_func->name);
             free(new_func);
@@ -17921,74 +17934,6 @@ static void copy_function_definitions(executor_t *dest, executor_t *src) {
 
         src_func = src_func->next;
     }
-}
-
-/**
- * @brief Simple recursive node copy
- *
- * Creates a copy of an AST node and its children. Simpler than
- * copy_ast_node, used for function definition copying.
- *
- * @param original Node to copy
- * @return Copy of node tree, or NULL on failure
- */
-static node_t *copy_node_simple(node_t *original) {
-    if (!original) {
-        return NULL;
-    }
-
-    node_t *copy = new_node(original->type);
-    if (!copy) {
-        return NULL;
-    }
-
-    copy->val_type = original->val_type;
-    copy->val = original->val;
-
-    /// If the node has a string value, copy it
-    if (original->val_type == VAL_STR && original->val.str) {
-        copy->val.str = strdup(original->val.str);
-        if (!copy->val.str) {
-            free_node_tree(copy);
-            return NULL;
-        }
-    }
-
-    copy->glob_qualified = original->glob_qualified;
-    copy->name_quoted = original->name_quoted;
-
-    /// Preserve the assignment-tilde provenance across the copy (#488), as
-    /// copy_ast_node does -- a function body reaches here too.
-    if (original->magic_equal_value) {
-        copy->magic_equal_value = strdup(original->magic_equal_value);
-        if (!copy->magic_equal_value) {
-            free_node_tree(copy);
-            return NULL;
-        }
-    }
-
-    /// Same for the per-character quote map (#498).
-    if (original->quote_prov) {
-        copy->quote_prov = strdup(original->quote_prov);
-        if (!copy->quote_prov) {
-            free_node_tree(copy);
-            return NULL;
-        }
-    }
-
-    /// Copy children recursively
-    node_t *child = original->first_child;
-    while (child) {
-        node_t *child_copy = copy_node_simple(child);
-        if (!child_copy) {
-            free_node_tree(copy);
-            return NULL;
-        }
-        add_child_node(copy, child_copy);
-        child = child->next_sibling;
-    }
-
-    return copy;
 }
 
 /**

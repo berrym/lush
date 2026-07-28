@@ -25,7 +25,7 @@
 /// to deep-copy a parsed body so zsh's `function NAME1 NAME2 { body }`
 /// multi-name form can produce one FUNCTION node per name with each
 /// owning its own independent body.
-extern node_t *copy_ast_node(node_t *node);
+extern node_t *node_copy(node_t *node);
 
 #include <ctype.h>
 #include <stdio.h>
@@ -5615,7 +5615,7 @@ static node_t *wrap_multi_name_functions(node_t *function_node,
         fn->val.str = extra_names[i]; /// ownership transferred
         extra_names[i] = NULL;
         if (original_body) {
-            node_t *body_copy = copy_ast_node(original_body);
+            node_t *body_copy = node_copy(original_body);
             if (!body_copy) {
                 free_node_tree(fn);
                 free_node_tree(wrapper);
