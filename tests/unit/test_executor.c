@@ -1227,7 +1227,7 @@ TEST(rt_declaration_util_mixed_quote_tilde) {
     /// the double- or single-quoted one stays literal. Previously the whole
     /// word was skipped when it contained any quoted span (both segments
     /// literal). The in-a-function cases exercise the deep-copied body: the
-    /// parser's provenance value must survive copy_ast_node / copy_node_simple.
+    /// parser's provenance value must survive node_copy (the deep-copy path).
     run_result_t r =
         run_shell("( export HOME=/tmp/h\n"
                   "  export A=~/a:\"~/b\";        echo \"1:$A\"\n"
@@ -1329,7 +1329,7 @@ TEST(rt_command_word_mixed_quote_provenance) {
                      "$y~/b\n"
                      /// array: unquoted ~ expands, quoted "~/y" stays literal
                      "/tmp/h/x ~/y /tmp/h/z\n"
-                     /// inside a deep-copied function body (copy_node_simple)
+                     /// inside a deep-copied function body (node_copy)
                      "xYz\n");
 }
 

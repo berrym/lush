@@ -65,7 +65,7 @@ bool is_posix_mode_enabled(void) { return false; }
  *
  * parser.c gained references to these when the zsh multi-name function
  * definition (`function NAME1 NAME2 { body }`) landed: the multi-name
- * path deep-copies the body via copy_ast_node, and the parse-trace
+ * path deep-copies the body via node_copy, and the parse-trace
  * instrumentation calls debug_trace_printf guarded on g_debug_context.
  * The parser fuzz target exercises parsing only, so a NULL-returning
  * copy and a no-op trace are the correct minimal shapes -- they keep
@@ -76,7 +76,7 @@ bool is_posix_mode_enabled(void) { return false; }
 
 struct node;
 
-struct node *copy_ast_node(struct node *node) {
+struct node *node_copy(struct node *node) {
     (void)node;
     return NULL;
 }
