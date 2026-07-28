@@ -1498,6 +1498,25 @@ if fs.exists('tests/unit/test_word.c')
 endif
 
 # ============================================================================
+# Word Parser Tests (Step 1b: parse_word tokenizer stream -> word_t)
+if fs.exists('tests/unit/test_word_parse.c')
+  test_word_parse = executable('test_word_parse',
+                               'tests/unit/test_word_parse.c',
+                               'src/word_parse.c',
+                               'src/word.c',
+                               'src/tokenizer.c',
+                               'src/brace_match.c',
+                               'src/dequote.c',
+                               'src/identifier.c',
+                               'src/shell_mode.c',
+                               include_directories: [inc, include_directories('tests')],
+                               dependencies: [lle_dep])
+  test('Word Parser', test_word_parse,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
 # Parser Unit Tests
 # Tests shell parser: commands, pipelines, control structures, redirections
 if fs.exists('tests/unit/test_parser.c')

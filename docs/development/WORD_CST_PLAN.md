@@ -219,12 +219,12 @@ Perfect compiler-enforced uniformity is achievable at the **word** layer (every 
 
 ## 4. Parsing: one `parse_word`
 
-`word_t *parse_word(parser_t *p, word_ctx_t ctx)` in a new `src/word_parse.c` replaces `collect_word_argument` (`parser.c:1333`) and the ~8 collapse builders. Two levels:
+`word_t *parse_word(tokenizer_t *tok, word_ctx_t ctx)` in a new `src/word_parse.c` replaces `collect_word_argument` (`parser.c:1333`) and the ~8 collapse builders. It takes the `tokenizer_t*` (the live token stream), not the `parser_t*`: `parse_word` needs only tokens plus the tokenizer's own lexer-feedback toggles, never the parser's statement state, so taking `tokenizer_t*` keeps the bench free of the whole `parser_t` construction surface and makes "does not take over statement parsing" a type-level guarantee. Two levels:
 
 1. **Token-fusion loop** — consume the maximal run of adjacent no-whitespace word tokens; each becomes one or more **parts, appended, never merged**. `$x"$y"` fuses into one `word_t` = `[WP_BARE(WP_PARAM x), WP_DOUBLE(WP_PARAM y)]`, *keeping* the boundary the current parser destroys.
 2. **Per-token structural scan** — for a compound payload, scan into sub-parts composing the shipped primitives: `lush_dequote_span` (unquoted/single/double/escape boundaries + each leaf's `literal_meta`), `lush_find_matching_brace` (`${...}`/`$(...)` boundary), `scan_subscript_bounds` (`[...]`), `lush_dollar_paren_is_arithmetic` (`$((` vs `$(`).
 
-This kills both accidental defects: the DQ-reader's char-by-char `${...}` mis-split (`parse_word` takes the whole `${...}` as one `WP_PARAM` via `lush_find_matching_brace` and recurses its operand as a fresh Word), and the parser adjacency re-fusion (fusion appends parts, never retypes the aggregate). Every part carries a source span from the token offsets. The statement parser is untouched except that each operand rule calls `parse_word(p, ctx)` and attaches the returned `word_t` to its typed node field. The tokenizer still owns lexer-feedback (heredoc-pending, case-pattern position, arithmetic context); `parse_word` consumes token payloads, it does not take over lexing.
+This kills both accidental defects: the DQ-reader's char-by-char `${...}` mis-split (`parse_word` takes the whole `${...}` as one `WP_PARAM` via `lush_find_matching_brace` and recurses its operand as a fresh Word), and the parser adjacency re-fusion (fusion appends parts, never retypes the aggregate). Every part carries a source span from the token offsets. The statement parser is untouched except that each operand rule calls `parse_word(parser->tokenizer, ctx)` and attaches the returned `word_t` to its typed node field. The tokenizer still owns lexer-feedback (heredoc-pending, case-pattern position, arithmetic context); `parse_word` consumes token payloads, it does not take over lexing.
 
 ---
 

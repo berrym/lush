@@ -224,6 +224,16 @@ word_t *word_copy(const word_t *w);
  */
 void word_free(word_t *w);
 
+/**
+ * @brief Free a single part and everything it owns (recursive). Safe on NULL.
+ *
+ * For builders that construct a part with word_part_new and must reclaim it on
+ * a failure before it is handed to word_add_part / word_set_body /
+ * word_add_item (after a successful add, the owning word/part frees it). Do NOT
+ * call on a part already added to a word.
+ */
+void word_part_free(word_part_t *p);
+
 /// Lossless CST support.
 
 /**
