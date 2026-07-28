@@ -1483,6 +1483,21 @@ if fs.exists('tests/unit/test_dequote.c')
 endif
 
 # ============================================================================
+# Word CST Foundation Tests (Phase 2 / Step 1)
+# Tests the word_part_t type + ownership API (word_copy/word_free) + lossless
+# source reconstruction. Standalone: word.c depends on nothing but libc.
+if fs.exists('tests/unit/test_word.c')
+  test_word = executable('test_word',
+                         'tests/unit/test_word.c',
+                         'src/word.c',
+                         include_directories: [inc, include_directories('tests')],
+                         dependencies: [lle_dep])
+  test('Word CST Foundation', test_word,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
 # Parser Unit Tests
 # Tests shell parser: commands, pipelines, control structures, redirections
 if fs.exists('tests/unit/test_parser.c')
