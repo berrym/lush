@@ -46,6 +46,7 @@
 #include "subscript_key.h"
 #include "symtable.h"
 #include "tokenizer.h" /// QUOTE_PROV_* byte values for node_t.quote_prov (#498)
+#include "word.h"      /// word_copy for node_t.word (Word CST integration)
 
 #include <ctype.h>
 #include <dirent.h>
@@ -11456,6 +11457,18 @@ node_t *node_copy(node_t *node) {
     if (node->quote_prov) {
         copy->quote_prov = strdup(node->quote_prov);
         if (!copy->quote_prov) {
+            free_node_tree(copy);
+            return NULL;
+        }
+    }
+
+    /// Deep-copy the dual-carried Word CST representation, handled here in the
+    /// one canonical walker -- copy-safe by construction (a single owned field,
+    /// a single copy site). NULL for every node until a later step populates
+    /// it.
+    if (node->word) {
+        copy->word = word_copy(node->word);
+        if (!copy->word) {
             free_node_tree(copy);
             return NULL;
         }

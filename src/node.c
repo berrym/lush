@@ -14,6 +14,7 @@
 
 #include "errors.h"
 #include "shell_error.h"
+#include "word.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -162,6 +163,10 @@ void free_node_tree(node_t *node) {
 
     /// Free the per-character quote-provenance map (independent of val.str).
     free(node->quote_prov);
+
+    /// Free the dual-carried Word CST representation (independent of val.str).
+    /// Safe on NULL; NULL for every node until a later step populates it.
+    word_free(node->word);
 
     free(node);
 }
