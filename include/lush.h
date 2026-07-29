@@ -433,47 +433,12 @@ int builtin_set(char **args);
  */
 
 /**
- * @brief Word structure for expansion results
- *
- * Represents a single word resulting from word expansion,
- * forming a linked list of words.
- */
-typedef struct word {
-    char *data;        ///< Word text
-    size_t len;        ///< Word length
-    struct word *next; ///< Next word in list
-} word_t;
-
-/**
- * @brief Create a new word structure
- *
- * @param str String to create word from
- * @return New word or NULL on failure
- */
-word_t *make_word(char *str);
-
-/**
- * @brief Free a list of words
- *
- * @param first First word in list
- */
-void free_all_words(word_t *first);
-
-/**
  * @brief Check if a string is a valid identifier name
  *
  * @param str String to check
  * @return true if valid name
  */
 bool is_name(const char *str);
-
-/**
- * @brief Convert a word list to a single string
- *
- * @param word First word in list
- * @return Concatenated string (caller must free)
- */
-char *wordlist_to_str(word_t *word);
 
 /* ============================================================================
  * Core Expansion Functions
@@ -522,43 +487,12 @@ expansion_t arithm_expand_exp(const char *str, const exp_ctx_t *ctx);
  */
 
 /**
- * @brief Perform full word expansion
- *
- * @param orig_word Original word to expand
- * @return List of resulting words
- */
-word_t *word_expand(const char *orig_word);
-
-/**
  * @brief Expand a word to a single string
  *
  * @param word Word to expand
  * @return Expanded string (caller must free)
  */
 char *word_expand_to_str(const char *word);
-
-/**
- * @brief Perform field splitting on a string
- *
- * @param str String to split
- * @return List of words
- */
-word_t *field_split(const char *str);
-
-/**
- * @brief Perform pathname expansion on word list
- *
- * @param words Word list to expand
- * @return Expanded word list
- */
-word_t *pathnames_expand(word_t *words);
-
-/**
- * @brief Remove quotes from a word list
- *
- * @param wordlist Word list to process
- */
-void remove_quotes(word_t *wordlist);
 
 /* ============================================================================
  * Context Management

@@ -155,6 +155,11 @@ typedef union {
     char *str;           ///< Heap-allocated string (owner)
 } symval_t;
 
+/// The Word CST representation of a node's word (defined in word.h). Forward-
+/// declared here so node_t can own a word_t* without pulling in word.h; C11
+/// permits this identical typedef to also appear in word.h.
+typedef struct word word_t;
+
 typedef struct node {
     node_type_t type;                         ///< AST node kind
     val_type_t val_type;                      ///< Active union member of `val`
@@ -200,6 +205,16 @@ typedef struct node {
     /// expander paths handle those). Heap-allocated (owner). Length must equal
     /// strlen(val.str); a mismatch is ignored.
     char *quote_prov;
+
+    /// The Word CST (word.h) representation of this node's word, or NULL.
+    /// During the early-integration vertical slice this is dual-carried
+    /// alongside the legacy val.str / quote_prov, so parse_word / word_eval can
+    /// be wired in one construct at a time and diffed against the legacy path.
+    /// Heap-allocated (owner): deep-copied by node_copy, freed by
+    /// free_node_tree. NULL until a later step populates it -- today every node
+    /// carries word == NULL, so the field is dormant infrastructure with no
+    /// behavioral effect.
+    word_t *word;
 } node_t;
 
 /**
