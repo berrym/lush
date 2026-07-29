@@ -87,6 +87,15 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
 static word_part_t *parse_simple_expansion(const char *s, size_t n,
                                            size_t *consumed, bool *handled) {
     *consumed = 0;
+    /// This parser is `$`-anchored (see the contract above). A TOK_VARIABLE may
+    /// also carry a kind-sigil expansion (`@name`/`%name`) whose leading byte
+    /// is not `$`; those are a later slice, so defer rather than mis-read the
+    /// sigil as `$` and resolve the bare name (which would drop the sigil's
+    /// semantics).
+    if (n < 1 || s[0] != '$') {
+        *handled = false;
+        return NULL;
+    }
     if (n < 2) {
         return NULL; /// a lone `$` is a literal
     }
@@ -123,6 +132,14 @@ static word_part_t *parse_simple_expansion(const char *s, size_t n,
         size_t j = 1;
         while (j < n && is_name_char(s[j])) {
             j++;
+        }
+        /// The name scan is ASCII-only, but lush supports Unicode identifiers
+        /// (`$café` in NFC/NFD). A high-bit byte right after the ASCII run may
+        /// continue the identifier, which this slice does not decode -- defer
+        /// rather than truncate the name and resolve the wrong variable.
+        if (j < n && (unsigned char)s[j] >= 0x80) {
+            *handled = false;
+            return NULL;
         }
         word_part_t *p = make_simple_param(s + 1, j - 1);
         if (!p) {
@@ -301,6 +318,30 @@ static bool emit_token_parts(word_t *w, tokenizer_t *tok, const token_t *t,
         if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
             *fully = false;
             return true;
+        }
+        /// A `$` that survives dequoting as an UNQUOTED byte is an expansion
+        /// introducer the tokenizer did not fold into a TOK_VARIABLE -- notably
+        /// a positional `$0`..`$9`, which the tokenizer splits into a lone `$`
+        /// token plus a following digit token, so the `$` lands here dangling
+        /// at a token end. Defer whenever an unquoted `$` is followed by an
+        /// introducer within the token, OR sits at the token end (a following
+        /// adjacent token would form the expansion; a truly trailing literal
+        /// `$` defers too, which is harmless). The literal path cannot resolve
+        /// any of these.
+        size_t tlen = strlen(text);
+        for (size_t i = 0; i < tlen; i++) {
+            if (text[i] != '$' || prov[i] != QUOTE_PROV_UNQUOTED) {
+                continue;
+            }
+            bool at_end = (i + 1 == tlen);
+            char nx = at_end ? '\0' : text[i + 1];
+            if (at_end || is_name_start(nx) || nx == '{' || nx == '(' ||
+                is_special_param(nx)) {
+                free(text);
+                free(prov);
+                *fully = false;
+                return true;
+            }
         }
         word_t *body = add_group(w, WP_BARE, off, len);
         if (!body) {
@@ -486,6 +527,16 @@ word_t *parse_word(tokenizer_t *tok, word_ctx_t ctx, bool *out_fully_handled) {
         first = false;
         tokenizer_advance(tok);
         t = tokenizer_current(tok);
+    }
+
+    /// A word beginning with an unquoted `~` is subject to tilde expansion, a
+    /// word-start construct this slice does not model. A quoted or escaped
+    /// tilde starts with a quote/backslash byte, and a mid-word `~` is not at
+    /// word start, so gating on the first raw byte defers exactly the expansion
+    /// case (a literal `~nouser` legacy leaves alone is deferred too -- always
+    /// safe).
+    if (tok->input[word_start] == '~') {
+        fully = false;
     }
 
     w->src_off = word_start;

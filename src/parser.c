@@ -20,6 +20,8 @@
 #include "node.h"
 #include "shell_mode.h"
 #include "tokenizer.h"
+#include "word.h"       /// word_t / word_free for node_t.word (Word CST)
+#include "word_parse.h" /// parse_word: build node->word from the arg span
 
 /// Lifted from executor.c (non-static). Used by parse_function_definition
 /// to deep-copy a parsed body so zsh's `function NAME1 NAME2 { body }`
@@ -1343,6 +1345,11 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         return false;
     }
 
+    /// Step 2 (Word CST dual-routing): the argument's source span begins here.
+    /// Captured before the adjacency loop reassigns arg_token, so the whole
+    /// word can be re-tokenized into a Word CST after the legacy node is built.
+    size_t first_pos = arg_token->position;
+
     /// Adjacency-collection: gather consecutive arg-like tokens that have
     /// no whitespace between them. `pre$VAR` becomes one logical arg
     /// instead of two.
@@ -1751,6 +1758,40 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         }
         free(dequoted);
         free(dequoted_prov);
+    }
+
+    /// Step 2 (Word CST dual-routing): build a Word CST for this argument from
+    /// its source span [first_pos, last_end_pos) and attach it to the node just
+    /// added (the last child of parent), ONLY when parse_word fully handled
+    /// every construct. This is additive -- the legacy val.str / quote_prov are
+    /// unchanged above; the executor evaluates node->word on the CST backbone
+    /// when present-and-covered, else falls back to the legacy expansion. A
+    /// fresh tokenizer over the exact span reproduces the same tokens in the
+    /// default argument context (any span whose re-lex could differ is a
+    /// not-yet-covered form, so parse_word reports fully=false and we discard).
+    if (token_count > 0 && last_end_pos > first_pos) {
+        node_t *attached = parent ? parent->first_child : NULL;
+        while (attached && attached->next_sibling) {
+            attached = attached->next_sibling;
+        }
+        if (attached && !attached->word) {
+            char *span = strndup(parser->tokenizer->input + first_pos,
+                                 last_end_pos - first_pos);
+            if (span) {
+                tokenizer_t *wtok = tokenizer_new(span);
+                if (wtok) {
+                    bool fully = false;
+                    word_t *w = parse_word(wtok, WORD_CTX_ARG, &fully);
+                    if (w && fully) {
+                        attached->word = w;
+                    } else {
+                        word_free(w);
+                    }
+                    tokenizer_free(wtok);
+                }
+                free(span);
+            }
+        }
     }
 
     for (int i = 0; i < token_count; i++) {

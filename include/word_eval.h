@@ -32,17 +32,28 @@
 /**
  * @brief The environment word_eval expands against.
  *
- * `get` resolves a parameter name to its value (or NULL if unset); it is a
- * callback so the bench can read the process environment (the default, shared
- * with the oracle subprocesses) while unit tests inject a deterministic map.
+ * `get` resolves a parameter name to an OWNED value string (word_eval frees it
+ * after copying), or NULL if unset. Owned so the live executor can source
+ * values from the symtable (which returns owned copies) without a leak; bench
+ * callbacks wrap getenv/a map in strdup to satisfy the contract.
  */
 typedef struct {
-    const char *(*get)(void *ctx,
-                       const char *name); ///< $name -> value or NULL.
-    void *ctx;                            ///< Passed to get().
+    char *(*get)(void *ctx,
+                 const char *name); ///< $name -> owned value or NULL.
+    /// Optional: true iff `$name` would expand in scalar context (a scalar or
+    /// unset). Returns false for a list/map, whose bare `$name` reference
+    /// yields a VECTOR this single-field slice cannot represent -- word_eval
+    /// then defers (not-yet-covered) rather than fabricate one wrong field.
+    /// NULL => assume scalar (bench callbacks source only scalars via getenv/a
+    /// map).
+    bool (*is_scalar)(void *ctx, const char *name);
+    void *ctx;               ///< Passed to get()/is_scalar().
     const char *ifs;         ///< IFS, or NULL for the default " \t\n".
     bool word_split_default; ///< FEATURE_WORD_SPLIT_DEFAULT (lush false, bash
                              ///< true).
+    bool zsh_extended_glob;  ///< FEATURE_ZSH_EXTENDED_GLOB: `#`/`^` are glob
+                             ///< metacharacters, so a bare literal carrying one
+                             ///< defers (not-yet-covered). Off by default.
 } word_eval_env_t;
 
 /**
