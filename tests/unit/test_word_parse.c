@@ -174,6 +174,47 @@ TEST(parse_adjacency_fusion) {
     word_free(w);
 }
 
+TEST(parse_ansic_string) {
+    /// $'...' decodes escapes at parse time into a WP_ANSIC leaf.
+    bool fully = false;
+    word_t *w = parse_line("$'a\\tb'", &fully);
+    ASSERT_TRUE(fully, "ANSI-C fully handled");
+    ASSERT_EQ(w->n_parts, 1u, "one part");
+    word_part_t *ac = WORD_PART(w, 0);
+    ASSERT_EQ(ac->kind, WP_ANSIC, "ANSIC kind");
+    ASSERT_STR_EQ(ac->u.leaf.text, "a\tb", "decoded tab (0x09)");
+    ASSERT_TRUE(ac->u.leaf.literal_meta, "ANSI-C is single-quote-like literal");
+    assert_reconstruct(w, "$'a\\tb'");
+    word_free(w);
+}
+
+TEST(parse_ansic_empty_hex_glob) {
+    bool fully = false;
+    word_t *w = parse_line("$''", &fully); /// empty
+    ASSERT_TRUE(fully, "empty ANSI-C handled");
+    ASSERT_EQ(WORD_PART(w, 0)->kind, WP_ANSIC, "empty is ANSIC");
+    ASSERT_STR_EQ(WORD_PART(w, 0)->u.leaf.text, "", "empty text");
+    word_free(w);
+
+    w = parse_line("$'x\\x41y'", &fully); /// hex escape
+    ASSERT_STR_EQ(WORD_PART(w, 0)->u.leaf.text, "xAy", "hex \\x41 -> A");
+    word_free(w);
+
+    w = parse_line("$'a*b'", &fully); /// glob metachar stays literal
+    ASSERT_STR_EQ(WORD_PART(w, 0)->u.leaf.text, "a*b", "metachar literal");
+    ASSERT_TRUE(WORD_PART(w, 0)->u.leaf.literal_meta, "not an active glob");
+    word_free(w);
+}
+
+TEST(parse_ansic_midword_and_unterminated_deferred) {
+    /// Mid-word $'...' (one bare WORD, decoded in place by the live executor)
+    /// and an unterminated $'... both defer -- never a mis-decode.
+    bool fully = true;
+    word_t *w = parse_line("pre$'\\t'", &fully);
+    ASSERT_FALSE(fully, "mid-word ANSI-C deferred");
+    word_free(w);
+}
+
 TEST(parse_stops_at_whitespace) {
     /// parse_word consumes only the first word; `foo bar` yields `foo`.
     bool fully = false;
@@ -189,10 +230,10 @@ TEST(deferred_constructs_report_not_handled) {
     /// Not-yet-covered constructs must set fully == false, never mis-parse.
     /// The whole-word span still round-trips (spans are complete regardless).
     const char *deferred[] = {
-        "$(echo hi)",      /// command substitution
-        "${v:-x}",         /// PE operator
-        "${#v}",           /// length operator
-        "$'a\\tb'",        /// ANSI-C string
+        "$(echo hi)", /// command substitution
+        "${v:-x}",    /// PE operator
+        "${#v}",      /// length operator
+        "pre$'\\t'",  /// mid-word ANSI-C (standalone $'...' is now covered)
         "pre$x\"$y\"post", /// tokenizer pre-fused mixed-quote token
         "\"a\"b",          /// mixed-quote adjacency
         "$((1+2))",        /// arithmetic
@@ -231,6 +272,9 @@ int main(void) {
     RUN_TEST(parse_braced_var);
     RUN_TEST(parse_special_param);
     RUN_TEST(parse_adjacency_fusion);
+    RUN_TEST(parse_ansic_string);
+    RUN_TEST(parse_ansic_empty_hex_glob);
+    RUN_TEST(parse_ansic_midword_and_unterminated_deferred);
     RUN_TEST(parse_stops_at_whitespace);
     RUN_TEST(deferred_constructs_report_not_handled);
     RUN_TEST(non_word_returns_null);

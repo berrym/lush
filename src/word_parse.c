@@ -22,6 +22,7 @@
 
 #include "brace_match.h"
 #include "dequote.h"
+#include "escape.h"
 
 /// Identifier-start / identifier-continue for a parameter name. ASCII only
 /// here; the tokenizer handles Unicode identifiers upstream, and 1b-1 defers
@@ -283,6 +284,19 @@ static bool emit_token_parts(word_t *w, tokenizer_t *tok, const token_t *t,
             *fully = false;
             return true;
         }
+        /// A bare word carrying a mid-word `$'...'` (`pre$'\t'`) is handed back
+        /// by the tokenizer as one WORD (not a standalone $'...' TOK_STRING),
+        /// where the live executor's ANSI-C handling is context-dependent
+        /// (decoded in an assignment/word RHS, left literal on the positional
+        /// path). Rather than replicate that here or treat `$'...'` as a
+        /// literal single-quoted run and risk claiming false coverage, defer it
+        /// -- mid-word ANSI-C is a later slice.
+        for (uint32_t i = 0; i + 1 < len; i++) {
+            if (raw[i] == '$' && raw[i + 1] == '\'') {
+                *fully = false;
+                return true;
+            }
+        }
         char *text = NULL, *prov = NULL;
         if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
             *fully = false;
@@ -303,9 +317,45 @@ static bool emit_token_parts(word_t *w, tokenizer_t *tok, const token_t *t,
 
     case TOK_STRING: {
         /// $'...' (ANSI-C) shares TOK_STRING with plain '...' but the raw span
-        /// begins with `$`; defer it (WP_ANSIC follow-up).
+        /// begins with `$`. Decode the escapes at parse time into a WP_ANSIC
+        /// leaf via lush's canonical decoder -- the SAME function, dialect, and
+        /// interior bounds live lush's expand_arg_node uses, so wordtool and
+        /// the live shell produce identical bytes wherever both decode. Two
+        /// caveats keep that claim honest: live lush gates the decode on
+        /// FEATURE_ANSI_QUOTING (off in POSIX mode, where it passes $'...'
+        /// through literally); this bench runs only the default (feature-on)
+        /// mode, so the POSIX-mode gate is a deferred concern for integration.
+        /// And the last-byte terminator test below is a heuristic that lush's
+        /// own guard shares (see the note there), not a full paired-quote scan.
         if (len >= 1 && raw[0] == '$') {
-            *fully = false;
+            /// Require the shape `$'` ... `'` by the same last-byte check
+            /// expand_arg_node uses (str[len-1]=='\''). A truly unterminated
+            /// $'... (ran to EOF, last byte not `'`) defers. This does NOT
+            /// distinguish a real closing quote from an escaped trailing `\'`
+            /// (`$'\'`), so such a token still decodes -- but live lush's
+            /// identical guard decodes it too, so wordtool stays == live lush.
+            if (len < 3 || raw[1] != '\'' || raw[len - 1] != '\'') {
+                *fully = false;
+                return true;
+            }
+            /// Interior = raw[2 .. len-1), stripping the `$'` prefix and the
+            /// trailing `'`. Empty $'' -> zero-length interior.
+            char *decoded =
+                lush_expand_escapes(raw + 2, len - 3, LUSH_ESC_ANSI_C);
+            if (!decoded) {
+                return false; /// allocation failure
+            }
+            word_part_t *ac = word_part_new(WP_ANSIC, off, len);
+            if (!ac) {
+                free(decoded);
+                return false;
+            }
+            ac->u.leaf.literal_meta = true; /// single-quote-like: globs literal
+            ac->u.leaf.text = decoded;      /// decoded bytes (owned)
+            if (!word_add_part(w, ac)) {
+                word_part_free(ac);
+                return false;
+            }
             return true;
         }
         word_part_t *sq = word_part_new(WP_SINGLE, off, len);

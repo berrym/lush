@@ -185,6 +185,18 @@ TEST(eval_special_param_not_yet_covered) {
     free_fields(got, n);
 }
 
+TEST(eval_ansic) {
+    /// $'...' decoded bytes become one literal field; empty stays one field;
+    /// a decoded glob metachar is literal (no glob).
+    const char *vars[] = {NULL};
+    const char *tab[] = {"a\tb", NULL};
+    assert_fields("$'a\\tb'", vars, tab);
+    const char *empty[] = {"", NULL};
+    assert_fields("$''", vars, empty);
+    const char *glob[] = {"a*b", NULL};
+    assert_fields("$'a*b'", vars, glob);
+}
+
 TEST(eval_bash_split_deferred) {
     /// Under bash-mode word splitting, an unquoted parameter needs IFS
     /// splitting (Step 1c-1b) and must defer -- never mis-eval as one field.
@@ -228,6 +240,7 @@ int main(void) {
     RUN_TEST(eval_glob_is_not_yet_covered);
     RUN_TEST(eval_quoted_glob_is_literal);
     RUN_TEST(eval_special_param_not_yet_covered);
+    RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();
 }

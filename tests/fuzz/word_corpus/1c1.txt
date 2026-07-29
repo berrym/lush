@@ -26,3 +26,24 @@ $UNSET
 # bucket as not-covered rather than false-passing on a partially-consumed line.
 two words
 abc 2>/dev/null
+# ANSI-C $'...' strings: parse-time-decoded, proven == live lush (both call the
+# same lush_expand_escapes). ASCII escapes only.
+$'a\tb'
+$'\n'
+$''
+$'it\'s'
+$'x\x41y'
+$'a*b'
+$'\e['
+$'\cA'
+$'tab\tend'
+# Mid-word $'...' (pre$'\t') is ANSI-C the live executor decodes in place, but
+# the tokenizer returns it as one bare WORD; the CST defers it (NOT-COVERED)
+# rather than mis-decode -- decoding mid-word ANSI-C is a later slice.
+pre$'\t'
+# Excluded (no parity signal through the printf/for transport, which truncates
+# at NUL; the char* leaf also cannot carry a length -- documented limitation):
+#   $'\0'  $'a\x00b'
+# Deferred to a fast follow-up (multi-byte UTF-8 output, locale-sensitivity to
+# verify end-to-end before claiming parity):
+#   $'é'  $'\U0001F600'
