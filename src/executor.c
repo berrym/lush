@@ -47,6 +47,7 @@
 #include "symtable.h"
 #include "tokenizer.h" /// QUOTE_PROV_* byte values for node_t.quote_prov (#498)
 #include "word.h"      /// word_copy for node_t.word (Word CST integration)
+#include "word_eval.h" /// word_eval: dual-route covered args on the CST backbone
 
 #include <ctype.h>
 #include <dirent.h>
@@ -6377,6 +6378,73 @@ static inline bool word_node_is_quoted(const node_t *node) {
                     node->type == NODE_STRING_EXPANDABLE);
 }
 
+/// word_eval get-callback for the live executor (Step 2 Word CST dual-routing).
+/// Resolves $name against the symtable -- the same source the legacy expansion
+/// reads, so a covered word sees identical values. Returns an OWNED copy (the
+/// symtable does; word_eval frees it per the get contract).
+static char *executor_symtable_word_get(void *ctx, const char *name) {
+    executor_t *ex = (executor_t *)ctx;
+    if (!ex || !ex->symtable || !name) {
+        return NULL;
+    }
+    return symtable_get_var(ex->symtable, name);
+}
+
+/// True iff `$name` would expand in scalar context here: a scalar binding or an
+/// unset name (whose bare reference is scalar-empty). A list/map returns false
+/// so word_eval defers -- its bare `$name` reference is a vector the legacy
+/// path produces via the multi-field expander, which this slice does not model.
+///
+/// symtable_lookup reads the global manager (and its live scope stack), the
+/// SAME store the scalar `get` callback (ex->symtable) and the legacy expander
+/// read: every production executor's symtable IS symtable_get_global_manager()
+/// (executor_new), and function/subshell scopes push onto it rather than
+/// swapping the executor's manager, so the kind seen here cannot diverge from
+/// the value `get` sources. (The only non-global executor,
+/// executor_new_with_symtable, is test-only and never builds an argv.)
+static bool executor_symtable_word_is_scalar(void *ctx, const char *name) {
+    (void)ctx;
+    if (!name) {
+        return true;
+    }
+    lush_value_view_t view;
+    if (!symtable_lookup(name, &view)) {
+        return true; /// unset -> scalar-empty
+    }
+    bool scalar =
+        (view.kind == LUSH_VALUE_SCALAR || view.kind == LUSH_VALUE_NONE);
+    lush_value_view_clear(&view);
+    return scalar;
+}
+
+/// Audit-mode check (Step 2, gated on LUSH_WORD_CST_AUDIT): abort loudly if the
+/// Word CST fields for a covered argument disagree with the legacy scalar
+/// expansion. Covered words are lush-mode-no-split, so they yield 0 fields (a
+/// null-word-removed empty) or 1 field (which must equal the legacy scalar).
+/// This pinpoints a live value-source divergence at the exact expansion point,
+/// converting a silent mismatch into an immediate, diagnosable abort.
+static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
+                           int n) {
+    char *legacy = expand_arg_node(executor, child);
+    bool match;
+    if (n == 0) {
+        match = (!legacy || legacy[0] == '\0');
+    } else if (n == 1) {
+        match = (legacy && strcmp(fields[0], legacy) == 0);
+    } else {
+        match = false; /// >1 field is not a covered lush-mode shape yet
+    }
+    if (!match) {
+        fprintf(stderr,
+                "WORD_CST AUDIT MISMATCH: word='%s' cst_n=%d cst[0]='%s' "
+                "legacy='%s'\n",
+                child->val.str ? child->val.str : "", n, n > 0 ? fields[0] : "",
+                legacy ? legacy : "(null)");
+        abort();
+    }
+    free(legacy);
+}
+
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc) {
     if (!executor || !command || !argc) {
@@ -6474,6 +6542,57 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
+                    /// Step 2 (Word CST dual-routing): if this argument carries
+                    /// a covered Word CST, evaluate it on the CST backbone.
+                    /// word_eval composes the same field_split / null-word
+                    /// primitives build_argv uses and resolves $name from the
+                    /// same symtable, so a covered word cannot drift; a not-ok
+                    /// result falls through to the exact legacy path below.
+                    /// Gated on LUSH_WORD_CST during bring-up.
+                    if (child->word && getenv("LUSH_WORD_CST")) {
+                        char *ifs_val =
+                            symtable_get_var(executor->symtable, "IFS");
+                        word_eval_env_t wenv = {
+                            .get = executor_symtable_word_get,
+                            .is_scalar = executor_symtable_word_is_scalar,
+                            .ctx = executor,
+                            .ifs = ifs_val,
+                            .word_split_default =
+                                shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
+                            .zsh_extended_glob =
+                                shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB),
+                        };
+                        int wn = 0;
+                        bool wok = false;
+                        char **wfields =
+                            word_eval(child->word, &wenv, &wn, &wok);
+                        free(ifs_val);
+                        if (wok) {
+                            if (getenv("LUSH_WORD_CST_AUDIT")) {
+                                word_cst_audit(executor, child, wfields, wn);
+                            }
+                            bool append_ok = true;
+                            for (int i = 0; i < wn; i++) {
+                                if (!add_to_argv_list(&argv_list, &argv_count,
+                                                      &argv_capacity,
+                                                      wfields[i])) {
+                                    for (int k = i; k < wn; k++) {
+                                        free(wfields[k]);
+                                    }
+                                    append_ok = false;
+                                    break;
+                                }
+                            }
+                            free(wfields);
+                            if (!append_ok) {
+                                goto cleanup_and_fail;
+                            }
+                            child = child->next_sibling;
+                            continue;
+                        }
+                        free(wfields); /// wok==false: NULL; fall through
+                    }
+
                     /// Vector-yielding expansion: `"$@"`, `"${arr[@]}"`,
                     /// `"${!arr[@]}"` and their slice variants must
                     /// produce N separate argv slots, not one

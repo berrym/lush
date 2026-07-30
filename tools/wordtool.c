@@ -31,9 +31,10 @@
 #include "word_eval.h"
 #include "word_parse.h"
 
-static const char *env_get(void *ctx, const char *name) {
+static char *env_get(void *ctx, const char *name) {
     (void)ctx;
-    return getenv(name);
+    const char *v = getenv(name);
+    return v ? strdup(v) : NULL; /// owned per the word_eval get contract
 }
 
 int main(int argc, char **argv) {

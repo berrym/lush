@@ -18,11 +18,12 @@
 #include "word_parse.h"
 
 /// Value source: `vars` is a NULL-terminated name,value,name,value,... array.
-static const char *map_get(void *ctx, const char *name) {
+/// Returns an OWNED copy (strdup) per the word_eval get contract.
+static char *map_get(void *ctx, const char *name) {
     const char **kv = ctx;
     for (int i = 0; kv[i]; i += 2) {
         if (strcmp(kv[i], name) == 0) {
-            return kv[i + 1];
+            return strdup(kv[i + 1]);
         }
     }
     return NULL;

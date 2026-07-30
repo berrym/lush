@@ -100,7 +100,16 @@ static bool is_plain_ident(const char *s) {
     return true;
 }
 
-static bool has_glob_meta(const char *s) { return strpbrk(s, "*?[") != NULL; }
+/// A bare (unquoted) literal must NOT be treated as a plain literal if it
+/// carries a character that triggers a later expansion pass this slice does not
+/// model. Conservative: the glob metacharacters `* ? [ ]`, the extglob group
+/// parens `( )` (covering `@(`/`?(`/`+(`/`!(`/`*(`, whose introducers are
+/// otherwise plain bytes), and the brace-expansion braces `{ }` (`{a,b}` ->
+/// a vector). Deferring a borderline word to the legacy path is always safe;
+/// wrongly covering an expanding word is not.
+static bool has_word_expansion_meta(const char *s) {
+    return strpbrk(s, "*?[](){}") != NULL;
+}
 
 static bool eval_parts(const word_t *body, eval_acc_t *a,
                        const word_eval_env_t *env, bool in_dquote, bool *ok);
@@ -114,9 +123,17 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
     case WP_SINGLE:
     case WP_ANSIC: {
         const char *text = p->u.leaf.text ? p->u.leaf.text : "";
-        /// An unquoted, glob-active literal metacharacter would glob at eval;
-        /// globbing is deferred (Step 1c-2), so such a word is not-yet-covered.
-        if (!in_dquote && !p->u.leaf.literal_meta && has_glob_meta(text)) {
+        /// A glob/brace metacharacter that the legacy path would re-expand must
+        /// defer. Legacy re-globs the DEQUOTED value, so a genuinely quoted
+        /// char (single/double/ANSI-C) is inert, but a backslash-ESCAPED one
+        /// (a WP_LITERAL leaf with literal_meta, e.g. `\*`) is NOT -- legacy
+        /// still globs it. So gate on quoted CONTEXT (part kind / in_dquote),
+        /// not on literal_meta, which conflates "escaped" with "quoted". Under
+        /// zsh-extended-glob `#`/`^` are glob metacharacters too.
+        bool quoted_ctx =
+            in_dquote || p->kind == WP_SINGLE || p->kind == WP_ANSIC;
+        if (!quoted_ctx && (has_word_expansion_meta(text) ||
+                            (env->zsh_extended_glob && strpbrk(text, "#^")))) {
             *ok = false;
             return true;
         }
@@ -151,11 +168,22 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
             *ok = false;
             return true;
         }
-        const char *val = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
-        if (!val) {
-            val = "";
+        /// A bare `$name` bound to a list/map expands to a VECTOR (its elements
+        /// / values) -- this single-field slice cannot represent that, so defer
+        /// rather than emit one joined field the legacy path would not.
+        if (env->is_scalar && !env->is_scalar(env->ctx, p->u.param.name)) {
+            *ok = false;
+            return true;
         }
-        if (!acc_append(a, val, strlen(val))) {
+        /// The get callback returns an OWNED string (or NULL for unset); we
+        /// copy it into the field and free it. This lets the live executor
+        /// source values from the symtable (which returns owned copies) without
+        /// leaking; bench callbacks wrap getenv in strdup to match the
+        /// contract.
+        char *got = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
+        bool appended = acc_append(a, got ? got : "", got ? strlen(got) : 0);
+        free(got);
+        if (!appended) {
             return false;
         }
         if (in_dquote) {
