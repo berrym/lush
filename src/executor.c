@@ -6418,11 +6418,26 @@ static bool executor_symtable_word_is_scalar(void *ctx, const char *name) {
 }
 
 /// Audit-mode check (Step 2, gated on LUSH_WORD_CST_AUDIT): abort loudly if the
-/// Word CST fields for a covered argument disagree with the legacy scalar
-/// expansion. Covered words are lush-mode-no-split, so they yield 0 fields (a
+/// Word CST fields for a covered argument disagree with the legacy expansion.
+/// Covered words are lush-mode-no-split, so they yield 0 fields (a
 /// null-word-removed empty) or 1 field (which must equal the legacy scalar).
-/// This pinpoints a live value-source divergence at the exact expansion point,
-/// converting a silent mismatch into an immediate, diagnosable abort.
+/// This pinpoints a live divergence at the exact expansion point, converting a
+/// silent mismatch into an immediate, diagnosable abort.
+///
+/// Two checks together prove full post-glob parity for a covered word:
+///  1. The pre-glob scalar compare below: the CST field(s) must equal the value
+///     legacy's expand_arg_node yields (catches any dequote / variable / ANSI-C
+///     divergence upstream).
+///  2. The post-scalar gate: legacy would next brace/glob-expand that scalar
+///     into a DIFFERENT field vector, which the scalar compare is blind to (a
+///     covered `\*` matches the scalar `*` yet legacy globs it). word_eval must
+///     defer any such word; if a covered word's scalar would still trigger
+///     legacy expansion, that is a coverage bug. We MIRROR the legacy gate from
+///     build_argv verbatim -- quoted-string nodes are exempt, brace/glob only
+///     fire otherwise, and glob no-ops under set -f -- so the prediction cannot
+///     disagree with what legacy actually does (no false positives).
+/// Field splitting needs no check: legacy splits only NODE_COMMAND_SUB /
+/// NODE_VAR words in split mode, both of which word_eval already defers.
 static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
                            int n) {
     char *legacy = expand_arg_node(executor, child);
@@ -6434,12 +6449,20 @@ static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
     } else {
         match = false; /// >1 field is not a covered lush-mode shape yet
     }
-    if (!match) {
+    /// A scalar-matching covered word still diverges if legacy would then
+    /// brace/glob-expand that scalar. Gate mirrors build_argv exactly.
+    bool post_expand =
+        match && n >= 1 && legacy && child->type != NODE_STRING_LITERAL &&
+        child->type != NODE_STRING_EXPANDABLE &&
+        (needs_brace_expansion(legacy) ||
+         (!shell_opts.no_globbing && needs_glob_expansion(legacy)));
+    if (!match || post_expand) {
         fprintf(stderr,
                 "WORD_CST AUDIT MISMATCH: word='%s' cst_n=%d cst[0]='%s' "
-                "legacy='%s'\n",
+                "legacy='%s'%s\n",
                 child->val.str ? child->val.str : "", n, n > 0 ? fields[0] : "",
-                legacy ? legacy : "(null)");
+                legacy ? legacy : "(null)",
+                post_expand ? " [post-glob/brace divergence]" : "");
         abort();
     }
     free(legacy);
