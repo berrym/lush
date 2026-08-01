@@ -1333,6 +1333,22 @@ TEST(rt_command_word_mixed_quote_provenance) {
                      "xYz\n");
 }
 
+TEST(rt_ansi_c_arg_is_mode_gated) {
+    /// A standalone $'...' command argument decodes ANSI-C escapes only under
+    /// FEATURE_ANSI_QUOTING (on in lush/bash/zsh, OFF in POSIX mode). The Word
+    /// CST decodes $'...' at parse time, so its dual-routing path must honour
+    /// the same mode gate as the legacy expander: decode when the feature is
+    /// on, leave $'...' literal under `set -o posix`. Regression guard for the
+    /// CST default-on flip -- run under `--setup lush:audit`, a divergence here
+    /// aborts. $'\t' == a tab.
+    run_result_t on = run_shell("printf '[%s]' $'\\t'\n");
+    ASSERT_STDOUT_EQ(on, "[\t]");
+    /// Subshell-isolated so POSIX mode does not leak into later tests
+    /// (run_shell shares mode state across tests).
+    run_result_t off = run_shell("( set -o posix; printf '[%s]' $'\\t' )\n");
+    ASSERT_STDOUT_EQ(off, "[$'\\t']");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8819,6 +8835,7 @@ int main(void) {
     RUN_TEST(rt_declaration_util_mixed_quote_tilde);
     RUN_TEST(rt_mixed_quote_provenance_assignment);
     RUN_TEST(rt_command_word_mixed_quote_provenance);
+    RUN_TEST(rt_ansi_c_arg_is_mode_gated);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

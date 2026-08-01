@@ -54,6 +54,10 @@ typedef struct {
     bool zsh_extended_glob;  ///< FEATURE_ZSH_EXTENDED_GLOB: `#`/`^` are glob
                              ///< metacharacters, so a bare literal carrying one
                              ///< defers (not-yet-covered). Off by default.
+    bool ansi_c_quoting;     ///< FEATURE_ANSI_QUOTING: when false (POSIX mode)
+                             ///< legacy leaves `$'...'` literal, so a WP_ANSIC
+                             ///< word defers instead of emitting decoded bytes.
+                             ///< Bench callers set true (default-mode parity).
 } word_eval_env_t;
 
 /**
