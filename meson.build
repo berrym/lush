@@ -38,6 +38,19 @@ endif
 
 message('Build directory: ' + build_dir_name + ' ✓')
 
+# ============================================================================
+# WORD CST DIFFERENTIAL AUDIT SETUP
+# ============================================================================
+# `meson test --setup lush:audit` runs the whole suite with the Word CST
+# dual-routing path forced on and the abort-on-mismatch audit enabled, so a
+# covered word whose CST expansion diverges from the legacy path fails the run
+# at the exact expansion point. Used by the word-cst-audit CI job to guard every
+# coverage-widening change. The setup name is subproject-qualified (`lush:`)
+# because the libhashtable subproject also defines tests. (LUSH_WORD_CST is also
+# the runtime default; the explicit '1' keeps this setup correct regardless.)
+add_test_setup('audit',
+               env: ['LUSH_WORD_CST=1', 'LUSH_WORD_CST_AUDIT=1'])
+
 # Debug build configuration
 debug_option = get_option('enable_debug')
 if debug_option

@@ -63,6 +63,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h> /// strcasecmp (LUSH_WORD_CST opt-out parsing)
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -6468,6 +6469,21 @@ static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
     free(legacy);
 }
 
+/// Whether the Word CST dual-routing path is active. It is the DEFAULT: a
+/// covered command-argument word expands on the CST backbone, with the exact
+/// legacy path as fallback for anything not covered. Opt out (fall back to the
+/// legacy expander for every word) by setting LUSH_WORD_CST to a falsey value
+/// -- 0 / off / false / no (case-insensitive) -- for troubleshooting a
+/// suspected CST divergence. Any other value, or unset, keeps the CST on.
+static bool word_cst_enabled(void) {
+    const char *v = getenv("LUSH_WORD_CST");
+    if (!v || !*v) {
+        return true;
+    }
+    return !(strcasecmp(v, "0") == 0 || strcasecmp(v, "off") == 0 ||
+             strcasecmp(v, "false") == 0 || strcasecmp(v, "no") == 0);
+}
+
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc) {
     if (!executor || !command || !argc) {
@@ -6565,14 +6581,15 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
-                    /// Step 2 (Word CST dual-routing): if this argument carries
-                    /// a covered Word CST, evaluate it on the CST backbone.
-                    /// word_eval composes the same field_split / null-word
-                    /// primitives build_argv uses and resolves $name from the
-                    /// same symtable, so a covered word cannot drift; a not-ok
-                    /// result falls through to the exact legacy path below.
-                    /// Gated on LUSH_WORD_CST during bring-up.
-                    if (child->word && getenv("LUSH_WORD_CST")) {
+                    /// Word CST dual-routing (default path): if this argument
+                    /// carries a covered Word CST, evaluate it on the CST
+                    /// backbone. word_eval composes the same field_split /
+                    /// null-word primitives build_argv uses and resolves $name
+                    /// from the same symtable, so a covered word cannot drift;
+                    /// a not-ok result falls through to the exact legacy path
+                    /// below. Opt out via LUSH_WORD_CST=0 (see
+                    /// word_cst_enabled).
+                    if (child->word && word_cst_enabled()) {
                         char *ifs_val =
                             symtable_get_var(executor->symtable, "IFS");
                         word_eval_env_t wenv = {
@@ -6584,6 +6601,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
                             .zsh_extended_glob =
                                 shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB),
+                            .ansi_c_quoting =
+                                shell_mode_allows(FEATURE_ANSI_QUOTING),
                         };
                         int wn = 0;
                         bool wok = false;

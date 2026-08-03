@@ -122,6 +122,14 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
     case WP_LITERAL:
     case WP_SINGLE:
     case WP_ANSIC: {
+        /// `$'...'` decodes ANSI-C escapes only under FEATURE_ANSI_QUOTING (off
+        /// in POSIX mode, where legacy leaves `$'...'` literal). WP_ANSIC was
+        /// decoded at parse time, so when the feature is off defer the whole
+        /// word to the legacy expander rather than emit the decoded bytes.
+        if (p->kind == WP_ANSIC && !env->ansi_c_quoting) {
+            *ok = false;
+            return true;
+        }
         const char *text = p->u.leaf.text ? p->u.leaf.text : "";
         /// A glob/brace metacharacter that the legacy path would re-expand must
         /// defer. Legacy re-globs the DEQUOTED value, so a genuinely quoted

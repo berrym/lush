@@ -43,7 +43,8 @@ static char **peval(const char *line, const char **vars, int *n, bool *ok,
         word_eval_env_t env = {.get = map_get,
                                .ctx = vars,
                                .ifs = NULL,
-                               .word_split_default = false};
+                               .word_split_default = false,
+                               .ansi_c_quoting = true};
         fields = word_eval(w, &env, n, ok);
     }
     word_free(w);
@@ -206,8 +207,11 @@ TEST(eval_bash_split_deferred) {
     bool fully = false;
     word_t *w = parse_word(tok, WORD_CTX_ARG, &fully);
     ASSERT_TRUE(fully, "parse covers $X");
-    word_eval_env_t env = {
-        .get = map_get, .ctx = vars, .ifs = NULL, .word_split_default = true};
+    word_eval_env_t env = {.get = map_get,
+                           .ctx = vars,
+                           .ifs = NULL,
+                           .word_split_default = true,
+                           .ansi_c_quoting = true};
     int n = 0;
     bool ok = false;
     char **got = word_eval(w, &env, &n, &ok);

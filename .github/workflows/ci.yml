@@ -63,6 +63,34 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  # Word CST differential audit soak. The Word CST dual-routing path is the
+  # runtime default; this job runs the FULL suite with the abort-on-mismatch
+  # audit (LUSH_WORD_CST_AUDIT) active, so any covered word whose CST expansion
+  # diverges from the legacy path -- in value, or in the post-glob/brace field
+  # vector -- aborts the run at the exact expansion point and fails CI. This is
+  # the guard for every future coverage-widening change to word_eval/word_parse.
+  word-cst-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build
+
+      - name: Configure
+        run: |
+          meson setup build
+
+      - name: Build
+        run: |
+          meson compile -C build
+
+      - name: Run full suite under the Word CST audit
+        run: |
+          meson test -C build --setup lush:audit --print-errorlogs
+
   # AddressSanitizer + UndefinedBehaviorSanitizer build. Leak detection is
   # disabled for now: the unit suite still has known leaks tracked separately,
   # so this job gates on hard memory-safety errors (heap-buffer-overflow,

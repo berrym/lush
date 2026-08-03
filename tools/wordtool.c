@@ -89,7 +89,8 @@ int main(int argc, char **argv) {
     word_eval_env_t env = {.get = env_get,
                            .ctx = NULL,
                            .ifs = getenv("IFS"),
-                           .word_split_default = false};
+                           .word_split_default = false,
+                           .ansi_c_quoting = true};
     int n = 0;
     bool ok = false;
     char **fields = word_eval(w, &env, &n, &ok);
