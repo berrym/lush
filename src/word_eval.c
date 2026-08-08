@@ -121,6 +121,15 @@ static bool is_positional(const char *name) {
     return name && name[0] >= '0' && name[0] <= '9' && name[1] == '\0';
 }
 
+/// The parameter-expansion operators this slice evaluates: the four
+/// alternation operators `${var:-x}` (0), `${var:+x}` (1), `${var-x}` (10),
+/// `${var+x}` (11). Their operator logic runs through the shared apply_op
+/// callback. Every other op index (pattern-strip, case, substitution, slice,
+/// assign, error, transform) defers.
+static bool is_covered_alternation_op(int32_t op) {
+    return op == 0 || op == 1 || op == 10 || op == 11;
+}
+
 /// A bare (unquoted) literal must NOT be treated as a plain literal if it
 /// carries a character that triggers a later expansion pass this slice does not
 /// model. Conservative: the glob metacharacters `* ? [ ]`, the extglob group
@@ -181,6 +190,75 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         a->cur_quoted = true;
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
+        /// A covered alternation operator
+        /// ${var:-x}/${var:+x}/${var-x}/${var+x}: resolve the value, evaluate
+        /// the operand to a scalar default, and apply the operator through the
+        /// shared apply_op primitive (so the semantics match legacy by
+        /// construction). Requires a plain-identifier scalar name, no
+        /// subscript/operand2/flags, the apply_op callback, and
+        /// -- unquoted -- no bash-mode splitting of the result.
+        if (is_covered_alternation_op(p->u.param.op)) {
+            if (p->u.param.subscript || p->u.param.operand2 ||
+                p->u.param.flags != 0 || !env->apply_op ||
+                !is_plain_ident(p->u.param.name) ||
+                (!in_dquote && env->word_split_default) ||
+                (env->is_scalar &&
+                 !env->is_scalar(env->ctx, p->u.param.name))) {
+                *ok = false;
+                return true;
+            }
+            char *value = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
+            char *deflt = NULL;
+            if (p->u.param.operand) {
+                /// Evaluate the operand as a scalar default: the operator
+                /// RESULT (not the operand) is what the outer word may split,
+                /// and the covered outer word does not split, so the operand
+                /// must yield at most one field. More than one, or not-covered,
+                /// defers.
+                int dn = 0;
+                bool dok = false;
+                char **df = word_eval(p->u.param.operand, env, &dn, &dok);
+                if (!dok || dn > 1) {
+                    for (int i = 0; i < dn; i++) {
+                        free(df[i]);
+                    }
+                    free(df);
+                    free(value);
+                    *ok = false;
+                    return true;
+                }
+                deflt =
+                    (dn == 1) ? df[0] : NULL; /// take ownership of the field
+                free(df);
+            }
+            char *result = env->apply_op(env->ctx, p->u.param.name, value,
+                                         deflt ? deflt : "", p->u.param.op);
+            free(value);
+            free(deflt);
+            if (!result) {
+                *ok = false;
+                return true;
+            }
+            /// The operator result is an expansion value: an unquoted one
+            /// carrying a glob/brace metachar is re-expanded by legacy, so
+            /// defer (mirror the $var value gate).
+            if (!in_dquote &&
+                (has_word_expansion_meta(result) ||
+                 (env->zsh_extended_glob && strpbrk(result, "#^")))) {
+                free(result);
+                *ok = false;
+                return true;
+            }
+            if (!acc_append(a, result, strlen(result))) {
+                free(result);
+                return false;
+            }
+            free(result);
+            if (in_dquote) {
+                a->cur_quoted = true;
+            }
+            return true;
+        }
         /// Covers a simple $name / ${name} (plain identifier), the scalar
         /// specials $?/$$/$# (is_covered_special), and single-digit positionals
         /// $0..$9 (is_positional): no operator, no subscript/operands, no zsh

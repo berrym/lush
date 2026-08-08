@@ -37,6 +37,29 @@ static char *env_get(void *ctx, const char *name) {
     return v ? strdup(v) : NULL; /// owned per the word_eval get contract
 }
 
+/// Bench apply_op: replicates the four alternation operators so wordtool
+/// evaluates ${var:-x} etc. against the process environment. Mirrors the
+/// executor's apply_param_operator for op 0/1/10/11.
+static char *bench_apply_op(void *ctx, const char *name, const char *value,
+                            const char *deflt, int op) {
+    (void)ctx;
+    (void)name;
+    bool empty = !value || value[0] == '\0';
+    const char *d = deflt ? deflt : "";
+    switch (op) {
+    case 0: /// :- use default if unset or empty
+        return strdup(empty ? d : value);
+    case 1: /// :+ use alternative if set and non-empty
+        return strdup(!empty ? d : "");
+    case 10: /// - use default if unset (NULL), not if empty
+        return strdup(!value ? d : value);
+    case 11: /// + use alternative if set (even if empty)
+        return strdup(value ? d : "");
+    default:
+        return strdup("");
+    }
+}
+
 int main(int argc, char **argv) {
     bool reconstruct = false;
     const char *word = NULL;
@@ -87,6 +110,7 @@ int main(int argc, char **argv) {
     }
 
     word_eval_env_t env = {.get = env_get,
+                           .apply_op = bench_apply_op,
                            .ctx = NULL,
                            .ifs = getenv("IFS"),
                            .word_split_default = false,

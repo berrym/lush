@@ -29,6 +29,28 @@ static char *map_get(void *ctx, const char *name) {
     return NULL;
 }
 
+/// Bench apply_op: the four alternation operators, mirroring the executor's
+/// apply_param_operator (op 0/1/10/11).
+static char *map_apply_op(void *ctx, const char *name, const char *value,
+                          const char *deflt, int op) {
+    (void)ctx;
+    (void)name;
+    bool empty = !value || value[0] == '\0';
+    const char *d = deflt ? deflt : "";
+    switch (op) {
+    case 0:
+        return strdup(empty ? d : value);
+    case 1:
+        return strdup(!empty ? d : "");
+    case 10:
+        return strdup(!value ? d : value);
+    case 11:
+        return strdup(value ? d : "");
+    default:
+        return strdup("");
+    }
+}
+
 /// Parse + evaluate the first word of `line` in lush mode (no split) against
 /// `vars`. Returns the field vector (or NULL); sets *n, *ok (word_eval covered)
 /// and *fully (parse_word covered).
@@ -41,6 +63,7 @@ static char **peval(const char *line, const char **vars, int *n, bool *ok,
     *ok = false;
     if (w && *fully) {
         word_eval_env_t env = {.get = map_get,
+                               .apply_op = map_apply_op,
                                .ctx = vars,
                                .ifs = NULL,
                                .word_split_default = false,
@@ -217,6 +240,30 @@ TEST(eval_positional_param_covered) {
     assert_fields("x$1y$2", vars, exf);
 }
 
+TEST(eval_pe_alternation_operators) {
+    /// The four alternation operators via the map + apply_op stub. :-/:+ treat
+    /// empty as unset; -/+ distinguish unset (map miss -> NULL) from empty.
+    const char *vars[] = {"set", "x", "empty", "", NULL};
+    const char *ex[] = {"x", NULL};
+    assert_fields("${set:-D}", vars, ex); /// set, non-empty -> value
+    const char *eD[] = {"D", NULL};
+    assert_fields("${empty:-D}", vars, eD); /// empty -> default
+    assert_fields("${un:-D}", vars, eD);    /// unset -> default
+    assert_fields("${un-D}", vars, eD);     /// unset -> default (- form)
+    const char *eA[] = {"A", NULL};
+    assert_fields("${set:+A}", vars, eA); /// set, non-empty -> alternative
+
+    /// Empty results null-word-drop (unquoted).
+    int n = -1;
+    bool ok = false, fully = false;
+    char **got = peval("${empty-D}", vars, &n, &ok, &fully);
+    ASSERT_TRUE(ok && n == 0, "${empty-D}: empty stays empty -> drops");
+    free_fields(got, n);
+    got = peval("${empty:+A}", vars, &n, &ok, &fully);
+    ASSERT_TRUE(ok && n == 0, "${empty:+A}: empty -> no alternative -> drops");
+    free_fields(got, n);
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -238,6 +285,7 @@ TEST(eval_bash_split_deferred) {
     word_t *w = parse_word(tok, WORD_CTX_ARG, &fully);
     ASSERT_TRUE(fully, "parse covers $X");
     word_eval_env_t env = {.get = map_get,
+                           .apply_op = map_apply_op,
                            .ctx = vars,
                            .ifs = NULL,
                            .word_split_default = true,
@@ -276,6 +324,7 @@ int main(void) {
     RUN_TEST(eval_quoted_glob_is_literal);
     RUN_TEST(eval_special_param_scalar_covered);
     RUN_TEST(eval_positional_param_covered);
+    RUN_TEST(eval_pe_alternation_operators);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

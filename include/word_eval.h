@@ -47,7 +47,16 @@ typedef struct {
     /// NULL => assume scalar (bench callbacks source only scalars via getenv/a
     /// map).
     bool (*is_scalar)(void *ctx, const char *name);
-    void *ctx;               ///< Passed to get()/is_scalar().
+    /// Apply a parameter-expansion operator to a resolved scalar value, via the
+    /// same shared primitive the legacy expander uses, so the semantics cannot
+    /// drift. `value` is the variable's value (NULL if unset), `deflt` the
+    /// evaluated operand (NULL/"" if empty), `op` an index into the executor's
+    /// param_operators[] (this slice passes only 0=`:-` 1=`:+` 10=`-` 11=`+`).
+    /// Returns the OWNED operator result. NULL => operators are not covered
+    /// (word_eval defers any `${var op ...}`); bench callbacks supply a stub.
+    char *(*apply_op)(void *ctx, const char *name, const char *value,
+                      const char *deflt, int op);
+    void *ctx;               ///< Passed to get()/is_scalar()/apply_op().
     const char *ifs;         ///< IFS, or NULL for the default " \t\n".
     bool word_split_default; ///< FEATURE_WORD_SPLIT_DEFAULT (lush false, bash
                              ///< true).
