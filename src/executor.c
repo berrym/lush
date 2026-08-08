@@ -6388,13 +6388,14 @@ static char *executor_symtable_word_get(void *ctx, const char *name) {
     if (!ex || !ex->symtable || !name) {
         return NULL;
     }
-    /// The scalar specials $?/$$/$# are not symtable-backed the way the legacy
-    /// expander reads them (it computes $? from last_exit_status, $$ from the
-    /// shell PID, $# from the positional count). Resolve them through that same
-    /// expander so the covered value matches legacy by construction rather than
-    /// re-deriving it here (which could drift).
+    /// The scalar specials $?/$$/$# and the single-digit positionals $0..$9 are
+    /// resolved by the legacy expander from live state (last_exit_status, the
+    /// shell PID, the positional count / vector), not necessarily the plain
+    /// symtable read. Resolve them through that same expander so the covered
+    /// value matches legacy by construction rather than re-deriving it here.
     if (name[0] != '\0' && name[1] == '\0' &&
-        (name[0] == '?' || name[0] == '$' || name[0] == '#')) {
+        (name[0] == '?' || name[0] == '$' || name[0] == '#' ||
+         (name[0] >= '0' && name[0] <= '9'))) {
         char ref[3] = {'$', name[0], '\0'};
         return expand_if_needed(ex, ref);
     }
