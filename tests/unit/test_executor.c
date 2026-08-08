@@ -1389,6 +1389,19 @@ TEST(rt_positional_params_covered) {
     ASSERT_STDOUT_EQ(r, "A B C A0 xAy\nin-fn P 3\nback A 3\nshifted B 2\n");
 }
 
+TEST(rt_bg_pid_and_option_flags_covered) {
+    /// $! (last background PID) and $- (current option flags) are covered
+    /// scalars on the CST backbone, sourced through the same expander legacy
+    /// uses; exact values are validated byte-for-byte under the audit soak.
+    /// Here we assert $! is a numeric PID after a background job, and that $-
+    /// reflects `set -f` (contains `f`) -- robust whether or not the harness
+    /// starts with other flags. Subshell-isolated so `set -f` does not leak.
+    run_result_t r = run_shell(
+        "( sleep 0.1 & case $! in ''|*[!0-9]*) echo BADPID;; *) echo bgok;; "
+        "esac; set -f; case $- in *f*) echo fset;; *) echo fnotset;; esac )\n");
+    ASSERT_STDOUT_EQ(r, "bgok\nfset\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8879,6 +8892,7 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_bg_pid_and_option_flags_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

@@ -173,21 +173,30 @@ TEST(eval_quoted_glob_is_literal) {
 }
 
 TEST(eval_special_param_scalar_covered) {
-    /// The scalar specials $?/$$/$# are covered, resolved through the get
-    /// callback like any scalar (here the map). The vector special $@ and the
-    /// identifier-shaped last-arg $_ remain deferred.
-    const char *vars[] = {"?", "0", "$", "4242", "#", "3", NULL};
+    /// The scalar specials $?/$$/$#/$!/$- are covered, resolved through the get
+    /// callback like any scalar (here the map). The vector specials $@/$* and
+    /// the identifier-shaped last-arg $_ remain deferred.
+    const char *vars[] = {"?", "0",  "$", "4242",  "#", "3",
+                          "!", "77", "-", "himBH", NULL};
     const char *ex_q[] = {"0", NULL};
     assert_fields("$?", vars, ex_q);
     const char *ex_d[] = {"4242", NULL};
     assert_fields("$$", vars, ex_d);
     const char *ex_h[] = {"3", NULL};
     assert_fields("$#", vars, ex_h);
+    const char *ex_b[] = {"77", NULL};
+    assert_fields("$!", vars, ex_b);
+    const char *ex_o[] = {"himBH", NULL};
+    assert_fields("$-", vars, ex_o);
 
     int n = -1;
     bool ok = true, fully = false;
     char **got = peval("$@", vars, &n, &ok, &fully);
     ASSERT_FALSE(ok, "$@ (vector special) deferred");
+    free_fields(got, n);
+    ok = true;
+    got = peval("$*", vars, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "$* (vector special) deferred");
     free_fields(got, n);
 
     ok = true;

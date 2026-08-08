@@ -101,14 +101,16 @@ static bool is_plain_ident(const char *s) {
 }
 
 /// The scalar special parameters this slice covers: `$?` (last exit status),
-/// `$$` (shell PID), `$#` (positional count). Each is a plain scalar -- no
-/// vector -- so it fits the single-field model. The value is sourced through
-/// the same expander legacy uses (see the get callback), so it matches by
-/// construction. Vector specials (`$@`/`$*`), the last-arg `$_`, `$!`, `$-`
-/// remain deferred.
+/// `$$` (shell PID), `$#` (positional count), `$!` (last background PID, or
+/// empty), `$-` (current option flags). Each is a plain scalar -- no vector --
+/// so it fits the single-field model. The value is sourced through the same
+/// expander legacy uses (see the get callback), so it matches by construction.
+/// Vector specials (`$@`/`$*`) and the identifier-shaped last-arg `$_` remain
+/// deferred.
 static bool is_covered_special(const char *name) {
     return name && name[0] != '\0' && name[1] == '\0' &&
-           (name[0] == '?' || name[0] == '$' || name[0] == '#');
+           (name[0] == '?' || name[0] == '$' || name[0] == '#' ||
+            name[0] == '!' || name[0] == '-');
 }
 
 /// A single-digit positional parameter `$0`..`$9` (name is exactly one digit).
