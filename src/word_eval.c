@@ -202,6 +202,20 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         /// leaking; bench callbacks wrap getenv in strdup to match the
         /// contract.
         char *got = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
+        /// An UNQUOTED parameter whose VALUE carries a glob/brace metacharacter
+        /// is re-expanded by the legacy path: it globs / brace-expands the
+        /// expansion result (per bash/POSIX -- `v='*'; echo $v` lists files,
+        /// `v='{a,b}'; echo $v` yields `a b`). This single-field slice does not
+        /// model that later pass, so defer. A quoted expansion is glob/brace-
+        /// inert, so this only fires unquoted. Under zsh-extended-glob `#`/`^`
+        /// are metacharacters too.
+        if (!in_dquote && got &&
+            (has_word_expansion_meta(got) ||
+             (env->zsh_extended_glob && strpbrk(got, "#^")))) {
+            free(got);
+            *ok = false;
+            return true;
+        }
         bool appended = acc_append(a, got ? got : "", got ? strlen(got) : 0);
         free(got);
         if (!appended) {

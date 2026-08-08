@@ -1361,6 +1361,20 @@ TEST(rt_special_params_scalar_covered) {
     ASSERT_STDOUT_EQ(r, "1\n3\ns=0 n=3\npidnum\n");
 }
 
+TEST(rt_unquoted_param_glob_brace_value_defers) {
+    /// An unquoted $var whose VALUE carries a glob/brace metacharacter is
+    /// re-expanded by the legacy path (it globs / brace-expands the expansion
+    /// result, per bash/POSIX). The CST covers scalars but not that later pass,
+    /// so it must defer such a value rather than emit it literally. A quoted
+    /// expansion is glob/brace-inert and stays literal. Brace form is used (not
+    /// glob) so the assertion is filesystem-independent. Runs under the CST
+    /// audit soak, where a divergence would abort.
+    run_result_t unq = run_shell("v='{a,b}'\nprintf '[%s]' $v\necho\n");
+    ASSERT_STDOUT_EQ(unq, "[a][b]\n");
+    run_result_t q = run_shell("v='{a,b}'\nprintf '[%s]' \"$v\"\necho\n");
+    ASSERT_STDOUT_EQ(q, "[{a,b}]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8849,6 +8863,7 @@ int main(void) {
     RUN_TEST(rt_command_word_mixed_quote_provenance);
     RUN_TEST(rt_ansi_c_arg_is_mode_gated);
     RUN_TEST(rt_special_params_scalar_covered);
+    RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
