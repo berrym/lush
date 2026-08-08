@@ -196,6 +196,18 @@ TEST(eval_special_param_scalar_covered) {
     free_fields(got, n);
 }
 
+TEST(eval_positional_param_covered) {
+    /// Single-digit positionals $0..$9 are covered, resolved through the get
+    /// callback like any scalar (here the map), including in concatenation.
+    const char *vars[] = {"0", "prog", "1", "A", "2", "B", NULL};
+    const char *ex0[] = {"prog", NULL};
+    assert_fields("$0", vars, ex0);
+    const char *ex1[] = {"A", NULL};
+    assert_fields("$1", vars, ex1);
+    const char *exf[] = {"xAyB", NULL};
+    assert_fields("x$1y$2", vars, exf);
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -254,6 +266,7 @@ int main(void) {
     RUN_TEST(eval_glob_is_not_yet_covered);
     RUN_TEST(eval_quoted_glob_is_literal);
     RUN_TEST(eval_special_param_scalar_covered);
+    RUN_TEST(eval_positional_param_covered);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

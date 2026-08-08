@@ -101,14 +101,22 @@ static bool is_plain_ident(const char *s) {
 }
 
 /// The scalar special parameters this slice covers: `$?` (last exit status),
-/// `$$` (shell PID), `$#` (positional count). Each is a plain numeric scalar --
-/// no splitting, no globbing, no vector -- so it fits the single-field model.
-/// The value is sourced through the same expander legacy uses (see the get
-/// callback), so it matches by construction. Vector specials (`$@`/`$*`), the
-/// last-arg `$_`, `$!`, `$-`, and positionals `$0`..`$9` remain deferred.
+/// `$$` (shell PID), `$#` (positional count). Each is a plain scalar -- no
+/// vector -- so it fits the single-field model. The value is sourced through
+/// the same expander legacy uses (see the get callback), so it matches by
+/// construction. Vector specials (`$@`/`$*`), the last-arg `$_`, `$!`, `$-`
+/// remain deferred.
 static bool is_covered_special(const char *name) {
     return name && name[0] != '\0' && name[1] == '\0' &&
            (name[0] == '?' || name[0] == '$' || name[0] == '#');
+}
+
+/// A single-digit positional parameter `$0`..`$9` (name is exactly one digit).
+/// `$0` is the shell/script name; `$1`..`$9` are positional arguments -- each a
+/// scalar sourced through the same expander legacy uses. Two-plus digits are
+/// spelled `${10}` (an operator/brace form) and are handled elsewhere.
+static bool is_positional(const char *name) {
+    return name && name[0] >= '0' && name[0] <= '9' && name[1] == '\0';
 }
 
 /// A bare (unquoted) literal must NOT be treated as a plain literal if it
@@ -171,14 +179,16 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         a->cur_quoted = true;
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
-        /// Covers a simple $name / ${name} (plain identifier) and the scalar
-        /// specials $?/$$/$# (is_covered_special): no operator, no
-        /// subscript/operands, no zsh flags. Vector specials ($@/$*), the
-        /// identifier-shaped $_ (last-arg), and other specials stay deferred.
+        /// Covers a simple $name / ${name} (plain identifier), the scalar
+        /// specials $?/$$/$# (is_covered_special), and single-digit positionals
+        /// $0..$9 (is_positional): no operator, no subscript/operands, no zsh
+        /// flags. Vector specials ($@/$*), the identifier-shaped $_ (last-arg),
+        /// and other specials stay deferred.
         if (p->u.param.op != -1 || p->u.param.subscript || p->u.param.operand ||
             p->u.param.operand2 || p->u.param.flags != 0 ||
             (!is_plain_ident(p->u.param.name) &&
-             !is_covered_special(p->u.param.name)) ||
+             !is_covered_special(p->u.param.name) &&
+             !is_positional(p->u.param.name)) ||
             strcmp(p->u.param.name, "_") == 0) {
             *ok = false;
             return true;

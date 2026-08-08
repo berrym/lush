@@ -1626,17 +1626,20 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                            tokenizer->input_length - tokenizer->position) > 0 ||
                        next == '?' || next == '$' || next == '!' ||
                        next == '@' || next == '*' || next == '#' ||
-                       next == '-') {
-                /// Simple variable $var, $?, $$, $!, $-, etc.
-                /// $var goes through the lush identifier predicate so a
+                       next == '-' || (next >= '0' && next <= '9')) {
+                /// Simple variable $var, $?, $$, $!, $-, a positional $0..$9,
+                /// etc. $var goes through the lush identifier predicate so a
                 /// non-ASCII identifier ($café, $Σ, $имя) is accepted
                 /// under FEATURE_UNICODE_IDENTIFIERS. Special-form
-                /// single-char variants ($?, $@, etc.) keep their
-                /// fast-path branch.
+                /// single-char variants ($?, $@, etc.) and single-digit
+                /// positionals ($0..$9; ${10} is used for two-plus digits) keep
+                /// their fast-path branch.
 
-                /// For special single-character variables, only advance by one
+                /// For special single-character variables and single-digit
+                /// positionals, only advance by one
                 if (next == '?' || next == '$' || next == '!' || next == '@' ||
-                    next == '*' || next == '#' || next == '-') {
+                    next == '*' || next == '#' || next == '-' ||
+                    (next >= '0' && next <= '9')) {
                     tokenizer
                         ->position++; /// Just one character for special vars
                     tokenizer->column++;

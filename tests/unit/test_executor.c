@@ -1375,6 +1375,20 @@ TEST(rt_unquoted_param_glob_brace_value_defers) {
     ASSERT_STDOUT_EQ(q, "[{a,b}]\n");
 }
 
+TEST(rt_positional_params_covered) {
+    /// Single-digit positionals $0..$9 expand on the CST backbone (covered, not
+    /// deferred), sourced through the same expander legacy uses so the value
+    /// matches by construction -- validated byte-for-byte under the audit soak.
+    /// $10 is ${1}0 (single-digit positional then a literal 0). Positional
+    /// count and values track function scope and shift. Subshell-isolated so
+    /// `set --` does not leak across tests.
+    run_result_t r =
+        run_shell("( set -- A B C; echo $1 $2 $3 $10 x$1y; "
+                  "f() { echo in-fn $1 $#; }; f P Q R; echo back $1 $#; "
+                  "shift; echo shifted $1 $# )\n");
+    ASSERT_STDOUT_EQ(r, "A B C A0 xAy\nin-fn P 3\nback A 3\nshifted B 2\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8864,6 +8878,7 @@ int main(void) {
     RUN_TEST(rt_ansi_c_arg_is_mode_gated);
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
+    RUN_TEST(rt_positional_params_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
