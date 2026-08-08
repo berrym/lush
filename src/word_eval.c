@@ -100,6 +100,17 @@ static bool is_plain_ident(const char *s) {
     return true;
 }
 
+/// The scalar special parameters this slice covers: `$?` (last exit status),
+/// `$$` (shell PID), `$#` (positional count). Each is a plain numeric scalar --
+/// no splitting, no globbing, no vector -- so it fits the single-field model.
+/// The value is sourced through the same expander legacy uses (see the get
+/// callback), so it matches by construction. Vector specials (`$@`/`$*`), the
+/// last-arg `$_`, `$!`, `$-`, and positionals `$0`..`$9` remain deferred.
+static bool is_covered_special(const char *name) {
+    return name && name[0] != '\0' && name[1] == '\0' &&
+           (name[0] == '?' || name[0] == '$' || name[0] == '#');
+}
+
 /// A bare (unquoted) literal must NOT be treated as a plain literal if it
 /// carries a character that triggers a later expansion pass this slice does not
 /// model. Conservative: the glob metacharacters `* ? [ ]`, the extglob group
@@ -160,12 +171,14 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         a->cur_quoted = true;
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
-        /// 1c-1 covers only a simple $name / ${name}: no operator, no
-        /// subscript/operands, no zsh flags, a plain identifier. Specials
-        /// ($@/$?/... and the identifier-shaped $_ = last-arg) are deferred.
+        /// Covers a simple $name / ${name} (plain identifier) and the scalar
+        /// specials $?/$$/$# (is_covered_special): no operator, no
+        /// subscript/operands, no zsh flags. Vector specials ($@/$*), the
+        /// identifier-shaped $_ (last-arg), and other specials stay deferred.
         if (p->u.param.op != -1 || p->u.param.subscript || p->u.param.operand ||
             p->u.param.operand2 || p->u.param.flags != 0 ||
-            !is_plain_ident(p->u.param.name) ||
+            (!is_plain_ident(p->u.param.name) &&
+             !is_covered_special(p->u.param.name)) ||
             strcmp(p->u.param.name, "_") == 0) {
             *ok = false;
             return true;
