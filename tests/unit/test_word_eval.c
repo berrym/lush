@@ -172,13 +172,22 @@ TEST(eval_quoted_glob_is_literal) {
     assert_fields("'a*b'", vars, exp2);
 }
 
-TEST(eval_special_param_not_yet_covered) {
-    /// $? and $@ are deferred in 1c-1; so is the identifier-shaped special $_.
-    const char *vars[] = {NULL};
+TEST(eval_special_param_scalar_covered) {
+    /// The scalar specials $?/$$/$# are covered, resolved through the get
+    /// callback like any scalar (here the map). The vector special $@ and the
+    /// identifier-shaped last-arg $_ remain deferred.
+    const char *vars[] = {"?", "0", "$", "4242", "#", "3", NULL};
+    const char *ex_q[] = {"0", NULL};
+    assert_fields("$?", vars, ex_q);
+    const char *ex_d[] = {"4242", NULL};
+    assert_fields("$$", vars, ex_d);
+    const char *ex_h[] = {"3", NULL};
+    assert_fields("$#", vars, ex_h);
+
     int n = -1;
     bool ok = true, fully = false;
-    char **got = peval("$?", vars, &n, &ok, &fully);
-    ASSERT_FALSE(ok, "special param deferred");
+    char **got = peval("$@", vars, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "$@ (vector special) deferred");
     free_fields(got, n);
 
     ok = true;
@@ -244,7 +253,7 @@ int main(void) {
     RUN_TEST(eval_concatenation_fusion);
     RUN_TEST(eval_glob_is_not_yet_covered);
     RUN_TEST(eval_quoted_glob_is_literal);
-    RUN_TEST(eval_special_param_not_yet_covered);
+    RUN_TEST(eval_special_param_scalar_covered);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

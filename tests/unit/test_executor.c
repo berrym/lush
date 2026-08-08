@@ -1349,6 +1349,18 @@ TEST(rt_ansi_c_arg_is_mode_gated) {
     ASSERT_STDOUT_EQ(off, "[$'\\t']");
 }
 
+TEST(rt_special_params_scalar_covered) {
+    /// The scalar specials $?/$$/$# expand on the CST backbone (covered, not
+    /// deferred), sourced through the same expander legacy uses so the value
+    /// matches by construction -- validated byte-for-byte under the CST audit
+    /// soak. $? = last exit status, $# = positional count, $$ = a numeric PID.
+    /// Subshell-isolated so `set --` positionals do not leak across tests.
+    run_result_t r = run_shell(
+        "( false; echo $?; set -- a b c; echo $#; echo \"s=$? n=$#\"; "
+        "case $$ in ''|*[!0-9]*) echo BADPID;; *) echo pidnum;; esac )\n");
+    ASSERT_STDOUT_EQ(r, "1\n3\ns=0 n=3\npidnum\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8836,6 +8848,7 @@ int main(void) {
     RUN_TEST(rt_mixed_quote_provenance_assignment);
     RUN_TEST(rt_command_word_mixed_quote_provenance);
     RUN_TEST(rt_ansi_c_arg_is_mode_gated);
+    RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
