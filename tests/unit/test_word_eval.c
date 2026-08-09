@@ -88,6 +88,34 @@ static char *map_apply_op(void *ctx, const char *name, const char *value,
         }
         return r;
     }
+    case 14: /// ${var:off:len} substring (bench: ASCII byte slice of the simple
+    {        /// non-negative spec; UTF-8/grapheme parity runs live)
+        const char *v = value ? value : "";
+        char *end;
+        long off = strtol(d, &end, 10);
+        long vlen = (long)strlen(v);
+        if (off > vlen) {
+            off = vlen;
+        }
+        long avail = vlen - off;
+        long len = avail;
+        if (*end == ':') {
+            len = strtol(end + 1, NULL, 10);
+            if (len > avail) {
+                len = avail;
+            }
+            if (len < 0) {
+                len = 0;
+            }
+        }
+        char *r = malloc(len + 1);
+        if (!r) {
+            return NULL;
+        }
+        memcpy(r, v + off, len);
+        r[len] = '\0';
+        return r;
+    }
     default:
         return strdup("");
     }
@@ -336,6 +364,24 @@ TEST(eval_pe_case_conversion_operators) {
     assert_fields("${s,}", vars, lf); /// , lower first
 }
 
+TEST(eval_pe_substring_operators) {
+    /// Substring ${var:off} / ${var:off:len} via the map + apply_op stub
+    /// (ASCII byte slice; UTF-8 grapheme parity runs live). Only the simple
+    /// non-negative numeric spec is covered.
+    const char *vars[] = {"s", "abcdef", NULL};
+    const char *from2[] = {"cdef", NULL};
+    assert_fields("${s:2}", vars, from2); /// offset only -> to end
+    const char *mid[] = {"cd", NULL};
+    assert_fields("${s:2:2}", vars, mid); /// offset + length
+    const char *head[] = {"abc", NULL};
+    assert_fields("${s:0:3}", vars, head); /// from start
+    const char *clip[] = {"ef", NULL};
+    assert_fields("${s:4:99}", vars, clip); /// length past end clamps
+    const char *none[] = {NULL};
+    assert_fields("${s:9}", vars,
+                  none); /// offset past end -> "" dropped unquoted
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -399,6 +445,7 @@ int main(void) {
     RUN_TEST(eval_pe_alternation_operators);
     RUN_TEST(eval_pe_pattern_strip_operators);
     RUN_TEST(eval_pe_case_conversion_operators);
+    RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

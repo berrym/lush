@@ -136,18 +136,27 @@ static bool is_case_op(int32_t op) {
     return op == 4 || op == 5 || op == 8 || op == 9;
 }
 
-/// Operators whose operand is a glob PATTERN, not a value: pattern-strip
-/// (`${var#p}` 6/2/7/3) and case-conversion (8/4/9/5). The pattern (literal in
-/// this slice) is passed to apply_op with metacharacters intact -- word_eval
-/// must not glob or dequote it.
-static bool op_has_pattern_operand(int32_t op) {
-    return op == 2 || op == 3 || op == 6 || op == 7 || is_case_op(op);
+/// The substring operator `${var:offset:length}` (14). The operand is a numeric
+/// offset[:length] spec (validated simple + non-negative at parse); it is
+/// recovered literally and handed to apply_op, which runs the same grapheme-
+/// aware extract_substring legacy uses -- parity by construction. zsh `:h`
+/// modifier chains and negative/arith/`$` operands defer at parse.
+static bool is_substring_op(int32_t op) { return op == 14; }
+
+/// Operators whose operand is recovered as a LITERAL string and passed to
+/// apply_op verbatim (word_eval must not glob, dequote, or word-split it):
+/// pattern-strip (`${var#p}` 6/2/7/3, a glob pattern), case-conversion
+/// (8/4/9/5, an optional restricting glob pattern), and substring (14, a
+/// numeric spec).
+static bool op_has_literal_operand(int32_t op) {
+    return op == 2 || op == 3 || op == 6 || op == 7 || is_case_op(op) ||
+           is_substring_op(op);
 }
 
 /// Every parameter-expansion operator this slice evaluates through apply_op.
-/// Substitution/slice/assign/error/transform ops still defer.
+/// Substitution/assign/error/transform ops still defer.
 static bool is_covered_pe_op(int32_t op) {
-    return is_covered_alternation_op(op) || op_has_pattern_operand(op);
+    return is_covered_alternation_op(op) || op_has_literal_operand(op);
 }
 
 /// Append the literal text of a pure-literal operand Word to the accumulator,
@@ -259,11 +268,11 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         a->cur_quoted = true;
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
-        /// A covered PE operator -- alternation (${var:-x} ...) or
-        /// pattern-strip
-        /// (${var#p} ...): resolve the value, evaluate the operand (a scalar
-        /// default VALUE for alternation, a glob PATTERN string for
-        /// pattern-strip), and apply the operator through the shared apply_op
+        /// A covered PE operator -- alternation (${var:-x} ...), pattern-strip
+        /// / case-conversion (${var#p}, ${var^^} ...), or substring
+        /// (${var:off:len}): resolve the value, evaluate the operand (a scalar
+        /// default VALUE for alternation, a literal glob PATTERN / numeric spec
+        /// otherwise), and apply the operator through the shared apply_op
         /// primitive (so the semantics match legacy by construction). Requires
         /// a plain-identifier scalar name, no subscript/operand2/flags, the
         /// apply_op callback, and -- unquoted -- no bash-mode splitting of the
@@ -280,12 +289,12 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
             }
             char *value = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
             char *deflt = NULL;
-            if (op_has_pattern_operand(p->u.param.op)) {
-                /// The operand is a glob PATTERN (literal in this slice):
-                /// recover its string with metacharacters intact; apply_op does
-                /// the match (pattern-strip) or the pattern-restricted case
-                /// conversion. A NULL operand is an empty pattern (case ops
-                /// then convert all characters).
+            if (op_has_literal_operand(p->u.param.op)) {
+                /// The operand is recovered as a LITERAL string with its bytes
+                /// intact (a glob pattern for strip/case, a numeric
+                /// offset[:len] spec for substring); apply_op does the match /
+                /// conversion / slice. A NULL operand is the empty string (an
+                /// empty pattern; case ops then convert all characters).
                 deflt = pattern_operand_string(p->u.param.operand);
                 if (!deflt) {
                     free(value);

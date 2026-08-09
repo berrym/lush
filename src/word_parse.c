@@ -69,14 +69,46 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
     return p;
 }
 
-/// True for an operator whose operand is a glob PATTERN, not a value: the
-/// pattern-strip ops (`#`/`##`/`%`/`%%`, 6/2/7/3) and the case-conversion ops
-/// (`^`/`^^`/`,`/`,,`, 8/4/9/5, whose pattern restricts which characters
-/// convert). The pattern is deferred if it needs `$`-expansion (this slice
-/// covers literal patterns only) and is never dequoted/globbed by word_eval.
-static bool op_has_pattern_operand(int op) {
+/// True for an operator whose operand is recovered as a LITERAL string (not
+/// word-eval'd as a value) and handed to apply_op verbatim: the pattern-strip
+/// ops (`#`/`##`/`%`/`%%`, 6/2/7/3, a glob pattern), the case-conversion ops
+/// (`^`/`^^`/`,`/`,,`, 8/4/9/5, an optional restricting glob pattern), and the
+/// substring op (`:`, 14, a numeric offset[:length] spec). The operand is
+/// deferred if it needs `$`-expansion (this slice covers literal operands only)
+/// and is never dequoted/globbed by word_eval.
+static bool op_has_literal_operand(int op) {
     return op == 2 || op == 3 || op == 6 || op == 7 || op == 4 || op == 5 ||
-           op == 8 || op == 9;
+           op == 8 || op == 9 || op == 14;
+}
+
+/// True when a `:` (substring) operand is the SIMPLE numeric form this slice
+/// covers: one or more decimal digits (the offset), optionally followed by `:`
+/// and one or more digits (the length). Everything else -- negative / space /
+/// paren offsets (`${v: -3}`, `${v:(-3)}`), a negative length (`${v:2:-1}`),
+/// arithmetic or `$` operands (`${v:i+1}`, `${v:$i}`), and the zsh modifier
+/// chains (`${v:h}`) -- returns false so the whole `${...}` defers to legacy. A
+/// non-negative literal offset[:length] handed to apply_param_operator (op 14)
+/// runs the same extract_substring legacy uses -> parity by construction.
+static bool is_simple_substring_spec(const char *s, size_t n) {
+    if (n == 0 || !isdigit((unsigned char)s[0])) {
+        return false;
+    }
+    size_t i = 0;
+    while (i < n && isdigit((unsigned char)s[i])) {
+        i++;
+    }
+    if (i == n) {
+        return true; /// offset only (`${v:2}`)
+    }
+    if (s[i] != ':') {
+        return false; /// trailing non-digit, non-`:` byte
+    }
+    i++; /// skip the interior `:`
+    size_t len_start = i;
+    while (i < n && isdigit((unsigned char)s[i])) {
+        i++;
+    }
+    return i == n && i > len_start; /// `:` then one-plus digits, nothing after
 }
 
 /// Detect a COVERED parameter-expansion operator at the start of `s` (the bytes
@@ -85,9 +117,11 @@ static bool op_has_pattern_operand(int op) {
 /// 6=`#` 2=`##` 7=`%` 3=`%%`; 8=`^` 4=`^^` 9=`,` 5=`,,`) and sets *op_len, or
 /// -1 when `s` does not begin a covered operator. Longest match wins (`##`
 /// before
-/// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`). Uncovered operators
-/// (`/`/`:=`/`:?`/`:off`/`@`/subscript `[`) return -1 so the whole `${...}`
-/// defers. `:=`/`:?`/`:off` start with `:` but are not `:-`/`:+`.
+/// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`; 14=`:` substring).
+/// A bare `:` is the substring op ONLY when a digit follows (`${var:2:3}`); the
+/// `:=`/`:?` operators and the zsh `:h` modifier chains fail that test and
+/// defer, as do `/`/`@`/subscript `[`, so the whole `${...}` defers. `:-`/`:+`
+/// are matched first; `:=`/`:?`/`: `/`:(` start with `:` but are not covered.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
@@ -96,6 +130,12 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '+') {
         *op_len = 2;
         return 1;
+    }
+    if (n >= 2 && s[0] == ':' && isdigit((unsigned char)s[1])) {
+        *op_len = 1;
+        return 14; /// : substring (numeric offset[:length]); the full operand
+                   /// is validated in make_operator_param, which defers any
+                   /// non-simple spec (negative/arith/$/zsh-modifier)
     }
     if (n >= 2 && s[0] == '#' && s[1] == '#') {
         *op_len = 2;
@@ -160,7 +200,14 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     /// operand is a glob PATTERN evaluated literally -- this slice covers
     /// literal patterns only, so a `$` in the pattern (which legacy expands)
     /// defers too.
-    bool pattern_op = op_has_pattern_operand(op);
+    /// The substring operator `:` (op 14) covers only a simple non-negative
+    /// numeric offset[:length]; a zsh `:h` modifier chain, a negative / space /
+    /// arithmetic / `$` offset, or an empty length defers to legacy.
+    if (op == 14 && !is_simple_substring_spec(operand_str, operand_len)) {
+        *handled = false;
+        return NULL;
+    }
+    bool pattern_op = op_has_literal_operand(op);
     for (size_t i = 0; i < operand_len; i++) {
         if (operand_str[i] == '\'' || operand_str[i] == '"' ||
             operand_str[i] == '\\' || (pattern_op && operand_str[i] == '$')) {
