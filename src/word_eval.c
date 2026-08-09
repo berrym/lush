@@ -121,13 +121,72 @@ static bool is_positional(const char *name) {
     return name && name[0] >= '0' && name[0] <= '9' && name[1] == '\0';
 }
 
-/// The parameter-expansion operators this slice evaluates: the four
-/// alternation operators `${var:-x}` (0), `${var:+x}` (1), `${var-x}` (10),
-/// `${var+x}` (11). Their operator logic runs through the shared apply_op
-/// callback. Every other op index (pattern-strip, case, substitution, slice,
-/// assign, error, transform) defers.
+/// The alternation operators: `${var:-x}` (0), `${var:+x}` (1), `${var-x}`
+/// (10), `${var+x}` (11). The operand is a scalar default VALUE (word_eval'd).
 static bool is_covered_alternation_op(int32_t op) {
     return op == 0 || op == 1 || op == 10 || op == 11;
+}
+
+/// The pattern-strip operators: `${var#p}` (6), `${var##p}` (2), `${var%p}`
+/// (7), `${var%%p}` (3). The operand is a glob PATTERN (literal in this slice),
+/// matched inside apply_op; word_eval passes it with metacharacters intact.
+static bool is_pattern_strip_op(int32_t op) {
+    return op == 2 || op == 3 || op == 6 || op == 7;
+}
+
+/// Every parameter-expansion operator this slice evaluates through apply_op.
+/// Case/substitution/slice/assign/error/transform ops still defer.
+static bool is_covered_pe_op(int32_t op) {
+    return is_covered_alternation_op(op) || is_pattern_strip_op(op);
+}
+
+/// Append the literal text of a pure-literal operand Word to the accumulator,
+/// keeping glob metacharacters (they are the strip PATTERN, matched by apply_op
+/// -- word_eval must not glob them). Returns false on a non-literal part (a `$`
+/// expansion / cmdsub -- deferred at parse for this slice) or allocation
+/// failure.
+static bool collect_literal_text(const word_t *w, eval_acc_t *a) {
+    for (uint32_t i = 0; i < w->n_parts; i++) {
+        const word_part_t *p = WORD_PART(w, i);
+        switch (p->kind) {
+        case WP_BARE:
+        case WP_DOUBLE:
+            if (!collect_literal_text(PART_BODY(p), a)) {
+                return false;
+            }
+            break;
+        case WP_LITERAL:
+        case WP_SINGLE:
+        case WP_ANSIC: {
+            const char *t = p->u.leaf.text ? p->u.leaf.text : "";
+            if (!acc_append(a, t, strlen(t))) {
+                return false;
+            }
+            break;
+        }
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Recover the glob PATTERN string of a pattern-strip operand (NULL operand ->
+/// "", an empty pattern). Owned; NULL means the operand is not a pure literal
+/// (or allocation failed) -> defer.
+static char *pattern_operand_string(const word_t *operand) {
+    eval_acc_t a;
+    if (!acc_init(&a)) {
+        return NULL;
+    }
+    if (operand && !collect_literal_text(operand, &a)) {
+        acc_free(&a);
+        return NULL;
+    }
+    char *s = a.cur; /// take ownership; acc_free then frees only a.fields
+    a.cur = NULL;
+    acc_free(&a);
+    return s;
 }
 
 /// A bare (unquoted) literal must NOT be treated as a plain literal if it
@@ -190,14 +249,16 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         a->cur_quoted = true;
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
-        /// A covered alternation operator
-        /// ${var:-x}/${var:+x}/${var-x}/${var+x}: resolve the value, evaluate
-        /// the operand to a scalar default, and apply the operator through the
-        /// shared apply_op primitive (so the semantics match legacy by
-        /// construction). Requires a plain-identifier scalar name, no
-        /// subscript/operand2/flags, the apply_op callback, and
-        /// -- unquoted -- no bash-mode splitting of the result.
-        if (is_covered_alternation_op(p->u.param.op)) {
+        /// A covered PE operator -- alternation (${var:-x} ...) or
+        /// pattern-strip
+        /// (${var#p} ...): resolve the value, evaluate the operand (a scalar
+        /// default VALUE for alternation, a glob PATTERN string for
+        /// pattern-strip), and apply the operator through the shared apply_op
+        /// primitive (so the semantics match legacy by construction). Requires
+        /// a plain-identifier scalar name, no subscript/operand2/flags, the
+        /// apply_op callback, and -- unquoted -- no bash-mode splitting of the
+        /// result.
+        if (is_covered_pe_op(p->u.param.op)) {
             if (p->u.param.subscript || p->u.param.operand2 ||
                 p->u.param.flags != 0 || !env->apply_op ||
                 !is_plain_ident(p->u.param.name) ||
@@ -209,8 +270,18 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
             }
             char *value = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
             char *deflt = NULL;
-            if (p->u.param.operand) {
-                /// Evaluate the operand as a scalar default: the operator
+            if (is_pattern_strip_op(p->u.param.op)) {
+                /// The operand is a glob PATTERN (literal in this slice):
+                /// recover its string with metacharacters intact; apply_op does
+                /// the match. A NULL operand is an empty pattern.
+                deflt = pattern_operand_string(p->u.param.operand);
+                if (!deflt) {
+                    free(value);
+                    *ok = false;
+                    return true;
+                }
+            } else if (p->u.param.operand) {
+                /// Alternation operand: a scalar default value. The operator
                 /// RESULT (not the operand) is what the outer word may split,
                 /// and the covered outer word does not split, so the operand
                 /// must yield at most one field. More than one, or not-covered,

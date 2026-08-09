@@ -1434,6 +1434,36 @@ TEST(rt_pe_operand_with_quotes_defers) {
     ASSERT_STDOUT_EQ(r, "['lit']\n");
 }
 
+TEST(rt_pe_pattern_strip_operators_covered) {
+    /// Pattern-strip operators ${var#p}/${var##p}/${var%p}/${var%%p} expand on
+    /// the CST backbone: the operand is a glob PATTERN matched via the shared
+    /// apply_param_operator (# shortest, ## longest prefix; % / %% suffix).
+    /// Covers literal glob patterns; a quoted pattern (kept literal by legacy)
+    /// or a $-pattern (expanded by legacy) defers and still matches. Validated
+    /// under --setup lush:audit. Subshell-isolated.
+    run_result_t r =
+        run_shell("( f=a.b.c.txt; q=ab; p=abcdef\n"
+                  "  echo \"[${f#*.}][${f##*.}][${f%.*}][${f%%.*}]\"\n"
+                  "  echo \"[${p#abc}][${p%def}][${p#xyz}][${p#}]\"\n"
+                  "  echo \"[${p#'ab'}][${p#$q}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[b.c.txt][txt][a.b.c][a]\n"
+                        "[def][abc][abcdef][abcdef]\n"
+                        "[abcdef][cdef]\n");
+}
+
+TEST(rt_pe_operand_edge_whitespace_defers) {
+    /// An operator operand with unquoted leading/trailing whitespace is part of
+    /// the pattern/default (${v#a } strips "a ", ${u:-def } defaults to "def
+    /// "). The tokenizer drops edge whitespace, so the CST defers such an
+    /// operand to match legacy (the audit soak would abort otherwise). Covers
+    /// both pattern-strip and alternation. Subshell-isolated.
+    run_result_t r =
+        run_shell("( v='a b c'; u=\n"
+                  "  printf '[%s]' \"${v#a }\" \"${v# a}\" \"${u:-def }\" "
+                  "\"${u:- x}\"; echo )\n");
+    ASSERT_STDOUT_EQ(r, "[b c][a b c][def ][ x]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8927,6 +8957,8 @@ int main(void) {
     RUN_TEST(rt_bg_pid_and_option_flags_covered);
     RUN_TEST(rt_pe_alternation_operators_covered);
     RUN_TEST(rt_pe_operand_with_quotes_defers);
+    RUN_TEST(rt_pe_pattern_strip_operators_covered);
+    RUN_TEST(rt_pe_operand_edge_whitespace_defers);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
