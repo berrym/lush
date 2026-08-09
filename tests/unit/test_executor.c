@@ -1472,11 +1472,13 @@ TEST(rt_pe_case_conversion_operators_covered) {
     /// legacy and still matches. Validated under --setup lush:audit.
     /// Subshell-isolated.
     run_result_t r =
-        run_shell("( s=heLLo; b=banana; unset -v u\n"
+        run_shell("( s=heLLo; b=banana; c=café; unset -v u\n"
                   "  echo \"[${s^^}][${s,,}][${s^}][${s,}]\"\n"
-                  "  echo \"[${b^^a}][${u^^}][${s^^}x][pre${s,,}]\" )\n");
+                  "  echo \"[${b^^a}][${u^^}][${s^^}x][pre${s,,}]\"\n"
+                  "  echo \"[${c^^}][${c,,}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[HELLO][hello][HeLLo][heLLo]\n"
-                        "[bAnAnA][][HELLOx][prehello]\n");
+                        "[bAnAnA][][HELLOx][prehello]\n"
+                        "[CAFÉ][café]\n");
 }
 
 TEST(rt_map_in_argv_forms) {
