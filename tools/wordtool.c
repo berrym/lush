@@ -55,6 +55,30 @@ static char *bench_apply_op(void *ctx, const char *name, const char *value,
         return strdup(!value ? d : value);
     case 11: /// + use alternative if set (even if empty)
         return strdup(value ? d : "");
+    case 2: /// ## remove longest prefix (bench: LITERAL pattern only)
+    case 6: /// #  remove shortest prefix
+    {
+        size_t pl = strlen(d);
+        if (value && pl && strncmp(value, d, pl) == 0) {
+            return strdup(value + pl);
+        }
+        return strdup(value ? value : "");
+    }
+    case 3: /// %% remove longest suffix
+    case 7: /// %  remove shortest suffix
+    {
+        size_t vl = value ? strlen(value) : 0;
+        size_t pl = strlen(d);
+        if (value && pl && pl <= vl && strcmp(value + vl - pl, d) == 0) {
+            char *r = malloc(vl - pl + 1);
+            if (r) {
+                memcpy(r, value, vl - pl);
+                r[vl - pl] = '\0';
+            }
+            return r ? r : strdup("");
+        }
+        return strdup(value ? value : "");
+    }
     default:
         return strdup("");
     }

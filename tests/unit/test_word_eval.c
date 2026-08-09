@@ -46,6 +46,28 @@ static char *map_apply_op(void *ctx, const char *name, const char *value,
         return strdup(!value ? d : value);
     case 11:
         return strdup(value ? d : "");
+    case 2: /// ## / # prefix strip (bench: LITERAL pattern)
+    case 6: {
+        size_t pl = strlen(d);
+        if (value && pl && strncmp(value, d, pl) == 0) {
+            return strdup(value + pl);
+        }
+        return strdup(value ? value : "");
+    }
+    case 3: /// %% / % suffix strip (bench: LITERAL pattern)
+    case 7: {
+        size_t vl = value ? strlen(value) : 0;
+        size_t pl = strlen(d);
+        if (value && pl && pl <= vl && strcmp(value + vl - pl, d) == 0) {
+            char *r = malloc(vl - pl + 1);
+            if (r) {
+                memcpy(r, value, vl - pl);
+                r[vl - pl] = '\0';
+            }
+            return r ? r : strdup("");
+        }
+        return strdup(value ? value : "");
+    }
     default:
         return strdup("");
     }
@@ -264,6 +286,21 @@ TEST(eval_pe_alternation_operators) {
     free_fields(got, n);
 }
 
+TEST(eval_pe_pattern_strip_operators) {
+    /// Pattern-strip via the map + the literal-pattern apply_op stub (glob
+    /// patterns are validated live where the real matcher runs).
+    const char *vars[] = {"p", "abcdef", NULL};
+    const char *e1[] = {"def", NULL};
+    assert_fields("${p#abc}", vars, e1);  /// # shortest prefix
+    assert_fields("${p##abc}", vars, e1); /// ## longest prefix
+    const char *e2[] = {"abc", NULL};
+    assert_fields("${p%def}", vars, e2);  /// % shortest suffix
+    assert_fields("${p%%def}", vars, e2); /// %% longest suffix
+    const char *e3[] = {"abcdef", NULL};
+    assert_fields("${p#xyz}", vars, e3); /// no match -> unchanged
+    assert_fields("${p#}", vars, e3);    /// empty pattern -> unchanged
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -325,6 +362,7 @@ int main(void) {
     RUN_TEST(eval_special_param_scalar_covered);
     RUN_TEST(eval_positional_param_covered);
     RUN_TEST(eval_pe_alternation_operators);
+    RUN_TEST(eval_pe_pattern_strip_operators);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

@@ -17,6 +17,7 @@
  */
 #include "word_parse.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,13 +69,22 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
     return p;
 }
 
+/// A pattern-strip operator (`#`/`##`/`%`/`%%`, op 6/2/7/3): the operand is a
+/// glob PATTERN, not a value, so it is deferred if it needs `$`-expansion (this
+/// slice covers literal patterns only) and is never dequoted/globbed by
+/// word_eval.
+static bool is_pattern_strip_op(int op) {
+    return op == 2 || op == 3 || op == 6 || op == 7;
+}
+
 /// Detect a COVERED parameter-expansion operator at the start of `s` (the bytes
 /// right after the name in `${name<op>operand}`). Returns the op_type (an index
-/// into the executor's param_operators[]: 0=`:-` 1=`:+` 10=`-` 11=`+`) and sets
-/// *op_len, or -1 when `s` does not begin a covered operator. This first slice
-/// covers only the four alternation operators; every other operator (`#`/`%`/
-/// `^`/`,`/`/`/`:=`/`:?`/`:off`/subscript `[` ...) returns -1 so the whole
-/// `${...}` defers. `:=`/`:?`/`:off` start with `:` but are not `:-`/`:+`.
+/// into the executor's param_operators[]: 0=`:-` 1=`:+` 10=`-` 11=`+`;
+/// 6=`#` 2=`##` 7=`%` 3=`%%`) and sets *op_len, or -1 when `s` does not begin a
+/// covered operator. Longest match wins (`##` before `#`, `%%` before `%`).
+/// Uncovered operators (`^`/`,`/`/`/`:=`/`:?`/`:off`/`@`/subscript `[`) return
+/// -1 so the whole `${...}` defers. `:=`/`:?`/`:off` start with `:` but are not
+/// `:-`/`:+`.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
@@ -83,6 +93,22 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '+') {
         *op_len = 2;
         return 1;
+    }
+    if (n >= 2 && s[0] == '#' && s[1] == '#') {
+        *op_len = 2;
+        return 2; /// ## : remove longest prefix
+    }
+    if (n >= 2 && s[0] == '%' && s[1] == '%') {
+        *op_len = 2;
+        return 3; /// %% : remove longest suffix
+    }
+    if (n >= 1 && s[0] == '#') {
+        *op_len = 1;
+        return 6; /// # : remove shortest prefix
+    }
+    if (n >= 1 && s[0] == '%') {
+        *op_len = 1;
+        return 7; /// % : remove shortest suffix
     }
     if (n >= 1 && s[0] == '-') {
         *op_len = 1;
@@ -95,13 +121,13 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     return -1;
 }
 
-/// Build a WP_PARAM for `${name<op>operand}` (an alternation operator). The
-/// operand is parsed as a child Word (it may itself contain expansions). An
-/// EMPTY operand (`${var:-}`) yields a NULL operand Word (an empty default),
-/// which the evaluator treats as "". A non-empty operand that parse_word does
-/// not fully cover means the default cannot be faithfully evaluated -> defer
-/// (sets *handled = false, returns NULL). Returns NULL with *handled unchanged
-/// on allocation failure.
+/// Build a WP_PARAM for `${name<op>operand}` (an alternation or pattern-strip
+/// operator). The operand is parsed as a child Word (it may itself contain
+/// expansions for alternation). An EMPTY operand (`${var:-}`/`${var#}`) yields
+/// a NULL operand Word (an empty default / empty pattern), which the evaluator
+/// treats as "". A non-empty operand that parse_word does not fully cover means
+/// it cannot be faithfully evaluated -> defer (sets *handled = false, returns
+/// NULL). Returns NULL with *handled unchanged on allocation failure.
 static word_part_t *make_operator_param(const char *name, size_t namelen,
                                         int op, const char *operand_str,
                                         size_t operand_len, bool *handled) {
@@ -111,13 +137,29 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     /// WOULD dequote them, diverging from legacy. So defer any operand carrying
     /// a quote or backslash; a plain / `$`-only operand dequotes to itself and
     /// is faithful. (Whether legacy SHOULD dequote here is a separate question;
-    /// the CST matches legacy for now.)
+    /// the CST matches legacy for now.) For a pattern-strip operator the
+    /// operand is a glob PATTERN evaluated literally -- this slice covers
+    /// literal patterns only, so a `$` in the pattern (which legacy expands)
+    /// defers too.
+    bool pattern_op = is_pattern_strip_op(op);
     for (size_t i = 0; i < operand_len; i++) {
         if (operand_str[i] == '\'' || operand_str[i] == '"' ||
-            operand_str[i] == '\\') {
+            operand_str[i] == '\\' || (pattern_op && operand_str[i] == '$')) {
             *handled = false;
             return NULL;
         }
+    }
+    /// The tokenizer skips leading/trailing whitespace, so an operand with an
+    /// edge space/tab (`${v#a }` -> pattern "a ", `${u:- x}` -> default " x")
+    /// would tokenize to just the inner word, silently dropping whitespace that
+    /// is part of the pattern/default. The consumed_all check below catches
+    /// INTERIOR whitespace (a trailing token) but not edge whitespace -- defer
+    /// explicitly. (Deferring is always safe; legacy keeps the whitespace.)
+    if (operand_len > 0 &&
+        (isspace((unsigned char)operand_str[0]) ||
+         isspace((unsigned char)operand_str[operand_len - 1]))) {
+        *handled = false;
+        return NULL;
     }
     word_t *operand = NULL;
     if (operand_len > 0) {
