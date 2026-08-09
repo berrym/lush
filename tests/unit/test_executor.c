@@ -1481,6 +1481,22 @@ TEST(rt_pe_case_conversion_operators_covered) {
                         "[CAFÉ][café]\n");
 }
 
+TEST(rt_pe_substring_operators_covered) {
+    /// Substring ${var:off} / ${var:off:len} expands on the CST backbone via
+    /// the shared apply_param_operator (extract_substring, grapheme-aware).
+    /// Covers the simple non-negative numeric spec, incl. UTF-8 live (café ->
+    /// caf / é by grapheme, not byte); offset/length past the end clamp; an
+    /// unset var is empty. A negative length (${s:2:-1}) is NOT covered and
+    /// defers to legacy, still matching. Validated under --setup lush:audit.
+    /// Subshell-isolated.
+    run_result_t r =
+        run_shell("( s=abcdef; c=café; unset -v u\n"
+                  "  echo \"[${s:2}][${s:2:2}][${s:0:3}][${s:4:99}][${s:9}]\"\n"
+                  "  echo \"[${c:0:3}][${c:3}][${u:0:2}][${s:2:-1}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[cdef][cd][abc][ef][]\n"
+                        "[caf][é][][cde]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8977,6 +8993,7 @@ int main(void) {
     RUN_TEST(rt_pe_pattern_strip_operators_covered);
     RUN_TEST(rt_pe_operand_edge_whitespace_defers);
     RUN_TEST(rt_pe_case_conversion_operators_covered);
+    RUN_TEST(rt_pe_substring_operators_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

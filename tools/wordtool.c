@@ -100,6 +100,34 @@ static char *bench_apply_op(void *ctx, const char *name, const char *value,
         }
         return r;
     }
+    case 14: /// ${var:off:len} substring (bench: ASCII byte slice of the simple
+    {        /// non-negative spec; UTF-8/grapheme parity runs live)
+        const char *v = value ? value : "";
+        char *end;
+        long off = strtol(d, &end, 10);
+        long vlen = (long)strlen(v);
+        if (off > vlen) {
+            off = vlen;
+        }
+        long avail = vlen - off;
+        long len = avail;
+        if (*end == ':') {
+            len = strtol(end + 1, NULL, 10);
+            if (len > avail) {
+                len = avail;
+            }
+            if (len < 0) {
+                len = 0;
+            }
+        }
+        char *r = malloc(len + 1);
+        if (!r) {
+            return NULL;
+        }
+        memcpy(r, v + off, len);
+        r[len] = '\0';
+        return r;
+    }
     default:
         return strdup("");
     }
