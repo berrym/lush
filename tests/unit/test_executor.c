@@ -1464,6 +1464,21 @@ TEST(rt_pe_operand_edge_whitespace_defers) {
     ASSERT_STDOUT_EQ(r, "[b c][a b c][def ][ x]\n");
 }
 
+TEST(rt_pe_case_conversion_operators_covered) {
+    /// Case-conversion operators ${var^^}/${var,,} (all characters) and
+    /// ${var^}/${var,} (first character) expand on the CST backbone via the
+    /// shared apply_param_operator (convert_case_all_* / convert first). Covers
+    /// the NO-pattern form; a pattern-restricted form (${var^^a}) defers to
+    /// legacy and still matches. Validated under --setup lush:audit.
+    /// Subshell-isolated.
+    run_result_t r =
+        run_shell("( s=heLLo; b=banana; unset -v u\n"
+                  "  echo \"[${s^^}][${s,,}][${s^}][${s,}]\"\n"
+                  "  echo \"[${b^^a}][${u^^}][${s^^}x][pre${s,,}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[HELLO][hello][HeLLo][heLLo]\n"
+                        "[bAnAnA][][HELLOx][prehello]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8959,6 +8974,7 @@ int main(void) {
     RUN_TEST(rt_pe_operand_with_quotes_defers);
     RUN_TEST(rt_pe_pattern_strip_operators_covered);
     RUN_TEST(rt_pe_operand_edge_whitespace_defers);
+    RUN_TEST(rt_pe_case_conversion_operators_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

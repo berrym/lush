@@ -8,6 +8,7 @@
  * empty drops, quoted empty survives), concatenation fusion, and that
  * not-yet-covered constructs report ok == false rather than a wrong vector.
  */
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -67,6 +68,25 @@ static char *map_apply_op(void *ctx, const char *name, const char *value,
             return r ? r : strdup("");
         }
         return strdup(value ? value : "");
+    }
+    case 4: /// ^^/^ upper, ,,/, lower (bench: EMPTY pattern -> convert all;
+    case 8: /// pattern-restricted case conversion runs live)
+    case 5:
+    case 9: {
+        char *r = strdup(value ? value : "");
+        if (!r) {
+            return NULL;
+        }
+        bool upper = (op == 4 || op == 8);
+        bool first_only = (op == 8 || op == 9);
+        for (char *c = r; *c; c++) {
+            *c = upper ? (char)toupper((unsigned char)*c)
+                       : (char)tolower((unsigned char)*c);
+            if (first_only) {
+                break;
+            }
+        }
+        return r;
     }
     default:
         return strdup("");
@@ -301,6 +321,21 @@ TEST(eval_pe_pattern_strip_operators) {
     assert_fields("${p#}", vars, e3);    /// empty pattern -> unchanged
 }
 
+TEST(eval_pe_case_conversion_operators) {
+    /// No-pattern case conversion via the map + the apply_op stub. (Pattern-
+    /// restricted forms defer and are exercised live where the real matcher
+    /// runs.)
+    const char *vars[] = {"s", "heLLo", NULL};
+    const char *up[] = {"HELLO", NULL};
+    assert_fields("${s^^}", vars, up); /// ^^ upper all
+    const char *lo[] = {"hello", NULL};
+    assert_fields("${s,,}", vars, lo); /// ,, lower all
+    const char *uf[] = {"HeLLo", NULL};
+    assert_fields("${s^}", vars, uf); /// ^ upper first
+    const char *lf[] = {"heLLo", NULL};
+    assert_fields("${s,}", vars, lf); /// , lower first
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -363,6 +398,7 @@ int main(void) {
     RUN_TEST(eval_positional_param_covered);
     RUN_TEST(eval_pe_alternation_operators);
     RUN_TEST(eval_pe_pattern_strip_operators);
+    RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();
