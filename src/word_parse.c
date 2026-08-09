@@ -68,6 +68,101 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
     return p;
 }
 
+/// Detect a COVERED parameter-expansion operator at the start of `s` (the bytes
+/// right after the name in `${name<op>operand}`). Returns the op_type (an index
+/// into the executor's param_operators[]: 0=`:-` 1=`:+` 10=`-` 11=`+`) and sets
+/// *op_len, or -1 when `s` does not begin a covered operator. This first slice
+/// covers only the four alternation operators; every other operator (`#`/`%`/
+/// `^`/`,`/`/`/`:=`/`:?`/`:off`/subscript `[` ...) returns -1 so the whole
+/// `${...}` defers. `:=`/`:?`/`:off` start with `:` but are not `:-`/`:+`.
+static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
+    if (n >= 2 && s[0] == ':' && s[1] == '-') {
+        *op_len = 2;
+        return 0;
+    }
+    if (n >= 2 && s[0] == ':' && s[1] == '+') {
+        *op_len = 2;
+        return 1;
+    }
+    if (n >= 1 && s[0] == '-') {
+        *op_len = 1;
+        return 10;
+    }
+    if (n >= 1 && s[0] == '+') {
+        *op_len = 1;
+        return 11;
+    }
+    return -1;
+}
+
+/// Build a WP_PARAM for `${name<op>operand}` (an alternation operator). The
+/// operand is parsed as a child Word (it may itself contain expansions). An
+/// EMPTY operand (`${var:-}`) yields a NULL operand Word (an empty default),
+/// which the evaluator treats as "". A non-empty operand that parse_word does
+/// not fully cover means the default cannot be faithfully evaluated -> defer
+/// (sets *handled = false, returns NULL). Returns NULL with *handled unchanged
+/// on allocation failure.
+static word_part_t *make_operator_param(const char *name, size_t namelen,
+                                        int op, const char *operand_str,
+                                        size_t operand_len, bool *handled) {
+    /// Legacy expands the operand through a `$`-only pass (expand_variables_in_
+    /// string) that does NOT remove quotes or backslashes -- `${un:-'x'}` keeps
+    /// the quotes literal, `${un:-a\b}` keeps the backslash. parse_word (below)
+    /// WOULD dequote them, diverging from legacy. So defer any operand carrying
+    /// a quote or backslash; a plain / `$`-only operand dequotes to itself and
+    /// is faithful. (Whether legacy SHOULD dequote here is a separate question;
+    /// the CST matches legacy for now.)
+    for (size_t i = 0; i < operand_len; i++) {
+        if (operand_str[i] == '\'' || operand_str[i] == '"' ||
+            operand_str[i] == '\\') {
+            *handled = false;
+            return NULL;
+        }
+    }
+    word_t *operand = NULL;
+    if (operand_len > 0) {
+        char *ostr = dup_n(operand_str, operand_len);
+        if (!ostr) {
+            return NULL;
+        }
+        tokenizer_t *otok = tokenizer_new(ostr);
+        if (!otok) {
+            free(ostr);
+            return NULL;
+        }
+        bool ofully = false;
+        operand = parse_word(otok, WORD_CTX_ARG, &ofully);
+        /// The operand is a single default VALUE whose spaces are literal
+        /// (`${var:-a b}` -> the default "a b"), but parse_word stops at
+        /// whitespace and would silently drop everything after the first space.
+        /// Require the whole operand to consume to ONE fully-covered word; a
+        /// trailing token (a space-separated remainder) means we cannot
+        /// faithfully represent the default -> defer.
+        token_t *rest = tokenizer_current(otok);
+        bool consumed_all = (!rest || rest->type == TOK_EOF);
+        tokenizer_free(otok);
+        free(ostr);
+        if (!operand || !ofully || !consumed_all) {
+            word_free(operand);
+            *handled = false;
+            return NULL;
+        }
+    }
+    word_part_t *p = word_part_new(WP_PARAM, 0, 0);
+    if (!p) {
+        word_free(operand);
+        return NULL;
+    }
+    p->u.param.op = op;
+    p->u.param.operand = operand;
+    p->u.param.name = dup_n(name, namelen);
+    if (!p->u.param.name) {
+        word_part_free(p);
+        return NULL;
+    }
+    return p;
+}
+
 /**
  * @brief Parse a `$...` expansion at s (s[0] == '$'), for Step 1b-1.
  *
@@ -114,15 +209,32 @@ static word_part_t *parse_simple_expansion(const char *s, size_t n,
             *handled = false; /// ${}, ${#x}, ${!x}, operators, subscripts ...
             return NULL;
         }
-        for (size_t i = 1; i < ilen; i++) {
-            if (!is_name_char(interior[i])) {
-                *handled = false; /// ${name:-x}, ${name[k]}, ${name/a/b} ...
+        /// Scan the plain-identifier name.
+        size_t namelen = 1;
+        while (namelen < ilen && is_name_char(interior[namelen])) {
+            namelen++;
+        }
+        word_part_t *p = NULL;
+        if (namelen == ilen) {
+            /// Bare ${name} -- no operator.
+            p = make_simple_param(interior, ilen);
+        } else {
+            /// A covered alternation operator (:-, :+, -, +) may follow the
+            /// name; anything else (a subscript `[`, another operator) defers.
+            size_t op_len = 0;
+            int op = detect_covered_pe_op(interior + namelen, ilen - namelen,
+                                          &op_len);
+            if (op < 0) {
+                *handled = false; /// ${name[k]}, ${name#pat}, ${name:off} ...
                 return NULL;
             }
+            p = make_operator_param(interior, namelen, op,
+                                    interior + namelen + op_len,
+                                    ilen - namelen - op_len, handled);
         }
-        word_part_t *p = make_simple_param(interior, ilen);
         if (!p) {
-            return NULL;
+            return NULL; /// allocation failure, or a not-covered operand
+                         /// (make_operator_param set *handled = false)
         }
         *consumed = 1 + close + 1; /// `$` + `{`..`}` span
         return p;

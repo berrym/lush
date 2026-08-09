@@ -6430,6 +6430,22 @@ static bool executor_symtable_word_is_scalar(void *ctx, const char *name) {
     return scalar;
 }
 
+/// Apply a parameter-expansion operator via the SAME primitive the legacy
+/// expander uses (apply_param_operator), so the covered `${var:-x}` family
+/// matches by construction. This slice passes only the alternation operators
+/// (op 0/1/10/11), which never assign back to the symbol table, so the
+/// assign_back result is ignored. `value` may be NULL (unset var, which the
+/// unset-only operators `-`/`+` distinguish from empty); apply_param_operator
+/// reads but does not mutate value/deflt.
+static char *executor_word_apply_op(void *ctx, const char *name,
+                                    const char *value, const char *deflt,
+                                    int op) {
+    executor_t *ex = (executor_t *)ctx;
+    bool assign_back = false;
+    return apply_param_operator(ex, name, (char *)value, (char *)deflt, op,
+                                &assign_back);
+}
+
 /// Audit-mode check (Step 2, gated on LUSH_WORD_CST_AUDIT): abort loudly if the
 /// Word CST fields for a covered argument disagree with the legacy expansion.
 /// Covered words are lush-mode-no-split, so they yield 0 fields (a
@@ -6607,6 +6623,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         word_eval_env_t wenv = {
                             .get = executor_symtable_word_get,
                             .is_scalar = executor_symtable_word_is_scalar,
+                            .apply_op = executor_word_apply_op,
                             .ctx = executor,
                             .ifs = ifs_val,
                             .word_split_default =

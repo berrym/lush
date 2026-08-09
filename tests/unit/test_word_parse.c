@@ -231,9 +231,9 @@ TEST(deferred_constructs_report_not_handled) {
     /// The whole-word span still round-trips (spans are complete regardless).
     const char *deferred[] = {
         "$(echo hi)", /// command substitution
-        "${v:-x}",    /// PE operator
-        "${#v}",      /// length operator
-        "pre$'\\t'",  /// mid-word ANSI-C (standalone $'...' is now covered)
+        "${v:=x}",   /// PE operator (assign; alternation :-/:+/-/+ now covered)
+        "${#v}",     /// length operator
+        "pre$'\\t'", /// mid-word ANSI-C (standalone $'...' is now covered)
         "pre$x\"$y\"post", /// tokenizer pre-fused mixed-quote token
         "\"a\"b",          /// mixed-quote adjacency
         "$((1+2))",        /// arithmetic

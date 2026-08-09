@@ -1402,6 +1402,38 @@ TEST(rt_bg_pid_and_option_flags_covered) {
     ASSERT_STDOUT_EQ(r, "bgok\nfset\n");
 }
 
+TEST(rt_pe_alternation_operators_covered) {
+    /// The four alternation parameter-expansion operators expand on the CST
+    /// backbone via the shared operator primitive: ${var:-x}/${var:+x} treat an
+    /// empty value like unset; ${var-x}/${var+x} distinguish unset from empty.
+    /// Nested ($set) and empty operands are covered; a space-containing default
+    /// (${un:-a b}) defers to legacy and still matches. Validated byte-for-byte
+    /// under --setup lush:audit. Subshell-isolated.
+    run_result_t r =
+        run_shell("( set=x; empty=; unset -v un\n"
+                  "  echo \"[${set:-D}][${empty:-D}][${un:-D}]\"\n"
+                  "  echo \"[${set:+A}][${empty:+A}][${un:+A}]\"\n"
+                  "  echo \"[${set-D}][${empty-D}][${un-D}]\"\n"
+                  "  echo \"[${set+A}][${empty+A}][${un+A}]\"\n"
+                  "  echo \"[${un:-$set}][${un:-}][${un:-a b}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[x][D][D]\n"
+                        "[A][][]\n"
+                        "[x][][D]\n"
+                        "[A][A][]\n"
+                        "[x][][a b]\n");
+}
+
+TEST(rt_pe_operand_with_quotes_defers) {
+    /// Legacy expands the PE operand through a $-only pass that does NOT remove
+    /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
+    /// quirk vs bash). The CST would dequote the operand via parse_word, so it
+    /// defers a quoted/backslash operand to match legacy. Regression for the
+    /// operand quote-context divergence (the audit soak would abort otherwise).
+    run_result_t r =
+        run_shell("( unset -v un\n  printf '[%s]\\n' \"${un:-'lit'}\" )\n");
+    ASSERT_STDOUT_EQ(r, "['lit']\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8893,6 +8925,8 @@ int main(void) {
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
     RUN_TEST(rt_bg_pid_and_option_flags_covered);
+    RUN_TEST(rt_pe_alternation_operators_covered);
+    RUN_TEST(rt_pe_operand_with_quotes_defers);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
