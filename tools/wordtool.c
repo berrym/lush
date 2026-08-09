@@ -21,6 +21,7 @@
  * A --reconstruct mode re-emits the word's source from its spans (lossless-CST
  * check) instead of evaluating.
  */
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,6 +79,26 @@ static char *bench_apply_op(void *ctx, const char *name, const char *value,
             return r ? r : strdup("");
         }
         return strdup(value ? value : "");
+    }
+    case 4: /// ^^ uppercase all   (bench: EMPTY pattern -> convert all;
+    case 8: /// ^  uppercase first  pattern-restricted cases run live)
+    case 5: /// ,, lowercase all
+    case 9: /// ,  lowercase first
+    {
+        char *r = strdup(value ? value : "");
+        if (!r) {
+            return NULL;
+        }
+        bool upper = (op == 4 || op == 8);
+        bool first_only = (op == 8 || op == 9);
+        for (char *c = r; *c; c++) {
+            *c = upper ? (char)toupper((unsigned char)*c)
+                       : (char)tolower((unsigned char)*c);
+            if (first_only) {
+                break;
+            }
+        }
+        return r;
     }
     default:
         return strdup("");

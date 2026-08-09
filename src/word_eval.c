@@ -127,17 +127,27 @@ static bool is_covered_alternation_op(int32_t op) {
     return op == 0 || op == 1 || op == 10 || op == 11;
 }
 
-/// The pattern-strip operators: `${var#p}` (6), `${var##p}` (2), `${var%p}`
-/// (7), `${var%%p}` (3). The operand is a glob PATTERN (literal in this slice),
-/// matched inside apply_op; word_eval passes it with metacharacters intact.
-static bool is_pattern_strip_op(int32_t op) {
-    return op == 2 || op == 3 || op == 6 || op == 7;
+/// The case-conversion operators: `${var^p}` (8), `${var^^p}` (4), `${var,p}`
+/// (9), `${var,,p}` (5). The (optional) pattern restricts which characters
+/// convert; this slice covers only the NO-pattern form (convert all / first),
+/// so a case op carrying a pattern defers -- the pattern-restricted match
+/// (convert_case_pattern) is not modelled by the bench.
+static bool is_case_op(int32_t op) {
+    return op == 4 || op == 5 || op == 8 || op == 9;
+}
+
+/// Operators whose operand is a glob PATTERN, not a value: pattern-strip
+/// (`${var#p}` 6/2/7/3) and case-conversion (8/4/9/5). The pattern (literal in
+/// this slice) is passed to apply_op with metacharacters intact -- word_eval
+/// must not glob or dequote it.
+static bool op_has_pattern_operand(int32_t op) {
+    return op == 2 || op == 3 || op == 6 || op == 7 || is_case_op(op);
 }
 
 /// Every parameter-expansion operator this slice evaluates through apply_op.
-/// Case/substitution/slice/assign/error/transform ops still defer.
+/// Substitution/slice/assign/error/transform ops still defer.
 static bool is_covered_pe_op(int32_t op) {
-    return is_covered_alternation_op(op) || is_pattern_strip_op(op);
+    return is_covered_alternation_op(op) || op_has_pattern_operand(op);
 }
 
 /// Append the literal text of a pure-literal operand Word to the accumulator,
@@ -270,13 +280,23 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
             }
             char *value = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
             char *deflt = NULL;
-            if (is_pattern_strip_op(p->u.param.op)) {
+            if (op_has_pattern_operand(p->u.param.op)) {
                 /// The operand is a glob PATTERN (literal in this slice):
                 /// recover its string with metacharacters intact; apply_op does
-                /// the match. A NULL operand is an empty pattern.
+                /// the match (pattern-strip) or the pattern-restricted case
+                /// conversion. A NULL operand is an empty pattern (case ops
+                /// then convert all characters).
                 deflt = pattern_operand_string(p->u.param.operand);
                 if (!deflt) {
                     free(value);
+                    *ok = false;
+                    return true;
+                }
+                /// A case op with a restricting pattern (${var^^pat}) defers:
+                /// only the convert-all/first (empty-pattern) form is covered.
+                if (is_case_op(p->u.param.op) && deflt[0] != '\0') {
+                    free(value);
+                    free(deflt);
                     *ok = false;
                     return true;
                 }

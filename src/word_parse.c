@@ -69,22 +69,25 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
     return p;
 }
 
-/// A pattern-strip operator (`#`/`##`/`%`/`%%`, op 6/2/7/3): the operand is a
-/// glob PATTERN, not a value, so it is deferred if it needs `$`-expansion (this
-/// slice covers literal patterns only) and is never dequoted/globbed by
-/// word_eval.
-static bool is_pattern_strip_op(int op) {
-    return op == 2 || op == 3 || op == 6 || op == 7;
+/// True for an operator whose operand is a glob PATTERN, not a value: the
+/// pattern-strip ops (`#`/`##`/`%`/`%%`, 6/2/7/3) and the case-conversion ops
+/// (`^`/`^^`/`,`/`,,`, 8/4/9/5, whose pattern restricts which characters
+/// convert). The pattern is deferred if it needs `$`-expansion (this slice
+/// covers literal patterns only) and is never dequoted/globbed by word_eval.
+static bool op_has_pattern_operand(int op) {
+    return op == 2 || op == 3 || op == 6 || op == 7 || op == 4 || op == 5 ||
+           op == 8 || op == 9;
 }
 
 /// Detect a COVERED parameter-expansion operator at the start of `s` (the bytes
 /// right after the name in `${name<op>operand}`). Returns the op_type (an index
 /// into the executor's param_operators[]: 0=`:-` 1=`:+` 10=`-` 11=`+`;
-/// 6=`#` 2=`##` 7=`%` 3=`%%`) and sets *op_len, or -1 when `s` does not begin a
-/// covered operator. Longest match wins (`##` before `#`, `%%` before `%`).
-/// Uncovered operators (`^`/`,`/`/`/`:=`/`:?`/`:off`/`@`/subscript `[`) return
-/// -1 so the whole `${...}` defers. `:=`/`:?`/`:off` start with `:` but are not
-/// `:-`/`:+`.
+/// 6=`#` 2=`##` 7=`%` 3=`%%`; 8=`^` 4=`^^` 9=`,` 5=`,,`) and sets *op_len, or
+/// -1 when `s` does not begin a covered operator. Longest match wins (`##`
+/// before
+/// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`). Uncovered operators
+/// (`/`/`:=`/`:?`/`:off`/`@`/subscript `[`) return -1 so the whole `${...}`
+/// defers. `:=`/`:?`/`:off` start with `:` but are not `:-`/`:+`.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
@@ -102,6 +105,14 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
         *op_len = 2;
         return 3; /// %% : remove longest suffix
     }
+    if (n >= 2 && s[0] == '^' && s[1] == '^') {
+        *op_len = 2;
+        return 4; /// ^^ : uppercase all (matching the pattern)
+    }
+    if (n >= 2 && s[0] == ',' && s[1] == ',') {
+        *op_len = 2;
+        return 5; /// ,, : lowercase all
+    }
     if (n >= 1 && s[0] == '#') {
         *op_len = 1;
         return 6; /// # : remove shortest prefix
@@ -109,6 +120,14 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 1 && s[0] == '%') {
         *op_len = 1;
         return 7; /// % : remove shortest suffix
+    }
+    if (n >= 1 && s[0] == '^') {
+        *op_len = 1;
+        return 8; /// ^ : uppercase first character
+    }
+    if (n >= 1 && s[0] == ',') {
+        *op_len = 1;
+        return 9; /// , : lowercase first character
     }
     if (n >= 1 && s[0] == '-') {
         *op_len = 1;
@@ -141,7 +160,7 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     /// operand is a glob PATTERN evaluated literally -- this slice covers
     /// literal patterns only, so a `$` in the pattern (which legacy expands)
     /// defers too.
-    bool pattern_op = is_pattern_strip_op(op);
+    bool pattern_op = op_has_pattern_operand(op);
     for (size_t i = 0; i < operand_len; i++) {
         if (operand_str[i] == '\'' || operand_str[i] == '"' ||
             operand_str[i] == '\\' || (pattern_op && operand_str[i] == '$')) {
