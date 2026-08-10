@@ -1497,6 +1497,25 @@ TEST(rt_pe_substring_operators_covered) {
                         "[caf][é][][cde]\n");
 }
 
+TEST(rt_pe_substitution_operators_covered) {
+    /// Substitution ${var/pat/repl} (first) and ${var//pat/repl} (all) expand
+    /// on the CST backbone via the shared apply_param_operator (pattern_
+    /// substitute). Covered: literal + glob patterns (o*b) + UTF-8 (é), incl.
+    /// empty replacement (remove), no-match (unchanged) and a `%` anchor whose
+    /// pattern does not start an identifier (${n/%1/X}). Deferring to legacy
+    /// (still matching): the \/ escaped-slash idiom, a /# anchor (a leading `#`
+    /// opens a comment) and a /%name kind-sigil anchor.
+    /// Validated under --setup lush:audit. Subshell-isolated.
+    run_result_t r = run_shell(
+        "( s=abcabc; f=foobar; g=foofoo; p=path/to/x; c=café; n=ab1\n"
+        "  echo \"[${s/a/X}][${s//a/X}][${s//a/}][${s/zzz/Q}]\"\n"
+        "  echo \"[${f/o*b/Z}][${g/#foo/X}][${g/%foo/X}][${n/%1/X}]\"\n"
+        "  echo \"[${p//\\//.}][${c/é/e}][${c//o/0}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[Xbcabc][XbcXbc][bcbc][abcabc]\n"
+                        "[fZar][Xfoo][fooX][abX]\n"
+                        "[path.to.x][cafe][café]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -8994,6 +9013,7 @@ int main(void) {
     RUN_TEST(rt_pe_operand_edge_whitespace_defers);
     RUN_TEST(rt_pe_case_conversion_operators_covered);
     RUN_TEST(rt_pe_substring_operators_covered);
+    RUN_TEST(rt_pe_substitution_operators_covered);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

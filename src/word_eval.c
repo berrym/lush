@@ -143,18 +143,32 @@ static bool is_case_op(int32_t op) {
 /// modifier chains and negative/arith/`$` operands defer at parse.
 static bool is_substring_op(int32_t op) { return op == 14; }
 
+/// The substitution operators `${var/pat/repl}` (16, first) and
+/// `${var//pat/repl}` (15, all). The whole `pattern/replacement` operand is
+/// recovered literally and handed to apply_op, which splits it at the first
+/// unescaped `/` and runs the same pattern_substitute legacy uses (the glob
+/// pattern is matched there) -- parity by construction. An operand that does
+/// not tokenize to one literal word defers at parse: a `$`-expanding, quoted,
+/// or backslash-carrying operand (incl. the `\/` escaped-slash idiom), and
+/// `${var/#pat/repl}` (a leading `#` starts a comment). `${var/%pat/repl}`
+/// defers only when `%` is followed by an identifier-start byte (the kind-sigil
+/// token, so coverage there is mode-dependent on FEATURE_KIND_SIGILS); other
+/// `%` anchors are COVERED, and parity still holds by construction because
+/// pattern_substitute strips the anchor on both paths.
+static bool is_substitution_op(int32_t op) { return op == 15 || op == 16; }
+
 /// Operators whose operand is recovered as a LITERAL string and passed to
 /// apply_op verbatim (word_eval must not glob, dequote, or word-split it):
 /// pattern-strip (`${var#p}` 6/2/7/3, a glob pattern), case-conversion
-/// (8/4/9/5, an optional restricting glob pattern), and substring (14, a
-/// numeric spec).
+/// (8/4/9/5, an optional restricting glob pattern), substring (14, a numeric
+/// spec), and substitution (15/16, a pattern/replacement spec).
 static bool op_has_literal_operand(int32_t op) {
     return op == 2 || op == 3 || op == 6 || op == 7 || is_case_op(op) ||
-           is_substring_op(op);
+           is_substring_op(op) || is_substitution_op(op);
 }
 
 /// Every parameter-expansion operator this slice evaluates through apply_op.
-/// Substitution/assign/error/transform ops still defer.
+/// The assign (`:=`/`=`), error (`:?`/`?`) and transform (`@`) ops still defer.
 static bool is_covered_pe_op(int32_t op) {
     return is_covered_alternation_op(op) || op_has_literal_operand(op);
 }
@@ -269,9 +283,10 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         return eval_parts(PART_BODY(p), a, env, true, ok);
     case WP_PARAM: {
         /// A covered PE operator -- alternation (${var:-x} ...), pattern-strip
-        /// / case-conversion (${var#p}, ${var^^} ...), or substring
-        /// (${var:off:len}): resolve the value, evaluate the operand (a scalar
-        /// default VALUE for alternation, a literal glob PATTERN / numeric spec
+        /// / case-conversion (${var#p}, ${var^^} ...), substring
+        /// (${var:off:len}), or substitution (${var/pat/repl}): resolve the
+        /// value, evaluate the operand (a scalar default VALUE for alternation,
+        /// a literal glob PATTERN / numeric / pattern-replacement spec
         /// otherwise), and apply the operator through the shared apply_op
         /// primitive (so the semantics match legacy by construction). Requires
         /// a plain-identifier scalar name, no subscript/operand2/flags, the
