@@ -6362,10 +6362,128 @@ static inline bool word_node_is_quoted(const node_t *node) {
 /// Resolves $name against the symtable -- the same source the legacy expansion
 /// reads, so a covered word sees identical values. Returns an OWNED copy (the
 /// symtable does; word_eval frees it per the get contract).
+/// A word's UNCOMMITTED assign-operator writes.
+///
+/// `${var:=x}` mutates the shell, but a CST evaluation is only provisional:
+/// word_eval can defer a LATER part of the same word, after which the whole
+/// word is re-expanded by the legacy expander. If the write had already landed,
+/// that re-expansion would run against mutated state and the EARLIER parts
+/// would expand differently than on a legacy-only run -- `echo
+/// A$u-B${u:=x}-C$g` (deferring on $g's brace value) printed `Ax-Bx` where
+/// legacy prints `A-Bx`. Idempotency of the operator itself does not save it;
+/// what breaks is the rest of the word.
+///
+/// So the writes are buffered for the duration of one word_eval and committed
+/// only once the word is known fully covered; a deferred word discards them and
+/// legacy re-expands from unmutated state, which is exactly a legacy-only run.
+/// Reads consult the buffer first, so within-word visibility (`${u:=x}${u}` ->
+/// `xx`) still matches legacy. Committing AFTER the audit compare likewise
+/// keeps the audit's legacy re-evaluation on unmutated state -- which means
+/// that under LUSH_WORD_CST_AUDIT the assignment happens TWICE (legacy's own
+/// write during the compare, then this commit writing the same value). That is
+/// audit-only and unobservable: the store carries no hook and the second write
+/// is the same name/value pair.
+typedef struct {
+    char **names;
+    char **values;
+    size_t n;
+    size_t cap;
+} word_assign_txn_t;
+
+/// Evaluation context for the Word CST callbacks: the executor plus the word's
+/// pending-write buffer.
+typedef struct {
+    executor_t *ex;
+    word_assign_txn_t *txn;
+} word_eval_ctx_t;
+
+/// Most recent pending value for @p name, or NULL when the word has not
+/// assigned it. Later entries win (a name can be assigned at most once per
+/// word in practice, but scanning backwards keeps that from being a
+/// requirement).
+static const char *word_txn_lookup(const word_assign_txn_t *txn,
+                                   const char *name) {
+    if (!txn || !name) {
+        return NULL;
+    }
+    for (size_t i = txn->n; i > 0; i--) {
+        if (strcmp(txn->names[i - 1], name) == 0) {
+            return txn->values[i - 1];
+        }
+    }
+    return NULL;
+}
+
+/// Record a pending write. False on allocation failure, which the caller turns
+/// into a defer (the legacy path then performs the assignment itself).
+static bool word_txn_push(word_assign_txn_t *txn, const char *name,
+                          const char *value) {
+    if (!txn || !name || !value) {
+        return false;
+    }
+    if (txn->n == txn->cap) {
+        size_t cap = txn->cap ? txn->cap * 2 : 4;
+        char **nn = realloc(txn->names, cap * sizeof(*nn));
+        if (!nn) {
+            return false;
+        }
+        txn->names = nn;
+        char **nv = realloc(txn->values, cap * sizeof(*nv));
+        if (!nv) {
+            return false;
+        }
+        txn->values = nv;
+        txn->cap = cap;
+    }
+    char *dn = strdup(name);
+    char *dv = strdup(value);
+    if (!dn || !dv) {
+        free(dn);
+        free(dv);
+        return false;
+    }
+    txn->names[txn->n] = dn;
+    txn->values[txn->n] = dv;
+    txn->n++;
+    return true;
+}
+
+static void word_txn_clear(word_assign_txn_t *txn) {
+    for (size_t i = 0; i < txn->n; i++) {
+        free(txn->names[i]);
+        free(txn->values[i]);
+    }
+    free(txn->names);
+    free(txn->values);
+    txn->names = NULL;
+    txn->values = NULL;
+    txn->n = 0;
+    txn->cap = 0;
+}
+
+/// Apply the buffered writes in assignment order, using the same
+/// symtable_set_var call the legacy scalar path makes (same scope resolution,
+/// same readonly enforcement), then clear the buffer.
+static void word_txn_commit(executor_t *ex, word_assign_txn_t *txn) {
+    for (size_t i = 0; i < txn->n; i++) {
+        symtable_set_var(ex->symtable, txn->names[i], txn->values[i],
+                         SYMVAR_NONE);
+    }
+    word_txn_clear(txn);
+}
+
 static char *executor_symtable_word_get(void *ctx, const char *name) {
-    executor_t *ex = (executor_t *)ctx;
+    word_eval_ctx_t *wc = (word_eval_ctx_t *)ctx;
+    executor_t *ex = wc ? wc->ex : NULL;
     if (!ex || !ex->symtable || !name) {
         return NULL;
+    }
+    /// An assign operator earlier in this word has already produced a value
+    /// for `name`, even though the write is not committed yet -- see
+    /// word_assign_txn_t. Legacy would see it, so this read must too.
+    const char *pending = word_txn_lookup(wc->txn, name);
+    if (pending) {
+        return strdup(pending);
     }
     /// The scalar specials $?/$$/$#/$!/$- and the single-digit positionals
     /// $0..$9 are resolved by the legacy expander from live state
@@ -6411,20 +6529,63 @@ static bool executor_symtable_word_is_scalar(void *ctx, const char *name) {
 
 /// Apply a parameter-expansion operator via the SAME primitive the legacy
 /// expander uses (apply_param_operator), so the covered `${var:-x}` family
-/// matches by construction. The covered set has since grown to the
-/// alternation, pattern-strip, case-conversion, substring and substitution
-/// families; none of them assigns back to the symbol table (the assign
-/// operators `:=`/`=` still defer), so the assign_back result is ignored.
+/// matches by construction. The covered set is the alternation, pattern-strip,
+/// case-conversion, substring, substitution and assign families.
 /// `value` may be NULL (unset var, which the unset-only operators `-`/`+`
 /// distinguish from empty); apply_param_operator reads but does not mutate
-/// value/deflt.
+/// value/deflt -- it is PURE and reports a needed write through assign_back.
+///
+/// The assign operators `${var:=x}` / `${var=x}` are the only covered family
+/// with a side effect, and this is where it is RECORDED: on assign_back the
+/// value goes into the word's pending-write buffer, which word_txn_commit
+/// later applies with the same symtable_set_var call the legacy scalar path
+/// uses (same scope resolution, same readonly enforcement) -- but only once
+/// the whole word is known covered. The legacy path's relaxed-mode bare-array
+/// branch (assign to element 0) is unreachable here because word_eval defers
+/// any non-scalar name.
 static char *executor_word_apply_op(void *ctx, const char *name,
                                     const char *value, const char *deflt,
                                     int op) {
-    executor_t *ex = (executor_t *)ctx;
+    word_eval_ctx_t *wc = (word_eval_ctx_t *)ctx;
+    executor_t *ex = wc ? wc->ex : NULL;
+    if (!ex) {
+        return NULL;
+    }
     bool assign_back = false;
-    return apply_param_operator(ex, name, (char *)value, (char *)deflt, op,
-                                &assign_back);
+    char *result = apply_param_operator(ex, name, (char *)value, (char *)deflt,
+                                        op, &assign_back);
+    if (assign_back && result) {
+        /// The pending-write buffer models a store that SUCCEEDS: a later read
+        /// in the same word is served the buffered value. A readonly target
+        /// breaks that model -- symtable_set_var refuses the write, so on the
+        /// legacy path the same read still sees the OLD value (`readonly r;
+        /// ${r:=v}${r}` is `v`, not `vv`, and a second `:=` on the name
+        /// re-fires because the variable is still empty). Rather than teach
+        /// the overlay to predict the refusal, defer the whole word and let
+        /// the legacy expander produce the refusal semantics it owns.
+        /// symtable_get_flags walks the scope chain while symtable_set_var
+        /// only refuses in the CURRENT scope, so this over-defers for a
+        /// readonly binding shadowed by a function frame -- deferring is
+        /// always safe. The one asymmetry that could UNDER-defer is that
+        /// find_var (behind symtable_get_flags) skips SYMVAR_UNSET tombstones
+        /// while the store's refusal check does not, so a current-scope entry
+        /// that was both UNSET and READONLY would slip through. No such entry
+        /// is reachable today (unset refuses on a readonly, and readonly on an
+        /// unset name rewrites the entry as set-empty); keep it that way, or
+        /// probe the current scope directly.
+        if (symtable_get_flags(ex->symtable, name) & SYMVAR_READONLY) {
+            free(result);
+            return NULL;
+        }
+        /// BUFFERED, not written: the word may still defer (see
+        /// word_assign_txn_t). Failing to buffer -- only under OOM -- defers
+        /// the word, and the legacy path then performs the assignment itself.
+        if (!word_txn_push(wc->txn, name, result)) {
+            free(result);
+            return NULL;
+        }
+    }
+    return result;
 }
 
 /// Audit-mode check (Step 2, gated on LUSH_WORD_CST_AUDIT): abort loudly if the
@@ -6601,11 +6762,16 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                     if (child->word && word_cst_enabled()) {
                         char *ifs_val =
                             symtable_get_var(executor->symtable, "IFS");
+                        /// Assign-operator writes are buffered per word and
+                        /// committed only if the word evaluates fully on the
+                        /// CST route (word_assign_txn_t).
+                        word_assign_txn_t wtxn = {0};
+                        word_eval_ctx_t wctx = {.ex = executor, .txn = &wtxn};
                         word_eval_env_t wenv = {
                             .get = executor_symtable_word_get,
                             .is_scalar = executor_symtable_word_is_scalar,
                             .apply_op = executor_word_apply_op,
-                            .ctx = executor,
+                            .ctx = &wctx,
                             .ifs = ifs_val,
                             .word_split_default =
                                 shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT),
@@ -6620,9 +6786,15 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                             word_eval(child->word, &wenv, &wn, &wok);
                         free(ifs_val);
                         if (wok) {
+                            /// Audit BEFORE committing: the legacy
+                            /// re-evaluation must see the same state the CST
+                            /// evaluation started from, or a word that reads a
+                            /// variable it also assigns (`"$u${u:=x}"`) would
+                            /// report a false mismatch.
                             if (getenv("LUSH_WORD_CST_AUDIT")) {
                                 word_cst_audit(executor, child, wfields, wn);
                             }
+                            word_txn_commit(executor, &wtxn);
                             bool append_ok = true;
                             for (int i = 0; i < wn; i++) {
                                 if (!add_to_argv_list(&argv_list, &argv_count,
@@ -6642,6 +6814,10 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                             child = child->next_sibling;
                             continue;
                         }
+                        /// Deferred: drop the pending writes so the legacy
+                        /// expander below re-expands the whole word from
+                        /// unmutated state and performs the assignment itself.
+                        word_txn_clear(&wtxn);
                         free(wfields); /// wok==false: NULL; fall through
                     }
 

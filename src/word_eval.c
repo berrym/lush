@@ -170,10 +170,30 @@ static bool op_has_literal_operand(int32_t op) {
            is_substring_op(op) || is_substitution_op(op);
 }
 
+/// The assign operators `${var:=x}` (12, when unset or empty) and `${var=x}`
+/// (13, when unset). UNLIKE every other covered operator these have a SIDE
+/// EFFECT: the value is written back to the variable.
+///
+/// A CST evaluation is PROVISIONAL -- this function can still defer a later
+/// part of the same word, and the caller then re-expands the whole word on the
+/// legacy path -- so the write must NOT be applied as it is computed. It would
+/// be visible to that re-expansion and the earlier parts would expand against
+/// mutated state (`echo A$u-B${u:=x}-C$g` printing `Ax-Bx` where legacy prints
+/// `A-Bx`). Operator idempotency does not help; what breaks is the rest of the
+/// word. The apply_op implementation therefore BUFFERS the write and its
+/// caller commits it only once the word is known covered -- see
+/// word_assign_txn_t in executor.c, whose read callback also serves the
+/// pending value so within-word visibility (`${u:=x}${u}`) still matches
+/// legacy. A bench apply_op with no store can simply ignore the write.
+///
+/// The operand is a scalar default VALUE (word-eval'd), like alternation.
+static bool is_assign_op(int32_t op) { return op == 12 || op == 13; }
+
 /// Every parameter-expansion operator this slice evaluates through apply_op.
-/// The assign (`:=`/`=`), error (`:?`/`?`) and transform (`@`) ops still defer.
+/// The error (`:?`/`?`) and transform (`@`) ops still defer.
 static bool is_covered_pe_op(int32_t op) {
-    return is_covered_alternation_op(op) || op_has_literal_operand(op);
+    return is_covered_alternation_op(op) || op_has_literal_operand(op) ||
+           is_assign_op(op);
 }
 
 /// Append the literal text of a pure-literal operand Word to the accumulator,
@@ -287,7 +307,8 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
     case WP_PARAM: {
         /// A covered PE operator -- alternation (${var:-x} ...), pattern-strip
         /// / case-conversion (${var#p}, ${var^^} ...), substring
-        /// (${var:off:len}), or substitution (${var/pat/repl}): resolve the
+        /// (${var:off:len}), substitution (${var/pat/repl}), or assign
+        /// (${var:=x}, the one family with a side effect): resolve the
         /// value, evaluate the operand (a scalar default VALUE for alternation,
         /// a literal glob PATTERN / numeric / pattern-replacement spec
         /// otherwise), and apply the operator through the shared apply_op

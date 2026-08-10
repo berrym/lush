@@ -48,8 +48,17 @@ static char *env_get(void *ctx, const char *name) {
 static char *bench_apply_op(void *ctx, const char *name, const char *value,
                             const char *deflt, int op) {
     (void)ctx;
-    (void)name;
-    return lush_param_op_apply(op, value, deflt, NULL);
+    bool assign_back = false;
+    char *result = lush_param_op_apply(op, value, deflt, &assign_back);
+    /// The assign operators write back. wordtool's variable store IS the
+    /// process environment (env_get reads it), so model the side effect there
+    /// -- otherwise a corpus line that OBSERVES the assignment
+    /// (`${u:=x}${u}`) would diverge from live lush for a reason that has
+    /// nothing to do with the operator.
+    if (assign_back && result) {
+        setenv(name, result, 1);
+    }
+    return result;
 }
 
 int main(int argc, char **argv) {

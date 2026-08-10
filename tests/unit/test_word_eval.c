@@ -327,6 +327,24 @@ TEST(eval_pe_substitution_operators) {
     assert_fields("${s/bc}", vars, no_sep); /// no separator -> delete first
 }
 
+TEST(eval_pe_assign_operators) {
+    /// Assign ${var:=x} / ${var=x} through the shared core. The bench map is
+    /// read-only, so this pins the RESULT (the value the word expands to);
+    /// the write-back itself is exercised live in test_executor and modelled
+    /// by wordtool through setenv.
+    const char *vars[] = {"s", "abc", "e", "", NULL};
+    const char *unset_colon[] = {"D", NULL};
+    assert_fields("${u:=D}", vars, unset_colon); /// unset -> default
+    const char *empty_colon[] = {"D", NULL};
+    assert_fields("${e:=D}", vars, empty_colon); /// empty -> default
+    const char *set_colon[] = {"abc", NULL};
+    assert_fields("${s:=D}", vars, set_colon); /// set -> keep value
+    const char *unset_plain[] = {"D", NULL};
+    assert_fields("${u=D}", vars, unset_plain); /// unset -> default
+    const char *empty_plain[] = {NULL};
+    assert_fields("${e=D}", vars, empty_plain); /// empty stays empty (dropped)
+}
+
 TEST(eval_pe_operand_glob_patterns) {
     /// Since #681 the bench runs the operators through the shared
     /// lush_param_op_apply, so a GLOB pattern operand is matched by the real
@@ -415,6 +433,7 @@ int main(void) {
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
+    RUN_TEST(eval_pe_assign_operators);
     RUN_TEST(eval_pe_operand_glob_patterns);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
