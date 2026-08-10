@@ -116,6 +116,57 @@ static char *map_apply_op(void *ctx, const char *name, const char *value,
         r[len] = '\0';
         return r;
     }
+    /// 15 = `//` replace all, 16 = `/` replace first. The bench substitutes a
+    /// LITERAL pattern only -- it does NOT model glob patterns or the `#`/`%`
+    /// anchors, which the live path matches through pattern_substitute. Those
+    /// forms are covered by the CST, so a corpus line carrying one would make
+    /// word_diff report a false BUG (bench != live); keep them out of
+    /// tests/fuzz/word_corpus and exercise them in the live executor tests.
+    case 15:
+    case 16: {
+        const char *v = value ? value : "";
+        bool global = (op == 15);
+        const char *sep = strchr(d, '/');
+        size_t patlen = sep ? (size_t)(sep - d) : strlen(d);
+        const char *repl = sep ? sep + 1 : "";
+        size_t rlen = strlen(repl);
+        size_t vlen = strlen(v);
+        if (patlen == 0) {
+            return strdup(v); /// empty pattern -> unchanged (matches legacy)
+        }
+        char *out = malloc(1);
+        if (!out) {
+            return NULL;
+        }
+        size_t olen = 0;
+        out[0] = '\0';
+        bool replaced = false;
+        for (size_t i = 0; i < vlen;) {
+            if ((global || !replaced) && i + patlen <= vlen &&
+                memcmp(v + i, d, patlen) == 0) {
+                char *grown = realloc(out, olen + rlen + 1);
+                if (!grown) {
+                    free(out);
+                    return NULL;
+                }
+                out = grown;
+                memcpy(out + olen, repl, rlen);
+                olen += rlen;
+                i += patlen;
+                replaced = true;
+            } else {
+                char *grown = realloc(out, olen + 2);
+                if (!grown) {
+                    free(out);
+                    return NULL;
+                }
+                out = grown;
+                out[olen++] = v[i++];
+            }
+            out[olen] = '\0';
+        }
+        return out;
+    }
     default:
         return strdup("");
     }
@@ -382,6 +433,28 @@ TEST(eval_pe_substring_operators) {
                   none); /// offset past end -> "" dropped unquoted
 }
 
+TEST(eval_pe_substitution_operators) {
+    /// Substitution ${var/pat/repl} (first) and ${var//pat/repl} (all) via the
+    /// map + apply_op stub (LITERAL pattern; glob patterns and /#/% anchors run
+    /// live). The operand is the whole `pat/repl` string, split inside
+    /// apply_op.
+    const char *vars[] = {"s", "abcabc", NULL};
+    const char *first[] = {"Xbcabc", NULL};
+    assert_fields("${s/a/X}", vars, first); /// replace first `a`
+    const char *all[] = {"XbcXbc", NULL};
+    assert_fields("${s//a/X}", vars, all); /// replace all `a`
+    const char *strip[] = {"bcbc", NULL};
+    assert_fields("${s//a/}", vars, strip); /// empty replacement -> remove all
+    const char *nomatch[] = {"abcabc", NULL};
+    assert_fields("${s/zzz/Q}", vars, nomatch); /// no match -> unchanged
+    const char *multi[] = {"aQQaQQ", NULL};
+    assert_fields("${s//bc/QQ}", vars, multi); /// multi-char pattern -> all
+    const char *empty_pat[] = {"abcabc", NULL};
+    assert_fields("${s///X}", vars, empty_pat); /// empty pattern -> unchanged
+    const char *no_sep[] = {"aabc", NULL};
+    assert_fields("${s/bc}", vars, no_sep); /// no separator -> delete first
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -446,6 +519,7 @@ int main(void) {
     RUN_TEST(eval_pe_pattern_strip_operators);
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_substring_operators);
+    RUN_TEST(eval_pe_substitution_operators);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

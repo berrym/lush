@@ -72,13 +72,14 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
 /// True for an operator whose operand is recovered as a LITERAL string (not
 /// word-eval'd as a value) and handed to apply_op verbatim: the pattern-strip
 /// ops (`#`/`##`/`%`/`%%`, 6/2/7/3, a glob pattern), the case-conversion ops
-/// (`^`/`^^`/`,`/`,,`, 8/4/9/5, an optional restricting glob pattern), and the
-/// substring op (`:`, 14, a numeric offset[:length] spec). The operand is
-/// deferred if it needs `$`-expansion (this slice covers literal operands only)
-/// and is never dequoted/globbed by word_eval.
+/// (`^`/`^^`/`,`/`,,`, 8/4/9/5, an optional restricting glob pattern), the
+/// substring op (`:`, 14, a numeric offset[:length] spec), and the substitution
+/// ops (`/`/`//`, 16/15, a `pattern/replacement` spec split by apply_op). The
+/// operand is deferred if it needs `$`-expansion (this slice covers literal
+/// operands only) and is never dequoted/globbed by word_eval.
 static bool op_has_literal_operand(int op) {
     return op == 2 || op == 3 || op == 6 || op == 7 || op == 4 || op == 5 ||
-           op == 8 || op == 9 || op == 14;
+           op == 8 || op == 9 || op == 14 || op == 15 || op == 16;
 }
 
 /// True when a `:` (substring) operand is the SIMPLE numeric form this slice
@@ -117,11 +118,13 @@ static bool is_simple_substring_spec(const char *s, size_t n) {
 /// 6=`#` 2=`##` 7=`%` 3=`%%`; 8=`^` 4=`^^` 9=`,` 5=`,,`) and sets *op_len, or
 /// -1 when `s` does not begin a covered operator. Longest match wins (`##`
 /// before
-/// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`; 14=`:` substring).
-/// A bare `:` is the substring op ONLY when a digit follows (`${var:2:3}`); the
-/// `:=`/`:?` operators and the zsh `:h` modifier chains fail that test and
-/// defer, as do `/`/`@`/subscript `[`, so the whole `${...}` defers. `:-`/`:+`
-/// are matched first; `:=`/`:?`/`: `/`:(` start with `:` but are not covered.
+/// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`, `//` before `/`;
+/// 14=`:` substring, 15=`//` replace-all, 16=`/` replace-first). A bare `:` is
+/// the substring op ONLY when a digit follows (`${var:2:3}`); the `:=`/`:?`
+/// operators and the zsh `:h` modifier chains fail that test and defer, as do
+/// `@`/subscript `[`, so the whole `${...}` defers. `:-`/`:+` are matched
+/// first;
+/// `:=`/`:?`/`: `/`:(` start with `:` but are not covered.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
@@ -168,6 +171,18 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 1 && s[0] == ',') {
         *op_len = 1;
         return 9; /// , : lowercase first character
+    }
+    if (n >= 2 && s[0] == '/' && s[1] == '/') {
+        *op_len = 2;
+        return 15; /// // : replace all occurrences (operand
+                   /// `pattern/replacement` split by apply_op; a `/#pat`
+                   /// anchor tokenizes as a comment and defers below, as does
+                   /// a `/%name` kind-sigil anchor -- other `%` anchors are
+                   /// covered and stripped by apply_op, as legacy does)
+    }
+    if (n >= 1 && s[0] == '/') {
+        *op_len = 1;
+        return 16; /// / : replace first occurrence
     }
     if (n >= 1 && s[0] == '-') {
         *op_len = 1;

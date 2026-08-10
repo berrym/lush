@@ -128,6 +128,57 @@ static char *bench_apply_op(void *ctx, const char *name, const char *value,
         r[len] = '\0';
         return r;
     }
+    /// 15 = `//` replace all, 16 = `/` replace first. The bench substitutes a
+    /// LITERAL pattern only -- it does NOT model glob patterns or the `#`/`%`
+    /// anchors, which the live path matches through pattern_substitute. Those
+    /// forms are covered by the CST, so a corpus line carrying one would make
+    /// word_diff report a false BUG (bench != live); keep them out of
+    /// tests/fuzz/word_corpus and exercise them in the live executor tests.
+    case 15:
+    case 16: {
+        const char *v = value ? value : "";
+        bool global = (op == 15);
+        const char *sep = strchr(d, '/');
+        size_t patlen = sep ? (size_t)(sep - d) : strlen(d);
+        const char *repl = sep ? sep + 1 : "";
+        size_t rlen = strlen(repl);
+        size_t vlen = strlen(v);
+        if (patlen == 0) {
+            return strdup(v); /// empty pattern -> unchanged (matches legacy)
+        }
+        char *out = malloc(1);
+        if (!out) {
+            return NULL;
+        }
+        size_t olen = 0;
+        out[0] = '\0';
+        bool replaced = false;
+        for (size_t i = 0; i < vlen;) {
+            if ((global || !replaced) && i + patlen <= vlen &&
+                memcmp(v + i, d, patlen) == 0) {
+                char *grown = realloc(out, olen + rlen + 1);
+                if (!grown) {
+                    free(out);
+                    return NULL;
+                }
+                out = grown;
+                memcpy(out + olen, repl, rlen);
+                olen += rlen;
+                i += patlen;
+                replaced = true;
+            } else {
+                char *grown = realloc(out, olen + 2);
+                if (!grown) {
+                    free(out);
+                    return NULL;
+                }
+                out = grown;
+                out[olen++] = v[i++];
+            }
+            out[olen] = '\0';
+        }
+        return out;
+    }
     default:
         return strdup("");
     }
