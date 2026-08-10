@@ -204,6 +204,7 @@ src = ['src/arithmetic.c',
        'src/word_eval.c',
        'src/opts.c',
        'src/parser.c',
+       'src/param_op.c',
        'src/pattern_match.c',
        'src/escape.c',
        'src/brace_match.c',
@@ -1548,6 +1549,8 @@ if fs.exists('tests/unit/test_word_eval.c')
                               'src/dequote.c',
                               'src/escape.c',
                               'src/identifier.c',
+                              'src/param_op.c',
+                              'src/pattern_match.c',
                               'src/shell_mode.c',
                               include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep])
@@ -1574,6 +1577,8 @@ if fs.exists('tools/wordtool.c') and fs.exists('tests/fuzz/word_diff.c')
                         'src/dequote.c',
                         'src/escape.c',
                         'src/identifier.c',
+                        'src/param_op.c',
+                        'src/pattern_match.c',
                         'src/shell_mode.c',
                         include_directories: inc,
                         dependencies: [lle_dep],
@@ -2753,6 +2758,9 @@ if fs.exists('tests/unit/test_pattern_match.c')
   test_pattern_match = executable('test_pattern_match',
                                   'tests/unit/test_pattern_match.c',
                                   'src/pattern_match.c',
+                                  # lush_shell_pattern_match gates the extglob
+                                  # dialects on the active mode.
+                                  'src/shell_mode.c',
                                   include_directories: [inc, include_directories('tests')],
                                   dependencies: [lle_dep])
   test('Pattern Match', test_pattern_match,

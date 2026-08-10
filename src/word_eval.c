@@ -130,8 +130,10 @@ static bool is_covered_alternation_op(int32_t op) {
 /// The case-conversion operators: `${var^p}` (8), `${var^^p}` (4), `${var,p}`
 /// (9), `${var,,p}` (5). The (optional) pattern restricts which characters
 /// convert; this slice covers only the NO-pattern form (convert all / first),
-/// so a case op carrying a pattern defers -- the pattern-restricted match
-/// (convert_case_pattern) is not modelled by the bench.
+/// so a case op carrying a pattern defers. (The original reason was that the
+/// bench could not model the pattern-restricted match; since #681 the bench
+/// runs the real lush_case_pattern, so covering it is now just a widening
+/// slice of its own -- see #683.)
 static bool is_case_op(int32_t op) {
     return op == 4 || op == 5 || op == 8 || op == 9;
 }
@@ -139,22 +141,23 @@ static bool is_case_op(int32_t op) {
 /// The substring operator `${var:offset:length}` (14). The operand is a numeric
 /// offset[:length] spec (validated simple + non-negative at parse); it is
 /// recovered literally and handed to apply_op, which runs the same grapheme-
-/// aware extract_substring legacy uses -- parity by construction. zsh `:h`
+/// aware lush_substring_extract legacy uses -- parity by construction. zsh `:h`
 /// modifier chains and negative/arith/`$` operands defer at parse.
 static bool is_substring_op(int32_t op) { return op == 14; }
 
 /// The substitution operators `${var/pat/repl}` (16, first) and
 /// `${var//pat/repl}` (15, all). The whole `pattern/replacement` operand is
 /// recovered literally and handed to apply_op, which splits it at the first
-/// unescaped `/` and runs the same pattern_substitute legacy uses (the glob
-/// pattern is matched there) -- parity by construction. An operand that does
-/// not tokenize to one literal word defers at parse: a `$`-expanding, quoted,
-/// or backslash-carrying operand (incl. the `\/` escaped-slash idiom), and
+/// unescaped `/` and runs the same lush_pattern_substitute legacy uses (the
+/// glob pattern is matched there) -- parity by construction. An operand that
+/// does not tokenize to one literal word defers at parse: a `$`-expanding,
+/// quoted, or backslash-carrying operand (incl. the `\/` escaped-slash idiom),
+/// and
 /// `${var/#pat/repl}` (a leading `#` starts a comment). `${var/%pat/repl}`
 /// defers only when `%` is followed by an identifier-start byte (the kind-sigil
 /// token, so coverage there is mode-dependent on FEATURE_KIND_SIGILS); other
 /// `%` anchors are COVERED, and parity still holds by construction because
-/// pattern_substitute strips the anchor on both paths.
+/// lush_pattern_substitute strips the anchor on both paths.
 static bool is_substitution_op(int32_t op) { return op == 15 || op == 16; }
 
 /// Operators whose operand is recovered as a LITERAL string and passed to

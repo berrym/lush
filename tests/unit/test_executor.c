@@ -1467,7 +1467,7 @@ TEST(rt_pe_operand_edge_whitespace_defers) {
 TEST(rt_pe_case_conversion_operators_covered) {
     /// Case-conversion operators ${var^^}/${var,,} (all characters) and
     /// ${var^}/${var,} (first character) expand on the CST backbone via the
-    /// shared apply_param_operator (convert_case_all_* / convert first). Covers
+    /// shared apply_param_operator (lush_case_all_* / convert first). Covers
     /// the NO-pattern form; a pattern-restricted form (${var^^a}) defers to
     /// legacy and still matches. Validated under --setup lush:audit.
     /// Subshell-isolated.
@@ -1483,12 +1483,12 @@ TEST(rt_pe_case_conversion_operators_covered) {
 
 TEST(rt_pe_substring_operators_covered) {
     /// Substring ${var:off} / ${var:off:len} expands on the CST backbone via
-    /// the shared apply_param_operator (extract_substring, grapheme-aware).
-    /// Covers the simple non-negative numeric spec, incl. UTF-8 live (café ->
-    /// caf / é by grapheme, not byte); offset/length past the end clamp; an
-    /// unset var is empty. A negative length (${s:2:-1}) is NOT covered and
-    /// defers to legacy, still matching. Validated under --setup lush:audit.
-    /// Subshell-isolated.
+    /// the shared apply_param_operator (lush_substring_extract,
+    /// grapheme-aware). Covers the simple non-negative numeric spec, incl.
+    /// UTF-8 live (café -> caf / é by grapheme, not byte); offset/length past
+    /// the end clamp; an unset var is empty. A negative length (${s:2:-1}) is
+    /// NOT covered and defers to legacy, still matching. Validated under
+    /// --setup lush:audit. Subshell-isolated.
     run_result_t r =
         run_shell("( s=abcdef; c=café; unset -v u\n"
                   "  echo \"[${s:2}][${s:2:2}][${s:0:3}][${s:4:99}][${s:9}]\"\n"

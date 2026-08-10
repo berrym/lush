@@ -1,5 +1,6 @@
 # Step 1c-1 differential corpus: the lush-mode covered subset.
-# Variables preset by word_diff: X="a b c", Y="cd", E="" (default IFS).
+# Variables preset by word_diff: X="a b c", Y="cd", E="", U="café"
+# (default IFS).
 # Deterministic only: no globs, no non-deterministic specials, no cmdsub.
 # Parity bar: wordtool == current-lush (lush mode). bash/zsh are triage only.
 hello
@@ -47,3 +48,49 @@ pre$'\t'
 # Deferred to a fast follow-up (multi-byte UTF-8 output, locale-sensitivity to
 # verify end-to-end before claiming parity):
 #   $'é'  $'\U0001F600'
+# Parameter-expansion operators. wordtool evaluates these through the SAME
+# shared core as live lush (lush_param_op_apply, src/param_op.c), so glob
+# patterns, the #/% substitution anchors and grapheme-aware substrings are all
+# real parity signal rather than a bench approximation (issue #681).
+${Y:-def}
+${E:-def}
+${UNSET:-def}
+${Y:+alt}
+${E:+alt}
+${UNSET-d}
+${E+a}
+${Y#c}
+${Y##?}
+${Y%d}
+${Y%%?}
+# The next three carry a SPACE in the pattern operand, which parse_word
+# cannot represent -- they bucket as NOT-COVERED and are here to pin that
+# boundary, not to assert a value.
+"${X#* }"
+"${X##* }"
+"${X%% *}"
+${Y^^}
+${Y^}
+${Y,,}
+"${X^^}"
+${U^^}
+${U,,}
+${Y:0:1}
+${Y:1}
+"${X:2:3}"
+${U:0:3}
+${U:3}
+${U:3:1}
+${Y/c/Z}
+${Y//c/Z}
+${Y//?/Z}
+${Y/c*/Z}
+${Y/%*/Z}
+${U/é/e}
+# NOTE: ${U//?/.} yields 5 fields' worth of dots, not 4 -- the pattern
+# scanners match single BYTES and split the multi-byte character (#682). The
+# line is still valid parity signal (the bar is wordtool == lush, and both run
+# the same shared core), and it will keep passing when #682 is fixed.
+${U//?/.}
+${Y/zz/Q}
+${Y//c/}
