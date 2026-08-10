@@ -74,4 +74,24 @@ bool lush_pattern_match(const char *str, const char *pattern);
 bool lush_pattern_match_ex(const char *str, const char *pattern,
                            unsigned flags);
 
+/**
+ * @brief Mode-aware shell pattern match
+ *
+ * Case patterns, the parameter-expansion matchers (`${v#p}` / `${v%p}` /
+ * `${v/p/r}`), `[[ == ]]` and the array/value filters route through here so
+ * the extglob and zsh extended-glob dialects are gated by the active shell
+ * mode's feature flags rather than being always active.
+ *
+ * @param str     String to match
+ * @param pattern Pattern to match against
+ * @return true on exact match, false otherwise
+ */
+bool lush_shell_pattern_match(const char *str, const char *pattern);
+
+/// The lush_pattern_match_ex flag set implied by the active shell mode:
+/// LUSH_PATTERN_EXTGLOB under FEATURE_EXTENDED_GLOB and
+/// LUSH_PATTERN_ZSH_EXTENDED under FEATURE_ZSH_EXTENDED_GLOB. Central builder
+/// so every pattern-matching site gates the dialects consistently.
+unsigned lush_shell_pattern_flags(void);
+
 #endif /* LUSH_PATTERN_MATCH_H */

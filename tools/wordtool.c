@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "param_op.h"
 #include "tokenizer.h"
 #include "word.h"
 #include "word_eval.h"
@@ -38,150 +39,17 @@ static char *env_get(void *ctx, const char *name) {
     return v ? strdup(v) : NULL; /// owned per the word_eval get contract
 }
 
-/// Bench apply_op: replicates the four alternation operators so wordtool
-/// evaluates ${var:-x} etc. against the process environment. Mirrors the
-/// executor's apply_param_operator for op 0/1/10/11.
+/// Bench apply_op: the PE operators are evaluated by the same shared core the
+/// executor uses (lush_param_op_apply in src/param_op.c), so wordtool's output
+/// matches live lush by construction -- glob patterns, `#`/`%` anchors and
+/// grapheme-aware substrings included. A hand-written bench copy used to model
+/// only literal patterns, which made the differential harness report false BUG
+/// verdicts for every form it could not model (issue #681).
 static char *bench_apply_op(void *ctx, const char *name, const char *value,
                             const char *deflt, int op) {
     (void)ctx;
     (void)name;
-    bool empty = !value || value[0] == '\0';
-    const char *d = deflt ? deflt : "";
-    switch (op) {
-    case 0: /// :- use default if unset or empty
-        return strdup(empty ? d : value);
-    case 1: /// :+ use alternative if set and non-empty
-        return strdup(!empty ? d : "");
-    case 10: /// - use default if unset (NULL), not if empty
-        return strdup(!value ? d : value);
-    case 11: /// + use alternative if set (even if empty)
-        return strdup(value ? d : "");
-    case 2: /// ## remove longest prefix (bench: LITERAL pattern only)
-    case 6: /// #  remove shortest prefix
-    {
-        size_t pl = strlen(d);
-        if (value && pl && strncmp(value, d, pl) == 0) {
-            return strdup(value + pl);
-        }
-        return strdup(value ? value : "");
-    }
-    case 3: /// %% remove longest suffix
-    case 7: /// %  remove shortest suffix
-    {
-        size_t vl = value ? strlen(value) : 0;
-        size_t pl = strlen(d);
-        if (value && pl && pl <= vl && strcmp(value + vl - pl, d) == 0) {
-            char *r = malloc(vl - pl + 1);
-            if (r) {
-                memcpy(r, value, vl - pl);
-                r[vl - pl] = '\0';
-            }
-            return r ? r : strdup("");
-        }
-        return strdup(value ? value : "");
-    }
-    case 4: /// ^^ uppercase all   (bench: EMPTY pattern -> convert all;
-    case 8: /// ^  uppercase first  pattern-restricted cases run live)
-    case 5: /// ,, lowercase all
-    case 9: /// ,  lowercase first
-    {
-        char *r = strdup(value ? value : "");
-        if (!r) {
-            return NULL;
-        }
-        bool upper = (op == 4 || op == 8);
-        bool first_only = (op == 8 || op == 9);
-        for (char *c = r; *c; c++) {
-            *c = upper ? (char)toupper((unsigned char)*c)
-                       : (char)tolower((unsigned char)*c);
-            if (first_only) {
-                break;
-            }
-        }
-        return r;
-    }
-    case 14: /// ${var:off:len} substring (bench: ASCII byte slice of the simple
-    {        /// non-negative spec; UTF-8/grapheme parity runs live)
-        const char *v = value ? value : "";
-        char *end;
-        long off = strtol(d, &end, 10);
-        long vlen = (long)strlen(v);
-        if (off > vlen) {
-            off = vlen;
-        }
-        long avail = vlen - off;
-        long len = avail;
-        if (*end == ':') {
-            len = strtol(end + 1, NULL, 10);
-            if (len > avail) {
-                len = avail;
-            }
-            if (len < 0) {
-                len = 0;
-            }
-        }
-        char *r = malloc(len + 1);
-        if (!r) {
-            return NULL;
-        }
-        memcpy(r, v + off, len);
-        r[len] = '\0';
-        return r;
-    }
-    /// 15 = `//` replace all, 16 = `/` replace first. The bench substitutes a
-    /// LITERAL pattern only -- it does NOT model glob patterns or the `#`/`%`
-    /// anchors, which the live path matches through pattern_substitute. Those
-    /// forms are covered by the CST, so a corpus line carrying one would make
-    /// word_diff report a false BUG (bench != live); keep them out of
-    /// tests/fuzz/word_corpus and exercise them in the live executor tests.
-    case 15:
-    case 16: {
-        const char *v = value ? value : "";
-        bool global = (op == 15);
-        const char *sep = strchr(d, '/');
-        size_t patlen = sep ? (size_t)(sep - d) : strlen(d);
-        const char *repl = sep ? sep + 1 : "";
-        size_t rlen = strlen(repl);
-        size_t vlen = strlen(v);
-        if (patlen == 0) {
-            return strdup(v); /// empty pattern -> unchanged (matches legacy)
-        }
-        char *out = malloc(1);
-        if (!out) {
-            return NULL;
-        }
-        size_t olen = 0;
-        out[0] = '\0';
-        bool replaced = false;
-        for (size_t i = 0; i < vlen;) {
-            if ((global || !replaced) && i + patlen <= vlen &&
-                memcmp(v + i, d, patlen) == 0) {
-                char *grown = realloc(out, olen + rlen + 1);
-                if (!grown) {
-                    free(out);
-                    return NULL;
-                }
-                out = grown;
-                memcpy(out + olen, repl, rlen);
-                olen += rlen;
-                i += patlen;
-                replaced = true;
-            } else {
-                char *grown = realloc(out, olen + 2);
-                if (!grown) {
-                    free(out);
-                    return NULL;
-                }
-                out = grown;
-                out[olen++] = v[i++];
-            }
-            out[olen] = '\0';
-        }
-        return out;
-    }
-    default:
-        return strdup("");
-    }
+    return lush_param_op_apply(op, value, deflt, NULL);
 }
 
 int main(int argc, char **argv) {

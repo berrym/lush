@@ -20,6 +20,7 @@
 #include "lle/unicode_case.h"
 #include "lle/unicode_class.h"
 #include "lle/utf8_support.h"
+#include "shell_mode.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -656,4 +657,28 @@ bool lush_pattern_match_ex(const char *str, const char *pattern,
         return !match(str, pattern + 1, flags);
     }
     return match(str, pattern, flags);
+}
+
+/// Pattern-matcher flags derived from the active shell mode: bash extglob
+/// (?( *( +( @( !() when FEATURE_EXTENDED_GLOB is enabled, and the zsh
+/// extended-glob operators (`x#`/`x##`, leading `^`) when
+/// FEATURE_ZSH_EXTENDED_GLOB is enabled. Central builder so every shell
+/// pattern-matching site gates these dialects consistently on the mode.
+unsigned lush_shell_pattern_flags(void) {
+    unsigned f = 0;
+    if (shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
+        f |= LUSH_PATTERN_EXTGLOB;
+    }
+    if (shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB)) {
+        f |= LUSH_PATTERN_ZSH_EXTENDED;
+    }
+    return f;
+}
+
+/// Mode-aware shell pattern match. Case patterns, parameter-expansion
+/// matchers (`${v#p}` / `${v%p}` / `${v/p/r}`), `[[ == ]]`, and array/value
+/// filters route through here so extglob and the zsh operators are gated by
+/// the current mode's feature flags rather than always active.
+bool lush_shell_pattern_match(const char *str, const char *pattern) {
+    return lush_pattern_match_ex(str, pattern, lush_shell_pattern_flags());
 }

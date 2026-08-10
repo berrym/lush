@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "param_op.h"
 #include "test_framework.h"
 #include "tokenizer.h"
 #include "word.h"
@@ -30,146 +31,17 @@ static char *map_get(void *ctx, const char *name) {
     return NULL;
 }
 
-/// Bench apply_op: the four alternation operators, mirroring the executor's
-/// apply_param_operator (op 0/1/10/11).
+/// Bench apply_op: the PE operators are evaluated by the same shared core the
+/// executor uses (lush_param_op_apply in src/param_op.c), so the bench asserts
+/// the REAL operator semantics by construction -- glob patterns, `#`/`%`
+/// anchors and grapheme-aware substrings included. A hand-written bench copy
+/// used to model only literal patterns, which made the differential harness
+/// report false BUG verdicts for every form it could not model (issue #681).
 static char *map_apply_op(void *ctx, const char *name, const char *value,
                           const char *deflt, int op) {
     (void)ctx;
     (void)name;
-    bool empty = !value || value[0] == '\0';
-    const char *d = deflt ? deflt : "";
-    switch (op) {
-    case 0:
-        return strdup(empty ? d : value);
-    case 1:
-        return strdup(!empty ? d : "");
-    case 10:
-        return strdup(!value ? d : value);
-    case 11:
-        return strdup(value ? d : "");
-    case 2: /// ## / # prefix strip (bench: LITERAL pattern)
-    case 6: {
-        size_t pl = strlen(d);
-        if (value && pl && strncmp(value, d, pl) == 0) {
-            return strdup(value + pl);
-        }
-        return strdup(value ? value : "");
-    }
-    case 3: /// %% / % suffix strip (bench: LITERAL pattern)
-    case 7: {
-        size_t vl = value ? strlen(value) : 0;
-        size_t pl = strlen(d);
-        if (value && pl && pl <= vl && strcmp(value + vl - pl, d) == 0) {
-            char *r = malloc(vl - pl + 1);
-            if (r) {
-                memcpy(r, value, vl - pl);
-                r[vl - pl] = '\0';
-            }
-            return r ? r : strdup("");
-        }
-        return strdup(value ? value : "");
-    }
-    case 4: /// ^^/^ upper, ,,/, lower (bench: EMPTY pattern -> convert all;
-    case 8: /// pattern-restricted case conversion runs live)
-    case 5:
-    case 9: {
-        char *r = strdup(value ? value : "");
-        if (!r) {
-            return NULL;
-        }
-        bool upper = (op == 4 || op == 8);
-        bool first_only = (op == 8 || op == 9);
-        for (char *c = r; *c; c++) {
-            *c = upper ? (char)toupper((unsigned char)*c)
-                       : (char)tolower((unsigned char)*c);
-            if (first_only) {
-                break;
-            }
-        }
-        return r;
-    }
-    case 14: /// ${var:off:len} substring (bench: ASCII byte slice of the simple
-    {        /// non-negative spec; UTF-8/grapheme parity runs live)
-        const char *v = value ? value : "";
-        char *end;
-        long off = strtol(d, &end, 10);
-        long vlen = (long)strlen(v);
-        if (off > vlen) {
-            off = vlen;
-        }
-        long avail = vlen - off;
-        long len = avail;
-        if (*end == ':') {
-            len = strtol(end + 1, NULL, 10);
-            if (len > avail) {
-                len = avail;
-            }
-            if (len < 0) {
-                len = 0;
-            }
-        }
-        char *r = malloc(len + 1);
-        if (!r) {
-            return NULL;
-        }
-        memcpy(r, v + off, len);
-        r[len] = '\0';
-        return r;
-    }
-    /// 15 = `//` replace all, 16 = `/` replace first. The bench substitutes a
-    /// LITERAL pattern only -- it does NOT model glob patterns or the `#`/`%`
-    /// anchors, which the live path matches through pattern_substitute. Those
-    /// forms are covered by the CST, so a corpus line carrying one would make
-    /// word_diff report a false BUG (bench != live); keep them out of
-    /// tests/fuzz/word_corpus and exercise them in the live executor tests.
-    case 15:
-    case 16: {
-        const char *v = value ? value : "";
-        bool global = (op == 15);
-        const char *sep = strchr(d, '/');
-        size_t patlen = sep ? (size_t)(sep - d) : strlen(d);
-        const char *repl = sep ? sep + 1 : "";
-        size_t rlen = strlen(repl);
-        size_t vlen = strlen(v);
-        if (patlen == 0) {
-            return strdup(v); /// empty pattern -> unchanged (matches legacy)
-        }
-        char *out = malloc(1);
-        if (!out) {
-            return NULL;
-        }
-        size_t olen = 0;
-        out[0] = '\0';
-        bool replaced = false;
-        for (size_t i = 0; i < vlen;) {
-            if ((global || !replaced) && i + patlen <= vlen &&
-                memcmp(v + i, d, patlen) == 0) {
-                char *grown = realloc(out, olen + rlen + 1);
-                if (!grown) {
-                    free(out);
-                    return NULL;
-                }
-                out = grown;
-                memcpy(out + olen, repl, rlen);
-                olen += rlen;
-                i += patlen;
-                replaced = true;
-            } else {
-                char *grown = realloc(out, olen + 2);
-                if (!grown) {
-                    free(out);
-                    return NULL;
-                }
-                out = grown;
-                out[olen++] = v[i++];
-            }
-            out[olen] = '\0';
-        }
-        return out;
-    }
-    default:
-        return strdup("");
-    }
+    return lush_param_op_apply(op, value, deflt, NULL);
 }
 
 /// Parse + evaluate the first word of `line` in lush mode (no split) against
@@ -455,6 +327,29 @@ TEST(eval_pe_substitution_operators) {
     assert_fields("${s/bc}", vars, no_sep); /// no separator -> delete first
 }
 
+TEST(eval_pe_operand_glob_patterns) {
+    /// Since #681 the bench runs the operators through the shared
+    /// lush_param_op_apply, so a GLOB pattern operand is matched by the real
+    /// matcher rather than approximated -- these assertions would have been
+    /// impossible against the old literal-only stub, and they are what makes
+    /// the differential corpus able to carry glob/anchor forms.
+    const char *vars[] = {"s", "foobar", "n", "ab1", NULL};
+    const char *shortest[] = {"obar", NULL};
+    assert_fields("${s#f*o}", vars, shortest); /// shortest prefix match
+    const char *longest[] = {"bar", NULL};
+    assert_fields("${s##f*o}", vars, longest); /// longest prefix match
+    const char *suffix[] = {"fo", NULL};
+    assert_fields("${s%o*r}", vars, suffix); /// glob suffix strip
+    const char *subst[] = {"fZar", NULL};
+    assert_fields("${s/o*b/Z}", vars, subst); /// glob substitution
+    const char *glob_all[] = {"f..bar", NULL};
+    assert_fields("${s//o/.}", vars, glob_all); /// literal, global
+    const char *star_all[] = {"f", NULL};
+    assert_fields("${s//o*/}", vars, star_all); /// glob, delete
+    const char *anchored[] = {"abX", NULL};
+    assert_fields("${n/%1/X}", vars, anchored); /// %-anchored substitution
+}
+
 TEST(eval_ansic) {
     /// $'...' decoded bytes become one literal field; empty stays one field;
     /// a decoded glob metachar is literal (no glob).
@@ -520,6 +415,7 @@ int main(void) {
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
+    RUN_TEST(eval_pe_operand_glob_patterns);
     RUN_TEST(eval_ansic);
     RUN_TEST(eval_bash_split_deferred);
     return TEST_RESULT();

@@ -89,7 +89,7 @@ static bool op_has_literal_operand(int op) {
 /// arithmetic or `$` operands (`${v:i+1}`, `${v:$i}`), and the zsh modifier
 /// chains (`${v:h}`) -- returns false so the whole `${...}` defers to legacy. A
 /// non-negative literal offset[:length] handed to apply_param_operator (op 14)
-/// runs the same extract_substring legacy uses -> parity by construction.
+/// runs the same lush_substring_extract legacy uses -> parity by construction.
 static bool is_simple_substring_spec(const char *s, size_t n) {
     if (n == 0 || !isdigit((unsigned char)s[0])) {
         return false;

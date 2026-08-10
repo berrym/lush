@@ -150,7 +150,8 @@ int main(int argc, char **argv) {
     setenv("X", "a b c", 1);
     setenv("Y", "cd", 1);
     setenv("E", "", 1);
-    unsetenv("IFS"); /// default IFS
+    setenv("U", "café", 1); /// multi-byte, for the grapheme-aware operators
+    unsetenv("IFS");        /// default IFS
 
     bool have_bash = shell_available(bash);
     bool have_zsh = shell_available(zsh);
@@ -209,7 +210,13 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        char *const lu_argv[] = {(char *)lush, "-c", cmd, NULL};
+        /// `--lush` pins the reference shell to lush mode. wordtool has no
+        /// config surface -- it runs on shell_mode.c's static default (lush) --
+        /// while lush resolves its mode from lushrc/CLI, so a developer whose
+        /// config selects another mode would otherwise see false BUG verdicts
+        /// on every mode-gated form (the extglob dialects reach the shared
+        /// operator core through lush_shell_pattern_match).
+        char *const lu_argv[] = {(char *)lush, "--lush", "-c", cmd, NULL};
         int lu_rc = capture(lu_argv, lu, &lulen);
         if (lu_rc == CAPTURE_OVERFLOW) {
             inconclusive++;
