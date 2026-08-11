@@ -902,6 +902,16 @@ void executor_clear_context(executor_t *executor) {
 /// rust-style source snippet, and the context stack, display it, and set the
 /// legacy error state. `suggestion` may be NULL for an error that carries no
 /// help line.
+/// Diagnostic capture for word_cst_audit. While muted, executor_report_error_v
+/// renders into g_error_capture instead of stderr, so the audit's SECOND
+/// (legacy) expansion of a word does not print a diagnostic the real run never
+/// produced. Only word_cst_audit sets these, only around its own
+/// expand_arg_node call, and a covered word cannot run a command (command
+/// substitution defers at parse), so nothing else can have its errors
+/// swallowed.
+static bool g_error_display_muted = false;
+static char *g_error_capture = NULL;
+
 static void executor_report_error_v(executor_t *executor,
                                     shell_error_code_t code,
                                     source_location_t loc,
@@ -943,8 +953,33 @@ static void executor_report_error_v(executor_t *executor,
         }
     }
 
-    /// Display the error immediately
-    shell_error_display(error, stderr, isatty(STDERR_FILENO));
+    /// Display the error immediately -- unless a diagnostic-capturing caller
+    /// has muted the channel (word_cst_audit, which expands a word a SECOND
+    /// time purely to compare routes and must not double-print the result).
+    if (g_error_display_muted) {
+        char *buf = NULL;
+        size_t len = 0;
+        FILE *ms = open_memstream(&buf, &len);
+        if (ms) {
+            shell_error_display(error, ms, false);
+            fclose(ms);
+            if (!g_error_capture) {
+                g_error_capture = buf;
+            } else {
+                /// More than one diagnostic in a single muted span: keep them
+                /// all, the report is more useful than the first line alone.
+                size_t have = strlen(g_error_capture);
+                char *joined = realloc(g_error_capture, have + len + 1);
+                if (joined) {
+                    memcpy(joined + have, buf, len + 1);
+                    g_error_capture = joined;
+                }
+                free(buf);
+            }
+        }
+    } else {
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+    }
 
     /// Set legacy error state for compatibility - use NULL since error was
     /// already displayed
@@ -6609,9 +6644,89 @@ static char *executor_word_apply_op(void *ctx, const char *name,
 ///     disagree with what legacy actually does (no false positives).
 /// Field splitting needs no check: legacy splits only NODE_COMMAND_SUB /
 /// NODE_VAR words in split mode, both of which word_eval already defers.
+/// The expansion-error state a word's expansion can leave on the executor.
+/// word_cst_audit expands each covered word a SECOND time on the legacy path
+/// purely to compare the two routes; that comparison must not be able to
+/// change the run, so this is snapshotted and restored around the call.
+/// error_message is a BORROWED pointer (set_executor_error stores the caller's
+/// string; the structured path sets NULL), so restoring it needs no free.
+typedef struct {
+    bool expansion_error;
+    int expansion_exit_status;
+    bool shell_exit_requested;
+    int shell_exit_status;
+    bool has_error;
+    const char *error_message;
+} expansion_error_state_t;
+
+static expansion_error_state_t
+expansion_error_state_save(const executor_t *executor) {
+    expansion_error_state_t s = {
+        .expansion_error = executor->expansion_error,
+        .expansion_exit_status = executor->expansion_exit_status,
+        .shell_exit_requested = executor->shell_exit_requested,
+        .shell_exit_status = executor->shell_exit_status,
+        .has_error = executor->has_error,
+        .error_message = executor->error_message,
+    };
+    return s;
+}
+
+static void expansion_error_state_restore(executor_t *executor,
+                                          const expansion_error_state_t *s) {
+    executor->expansion_error = s->expansion_error;
+    executor->expansion_exit_status = s->expansion_exit_status;
+    executor->shell_exit_requested = s->shell_exit_requested;
+    executor->shell_exit_status = s->shell_exit_status;
+    executor->has_error = s->has_error;
+    executor->error_message = s->error_message;
+}
+
+/// True when the legacy expansion RAISED an error the word did not arrive
+/// with. Transition-based (false -> true) rather than absolute: an expansion
+/// earlier in the same command may have left a flag set, and this cannot tell
+/// whether legacy raised it again -- under-reporting there is fine, since the
+/// first raise already aborted.
+static bool expansion_error_state_raised(const expansion_error_state_t *before,
+                                         const executor_t *executor) {
+    return (executor->expansion_error && !before->expansion_error) ||
+           (executor->shell_exit_requested && !before->shell_exit_requested) ||
+           (executor->has_error && !before->has_error);
+}
+
 static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
                            int n) {
+    /// Isolate the comparison expansion: snapshot the error state, mute the
+    /// diagnostic channel, and restore both afterwards. Without this the audit
+    /// is not observation-only -- legacy's expansion_error suppresses the
+    /// command and turns rc 0 into rc 1 (issue #687).
+    expansion_error_state_t before = expansion_error_state_save(executor);
+    free(g_error_capture);
+    g_error_capture = NULL;
+    g_error_display_muted = true;
     char *legacy = expand_arg_node(executor, child);
+    g_error_display_muted = false;
+    bool legacy_raised = expansion_error_state_raised(&before, executor);
+    expansion_error_state_restore(executor, &before);
+    char *captured = g_error_capture;
+    g_error_capture = NULL;
+
+    /// A covered word whose legacy expansion ERRORS is a divergence even when
+    /// the two routes agree on the string: legacy reports a diagnostic and
+    /// fails the command, the CST route silently yields a value. word_eval has
+    /// no error channel by design -- the CST is a value producer and defers
+    /// anything it cannot express -- so the invariant is one-directional:
+    /// legacy raised an error => the word must NOT have been covered.
+    if (legacy_raised) {
+        fprintf(stderr,
+                "WORD_CST AUDIT ERROR-STATE MISMATCH: word='%s' cst_n=%d "
+                "cst[0]='%s' legacy='%s' -- legacy raised an expansion error "
+                "the CST route did not; the word should have deferred.\n%s",
+                child->val.str ? child->val.str : "", n, n > 0 ? fields[0] : "",
+                legacy ? legacy : "(null)", captured ? captured : "");
+        abort();
+    }
+    free(captured);
     bool match;
     if (n == 0) {
         match = (!legacy || legacy[0] == '\0');
