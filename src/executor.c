@@ -6695,11 +6695,22 @@ static bool expansion_error_state_raised(const expansion_error_state_t *before,
 }
 
 static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
-                           int n) {
+                           int n, const expansion_error_state_t *pre_eval) {
+    /// Did the CST evaluation itself raise? word_eval is a value producer, but
+    /// its callbacks re-enter the legacy expander (the get callback resolves
+    /// the specials and positionals through expand_if_needed, and apply_op's
+    /// substring arm expands its spec), so an error CAN be raised during a
+    /// "covered" evaluation. Snapshotting only at audit entry would miss it and
+    /// score the word as clean; @p pre_eval is taken before word_eval so the
+    /// two routes are compared symmetrically.
+    bool cst_raised = expansion_error_state_raised(pre_eval, executor);
+
     /// Isolate the comparison expansion: snapshot the error state, mute the
     /// diagnostic channel, and restore both afterwards. Without this the audit
     /// is not observation-only -- legacy's expansion_error suppresses the
-    /// command and turns rc 0 into rc 1 (issue #687).
+    /// command and turns rc 0 into rc 1 (issue #687). The restore target is the
+    /// state as of audit ENTRY, not pre_eval: an error the CST route raised is
+    /// real and must survive.
     expansion_error_state_t before = expansion_error_state_save(executor);
     free(g_error_capture);
     g_error_capture = NULL;
@@ -6711,19 +6722,24 @@ static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
     char *captured = g_error_capture;
     g_error_capture = NULL;
 
-    /// A covered word whose legacy expansion ERRORS is a divergence even when
-    /// the two routes agree on the string: legacy reports a diagnostic and
-    /// fails the command, the CST route silently yields a value. word_eval has
-    /// no error channel by design -- the CST is a value producer and defers
-    /// anything it cannot express -- so the invariant is one-directional:
-    /// legacy raised an error => the word must NOT have been covered.
-    if (legacy_raised) {
+    /// A covered word whose two routes disagree about RAISING AN ERROR is a
+    /// divergence even when they agree on the string: legacy reports a
+    /// diagnostic and fails the command while the CST route silently yields a
+    /// value, or the reverse. word_eval has no error channel of its own -- it
+    /// defers anything it cannot express -- so in practice this fires as
+    /// "legacy raised, the CST did not", meaning the word should have
+    /// deferred; the symmetric form catches an error raised through a
+    /// re-entrant callback.
+    if (legacy_raised != cst_raised) {
         fprintf(stderr,
                 "WORD_CST AUDIT ERROR-STATE MISMATCH: word='%s' cst_n=%d "
-                "cst[0]='%s' legacy='%s' -- legacy raised an expansion error "
-                "the CST route did not; the word should have deferred.\n%s",
+                "cst[0]='%s' legacy='%s' -- %s raised an expansion error the "
+                "other route did not%s.\n%s",
                 child->val.str ? child->val.str : "", n, n > 0 ? fields[0] : "",
-                legacy ? legacy : "(null)", captured ? captured : "");
+                legacy ? legacy : "(null)",
+                legacy_raised ? "legacy" : "the CST route",
+                legacy_raised ? "; the word should have deferred" : "",
+                captured ? captured : "");
         abort();
     }
     free(captured);
@@ -6894,9 +6910,16 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 shell_mode_allows(FEATURE_ZSH_EXTENDED_GLOB),
                             .ansi_c_quoting =
                                 shell_mode_allows(FEATURE_ANSI_QUOTING),
+                            .nounset = shell_opts.unset_error,
                         };
                         int wn = 0;
                         bool wok = false;
+                        /// Snapshot BEFORE the CST evaluation so the audit can
+                        /// tell an error raised by the CST route (through a
+                        /// re-entrant callback) from one raised by its own
+                        /// legacy comparison run.
+                        expansion_error_state_t pre_eval =
+                            expansion_error_state_save(executor);
                         char **wfields =
                             word_eval(child->word, &wenv, &wn, &wok);
                         free(ifs_val);
@@ -6907,7 +6930,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                             /// variable it also assigns (`"$u${u:=x}"`) would
                             /// report a false mismatch.
                             if (getenv("LUSH_WORD_CST_AUDIT")) {
-                                word_cst_audit(executor, child, wfields, wn);
+                                word_cst_audit(executor, child, wfields, wn,
+                                               &pre_eval);
                             }
                             word_txn_commit(executor, &wtxn);
                             bool append_ok = true;

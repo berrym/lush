@@ -430,7 +430,39 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
         /// source values from the symtable (which returns owned copies) without
         /// leaking; bench callbacks wrap getenv in strdup to match the
         /// contract.
+        /// `set -u`: legacy reports E1122 and fails the command for a read of
+        /// an unbound plain name, and for an unset positional $1-$9; the
+        /// specials it exempts are the single characters `? $ # 0 @ * - !`
+        /// (of those, the CST covers `? $ # - !` via is_covered_special and
+        /// `0` below; `@`/`*` are vectors it never covers). The CST cannot
+        /// raise that error -- it is a value producer with no error channel --
+        /// and a silently-empty expansion is the wrong answer, so defer and let
+        /// the legacy expander own the diagnostic, the exit status and the
+        /// POSIX-mode exit request.
+        ///
+        /// A positional defers UNCONDITIONALLY under nounset. The get callback
+        /// resolves $1-$9 through the legacy expander, which yields "" for an
+        /// unset positional, so this layer cannot tell unset from empty. Note
+        /// this is a DESIGN choice, not a correctness requirement: without the
+        /// pre-defer the get callback's own re-entry into the legacy expander
+        /// raises the diagnostic anyway, and the output stays correct. But that
+        /// error would be raised as a side effect of a "covered" evaluation,
+        /// which is exactly the shape the audit had to be taught to see -- so
+        /// defer and keep word_eval a pure value producer. Over-deferring is
+        /// safe and confined to shells that enabled nounset.
+        if (env->nounset && is_positional(p->u.param.name) &&
+            p->u.param.name[0] != '0') { /// $0 is always set
+            *ok = false;
+            return true;
+        }
         char *got = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
+        /// Unbound under nounset (see above): defer to the legacy expander,
+        /// which reports it. NULL is the get contract's "unset" -- the covered
+        /// specials never return NULL, and are exempt regardless.
+        if (env->nounset && !got && !is_covered_special(p->u.param.name)) {
+            *ok = false;
+            return true;
+        }
         /// An UNQUOTED parameter whose VALUE carries a glob/brace metacharacter
         /// is re-expanded by the legacy path: it globs / brace-expands the
         /// expansion result (per bash/POSIX -- `v='*'; echo $v` lists files,

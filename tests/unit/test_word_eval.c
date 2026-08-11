@@ -68,6 +68,23 @@ static char **peval(const char *line, const char **vars, int *n, bool *ok,
     return fields;
 }
 
+/// peval with a caller-supplied env, for the flags peval does not set
+/// (nounset, word_split_default, ...). Same contract otherwise.
+static char **peval_env(const char *line, word_eval_env_t *env, int *n,
+                        bool *ok, bool *fully) {
+    tokenizer_t *tok = tokenizer_new(line);
+    word_t *w = parse_word(tok, WORD_CTX_ARG, fully);
+    char **fields = NULL;
+    *n = 0;
+    *ok = false;
+    if (w && *fully) {
+        fields = word_eval(w, env, n, ok);
+    }
+    word_free(w);
+    tokenizer_free(tok);
+    return fields;
+}
+
 static void free_fields(char **f, int n) {
     if (!f) {
         return;
@@ -327,6 +344,38 @@ TEST(eval_pe_substitution_operators) {
     assert_fields("${s/bc}", vars, no_sep); /// no separator -> delete first
 }
 
+TEST(eval_nounset_defers_unbound) {
+    /// #686: under nounset an unbound read DEFERS (word_eval reports
+    /// not-covered) so the legacy expander can report E1122; a bound name, the
+    /// exempt specials and $0 stay covered, as do the operator forms that
+    /// supply a value for an unset name.
+    const char *vars[] = {"s", "abc", NULL};
+    int n = 0;
+    bool ok = false, fully = false;
+    word_eval_env_t env = {.get = map_get,
+                           .apply_op = map_apply_op,
+                           .ctx = vars,
+                           .ansi_c_quoting = true,
+                           .nounset = true};
+    char **f = peval_env("$missing", &env, &n, &ok, &fully);
+    ASSERT_TRUE(fully, "parses");
+    ASSERT_FALSE(ok, "unbound read defers under nounset");
+    free_fields(f, n);
+
+    f = peval_env("$s", &env, &n, &ok, &fully);
+    ASSERT_TRUE(ok, "bound read stays covered under nounset");
+    free_fields(f, n);
+
+    f = peval_env("${missing:-d}", &env, &n, &ok, &fully);
+    ASSERT_TRUE(ok, "an operator supplying a value is exempt");
+    free_fields(f, n);
+
+    env.nounset = false;
+    f = peval_env("$missing", &env, &n, &ok, &fully);
+    ASSERT_TRUE(ok, "without nounset an unbound read is covered (empty)");
+    free_fields(f, n);
+}
+
 TEST(eval_pe_assign_operators) {
     /// Assign ${var:=x} / ${var=x} through the shared core. The bench map is
     /// read-only, so this pins the RESULT (the value the word expands to);
@@ -433,6 +482,7 @@ int main(void) {
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
+    RUN_TEST(eval_nounset_defers_unbound);
     RUN_TEST(eval_pe_assign_operators);
     RUN_TEST(eval_pe_operand_glob_patterns);
     RUN_TEST(eval_ansic);

@@ -67,6 +67,12 @@ typedef struct {
                              ///< legacy leaves `$'...'` literal, so a WP_ANSIC
                              ///< word defers instead of emitting decoded bytes.
                              ///< Bench callers set true (default-mode parity).
+    /// `set -u` (shell_opts.unset_error). The Word CST is a value producer with
+    /// no error channel, so when nounset is engaged a read that legacy would
+    /// report as E1122 "unbound variable" DEFERS instead -- the legacy expander
+    /// then owns the diagnostic, the exit status and the POSIX-mode exit
+    /// request. Bench callers set false (no nounset).
+    bool nounset;
 } word_eval_env_t;
 
 /**

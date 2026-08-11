@@ -1516,6 +1516,47 @@ TEST(rt_pe_substitution_operators_covered) {
                         "[path.to.x][cafe][café]\n");
 }
 
+TEST(rt_nounset_errors_on_covered_words) {
+    /// #686: `set -u` was inert for any word the Word CST covers -- which is
+    /// the DEFAULT route -- so an unbound reference expanded to empty and the
+    /// command ran. The CST is a value producer with no error channel, so it
+    /// now DEFERS such a read and the legacy expander reports E1122 and fails.
+    /// Every shape is covered by the CST in lush mode (quoted, unquoted, mid-
+    /// word, braced), so every one regressed before the fix.
+    /// Subshell-isolated (`set -u` must not leak into later tests) and mode-
+    /// pinned: mode is process-global across tests, and the unquoted case only
+    /// exercises the CST route in a mode where word splitting does not already
+    /// defer it.
+    run_result_t r =
+        run_shell("( mode lush; set -u; unset U\n"
+                  "  ( echo \"[$U]\" ) 2>/dev/null; echo \"a=$?\"\n"
+                  "  ( echo [$U] ) 2>/dev/null; echo \"b=$?\"\n"
+                  "  ( echo \"[pre${U}post]\" ) 2>/dev/null; echo \"c=$?\"\n"
+                  "  ( echo \"[${U}]\" ) 2>/dev/null; echo \"d=$?\" )\n");
+    ASSERT_STDOUT_EQ(r, "a=1\nb=1\nc=1\nd=1\n");
+}
+
+TEST(rt_nounset_exempt_forms_still_expand) {
+    /// The nounset defer must not over-fire. Legacy exempts the specials it
+    /// lists (`? $ # 0 @ * - !`) and every operator form that supplies a value
+    /// for an unset name, so those must still expand on the CST route. An
+    /// unset POSITIONAL is NOT exempt ($0 is), and positionals defer
+    /// unconditionally under nounset because this layer cannot tell an unset
+    /// positional from an empty one. Subshell-isolated.
+    run_result_t r =
+        run_shell("( set -u; unset U; set -- p\n"
+                  "  echo \"[${U:-d}][${U-d}][${U:+a}][${U+a}][${U#p}]\"\n"
+                  "  echo \"[${U^^}][${U:0:1}][${U/a/b}][${U:=asg}][$U]\"\n"
+                  "  echo \"[$#][$?][$1]\"\n"
+                  "  echo \"$0\" >/dev/null; echo \"zero=$?\"\n"
+                  "  ( echo \"[$2]\" ) 2>/dev/null; echo \"unset_pos=$?\" )\n");
+    ASSERT_STDOUT_EQ(r, "[d][d][][][]\n"
+                        "[][][][asg][asg]\n"
+                        "[1][0][p]\n"
+                        "zero=0\n"
+                        "unset_pos=1\n");
+}
+
 TEST(rt_pe_assign_operators_covered) {
     /// Assign ${var:=x} (when unset OR empty) and ${var=x} (when unset) expand
     /// on the CST backbone AND write the value back through the same
@@ -9069,6 +9110,8 @@ int main(void) {
     RUN_TEST(rt_pe_case_conversion_operators_covered);
     RUN_TEST(rt_pe_substring_operators_covered);
     RUN_TEST(rt_pe_substitution_operators_covered);
+    RUN_TEST(rt_nounset_errors_on_covered_words);
+    RUN_TEST(rt_nounset_exempt_forms_still_expand);
     RUN_TEST(rt_pe_assign_operators_covered);
     RUN_TEST(rt_pe_assign_write_is_transactional);
     RUN_TEST(rt_pe_assign_operators_defer_forms);
