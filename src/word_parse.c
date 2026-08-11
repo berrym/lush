@@ -119,16 +119,21 @@ static bool is_simple_substring_spec(const char *s, size_t n) {
 /// -1 when `s` does not begin a covered operator. Longest match wins (`##`
 /// before
 /// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`, `//` before `/`;
-/// 14=`:` substring, 15=`//` replace-all, 16=`/` replace-first). A bare `:` is
-/// the substring op ONLY when a digit follows (`${var:2:3}`); the `:=`/`:?`
-/// operators and the zsh `:h` modifier chains fail that test and defer, as do
-/// `@`/subscript `[`, so the whole `${...}` defers. `:-`/`:+` are matched
-/// first;
-/// `:=`/`:?`/`: `/`:(` start with `:` but are not covered.
+/// 14=`:` substring, 15=`//` replace-all, 16=`/` replace-first, 12=`:=` and
+/// 13=`=` assign). A bare `:` is the substring op ONLY when a digit follows
+/// (`${var:2:3}`); the `:?` operator and the zsh `:h` modifier chains fail that
+/// test and defer, as do `@`/subscript `[`, so the whole `${...}` defers.
+/// `:-`/`:+`/`:=` are matched before it; `:?`/`: `/`:(` start with `:` but are
+/// not covered.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
         return 0;
+    }
+    if (n >= 2 && s[0] == ':' && s[1] == '=') {
+        *op_len = 2;
+        return 12; /// := : assign the default when unset OR empty, then expand
+                   /// to it (a SIDE EFFECT -- see word_eval's is_assign_op)
     }
     if (n >= 2 && s[0] == ':' && s[1] == '+') {
         *op_len = 2;
@@ -183,6 +188,11 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 1 && s[0] == '/') {
         *op_len = 1;
         return 16; /// / : replace first occurrence
+    }
+    if (n >= 1 && s[0] == '=') {
+        *op_len = 1;
+        return 13; /// = : assign the default when UNSET (an empty value is
+                   /// left alone), then expand to it -- also a side effect
     }
     if (n >= 1 && s[0] == '-') {
         *op_len = 1;

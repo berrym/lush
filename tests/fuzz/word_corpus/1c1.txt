@@ -94,3 +94,20 @@ ${U/é/e}
 ${U//?/.}
 ${Y/zz/Q}
 ${Y//c/}
+# The assign operators are the one covered family with a SIDE EFFECT: wordtool
+# models the write-back with setenv (its variable store is the environment), so
+# a line that observes the assignment is real parity signal. word_diff runs one
+# process per line per shell, so the writes do not leak between lines.
+${A1:=set}
+${A2=set}
+${Y:=other}
+${E:=filled}
+${E=kept}
+${A3:=}
+# These OBSERVE the write-back within the same word, which is what makes the
+# bench's setenv model (and lush's pending-write buffer) real parity signal
+# rather than an untested claim.
+${A4:=v}${A4}
+${A5}${A5:=w}
+"${A6:=q}${A6}"
+${E:=z}${E}

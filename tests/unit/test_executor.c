@@ -1516,6 +1516,61 @@ TEST(rt_pe_substitution_operators_covered) {
                         "[path.to.x][cafe][café]\n");
 }
 
+TEST(rt_pe_assign_operators_covered) {
+    /// Assign ${var:=x} (when unset OR empty) and ${var=x} (when unset) expand
+    /// on the CST backbone AND write the value back through the same
+    /// symtable_set_var the legacy scalar path uses. Also pins within-word
+    /// visibility: a later part of the SAME word sees the assigned value
+    /// (${w:=x}${w} -> xx), which the pending-write buffer must preserve.
+    /// Validated under --setup lush:audit. Subshell-isolated.
+    run_result_t r =
+        run_shell("( unset u; e=; s=set\n"
+                  "  echo \"[${u:=A}][$u][${e:=B}][$e][${s:=C}][$s]\"\n"
+                  "  unset v; f=\n"
+                  "  echo \"[${v=D}][$v][${f=E}][$f]\"\n"
+                  "  unset w; echo \"[${w:=x}${w}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[A][A][B][B][set][set]\n"
+                        "[D][D][][]\n"
+                        "[xx]\n");
+}
+
+TEST(rt_pe_assign_write_is_transactional) {
+    /// The assign write is BUFFERED until the whole word is known covered.
+    /// Here the word assigns and THEN defers on a brace-carrying value, so it
+    /// falls back to the legacy expander, which re-expands the word from the
+    /// start. Had the write already landed, the earlier `$u` would see the
+    /// assigned value and print `Ax-Bx` instead of legacy's `A-Bx`. The second
+    /// line is the same hazard where a LATER assign feeds an earlier one's
+    /// operand: `b` must stay unset-then-empty, not pick up `a`'s new value.
+    run_result_t r =
+        run_shell("( unset u; g=\"{1,2}\"\n"
+                  "  echo A$u-B${u:=x}-C$g\n"
+                  "  unset a b\n"
+                  "  echo X${b:=$a}Y${a:=1}Z$g; echo \"a=<$a> b=<$b>\" )\n");
+    ASSERT_STDOUT_EQ(r, "A-Bx-C1 A-Bx-C2\n"
+                        "XY1Z1 XY1Z2\n"
+                        "a=<1> b=<>\n");
+}
+
+TEST(rt_pe_assign_operators_defer_forms) {
+    /// The assign operators inherit the family's restrictions: a quoted or
+    /// space-carrying operand defers at parse, and a non-plain-identifier name
+    /// (a positional, a special) is never covered, so it can never be assigned
+    /// through this route -- the positional case uses `set --` so the assign
+    /// branch is actually live. A READONLY target defers too: the pending-write
+    /// buffer models a store that succeeds, but symtable_set_var refuses this
+    /// one, so legacy's later read still sees the old value (`[v]`, not
+    /// `[vv]`). Deferring is invisible in the OUTPUT -- legacy handles all of
+    /// these identically -- so this pins the behavior, and the audit soak
+    /// proves the two paths agree.
+    run_result_t r =
+        run_shell("( unset u; echo \"[${u:=a b}][$u]\"\n"
+                  "  unset v; echo \"[${v:='q'}][$v]\"\n"
+                  "  set --; echo \"[${1:=z}][$1]\"\n"
+                  "  unset r; readonly r; echo \"[${r:=v}${r}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[a b][a b]\n[\'q\'][\'q\']\n[z][z]\n[v]\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -9014,6 +9069,9 @@ int main(void) {
     RUN_TEST(rt_pe_case_conversion_operators_covered);
     RUN_TEST(rt_pe_substring_operators_covered);
     RUN_TEST(rt_pe_substitution_operators_covered);
+    RUN_TEST(rt_pe_assign_operators_covered);
+    RUN_TEST(rt_pe_assign_write_is_transactional);
+    RUN_TEST(rt_pe_assign_operators_defer_forms);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
