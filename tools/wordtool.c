@@ -115,7 +115,11 @@ int main(int argc, char **argv) {
                            .ctx = NULL,
                            .ifs = getenv("IFS"),
                            .word_split_default = false,
-                           .ansi_c_quoting = true};
+                           .ansi_c_quoting = true,
+                           /// WORDTOOL_NOUNSET models `set -u`, so the triage
+                           /// output matches what the live shell covers under
+                           /// nounset (an unbound read defers there).
+                           .nounset = getenv("WORDTOOL_NOUNSET") != NULL};
     int n = 0;
     bool ok = false;
     char **fields = word_eval(w, &env, &n, &ok);
