@@ -152,6 +152,11 @@ int main(int argc, char **argv) {
     setenv("E", "", 1);
     setenv("U", "café", 1); /// multi-byte, for the grapheme-aware operators
     unsetenv("IFS");        /// default IFS
+    /// Pin the reference lush to the LEGACY expander so a covered line is
+    /// compared CST-vs-legacy rather than CST-vs-CST (see the lu_argv comment).
+    /// wordtool ignores this variable -- it IS the CST -- so one setenv here
+    /// covers both children.
+    setenv("LUSH_WORD_CST", "0", 1);
 
     bool have_bash = shell_available(bash);
     bool have_zsh = shell_available(zsh);
@@ -216,6 +221,13 @@ int main(int argc, char **argv) {
         /// config selects another mode would otherwise see false BUG verdicts
         /// on every mode-gated form (the extglob dialects reach the shared
         /// operator core through lush_shell_pattern_match).
+        ///
+        /// The reference is pinned to the LEGACY expander (LUSH_WORD_CST=0,
+        /// exported in main). Since #667 made the Word CST the default route,
+        /// a covered line would otherwise be expanded by the CST on BOTH
+        /// sides -- wordtool compared against itself -- and the stated parity
+        /// bar ("wordtool == current lush") would hold vacuously. Pinning the
+        /// reference restores the bar this harness exists to enforce.
         char *const lu_argv[] = {(char *)lush, "--lush", "-c", cmd, NULL};
         int lu_rc = capture(lu_argv, lu, &lulen);
         if (lu_rc == CAPTURE_OVERFLOW) {

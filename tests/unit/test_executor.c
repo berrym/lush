@@ -1612,6 +1612,101 @@ TEST(rt_pe_assign_operators_defer_forms) {
     ASSERT_STDOUT_EQ(r, "[a b][a b]\n[\'q\'][\'q\']\n[z][z]\n[v]\n");
 }
 
+TEST(rt_pe_required_operators_covered) {
+    /// The required-parameter operators ${var:?msg} / ${var?msg} expand on the
+    /// CST backbone whenever the parameter passes its set-ness test: the
+    /// result is the value and the message is never consulted, so a message
+    /// carrying spaces or glob metacharacters is covered too (it is captured
+    /// raw, exactly as the legacy expander keeps it); a message carrying a
+    /// QUOTING byte defers instead, because the CST and the legacy
+    /// double-quoted-word expander disagree on where a `${...}` containing one
+    /// ends -- the third line is exactly that shape and must still print what
+    /// legacy prints. `?` treats an
+    /// EMPTY value as set; `:?` does not. The last line is the cross-slice
+    /// case: an assign operator earlier in the SAME word makes the name set,
+    /// and the required operator must see that pending value (as legacy sees
+    /// the committed one) rather than firing. Validated under
+    /// --setup lush:audit. Subshell-isolated.
+    run_result_t r =
+        run_shell("( v=hello; e=\n"
+                  "  echo \"[${v:?msg}][${v?msg}][${v:?}][${v?}]\"\n"
+                  "  echo \"[${v:?must be set}][${v:?a-b+c*d}]\"\n"
+                  "  echo \"[${v:?a'}'b}]\"\n"
+                  "  echo \"[${e?empty is set}]\"\n"
+                  "  echo a${v:?m}b\n"
+                  "  unset q; echo \"[${q:=x}${q:?m}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[hello][hello][hello][hello]\n"
+                        "[hello][hello]\n"
+                        "[hello'b}]\n"
+                        "[]\n"
+                        "ahellob\n"
+                        "[xx]\n");
+}
+
+TEST(rt_pe_required_operators_error_forms) {
+    /// A FIRING expansion is never covered: word_eval defers it so the legacy
+    /// expander raises E1307 and requests the POSIX exit (the statement after
+    /// it must not run). Deferring is invisible in the output -- that is the
+    /// point -- so this pins the diagnostic and the exit status, and that
+    /// `${e?}` on an empty value does NOT fire while `${e:?}` does. Run in a
+    /// subprocess: the POSIX exit request is a real shell-level abort.
+    run_result_t r = run_shell_subprocess("unset pe_u\n"
+                                          "echo \"[${pe_u:?nope}]\"\n"
+                                          "echo after\n");
+    ASSERT_EXIT_STATUS(r, 1);
+    ASSERT_STDOUT_EQ(r, "");
+    ASSERT_STDERR_CONTAINS(r, "pe_u: nope");
+
+    run_result_t r2 = run_shell_subprocess("pe_e=\n"
+                                           "echo \"[${pe_e:?empty}]\"\n"
+                                           "echo after\n");
+    ASSERT_EXIT_STATUS(r2, 1);
+    ASSERT_STDOUT_EQ(r2, "");
+    ASSERT_STDERR_CONTAINS(r2, "pe_e: empty");
+
+    /// No message -> the built-in default text, and the `?` form's trigger is
+    /// unset-only.
+    run_result_t r3 = run_shell_subprocess("unset pe_u\necho \"[${pe_u?}]\"\n");
+    ASSERT_EXIT_STATUS(r3, 1);
+    ASSERT_STDERR_CONTAINS(r3, "parameter not set");
+
+    /// Deferring BEFORE the operator is applied is load-bearing, not tidiness.
+    /// If the CST applied a firing operator and only then deferred on a later
+    /// part of the same word (here `$g`, whose brace-carrying value defers),
+    /// the legacy re-expansion of the whole word would raise the diagnostic a
+    /// SECOND time. Exactly one must reach the user.
+    run_result_t r4 = run_shell_subprocess("unset pe_u; g=\"{1,2}\"\n"
+                                           "echo ${pe_u:?dup}$g\n");
+    ASSERT_EXIT_STATUS(r4, 1);
+    int seen = 0;
+    for (const char *scan = r4.err; (scan = strstr(scan, "pe_u: dup")) != NULL;
+         scan += 9) {
+        seen++;
+    }
+    ASSERT_TRUE(seen == 1, "the diagnostic is reported exactly once");
+}
+
+TEST(rt_pe_required_message_dollar_defers) {
+    /// The message is expanded EAGERLY by the legacy expander -- before the
+    /// set-ness test -- so `${set_var:?$(cmd)}` runs cmd even though the error
+    /// never fires. word_eval cannot reproduce that side effect while covering
+    /// the expansion, so a `$` in the message defers the whole `${...}`. The
+    /// marker file proves the side effect survives on the CST-default build;
+    /// without the defer it would be silently lost. NOTE: the eager evaluation
+    /// pinned here is itself a divergence from lush's value-producer semantics
+    /// (issue #692); this asserts the CURRENT behavior so the CST cannot change
+    /// it silently. When #692 is fixed this expectation changes with it and the
+    /// `$` operand becomes coverable.
+    run_result_t r =
+        run_shell_subprocess("m=${TMPDIR:-/tmp}/lush_pe_req_marker_$$\n"
+                             "rm -f \"$m\"\n"
+                             "v=hi; echo \"[${v:?$(touch $m)x}]\"\n"
+                             "if [ -f \"$m\" ]; then echo SIDE-EFFECT; fi\n"
+                             "rm -f \"$m\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[hi]\nSIDE-EFFECT\n");
+}
+
 TEST(rt_map_in_argv_forms) {
     /// #222: a map in command-argument (vector) position. Bare ${m[@]} / $m /
     /// @m / ${(v)m} contribute the VALUES in insertion order (like ${arr[@]});
@@ -9115,6 +9210,9 @@ int main(void) {
     RUN_TEST(rt_pe_assign_operators_covered);
     RUN_TEST(rt_pe_assign_write_is_transactional);
     RUN_TEST(rt_pe_assign_operators_defer_forms);
+    RUN_TEST(rt_pe_required_operators_covered);
+    RUN_TEST(rt_pe_required_operators_error_forms);
+    RUN_TEST(rt_pe_required_message_dollar_defers);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

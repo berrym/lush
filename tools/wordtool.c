@@ -48,6 +48,17 @@ static char *env_get(void *ctx, const char *name) {
 static char *bench_apply_op(void *ctx, const char *name, const char *value,
                             const char *deflt, int op) {
     (void)ctx;
+    /// The required-parameter operators are impure -- the diagnostic and the
+    /// POSIX exit belong to the executor -- so the shared core does not apply
+    /// them. word_eval only reaches apply_op once it has established that the
+    /// error does NOT fire, and the executor's non-firing result is the value
+    /// unchanged; both halves come from param_op.c so the bench cannot drift
+    /// from live lush (issue #681).
+    if (op == 18 || op == 19) {
+        return lush_param_op_required_fires(op, value)
+                   ? NULL /// word_eval defers this; reaching it means defer
+                   : lush_param_op_required_value(value);
+    }
     bool assign_back = false;
     char *result = lush_param_op_apply(op, value, deflt, &assign_back);
     /// The assign operators write back. wordtool's variable store IS the

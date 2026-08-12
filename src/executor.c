@@ -6586,6 +6586,18 @@ static char *executor_word_apply_op(void *ctx, const char *name,
     if (!ex) {
         return NULL;
     }
+    /// BOUNDARY GUARD for the required-parameter operators. word_eval must not
+    /// raise -- it is a value producer whose evaluation is PROVISIONAL, and a
+    /// diagnostic emitted here would survive a later defer and be reported a
+    /// second time by legacy's re-expansion. word_eval already pre-checks the
+    /// trigger and defers, so this is defence in depth: if a firing shape ever
+    /// reaches this callback, refuse it (NULL defers the word) instead of
+    /// letting apply_param_operator report E1307 and request the POSIX exit
+    /// from inside a "covered" evaluation. Both bench apply_op callbacks carry
+    /// the same guard, so the production and bench boundaries behave alike.
+    if (lush_param_op_required_fires(op, value)) {
+        return NULL;
+    }
     bool assign_back = false;
     char *result = apply_param_operator(ex, name, (char *)value, (char *)deflt,
                                         op, &assign_back);
@@ -12015,14 +12027,6 @@ static node_t *copy_ast_chain(node_t *node) {
 }
 
 /**
- * @brief Check if a string is empty or NULL
- *
- * @param str String to check
- * @return true if str is NULL or empty string
- */
-static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
-
-/**
  * @brief Quote a string for safe reuse as shell input
  *
  * Used for ${var@Q} transformation.
@@ -15949,21 +15953,19 @@ static char *apply_param_operator(executor_t *executor, const char *var_name,
         break;
 
     case 18: /// ${var:?word} - error if var unset or null (POSIX)
-        if (is_empty_or_null(var_value)) {
-            result = handle_required_param_error(executor, var_name,
-                                                 expanded_default,
-                                                 "parameter null or not set");
-        } else {
-            result = strdup(var_value);
-        }
-        break;
-
     case 19: /// ${var?word} - error if var unset (null permitted) (POSIX)
-        if (!var_value) {
+        /// The TRIGGER is a pure predicate over the value and lives in
+        /// param_op.c so the Word CST evaluator tests the same rule when it
+        /// decides whether it may cover this expansion (it defers a firing
+        /// one -- it has no error channel). Only the diagnostic and the POSIX
+        /// exit request stay here.
+        if (lush_param_op_required_fires(op_type, var_value)) {
             result = handle_required_param_error(
-                executor, var_name, expanded_default, "parameter not set");
+                executor, var_name, expanded_default,
+                op_type == 18 ? "parameter null or not set"
+                              : "parameter not set");
         } else {
-            result = strdup(var_value);
+            result = lush_param_op_required_value(var_value);
         }
         break;
     }

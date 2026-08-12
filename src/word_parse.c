@@ -74,13 +74,29 @@ static word_part_t *make_simple_param(const char *name, size_t namelen) {
 /// ops (`#`/`##`/`%`/`%%`, 6/2/7/3, a glob pattern), the case-conversion ops
 /// (`^`/`^^`/`,`/`,,`, 8/4/9/5, an optional restricting glob pattern), the
 /// substring op (`:`, 14, a numeric offset[:length] spec), and the substitution
-/// ops (`/`/`//`, 16/15, a `pattern/replacement` spec split by apply_op). The
-/// operand is deferred if it needs `$`-expansion (this slice covers literal
-/// operands only) and is never dequoted/globbed by word_eval.
+/// ops (`/`/`//`, 16/15, a `pattern/replacement` spec split by apply_op), and
+/// the required-parameter error MESSAGE (`:?`/`?`, 18/19). The operand is
+/// deferred if it needs `$`-expansion (this slice covers literal operands only)
+/// and is never dequoted/globbed by word_eval. Kept in step with the predicate
+/// of the same name in word_eval.c, which decides how the operand is recovered.
 static bool op_has_literal_operand(int op) {
     return op == 2 || op == 3 || op == 6 || op == 7 || op == 4 || op == 5 ||
-           op == 8 || op == 9 || op == 14 || op == 15 || op == 16;
+           op == 8 || op == 9 || op == 14 || op == 15 || op == 16 || op == 18 ||
+           op == 19;
 }
+
+/// The subset of op_has_literal_operand whose operand is captured RAW at parse
+/// rather than tokenized: the required-parameter operators `${var:?msg}` (18)
+/// and `${var?msg}` (19), whose operand is an error MESSAGE rather than a value
+/// or a pattern. Raw capture is faithful because the legacy expander builds the
+/// message with expand_variables_in_string, which copies every non-`$` byte
+/// verbatim -- no quote removal, no backslash processing, no backtick
+/// substitution -- so for an operand free of `$` and of quoting bytes the
+/// message IS the source bytes. That makes a single literal leaf the faithful
+/// structure, and it lifts the WHITESPACE restriction the other operand
+/// families need: `${v:?must be set}` keeps its spaces and is covered. The
+/// quoting bytes still defer -- see make_operator_param for why.
+static bool op_has_raw_operand(int op) { return op == 18 || op == 19; }
 
 /// True when a `:` (substring) operand is the SIMPLE numeric form this slice
 /// covers: one or more decimal digits (the offset), optionally followed by `:`
@@ -121,10 +137,10 @@ static bool is_simple_substring_spec(const char *s, size_t n) {
 /// `#`, `%%` before `%`, `^^` before `^`, `,,` before `,`, `//` before `/`;
 /// 14=`:` substring, 15=`//` replace-all, 16=`/` replace-first, 12=`:=` and
 /// 13=`=` assign). A bare `:` is the substring op ONLY when a digit follows
-/// (`${var:2:3}`); the `:?` operator and the zsh `:h` modifier chains fail that
-/// test and defer, as do `@`/subscript `[`, so the whole `${...}` defers.
-/// `:-`/`:+`/`:=` are matched before it; `:?`/`: `/`:(` start with `:` but are
-/// not covered.
+/// (`${var:2:3}`); the zsh `:h` modifier chains fail that test and defer, as
+/// do `@`/subscript `[`, so the whole `${...}` defers. `:-`/`:+`/`:=`/`:?` are
+/// matched before it; `: `/`:(` start with `:` but are not covered.
+/// 18=`:?` and 19=`?` are the required-parameter (error) operators.
 static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '-') {
         *op_len = 2;
@@ -138,6 +154,12 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     if (n >= 2 && s[0] == ':' && s[1] == '+') {
         *op_len = 2;
         return 1;
+    }
+    if (n >= 2 && s[0] == ':' && s[1] == '?') {
+        *op_len = 2;
+        return 18; /// :? : error out when unset OR null. word_eval covers only
+                   /// the NON-firing case and defers the rest, so the error
+                   /// stays the legacy expander's to raise (see is_required_op)
     }
     if (n >= 2 && s[0] == ':' && isdigit((unsigned char)s[1])) {
         *op_len = 1;
@@ -194,6 +216,10 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
         return 13; /// = : assign the default when UNSET (an empty value is
                    /// left alone), then expand to it -- also a side effect
     }
+    if (n >= 1 && s[0] == '?') {
+        *op_len = 1;
+        return 19; /// ? : error out when unset (a null value is permitted)
+    }
     if (n >= 1 && s[0] == '-') {
         *op_len = 1;
         return 10;
@@ -205,13 +231,15 @@ static int detect_covered_pe_op(const char *s, size_t n, size_t *op_len) {
     return -1;
 }
 
-/// Build a WP_PARAM for `${name<op>operand}` (an alternation or pattern-strip
-/// operator). The operand is parsed as a child Word (it may itself contain
-/// expansions for alternation). An EMPTY operand (`${var:-}`/`${var#}`) yields
-/// a NULL operand Word (an empty default / empty pattern), which the evaluator
-/// treats as "". A non-empty operand that parse_word does not fully cover means
-/// it cannot be faithfully evaluated -> defer (sets *handled = false, returns
-/// NULL). Returns NULL with *handled unchanged on allocation failure.
+/// Build a WP_PARAM for `${name<op>operand}` (an alternation, pattern-strip or
+/// required-parameter operator). The operand is parsed as a child Word (it may
+/// itself contain expansions for alternation); the required-parameter message
+/// is captured raw instead -- see op_has_raw_operand. An EMPTY operand
+/// (`${var:-}`/`${var#}`) yields a NULL operand Word (an empty default / empty
+/// pattern), which the evaluator treats as "". A non-empty operand that
+/// parse_word does not fully cover means it cannot be faithfully evaluated ->
+/// defer (sets *handled = false, returns NULL). Returns NULL with *handled
+/// unchanged on allocation failure.
 static word_part_t *make_operator_param(const char *name, size_t namelen,
                                         int op, const char *operand_str,
                                         size_t operand_len, bool *handled) {
@@ -231,6 +259,78 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     if (op == 14 && !is_simple_substring_spec(operand_str, operand_len)) {
         *handled = false;
         return NULL;
+    }
+    /// The required-parameter operators take the operand as a raw MESSAGE:
+    /// legacy never dequotes or word-splits it, so it is captured verbatim
+    /// below instead of being tokenized into a word. Two byte classes must
+    /// still defer.
+    ///
+    /// `$`, because legacy expands the message EAGERLY -- before the set-ness
+    /// test -- so `${set_var:?$(cmd)}` runs cmd even though the error never
+    /// fires (verified, not assumed; that eager evaluation is itself issue
+    /// #692). word_eval cannot reproduce that side effect while covering the
+    /// expansion, so leave the whole `${...}` to the legacy expander.
+    ///
+    /// A quote, backtick or backslash, because the two routes do not agree on
+    /// where the `${...}` ENDS. The CST finds the closing brace with
+    /// lush_find_matching_brace, which treats `'...'`, `"..."`, `` `...` ``,
+    /// `$'...'` and `\X` as atomic spans; the legacy double-quoted-word
+    /// expander (expand_quoted_string_prov) uses a plain `{`/`}` depth counter
+    /// that is neither quote- nor escape-aware. A `}` inside a quoted span in
+    /// the message therefore ends the expansion on one route and not the
+    /// other: `echo "[${v:?a'}'b}]"` yields `[hi]` on the CST and `[hi'b}]` on
+    /// legacy (an audit MISMATCH). Deferring the whole class keeps the two
+    /// scanners from ever having to agree. The plain forms this slice is for
+    /// -- `${v:?}`, `${v:?required}`, `${v:?must be set}` -- are unaffected.
+    if (op_has_raw_operand(op)) {
+        for (size_t i = 0; i < operand_len; i++) {
+            if (operand_str[i] == '$' || operand_str[i] == '\'' ||
+                operand_str[i] == '"' || operand_str[i] == '`' ||
+                operand_str[i] == '\\') {
+                *handled = false;
+                return NULL;
+            }
+        }
+        word_t *msg = NULL;
+        if (operand_len > 0) {
+            /// Spans are in the OPERAND string's coordinates, the same
+            /// system parse_word uses for the other operand families: this
+            /// leaf covers all of it.
+            msg = word_new(0, (uint32_t)operand_len);
+            if (!msg) {
+                return NULL;
+            }
+            word_part_t *leaf =
+                word_part_new(WP_LITERAL, 0, (uint32_t)operand_len);
+            if (!leaf) {
+                word_free(msg);
+                return NULL;
+            }
+            /// literal_meta records ORIGIN (quoted/escaped), not inertness,
+            /// and these are raw unquoted source bytes -- the same value
+            /// parse_word would give them. Their metacharacters are inert
+            /// because nothing globs an operand word, not because of a flag.
+            leaf->u.leaf.literal_meta = false;
+            leaf->u.leaf.text = dup_n(operand_str, operand_len);
+            if (!leaf->u.leaf.text || !word_add_part(msg, leaf)) {
+                word_part_free(leaf);
+                word_free(msg);
+                return NULL;
+            }
+        }
+        word_part_t *rp = word_part_new(WP_PARAM, 0, 0);
+        if (!rp) {
+            word_free(msg);
+            return NULL;
+        }
+        rp->u.param.op = op;
+        rp->u.param.operand = msg;
+        rp->u.param.name = dup_n(name, namelen);
+        if (!rp->u.param.name) {
+            word_part_free(rp);
+            return NULL;
+        }
+        return rp;
     }
     bool pattern_op = op_has_literal_operand(op);
     for (size_t i = 0; i < operand_len; i++) {

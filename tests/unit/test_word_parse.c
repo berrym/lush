@@ -146,6 +146,62 @@ TEST(parse_double_two_vars_and_trailing_dollar) {
     word_free(w);
 }
 
+TEST(parse_required_param_message_is_raw) {
+    /// The `:?` / `?` message operand is captured RAW -- one literal leaf
+    /// holding the source bytes -- rather than tokenized into a word. That is
+    /// what makes a message with spaces (or quotes, or glob metacharacters)
+    /// representable: the legacy expander keeps those bytes verbatim, so a
+    /// tokenized operand would drop or dequote them. A `$` in the message
+    /// defers instead, because legacy expands it eagerly (issue #692).
+    bool fully = false;
+    word_t *w = parse_line("${v:?must be set}", &fully);
+    ASSERT_TRUE(fully, "raw message fully handled");
+    word_part_t *p = WORD_PART(PART_BODY(WORD_PART(w, 0)), 0);
+    ASSERT_EQ(p->kind, WP_PARAM, "PARAM");
+    ASSERT_STR_EQ(p->u.param.name, "v", "name");
+    ASSERT_EQ(p->u.param.op, 18, "op 18 = :?");
+    ASSERT_NOT_NULL(p->u.param.operand, "message operand present");
+    ASSERT_EQ(p->u.param.operand->n_parts, 1u, "one literal leaf");
+    ASSERT_EQ(WORD_PART(p->u.param.operand, 0)->kind, WP_LITERAL, "literal");
+    ASSERT_STR_EQ(WORD_PART(p->u.param.operand, 0)->u.leaf.text, "must be set",
+                  "message kept verbatim, spaces and all");
+    /// literal_meta records ORIGIN, and these are raw unquoted source bytes --
+    /// the value parse_word would give them. Pinned because it is otherwise
+    /// invisible: nothing globs an operand word, so either value "works".
+    ASSERT_FALSE(WORD_PART(p->u.param.operand, 0)->u.leaf.literal_meta,
+                 "raw message bytes are unquoted-origin");
+    assert_reconstruct(w, "${v:?must be set}");
+    word_free(w);
+
+    fully = false;
+    w = parse_line("${v?m}", &fully);
+    ASSERT_TRUE(fully, "`?` form fully handled");
+    p = WORD_PART(PART_BODY(WORD_PART(w, 0)), 0);
+    ASSERT_EQ(p->u.param.op, 19, "op 19 = ?");
+    word_free(w);
+
+    fully = false;
+    w = parse_line("${v:?}", &fully);
+    ASSERT_TRUE(fully, "empty message fully handled");
+    p = WORD_PART(PART_BODY(WORD_PART(w, 0)), 0);
+    ASSERT_EQ(p->u.param.op, 18, "op 18");
+    ASSERT_NULL(p->u.param.operand, "empty message -> no operand word");
+    word_free(w);
+
+    fully = false;
+    w = parse_line("${v:?$x}", &fully);
+    ASSERT_FALSE(fully, "a `$` message defers (legacy expands it eagerly)");
+    word_free(w);
+
+    /// A quoting byte defers: lush_find_matching_brace treats a quoted span as
+    /// atomic, while the legacy double-quoted-word expander counts braces
+    /// naively, so `"${v:?a'}'b}"` ends in two different places.
+    fully = false;
+    w = parse_line("${v:?a'q'b}", &fully);
+    ASSERT_FALSE(fully, "a quote in the message defers");
+    word_free(w);
+}
+
 TEST(parse_special_param) {
     bool fully = false;
     word_t *w = parse_line("$?", &fully);
@@ -231,9 +287,11 @@ TEST(deferred_constructs_report_not_handled) {
     /// The whole-word span still round-trips (spans are complete regardless).
     const char *deferred[] = {
         "$(echo hi)", /// command substitution
-        "${v:?msg}",  /// PE operator: the error op still defers (the
-                      /// alternation, strip, case, substring, substitution and
-                      /// assign families are covered)
+        "${v@Q}",     /// PE operator: the transform family still defers (the
+                      /// alternation, strip, case, substring, substitution,
+                      /// assign and required-parameter families are covered)
+        "${v:?$x}",   /// covered operator, but a `$` message defers (legacy
+                      /// expands the operand eagerly -- issue #692)
         "${#v}",      /// length operator
         "pre$'\\t'",  /// mid-word ANSI-C (standalone $'...' is now covered)
         "pre$x\"$y\"post", /// tokenizer pre-fused mixed-quote token
@@ -272,6 +330,7 @@ int main(void) {
     RUN_TEST(parse_double_two_vars_and_trailing_dollar);
     RUN_TEST(parse_simple_var);
     RUN_TEST(parse_braced_var);
+    RUN_TEST(parse_required_param_message_is_raw);
     RUN_TEST(parse_special_param);
     RUN_TEST(parse_adjacency_fusion);
     RUN_TEST(parse_ansic_string);
