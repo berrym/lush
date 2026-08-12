@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "field_split.h"
+#include "param_op.h"
 
 /// Field accumulator: the argv list being built plus the current field.
 typedef struct {
@@ -160,14 +161,29 @@ static bool is_substring_op(int32_t op) { return op == 14; }
 /// lush_pattern_substitute strips the anchor on both paths.
 static bool is_substitution_op(int32_t op) { return op == 15 || op == 16; }
 
+/// The required-parameter operators `${var:?msg}` (18) and `${var?msg}` (19).
+/// They RAISE: on a failed set-ness test legacy reports E1307 and requests the
+/// POSIX shell exit. word_eval is a pure value producer with no error channel,
+/// so it covers only the NON-firing case -- where the expansion is simply the
+/// value -- and defers the rest to the legacy expander, the same model
+/// `set -u` uses (issue #686). That keeps the audit invariant one-directional:
+/// legacy raised => the word was not covered. The trigger itself is not
+/// re-derived here; lush_param_op_required_fires is the one definition the
+/// executor tests too. The operand is the error MESSAGE: never consulted on
+/// the covered path, captured raw at parse (op_has_raw_operand), and passed
+/// through to apply_op so the diagnostic would still be right if the covered
+/// path ever reached a firing expansion.
+static bool is_required_op(int32_t op) { return op == 18 || op == 19; }
+
 /// Operators whose operand is recovered as a LITERAL string and passed to
 /// apply_op verbatim (word_eval must not glob, dequote, or word-split it):
 /// pattern-strip (`${var#p}` 6/2/7/3, a glob pattern), case-conversion
 /// (8/4/9/5, an optional restricting glob pattern), substring (14, a numeric
-/// spec), and substitution (15/16, a pattern/replacement spec).
+/// spec), substitution (15/16, a pattern/replacement spec), and the required-
+/// parameter error message (18/19, raw source bytes).
 static bool op_has_literal_operand(int32_t op) {
     return op == 2 || op == 3 || op == 6 || op == 7 || is_case_op(op) ||
-           is_substring_op(op) || is_substitution_op(op);
+           is_substring_op(op) || is_substitution_op(op) || is_required_op(op);
 }
 
 /// The assign operators `${var:=x}` (12, when unset or empty) and `${var=x}`
@@ -190,7 +206,8 @@ static bool op_has_literal_operand(int32_t op) {
 static bool is_assign_op(int32_t op) { return op == 12 || op == 13; }
 
 /// Every parameter-expansion operator this slice evaluates through apply_op.
-/// The error (`:?`/`?`) and transform (`@`) ops still defer.
+/// The transform (`@`) ops still defer; the error ops (`:?`/`?`) are covered
+/// only when their diagnostic does not fire (is_required_op).
 static bool is_covered_pe_op(int32_t op) {
     return is_covered_alternation_op(op) || op_has_literal_operand(op) ||
            is_assign_op(op);
@@ -307,8 +324,9 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
     case WP_PARAM: {
         /// A covered PE operator -- alternation (${var:-x} ...), pattern-strip
         /// / case-conversion (${var#p}, ${var^^} ...), substring
-        /// (${var:off:len}), substitution (${var/pat/repl}), or assign
-        /// (${var:=x}, the one family with a side effect): resolve the
+        /// (${var:off:len}), substitution (${var/pat/repl}), assign
+        /// (${var:=x}, the one family with a side effect), or the non-firing
+        /// half of the required-parameter errors (${var:?msg}): resolve the
         /// value, evaluate the operand (a scalar default VALUE for alternation,
         /// a literal glob PATTERN / numeric / pattern-replacement spec
         /// otherwise), and apply the operator through the shared apply_op
@@ -327,6 +345,18 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
                 return true;
             }
             char *value = env->get ? env->get(env->ctx, p->u.param.name) : NULL;
+            /// `${var:?msg}` / `${var?msg}` whose parameter fails its set-ness
+            /// test: legacy raises E1307 and requests the POSIX exit. Defer
+            /// rather than cover -- see is_required_op. The value the executor
+            /// `get` callback returns for a plain identifier IS the
+            /// symtable_get_var result legacy tests, NULL for unset, so the
+            /// two paths agree on the trigger by construction.
+            if (is_required_op(p->u.param.op) &&
+                lush_param_op_required_fires(p->u.param.op, value)) {
+                free(value);
+                *ok = false;
+                return true;
+            }
             char *deflt = NULL;
             if (op_has_literal_operand(p->u.param.op)) {
                 /// The operand is recovered as a LITERAL string with its bytes

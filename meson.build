@@ -1750,7 +1750,13 @@ if fs.exists('tests/unit/test_executor.c')
                              dependencies: [lle_dep, libm])
   test('Executor', test_executor,
        suite: 'unit',
-       timeout: 60)
+       timeout: 60,
+       # The required-parameter tests use run_shell_subprocess: a POSIX exit
+       # request is a shell-level abort, so it has to be observed in a real
+       # process. LUSH_TEST_BINARY points the harness at the built lush (the
+       # ./build/lush fallback does not resolve from the build directory).
+       depends: [lush_exe],
+       env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
 endif
 
 # ============================================================================

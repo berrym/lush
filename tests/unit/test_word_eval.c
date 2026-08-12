@@ -40,7 +40,34 @@ static char *map_get(void *ctx, const char *name) {
 static char *map_apply_op(void *ctx, const char *name, const char *value,
                           const char *deflt, int op) {
     (void)ctx;
+    /// The required-parameter operators are impure -- the diagnostic and the
+    /// POSIX exit belong to the executor -- so the shared core does not apply
+    /// them. word_eval only reaches apply_op once it has established that the
+    /// error does NOT fire, and the executor's non-firing result is the value
+    /// unchanged; both halves come from param_op.c so the bench cannot drift
+    /// from live lush (issue #681).
+    if (op == 18 || op == 19) {
+        return lush_param_op_required_fires(op, value)
+                   ? NULL /// word_eval defers this; reaching it means defer
+                   : lush_param_op_required_value(value);
+    }
     (void)name;
+    return lush_param_op_apply(op, value, deflt, NULL);
+}
+
+/// A deliberately PERMISSIVE apply_op for the required-parameter operators:
+/// unlike map_apply_op -- and unlike the live executor callback -- it returns a
+/// value for a FIRING ${var:?msg} instead of refusing. word_eval defers on ANY
+/// NULL apply_op result, so an assertion made against the ordinary stub cannot
+/// tell the pre-check from the callback's refusal. Against this one, only
+/// word_eval's own trigger test can defer the word.
+static char *permissive_apply_op(void *ctx, const char *name, const char *value,
+                                 const char *deflt, int op) {
+    (void)ctx;
+    (void)name;
+    if (op == 18 || op == 19) {
+        return strdup(value ? value : "");
+    }
     return lush_param_op_apply(op, value, deflt, NULL);
 }
 
@@ -344,6 +371,79 @@ TEST(eval_pe_substitution_operators) {
     assert_fields("${s/bc}", vars, no_sep); /// no separator -> delete first
 }
 
+TEST(eval_pe_required_operators) {
+    /// The required-parameter operators ${var:?msg} (18) and ${var?msg} (19).
+    /// Only the NON-firing case is covered -- the expansion is the value and
+    /// the message is never consulted, so a message with spaces, quotes or
+    /// glob metacharacters is still covered (it is captured raw). A FIRING
+    /// expansion defers so the legacy expander owns the diagnostic and the
+    /// POSIX exit; a `$` in the message defers because legacy expands it
+    /// eagerly, side effects and all; and a QUOTING byte defers because the
+    /// two routes disagree on where a `${...}` carrying one ends.
+    const char *vars[] = {"s", "abc", "e", "", NULL};
+    const char *val[] = {"abc", NULL};
+    assert_fields("${s:?msg}", vars, val);         /// set + non-null -> value
+    assert_fields("${s?msg}", vars, val);          /// set -> value
+    assert_fields("${s:?}", vars, val);            /// empty message
+    assert_fields("${s:?must be set}", vars, val); /// spaces kept raw
+    assert_fields("${s:?a-b+c*d}", vars, val);     /// operator/glob bytes
+    const char *empty_ok[] = {NULL};
+    assert_fields("${e?msg}", vars,
+                  empty_ok); /// `?`: empty is SET -> covered, "" dropped
+
+    int n = 0;
+    bool ok = false, fully = false;
+    word_eval_env_t env = {.get = map_get,
+                           .apply_op = map_apply_op,
+                           .ctx = vars,
+                           .ansi_c_quoting = true};
+    char **f = peval_env("${e:?msg}", &env, &n, &ok, &fully);
+    ASSERT_TRUE(fully, "parses");
+    ASSERT_FALSE(ok, "`:?` on an empty value fires -> defers");
+    free_fields(f, n);
+
+    f = peval_env("${u:?msg}", &env, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "`:?` on an unset name fires -> defers");
+    free_fields(f, n);
+
+    f = peval_env("${u?msg}", &env, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "`?` on an unset name fires -> defers");
+    free_fields(f, n);
+
+    f = peval_env("${s:?$e}", &env, &n, &ok, &fully);
+    ASSERT_FALSE(fully, "a `$` message defers at parse (legacy expands it)");
+    free_fields(f, n);
+
+    /// Pin the PRE-CHECK itself. The assertions above are satisfied by
+    /// map_apply_op returning NULL, so they would still pass if word_eval's
+    /// trigger test were deleted; against a stub that would happily produce a
+    /// value for a firing operator, only the pre-check can defer these.
+    word_eval_env_t penv = {.get = map_get,
+                            .apply_op = permissive_apply_op,
+                            .ctx = vars,
+                            .ansi_c_quoting = true};
+    f = peval_env("${e:?msg}", &penv, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "word_eval's own pre-check defers a firing `:?`");
+    free_fields(f, n);
+    f = peval_env("${u?msg}", &penv, &n, &ok, &fully);
+    ASSERT_FALSE(ok, "word_eval's own pre-check defers a firing `?`");
+    free_fields(f, n);
+    f = peval_env("${s:?msg}", &penv, &n, &ok, &fully);
+    ASSERT_TRUE(ok, "a non-firing required op is still covered");
+    free_fields(f, n);
+
+    /// The quoting bytes defer: lush_find_matching_brace treats a quoted span
+    /// as atomic while the legacy double-quoted-word expander counts braces
+    /// naively, so a `}` inside one ends the expansion on only one route.
+    const char *quoting[] = {"${s:?'q'}", "${s:?\"q\"}", "${s:?a`b`}",
+                             "${s:?a\\b}"};
+    for (size_t qi = 0; qi < sizeof(quoting) / sizeof(*quoting); qi++) {
+        f = peval_env(quoting[qi], &env, &n, &ok, &fully);
+        ASSERT_FALSE(fully, "a quoting byte in the message defers at parse");
+        free_fields(f, n);
+    }
+}
+
 TEST(eval_nounset_defers_unbound) {
     /// #686: under nounset an unbound read DEFERS (word_eval reports
     /// not-covered) so the legacy expander can report E1122; a bound name, the
@@ -482,6 +582,7 @@ int main(void) {
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
+    RUN_TEST(eval_pe_required_operators);
     RUN_TEST(eval_nounset_defers_unbound);
     RUN_TEST(eval_pe_assign_operators);
     RUN_TEST(eval_pe_operand_glob_patterns);

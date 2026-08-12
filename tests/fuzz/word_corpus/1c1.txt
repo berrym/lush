@@ -111,3 +111,18 @@ ${A4:=v}${A4}
 ${A5}${A5:=w}
 "${A6:=q}${A6}"
 ${E:=z}${E}
+# The required-parameter operators are covered only where the diagnostic does
+# NOT fire (a firing one defers so the legacy expander owns the error and the
+# POSIX exit). The message is captured RAW, so spaces and glob metacharacters
+# in it are covered -- these lines are the parity signal for that, since a
+# tokenized operand would drop the spaces. A message carrying a QUOTING byte
+# (quote, backtick, backslash) or a `$` DEFERS, so no such line appears here.
+${X:?msg}
+${Y?msg}
+${Y:?}
+${Y?}
+${Y:?must be set}
+${Y:?a-b+c*d}
+${E?empty is set}
+"${Y:?a}b"
+${Y:?a}${Y?b}

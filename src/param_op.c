@@ -924,6 +924,22 @@ static char *split_substitution_spec(const char *spec,
     return pattern;
 }
 
+/// The required-parameter operators' pure half. See param_op.h.
+bool lush_param_op_required_fires(int op_type, const char *var_value) {
+    switch (op_type) {
+    case 18: /// ${var:?word} -- unset OR null
+        return !var_value || var_value[0] == '\0';
+    case 19: /// ${var?word} -- unset only (a null value is permitted)
+        return !var_value;
+    default:
+        return false;
+    }
+}
+
+char *lush_param_op_required_value(const char *var_value) {
+    return strdup(var_value ? var_value : "");
+}
+
 char *lush_param_op_apply(int op_type, const char *var_value,
                           const char *operand, bool *assign_back) {
     if (assign_back) {

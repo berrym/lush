@@ -67,6 +67,35 @@ bool lush_param_op_is_pure(int op_type);
 char *lush_param_op_apply(int op_type, const char *var_value,
                           const char *operand, bool *assign_back);
 
+/**
+ * @brief True when `${var:?word}` / `${var?word}` must raise its diagnostic.
+ *
+ * The required-parameter operators are impure -- the diagnostic and the POSIX
+ * shell exit belong to the executor -- but their TRIGGER is a pure predicate
+ * over the value: `:?` (18) fires when the parameter is unset OR null, `?`
+ * (19) only when it is unset. Sharing the predicate keeps the executor, the
+ * Word CST evaluator (which DEFERS a firing expansion to the legacy expander
+ * rather than raising an error it has no channel for) and the bench on one
+ * definition of when the error fires.
+ *
+ * @param op_type   18 (`:?`) or 19 (`?`); any other operator returns false.
+ * @param var_value The variable's value, or NULL when it is unset.
+ */
+bool lush_param_op_required_fires(int op_type, const char *var_value);
+
+/**
+ * @brief Result of `${var:?word}` / `${var?word}` when the error does NOT fire.
+ *
+ * The parameter passes its set-ness test, so the expansion is simply the value
+ * unchanged and the operand (the message) is never consulted. Callers must
+ * check lush_param_op_required_fires first -- this function does not test the
+ * trigger, so calling it on a firing expansion silently swallows the error.
+ *
+ * @return Newly allocated copy of @p var_value (NULL only on allocation
+ *         failure); a NULL value yields an empty string.
+ */
+char *lush_param_op_required_value(const char *var_value);
+
 /// Length in bytes of the shortest (longest == false) or longest prefix of
 /// @p str matching glob @p pattern -- the `${var#p}` / `${var##p}` engine.
 int lush_prefix_match_len(const char *str, const char *pattern, bool longest);
