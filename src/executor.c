@@ -20,6 +20,7 @@
 #include "builtins.h"
 #include "config.h"
 #include "debug.h"
+#include "dequote.h"
 #include "escape.h"
 #include "field_split.h"
 #include "ht.h"
@@ -284,6 +285,36 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
 static char *expand_quoted_string_prov(executor_t *executor, const char *str,
                                        bool in_double_quotes, const char *prov,
                                        bool allow_tilde);
+/// How a `${var OP operand}` operand is processed once the tokenizer hands the
+/// whole `${...}` over verbatim: a VALUE operand (`:-`/`:=`/`:+`/`:?` ...) is a
+/// word (quote-removed, expanded, tilde-expanded); a PATTERN operand
+/// (`#`/`##`/`%`/`%%`, case-mod restrictors) is quote-removed + expanded, then
+/// its quoted metacharacters are made glob-literal so they match as text.
+typedef enum { PE_OPERAND_VALUE, PE_OPERAND_PATTERN } pe_operand_class_t;
+
+/// True if op_type's operand is dequoted here, setting *out_class. False for
+/// operators whose operand is handled elsewhere: substring (`:`) and the
+/// transform (`@`) families. The replace operators (`/`/`//`) are dequoted
+/// per-half after their separator split, not through this predicate.
+static bool pe_operand_op(int op_type, pe_operand_class_t *out_class);
+
+/// Quote-remove + expand a parameter-expansion operand carried verbatim inside
+/// a `${...}`, composing lush_dequote_span with expand_quoted_string_prov (and,
+/// for PATTERN operands, glob-suppressing the quoted parts). Returns an owned
+/// string.
+static char *pe_process_operand(executor_t *executor, const char *raw,
+                                size_t len, pe_operand_class_t cls,
+                                bool in_double_quotes);
+
+/// Quote-remove + expand a REPLACE operand (`${v/pat/repl}`), which carries two
+/// halves and so cannot go through pe_process_operand. Returns an owned string.
+static char *pe_process_replace_operand(executor_t *executor, const char *raw,
+                                        size_t len);
+
+/// Remove one level of quoting from an INDEXED-array subscript before it is
+/// evaluated as arithmetic. Returns an owned string.
+static char *pe_dequote_subscript(const char *raw);
+
 /// expand_arg_node is declared in executor.h -- it is the shared per-node-type
 /// word expander, also consumed by the redirection/here-string target path.
 static char *expand_array_unsubscripted(executor_t *executor,
@@ -13121,7 +13152,8 @@ static int cmp_str_desc(const void *a, const void *b) {
 }
 
 static char *parse_parameter_expansion(executor_t *executor,
-                                       const char *expansion) {
+                                       const char *expansion,
+                                       bool in_double_quotes) {
     if (!expansion) {
         return strdup("");
     }
@@ -13402,7 +13434,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                 /// Handle (w)# - word count instead of character count
                 /// Get the variable value first
                 const char *var_name = rest + 1; /// Skip the #
-                char *var_value = parse_parameter_expansion(executor, var_name);
+                char *var_value =
+                    parse_parameter_expansion(executor, var_name, false);
                 if (var_value) {
                     /// Count words (space-separated)
                     size_t word_count = 0;
@@ -13535,7 +13568,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         inner_result = expand_variable(executor, rest);
                     } else {
                         inner_result =
-                            parse_parameter_expansion(executor, rest);
+                            parse_parameter_expansion(executor, rest, false);
                     }
                 }
             }
@@ -14834,8 +14867,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                     } else {
                         /// Indexed array - ${arr[n]} - specific element
                         arithm_clear_error();
-                        char *idx_result =
-                            arithm_expand_with_executor(executor, subscript);
+                        char *idx_raw = pe_dequote_subscript(subscript);
+                        char *idx_result = arithm_expand_with_executor(
+                            executor, idx_raw ? idx_raw : subscript);
+                        free(idx_raw);
                         if (idx_result && !arithm_error_is_flagged()) {
                             long long idx = strtoll(idx_result, NULL, 10);
                             free(idx_result);
@@ -15362,9 +15397,44 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
         const char *default_value = op_pos + strlen(operators[op_type]);
 
-        /// Expand variables in default value
-        char *expanded_default =
-            expand_variables_in_string(executor, default_value);
+        /// Quote-remove the operand, then expand it. The tokenizer now hands
+        /// the whole `${...}` over verbatim (its double-quote scanner has a
+        /// `${` branch), so an operand's quote bytes reach here intact --
+        /// previously the scanner split the word at the inner quote and the
+        /// parser's re-fusion stripped them by accident, which is what made
+        /// `${v#"a"}` appear to work. Quote removal is the operand's own step,
+        /// and for a PATTERN operand the quoted metacharacters are then made
+        /// literal so `${x#"a*"}` matches the text `a*` rather than globbing
+        /// (SEMANTICS section 3.6). Operators whose operand is not a single
+        /// value-or-pattern -- substring, replace, transform -- keep the plain
+        /// `$`-only pass and handle their own structure.
+        pe_operand_class_t op_class;
+        char *expanded_default;
+        /// A VALUE operand inside a `"..."` string is not a fresh word, so its
+        /// quote characters are LITERAL -- `"${u:-'lit'}"` yields `'lit'` in
+        /// both bash and zsh, while the unquoted `${u:-'lit'}` yields `lit`.
+        /// A PATTERN operand dequotes in BOTH contexts (`"${p#'ab'}"` strips
+        /// `ab`), because there the quotes mark glob-literality rather than
+        /// word syntax. Verified across bash and zsh; only this one cell of the
+        /// class-by-context table needs the enclosing quote state.
+        bool value_operand_in_dq = in_double_quotes &&
+                                   pe_operand_op(op_type, &op_class) &&
+                                   op_class == PE_OPERAND_VALUE;
+        if (value_operand_in_dq) {
+            expanded_default =
+                expand_variables_in_string(executor, default_value);
+        } else if (op_type == 15 || op_type == 16) {
+            /// `/` and `//`: two halves, split before quote removal.
+            expanded_default = pe_process_replace_operand(
+                executor, default_value, strlen(default_value));
+        } else if (pe_operand_op(op_type, &op_class)) {
+            expanded_default =
+                pe_process_operand(executor, default_value,
+                                   strlen(default_value), op_class, false);
+        } else {
+            expanded_default =
+                expand_variables_in_string(executor, default_value);
+        }
 
         char *result = NULL;
 
@@ -16052,7 +16122,8 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 strncpy(expansion, var_name + 1, len);
                 expansion[len] = '\0';
 
-                char *result = parse_parameter_expansion(executor, expansion);
+                char *result =
+                    parse_parameter_expansion(executor, expansion, false);
 
                 free(expansion);
                 return result;
@@ -16100,7 +16171,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                     strncpy(expansion, var_name, total_len);
                     expansion[total_len] = '\0';
                     char *result =
-                        parse_parameter_expansion(executor, expansion);
+                        parse_parameter_expansion(executor, expansion, false);
                     free(expansion);
                     return result;
                 }
@@ -17496,8 +17567,8 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
                         var_name[var_name_len] = '\0';
                         /// Use parameter expansion to handle operators like =,
                         /// :-, etc.
-                        char *var_value =
-                            parse_parameter_expansion(executor, var_name);
+                        char *var_value = parse_parameter_expansion(
+                            executor, var_name, in_double_quotes);
 
                         if (var_value) {
                             size_t value_len = strlen(var_value);
@@ -19787,12 +19858,198 @@ static char *cond_escape_all_meta(char *expanded) {
     return out;
 }
 
-/// Expand the RHS of `==` / `!=` as a glob pattern with SEMANTICS section 3.9 /
-/// issue #515 quoting: a metacharacter that came from a quoted or
-/// backslash-escaped source is literal (emitted `\<meta>` for the shared
-/// matcher); an unquoted metacharacter -- including one produced by an unquoted
-/// `$var` expansion -- stays active (the curated bash/zsh consensus). Returns
-/// an owned string; never NULL (empty on allocation failure).
+/// Make the quoted glob metacharacters of a dequoted+expanded PATTERN operand
+/// literal, leaving unquoted (U-provenance) metacharacters glob-active (#654).
+/// `text`/`prov` are the pre-expansion (dequoted text, U/S/D/E map) from
+/// lush_dequote_span; `expanded` is `text` after `$`-expansion. Frees
+/// `expanded`, returns an owned string. Same discriminator and length-equality
+/// strategy as cond_expand_rhs_pattern (the `[[ ]]` `==`/`!=` path).
+static char *pe_glob_suppress(char *expanded, const char *text,
+                              const char *prov) {
+    if (!expanded || !prov || !text) {
+        return expanded;
+    }
+    /// A fully unquoted operand keeps every metacharacter active -- an exact
+    /// passthrough, which is what makes the fix a no-op for `${v%.gz}` etc.
+    bool all_unquoted = true;
+    for (size_t i = 0; prov[i] != '\0'; i++) {
+        if (prov[i] != QUOTE_PROV_UNQUOTED) {
+            all_unquoted = false;
+            break;
+        }
+    }
+    if (all_unquoted) {
+        return expanded;
+    }
+    /// No length change from `$`-expansion: prov still aligns to `expanded`, so
+    /// escape only the quoted (non-U) metacharacters -- a fused `abc"*"def`
+    /// keeps its unquoted parts active.
+    size_t elen = strlen(expanded);
+    if (strlen(text) == elen) {
+        char *out = malloc(elen * 2 + 1);
+        if (!out) {
+            return expanded;
+        }
+        size_t j = 0;
+        for (size_t i = 0; i < elen; i++) {
+            if (cond_pattern_meta(expanded[i]) &&
+                prov[i] != QUOTE_PROV_UNQUOTED) {
+                out[j++] = '\\';
+            }
+            out[j++] = expanded[i];
+        }
+        out[j] = '\0';
+        free(expanded);
+        return out;
+    }
+    /// Expansion changed the length so per-byte provenance no longer aligns:
+    /// protect the whole operand (a lone quoted `"$var"` is uniformly quoted,
+    /// so this is exact for it; the mixed-with-unquoted-trailing-glob corner
+    /// over-literalizes, the same documented limitation the `[[ ]]` path
+    /// holds).
+    return cond_escape_all_meta(expanded);
+}
+
+static bool pe_operand_op(int op_type, pe_operand_class_t *out_class) {
+    switch (op_type) {
+    case 0:  /// :-
+    case 1:  /// :+
+    case 10: /// -
+    case 11: /// +
+    case 12: /// :=
+    case 13: /// =
+    case 18: /// :?
+    case 19: /// ?
+        *out_class = PE_OPERAND_VALUE;
+        return true;
+    case 2: /// ##
+    case 3: /// %%
+    case 6: /// #
+    case 7: /// %
+    case 4: /// ^^ (case-mod pattern restrictor)
+    case 5: /// ,,
+    case 8: /// ^
+    case 9: /// ,
+        *out_class = PE_OPERAND_PATTERN;
+        return true;
+    default: /// 14 substring, 15/16 replace (Commit 2), 17 transform
+        return false;
+    }
+}
+
+static char *pe_process_operand(executor_t *executor, const char *raw,
+                                size_t len, pe_operand_class_t cls,
+                                bool in_double_quotes) {
+    char *text = NULL, *prov = NULL;
+    /// NOTE: the shipped lush_dequote_span has no in_double_quotes MODE (the
+    /// abandoned #654 branch added one; it is not on master). Every call site
+    /// here passes in_double_quotes = false, so the unquoted rules apply and
+    /// the parameter only governs tilde eligibility below. A `"${v:-~}"` whose
+    /// tilde should stay literal is therefore not yet distinguished -- see the
+    /// comment on the parameter.
+    (void)in_double_quotes;
+    if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
+        /// Degrade to plain expansion on OOM rather than dropping the operand.
+        return expand_variables_in_string(executor, raw);
+    }
+    /// A value operand in an UNQUOTED ${...} is a fresh word: a leading
+    /// unquoted
+    /// `~` tilde-expands. Inside a `"..."` string it is not a word, so `~`
+    /// stays literal (the dequote already keeps single quotes / bare
+    /// backslashes; the prov map drives the rest of the double-quote handling).
+    bool allow_tilde = !in_double_quotes && cls == PE_OPERAND_VALUE;
+    char *expanded =
+        expand_quoted_string_prov(executor, text, false, prov, allow_tilde);
+    if (cls == PE_OPERAND_PATTERN) {
+        expanded = pe_glob_suppress(expanded, text, prov);
+    }
+    free(text);
+    free(prov);
+    return expanded;
+}
+
+/// Quote-remove + expand a REPLACE operand (`${v/pat/repl}`, `${v//pat/repl}`).
+///
+/// Unlike a value or pattern operand this one carries TWO halves, so it cannot
+/// go through pe_process_operand: quote removal has to happen per half, AFTER
+/// the separator is located.
+///
+/// The separator is the first `/` in the RAW operand that is not backslash-
+/// escaped -- quoting does NOT protect it. That is the bash and zsh consensus,
+/// verified: `v=a/b/c; ${v//"/"/-}` leaves the value untouched in both (the
+/// separator is the `/` INSIDE the quotes, making the pattern a lone `"`),
+/// while the idiomatic `${v//\//-}` replaces. Scanning the dequoted text
+/// instead would find a different separator and silently diverge from both.
+///
+/// Each half is then dequoted and expanded on its own; only the pattern half is
+/// glob-suppressed, so `${v//"a*"/Q}` matches the text `a*` while `${v//a*/Q}`
+/// still globs. The halves are recombined into the `pattern/replacement`
+/// spelling apply_param_operator expects, escaping any `/` produced INSIDE the
+/// pattern as `\/` -- the escape its split already understands -- so the round
+/// trip cannot re-split in the wrong place.
+/// Remove one level of quoting from an INDEXED-array subscript before it is
+/// evaluated as arithmetic. The associative path canonicalizes its key through
+/// subscript_normalize_key; the indexed path has no such step, and since the
+/// tokenizer began handing `${...}` over verbatim the quote bytes of
+/// `${arr["k"]}` reach the arithmetic evaluator, which cannot parse them. Only
+/// quote removal happens here -- `$`-expansion is the arithmetic evaluator's
+/// own first pass, so doing it here too would expand twice. Returns an owned
+/// string; falls back to a copy of the input on allocation failure.
+static char *pe_dequote_subscript(const char *raw) {
+    char *text = NULL, *prov = NULL;
+    if (!lush_dequote_span(raw, strlen(raw), &text, &prov, NULL)) {
+        return strdup(raw);
+    }
+    free(prov);
+    return text;
+}
+
+static char *pe_process_replace_operand(executor_t *executor, const char *raw,
+                                        size_t len) {
+    size_t sep = len;
+    for (size_t i = 0; i < len; i++) {
+        if (raw[i] == '\\' && i + 1 < len) {
+            i++;
+            continue;
+        }
+        if (raw[i] == '/') {
+            sep = i;
+            break;
+        }
+    }
+    char *pat =
+        pe_process_operand(executor, raw, sep, PE_OPERAND_PATTERN, false);
+    char *rep = (sep < len)
+                    ? pe_process_operand(executor, raw + sep + 1, len - sep - 1,
+                                         PE_OPERAND_VALUE, false)
+                    : NULL;
+    if (!pat) {
+        free(rep);
+        return strdup("");
+    }
+    size_t plen = strlen(pat), rlen = rep ? strlen(rep) : 0;
+    char *out = malloc(plen * 2 + rlen + 2);
+    if (!out) {
+        free(pat), free(rep);
+        return strdup("");
+    }
+    size_t j = 0;
+    for (size_t i = 0; i < plen; i++) {
+        if (pat[i] == '/') {
+            out[j++] = '\\';
+        }
+        out[j++] = pat[i];
+    }
+    if (rep) {
+        out[j++] = '/';
+        memcpy(out + j, rep, rlen);
+        j += rlen;
+    }
+    out[j] = '\0';
+    free(pat), free(rep);
+    return out;
+}
+
 static char *cond_expand_rhs_pattern(executor_t *executor, node_t *rhs) {
     char *expanded = cond_expand_operand(executor, rhs);
 
@@ -20641,7 +20898,10 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     } else {
         /// Indexed array - evaluate subscript as arithmetic expression
         arithm_clear_error();
-        char *idx_result = arithm_expand_with_executor(executor, subscript);
+        char *idx_raw = pe_dequote_subscript(subscript);
+        char *idx_result = arithm_expand_with_executor(
+            executor, idx_raw ? idx_raw : subscript);
+        free(idx_raw);
 
         if (!idx_result || arithm_error_is_flagged()) {
             if (idx_result)

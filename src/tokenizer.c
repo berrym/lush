@@ -1073,6 +1073,65 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 result_len += subst_len;
                 prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
                             subst_len);
+            } else if (curr == '$' &&
+                       tokenizer->position + 1 < tokenizer->input_length &&
+                       tokenizer->input[tokenizer->position + 1] == '{') {
+                /// Handle parameter expansion inside double quotes - copy
+                /// verbatim, exactly as the `$(` branch above does.
+                ///
+                /// Without this branch `$` and `{` are ordinary bytes here, so
+                /// a `"` INSIDE the expansion -- a quoted subscript key or a
+                /// quoted operator operand -- reaches the closing-quote branch
+                /// above and ends the token in the middle of the expansion.
+                /// The word is then split in the LEXER, which no later layer
+                /// can undo: `"read=[${m["a b"]}]"` became the two words
+                /// `read=[${m[a` and `b]}]` (issue #654), a quoted glob
+                /// metacharacter in an operand lost its literality
+                /// (`"${x#"a*"}"`), and a quoted literal `*` subscript
+                /// degraded into the aggregate sigil, returning every element.
+                ///
+                /// lush_find_matching_brace is the canonical structure-aware
+                /// matcher: it treats `'...'`, `"..."`, `` `...` ``, `$'...'`
+                /// and `\X` as atomic spans, so the closing `}` it reports is
+                /// the one that actually closes this expansion. The opener is
+                /// the `{` at subst_start + 1.
+                size_t subst_start = tokenizer->position;
+                tokenizer->position += 2; /// Skip ${
+                tokenizer->column += 2;
+                size_t pe_close_off = 0;
+                bool pe_matched = lush_find_matching_brace(
+                    &tokenizer->input[subst_start + 1],
+                    tokenizer->input_length - (subst_start + 1), &pe_close_off);
+                /// Unterminated `${` runs to end of input, matching the `$(`
+                /// branch; the parser reports the missing brace.
+                size_t pe_end = pe_matched ? subst_start + 1 + pe_close_off + 1
+                                           : tokenizer->input_length;
+                while (tokenizer->position < pe_end) {
+                    if (tokenizer->input[tokenizer->position] == '\n') {
+                        tokenizer->line++;
+                        tokenizer->column = 1;
+                    } else {
+                        tokenizer->column++;
+                    }
+                    tokenizer->position++;
+                }
+                size_t subst_len = tokenizer->position - subst_start;
+                while (result_len + subst_len + 1 >= result_capacity) {
+                    result_capacity *= 2;
+                    char *new_result = realloc(result, result_capacity);
+                    if (!new_result) {
+                        free(result), free(prov);
+                        return token_new(TOK_ERROR,
+                                         &tokenizer->input[start_pos], 1,
+                                         start_line, start_column, start_pos);
+                    }
+                    result = new_result;
+                }
+                memcpy(&result[result_len], &tokenizer->input[subst_start],
+                       subst_len);
+                result_len += subst_len;
+                prov_append(&prov, &prov_len, &prov_cap, QUOTE_PROV_DOUBLE,
+                            subst_len);
             } else if (curr == '`') {
                 /// Handle backtick command substitution - copy verbatim
                 size_t subst_start = tokenizer->position;

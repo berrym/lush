@@ -1438,9 +1438,11 @@ TEST(rt_pe_pattern_strip_operators_covered) {
     /// Pattern-strip operators ${var#p}/${var##p}/${var%p}/${var%%p} expand on
     /// the CST backbone: the operand is a glob PATTERN matched via the shared
     /// apply_param_operator (# shortest, ## longest prefix; % / %% suffix).
-    /// Covers literal glob patterns; a quoted pattern (kept literal by legacy)
-    /// or a $-pattern (expanded by legacy) defers and still matches. Validated
-    /// under --setup lush:audit. Subshell-isolated.
+    /// Covers literal glob patterns; a quoted pattern or a $-pattern defers on
+    /// the CST route and is expanded by the legacy path, which now quote-
+    /// removes it -- so `${p#'ab'}` strips `ab`, matching bash and zsh (it
+    /// previously kept the quote bytes and matched nothing). Validated under
+    /// --setup lush:audit. Subshell-isolated.
     run_result_t r =
         run_shell("( f=a.b.c.txt; q=ab; p=abcdef\n"
                   "  echo \"[${f#*.}][${f##*.}][${f%.*}][${f%%.*}]\"\n"
@@ -1448,7 +1450,7 @@ TEST(rt_pe_pattern_strip_operators_covered) {
                   "  echo \"[${p#'ab'}][${p#$q}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[b.c.txt][txt][a.b.c][a]\n"
                         "[def][abc][abcdef][abcdef]\n"
-                        "[abcdef][cdef]\n");
+                        "[cdef][cdef]\n");
 }
 
 TEST(rt_pe_operand_edge_whitespace_defers) {
@@ -1610,6 +1612,93 @@ TEST(rt_pe_assign_operators_defer_forms) {
                   "  set --; echo \"[${1:=z}][$1]\"\n"
                   "  unset r; readonly r; echo \"[${r:=v}${r}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[a b][a b]\n[\'q\'][\'q\']\n[z][z]\n[v]\n");
+}
+
+TEST(rt_dq_param_expansion_is_one_token) {
+    /// The double-quote scanner has a `${` branch, so an expansion carrying its
+    /// own quotes stays ONE token. Without it the scanner treated `$` and `{`
+    /// as ordinary bytes and the inner `"` closed the string, splitting the
+    /// word in the LEXER -- which no later layer can undo. Issue #654: the
+    /// braced read of a quoted associative key emitted its own source text.
+    run_result_t r =
+        run_shell("( declare -A m; m[\"a b\"]=9\n"
+                  "  echo \"read=[${m[\"a b\"]}]\"\n"
+                  "  set -- \"x=[${m[\"a b\"]}]\"; echo \"argc=$#\" )\n");
+    ASSERT_STDOUT_EQ(r, "read=[9]\nargc=1\n");
+}
+
+TEST(rt_dq_quoted_subscript_key_is_literal) {
+    /// A quoted `*` subscript is a literal KEY, not the aggregate selector.
+    /// The lexer split used to hand the expander a mangled subscript, which
+    /// degraded into "every element" -- silent data corruption, since the
+    /// caller sees a plausible value that is not the one it asked for.
+    run_result_t r = run_shell("( declare -A m; m[\"*\"]=STAR; m[b]=9\n"
+                               "  echo \"[${m[\"*\"]}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[STAR]\n");
+}
+
+TEST(rt_pe_operand_quote_removal_by_class_and_context) {
+    /// The operand quote rules are a 2x2 of CLASS by CONTEXT, and only one cell
+    /// needs the enclosing quote state. A VALUE operand inside a `"..."` string
+    /// is not a fresh word, so its quotes are LITERAL; unquoted, it is a word
+    /// and they are removed. A PATTERN operand is quote-removed in BOTH
+    /// contexts, because there the quotes mark glob-literality rather than word
+    /// syntax. All four cells verified identical in bash and zsh.
+    /// The unquoted cells use printf's format string for the brackets: an
+    /// unquoted `[...]` around the expansion would be a GLOB bracket group, not
+    /// a delimiter.
+    run_result_t r = run_shell("( unset -v u; p=abcdef\n"
+                               "  echo \"[${u:-'lit'}]\"\n"
+                               "  printf '[%s]\\n' ${u:-'lit'}\n"
+                               "  echo \"[${p#'ab'}]\"\n"
+                               "  printf '[%s]\\n' ${p#'ab'} )\n");
+    ASSERT_STDOUT_EQ(r, "['lit']\n[lit]\n[cdef]\n[cdef]\n");
+}
+
+TEST(rt_pe_quoted_pattern_metachar_is_literal) {
+    /// SEMANTICS section 3.6: a metacharacter that came from a QUOTED span is
+    /// literal, while an unquoted one stays glob-active. Applies to the strip
+    /// and substitution families alike.
+    run_result_t r = run_shell("( x=\"a*c\"\n"
+                               "  echo \"[${x#\"a*\"}]\"\n"
+                               "  echo \"[${x#a*}]\"\n"
+                               "  echo \"[${x//\"a*\"/Q}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[c]\n[*c]\n[Qc]\n");
+}
+
+TEST(rt_pe_replace_operand_halves_and_separator) {
+    /// The replace operand carries two halves. The separator is the first `/`
+    /// in the RAW operand that is not backslash-escaped -- quoting does NOT
+    /// protect it, which is the bash and zsh consensus: `${v//"/"/-}` leaves
+    /// the value untouched in both (the separator is the `/` inside the
+    /// quotes), while the escaped `${v//\//-}` replaces. Each half is then
+    /// quote-removed on its own, and only the pattern half is glob-suppressed.
+    run_result_t r = run_shell("( v=abc; w=a/b/c\n"
+                               "  echo \"[${v//\"a\"/b}][${v//a/b}]\"\n"
+                               "  echo \"[${w//\"/\"/-}][${w//\\//-}]\"\n"
+                               "  echo \"[${v/\"b\"/X}][${v//\"a\"}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[bbc][bbc]\n[a/b/c][a-b-c]\n[aXc][bc]\n");
+}
+
+TEST(rt_indexed_subscript_is_dequoted_before_arithmetic) {
+    /// An indexed subscript is arithmetic, so it must be quote-removed first --
+    /// the associative path canonicalizes its key, the indexed path had no such
+    /// step and the quote bytes reached the arithmetic evaluator, which cannot
+    /// parse them. Both read and write sites.
+    run_result_t r = run_shell("( arr=(x y); i=1\n"
+                               "  echo \"[${arr[\"i\"]}][${arr[1]}]\"\n"
+                               "  arr[\"1\"]=Z; echo \"[${arr[1]}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[y][y]\n[Z]\n");
+}
+
+TEST(rt_dq_unterminated_param_expansion_errors) {
+    /// An unterminated `${` inside a double-quoted string consumes the closing
+    /// quote, so the string is unterminated -- what bash ("unexpected EOF while
+    /// looking for matching") and zsh ("unmatched \"") both report. lush
+    /// previously printed the source bytes and exited 0.
+    run_result_t r = run_shell_subprocess("echo \"a${\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+    ASSERT_STDERR_CONTAINS(r, "unterminated");
 }
 
 TEST(rt_pe_required_operators_covered) {
@@ -9210,6 +9299,13 @@ int main(void) {
     RUN_TEST(rt_pe_assign_operators_covered);
     RUN_TEST(rt_pe_assign_write_is_transactional);
     RUN_TEST(rt_pe_assign_operators_defer_forms);
+    RUN_TEST(rt_dq_param_expansion_is_one_token);
+    RUN_TEST(rt_dq_quoted_subscript_key_is_literal);
+    RUN_TEST(rt_pe_operand_quote_removal_by_class_and_context);
+    RUN_TEST(rt_pe_quoted_pattern_metachar_is_literal);
+    RUN_TEST(rt_pe_replace_operand_halves_and_separator);
+    RUN_TEST(rt_indexed_subscript_is_dequoted_before_arithmetic);
+    RUN_TEST(rt_dq_unterminated_param_expansion_errors);
     RUN_TEST(rt_pe_required_operators_covered);
     RUN_TEST(rt_pe_required_operators_error_forms);
     RUN_TEST(rt_pe_required_message_dollar_defers);
