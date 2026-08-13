@@ -38,7 +38,8 @@ static void assert_matches_reader(const char *input) {
 
     char *text = NULL, *prov = NULL;
     dequote_flags_t flags;
-    bool ok = lush_dequote_span(input, strlen(input), &text, &prov, &flags);
+    bool ok =
+        lush_dequote_span(input, strlen(input), &text, &prov, &flags, false);
     ASSERT_TRUE(ok, "lush_dequote_span failed");
     ASSERT_STR_EQ(text, t->text, "dequoted text differs from reader");
     size_t n = strlen(t->text);
@@ -91,7 +92,8 @@ static void assert_dequote(const char *input, const char *want_text,
                            const char *want_prov) {
     char *text = NULL, *prov = NULL;
     dequote_flags_t flags;
-    bool ok = lush_dequote_span(input, strlen(input), &text, &prov, &flags);
+    bool ok =
+        lush_dequote_span(input, strlen(input), &text, &prov, &flags, false);
     ASSERT_TRUE(ok, "lush_dequote_span failed");
     ASSERT_STR_EQ(text, want_text, "text mismatch");
     ASSERT_EQ(memcmp(prov, want_prov, strlen(want_text)), 0, "prov mismatch");
@@ -128,17 +130,17 @@ TEST(dequote_empty_span) { assert_dequote("", "", ""); }
 TEST(dequote_flags_single_vs_double) {
     char *text = NULL, *prov = NULL;
     dequote_flags_t f;
-    lush_dequote_span("'x'", 3, &text, &prov, &f);
+    lush_dequote_span("'x'", 3, &text, &prov, &f, false);
     ASSERT_TRUE(f.any_quoted && f.any_single && !f.expandable,
                 "single-quote flags");
     free(text), free(prov);
-    lush_dequote_span("\"x\"", 3, &text, &prov, &f);
+    lush_dequote_span("\"x\"", 3, &text, &prov, &f, false);
     ASSERT_TRUE(f.any_quoted && !f.any_single && f.expandable,
                 "double-quote flags");
     free(text), free(prov);
     /// A single-quoted segment fused with an adjacent unquoted run is
     /// expandable, matching the reader's has_expandable (`'x'yz`).
-    lush_dequote_span("'x'yz", 5, &text, &prov, &f);
+    lush_dequote_span("'x'yz", 5, &text, &prov, &f, false);
     ASSERT_TRUE(f.any_quoted && f.any_single && f.expandable,
                 "single+unquoted fusion is expandable");
     free(text), free(prov);

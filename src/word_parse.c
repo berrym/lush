@@ -660,7 +660,7 @@ static bool emit_token_parts(word_t *w, tokenizer_t *tok, const token_t *t,
             }
         }
         char *text = NULL, *prov = NULL;
-        if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
+        if (!lush_dequote_span(raw, len, &text, &prov, NULL, false)) {
             *fully = false;
             return true;
         }
@@ -768,7 +768,7 @@ static bool emit_token_parts(word_t *w, tokenizer_t *tok, const token_t *t,
         /// expansion. Both mixed-quote splitting and double-quote escape
         /// processing are follow-up slices.
         char *text = NULL, *prov = NULL;
-        if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
+        if (!lush_dequote_span(raw, len, &text, &prov, NULL, false)) {
             *fully = false;
             return true;
         }

@@ -15410,27 +15410,30 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// `$`-only pass and handle their own structure.
         pe_operand_class_t op_class;
         char *expanded_default;
-        /// A VALUE operand inside a `"..."` string is not a fresh word, so its
-        /// quote characters are LITERAL -- `"${u:-'lit'}"` yields `'lit'` in
-        /// both bash and zsh, while the unquoted `${u:-'lit'}` yields `lit`.
-        /// A PATTERN operand dequotes in BOTH contexts (`"${p#'ab'}"` strips
-        /// `ab`), because there the quotes mark glob-literality rather than
-        /// word syntax. Verified across bash and zsh; only this one cell of the
-        /// class-by-context table needs the enclosing quote state.
-        bool value_operand_in_dq = in_double_quotes &&
-                                   pe_operand_op(op_type, &op_class) &&
-                                   op_class == PE_OPERAND_VALUE;
-        if (value_operand_in_dq) {
-            expanded_default =
-                expand_variables_in_string(executor, default_value);
-        } else if (op_type == 15 || op_type == 16) {
+        /// The enclosing quote state changes what a quote byte MEANS in the
+        /// operand, so it is threaded down rather than assumed. Inside a
+        /// `"..."` string the operand is not a fresh word: a `'` is an ordinary
+        /// literal character (`"${u:-'lit'}"` yields `'lit'`), while a bare `"`
+        /// is STILL quoting syntax and is removed (`"${f:+"--flag=$f"}"` yields
+        /// `--flag=x`), and a backslash-escaped quote yields a literal one.
+        /// Unquoted, the operand IS a word and every quote byte is syntax. A
+        /// PATTERN operand dequotes in both contexts, because there the quotes
+        /// mark glob-literality rather than word syntax. All four cells are
+        /// verified against bash and zsh, and lush_dequote_span's
+        /// in_double_quotes mode implements the distinction -- no cell bypasses
+        /// quote removal.
+        if (op_type == 15 || op_type == 16) {
             /// `/` and `//`: two halves, split before quote removal.
             expanded_default = pe_process_replace_operand(
                 executor, default_value, strlen(default_value));
         } else if (pe_operand_op(op_type, &op_class)) {
-            expanded_default =
-                pe_process_operand(executor, default_value,
-                                   strlen(default_value), op_class, false);
+            /// Only the VALUE class inherits the enclosing quote state; a
+            /// PATTERN operand dequotes with unquoted-word rules in BOTH
+            /// contexts (`"${p#'ab'}"` strips `ab`, same as unquoted), because
+            /// there the quotes mark glob-literality rather than word syntax.
+            expanded_default = pe_process_operand(
+                executor, default_value, strlen(default_value), op_class,
+                in_double_quotes && op_class == PE_OPERAND_VALUE);
         } else {
             expanded_default =
                 expand_variables_in_string(executor, default_value);
@@ -19922,6 +19925,12 @@ static bool pe_operand_op(int op_type, pe_operand_class_t *out_class) {
     case 19: /// ?
         *out_class = PE_OPERAND_VALUE;
         return true;
+    case 14: /// :offset:length -- the spec is a numeric VALUE, not a pattern.
+             /// Without quote removal a quoted offset or length reaches the
+             /// arithmetic evaluator as `"3"`, which cannot parse it, so the
+             /// substring came out silently wrong rather than diagnosed.
+        *out_class = PE_OPERAND_VALUE;
+        return true;
     case 2: /// ##
     case 3: /// %%
     case 6: /// #
@@ -19941,14 +19950,7 @@ static char *pe_process_operand(executor_t *executor, const char *raw,
                                 size_t len, pe_operand_class_t cls,
                                 bool in_double_quotes) {
     char *text = NULL, *prov = NULL;
-    /// NOTE: the shipped lush_dequote_span has no in_double_quotes MODE (the
-    /// abandoned #654 branch added one; it is not on master). Every call site
-    /// here passes in_double_quotes = false, so the unquoted rules apply and
-    /// the parameter only governs tilde eligibility below. A `"${v:-~}"` whose
-    /// tilde should stay literal is therefore not yet distinguished -- see the
-    /// comment on the parameter.
-    (void)in_double_quotes;
-    if (!lush_dequote_span(raw, len, &text, &prov, NULL)) {
+    if (!lush_dequote_span(raw, len, &text, &prov, NULL, in_double_quotes)) {
         /// Degrade to plain expansion on OOM rather than dropping the operand.
         return expand_variables_in_string(executor, raw);
     }
@@ -19997,7 +19999,7 @@ static char *pe_process_operand(executor_t *executor, const char *raw,
 /// string; falls back to a copy of the input on allocation failure.
 static char *pe_dequote_subscript(const char *raw) {
     char *text = NULL, *prov = NULL;
-    if (!lush_dequote_span(raw, strlen(raw), &text, &prov, NULL)) {
+    if (!lush_dequote_span(raw, strlen(raw), &text, &prov, NULL, false)) {
         return strdup(raw);
     }
     free(prov);

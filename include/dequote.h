@@ -47,9 +47,9 @@ typedef struct {
  * builds the dequoted text with a parallel per-byte U/S/D/E map:
  *
  *   - `'...'`  single-quoted: interior copied literally, tagged S; no escapes.
- *   - `"..."`  double-quoted: interior tagged D; `$(...)` and `` `...` ``
- * copied verbatim; `\X` KEPT as backslash+char (deferred for the double-quote
- * expander); `\<newline>` line continuation removed.
+ *   - `"..."`  double-quoted: interior tagged D; `$(...)`/`${...}` and
+ * `` `...` `` copied verbatim; `\X` KEPT as backslash+char (deferred for the
+ * double-quote expander); `\<newline>` line continuation removed.
  *   - `\X`     unquoted escape: backslash DROPPED, `X` kept, tagged E;
  *              `\<newline>` line continuation removed.
  *   - anything else: copied literally, tagged U.
@@ -63,6 +63,16 @@ typedef struct {
  * an escape-decoded C string -- so a caller that may see `$'...'` (e.g. a
  * future subscript path) must handle or reject it before calling here.
  *
+ * When @p in_double_quotes is true the span's *bare* runs inherit double-quote
+ * rules instead of unquoted-word rules -- for a span that is the operand of a
+ * `${...}` sitting inside a `"..."` string (#654): a `'` is a literal character
+ * (single quotes do not quote inside double quotes) tagged U, and a bare `\X`
+ * is KEPT deferred and tagged D (double-quote backslash rules) rather than
+ * dropped. Explicit `"..."` segments still strip, bare characters stay U so a
+ * glob metacharacter remains active, and tilde is the caller's policy (it
+ * passes allow_tilde=false to the expander). Pass false for a normal
+ * unquoted-word span.
+ *
  * @param raw       Raw span (need not be NUL-terminated at @p len).
  * @param len       Number of bytes of @p raw to process.
  * @param out_text  Receives the malloc'd, NUL-terminated dequoted text.
@@ -70,10 +80,12 @@ typedef struct {
  *                  @p out_text (NOT NUL-terminated to its own length; a
  * trailing NUL is written for convenience).
  * @param out_flags Optional; receives the coarse facts. May be NULL.
+ * @param in_double_quotes  True if the span is enclosed in a `"..."` string.
  * @return true on success (both outputs owned by caller); false on OOM (outputs
  *         set to NULL).
  */
 bool lush_dequote_span(const char *raw, size_t len, char **out_text,
-                       char **out_prov, dequote_flags_t *out_flags);
+                       char **out_prov, dequote_flags_t *out_flags,
+                       bool in_double_quotes);
 
 #endif /* DEQUOTE_H */

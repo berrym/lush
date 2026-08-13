@@ -73,7 +73,8 @@ static void dq_put(dq_builder_t *b, const char *src, size_t n, char p) {
 static void dq_putc(dq_builder_t *b, char c, char p) { dq_put(b, &c, 1, p); }
 
 bool lush_dequote_span(const char *raw, size_t len, char **out_text,
-                       char **out_prov, dequote_flags_t *out_flags) {
+                       char **out_prov, dequote_flags_t *out_flags,
+                       bool in_double_quotes) {
     if (out_text) {
         *out_text = NULL;
     }
@@ -96,8 +97,10 @@ bool lush_dequote_span(const char *raw, size_t len, char **out_text,
     while (i < len && b.ok) {
         char c = raw[i];
 
-        if (c == '\'') {
-            /// Single-quoted: interior literal, no escapes, tagged S.
+        if (c == '\'' && !in_double_quotes) {
+            /// Single-quoted: interior literal, no escapes, tagged S. Inside a
+            /// double-quoted context a `'` is not a delimiter -- it falls
+            /// through to the bare branch as a literal U character (#654).
             flags.any_quoted = true;
             flags.any_single = true;
             i++; /// opening quote
@@ -158,11 +161,17 @@ bool lush_dequote_span(const char *raw, size_t len, char **out_text,
                 i++; /// closing quote
             }
         } else if (c == '\\' && i + 1 < len) {
-            /// Unquoted escape: drop the backslash, keep the char tagged E;
-            /// `\<newline>` line continuation removed. Unquoted content is
-            /// expandable (matches the reader's has_expandable, which it sets
-            /// for every character of an adjacent unquoted run).
+            /// Bare escape. `\<newline>` line continuation is removed in both
+            /// contexts. Outside double quotes the backslash is DROPPED and the
+            /// char tagged E (unquoted quote removal, already final). Inside a
+            /// double-quoted context (#654) the `\X` is KEPT deferred and
+            /// tagged D, so expand_quoted_string_prov applies the double-quote
+            /// backslash rules (`\$`->`$`, `\"`->`"`, `\<other>`->`\<other>`).
             if (raw[i + 1] == '\n') {
+                i += 2;
+            } else if (in_double_quotes) {
+                flags.expandable = true;
+                dq_put(&b, &raw[i], 2, QUOTE_PROV_DOUBLE);
                 i += 2;
             } else {
                 flags.expandable = true;

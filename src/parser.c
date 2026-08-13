@@ -1453,7 +1453,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 dequote_flags_t f;
                 if (lush_dequote_span(collected_tokens[0].text,
                                       strlen(collected_tokens[0].text), &dtext,
-                                      &dprov, &f)) {
+                                      &dprov, &f, false)) {
                     arg_node->val.str = dtext;
                     arg_node->quote_prov = dprov;
                 } else {
@@ -1577,7 +1577,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                     dequote_flags_t f;
                     lush_dequote_span(collected_tokens[i].text,
                                       strlen(collected_tokens[i].text),
-                                      &dequoted[i], &dequoted_prov[i], &f);
+                                      &dequoted[i], &dequoted_prov[i], &f,
+                                      false);
                 } else {
                     /// Word-like tokens: word-context backslashes collapse; the
                     /// companion emits the parallel provenance (bare U,

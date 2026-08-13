@@ -25,7 +25,7 @@ char *subscript_normalize_key(executor_t *executor, const char *interior,
     /// Step 1: strip one level of quoting, recording per-byte provenance so the
     /// expander protects single-quoted / escaped bytes and expands the rest.
     char *text = NULL, *prov = NULL;
-    if (!lush_dequote_span(interior, len, &text, &prov, NULL)) {
+    if (!lush_dequote_span(interior, len, &text, &prov, NULL, false)) {
         return NULL;
     }
 
