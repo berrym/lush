@@ -126,3 +126,12 @@ ${Y:?a-b+c*d}
 ${E?empty is set}
 "${Y:?a}b"
 ${Y:?a}${Y?b}
+# A backtick is an expansion introducer inside a double-quoted string, not a
+# literal byte. Covering it as a literal made `echo "date: `date`"` emit its own
+# source text on the default route (#693). It survived because no corpus line
+# and no test contained one -- which is the point of this line: word_diff
+# compares against the LEGACY expander, so a re-cover would show up as a BUG
+# verdict rather than as silence.
+"[`echo H`]"
+"pre`echo H`post"
+"$X`echo H`"

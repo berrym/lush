@@ -563,6 +563,21 @@ static bool parse_double_interior(word_t *body, const char *text, size_t n,
                                   bool *handled) {
     size_t i = 0, lit_start = 0;
     while (i < n) {
+        if (text[i] == '`') {
+            /// Backtick command substitution. `$` is not the only expansion
+            /// introducer in a double-quoted string, and treating it as one
+            /// let a backtick fall into a literal leaf while the word was
+            /// still reported fully handled -- so `echo "date: `date`"`
+            /// emitted its own source bytes instead of running the command,
+            /// on the DEFAULT route (issue #693). This is the wrongly-COVERING
+            /// class the dual-route design exists to prevent, so defer exactly
+            /// as an uncovered `$` construct does below. An ESCAPED backtick
+            /// needs no special case: the caller's pure-interior gate rejects
+            /// any interior containing a backslash, so `"a\`b"` never reaches
+            /// here.
+            *handled = false;
+            break;
+        }
         if (text[i] != '$') {
             i++;
             continue;

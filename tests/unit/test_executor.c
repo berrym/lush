@@ -1612,6 +1612,19 @@ TEST(rt_pe_assign_operators_defer_forms) {
     ASSERT_STDOUT_EQ(r, "[a b][a b]\n[\'q\'][\'q\']\n[z][z]\n[v]\n");
 }
 
+TEST(rt_dq_backtick_runs_the_substitution) {
+    /// #693: a backtick inside a DOUBLE-QUOTED string is an expansion
+    /// introducer, not a literal byte. parse_double_interior treated only `$`
+    /// as one, so the backticks landed in a literal leaf while the word was
+    /// still reported fully handled, and the default route emitted the source
+    /// text instead of running the command. Both routes must agree, and both
+    /// must match what lush's own legacy expander (and bash and zsh) do.
+    run_result_t r = run_shell("( echo \"v: `echo HI`\"\n"
+                               "  echo \"pre`echo A`post\"\n"
+                               "  x=Q; echo \"[$x`echo B`]\" )\n");
+    ASSERT_STDOUT_EQ(r, "v: HI\npreApost\n[QB]\n");
+}
+
 TEST(rt_pe_required_operators_covered) {
     /// The required-parameter operators ${var:?msg} / ${var?msg} expand on the
     /// CST backbone whenever the parameter passes its set-ness test: the
@@ -9210,6 +9223,7 @@ int main(void) {
     RUN_TEST(rt_pe_assign_operators_covered);
     RUN_TEST(rt_pe_assign_write_is_transactional);
     RUN_TEST(rt_pe_assign_operators_defer_forms);
+    RUN_TEST(rt_dq_backtick_runs_the_substitution);
     RUN_TEST(rt_pe_required_operators_covered);
     RUN_TEST(rt_pe_required_operators_error_forms);
     RUN_TEST(rt_pe_required_message_dollar_defers);
