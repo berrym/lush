@@ -46,6 +46,47 @@ static void assert_deep_equal(const word_t *a, const word_t *b) {
     }
 }
 
+TEST(word_rebase_shifts_spans_to_absolute) {
+    /// A word parsed from a COPY of its source span carries spans relative to
+    /// that copy. word_rebase makes them absolute so word_reconstruct reads the
+    /// right bytes -- without it the offsets address the wrong text SILENTLY,
+    /// because word_reconstruct only checks that a span FITS the buffer it is
+    /// handed, not that it is the right span.
+    const char *real = "echo aaaaaaaaaa hello";
+    const uint32_t base = 16; /// where "hello" starts in `real`
+
+    /// Shaped like a word parsed from the copy "hello": word and leaf both at
+    /// offset 0, length 5.
+    word_t *w = word_new(0, 5);
+    ASSERT_NOT_NULL(w, "word");
+    word_part_t *leaf = word_part_new(WP_LITERAL, 0, 5);
+    ASSERT_NOT_NULL(leaf, "leaf");
+    leaf->u.leaf.text = strdup("hello");
+    ASSERT_TRUE(word_add_part(w, leaf), "add part");
+
+    /// Against the real input the copy-relative span resolves to the wrong
+    /// slice -- and RETURNS SUCCESSFULLY, which is what makes it dangerous.
+    char *wrong = word_reconstruct(w, real, strlen(real));
+    ASSERT_NOT_NULL(wrong, "reconstruct succeeds even though it is wrong");
+    ASSERT_STR_EQ(wrong, "echo ", "wrong slice, silently");
+    free(wrong);
+
+    word_rebase(w, base);
+    ASSERT_EQ(w->src_off, base, "word span is absolute after rebase");
+    ASSERT_EQ(WORD_PART(w, 0)->src_off, base, "part span too");
+    char *right = word_reconstruct(w, real, strlen(real));
+    ASSERT_NOT_NULL(right, "reconstruct");
+    ASSERT_STR_EQ(right, "hello", "the actual source text");
+    free(right);
+
+    /// A zero base is a no-op, and a NULL word is safe.
+    word_rebase(w, 0);
+    ASSERT_EQ(w->src_off, base, "zero base does not move it");
+    word_rebase(NULL, 4);
+
+    word_free(w);
+}
+
 TEST(word_construct_and_free_all_kinds) {
     /// One word holding a representative of every structural kind, so
     /// word_free walks every switch arm.
@@ -248,6 +289,7 @@ TEST(word_add_part_grows_capacity) {
 
 int main(void) {
     printf("=== Word CST Foundation Tests ===\n\n");
+    RUN_TEST(word_rebase_shifts_spans_to_absolute);
     RUN_TEST(word_construct_and_free_all_kinds);
     RUN_TEST(word_copy_is_deep_and_independent);
     RUN_TEST(word_copy_null_is_null);

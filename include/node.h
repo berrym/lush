@@ -211,9 +211,13 @@ typedef struct node {
     /// alongside the legacy val.str / quote_prov, so parse_word / word_eval can
     /// be wired in one construct at a time and diffed against the legacy path.
     /// Heap-allocated (owner): deep-copied by node_copy, freed by
-    /// free_node_tree. NULL until a later step populates it -- today every node
-    /// carries word == NULL, so the field is dormant infrastructure with no
-    /// behavioral effect.
+    /// free_node_tree. Populated by the parser for a command ARGUMENT whose
+    /// span parse_word fully covers, and NULL otherwise -- so a NULL word means
+    /// "not covered, use the legacy path", not "not wired yet". The CST route
+    /// is the DEFAULT for a covered argument (opt out with LUSH_WORD_CST=0).
+    /// Spans inside it are absolute against the original input: the parser
+    /// rebases them at attach time (word_rebase), because parse_word runs on a
+    /// bounded COPY of the argument's span.
     word_t *word;
 } node_t;
 

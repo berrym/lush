@@ -254,4 +254,26 @@ void word_part_free(word_part_t *p);
  */
 char *word_reconstruct(const word_t *w, const char *src, size_t srclen);
 
+/**
+ * @brief Shift every source span in @p w by @p base bytes.
+ *
+ * A word is often parsed from a COPY of its source span (the parser hands
+ * parse_word a strndup'd slice so the re-lex is bounded to that one argument),
+ * which makes every span in the result relative to that copy rather than to the
+ * real input. Rebasing at the attach point makes them absolute, so
+ * word_reconstruct and any span consumer -- debugger, formatter, error
+ * snippets -- read the right bytes. Without it the offsets silently address the
+ * wrong text: word_reconstruct only checks that a span FITS the buffer it is
+ * given, so a wrong-but-in-range offset returns successfully.
+ *
+ * Descends into group bodies and multi-item words, which share the word's
+ * coordinate system. Does NOT descend into a WP_PARAM's subscript / operand /
+ * operand2: those are parsed from their own strings and are already relative to
+ * THEMSELVES, so shifting them by this base would make them meaningless.
+ *
+ * @param w    Word to rebase (NULL is a no-op).
+ * @param base Byte offset of the word's source within the real input.
+ */
+void word_rebase(word_t *w, uint32_t base);
+
 #endif /* LUSH_WORD_H */

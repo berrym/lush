@@ -6761,7 +6761,20 @@ static void word_cst_audit(executor_t *executor, node_t *child, char **fields,
     } else if (n == 1) {
         match = (legacy && strcmp(fields[0], legacy) == 0);
     } else {
-        match = false; /// >1 field is not a covered lush-mode shape yet
+        /// A covered word yielding MORE THAN ONE field. Unreachable today --
+        /// word_eval flushes a single field for every covered shape -- and the
+        /// audit's legacy side is a scalar, so there is nothing to compare it
+        /// against. Rather than let this masquerade as a value mismatch and
+        /// send whoever widens coverage hunting a phantom expansion bug, say
+        /// exactly what happened and what to do about it.
+        fprintf(stderr,
+                "WORD_CST AUDIT: word='%s' was COVERED and produced %d fields, "
+                "but the audit can only compare a single-field result against "
+                "legacy's scalar. Teach word_cst_audit to build and compare a "
+                "legacy FIELD VECTOR before widening coverage to multi-field "
+                "words.\n",
+                child->val.str ? child->val.str : "", n);
+        abort();
     }
     /// A scalar-matching covered word still diverges if legacy would then
     /// brace/glob-expand that scalar. Gate mirrors build_argv exactly.
