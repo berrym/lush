@@ -924,6 +924,34 @@ static char *split_substitution_spec(const char *spec,
     return pattern;
 }
 
+/// Which branch of a conditional operator consumes the operand. See param_op.h.
+/// The trigger conditions are the same ones lush_param_op_apply switches on, so
+/// this predicate and the operator it gates cannot disagree about which branch
+/// runs. Verified against bash and zsh across every (operator, value-state)
+/// pair: both evaluate the operand only on the consuming branch.
+bool lush_param_op_consumes_operand(int op_type, const char *var_value) {
+    bool unset = (var_value == NULL);
+    bool empty_or_unset = (!var_value || var_value[0] == '\0');
+    switch (op_type) {
+    case 0:  /// ${var:-w}   -- w only when unset OR null
+    case 12: /// ${var:=w}   -- assigns w only when unset OR null
+    case 18: /// ${var:?w}   -- w is the message, printed only when it fires
+        return empty_or_unset;
+    case 10: /// ${var-w}    -- w only when unset
+    case 13: /// ${var=w}    -- assigns w only when unset
+    case 19: /// ${var?w}    -- message, only when it fires
+        return unset;
+    case 1: /// ${var:+w}    -- w only when set AND non-null
+        return !empty_or_unset;
+    case 11: /// ${var+w}    -- w only when set
+        return !unset;
+    default:
+        /// Pattern strip, case conversion, substring, substitution and the
+        /// transforms all need their operand on every branch.
+        return true;
+    }
+}
+
 /// The required-parameter operators' pure half. See param_op.h.
 bool lush_param_op_required_fires(int op_type, const char *var_value) {
     switch (op_type) {

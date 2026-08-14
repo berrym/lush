@@ -378,7 +378,17 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
                     *ok = false;
                     return true;
                 }
-            } else if (p->u.param.operand) {
+            } else if (p->u.param.operand &&
+                       lush_param_op_consumes_operand(p->u.param.op, value)) {
+                /// Evaluated ONLY on the branch that consumes it (#692). A
+                /// discarded operand is a word: evaluating it would run its
+                /// command substitution, assign through a nested `${u:=x}`, or
+                /// raise a diagnostic for a branch never taken. The legacy
+                /// expander gates on the SAME predicate, so the two routes
+                /// agree on side effects and not merely on the value -- which
+                /// matters because the audit compares fields and is blind to a
+                /// side-effect divergence.
+                ///
                 /// Alternation operand: a scalar default value. The operator
                 /// RESULT (not the operand) is what the outer word may split,
                 /// and the covered outer word does not split, so the operand

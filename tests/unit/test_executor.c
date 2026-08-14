@@ -1625,6 +1625,73 @@ TEST(rt_dq_backtick_runs_the_substitution) {
     ASSERT_STDOUT_EQ(r, "v: HI\npreApost\n[QB]\n");
 }
 
+TEST(rt_pe_operand_is_evaluated_only_when_consumed) {
+    /// #692: a conditional operator uses its operand on ONE branch. The operand
+    /// is a word -- it can run a command substitution, move a variable through
+    /// an arithmetic side effect, or raise a diagnostic -- so evaluating it on
+    /// the branch that discards the result performs work the expansion never
+    /// asked for. Each line below pairs the discarding branch (side effect must
+    /// NOT happen) with the consuming branch (it must). Verified against bash
+    /// and zsh across all eight operators and all three value states.
+    run_result_t r =
+        run_shell("( v=hi; unset -v u; e=\n"
+                  "  i=0; : \"${v:-$((i+=5))}\"; echo \"a=$i\"\n"
+                  "  i=0; : \"${u:-$((i+=5))}\"; echo \"b=$i\"\n"
+                  "  i=0; : \"${v:+$((i+=5))}\"; echo \"c=$i\"\n"
+                  "  i=0; : \"${e:+$((i+=5))}\"; echo \"d=$i\"\n"
+                  "  i=0; : \"${e-$((i+=5))}\"; echo \"e=$i\"\n"
+                  "  i=0; : \"${u-$((i+=5))}\"; echo \"f=$i\"\n"
+                  "  i=0; : \"${v+$((i+=5))}\"; echo \"g=$i\" )\n");
+    ASSERT_STDOUT_EQ(r, "a=0\nb=5\nc=5\nd=0\ne=0\nf=5\ng=5\n");
+}
+
+TEST(rt_pe_unused_operand_lazy_on_both_engines) {
+    /// The laziness has to hold on BOTH expansion routes. The other tests here
+    /// use `$((...))` / `$(...)` operands, which word_eval DEFERS -- so they
+    /// measure the legacy expander only and would pass even if the Word CST
+    /// evaluated operands eagerly. A nested `${u:=X}` is a side-effecting
+    /// operand form the CST COVERS, so it pins the CST path specifically: the
+    /// discarded branch must not assign. Both routes must agree, because the
+    /// audit gate compares field strings and is blind to a side effect.
+    run_result_t r =
+        run_shell("( v=hi; e=; unset -v n\n"
+                  "  unset -v u; echo \"1 ${v:-${u:=X}} u=[$u]\"\n"
+                  "  unset -v u; echo \"2 ${e:+${u:=X}} u=[$u]\"\n"
+                  "  unset -v u; echo \"3 ${e-${u:=X}} u=[$u]\"\n"
+                  "  unset -v u; echo \"4 ${n+${u:=X}} u=[$u]\"\n"
+                  "  unset -v u; echo \"5 ${v:=${u:=X}} u=[$u]\"\n"
+                  "  unset -v u; echo \"6 ${e=${u:=X}} u=[$u]\" )\n");
+    ASSERT_STDOUT_EQ(r, "1 hi u=[]\n2  u=[]\n3  u=[]\n4  u=[]\n"
+                        "5 hi u=[]\n6  u=[]\n");
+
+    /// And the consuming branch still evaluates and assigns.
+    run_result_t c =
+        run_shell("( unset -v u v; echo \"[${v:-${u:=X}}] u=[$u]\" )\n");
+    ASSERT_STDOUT_EQ(c, "[X] u=[X]\n");
+}
+
+TEST(rt_pe_unused_operand_raises_no_diagnostic) {
+    /// The sharpest form: an unused operand must not report the error of a
+    /// branch never taken. Eagerly expanding `${u:?boom}` inside the default of
+    /// an operator that does not need it made lush diagnose an expansion its
+    /// own semantics say never applies -- and fail the command.
+    run_result_t r =
+        run_shell("( v=hi; unset -v u\n"
+                  "  echo \"[${v:-${u:?boom}}]\"; echo \"rc=$?\" )\n");
+    ASSERT_STDOUT_EQ(r, "[hi]\nrc=0\n");
+    ASSERT_STDERR_EQ(r, "");
+}
+
+TEST(rt_pe_assign_operand_lazy_but_still_assigns) {
+    /// The assign operators must stay lazy WITHOUT losing the write: the
+    /// operand is evaluated (and stored) exactly on the branch that assigns.
+    run_result_t r =
+        run_shell("( v=hi; unset -v u; i=0\n"
+                  "  : \"${v:=$((i+=5))}\"; echo \"kept=$v i=$i\"\n"
+                  "  i=0; : \"${u:=$((i+=5))}\"; echo \"set=$u i=$i\" )\n");
+    ASSERT_STDOUT_EQ(r, "kept=hi i=0\nset=5 i=5\n");
+}
+
 TEST(rt_pe_required_operators_covered) {
     /// The required-parameter operators ${var:?msg} / ${var?msg} expand on the
     /// CST backbone whenever the parameter passes its set-ness test: the
@@ -1699,25 +1766,29 @@ TEST(rt_pe_required_operators_error_forms) {
     ASSERT_TRUE(seen == 1, "the diagnostic is reported exactly once");
 }
 
-TEST(rt_pe_required_message_dollar_defers) {
-    /// The message is expanded EAGERLY by the legacy expander -- before the
-    /// set-ness test -- so `${set_var:?$(cmd)}` runs cmd even though the error
-    /// never fires. word_eval cannot reproduce that side effect while covering
-    /// the expansion, so a `$` in the message defers the whole `${...}`. The
-    /// marker file proves the side effect survives on the CST-default build;
-    /// without the defer it would be silently lost. NOTE: the eager evaluation
-    /// pinned here is itself a divergence from lush's value-producer semantics
-    /// (issue #692); this asserts the CURRENT behavior so the CST cannot change
-    /// it silently. When #692 is fixed this expectation changes with it and the
-    /// `$` operand becomes coverable.
+TEST(rt_pe_required_message_is_not_evaluated_when_unused) {
+    /// The `:?` message is consumed only when the diagnostic fires. This test
+    /// previously pinned the OPPOSITE -- the legacy expander evaluated the
+    /// operand eagerly, so `${set_var:?$(cmd)}` ran cmd even though the error
+    /// never fired -- and said so, flagging it as issue #692 and noting the
+    /// expectation would flip when that was fixed. It is fixed: the marker must
+    /// NOT exist, matching bash. (zsh does not expand the message at all, even
+    /// when firing; lush curates bash's reading that the message IS expanded,
+    /// and now shares its laziness.)
+    ///
+    /// word_eval still defers a `$`-carrying message. That defer is now
+    /// CONSERVATIVE rather than required -- with the operand lazy, covering it
+    /// unevaluated would match legacy -- so the required-parameter family is
+    /// newly widenable. Deferring more than necessary is always safe.
     run_result_t r =
         run_shell_subprocess("m=${TMPDIR:-/tmp}/lush_pe_req_marker_$$\n"
                              "rm -f \"$m\"\n"
                              "v=hi; echo \"[${v:?$(touch $m)x}]\"\n"
-                             "if [ -f \"$m\" ]; then echo SIDE-EFFECT; fi\n"
+                             "if [ -f \"$m\" ]; then echo SIDE-EFFECT; "
+                             "else echo NO-SIDE-EFFECT; fi\n"
                              "rm -f \"$m\"\n");
     ASSERT_EXIT_STATUS(r, 0);
-    ASSERT_STDOUT_EQ(r, "[hi]\nSIDE-EFFECT\n");
+    ASSERT_STDOUT_EQ(r, "[hi]\nNO-SIDE-EFFECT\n");
 }
 
 TEST(rt_map_in_argv_forms) {
@@ -9224,9 +9295,13 @@ int main(void) {
     RUN_TEST(rt_pe_assign_write_is_transactional);
     RUN_TEST(rt_pe_assign_operators_defer_forms);
     RUN_TEST(rt_dq_backtick_runs_the_substitution);
+    RUN_TEST(rt_pe_operand_is_evaluated_only_when_consumed);
+    RUN_TEST(rt_pe_unused_operand_lazy_on_both_engines);
+    RUN_TEST(rt_pe_unused_operand_raises_no_diagnostic);
+    RUN_TEST(rt_pe_assign_operand_lazy_but_still_assigns);
     RUN_TEST(rt_pe_required_operators_covered);
     RUN_TEST(rt_pe_required_operators_error_forms);
-    RUN_TEST(rt_pe_required_message_dollar_defers);
+    RUN_TEST(rt_pe_required_message_is_not_evaluated_when_unused);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);

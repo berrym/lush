@@ -14907,10 +14907,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                         int el_op =
                             detect_param_operator_suffix(after_bracket, &rhs);
                         if (el_op >= 0) {
-                            char *el_default = expand_variables_in_string(
-                                executor, rhs ? rhs : "");
                             char *elem_val =
                                 (result && *result) ? result : NULL;
+                            /// Lazy operand, as on the scalar path (#692).
+                            char *el_default =
+                                lush_param_op_consumes_operand(el_op, elem_val)
+                                    ? expand_variables_in_string(executor,
+                                                                 rhs ? rhs : "")
+                                    : strdup("");
                             bool assign_back = false;
                             char *applied = apply_param_operator(
                                 executor, arr_name, elem_val,
@@ -15071,10 +15075,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                     /// empty value is passed as NULL: the unset-keyed operators
                     /// (`:-`/`-`/`:=`/`=`/`:?`/`?`) fire, matching the declared
                     /// array-element path.
-                    char *el_default = expand_variables_in_string(
-                        executor, el_rhs ? el_rhs : "");
                     char *elem_val =
                         (elem_result && *elem_result) ? elem_result : NULL;
+                    /// Lazy operand, as on the scalar path (#692).
+                    char *el_default =
+                        lush_param_op_consumes_operand(el_op, elem_val)
+                            ? expand_variables_in_string(executor,
+                                                         el_rhs ? el_rhs : "")
+                            : strdup("");
                     bool assign_back = false;
                     char *applied = apply_param_operator(
                         executor, arr_name, elem_val,
@@ -15375,9 +15383,19 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
         const char *default_value = op_pos + strlen(operators[op_type]);
 
-        /// Expand variables in default value
+        /// Expand the operand ONLY on the branch that consumes it. A
+        /// conditional operator uses its operand on one branch and discards it
+        /// on the other, and the operand is a WORD: it can run a command
+        /// substitution, mutate a variable through an arithmetic side effect,
+        /// or raise a diagnostic. Expanding it eagerly performed all of that on
+        /// the branch that throws the result away -- `v=hi; ${v:-$(cmd)}` ran
+        /// cmd, `${v:-$((i+=1))}` moved i, and `${v:-${u:?boom}}` reported the
+        /// error of a branch never taken (issue #692). bash and zsh both
+        /// evaluate only on the consuming branch.
         char *expanded_default =
-            expand_variables_in_string(executor, default_value);
+            lush_param_op_consumes_operand(op_type, var_value)
+                ? expand_variables_in_string(executor, default_value)
+                : strdup("");
 
         char *result = NULL;
 
