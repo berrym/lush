@@ -188,9 +188,16 @@ TEST(parse_required_param_message_is_raw) {
     ASSERT_NULL(p->u.param.operand, "empty message -> no operand word");
     word_free(w);
 
+    /// A `$` message is covered since #692: legacy no longer builds it on the
+    /// branch that discards it, so there is no eager side effect left to
+    /// preserve. The message is captured raw, `$` and all -- it is consulted
+    /// only when the diagnostic fires, and a firing expansion defers.
     fully = false;
     w = parse_line("${v:?$x}", &fully);
-    ASSERT_FALSE(fully, "a `$` message defers (legacy expands it eagerly)");
+    ASSERT_TRUE(fully, "a `$` message is captured raw and covered");
+    p = WORD_PART(PART_BODY(WORD_PART(w, 0)), 0);
+    ASSERT_STR_EQ(WORD_PART(p->u.param.operand, 0)->u.leaf.text, "$x",
+                  "captured verbatim, not expanded");
     word_free(w);
 
     /// A quoting byte defers: lush_find_matching_brace treats a quoted span as
@@ -290,8 +297,9 @@ TEST(deferred_constructs_report_not_handled) {
         "${v@Q}",     /// PE operator: the transform family still defers (the
                       /// alternation, strip, case, substring, substitution,
                       /// assign and required-parameter families are covered)
-        "${v:?$x}",   /// covered operator, but a `$` message defers (legacy
-                      /// expands the operand eagerly -- issue #692)
+        "${v:?'q'}",  /// covered operator, but a QUOTING byte in the message
+                      /// defers: the CST and the legacy double-quoted-word
+                      /// expander disagree on where such a `${...}` ends
         "${#v}",      /// length operator
         "pre$'\\t'",  /// mid-word ANSI-C (standalone $'...' is now covered)
         "pre$x\"$y\"post", /// tokenizer pre-fused mixed-quote token

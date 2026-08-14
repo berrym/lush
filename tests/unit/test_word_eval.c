@@ -410,8 +410,14 @@ TEST(eval_pe_required_operators) {
     ASSERT_FALSE(ok, "`?` on an unset name fires -> defers");
     free_fields(f, n);
 
+    /// A `$` message is COVERED since #692 made the legacy expander evaluate a
+    /// conditional operand only on the branch that consumes it: on the covered
+    /// (non-firing) branch neither route builds the message, so they agree by
+    /// construction. It used to defer here to preserve legacy's eager side
+    /// effect.
     f = peval_env("${s:?$e}", &env, &n, &ok, &fully);
-    ASSERT_FALSE(fully, "a `$` message defers at parse (legacy expands it)");
+    ASSERT_TRUE(fully, "a `$` message parses");
+    ASSERT_TRUE(ok, "and is covered when the parameter passes its test");
     free_fields(f, n);
 
     /// Pin the PRE-CHECK itself. The assertions above are satisfied by

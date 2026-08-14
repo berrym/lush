@@ -1766,6 +1766,36 @@ TEST(rt_pe_required_operators_error_forms) {
     ASSERT_TRUE(seen == 1, "the diagnostic is reported exactly once");
 }
 
+TEST(rt_pe_required_dollar_message_is_covered) {
+    /// The `$`-carrying message used to defer the whole `${...}` because the
+    /// legacy expander built it EAGERLY, so covering it unevaluated would have
+    /// dropped a side effect that had already happened. Since #692 legacy
+    /// evaluates a conditional operand only on the consuming branch, so on the
+    /// non-firing branch NEITHER route evaluates the message -- they agree by
+    /// construction and the defer is obsolete. wordtool reports
+    /// `${v:?$(echo X)}` as covered (rc 0) where it previously reported a
+    /// defer (rc 2).
+    ///
+    /// Behaviour must be identical either way, which is the point: this pins
+    /// that widening coverage changed nothing observable. The marker proves the
+    /// message is not built when the parameter passes its test, and the firing
+    /// case proves it still is when the diagnostic needs it.
+    run_result_t r = run_shell_subprocess(
+        "m=${TMPDIR:-/tmp}/lush_req_dollar_$$\n"
+        "rm -f \"$m\"\n"
+        "v=hi; echo \"[${v:?$(touch $m)x}]\"\n"
+        "if [ -f \"$m\" ]; then echo BUILT; else echo NOT-BUILT; fi\n"
+        "rm -f \"$m\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "[hi]\nNOT-BUILT\n");
+
+    /// Firing: the message IS built, expanded, and reported once.
+    run_result_t f =
+        run_shell_subprocess("unset u\necho \"[${u:?$(echo EXPANDED)}]\"\n");
+    ASSERT_EXIT_STATUS(f, 1);
+    ASSERT_STDERR_CONTAINS(f, "u: EXPANDED");
+}
+
 TEST(rt_pe_required_message_is_not_evaluated_when_unused) {
     /// The `:?` message is consumed only when the diagnostic fires. This test
     /// previously pinned the OPPOSITE -- the legacy expander evaluated the
@@ -9301,6 +9331,7 @@ int main(void) {
     RUN_TEST(rt_pe_assign_operand_lazy_but_still_assigns);
     RUN_TEST(rt_pe_required_operators_covered);
     RUN_TEST(rt_pe_required_operators_error_forms);
+    RUN_TEST(rt_pe_required_dollar_message_is_covered);
     RUN_TEST(rt_pe_required_message_is_not_evaluated_when_unused);
     RUN_TEST(rt_map_in_argv_forms);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
