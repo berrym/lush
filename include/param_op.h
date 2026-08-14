@@ -81,6 +81,25 @@ char *lush_param_op_apply(int op_type, const char *var_value,
  * @param op_type   18 (`:?`) or 19 (`?`); any other operator returns false.
  * @param var_value The variable's value, or NULL when it is unset.
  */
+/**
+ * @brief True when @p op_type will actually CONSUME its operand for this value.
+ *
+ * The conditional operators use their operand on only one branch: `${v:-w}`
+ * needs `w` only when `v` is unset or null, `${v:+w}` only when it is set and
+ * non-null, and so on. The operand is a word -- it can run a command
+ * substitution, mutate a variable through an arithmetic side effect, or raise a
+ * diagnostic -- so evaluating it on the branch that discards it performs work
+ * the expansion never asked for. Callers use this to expand LAZILY.
+ *
+ * Returns true for every operator whose operand is always needed (the pattern,
+ * substring, substitution and transform families), so a caller can gate on it
+ * unconditionally.
+ *
+ * @param op_type   Operator index (see lush_param_op_is_pure).
+ * @param var_value The variable's value, or NULL when it is unset.
+ */
+bool lush_param_op_consumes_operand(int op_type, const char *var_value);
+
 bool lush_param_op_required_fires(int op_type, const char *var_value);
 
 /**
