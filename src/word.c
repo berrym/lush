@@ -314,6 +314,65 @@ fail:
 
 /// Lossless reconstruction.
 
+static void word_part_rebase(word_part_t *p, uint32_t base);
+
+void word_rebase(word_t *w, uint32_t base) {
+    if (!w || base == 0) {
+        return;
+    }
+    w->src_off += base;
+    for (uint32_t i = 0; i < w->n_parts; i++) {
+        word_part_rebase(w->parts[i], base);
+    }
+    word_rebase(w->key, base);
+}
+
+/// Span-shift one part. Mirrors word_part_copy's traversal so a new kind cannot
+/// be added without visiting here: no default label, and the switch is wrapped
+/// in the same pragma region that promotes -Wswitch and -Wswitch-enum to
+/// errors on both clang and gcc.
+static void word_part_rebase(word_part_t *p, uint32_t base) {
+    if (!p) {
+        return;
+    }
+    p->src_off += base;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wswitch"
+#pragma GCC diagnostic error "-Wswitch-enum"
+    switch (p->kind) {
+    case WP_DOUBLE:
+    case WP_BARE:
+        word_rebase(p->u.group.body, base);
+        break;
+    case WP_BRACE:
+    case WP_ARRAY_LIT:
+        for (uint32_t i = 0; i < p->u.multi.n_items; i++) {
+            word_rebase(p->u.multi.items[i], base);
+        }
+        break;
+    case WP_PARAM:
+        /// subscript / operand / operand2 are parsed from their OWN strings, so
+        /// their spans are already relative to themselves. Shifting them by
+        /// this word's base would make them address unrelated bytes. They stay
+        /// in their own coordinate system -- see word_rebase's contract.
+        break;
+    case WP_LITERAL:
+    case WP_SINGLE:
+    case WP_ANSIC:
+    case WP_CMDSUB:
+    case WP_BACKTICK:
+    case WP_ARITH:
+    case WP_TILDE:
+    case WP_PROCSUB_IN:
+    case WP_PROCSUB_OUT:
+    case WP_KINDSIGIL:
+        /// Leaves: the span shifted above is all they carry.
+        break;
+    }
+#pragma GCC diagnostic pop
+}
+
 char *word_reconstruct(const word_t *w, const char *src, size_t srclen) {
     if (!w || !src) {
         return NULL;

@@ -11,15 +11,23 @@
  * See docs/development/WORD_CST_PLAN.md section 5. Bench-only in Step 1c; wired
  * into the live executor at the Phase 2 cutover.
  *
- * STEP 1c-1 SCOPE: the lush-mode (no word-split) covered subset -- literals,
- * single/double quotes, simple $name (identifier) references, and adjacency
- * fusion. In lush mode no covered word splits, so each word yields 0 fields
- * (an unquoted expansion that produced empty -- null-word removal) or 1 field.
- * word_eval sets *out_ok = false (not-yet-covered) for anything outside that:
- * an active unquoted glob metacharacter, a special/subscripted/operator param,
- * a vector form, or -- when word_split_default is set (bash mode) -- an
- * unquoted parameter that would need IFS splitting (the split path is Step
- * 1c-1b). It never fabricates a wrong field vector; the differential harness
+ * COVERED SUBSET (widened slice by slice; this list is the current state, not
+ * a plan): literals, single/double quotes, ANSI-C `$'...'`, adjacency fusion,
+ * simple $name references, the scalar specials $?/$$/$#/$!/$-, the
+ * single-digit positionals $0-$9, and seven parameter-expansion operator
+ * families -- alternation (`:-` `:+` `-` `+`), pattern-strip (`#` `##` `%`
+ * `%%`), case-conversion (`^` `^^` `,` `,,`), substring (`:off:len`),
+ * substitution (`/` `//`), assign (`:=` `=`), and the non-firing half of the
+ * required-parameter errors (`:?` `?`).
+ *
+ * In lush mode no covered word splits, so each word yields 0 fields (an
+ * unquoted expansion that produced empty -- null-word removal) or 1 field.
+ * word_eval sets *out_ok = false (not-yet-covered) for anything outside the
+ * covered set: an active unquoted glob metacharacter, a vector form, a
+ * subscripted or `@`-transform param, a backtick or command substitution, a
+ * firing `:?`, an unbound name under `set -u`, or -- when word_split_default
+ * is set (bash mode) -- an unquoted parameter that would need IFS splitting.
+ * It never fabricates a wrong field vector; the differential harness
  * classifies a not-ok word as not-yet-covered, distinct from a parity bug.
  */
 #ifndef LUSH_WORD_EVAL_H

@@ -1783,6 +1783,11 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                     bool fully = false;
                     word_t *w = parse_word(wtok, WORD_CTX_ARG, &fully);
                     if (w && fully) {
+                        /// parse_word ran on `span`, a COPY starting at
+                        /// first_pos, so every span in the result is relative
+                        /// to that copy -- which is freed below. Rebase to the
+                        /// real input so a span consumer reads the right bytes.
+                        word_rebase(w, (uint32_t)first_pos);
                         attached->word = w;
                     } else {
                         word_free(w);
