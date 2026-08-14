@@ -177,6 +177,35 @@ char *lush_substring_extract(const char *str, int offset, int length,
  * @param longest If true, find longest match (##), else shortest (#)
  * @return Number of characters matched from beginning
  */
+/// True when byte offset @p off in @p str starts a TR#29 grapheme cluster.
+///
+/// The prefix and suffix strip operators try candidate split points and ask the
+/// shared matcher whether each candidate matches the pattern. Offering a
+/// candidate that falls INSIDE a character is what produced issue #682: for
+/// `caf` + U+00E9 the byte-aligned suffix loop handed the matcher a lone
+/// continuation byte, `decode_one` charitably treated that invalid byte as a
+/// one-byte codepoint, `?` matched it, and one byte was stripped -- leaving a
+/// truncated UTF-8 sequence on stdout.
+///
+/// Restricting candidates to character boundaries makes that unrepresentable
+/// rather than merely unlikely: a split the operator cannot express is a split
+/// it cannot emit. Offsets 0 and strlen are boundaries by definition.
+static bool at_grapheme_boundary(const char *str, size_t str_len, size_t off) {
+    if (off == 0 || off >= str_len) {
+        return true;
+    }
+    /// A UTF-8 continuation byte is not a codepoint start, and
+    /// lle_is_grapheme_boundary reports invalid UTF-8 as a boundary -- a lone
+    /// continuation byte is invalid standing alone, so asking it directly
+    /// would answer "yes" for exactly the mid-character offsets this is meant
+    /// to reject. Screen those out first, the same way lush_substring_extract
+    /// only consults the boundary algorithm at codepoint starts.
+    if (((unsigned char)str[off] & 0xC0) == 0x80) {
+        return false;
+    }
+    return lle_is_grapheme_boundary(str + off, str, str + str_len);
+}
+
 int lush_prefix_match_len(const char *str, const char *pattern, bool longest) {
     if (!str || !pattern) {
         return 0;
@@ -186,6 +215,10 @@ int lush_prefix_match_len(const char *str, const char *pattern, bool longest) {
     int match_len = 0;
 
     for (int i = 0; i <= str_len; i++) {
+        /// Only split on character boundaries -- see at_grapheme_boundary.
+        if (!at_grapheme_boundary(str, (size_t)str_len, (size_t)i)) {
+            continue;
+        }
         char *substr = malloc(i + 1);
         if (!substr) {
             break;
@@ -227,6 +260,11 @@ int lush_suffix_match_len(const char *str, const char *pattern, bool longest) {
     int match_len = 0;
 
     for (int i = 0; i <= str_len; i++) {
+        /// Only split on character boundaries -- see at_grapheme_boundary.
+        if (!at_grapheme_boundary(str, (size_t)str_len,
+                                  (size_t)(str_len - i))) {
+            continue;
+        }
         const char *suffix = str + str_len - i;
         if (lush_shell_pattern_match(suffix, pattern)) {
             match_len = i;

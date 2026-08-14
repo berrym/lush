@@ -19,6 +19,7 @@
 
 #include "lle/unicode_case.h"
 #include "lle/unicode_class.h"
+#include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include "shell_mode.h"
 
@@ -149,6 +150,49 @@ static uint32_t decode_one(const char *p, size_t *bytes) {
         *bytes = (size_t)consumed;
     }
     return cp;
+}
+
+/**
+ * @brief Byte length of the TR#29 grapheme cluster starting at `s`
+ *
+ * lush is grapheme-aware everywhere it processes text that is not provably
+ * ASCII: a "character" in this shell is a user-perceived character (Unicode
+ * TR#29 extended grapheme cluster), not a codepoint and not a byte. The
+ * wildcards honour that, so `?` consumes `e` + U+0301 as ONE character rather
+ * than leaving a combining mark stranded -- and never splits a multi-byte
+ * sequence into an invalid byte stream (issue #682).
+ *
+ * Steps codepoint by codepoint via lle_utf8_decode_codepoint and stops at the
+ * next position lle_is_grapheme_boundary reports -- the same idiom
+ * lush_substring_extract uses in src/param_op.c.
+ *
+ * The boundary algorithm takes the enclosing string so it can see the
+ * character preceding the position under test. Stepping FORWARD from `s` that
+ * character is always at or after `s` itself (the cluster's own base), so `s`
+ * serves as the start bound -- which matters because the matcher recurses with
+ * a moving `s` and does not carry the original string head. Returns at least 1
+ * for a malformed byte, so a bad sequence can never stall the matcher.
+ */
+static size_t grapheme_step(const char *s) {
+    if (!s || !*s) {
+        return 0;
+    }
+    const char *end = s + strlen(s);
+    size_t step = 0;
+    (void)decode_one(s, &step);
+    if (step == 0) {
+        step = 1;
+    }
+    const char *q = s + step;
+    while (q < end && *q && !lle_is_grapheme_boundary(q, s, end)) {
+        size_t more = 0;
+        (void)decode_one(q, &more);
+        if (more == 0) {
+            more = 1;
+        }
+        q += more;
+    }
+    return (size_t)(q - s);
 }
 
 /**
@@ -576,17 +620,17 @@ static bool match(const char *s, const char *p, unsigned flags) {
             if (*p == '\0') {
                 return true;
             }
-            /// Step through input by codepoint anchors. Mid-codepoint
-            /// anchor positions are invalid UTF-8 starting points and
-            /// would never match an honest pattern, so codepoint
-            /// stepping is both faster and more principled than the
-            /// prior byte-stepping `s++`.
+            /// Step through input by GRAPHEME anchors. A mid-cluster anchor is
+            /// not a character boundary, so offering one lets the rest of the
+            /// pattern match starting INSIDE a user-perceived character --
+            /// which is how `${v%?}` came to strip a lone continuation byte and
+            /// emit invalid UTF-8 (issue #682). Anchoring on clusters is also
+            /// strictly fewer positions to try than codepoints or bytes.
             while (*s) {
                 if (match(s, p, flags)) {
                     return true;
                 }
-                size_t step;
-                (void)decode_one(s, &step);
+                size_t step = grapheme_step(s);
                 if (step == 0) {
                     step = 1; /// defensive against malformed UTF-8
                 }
@@ -598,12 +642,11 @@ static bool match(const char *s, const char *p, unsigned flags) {
             if (*s == '\0') {
                 return false;
             }
-            /// `?` matches one codepoint, not one byte. The pattern
-            /// `c?é` against `café` previously failed because `?` ate
-            /// only the first byte of `é` and the literal `é` then
-            /// failed to match starting mid-codepoint.
-            size_t step;
-            (void)decode_one(s, &step);
+            /// `?` matches one CHARACTER -- a TR#29 grapheme cluster, which
+            /// is what a user means by one character. A codepoint would consume
+            /// `e` out of `e`+U+0301 and strand the combining mark; a byte
+            /// would split the sequence and emit invalid UTF-8 (issue #682).
+            size_t step = grapheme_step(s);
             if (step == 0) {
                 step = 1;
             }

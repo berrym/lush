@@ -188,6 +188,46 @@ TEST(question_matches_unicode_codepoint) {
            "? + literal mismatch fails cleanly");
 }
 
+TEST(question_matches_decomposed_grapheme_cluster) {
+    /// THE DISCRIMINATING CASE. Every pre-existing Unicode test here uses
+    /// PRECOMPOSED literals ("café" = U+00E9), where one codepoint and one
+    /// TR#29 grapheme cluster are the same thing -- so they pass under
+    /// codepoint-only semantics and cannot detect the difference. A DECOMPOSED
+    /// sequence separates them: "cafe" + U+0301 is five codepoints but four
+    /// characters.
+    ///
+    /// lush is grapheme-aware everywhere it handles text that is not provably
+    /// ASCII, so `?` is one CHARACTER: it consumes the base and its combining
+    /// mark together. Under codepoint semantics `?` would eat the `e` and
+    /// leave U+0301 unmatched, and under byte semantics it would split the
+    /// mark itself and emit invalid UTF-8 (issue #682).
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "caf?"),
+           "? matches a decomposed e+U+0301 as ONE character");
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "c?f?"),
+           "two ? match c-a-f-e-combining as four characters");
+    ASSERT(!lush_pattern_match("cafe\xcc\x81", "caf??"),
+           "the cluster is ONE character, so two ? overshoot");
+
+    /// A multi-codepoint emoji cluster is the same rule at a larger scale:
+    /// family emoji joined by ZWJ are one user-perceived character.
+    ASSERT(lush_pattern_match("\xf0\x9f\x91\xa9\xe2\x80\x8d"
+                              "\xf0\x9f\x92\xbb",
+                              "?"),
+           "? matches a ZWJ emoji sequence as one character");
+}
+
+TEST(star_anchors_on_grapheme_boundaries) {
+    /// `*` offers candidate anchor positions to the rest of the pattern. A
+    /// mid-cluster anchor is not a character boundary, so offering one lets the
+    /// tail match starting INSIDE a character -- the same defect shape that
+    /// made `${v%?}` strip a lone continuation byte.
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "*e\xcc\x81"),
+           "* anchors before a whole cluster");
+    ASSERT(!lush_pattern_match("cafe\xcc\x81", "*\xcc\x81"),
+           "* never anchors mid-cluster, so a bare combining mark is not a "
+           "character the tail can start at");
+}
+
 TEST(literal_multibyte_matches) {
     ASSERT(lush_pattern_match("café", "café"),
            "literal multi-byte pattern matches identical input");
@@ -329,6 +369,8 @@ int main(void) {
 
     printf("\nUnicode codepoint awareness:\n");
     RUN_TEST(question_matches_unicode_codepoint);
+    RUN_TEST(question_matches_decomposed_grapheme_cluster);
+    RUN_TEST(star_anchors_on_grapheme_boundaries);
     RUN_TEST(literal_multibyte_matches);
     RUN_TEST(star_matches_with_unicode_tail);
     RUN_TEST(bracket_range_unicode_lowercase);
