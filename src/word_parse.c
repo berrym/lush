@@ -262,16 +262,21 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     }
     /// The required-parameter operators take the operand as a raw MESSAGE:
     /// legacy never dequotes or word-splits it, so it is captured verbatim
-    /// below instead of being tokenized into a word. Two byte classes must
-    /// still defer.
+    /// below instead of being tokenized into a word. It is never consulted on
+    /// the covered path -- the message exists only for the diagnostic, and a
+    /// firing expansion defers -- so its CONTENT does not have to be modelled.
     ///
-    /// `$`, because legacy expands the message EAGERLY -- before the set-ness
-    /// test -- so `${set_var:?$(cmd)}` runs cmd even though the error never
-    /// fires (verified, not assumed; that eager evaluation is itself issue
-    /// #692). word_eval cannot reproduce that side effect while covering the
-    /// expansion, so leave the whole `${...}` to the legacy expander.
+    /// A `$` used to defer here, because legacy expanded the message EAGERLY,
+    /// before the set-ness test, and covering it unevaluated would have lost a
+    /// side effect that had already happened. Since #692 the legacy expander
+    /// evaluates a conditional operand only on the branch that consumes it, so
+    /// on the covered (non-firing) branch NEITHER route evaluates the message
+    /// and the two agree by construction. The defer is gone; `${v:?$msg}` and
+    /// `${v:?$(cmd)}` are covered when the parameter passes its set-ness test,
+    /// and still defer when it does not, which is where the message is built.
     ///
-    /// A quote, backtick or backslash, because the two routes do not agree on
+    /// A quote, backtick or backslash still defers, because the two routes do
+    /// not agree on
     /// where the `${...}` ENDS. The CST finds the closing brace with
     /// lush_find_matching_brace, which treats `'...'`, `"..."`, `` `...` ``,
     /// `$'...'` and `\X` as atomic spans; the legacy double-quoted-word
@@ -284,9 +289,8 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     /// -- `${v:?}`, `${v:?required}`, `${v:?must be set}` -- are unaffected.
     if (op_has_raw_operand(op)) {
         for (size_t i = 0; i < operand_len; i++) {
-            if (operand_str[i] == '$' || operand_str[i] == '\'' ||
-                operand_str[i] == '"' || operand_str[i] == '`' ||
-                operand_str[i] == '\\') {
+            if (operand_str[i] == '\'' || operand_str[i] == '"' ||
+                operand_str[i] == '`' || operand_str[i] == '\\') {
                 *handled = false;
                 return NULL;
             }
