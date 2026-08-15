@@ -3215,6 +3215,16 @@ if fs.exists('tests/integration/test_comment_after_operator.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_arith_boundaries.c')
+  test_arith_boundaries = executable('test_arith_boundaries',
+    ['tests/integration/test_arith_boundaries.c'])
+  test('arithmetic expression boundaries (wrapper, group, base, redirection)',
+       test_arith_boundaries,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_hash_in_word.c')
   test_hash_in_word = executable('test_hash_in_word',
     ['tests/integration/test_hash_in_word.c'])

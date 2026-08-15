@@ -136,6 +136,7 @@ tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
     tokenizer->lookahead = NULL;
     tokenizer->enable_keywords = true;
     tokenizer->arith_cmd_depth = 0;
+    tokenizer->arith_paren_depth = 0;
 
     /// Initialize by getting the first two tokens. The line number must
     /// be set BEFORE tokenize_next, since lookahead pre-tokenizes too.
@@ -520,6 +521,10 @@ void tokenizer_refresh_lookahead(tokenizer_t *tokenizer) {
     size_t saved_position = tokenizer->lookahead->position;
     size_t saved_line = tokenizer->lookahead->line;
     size_t saved_column = tokenizer->lookahead->column;
+    /// ... and the scan depths it started from, or re-reading the same text
+    /// counts its parentheses a second time.
+    int saved_cmd_depth = tokenizer->lookahead->arith_cmd_depth_before;
+    int saved_paren_depth = tokenizer->lookahead->arith_paren_depth_before;
 
     /// Free the lookahead
     token_free(tokenizer->lookahead);
@@ -528,6 +533,8 @@ void tokenizer_refresh_lookahead(tokenizer_t *tokenizer) {
     tokenizer->position = saved_position;
     tokenizer->line = saved_line;
     tokenizer->column = saved_column;
+    tokenizer->arith_cmd_depth = saved_cmd_depth;
+    tokenizer->arith_paren_depth = saved_paren_depth;
 
     /// Re-tokenize with current settings
     tokenizer->lookahead = tokenize_next(tokenizer);
@@ -550,6 +557,8 @@ void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer) {
     size_t saved_position = tokenizer->current->position;
     size_t saved_line = tokenizer->current->line;
     size_t saved_column = tokenizer->current->column;
+    int saved_cmd_depth = tokenizer->current->arith_cmd_depth_before;
+    int saved_paren_depth = tokenizer->current->arith_paren_depth_before;
 
     token_free(tokenizer->current);
     tokenizer->current = NULL;
@@ -561,6 +570,8 @@ void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer) {
     tokenizer->position = saved_position;
     tokenizer->line = saved_line;
     tokenizer->column = saved_column;
+    tokenizer->arith_cmd_depth = saved_cmd_depth;
+    tokenizer->arith_paren_depth = saved_paren_depth;
 
     tokenizer->current = tokenize_next(tokenizer);
     tokenizer->lookahead = tokenize_next(tokenizer);
@@ -589,6 +600,14 @@ void tokenizer_refresh_from_position(tokenizer_t *tokenizer) {
         token_free(tokenizer->lookahead);
         tokenizer->lookahead = NULL;
     }
+
+    /// The caller has moved the cursor to a new command boundary -- past a
+    /// here-document body, or forward after an error. Arithmetic depth does
+    /// not span that boundary (a here-doc body cannot sit inside (( ))), and
+    /// the discarded tokens may have counted parentheses out of a body that is
+    /// data, not code. Start the arithmetic scan state clean.
+    tokenizer->arith_cmd_depth = 0;
+    tokenizer->arith_paren_depth = 0;
 
     /// Re-tokenize from current position
     tokenizer->current = tokenize_next(tokenizer);
@@ -627,6 +646,8 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
     /// the conservative position + length so consumers that bypass the
     /// wrapper still get a usable value for unquoted tokens.
     token->end_position = position + length;
+    token->arith_cmd_depth_before = 0;
+    token->arith_paren_depth_before = 0;
     token->next = NULL;
     token->glob_qualified = false;
     /// Per-character quote provenance is opt-in: only the mixed-quote word
@@ -838,9 +859,15 @@ static void skip_whitespace(tokenizer_t *tokenizer) {
  * expansions, and other tokens whose stored text length differs from
  * the consumed input span. */
 static token_t *tokenize_next(tokenizer_t *tokenizer) {
+    /// Snapshot the arithmetic scan depths BEFORE the scan, so a rewind to
+    /// this token can restore them (see token_t::arith_cmd_depth_before).
+    int cmd_before = tokenizer ? tokenizer->arith_cmd_depth : 0;
+    int paren_before = tokenizer ? tokenizer->arith_paren_depth : 0;
     token_t *tok = tokenize_next_inner(tokenizer);
     if (tok && tokenizer) {
         tok->end_position = tokenizer->position;
+        tok->arith_cmd_depth_before = cmd_before;
+        tok->arith_paren_depth_before = paren_before;
     }
     return tok;
 }
@@ -2168,6 +2195,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
             tokenizer->position++;
             tokenizer->column++;
+            /// A plain group inside (( )) must be balanced before a `))` can
+            /// be read as the command terminator (#608).
+            if (tokenizer->arith_cmd_depth > 0) {
+                tokenizer->arith_paren_depth++;
+            }
             return token_new(TOK_LPAREN, "(", 1, start_line, start_column,
                              start_pos);
 
@@ -2176,18 +2208,32 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             /// Without this check, nested process substitutions like
             /// cat <(cat <(echo nested)) would fail because )) gets
             /// tokenized as TOK_DOUBLE_RPAREN instead of two TOK_RPAREN
+            ///
+            /// Only when no plain ( ) group is still open: in `(( (3-(2)) ))`
+            /// the `))` after the 2 closes the inner group and then the outer
+            /// one -- it is not the command terminator. Fusing it consumed the
+            /// terminator and the command failed to parse (#608). `+(`/`*(`
+            /// escaped this only because they lex as extglob operators.
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == ')' &&
                 tokenizer->arith_cmd_depth > 0 &&
+                tokenizer->arith_paren_depth == 0 &&
                 shell_mode_allows(FEATURE_ARITH_COMMAND)) {
                 tokenizer->position += 2;
                 tokenizer->column += 2;
                 tokenizer->arith_cmd_depth--; /// Leaving arithmetic context
+                if (tokenizer->arith_cmd_depth == 0) {
+                    tokenizer->arith_paren_depth = 0;
+                }
                 return token_new(TOK_DOUBLE_RPAREN, "))", 2, start_line,
                                  start_column, start_pos);
             }
             tokenizer->position++;
             tokenizer->column++;
+            if (tokenizer->arith_cmd_depth > 0 &&
+                tokenizer->arith_paren_depth > 0) {
+                tokenizer->arith_paren_depth--;
+            }
             return token_new(TOK_RPAREN, ")", 1, start_line, start_column,
                              start_pos);
 

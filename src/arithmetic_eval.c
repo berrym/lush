@@ -26,6 +26,7 @@
 
 #include "arithmetic_ast.h"
 #include "executor.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <limits.h>
@@ -153,7 +154,10 @@ static char *read_var_string(eval_ctx_t *ctx, const char *name) {
  */
 static bool parse_pure_integer(const char *s, ssize_t *out) {
     char *end = NULL;
-    long value = strtol(s, &end, 0);
+    /// The same base rule the lexer applies, so a scalar holding "010" and the
+    /// literal 010 can never disagree (#578).
+    long value =
+        arith_strtol_based(s, shell_mode_allows(FEATURE_OCTAL_ZEROES), &end);
     if (end == s) {
         return false; /// no digits consumed
     }
@@ -171,7 +175,7 @@ static bool parse_pure_integer(const char *s, ssize_t *out) {
  * @brief Resolve an owned value string to its integer value (recursively).
  *
  * Takes ownership of @p value (always non-NULL) and frees it. A pure integer
- * literal reads by base 0 (0x hex, 0 octal, decimal -- issue #578); an empty /
+ * literal reads under the active base rule (issue #578); an empty /
  * all-whitespace value is 0; any other value is itself evaluated as an
  * arithmetic expression, depth-capped to bound cycles. Shared by scalar reads
  * (read_scalar) and array-element reads (lvalue_read), so `a[0]="b+1"; b=5`
@@ -210,7 +214,8 @@ static ssize_t resolve_value_string(eval_ctx_t *ctx, char *value) {
     /// Evaluate the value as an arithmetic expression.
     arith_token_t *tokens = NULL;
     size_t count = 0;
-    if (!arith_lex(value, &tokens, &count, ctx->diag)) {
+    if (!arith_lex(value, &tokens, &count, ctx->diag,
+                   shell_mode_allows(FEATURE_OCTAL_ZEROES))) {
         ctx->failed = true;
         free(value);
         return 0;
@@ -281,7 +286,8 @@ static ssize_t eval_subscript(eval_ctx_t *ctx, const char *raw) {
     }
     arith_token_t *tokens = NULL;
     size_t count = 0;
-    if (!arith_lex(raw, &tokens, &count, ctx->diag)) {
+    if (!arith_lex(raw, &tokens, &count, ctx->diag,
+                   shell_mode_allows(FEATURE_OCTAL_ZEROES))) {
         ctx->failed = true;
         return 0;
     }

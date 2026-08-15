@@ -37,7 +37,7 @@ static bool eval_expr(executor_t *exec, const char *expr, ssize_t *out) {
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    if (!arith_lex(expr, &tokens, &count, &diag)) {
+    if (!arith_lex(expr, &tokens, &count, &diag, true)) {
         return false;
     }
     arith_ast_t *ast = arith_parse(tokens, count, &diag);
@@ -58,7 +58,7 @@ static bool eval_fails(executor_t *exec, const char *expr,
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    if (!arith_lex(expr, &tokens, &count, &diag)) {
+    if (!arith_lex(expr, &tokens, &count, &diag, true)) {
         return false;
     }
     arith_ast_t *ast = arith_parse(tokens, count, &diag);

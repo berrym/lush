@@ -21,7 +21,7 @@ static bool parse_sexpr(const char *expr, char *out, size_t outsize) {
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    if (!arith_lex(expr, &tokens, &count, &diag)) {
+    if (!arith_lex(expr, &tokens, &count, &diag, true)) {
         return false;
     }
     arith_ast_t *ast = arith_parse(tokens, count, &diag);
@@ -42,7 +42,7 @@ static bool parse_fails(const char *expr, shell_error_code_t expected_code) {
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    if (!arith_lex(expr, &tokens, &count, &diag)) {
+    if (!arith_lex(expr, &tokens, &count, &diag, true)) {
         return diag.flagged && diag.code == expected_code;
     }
     arith_ast_t *ast = arith_parse(tokens, count, &diag);
@@ -81,7 +81,7 @@ TEST(lex_span_recorded) {
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    bool ok = arith_lex("12 @", &tokens, &count, &diag);
+    bool ok = arith_lex("12 @", &tokens, &count, &diag, true);
     ASSERT_TRUE(!ok, "lexing '12 @' fails");
     ASSERT_EQ((long)diag.pos, 3L, "caret at the '@' (offset 3)");
     ASSERT_EQ((long)diag.len, 1L, "caret length 1");
@@ -286,7 +286,8 @@ TEST(empty_is_not_an_error) {
     arith_token_t *tokens = NULL;
     size_t count = 0;
     arith_diag_t diag = {0};
-    ASSERT_TRUE(arith_lex("   ", &tokens, &count, &diag), "lexing blanks");
+    ASSERT_TRUE(arith_lex("   ", &tokens, &count, &diag, true),
+                "lexing blanks");
     arith_ast_t *ast = arith_parse(tokens, count, &diag);
     arith_tokens_free(tokens, count);
     ASSERT_NULL(ast, "empty expression yields a NULL AST");
