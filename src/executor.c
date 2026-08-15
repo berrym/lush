@@ -915,6 +915,46 @@ void executor_clear_context(executor_t *executor) {
 static bool g_error_display_muted = false;
 static char *g_error_capture = NULL;
 
+/**
+ * @brief Send a finished diagnostic to stderr, or to the capture buffer.
+ *
+ * Every diagnostic leaves through here, so a caller that has muted the channel
+ * mutes ALL of them. The word CST audit expands a word a second time purely to
+ * compare routes; a diagnostic printed from that second pass never happened as
+ * far as the user is concerned. A reporter that wrote to stderr directly would
+ * be invisible to the mute and would double-print into the audit.
+ */
+static void executor_emit_error(shell_error_t *error) {
+    if (!error) {
+        return;
+    }
+    if (!g_error_display_muted) {
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        return;
+    }
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *ms = open_memstream(&buf, &len);
+    if (!ms) {
+        return;
+    }
+    shell_error_display(error, ms, false);
+    fclose(ms);
+    if (!g_error_capture) {
+        g_error_capture = buf;
+        return;
+    }
+    /// More than one diagnostic in a single muted span: keep them all, the
+    /// report is more useful than the first line alone.
+    size_t have = strlen(g_error_capture);
+    char *joined = realloc(g_error_capture, have + len + 1);
+    if (joined) {
+        memcpy(joined + have, buf, len + 1);
+        g_error_capture = joined;
+    }
+    free(buf);
+}
+
 static void executor_report_error_v(executor_t *executor,
                                     shell_error_code_t code,
                                     source_location_t loc,
@@ -956,33 +996,7 @@ static void executor_report_error_v(executor_t *executor,
         }
     }
 
-    /// Display the error immediately -- unless a diagnostic-capturing caller
-    /// has muted the channel (word_cst_audit, which expands a word a SECOND
-    /// time purely to compare routes and must not double-print the result).
-    if (g_error_display_muted) {
-        char *buf = NULL;
-        size_t len = 0;
-        FILE *ms = open_memstream(&buf, &len);
-        if (ms) {
-            shell_error_display(error, ms, false);
-            fclose(ms);
-            if (!g_error_capture) {
-                g_error_capture = buf;
-            } else {
-                /// More than one diagnostic in a single muted span: keep them
-                /// all, the report is more useful than the first line alone.
-                size_t have = strlen(g_error_capture);
-                char *joined = realloc(g_error_capture, have + len + 1);
-                if (joined) {
-                    memcpy(joined + have, buf, len + 1);
-                    g_error_capture = joined;
-                }
-                free(buf);
-            }
-        }
-    } else {
-        shell_error_display(error, stderr, isatty(STDERR_FILENO));
-    }
+    executor_emit_error(error);
 
     /// Set legacy error state for compatibility - use NULL since error was
     /// already displayed
@@ -14358,9 +14372,20 @@ static char *parse_parameter_expansion(executor_t *executor,
                                              "%zu", elem_len);
                                 }
                             } else {
+                                /// A length of 0 is a LEGITIMATE answer -- an
+                                /// empty element has length 0 -- so it must
+                                /// not double as the failure token. Report the
+                                /// failure and yield nothing (#710).
                                 if (idx_result)
                                     free(idx_result);
-                                snprintf(result_buf, sizeof(result_buf), "0");
+                                executor_report_arith_failure(
+                                    executor, executor_current_loc(executor),
+                                    "evaluating an array subscript");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
                             }
                         }
 
@@ -14534,6 +14559,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 free(resolved_arr_owned);
                 if (array) {
                     char *result = NULL;
+                    /// True once the subscript's arithmetic has FAILED, as
+                    /// distinct from evaluating to an index with no element.
+                    /// The operator hand-off below must not treat a failure as
+                    /// "unset" and answer it with :- / :+ / := .
+                    bool subscript_failed = false;
 
                     /// Detect a bash slicing suffix `:N` / `:N:M` after
                     /// the closing `]`. ${arr[@]:N}, ${arr[@]:N:M},
@@ -14900,8 +14930,21 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 result = strdup(elem ? elem : "");
                             }
                         } else {
+                            /// The engine was asked and it failed. lush
+                            /// already reports that everywhere it is asked
+                            /// directly -- $(( )), (( )), let, and the for
+                            /// header -- and reducing it here to "" is what
+                            /// let a broken subscript read as an ordinary
+                            /// empty element (#710, and the reason #646
+                            /// presented as an array bug for so long).
                             if (idx_result)
                                 free(idx_result);
+                            executor_report_arith_failure(
+                                executor, executor_current_loc(executor),
+                                "evaluating an array subscript");
+                            executor->expansion_error = true;
+                            executor->expansion_exit_status = 1;
+                            subscript_failed = true;
                             result = strdup("");
                         }
                     }
@@ -14923,8 +14966,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                     /// re-applied as a substring operator (issue #530: the
                     /// element slice and the substring operator both matched
                     /// `:0:2`, double-slicing ${arr[*]:0:2}).
+                    ///
+                    /// Skipped entirely when the subscript's arithmetic
+                    /// failed: `:-`, `-`, `:+`, `+`, `:=` and `=` are answers
+                    /// to ABSENCE, and a failed evaluation is not an absence.
+                    /// Letting them rescue it is precisely how a broken
+                    /// subscript came back as a plausible default and stayed
+                    /// invisible (#710).
                     const char *after_bracket = close + 1;
-                    if (*after_bracket != '\0' && !has_slice) {
+                    if (*after_bracket != '\0' && !has_slice &&
+                        !subscript_failed) {
                         const char *rhs = NULL;
                         int el_op =
                             detect_param_operator_suffix(after_bracket, &rhs);
@@ -15119,17 +15170,36 @@ static char *parse_parameter_expansion(executor_t *executor,
                             arithm_clear_error();
                             char *ir = arithm_expand_with_executor(executor,
                                                                    subscript);
-                            if (ir && !arithm_error_is_flagged()) {
-                                long ix = strtoll(ir, NULL, 10);
-                                bool one_based = !shell_mode_allows(
-                                    FEATURE_ARRAY_ZERO_INDEXED);
-                                if (!(one_based && ix == 0)) {
-                                    if (one_based && ix > 0) {
-                                        ix--; /// 1-based -> 0-based
-                                    }
-                                    symtable_array_set_index(new_arr, ix,
-                                                             applied);
+                            if (!ir || arithm_error_is_flagged()) {
+                                /// The array is created before the subscript
+                                /// is known, so a failed subscript used to
+                                /// skip the element write and bind the empty
+                                /// array anyway -- and still return the value
+                                /// it never assigned. Roll the creation back
+                                /// and report, the way the write path already
+                                /// rolls back a failed bare assignment (#710).
+                                free(ir);
+                                symtable_array_free(new_arr);
+                                executor_report_arith_failure(
+                                    executor, executor_current_loc(executor),
+                                    "evaluating an array subscript");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(applied);
+                                free(el_default);
+                                free(elem_result);
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
+                            }
+                            long ix = strtoll(ir, NULL, 10);
+                            bool one_based =
+                                !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
+                            if (!(one_based && ix == 0)) {
+                                if (one_based && ix > 0) {
+                                    ix--; /// 1-based -> 0-based
                                 }
+                                symtable_array_set_index(new_arr, ix, applied);
                             }
                             free(ir);
                             /// symtable_assign_array takes ownership on success
@@ -16793,7 +16863,7 @@ static void executor_report_arith_failure(executor_t *executor,
     if (help) {
         shell_error_set_suggestion(err, help);
     }
-    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+    executor_emit_error(err);
     shell_error_free(err);
     executor->has_error = true;
     executor->error_message = NULL;
@@ -20777,7 +20847,20 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             if (rollback_on_fail) {
                 symtable_unset_global(var_name);
             }
-            report_invalid_index_error(executor, assign_node->loc, subscript);
+            /// The status was already right here; the REASON was not. When the
+            /// engine flagged a specific cause -- division by zero, an invalid
+            /// octal digit, a syntax error -- report THAT, the way
+            /// `(( a[1/0] = 5 ))` already does. The generic
+            /// "must evaluate to an integer" text, with its declare -A
+            /// suggestion, is the right answer only when the engine did not
+            /// flag anything and the subscript is simply not a number (#710).
+            if (arithm_error_is_flagged()) {
+                executor_report_arith_failure(executor, assign_node->loc,
+                                              "evaluating an array subscript");
+            } else {
+                report_invalid_index_error(executor, assign_node->loc,
+                                           subscript);
+            }
             return 1;
         }
 
