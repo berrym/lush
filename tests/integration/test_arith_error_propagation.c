@@ -198,6 +198,76 @@ int main(int argc, char **argv) {
     check(lush, "a failing body does not stop the loop",
           "for ((i=0;i<3;i++)); do false; done; echo done", 0, "done", NULL);
 
+    /// ------------------------------------------ #710: the parameter surfaces
+    /// The engine was asked and its verdict was discarded. A failed subscript
+    /// is an evaluation failure, not an element that happens to be empty.
+    check(lush, "710 element read reports instead of yielding empty",
+          "a=(1 2 3); echo \"[${a[1/0]}]\"", 1, "division by zero", NULL);
+    check(lush, "710 the diagnostic names the position",
+          "a=(1 2 3); echo \"[${a[1/0]}]\"", 1, "evaluating an array subscript",
+          NULL);
+    check(lush, "710 element length reports instead of yielding 0",
+          "a=(1 2 3); echo \"[${#a[1/0]}]\"", 1, "division by zero", NULL);
+    /// A length of 0 is a legitimate answer and must not double as the failure
+    /// token.
+    check(lush, "710 an absent element still has length 0",
+          "a=(1 2 3); echo \"[${#a[9]}]\"", 0, "[0]", NULL);
+
+    /// A failure must not be laundered into "unset" and answered by an
+    /// operator: :- and friends are answers to ABSENCE (owner decision, Q3).
+    check(lush, "710 :- does not rescue a failed subscript",
+          "a=(1 2 3); echo \"[${a[1/0]:-DEF}]\"", 1, "division by zero", "DEF");
+    check(lush, "710 - does not rescue it either",
+          "a=(1 2 3); echo \"[${a[1/0]-DEF}]\"", 1, "division by zero", "DEF");
+    check(lush, "710 :+ does not rescue it",
+          "a=(1 2 3); echo \"[${a[1/0]:+SET}]\"", 1, "division by zero", "SET");
+    check(lush, "710 a case operator does not rescue it",
+          "a=(1 2 3); echo \"[${a[1/0]^^}]\"", 1, "division by zero", NULL);
+    /// ... while a genuinely absent element still gets its default.
+    check(lush, "710 :- still answers a real absence",
+          "a=(1 2 3); echo \"[${a[9]:-DEF}]\"", 0, "[DEF]", NULL);
+
+    /// The write-backs reported a value they never assigned.
+    check(lush, "710 := on an existing array does not claim a phantom write",
+          "a=(1 2 3); echo \"[${a[1/0]:=X}]\"", 1, "division by zero", "[X]");
+    check(lush, "710 ... and leaves the array untouched",
+          "a=(1 2 3); ${a[1/0]:=X} 2>/dev/null; echo \"[${a[*]}]\"", -1,
+          "[1 2 3]", NULL);
+    /// Asserted on `declare -p`'s OUTPUT, not its exit status: `declare -p`
+    /// on a missing name prints "not found" and still exits 0, so a status
+    /// probe here reports BOUND even for a name that was never touched.
+    check(lush, "710 := on an unset name creates no phantom binding",
+          "echo \"[${u[1/0]:=X}]\"; declare -p u", -1, "u: not found",
+          "declare -a u");
+    /// ... while the working assign-backs still bind.
+    check(lush, "710 := still creates the array when the subscript is sound",
+          "echo \"[${u[2]:=X}]\"; declare -p u", 0, "[2]=\"X\"", NULL);
+
+    /// The write path's status was already right; the REASON was generic.
+    check(lush, "710 a failed write subscript reports the engine's cause",
+          "a=(1 2 3); a[1/0]=X", 1, "division by zero", NULL);
+    check(lush, "710 ... rather than the generic integer-subscript text",
+          "a=(1 2 3); a[1/0]=X", 1, NULL, "must evaluate to an integer");
+
+    /// Failure kinds other than division reach the same path.
+    check(lush, "710 an invalid literal in a subscript is reported",
+          "a=(1 2 3); echo \"[${a[08]}]\"", 1, "invalid octal digit", NULL);
+    check(lush, "710 a syntax error in a subscript is reported",
+          "a=(1 2 3); echo \"[${a[1+]}]\"", 1, "arithmetic", NULL);
+
+    /// ------------------------------------------- where silence stays correct
+    /// These evaluate SUCCESSFULLY; only a flagged failure becomes loud.
+    check(lush, "a valid index with no element stays quiet",
+          "a=(1 2 3); echo \"[${a[9]}]\"", 0, "[]", "error");
+    check(lush, "an unset operand resolves to 0, not a failure",
+          "a=(1 2 3); echo \"[${a[foo]}]\"", 0, "[1]", "error");
+    check(lush, "an empty subscript resolves to 0",
+          "a=(1 2 3); i=; echo \"[${a[i]}]\"", 0, "[1]", "error");
+    check(lush, "an associative key is a string, never arithmetic",
+          "declare -A m; m[1/0]=V; echo \"[${m[1/0]}]\"", 0, "[V]", "error");
+    check(lush, "arithmetic that succeeds is untouched",
+          "a=(1 2 3); i=1; echo \"[${a[i+1]}]\"", 0, "[3]", "error");
+
     /// ------------------------------- the sibling positions already conformant
     /// These pin the contract this fix was measured against; if they ever go
     /// quiet, the reference implementation itself has drifted.
