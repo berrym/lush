@@ -3225,6 +3225,16 @@ if fs.exists('tests/integration/test_declare_p_status.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_array_assign_location.c')
+  test_array_assign_location = executable('test_array_assign_location',
+    ['tests/integration/test_array_assign_location.c'])
+  test('array assignment diagnostics cite their source',
+       test_array_assign_location,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_arith_error_propagation.c')
   test_arith_error_propagation = executable('test_arith_error_propagation',
     ['tests/integration/test_arith_error_propagation.c'])

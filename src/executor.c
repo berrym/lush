@@ -20668,7 +20668,37 @@ static void report_invalid_index_error(executor_t *executor,
     }
 }
 
+static int execute_array_assignment_inner(executor_t *executor,
+                                          node_t *assign_node);
+
+/**
+ * @brief Execute an array assignment, with its source location published.
+ *
+ * Every diagnostic raised on this path -- the readonly refusal, an invalid
+ * subscript, an arithmetic failure in the subscript -- printed with no
+ * `--> file:line:col` and no source snippet, while the scalar assignment
+ * path beside it cited its source correctly. The location was simply never
+ * published, so `executor_current_loc` had nothing to report.
+ *
+ * Published here rather than at each raise, and restored on the way out, the
+ * way execute_command already does for a command. The body has sixteen
+ * returns, so it stays in a helper instead of growing a restore before each.
+ */
 static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
+    if (!executor || !assign_node) {
+        return 1;
+    }
+    source_location_t saved_active_loc = executor->active_loc;
+    if (SOURCE_LOC_VALID(assign_node->loc)) {
+        executor->active_loc = assign_node->loc;
+    }
+    int result = execute_array_assignment_inner(executor, assign_node);
+    executor->active_loc = saved_active_loc;
+    return result;
+}
+
+static int execute_array_assignment_inner(executor_t *executor,
+                                          node_t *assign_node) {
     if (!assign_node || !assign_node->val.str) {
         return 1;
     }
