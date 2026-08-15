@@ -5251,13 +5251,116 @@ static int execute_logical_or(executor_t *executor, node_t *or_node) {
 /// never begin a slice, and strtol would otherwise consume the +/- of
 /// `:+N` / `:-N` and mis-read the operand as a slice offset (#530). Shared
 /// by the scalar-slot slice and the vector-slice paths so the two agree.
-static bool slice_spec_is_numeric(const char *spec) {
-    if (*spec == '-' || *spec == '+' || *spec == '=' || *spec == '?') {
+/**
+ * @brief Evaluate one half of a slice spec, quietly or loudly.
+ *
+ * @param quiet When true a failure is swallowed (the caller is TRYING a split
+ *              and will fall back); when false it is reported and marks the
+ *              expansion failed, per the contract in docs/SEMANTICS.md.
+ * @return true on success, with the value in @p out.
+ */
+static bool slice_part_eval(executor_t *executor, const char *expr, bool quiet,
+                            long long *out) {
+    if (!expr || !*expr) {
         return false;
     }
-    char *endp = NULL;
-    (void)strtol(spec, &endp, 10);
-    return endp != spec;
+    arithm_clear_error();
+    char *r = arithm_expand_with_executor(executor, expr);
+    if (!r || arithm_error_is_flagged()) {
+        free(r);
+        if (quiet) {
+            arithm_clear_error();
+        } else {
+            executor_report_arith_failure(executor,
+                                          executor_current_loc(executor),
+                                          "evaluating a substring offset");
+            executor->expansion_error = true;
+            executor->expansion_exit_status = 1;
+        }
+        return false;
+    }
+    *out = strtoll(r, NULL, 10);
+    free(r);
+    return true;
+}
+
+/**
+ * @brief Resolve `offset[:length]` to its integer values.
+ *
+ * The offset and the length are arithmetic expressions, not decimal literals:
+ * `${s:i:2}` and `${s:1+1:2}` mean what they say. Reading them with strtol
+ * took a leading digit run and silently dropped the rest, so `${s:1+1:2}`
+ * sliced from 1 with no length at all, and a spec with no leading digit was
+ * not recognized as a slice (#711).
+ *
+ * The separator is also the ternary's `:`, so the split is tried at the LAST
+ * `:` and falls back to treating the whole spec as the offset when the
+ * left-hand side is not a valid expression:
+ *
+ *     2:3          -> offset 2, length 3
+ *     i>1?1:2      -> "i>1?1" does not parse, so the whole spec is the offset
+ *     (i>1?1:2):3  -> both parse: offset 1, length 3
+ *
+ * @return false if the arithmetic failed (already reported), else true.
+ */
+static bool slice_spec_resolve(executor_t *executor, const char *spec,
+                               long long *offset, bool *has_length,
+                               long long *length) {
+    *has_length = false;
+    *length = 0;
+
+    const char *last = strrchr(spec, ':');
+    char *head = NULL;
+    if (last && last != spec) {
+        head = strndup(spec, (size_t)(last - spec));
+        if (head) {
+            long long off = 0;
+            if (slice_part_eval(executor, head, true, &off)) {
+                free(head);
+                long long len = 0;
+                if (!slice_part_eval(executor, last + 1, false, &len)) {
+                    return false;
+                }
+                *offset = off;
+                *length = len;
+                *has_length = true;
+                return true;
+            }
+        }
+    }
+
+    if (slice_part_eval(executor, spec, true, offset)) {
+        free(head);
+        return true;
+    }
+
+    /// Neither reading worked. Report the SPLIT's failure rather than the
+    /// whole-spec one: for `1/0:2` the whole spec fails on the `:` with a
+    /// parse error, which says nothing, while the offset half fails with the
+    /// actual cause -- division by zero.
+    bool reported = false;
+    if (head) {
+        long long ignored = 0;
+        reported = !slice_part_eval(executor, head, false, &ignored);
+        free(head);
+    }
+    if (!reported) {
+        long long ignored = 0;
+        (void)slice_part_eval(executor, spec, false, &ignored);
+    }
+    return false;
+}
+
+static bool slice_spec_is_numeric(const char *spec) {
+    /// The question here is "slice or operator?", and the answer is the
+    /// leading sigil: `:-` `:+` `:=` `:?` are operators, anything else after
+    /// the `:` is a slice spec. It USED to also require a leading digit run,
+    /// which meant an offset that was an EXPRESSION (`${a[@]:i:2}`) was not
+    /// recognized as a slice at all -- the whole reference then fell through
+    /// to the scalar path, where `${a[@]}` raised a list-in-scalar type error
+    /// instead of slicing (#711). Evaluating the spec is slice_spec_resolve's
+    /// job; this predicate only draws the boundary.
+    return !(*spec == '-' || *spec == '+' || *spec == '=' || *spec == '?');
 }
 
 /// Parse an optional `:N` / `:N:M` slice suffix shared by the array and
@@ -5266,9 +5369,9 @@ static bool slice_spec_is_numeric(const char *spec) {
 /// the closing `}`. On a `:` slice sets *has_slice and the offset/length;
 /// with no suffix leaves them untouched. Returns false on malformed junk
 /// (anything other than end-of-content or a `:`-led numeric slice).
-static bool parse_vector_slice_suffix(const char *p, const char *end,
-                                      bool *has_slice, int *slice_offset,
-                                      int *slice_length) {
+static bool parse_vector_slice_suffix(executor_t *executor, const char *p,
+                                      const char *end, bool *has_slice,
+                                      int *slice_offset, int *slice_length) {
     if (p == end) {
         return true; /// no slice suffix
     }
@@ -5289,15 +5392,14 @@ static bool parse_vector_slice_suffix(const char *p, const char *end,
     if (!slice_spec_is_numeric(spec)) {
         return false; /// a :- / :+ / := / :? operator, not a slice
     }
-    char *endp = NULL;
-    *slice_offset = (int)strtol(spec, &endp, 10);
-    if (!endp) {
-        return false;
+    long long off = 0, len = 0;
+    bool has_len = false;
+    if (!slice_spec_resolve(executor, spec, &off, &has_len, &len)) {
+        return false; /// arithmetic failed; already reported
     }
-    if (*endp == ':') {
-        *slice_length = (int)strtol(endp + 1, NULL, 10);
-    } else if (*endp != '\0') {
-        return false;
+    *slice_offset = (int)off;
+    if (has_len) {
+        *slice_length = (int)len;
     }
     *has_slice = true;
     return true;
@@ -5927,8 +6029,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
             is_positional = true;
             subscript = *p;
             p++;
-            if (!parse_vector_slice_suffix(p, end, &has_slice, &slice_offset,
-                                           &slice_length)) {
+            if (!parse_vector_slice_suffix(executor, p, end, &has_slice,
+                                           &slice_offset, &slice_length)) {
                 return false;
             }
         } else {
@@ -5987,8 +6089,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
             }
             p++;
             /// Optional slicing :N or :N:M (shared parser).
-            if (!parse_vector_slice_suffix(p, end, &has_slice, &slice_offset,
-                                           &slice_length)) {
+            if (!parse_vector_slice_suffix(executor, p, end, &has_slice,
+                                           &slice_offset, &slice_length)) {
                 return false;
             }
         }
@@ -14588,11 +14690,21 @@ static char *parse_parameter_expansion(executor_t *executor,
                         /// subscript below, not treated as slices (#530).
                         const char *spec = close + 2;
                         if (slice_spec_is_numeric(spec)) {
-                            char *endp = NULL;
-                            slice_offset = (int)strtol(spec, &endp, 10);
-                            has_slice = true;
-                            if (*endp == ':') {
-                                slice_length = (int)strtol(endp + 1, NULL, 10);
+                            long long off = 0, len = 0;
+                            bool has_len = false;
+                            if (slice_spec_resolve(executor, spec, &off,
+                                                   &has_len, &len)) {
+                                slice_offset = (int)off;
+                                has_slice = true;
+                                if (has_len) {
+                                    slice_length = (int)len;
+                                }
+                            } else {
+                                /// Reported; refuse the slice rather than
+                                /// slicing from a guessed offset.
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
                             }
                         }
                     }
@@ -16011,13 +16123,32 @@ static char *apply_param_operator(executor_t *executor, const char *var_name,
             /// never a valid substring offset (those are numeric).
             result = apply_zsh_modifiers(executor, var_value, expanded_default);
         } else if (var_value) {
-            /// Substring: `$`-expand the offset[:length] spec here (that is
-            /// the executor-dependent half), then hand the resolved numeric
-            /// spec to the shared pure core.
+            /// Substring: resolve the offset[:length] spec here -- that is the
+            /// executor-dependent half -- then hand a plain decimal spec to
+            /// the shared pure core. Resolving means EVALUATING: the two parts
+            /// are arithmetic expressions, so `${s:i:2}` and `${s:1+1:2}` mean
+            /// what they say (#711). param_op.c stays free of the executor and
+            /// the arithmetic engine, which is what lets it serve as the Word
+            /// CST bench's oracle.
             char *expanded_offset_str =
                 expand_variables_in_string(executor, expanded_default);
-            result =
-                lush_param_op_apply(14, var_value, expanded_offset_str, NULL);
+            long long off = 0, len = 0;
+            bool has_len = false;
+            if (expanded_offset_str &&
+                slice_spec_resolve(executor, expanded_offset_str, &off,
+                                   &has_len, &len)) {
+                char numeric[64];
+                if (has_len) {
+                    snprintf(numeric, sizeof(numeric), "%lld:%lld", off, len);
+                } else {
+                    snprintf(numeric, sizeof(numeric), "%lld", off);
+                }
+                result = lush_param_op_apply(14, var_value, numeric, NULL);
+            } else {
+                /// The arithmetic failed and has been reported; refuse the
+                /// substring rather than slicing from a guessed offset.
+                result = strdup("");
+            }
             free(expanded_offset_str);
         } else {
             result = strdup("");
