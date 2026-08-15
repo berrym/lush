@@ -133,21 +133,36 @@ typedef enum {
                               ///< loop. Curated lush-mode default; off in
                               ///< POSIX/bash/zsh modes for polyglot parity.
                               ///< Toggleable per-script via setopt/unsetopt.
-    FEATURE_XPG_ECHO,     ///< echo interprets \n, \t, etc. by default (XSI/zsh
-                          ///< behavior); when false, echo prints args literally
-                          ///< unless `-e` is given (bash default). Bridged via
-                          ///< `xpg_echo` (bash shopt name) and inverted alias
-                          ///< `bsd_echo` (zsh setopt name).
-    FEATURE_OCTAL_ZEROES, ///< A leading zero denotes an octal literal in
-                          ///< arithmetic: `010` is 8, and `08`/`09` are
-                          ///< rejected as non-octal digits. Governs
-                          ///< literals and #578 scalar reads together, so
-                          ///< a number and a variable holding the same
-                          ///< text always agree. ON in lush (curated,
-                          ///< #594 -- with a diagnostic that names the
-                          ///< offending digit, which no reference shell
-                          ///< does), ON in bash and posix whose oracles
-                          ///< always read octal, OFF in zsh whose oracle
+    FEATURE_XPG_ECHO, ///< echo interprets \n, \t, etc. by default (XSI/zsh
+                      ///< behavior); when false, echo prints args literally
+                      ///< unless `-e` is given (bash default). Bridged via
+                      ///< `xpg_echo` (bash shopt name) and inverted alias
+                      ///< `bsd_echo` (zsh setopt name).
+    FEATURE_EMPTY_PARAMS_UNSET, ///< An empty positional list counts as UNSET
+                                ///< for the colon-less operators, so
+                                ///< `${@-word}` substitutes and `${@+word}`
+                                ///< does not. lush's own value model says
+                                ///< otherwise: a list is a first-class value
+                                ///< (SEMANTICS 3.1), and `set --` leaves an
+                                ///< EMPTY list, which is a value and not an
+                                ///< absence -- so OFF in lush mode. ON in
+                                ///< bash mode, whose oracle treats it as
+                                ///< unset; OFF in zsh and posix, whose
+                                ///< oracles agree with lush here. The
+                                ///< colon-bearing forms `${@:-word}` /
+                                ///< `${@:+word}` ask "unset OR empty" and
+                                ///< are unaffected -- all four references
+                                ///< already agree on those.
+    FEATURE_OCTAL_ZEROES,       ///< A leading zero denotes an octal literal in
+                                ///< arithmetic: `010` is 8, and `08`/`09` are
+                                ///< rejected as non-octal digits. Governs
+                                ///< literals and #578 scalar reads together, so
+                                ///< a number and a variable holding the same
+                                ///< text always agree. ON in lush (curated,
+                                ///< #594 -- with a diagnostic that names the
+                                ///< offending digit, which no reference shell
+                                ///< does), ON in bash and posix whose oracles
+                                ///< always read octal, OFF in zsh whose oracle
                           ///< ships this option off and reads `010` as 10.
                           ///< Bridged as the zsh setopt name
                           ///< `octal_zeroes` / `octalzeroes`.

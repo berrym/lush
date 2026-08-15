@@ -43,6 +43,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_POSIX - Strict POSIX sh compliance
     [SHELL_MODE_POSIX] =
         {
+                            [FEATURE_EMPTY_PARAMS_UNSET] = false,
+
                             [FEATURE_OCTAL_ZEROES] = true,
 
                             /// Arrays - not in POSIX
@@ -144,6 +146,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_BASH - Bash 5.x compatibility
     [SHELL_MODE_BASH] =
         {
+                            [FEATURE_EMPTY_PARAMS_UNSET] = true,
+
                             [FEATURE_OCTAL_ZEROES] = true,
 
                             /// Arrays
@@ -250,6 +254,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_ZSH - Zsh compatibility
     [SHELL_MODE_ZSH] =
         {
+                            [FEATURE_EMPTY_PARAMS_UNSET] = false,
+
                             [FEATURE_OCTAL_ZEROES] = false,
 
                             /// Arrays
@@ -363,6 +369,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_LUSH - Curated best of both (DEFAULT)
     [SHELL_MODE_LUSH] =
         {
+                            [FEATURE_EMPTY_PARAMS_UNSET] = false,
+
                             [FEATURE_OCTAL_ZEROES] = true,
 
                             /// Arrays - full support, 0-indexed like Bash (more intuitive)
@@ -565,6 +573,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_SELECT_LOOP] = "select_loop",
     [FEATURE_TIME_KEYWORD] = "time_keyword",
     [FEATURE_OCTAL_ZEROES] = "octal_zeroes",
+    [FEATURE_EMPTY_PARAMS_UNSET] = "empty_params_unset",
 
     /// Behavior Defaults
     [FEATURE_STRICT_VALUE_TYPING] = "strict_value_typing",
