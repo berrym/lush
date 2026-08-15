@@ -43,6 +43,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_POSIX - Strict POSIX sh compliance
     [SHELL_MODE_POSIX] =
         {
+                            [FEATURE_OCTAL_ZEROES] = true,
+
                             /// Arrays - not in POSIX
             [FEATURE_INDEXED_ARRAYS] = false,
                             [FEATURE_ASSOCIATIVE_ARRAYS] = false,
@@ -142,6 +144,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_BASH - Bash 5.x compatibility
     [SHELL_MODE_BASH] =
         {
+                            [FEATURE_OCTAL_ZEROES] = true,
+
                             /// Arrays
             [FEATURE_INDEXED_ARRAYS] = true,
                             [FEATURE_ASSOCIATIVE_ARRAYS] = true,
@@ -246,6 +250,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_ZSH - Zsh compatibility
     [SHELL_MODE_ZSH] =
         {
+                            [FEATURE_OCTAL_ZEROES] = false,
+
                             /// Arrays
             [FEATURE_INDEXED_ARRAYS] = true,
                             [FEATURE_ASSOCIATIVE_ARRAYS] = true,
@@ -357,6 +363,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /// SHELL_MODE_LUSH - Curated best of both (DEFAULT)
     [SHELL_MODE_LUSH] =
         {
+                            [FEATURE_OCTAL_ZEROES] = true,
+
                             /// Arrays - full support, 0-indexed like Bash (more intuitive)
             [FEATURE_INDEXED_ARRAYS] = true,
                             [FEATURE_ASSOCIATIVE_ARRAYS] = true,
@@ -556,6 +564,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_CASE_FALLTHROUGH] = "case_fallthrough",
     [FEATURE_SELECT_LOOP] = "select_loop",
     [FEATURE_TIME_KEYWORD] = "time_keyword",
+    [FEATURE_OCTAL_ZEROES] = "octal_zeroes",
 
     /// Behavior Defaults
     [FEATURE_STRICT_VALUE_TYPING] = "strict_value_typing",
@@ -623,6 +632,7 @@ static const struct {
     {            "procsub",   FEATURE_PROCESS_SUBSTITUTION, false},
     {            "extglob",          FEATURE_EXTENDED_GLOB, false},
     {         "zshextglob",      FEATURE_ZSH_EXTENDED_GLOB, false},
+    {        "octalzeroes",           FEATURE_OCTAL_ZEROES, false},
     {           "nullglob",              FEATURE_NULL_GLOB, false},
     {            "dotglob",               FEATURE_DOT_GLOB, false},
     {           "globstar",               FEATURE_GLOBSTAR, false},

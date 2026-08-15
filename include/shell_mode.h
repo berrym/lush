@@ -133,11 +133,24 @@ typedef enum {
                               ///< loop. Curated lush-mode default; off in
                               ///< POSIX/bash/zsh modes for polyglot parity.
                               ///< Toggleable per-script via setopt/unsetopt.
-    FEATURE_XPG_ECHO, ///< echo interprets \n, \t, etc. by default (XSI/zsh
-                      ///< behavior); when false, echo prints args literally
-                      ///< unless `-e` is given (bash default). Bridged via
-                      ///< `xpg_echo` (bash shopt name) and inverted alias
-                      ///< `bsd_echo` (zsh setopt name).
+    FEATURE_XPG_ECHO,     ///< echo interprets \n, \t, etc. by default (XSI/zsh
+                          ///< behavior); when false, echo prints args literally
+                          ///< unless `-e` is given (bash default). Bridged via
+                          ///< `xpg_echo` (bash shopt name) and inverted alias
+                          ///< `bsd_echo` (zsh setopt name).
+    FEATURE_OCTAL_ZEROES, ///< A leading zero denotes an octal literal in
+                          ///< arithmetic: `010` is 8, and `08`/`09` are
+                          ///< rejected as non-octal digits. Governs
+                          ///< literals and #578 scalar reads together, so
+                          ///< a number and a variable holding the same
+                          ///< text always agree. ON in lush (curated,
+                          ///< #594 -- with a diagnostic that names the
+                          ///< offending digit, which no reference shell
+                          ///< does), ON in bash and posix whose oracles
+                          ///< always read octal, OFF in zsh whose oracle
+                          ///< ships this option off and reads `010` as 10.
+                          ///< Bridged as the zsh setopt name
+                          ///< `octal_zeroes` / `octalzeroes`.
     FEATURE_MAGIC_EQUAL_SUBST, ///< Tilde-expand the RHS of assignment-style
                                ///< argument words `cmd name=~/path` (zsh
                                ///< magic_equal_subst); off by default

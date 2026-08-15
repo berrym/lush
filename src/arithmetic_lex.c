@@ -75,6 +75,35 @@ void arith_tokens_free(arith_token_t *tokens, size_t count) {
 }
 
 /**
+ * @brief Read an integer literal under the active base rule.
+ *
+ * ONE base rule, shared by every reader of a lush number: this lexer and the
+ * evaluator's pure-integer fast path for scalar values (#578 keeps a literal
+ * and a variable holding the same text in agreement). They must not each carry
+ * their own copy -- when they did, `octal_zeroes` reached literals but not
+ * scalar reads, so `mode zsh` evaluated `$((010))` as 10 and `x=010; $((x))`
+ * as 8.
+ *
+ * With @p octal_zeroes set, a leading zero denotes octal (base 0: `0x` hex,
+ * `0` octal, else decimal). With it clear, a leading zero is not significant
+ * and only an explicit `0x` selects a base -- the zsh oracle's default.
+ *
+ * @param s            Start of the literal.
+ * @param octal_zeroes Whether a leading zero denotes octal.
+ * @param end          Receives the first byte not consumed (as strtol).
+ * @return The parsed value; @p end == @p s means no digits were consumed.
+ */
+long arith_strtol_based(const char *s, bool octal_zeroes, char **end) {
+    if (octal_zeroes) {
+        return strtol(s, end, 0);
+    }
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        return strtol(s, end, 16);
+    }
+    return strtol(s, end, 10);
+}
+
+/**
  * @brief Lex a single operator/punctuation token by longest match.
  *
  * On a recognized operator, sets *kind and *len (byte length consumed) and
@@ -265,7 +294,7 @@ static bool lex_operator(const char *p, arith_token_kind_t *kind, size_t *len) {
              "out of memory tokenizing the arithmetic expression")
 
 bool arith_lex(const char *expr, arith_token_t **out_tokens, size_t *out_count,
-               arith_diag_t *diag) {
+               arith_diag_t *diag, bool octal_zeroes) {
     if (!expr || !out_tokens || !out_count) {
         return lex_fail(diag, SHELL_ERR_ARITHMETIC_SYNTAX,
                         "this is an internal error; please report it", 0, 1,
@@ -293,12 +322,10 @@ bool arith_lex(const char *expr, arith_token_t **out_tokens, size_t *out_count,
 
         if (isdigit((unsigned char)*p)) {
             /// Integer literal: base 0 handles 0x hex, 0 octal, else decimal --
-            /// the same convention as scalar variable reads (issue #578). A
-            /// malformed run (e.g. an "8" or "9" following a leading 0) keeps
-            /// strtol's parsed value and consumes the trailing digits as one
-            /// token rather than splitting; refining that is issue #594.
+            /// one convention shared with scalar variable reads (#578), so a
+            /// literal and a variable holding the same text always agree.
             char *end = NULL;
-            long value = strtol(p, &end, 0);
+            long value = arith_strtol_based(p, octal_zeroes, &end);
             if (end == p) {
                 arith_tokens_free(tokens, count);
                 return lex_fail(
@@ -306,8 +333,31 @@ bool arith_lex(const char *expr, arith_token_t **out_tokens, size_t *out_count,
                     "expected a decimal, 0x hex, or 0 octal literal", pos, 1,
                     "malformed numeric literal");
             }
-            while (isdigit((unsigned char)*end)) {
-                end++;
+            /// A digit strtol refused means the run is not valid in the base
+            /// its own prefix selected: a leading 0 makes the literal octal,
+            /// and 9 is not an octal digit.
+            ///
+            /// Curated decision (#594, owner call): a leading zero DENOTES
+            /// OCTAL in lush, keeping literals and #578 scalar reads unified
+            /// under one base rule. What lush adds is the diagnostic -- the
+            /// offending digit is named and the way out is stated, rather than
+            /// the run being silently truncated to 0 (the old behavior, which
+            /// quietly produced a wrong number) or reported as an opaque
+            /// parse failure. The decimal reading stays available as a future
+            /// opt-in; zsh already names that knob `octal_zeroes`.
+            if (isdigit((unsigned char)*end) && octal_zeroes && p[0] == '0') {
+                char bad = *end;
+                const char *run = end;
+                while (isdigit((unsigned char)*run)) {
+                    run++;
+                }
+                char msg[64];
+                snprintf(msg, sizeof(msg), "invalid octal digit '%c'", bad);
+                arith_tokens_free(tokens, count);
+                return lex_fail(diag, SHELL_ERR_ARITHMETIC_SYNTAX,
+                                "a leading 0 means octal, so digits must be "
+                                "0-7; drop the 0 for decimal or use 0x for hex",
+                                pos, (size_t)(run - p), msg);
             }
             tok.kind = ATK_NUM;
             tok.num = value;

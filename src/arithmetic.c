@@ -29,6 +29,7 @@
 #include "arithmetic_ast.h"
 #include "brace_match.h"
 #include "executor.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <stdarg.h>
@@ -276,7 +277,8 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
     size_t count = 0;
     arith_diag_t diag = {0};
 
-    if (!arith_lex(pure, &tokens, &count, &diag)) {
+    if (!arith_lex(pure, &tokens, &count, &diag,
+                   shell_mode_allows(FEATURE_OCTAL_ZEROES))) {
         arithm_raise_diag(&diag);
         free(expanded);
         free(unwrapped);

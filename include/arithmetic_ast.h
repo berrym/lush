@@ -175,6 +175,13 @@ typedef struct arith_ast {
 } arith_ast_t;
 
 /**
+ * @brief Read an integer literal under the active base rule (see
+ *        arithmetic_lex.c). Shared by the lexer and the evaluator's
+ *        scalar fast path so both agree on what a leading zero means.
+ */
+long arith_strtol_based(const char *s, bool octal_zeroes, char **end);
+
+/**
  * @brief Tokenize an arithmetic expression.
  *
  * On success, *out_tokens points to a freshly allocated array of *out_count
@@ -189,7 +196,7 @@ typedef struct arith_ast {
  * @return true on success, false on a lexical error
  */
 bool arith_lex(const char *expr, arith_token_t **out_tokens, size_t *out_count,
-               arith_diag_t *diag);
+               arith_diag_t *diag, bool octal_zeroes);
 
 /**
  * @brief Free a token array returned by arith_lex.

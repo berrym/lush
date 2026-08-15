@@ -2,7 +2,7 @@
  * @file test_arith_boundaries.c
  * @brief Where an arithmetic expression begins, ends, and what may follow it.
  *
- * Four defects clustered on the same question -- where does an arithmetic
+ * Five defects clustered on the same question -- where does an arithmetic
  * construct stop? -- and each answered it by looking at too few characters:
  *
  *   #613/#646  the `$(( ))` wrapper was detected by "starts with $((" plus
@@ -17,6 +17,9 @@
  *   #617       a redirection after `))` was rejected outright, making the
  *              arithmetic command the only compound construct that could not
  *              take one.
+ *   #594       a digit outside the base the literal's own prefix selected was
+ *              consumed silently, so `09` evaluated to 0 -- a wrong number,
+ *              reported as nothing at all.
  * Also pins #596 (command substitution inside `$(( ))`) and #597 (adjacent
  * nested expansions), which the AST-engine cutover fixed but left unguarded.
  *
@@ -175,6 +178,56 @@ int main(int argc, char **argv) {
     /// The side effect still happens, and the descriptor is restored after.
     check(lush, "617 side effect survives and stdout is restored",
           "i=0; (( i++ )) >/dev/null; echo i=$i", "i=1", NULL);
+
+    /// ------------------------------------------------------- #594: literal
+    /// base Curated: a leading zero denotes octal, one base rule shared by
+    /// literals and #578 scalar reads. lush's contribution is the diagnostic --
+    /// naming the offending digit instead of silently truncating the run to 0.
+    /// The absent-check is tagged so it tests the VALUE, not the digits that
+    /// appear inside the diagnostic's own help text.
+    check(lush, "594 invalid octal digit is named", "echo \"R=$((09))\"",
+          "invalid octal digit '9'", "R=0");
+    check(lush, "594 same diagnosis through a scalar read (#578 alignment)",
+          "x=09; echo \"R=$((x))\"", "invalid octal digit '9'", "R=0");
+    check(lush, "594 the help states the way out", "echo $((08))",
+          "drop the 0 for decimal", NULL);
+    check(lush, "594 octal literal", "echo R=$((010))", "R=8", NULL);
+    check(lush, "594 valid octal digits are unaffected", "echo R=$((07))",
+          "R=7", NULL);
+    check(lush, "594 hex literal", "echo R=$((0x1f))", "R=31", NULL);
+    check(lush, "594 decimal literal", "echo R=$((123))", "R=123", NULL);
+    check(lush, "594 a lone zero is still zero", "echo R=$((0))", "R=0", NULL);
+
+    /// --------------------------------- #594: one rule, four baselines, toggle
+    /// Each mode reproduces its own oracle's baseline: bash and dash always
+    /// read octal, zsh ships `octal_zeroes` off and reads 010 as 10. lush mode
+    /// curates octal plus the diagnostic. A mode is a baseline, not a
+    /// restriction, so the feature stays reachable from every one of them.
+    check(lush, "594 zsh baseline reads a leading zero as decimal",
+          "mode zsh; echo R=$((010))", "R=10", NULL);
+    check(lush, "594 zsh baseline accepts 09", "mode zsh; echo R=$((09))",
+          "R=9", NULL);
+    check(lush, "594 bash baseline reads octal", "mode bash; echo R=$((010))",
+          "R=8", NULL);
+    check(lush, "594 posix baseline reads octal", "mode posix; echo R=$((010))",
+          "R=8", NULL);
+    /// The literal and a scalar holding the same text must never disagree
+    /// (#578) -- including under the toggle, which is where they first did.
+    check(lush, "594 literal and scalar agree in zsh mode",
+          "mode zsh; x=010; echo R=$((x))", "R=10", NULL);
+    check(lush, "594 literal and scalar agree in lush mode",
+          "mode lush; x=010; echo R=$((x))", "R=8", NULL);
+    /// Reachable in both directions, in zsh's own spelling and bash's.
+    check(lush, "594 zsh mode can opt into octal",
+          "mode zsh; setopt octal_zeroes; echo R=$((010))", "R=8", NULL);
+    check(lush, "594 lush mode can opt out",
+          "mode lush; unsetopt octal_zeroes; echo R=$((010))", "R=10", NULL);
+    check(lush, "594 the bash spelling reaches the same state",
+          "mode bash; shopt -u octal_zeroes; echo R=$((010))", "R=10", NULL);
+    /// Opting in brings the diagnostic with it.
+    check(lush, "594 opting in brings the diagnostic",
+          "mode zsh; setopt octal_zeroes; echo $((09))",
+          "invalid octal digit '9'", NULL);
 
     /// ------------------------------------- #596/#597: pinned, fixed by #612
     check(lush, "596 command substitution inside arithmetic",

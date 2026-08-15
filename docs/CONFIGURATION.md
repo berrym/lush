@@ -29,7 +29,7 @@ no surface has hidden state shared with another.
 |---|---|---|
 | **`mode <name>`** | Identity selector. Re-seeds the three surfaces below for a chosen preset. | Lush-native; no analog in POSIX |
 | **`set`** | POSIX shell options (`errexit`, `noclobber`, `vi`, `emacs`, `xtrace`, ...) | POSIX-strict + recognized bash extensions (`pipefail`) routed as aliases |
-| **`setopt` / `unsetopt`** | Feature matrix (42 entries: `extended_glob`, `process_substitution`, `case_modification`, ...) | Lush canonical |
+| **`setopt` / `unsetopt`** | Feature matrix (67 entries: `extended_glob`, `process_substitution`, `case_modification`, ...) | Lush canonical |
 | **`shopt -s` / `-u`** | Same feature matrix as `setopt` | Bash-spelling sugar; identical underlying state |
 | **`config`** | Central registry (`completion.fuzzy`, `display.syntax_highlighting`, `history.size`, ...) | Lush-native |
 
@@ -431,6 +431,51 @@ chain_directories: on
 $ mode bash
 $ display lle completion chain_directories
 chain_directories: off
+```
+
+### Example: `octal_zeroes` (feature matrix)
+
+The same mechanism on the feature-matrix surface, and a worked example of
+how a mode relates to the shell it is named after. Each mode reproduces its
+own reference's baseline; none of them restricts what is reachable.
+
+| Mode | `octal_zeroes` | `$((010))` | `$((09))` |
+|---|---|---|---|
+| `lush` | on | `8` | error naming the offending digit |
+| `bash` | on | `8` | error (bash always reads octal) |
+| `posix` | on | `8` | error (dash always reads octal) |
+| `zsh` | off | `10` | `9` (zsh ships this option off) |
+
+A leading zero denotes an octal literal when the feature is on. The rule
+governs literals and scalar reads together, so a number and a variable
+holding the same text always agree:
+
+```sh
+$ mode lush
+$ x=010; echo $((010)) $((x))
+8 8
+
+$ mode zsh
+$ x=010; echo $((010)) $((x))
+10 10
+```
+
+What lush adds over every reference is the diagnostic. `09` is not a
+valid octal literal in any of them, but only lush says which digit is
+wrong and what to do instead:
+
+```
+error[E1304]: arithmetic: invalid octal digit '9'
+   = help: a leading 0 means octal, so digits must be 0-7; drop the 0 for
+           decimal or use 0x for hex
+```
+
+Reachable from any mode, in either dialect's spelling:
+
+```sh
+$ mode zsh; setopt octal_zeroes      # zsh's own option name
+$ mode lush; unsetopt octal_zeroes   # opt out of the curated default
+$ mode bash; shopt -u octal_zeroes   # bash-spelling sugar, same state
 ```
 
 ### Re-seed semantic
