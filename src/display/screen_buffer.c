@@ -276,6 +276,26 @@ static void write_char_to_buffer(screen_buffer_t *buffer,
         }
     }
 
+    /// Bound the COLUMN, as SCREEN_BUFFER_SPECIFICATION.md requires. Its
+    /// reference implementation of this function guards BOTH dimensions
+    /// (`*row < SCREEN_BUFFER_MAX_ROWS && *col < SCREEN_BUFFER_MAX_COLS`) and
+    /// states the rule outright in its DO/DON'T section; the row half is above,
+    /// the column half was missing. On a terminal wider than
+    /// SCREEN_BUFFER_MAX_COLS the wrap logic produced a column past the end of
+    /// cells[], and the write landed in the next struct member -- lines[N].
+    /// prefix, a heap pointer that is later freed. Typing an ordinary ASCII
+    /// line at 520 columns segfaulted the shell (#705).
+    ///
+    /// The bound belongs HERE and not on terminal_width. This module models the
+    /// REAL terminal: clamping the width would make it wrap at 512 while the
+    /// terminal wraps at its true width, so every position it derives, cursor
+    /// row and column included, would diverge from where the terminal actually
+    /// put the text. SCREEN_BUFFER_MAX_COLS is a STORAGE capacity -- the spec
+    /// calls it "supports ultra-wide terminals" -- not a width to clamp to.
+    if (*col >= SCREEN_BUFFER_MAX_COLS) {
+        return;
+    }
+
     /// Write UTF-8 sequence to buffer
     screen_cell_t *cell = &buffer->lines[*row].cells[*col];
     memcpy(cell->utf8_bytes, utf8_bytes, byte_len);
