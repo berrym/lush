@@ -1967,6 +1967,11 @@ static node_t *parse_simple_command(parser_t *parser) {
     if (token_is_word_like(current->type)) {
         token_t *next = tokenizer_peek(parser->tokenizer);
 
+        /// The assignment word's location, captured before the tokenizer
+        /// advances past it, so the node built below can cite its source.
+        source_location_t array_assign_loc =
+            token_to_source_location(current, parser->source_name);
+
         /// Check for array element assignment: arr[n]=value or arr[n]+=value
         /// Tokenizer produces: arr[n] (WORD) + = (ASSIGN) + value (WORD)
         /// or: arr[n] (WORD) + += (PLUS_ASSIGN) + value (WORD)
@@ -2028,8 +2033,15 @@ static node_t *parse_simple_command(parser_t *parser) {
                     value_str = strdup("");
                 }
 
-                /// Create array assignment node
-                node_t *assign_node = new_node(NODE_ARRAY_ASSIGN);
+                /// Create array assignment node, carrying the source
+                /// location of the assignment word. Without it every
+                /// diagnostic raised while executing this node -- a readonly
+                /// refusal, an invalid subscript, an arithmetic failure in
+                /// the subscript -- printed with no `--> file:line:col` and
+                /// no source snippet, while the scalar assignment beside it
+                /// cited its source correctly.
+                node_t *assign_node =
+                    new_node_at(NODE_ARRAY_ASSIGN, array_assign_loc);
                 if (!assign_node) {
                     free(var_name);
                     free(subscript);
@@ -2463,7 +2475,8 @@ static char *parse_scalar_assignment_string(parser_t *parser,
             return NULL;
         }
         node_t *assign_node =
-            new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
+            new_node_at(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN,
+                        token_to_source_location(current, parser->source_name));
         if (!assign_node) {
             free(var_name);
             free_node_tree(array_node);
