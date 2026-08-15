@@ -60,10 +60,10 @@ if [ -n "$PROHIBITED_IN_ROOT" ]; then
 fi
 
 # Check for markdown files in root (excluding allowed files, excluding deletions)
-ROOT_MD=$(git diff --cached --name-only --diff-filter=d | grep "^[^/]*\.md$" | grep -v "^README\.md$" | grep -v "^CLAUDE\.md$" || true)
+ROOT_MD=$(git diff --cached --name-only --diff-filter=d | grep "^[^/]*\.md$" | grep -v "^README\.md$" || true)
 if [ -n "$ROOT_MD" ]; then
     echo "❌ POLICY VIOLATION: Markdown files must be in docs/ subdirectories"
-    echo "   Only README.md and CLAUDE.md allowed in root"
+    echo "   Only README.md allowed in root"
     echo "   Files:"
     echo "$ROOT_MD"
     echo ""

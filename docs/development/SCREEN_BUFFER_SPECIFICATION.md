@@ -16,8 +16,8 @@ current implementation**. Lush uses prompt-once + clear-and-redraw
 hooks are scaffolding kept in place for future re-evaluation but
 are not on any render path today. Treat any "differential update"
 language in this document as design context, not as current
-behavior. See [`../../CLAUDE.md`](../../CLAUDE.md) "Display System"
-for the authoritative summary of how rendering actually works.
+behavior. This document is the authoritative account of how
+rendering actually works.
 
 ---
 

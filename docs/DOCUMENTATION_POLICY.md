@@ -24,7 +24,6 @@ This policy is **ENFORCED** not suggested. The pre-commit hook system will **REJ
 ### Rule 1: Root Directory Cleanliness
 
 **Allowed in Root** (exhaustive list):
-- `CLAUDE.md` (Claude Code project guide - must be in root for auto-detection)
 - `README.md` (project introduction)
 - `LICENSE` (project license)
 - `meson.build`, `meson_options.txt` (build configuration)
@@ -35,7 +34,7 @@ This policy is **ENFORCED** not suggested. The pre-commit hook system will **REJ
 - `.o` files (build artifacts)
 - `core.*` files (core dumps)
 - `*.log` files (except active logs in proper directories)
-- Markdown files other than CLAUDE.md and README.md
+- Markdown files other than README.md
 - Test scripts (belong in `scripts/`)
 - Temporary files
 
