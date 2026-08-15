@@ -255,6 +255,62 @@ int main(int argc, char **argv) {
     check(lush, "710 a syntax error in a subscript is reported",
           "a=(1 2 3); echo \"[${a[1+]}]\"", 1, "arithmetic", NULL);
 
+    /// ------------------------------------- #711: a slice spec IS arithmetic
+    /// Offset and length are expressions, not decimal literals. strtol took a
+    /// leading digit run and dropped the rest, so `${s:1+1:2}` sliced from 1
+    /// with no length; a spec with no leading digit was not recognized as a
+    /// slice at all, and for ${a[@]:...} the whole reference then fell through
+    /// to the scalar path and raised a list-in-scalar type error.
+    check(lush, "711 scalar offset from a variable",
+          "s=abcdefghij; i=2; echo \"[${s:i:2}]\"", 0, "[cd]", NULL);
+    check(lush, "711 scalar offset from an expression",
+          "s=abcdefghij; echo \"[${s:1+1:2}]\"", 0, "[cd]", NULL);
+    check(lush, "711 length from a variable",
+          "s=abcdefghij; i=2; echo \"[${s:2:i}]\"", 0, "[cd]", NULL);
+    check(lush, "711 array slice with an expression offset",
+          "a=(A B C D E); i=2; echo \"[${a[@]:i:2}]\"", 0, "[C D]", NULL);
+    check(lush, "711 star form too",
+          "a=(A B C D E); i=2; echo "
+          "\"[${a[*]:1+1:2}]\"",
+          0, "[C D]", NULL);
+    check(lush, "711 offset only, no length",
+          "a=(A B C D E); i=2; echo \"[${a[@]:i}]\"", 0, "[C D E]", NULL);
+
+    /// The separator is also the ternary's `:`, so the split is tried at the
+    /// LAST `:` and falls back to the whole spec when the left side is not an
+    /// expression.
+    check(lush, "711 a ternary offset is not split at its own colon",
+          "s=abcdefghij; i=2; echo \"[${s:i>1?1:2}]\"", 0, "[bcdefghij]", NULL);
+    check(lush, "711 a parenthesized ternary keeps its length",
+          "s=abcdefghij; i=2; echo \"[${s:(i>1?1:2):3}]\"", 0, "[bcd]", NULL);
+
+    /// The spec follows lush's own base rule, so it agrees with $(( )).
+    check(lush, "711 a leading zero means octal here too, as in $(( ))",
+          "s=abcdefghijklmno; echo \"[${s:010:2}]\"", 0, "[ij]", NULL);
+    check(lush, "711 ... and follows the mode baseline",
+          "mode zsh; s=abcdefghijklmno; echo \"[${s:010:2}]\"", 0, "[kl]",
+          NULL);
+
+    /// A failed spec is reported and the slice refused, and the diagnostic
+    /// names the real cause rather than a parse error on the separator.
+    check(lush, "711 a failed offset is reported",
+          "s=abcdefghij; echo \"[${s:1/0:2}]\"", 1, "division by zero", NULL);
+    check(lush, "711 a failed length is reported",
+          "s=abcdefghij; echo \"[${s:2:1/0}]\"", 1, "division by zero", NULL);
+
+    /// The operators start with `:` too and must stay operators -- the #530
+    /// regression class, where strtol ate the `+` of `:+`.
+    check(lush, "711 :+ is still an operator, not a slice",
+          "a=(A B C); echo \"[${a[*]:+2}]\"", 0, "[2]", NULL);
+    check(lush, "711 :- is still an operator", "u=; echo \"[${u:-D}]\"", 0,
+          "[D]", NULL);
+    check(lush, "711 := is still an operator", "u=; echo \"[${u:=D}]\"", 0,
+          "[D]", NULL);
+    check(lush, "711 a negative offset still needs its space",
+          "s=abcdefghij; echo \"[${s: -3}]\"", 0, "[hij]", NULL);
+    check(lush, "711 literal specs are unchanged",
+          "s=abcdefghij; echo \"[${s:2:3}]\"", 0, "[cde]", NULL);
+
     /// ------------------------------------------- where silence stays correct
     /// These evaluate SUCCESSFULLY; only a flagged failure becomes loud.
     check(lush, "a valid index with no element stays quiet",
