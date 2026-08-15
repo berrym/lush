@@ -117,6 +117,11 @@ static void declare_print_local_callback(const char *name, const char *value,
  * @return 0 on success, non-zero on error
  */
 int bin_declare(int argc, char **argv) {
+    /// A `declare -p NAME` that finds nothing reports "not found"; the status
+    /// has to say so too, or the diagnostic and the status disagree and the
+    /// usual `if declare -p NAME` test answers "bound" for a name that is not
+    /// (issue #715).
+    int print_status = 0;
     bool opt_indexed_array = false;
     bool opt_assoc_array = false;
     bool opt_integer = false;
@@ -413,12 +418,14 @@ int bin_declare(int argc, char **argv) {
                     executor_error_report(
                         current_executor, SHELL_ERR_INVALID_ARGUMENT,
                         builtin_get_source_location(), "%s: not found", name);
+                    print_status = 1;
                 }
                 free(var_value);
             } else {
                 executor_error_report(
                     current_executor, SHELL_ERR_INVALID_ARGUMENT,
                     builtin_get_source_location(), "%s: not found", name);
+                print_status = 1;
             }
             free(name);
             continue;
@@ -702,5 +709,5 @@ int bin_declare(int argc, char **argv) {
         free(name);
     }
 
-    return 0;
+    return print_status;
 }
