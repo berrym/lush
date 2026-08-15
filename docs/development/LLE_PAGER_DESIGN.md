@@ -20,7 +20,7 @@ function is written.
 
 ## 1. Existing architecture (what we must respect)
 
-The LLE + display rules (CLAUDE.md, SCREEN_BUFFER_SPECIFICATION,
+The LLE + display rules (SCREEN_BUFFER_SPECIFICATION,
 LLE_DISPLAY_ARCHITECTURE_RESEARCH, README in src/display/) collapse
 to the following non-negotiables:
 

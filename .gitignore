@@ -119,5 +119,16 @@ oom-*
 tests/fuzz/findings/
 
 
-# Local tool state
+# Local tooling and editor scratch -- never part of the tree
 .claude/
+/CLAUDE.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.continue/
+.codeium/
+.mcp.json
+.github/copilot-instructions.md
