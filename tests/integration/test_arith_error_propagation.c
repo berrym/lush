@@ -501,6 +501,36 @@ int main(int argc, char **argv) {
     check(lush, "718 a case operator is unchanged",
           "set -- alpha beta; echo \"[${@^^}]\"", 0, "[ALPHA BETA]", NULL);
 
+    /// ------------------------- #709: backticks reach the Layer-0 expansion
+    /// Layer 0 dispatched only on `$`, so a backtick substitution never ran
+    /// there and reached the arithmetic lexer as a stray byte. Every other
+    /// position in the shell already handled backticks; these two did not.
+    check(lush, "709 a backtick substitution inside arithmetic",
+          "echo \"[$(( `echo 1` + 1 ))]\"", 0, "[2]", NULL);
+    check(lush, "709 both operands", "echo \"[$(( `echo 2` * `echo 3` ))]\"", 0,
+          "[6]", NULL);
+    check(lush, "709 a backtick subscript",
+          "n=(10 20 30); echo \"[${n[`echo 1`]}]\"", 0, "[20]", NULL);
+    check(lush, "709 a backtick subscript with trailing arithmetic",
+          "n=(10 20 30); echo \"[${n[`echo 1`+1]}]\"", 0, "[30]", NULL);
+    /// A nested $( ) inside the backticks still resolves.
+    check(lush, "709 a nested $( ) inside backticks",
+          "echo \"[$(( `echo $(echo 2)` + 1 ))]\"", 0, "[3]", NULL);
+    /// The same expression written with $( ) must be unchanged.
+    check(lush, "709 the $( ) spelling is unaffected",
+          "echo \"[$(( $(echo 1) + 1 ))]\"", 0, "[2]", NULL);
+    /// Backticks outside arithmetic were always fine and must stay so.
+    check(lush, "709 a plain backtick word still works", "echo \"[`echo hi`]\"",
+          0, "[hi]", NULL);
+    check(lush, "709 an assignment from backticks still works",
+          "x=`echo hi`; echo \"[$x]\"", 0, "[hi]", NULL);
+    /// Single quotes still suppress it entirely.
+    check(lush, "709 backticks inside single quotes stay literal",
+          "echo '`echo hi`'", 0, "`echo hi`", "hi\n");
+    /// An unterminated span must not run anything or hang.
+    check(lush, "709 an unterminated backtick is diagnosed, not executed",
+          "echo $(( `echo 1 + 1 ))", 1, "error", NULL);
+
     /// ------------------------------------------- where silence stays correct
     /// These evaluate SUCCESSFULLY; only a flagged failure becomes loud.
     check(lush, "a valid index with no element stays quiet",
