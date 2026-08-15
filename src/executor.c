@@ -290,6 +290,7 @@ static char *expand_array_unsubscripted(executor_t *executor,
                                         array_value_t *array,
                                         const char *arr_name);
 static void executor_request_posix_exit(executor_t *executor, int status);
+static size_t expansion_construct_len(const char *s, size_t n);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment,
                               source_location_t loc);
@@ -12595,6 +12596,51 @@ char *expand_variables_in_string(executor_t *executor, const char *str) {
     size_t result_size = len * 2 + 1;
 
     for (size_t i = 0; i < len; i++) {
+        if (str[i] == '`') {
+            /// Layer 0 dispatched only on `$`, so a backtick command
+            /// substitution never ran here -- it reached the arithmetic lexer
+            /// as a stray byte, and inside an array subscript it failed the
+            /// same way. Every other position in the shell already handles
+            /// backticks; this was the one that did not (issue #709).
+            ///
+            /// Both halves already exist: expansion_construct_len finds the
+            /// span with backtick escape rules (a backslash consumes the next
+            /// byte, an unescaped backtick closes), and
+            /// expand_command_substitution accepts the backtick form
+            /// directly. Nothing here re-implements either.
+            size_t span = expansion_construct_len(&str[i], len - i);
+            if (span >= 2 && str[i + span - 1] == '`') {
+                char *sub = malloc(span + 1);
+                if (!sub) {
+                    free(result);
+                    return strdup("");
+                }
+                memcpy(sub, &str[i], span);
+                sub[span] = '\0';
+                char *cmd_result = expand_command_substitution(executor, sub);
+                free(sub);
+                if (cmd_result) {
+                    size_t value_len = strlen(cmd_result);
+                    while (result_pos + value_len >= result_size) {
+                        result_size *= 2;
+                        char *grown = realloc(result, result_size);
+                        if (!grown) {
+                            free(result);
+                            free(cmd_result);
+                            return strdup("");
+                        }
+                        result = grown;
+                    }
+                    memcpy(&result[result_pos], cmd_result, value_len);
+                    result_pos += value_len;
+                    free(cmd_result);
+                }
+                i += span - 1; /// the loop's own ++ consumes the last byte
+                continue;
+            }
+            /// Unterminated: fall through and copy the byte literally, the
+            /// way an unmatched `$(` is left alone.
+        }
         if (str[i] == '$') {
             /// Check for arithmetic expansion $((...)
             if (i + 2 < len && str[i + 1] == '(' && str[i + 2] == '(') {
