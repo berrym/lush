@@ -241,6 +241,9 @@ static int execute_negate(executor_t *executor, node_t *negate_node);
 
 /// Forward declarations for Arrays and Arithmetic
 static int execute_arithmetic_command(executor_t *executor, node_t *arith_node);
+static void executor_report_arith_failure(executor_t *executor,
+                                          source_location_t loc,
+                                          const char *while_ctx);
 static int execute_array_assignment(executor_t *executor, node_t *assign_node);
 static int execute_array_append(executor_t *executor, node_t *append_node);
 
@@ -4374,9 +4377,15 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             if (result_str) {
                 free(result_str);
             }
-            if (arithm_error_is_flagged() && executor->debug) {
-                fprintf(stderr, "DEBUG: C-style for init failed: %s\n",
-                        init_expanded);
+            /// A failed init is an evaluation failure, not a zero: the
+            /// counter never got a value, so the loop must not run. Report
+            /// it the way every other arithmetic position does (#713).
+            if (arithm_error_is_flagged()) {
+                executor_report_arith_failure(
+                    executor, for_arith_node->loc,
+                    "evaluating the init expression of for ((...))");
+                free(init_expanded);
+                return 1;
             }
             free(init_expanded);
         }
@@ -4393,7 +4402,12 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 char *result_str =
                     arithm_expand_with_executor(executor, test_expanded);
                 if (!result_str || arithm_error_is_flagged()) {
-                    /// Arithmetic error
+                    /// The loop already stopped with a non-zero status here,
+                    /// but the engine's typed diagnostic was freed unread, so
+                    /// the failure had no reason attached (#713).
+                    executor_report_arith_failure(
+                        executor, for_arith_node->loc,
+                        "evaluating the test expression of for ((...))");
                     free(result_str);
                     free(test_expanded);
                     last_result = 1;
@@ -4459,9 +4473,17 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 if (result_str) {
                     free(result_str);
                 }
-                if (arithm_error_is_flagged() && executor->debug) {
-                    fprintf(stderr, "DEBUG: C-style for update failed: %s\n",
-                            update_expanded);
+                /// A failed update cannot be ignored: the counter does not
+                /// advance, so a test that depends on it stays true and the
+                /// loop never ends. `for ((i=0;i<1;i=1/0))` ran forever with
+                /// no output at all (#713).
+                if (arithm_error_is_flagged()) {
+                    executor_report_arith_failure(
+                        executor, for_arith_node->loc,
+                        "evaluating the update expression of for ((...))");
+                    free(update_expanded);
+                    last_result = 1;
+                    break;
                 }
                 free(update_expanded);
             }
@@ -16709,6 +16731,75 @@ static char *magic_equal_tilde_expand(const char *word) {
 }
 
 /**
+ * @brief Render the arithmetic module's flagged failure as a diagnostic.
+ *
+ * The reporting half of the contract $(( )) established and `docs/SEMANTICS.md`
+ * states: an arithmetic failure is reported with the engine's own typed code,
+ * its `while:` context and its `help:` line -- never reduced to a blanket
+ * syntax error, and never dropped. The arithmetic module owns the semantics;
+ * the executor owns the display.
+ *
+ * The CONTROL-FLOW half stays with the caller, because it differs by position:
+ * an expansion marks `expansion_error` so the enclosing command does not run,
+ * a loop header stops the loop. Both must still refuse the operation.
+ *
+ * @param executor  Executor, for the context stack and error state.
+ * @param loc       Where to point the diagnostic.
+ * @param while_ctx Optional phrase naming the position that failed (for
+ *                  example "evaluating the update expression of for ((...))"),
+ *                  pushed just outside the engine's own `while:` line.
+ */
+static void executor_report_arith_failure(executor_t *executor,
+                                          source_location_t loc,
+                                          const char *while_ctx) {
+    if (!executor) {
+        return;
+    }
+
+    if (!arithm_error_is_flagged()) {
+        /// Defensive: a NULL result with no flagged cause.
+        /// arithm_error_message() is NULL when unflagged, so it must not be
+        /// read here.
+        executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX, loc,
+                              "arithmetic: evaluation error");
+        return;
+    }
+
+    const char *msg = arithm_error_message();
+    const char *engine_while = arithm_error_while();
+    const char *help = arithm_error_help();
+    shell_error_t *err =
+        shell_error_create(arithm_error_code(), SHELL_SEVERITY_ERROR, loc,
+                           "arithmetic: %s", msg ? msg : "evaluation error");
+    if (!err) {
+        /// Fallback if shell_error_create failed (e.g. OOM)
+        executor_error_report(executor, arithm_error_code(), loc,
+                              "arithmetic: %s", msg ? msg : "evaluation error");
+        return;
+    }
+
+    if (engine_while) {
+        shell_error_push_context(err, "%s", engine_while);
+    }
+    if (while_ctx) {
+        shell_error_push_context(err, "%s", while_ctx);
+    }
+    for (size_t i = 0;
+         i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
+        if (executor->context_stack[i]) {
+            shell_error_push_context(err, "%s", executor->context_stack[i]);
+        }
+    }
+    if (help) {
+        shell_error_set_suggestion(err, help);
+    }
+    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+    shell_error_free(err);
+    executor->has_error = true;
+    executor->error_message = NULL;
+}
+
+/**
  * @brief Expand arithmetic expression $((...))
  *
  * Evaluates arithmetic expressions and returns the result as a string.
@@ -16745,44 +16836,8 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
     /// `while:` context, and site-specific `help:` suggestion. The
     /// arithmetic module owns the error semantics; the executor owns
     /// displaying them.
-    if (arithm_error_is_flagged()) {
-        const char *msg = arithm_error_message();
-        const char *while_ctx = arithm_error_while();
-        const char *help = arithm_error_help();
-        shell_error_t *err =
-            shell_error_create(arithm_error_code(), SHELL_SEVERITY_ERROR,
-                               executor_current_loc(executor), "arithmetic: %s",
-                               msg ? msg : "evaluation error");
-        if (err) {
-            if (while_ctx) {
-                shell_error_push_context(err, "%s", while_ctx);
-            }
-            for (size_t i = 0;
-                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
-                 i++) {
-                if (executor->context_stack[i]) {
-                    shell_error_push_context(err, "%s",
-                                             executor->context_stack[i]);
-                }
-            }
-            if (help) {
-                shell_error_set_suggestion(err, help);
-            }
-            shell_error_display(err, stderr, isatty(STDERR_FILENO));
-            shell_error_free(err);
-            executor->has_error = true;
-            executor->error_message = NULL;
-        } else {
-            /// Fallback if shell_error_create failed (e.g. OOM)
-            executor_error_report(
-                executor, arithm_error_code(), executor_current_loc(executor),
-                "arithmetic: %s", msg ? msg : "evaluation error");
-        }
-    } else {
-        executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
-                              executor_current_loc(executor),
-                              "arithmetic: evaluation error");
-    }
+    executor_report_arith_failure(executor, executor_current_loc(executor),
+                                  NULL);
 
     /// Set expansion error flag instead of immediate exit status
     executor->expansion_error = true;
