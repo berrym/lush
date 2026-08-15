@@ -3215,6 +3215,16 @@ if fs.exists('tests/integration/test_comment_after_operator.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_arith_error_propagation.c')
+  test_arith_error_propagation = executable('test_arith_error_propagation',
+    ['tests/integration/test_arith_error_propagation.c'])
+  test('an arithmetic failure is reported and refused wherever it happens',
+       test_arith_error_propagation,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_arith_boundaries.c')
   test_arith_boundaries = executable('test_arith_boundaries',
     ['tests/integration/test_arith_boundaries.c'])
