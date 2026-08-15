@@ -3215,6 +3215,16 @@ if fs.exists('tests/integration/test_comment_after_operator.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_declare_p_status.c')
+  test_declare_p_status = executable('test_declare_p_status',
+    ['tests/integration/test_declare_p_status.c'])
+  test('declare -p reports failure when it finds nothing',
+       test_declare_p_status,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_arith_error_propagation.c')
   test_arith_error_propagation = executable('test_arith_error_propagation',
     ['tests/integration/test_arith_error_propagation.c'])
