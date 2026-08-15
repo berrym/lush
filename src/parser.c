@@ -6211,6 +6211,16 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
     arith_node->val.str = expr;
     arith_node->val_type = VAL_STR;
 
+    /// A redirection after the `))` belongs to the arithmetic command, exactly
+    /// as it does for if/while/for/until -- `(( i++ )) 2>/dev/null` is ordinary
+    /// shell, and rejecting it made the construct the odd one out (#617). The
+    /// body was sliced from the raw source between (( and )), so a trailing
+    /// redirection was never part of the expression text.
+    if (!parse_trailing_redirections(parser, arith_node)) {
+        free_node_tree(arith_node);
+        return NULL;
+    }
+
     return arith_node;
 }
 

@@ -19360,8 +19360,46 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
  * @param arith_node Arithmetic command node with expression in val.str
  * @return 0 if result is non-zero, 1 if result is zero
  */
+static int execute_arithmetic_command_body(executor_t *executor,
+                                           node_t *arith_node);
+
+/**
+ * @brief Execute a (( )) arithmetic command, honoring trailing redirections.
+ *
+ * Redirections attached to the command apply to the whole evaluation, the same
+ * contract if/while/for/until follow (#617). The evaluation itself has several
+ * early-return paths, so it stays in a helper and the descriptor save/restore
+ * lives here -- no return path can leak a redirected descriptor.
+ */
 static int execute_arithmetic_command(executor_t *executor,
                                       node_t *arith_node) {
+    if (!arith_node) {
+        return 1;
+    }
+
+    bool has_redirections = count_redirections(arith_node) > 0;
+    redirection_state_t redir_state;
+
+    if (has_redirections) {
+        save_file_descriptors(&redir_state);
+        int redir_result = setup_redirections(executor, arith_node);
+        if (redir_result != 0) {
+            restore_file_descriptors(&redir_state);
+            return redir_result;
+        }
+    }
+
+    int result = execute_arithmetic_command_body(executor, arith_node);
+
+    if (has_redirections) {
+        restore_file_descriptors(&redir_state);
+    }
+
+    return result;
+}
+
+static int execute_arithmetic_command_body(executor_t *executor,
+                                           node_t *arith_node) {
     if (!arith_node || !arith_node->val.str) {
         return 1;
     }

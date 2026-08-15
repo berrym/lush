@@ -27,6 +27,7 @@
 #include "arithmetic.h"
 
 #include "arithmetic_ast.h"
+#include "brace_match.h"
 #include "executor.h"
 #include "symtable.h"
 
@@ -184,12 +185,43 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
     }
 
     /// Strip a whole-expression $(( )) wrapper if present.
+    ///
+    /// "Starts with $(( and ends with ))" is NOT sufficient: an expression may
+    /// merely BEGIN with a nested expansion. The `((` after the `$` has to be
+    /// the pair that closes at the very end, which is a balance question, so
+    /// ask the canonical matcher instead of looking at the last two bytes.
+    ///
+    ///   $((a)) + $((b))  both tests pass, but on DIFFERENT parens -- the naive
+    ///                    strip produced `a)) + $((b` (#613)
+    ///   $((1))+1         starts right, ends wrong -- the naive test called a
+    ///                    valid expression malformed and hard-errored, which
+    ///                    the ${arr[...]} read path swallowed into an empty
+    ///                    result (#646)
+    ///
+    /// Both are the same mistake. A leading `$((` that closes early is simply a
+    /// nested expansion: leave it for Layer 0, which expands it correctly.
     const char *expr = orig_expr;
     char *unwrapped = NULL;
     if (strncmp(orig_expr, "$((", 3) == 0) {
         size_t len = strlen(orig_expr);
-        if (len >= 5 && orig_expr[len - 2] == ')' &&
-            orig_expr[len - 1] == ')') {
+        size_t close = 0;
+        /// orig_expr + 1 starts at the `((`, whose OUTER paren is the one a
+        /// true wrapper's trailing `))` closes.
+        bool balanced =
+            lush_find_matching_brace(orig_expr + 1, len - 1, &close);
+        /// The canonical matcher reads SHELL structure -- it honors `#`
+        /// comments and case-pattern `)`. Arithmetic text has neither, so a
+        /// `#` or an odd quote makes it report "unbalanced" for input whose
+        /// `))` is plainly present. Its NEGATIVE answer therefore is not
+        /// evidence of a missing `))`; only its positive answer is decisive.
+        /// When it declines but the text does end in `))`, treat that as the
+        /// wrapper and let the arithmetic lexer -- which reads arithmetic --
+        /// name the real defect. Nothing is lost: a truly unterminated `$((`
+        /// does not end in `))` and still gets the precise diagnostic below.
+        bool ends_with_close =
+            len >= 5 && orig_expr[len - 2] == ')' && orig_expr[len - 1] == ')';
+        if ((balanced && 1 + close == len - 1) ||
+            (!balanced && ends_with_close)) {
             unwrapped = malloc(len - 5 + 1);
             if (!unwrapped) {
                 arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
@@ -200,13 +232,16 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             memcpy(unwrapped, orig_expr + 3, len - 5);
             unwrapped[len - 5] = '\0';
             expr = unwrapped;
-        } else {
+        } else if (!balanced) {
+            /// Unbalanced AND not ending in `))`: genuinely unterminated.
             arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
                              "scanning a $(( )) wrapper",
                              "every '$((' needs a matching '))'",
                              "malformed $(( )) arithmetic expansion");
             return NULL;
         }
+        /// Balanced but closing early: a leading nested expansion, not a
+        /// wrapper. Fall through with expr == orig_expr.
     }
 
     /// Layer 0: expand $-forms to a pure arithmetic string. Without an executor

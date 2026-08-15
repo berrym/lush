@@ -141,6 +141,16 @@ typedef struct token {
      * the consumed input span; use end_position for that).
      */
     size_t length;
+    /**
+     * Arithmetic scan depths as they stood when THIS token's scan
+     * began. The tokenizer rewinds `position` to re-read a token
+     * (lookahead refresh, speculative backtrack); those depths are
+     * position-dependent state, so they have to rewind with it or the
+     * same text is counted twice and a later `))` stops terminating
+     * its own (( )).
+     */
+    int arith_cmd_depth_before;
+    int arith_paren_depth_before;
     size_t line;     ///< Line number (1-based)
     size_t column;   ///< Column number (1-based)
     size_t position; ///< Byte offset where this token starts in input.
@@ -201,6 +211,9 @@ typedef struct tokenizer {
     token_t *lookahead;   ///< Next token (for lookahead)
     bool enable_keywords; ///< Whether to recognize keywords (context-sensitive)
     int arith_cmd_depth;  ///< Nesting depth of (( )) arithmetic commands
+    int arith_paren_depth; ///< Depth of plain ( ) groups inside the
+                           ///< innermost (( )); a `))` only terminates
+                           ///< the command at depth 0 (#608)
 } tokenizer_t;
 
 /* ============================================================================
