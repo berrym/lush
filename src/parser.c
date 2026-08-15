@@ -2458,6 +2458,14 @@ static char *parse_scalar_assignment_string(parser_t *parser,
     /// `X= /bin/echo hi` as command `hi` with X="/bin/echo".
     size_t assign_op_end = next ? next->end_position : 0;
 
+    /// The assignment word's location, captured while its token is still
+    /// alive. tokenizer_advance FREES the token it moves off, so reading
+    /// `current` after the advances below is a use-after-free -- which is
+    /// exactly what happened when this location was taken inline at the
+    /// new_node_at call further down.
+    source_location_t assign_word_loc =
+        token_to_source_location(current, parser->source_name);
+
     tokenizer_advance(parser->tokenizer); /// consume variable name
     tokenizer_advance(parser->tokenizer); /// consume '=' or '+='
 
@@ -2474,9 +2482,8 @@ static char *parse_scalar_assignment_string(parser_t *parser,
             free(var_name);
             return NULL;
         }
-        node_t *assign_node =
-            new_node_at(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN,
-                        token_to_source_location(current, parser->source_name));
+        node_t *assign_node = new_node_at(
+            is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN, assign_word_loc);
         if (!assign_node) {
             free(var_name);
             free_node_tree(array_node);
