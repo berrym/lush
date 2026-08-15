@@ -6,7 +6,9 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "arithmetic.h"
 #include "builtins.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 /**
@@ -72,9 +74,42 @@ int bin_unset(int argc, char **argv) {
                         if (array->is_associative) {
                             symtable_array_unset_assoc(array, sub_buf);
                         } else {
-                            /// Full-width subscript so a 64-bit index is unset,
-                            /// not truncated to a wrong element (issue #618).
-                            long long idx = strtoll(sub_buf, NULL, 10);
+                            /// The subscript is an arithmetic expression, the
+                            /// same as on every other element surface. strtoll
+                            /// read `i` as 0 and destroyed the FIRST element
+                            /// instead of the one asked for, silently and with
+                            /// status 0 -- `0xa` and `1+1` the same way
+                            /// (issue #647). Full-width so a 64-bit index is
+                            /// unset rather than truncated (issue #618).
+                            arithm_clear_error();
+                            char *ir = arithm_expand_with_executor(
+                                current_executor, sub_buf);
+                            if (!ir || arithm_error_is_flagged()) {
+                                free(ir);
+                                executor_report_arith_failure(
+                                    current_executor,
+                                    builtin_get_source_location(),
+                                    "evaluating an array subscript");
+                                rc = 1;
+                                continue;
+                            }
+                            long long idx = strtoll(ir, NULL, 10);
+                            free(ir);
+                            /// Same indexing convention the read and write
+                            /// surfaces use: in zsh mode user index 1 is the
+                            /// first element, and 0 addresses nothing. Without
+                            /// this, `${a[1]}` read the first element while
+                            /// `unset a[1]` destroyed the second -- lush
+                            /// disagreeing with itself (issue #68, array half).
+                            if (!shell_mode_allows(
+                                    FEATURE_ARRAY_ZERO_INDEXED)) {
+                                if (idx == 0) {
+                                    continue; /// addresses no element
+                                }
+                                if (idx > 0) {
+                                    idx--; /// 1-based -> 0-based
+                                }
+                            }
                             symtable_array_unset_index(array, idx);
                         }
                         continue;

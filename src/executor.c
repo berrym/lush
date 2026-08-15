@@ -241,9 +241,6 @@ static int execute_negate(executor_t *executor, node_t *negate_node);
 
 /// Forward declarations for Arrays and Arithmetic
 static int execute_arithmetic_command(executor_t *executor, node_t *arith_node);
-static void executor_report_arith_failure(executor_t *executor,
-                                          source_location_t loc,
-                                          const char *while_ctx);
 static int execute_array_assignment(executor_t *executor, node_t *assign_node);
 static int execute_array_append(executor_t *executor, node_t *append_node);
 
@@ -16950,9 +16947,8 @@ static char *magic_equal_tilde_expand(const char *word) {
  *                  example "evaluating the update expression of for ((...))"),
  *                  pushed just outside the engine's own `while:` line.
  */
-static void executor_report_arith_failure(executor_t *executor,
-                                          source_location_t loc,
-                                          const char *while_ctx) {
+void executor_report_arith_failure(executor_t *executor, source_location_t loc,
+                                   const char *while_ctx) {
     if (!executor) {
         return;
     }
