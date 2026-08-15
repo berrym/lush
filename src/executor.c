@@ -5579,6 +5579,82 @@ static char **collect_positional_params(executor_t *executor, int *out_count) {
     return params;
 }
 
+/**
+ * @brief Slice the conceptual positional sequence [$0, $1, ..., $N].
+ *
+ * `${@:offset:length}` slices a sequence whose index 0 is `$0`, while the
+ * caller's vector holds $1..$N -- so the offset is one greater than the
+ * vector index it lands on. A negative offset counts from the end; a
+ * negative length means "to the end".
+ *
+ * Shared by the vector form (a standalone `${@:o:l}` word, which expands to
+ * several arguments) and the scalar form (the same reference embedded in a
+ * larger word or assigned, which joins on IFS[0]). They differ only in what
+ * they do with the result, so the slicing itself lives here rather than in
+ * both.
+ *
+ * An EMPTY slice is a legitimate result, not a failure: `"${@:9}"` past the
+ * end selects nothing and must expand to NO words, the way `"$@"` does with
+ * no arguments. It is reported as success with a count of 0 and a NULL
+ * vector, which is why the result comes back through out-params and the
+ * return value means only "did the allocation succeed". Conflating the two --
+ * NULL for both empty and out-of-memory -- made the caller abandon the vector
+ * form, fall back to scalar expansion, and hand the callee ONE empty argument
+ * instead of none, re-running any side effect in the spec on the way.
+ *
+ * @param vec     The caller's $1..$N, borrowed and left intact.
+ * @param vcount  How many.
+ * @param out_vec/out_count/out_cap  Receive the new vector, its count and its
+ *                capacity. On an empty slice, NULL / 0 / 0.
+ * @return false only on allocation failure.
+ */
+static bool positional_slice(executor_t *executor, char **vec, int vcount,
+                             int slice_offset, int slice_length,
+                             char ***out_vec, int *out_count, int *out_cap) {
+    char *zero = symtable_get_var(executor->symtable, "0");
+    if (!zero) {
+        zero = strdup((shell_argv && shell_argc > 0 && shell_argv[0])
+                          ? shell_argv[0]
+                          : "");
+    }
+    int nelem = vcount + 1; /// includes $0
+    int start = slice_offset;
+    if (start < 0) {
+        start = nelem + start;
+    }
+    if (start < 0) {
+        start = 0;
+    }
+    int end_idx = (slice_length >= 0) ? start + slice_length - 1 : nelem - 1;
+    if (end_idx >= nelem) {
+        end_idx = nelem - 1;
+    }
+    char **sliced = NULL;
+    int scount = 0, scap = 0;
+    bool oom = false;
+    for (int idx = start; idx <= end_idx && idx >= 0; idx++) {
+        const char *src = (idx == 0) ? zero : vec[idx - 1];
+        char *val = strdup(src ? src : "");
+        if (!add_to_argv_list(&sliced, &scount, &scap, val)) {
+            free(val);
+            oom = true;
+            break;
+        }
+    }
+    free(zero);
+    if (oom) {
+        for (int k = 0; k < scount; k++) {
+            free(sliced[k]);
+        }
+        free(sliced);
+        return false;
+    }
+    *out_vec = sliced;
+    *out_count = scount;
+    *out_cap = scap;
+    return true;
+}
+
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                                   char ***out_vec, int *out_count,
                                   bool positional_only) {
@@ -6156,49 +6232,18 @@ braced_bare_array_ready:;
         /// $1..$N. A negative offset counts from the end; an omitted
         /// length runs to the end.
         if (has_slice) {
-            char *zero = symtable_get_var(executor->symtable, "0");
-            if (!zero) {
-                zero = strdup((shell_argv && shell_argc > 0 && shell_argv[0])
-                                  ? shell_argv[0]
-                                  : "");
-            }
-            int nelem = vcount + 1; /// includes $0
-            int start = slice_offset;
-            if (start < 0) {
-                start = nelem + start;
-            }
-            if (start < 0) {
-                start = 0;
-            }
-            int end_idx =
-                (slice_length >= 0) ? start + slice_length - 1 : nelem - 1;
-            if (end_idx >= nelem) {
-                end_idx = nelem - 1;
-            }
             char **sliced = NULL;
             int scount = 0, scap = 0;
-            bool oom = false;
-            for (int idx = start; idx <= end_idx && idx >= 0; idx++) {
-                const char *src = (idx == 0) ? zero : vec[idx - 1];
-                char *val = strdup(src ? src : "");
-                if (!add_to_argv_list(&sliced, &scount, &scap, val)) {
-                    free(val);
-                    oom = true;
-                    break;
-                }
-            }
-            free(zero);
+            bool ok = positional_slice(executor, vec, vcount, slice_offset,
+                                       slice_length, &sliced, &scount, &scap);
             for (int k = 0; k < vcount; k++) {
                 free(vec[k]);
             }
             free(vec);
-            if (oom) {
-                for (int k = 0; k < scount; k++) {
-                    free(sliced[k]);
-                }
-                free(sliced);
+            if (!ok) {
                 return false;
             }
+            /// An empty slice is a valid vector of no words.
             vec = sliced;
             vcount = scount;
             vcap = scap;
@@ -14379,6 +14424,24 @@ static char *parse_parameter_expansion(executor_t *executor,
     if (expansion[0] == '#') {
         const char *var_name = expansion + 1;
 
+        /// ${#@} / ${#*} means HOW MANY positional parameters, the same as
+        /// $#, where ${#name} for an ordinary scalar means the LENGTH of its
+        /// value. The positionals are not symtable bindings, so the scalar
+        /// lookup below found nothing and the answer was 0 no matter how many
+        /// arguments the script had -- the same blindness that made a
+        /// scalar-slot ${@:o:l} expand to nothing (issue #721).
+        if ((var_name[0] == '@' || var_name[0] == '*') && var_name[1] == '\0') {
+            int pcount = 0;
+            char **params = collect_positional_params(executor, &pcount);
+            for (int i = 0; i < pcount; i++) {
+                free(params[i]);
+            }
+            free(params);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%d", pcount);
+            return strdup(buf);
+        }
+
         /// Nested form ${#${INNER}}: count the length of the inner
         /// expansion's result. expand_variable handles the full ${...}
         /// form. Issue #98. Bash/zsh return codepoint count, not byte
@@ -15579,6 +15642,39 @@ static char *parse_parameter_expansion(executor_t *executor,
             var_value = relaxed_bare_value;
         } else if (var_name[0] == '$' && var_name[1] == '{') {
             var_value = expand_variable(executor, var_name);
+        } else if ((var_name[0] == '@' || var_name[0] == '*') &&
+                   var_name[1] == '\0') {
+            /// The positional parameters are not symtable bindings, so the
+            /// lookup below returned NULL for them and every operator here saw
+            /// $@ as UNSET -- `${@:-D}` substituted the default while the
+            /// script actually had arguments, and `${@:1:2}` came back empty
+            /// (issue #718). In a scalar slot they read as their values joined
+            /// on IFS[0], which is what the bare `${@}` case already does.
+            /// With no positionals at all they really are unset, so the
+            /// unset-keyed operators (`-`, `=`, `?`) still fire.
+            int pcount = 0;
+            char **params = collect_positional_params(executor, &pcount);
+            if (pcount == 0) {
+                /// Is an EMPTY positional list unset, or set-and-empty? Only
+                /// the colon-less operators can tell the difference, and the
+                /// references split: bash reads it as unset, zsh and dash read
+                /// it as set. lush's own value model settles the default --
+                /// a list is a first-class value (SEMANTICS 3.1) and `set --`
+                /// leaves an empty LIST, which is a value, not an absence --
+                /// so lush mode reads it as SET, and each other mode
+                /// reproduces its own oracle through the matrix.
+                var_value = shell_mode_allows(FEATURE_EMPTY_PARAMS_UNSET)
+                                ? NULL
+                                : strdup("");
+            } else {
+                char sep[2];
+                ifs_join_separator(executor, sep);
+                var_value = join_strings_with_sep(params, pcount, sep);
+            }
+            for (int i = 0; i < pcount; i++) {
+                free(params[i]);
+            }
+            free(params);
         } else {
             var_value = symtable_get_var(executor->symtable, var_name);
         }
@@ -16119,6 +16215,56 @@ static char *apply_param_operator(executor_t *executor, const char *var_name,
             /// :gs///). The leading char is a modifier letter, which is
             /// never a valid substring offset (those are numeric).
             result = apply_zsh_modifiers(executor, var_value, expanded_default);
+        } else if ((var_name[0] == '@' || var_name[0] == '*') &&
+                   var_name[1] == '\0' &&
+                   !(shell_mode_allows(FEATURE_ZSH_PARAM_MODIFIERS) &&
+                     looks_like_zsh_modifier(expanded_default))) {
+            /// The modifier branch above is guarded on var_value, which is
+            /// NULL when there are no positionals at all -- so without this
+            /// second guard `${@:t}` with an empty argument list fell through
+            /// to here and was read as a SLICE, evaluating `t` to 0 and
+            /// returning the tail of $0. A modifier is a modifier whether or
+            /// not there is anything to apply it to.
+            ///
+            /// `${@:offset:length}` slices the positional SEQUENCE, not the
+            /// bytes of the joined string: `${@:1:2}` is the first two
+            /// arguments, not two characters. The vector form already sliced
+            /// elements; this is the same slice, joined on IFS[0] because the
+            /// reference sits in a scalar slot (issue #718).
+            char *spec = expand_variables_in_string(executor, expanded_default);
+            long long off = 0, len = 0;
+            bool has_len = false;
+            if (spec &&
+                slice_spec_resolve(executor, spec, &off, &has_len, &len)) {
+                int pcount = 0;
+                char **params = collect_positional_params(executor, &pcount);
+                char **sliced = NULL;
+                int scount = 0, scap = 0;
+                bool ok = positional_slice(executor, params, pcount, (int)off,
+                                           has_len ? (int)len : -1, &sliced,
+                                           &scount, &scap);
+                for (int i = 0; i < pcount; i++) {
+                    free(params[i]);
+                }
+                free(params);
+                if (ok) {
+                    char sep[2];
+                    ifs_join_separator(executor, sep);
+                    result = join_strings_with_sep(sliced, scount, sep);
+                    for (int i = 0; i < scount; i++) {
+                        free(sliced[i]);
+                    }
+                    free(sliced);
+                }
+                if (!result) {
+                    /// Empty slice, or allocation failure already handled.
+                    result = strdup("");
+                }
+            } else {
+                /// Reported by slice_spec_resolve; refuse the slice.
+                result = strdup("");
+            }
+            free(spec);
         } else if (var_value) {
             /// Substring: resolve the offset[:length] spec here -- that is the
             /// executor-dependent half -- then hand a plain decimal spec to

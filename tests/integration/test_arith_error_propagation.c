@@ -359,6 +359,148 @@ int main(int argc, char **argv) {
     check(lush, "647 a whole array still unsets",
           "a=(1 2); unset a; echo \"[${a[@]-GONE}]\"", 0, "[GONE]", NULL);
 
+    /// ------------------------- #718: the positionals in a scalar-slot slice
+    /// The positional parameters are not symtable bindings, so the operator
+    /// path's lookup found nothing and every `:`-led operator saw $@ as
+    /// UNSET. A slice came back empty, and -- worse -- `${@:-D}` substituted
+    /// the default while the script actually had arguments.
+    check(lush, "718 a slice in a scalar slot",
+          "set -- alpha beta gamma; echo \"[${@:1:2}]\"", 0, "[alpha beta]",
+          NULL);
+    check(lush, "718 offset only",
+          "set -- alpha beta gamma; echo "
+          "\"[${@:2}]\"",
+          0, "[beta gamma]", NULL);
+    check(lush, "718 the star form too",
+          "set -- alpha beta gamma; echo \"[${*:1:2}]\"", 0, "[alpha beta]",
+          NULL);
+    check(lush, "718 assigned to a variable",
+          "set -- alpha beta gamma; x=${@:1:2}; echo \"[$x]\"", 0,
+          "[alpha beta]", NULL);
+    check(lush, "718 embedded in a larger word",
+          "set -- alpha beta gamma; echo \"X${@:1:2}Y\"", 0, "Xalpha betaY",
+          NULL);
+    /// It slices the SEQUENCE, not the bytes of the joined string: two
+    /// arguments, not two characters.
+    check(lush, "718 the slice is over elements, not bytes",
+          "set -- alpha beta gamma; echo \"[${@:1:2}]\"", 0, "[alpha beta]",
+          "[al]");
+
+    /// A default must not replace arguments that exist.
+    check(lush, "718 :- does not fire when arguments are set",
+          "set -- a b; echo \"[${@:-D}]\"", 0, "[a b]", "[D]");
+    check(lush, "718 - does not fire either", "set -- a b; echo \"[${@-D}]\"",
+          0, "[a b]", "[D]");
+    check(lush, "718 :+ sees them as set", "set -- a b; echo \"[${@:+S}]\"", 0,
+          "[S]", NULL);
+    /// With no positionals they really are unset, so the operators do fire.
+    check(lush, "718 :- fires with no arguments", "set --; echo \"[${@:-D}]\"",
+          0, "[D]", NULL);
+    /// The colon-LESS form does NOT fire in lush mode: an empty positional
+    /// list is an empty LIST, which is a value. The mode-gate checks below
+    /// cover the other three baselines.
+    check(lush, "718 - does not fire with no arguments (lush reading)",
+          "set --; echo \"[${@-D}]\"", 0, "[]", "[D]");
+    check(lush, "718 a slice of nothing is empty",
+          "set --; echo "
+          "\"[${@:1:2}]\"",
+          0, "[]", NULL);
+
+    /// Function scope has its own positionals; the slice must see those.
+    check(lush, "718 a slice inside a function",
+          "f() { echo \"[${@:1:2}]\"; }; f x y z", 0, "[x y]", NULL);
+
+    /// The standalone vector form kept working throughout; pin it so the
+    /// shared slice helper cannot regress one caller while fixing the other.
+    check(lush, "718 the vector form still expands to separate words",
+          "set -- p q r s t; printf '<%s>' ${@:2:2}; echo", 0, "<q><r>", NULL);
+    check(lush, "718 a negative offset counts from the end",
+          "set -- p q r s t; printf '<%s>' ${@: -2}; echo", 0, "<s><t>", NULL);
+
+    /// The third site with the same blindness: ${#@} means HOW MANY, the way
+    /// $# does, where ${#name} for a scalar means the LENGTH of its value.
+    check(lush, "718 ${#@} counts the positionals",
+          "set -- a b c; echo \"[${#@}]\"", 0, "[3]", NULL);
+    check(lush, "718 ${#*} counts them too", "set -- a b c; echo \"[${#*}]\"",
+          0, "[3]", NULL);
+    check(lush, "718 ${#@} with none", "set --; echo \"[${#@}]\"", 0, "[0]",
+          NULL);
+    check(lush, "718 ${#@} inside a function",
+          "f() { echo \"[${#@}]\"; }; f x y", 0, "[2]", NULL);
+    /// ... while ${#name} keeps meaning length everywhere else.
+    check(lush, "718 ${#scalar} is still a length", "v=hello; echo \"[${#v}]\"",
+          0, "[5]", NULL);
+    check(lush, "718 ${#arr[@]} is still a count",
+          "a=(x y z); echo \"[${#a[@]}]\"", 0, "[3]", NULL);
+    check(lush, "718 ${#arr[0]} is still an element length",
+          "a=(xx yy); echo \"[${#a[0]}]\"", 0, "[2]", NULL);
+
+    /// An EMPTY positional list: is it unset, or set-and-empty? Only the
+    /// colon-LESS operators can tell, and the references split -- bash reads
+    /// unset, zsh and dash read set. lush's own value model settles its
+    /// default: a list is a first-class value and `set --` leaves an empty
+    /// LIST, which is a value and not an absence. Each mode reproduces its
+    /// own oracle; none of them is a restriction.
+    check(lush, "718 lush mode reads an empty list as SET",
+          "mode lush; set --; echo \"[${@-D}]\"", 0, "[]", "[D]");
+    check(lush, "718 bash mode reads it as unset, as bash does",
+          "mode bash; set --; echo \"[${@-D}]\"", 0, "[D]", NULL);
+    check(lush, "718 zsh mode reads it as set, as zsh does",
+          "mode zsh; set --; echo \"[${@-D}]\"", 0, "[]", "[D]");
+    check(lush, "718 posix mode reads it as set, as dash does",
+          "mode posix; set --; echo \"[${@-D}]\"", 0, "[]", "[D]");
+    /// The inverted operator must split the same way.
+    check(lush, "718 the + operator splits identically",
+          "mode lush; set --; echo \"[${@+S}]\"", 0, "[S]", NULL);
+    check(lush, "718 ... and bash mode inverts it",
+          "mode bash; set --; echo \"[${@+S}]\"", 0, "[]", "[S]");
+    /// The colon-bearing forms ask "unset OR empty" -- every reference agrees,
+    /// so they must NOT be gated.
+    check(lush, "718 :- is not gated", "mode lush; set --; echo \"[${@:-D}]\"",
+          0, "[D]", NULL);
+    check(lush, "718 :- is not gated in bash mode either",
+          "mode bash; set --; echo \"[${@:-D}]\"", 0, "[D]", NULL);
+    check(lush, "718 :+ is not gated", "mode lush; set --; echo \"[${@:+S}]\"",
+          0, "[]", "[S]");
+    /// Reachable from any mode, in either dialect's spelling.
+    check(lush, "718 lush mode can opt into the bash reading",
+          "mode lush; setopt empty_params_unset; set --; echo \"[${@-D}]\"", 0,
+          "[D]", NULL);
+    check(lush, "718 bash mode can opt out",
+          "mode bash; unsetopt empty_params_unset; set --; echo \"[${@-D}]\"",
+          0, "[]", "[D]");
+    /// With arguments present the question does not arise.
+    check(lush, "718 arguments present: no mode differs",
+          "mode bash; set -- a b; echo \"[${@-D}]\"", 0, "[a b]", NULL);
+
+    /// An empty SLICE is a valid result, not a failure: a quoted slice that
+    /// selects nothing expands to NO words, the way "$@" does with no
+    /// arguments. Conflating the two handed the callee one empty argument and
+    /// re-ran any side effect in the spec.
+    check(lush, "718 an empty quoted slice passes no arguments",
+          "set -- p q r; c(){ printf \"n=%s\" \"$#\"; }; c \"${@:9}\"", 0,
+          "n=0", "n=1");
+    check(lush, "718 a zero length passes no arguments",
+          "set -- p q r; c(){ printf \"n=%s\" \"$#\"; }; c \"${@:1:0}\"", 0,
+          "n=0", "n=1");
+    check(lush, "718 a side effect in the spec runs once",
+          "set -- a b c; i=0; echo \"[\" ${@:1:(i+=1)-1} \"]\"; echo \"i=$i\"",
+          0, "i=1", "i=2");
+
+    /// A zsh modifier is a modifier even with nothing to apply it to -- the
+    /// modifier branch is guarded on the value, which is empty here, so the
+    /// slice branch must not claim `:t` as an offset.
+    check(lush, "718 a modifier with no arguments yields nothing",
+          "set --; echo \"[${@:t}]\"", 0, "[]", "lush");
+    check(lush, "718 a modifier with arguments applies",
+          "set -- a/b.txt; echo \"[${@:t}]\"", 0, "[b.txt]", NULL);
+
+    /// Operators that already worked on $@ are untouched.
+    check(lush, "718 a pattern operator is unchanged",
+          "set -- alpha beta; echo \"[${@#a}]\"", 0, "[lpha beta]", NULL);
+    check(lush, "718 a case operator is unchanged",
+          "set -- alpha beta; echo \"[${@^^}]\"", 0, "[ALPHA BETA]", NULL);
+
     /// ------------------------------------------- where silence stays correct
     /// These evaluate SUCCESSFULLY; only a flagged failure becomes loud.
     check(lush, "a valid index with no element stays quiet",
