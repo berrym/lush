@@ -308,6 +308,27 @@ typedef struct executor {
     lush_value_view_t typed_fn_return_value;
 } executor_t;
 
+/**
+ * @brief Render the arithmetic module's flagged failure as a diagnostic.
+ *
+ * The reporting half of the contract stated in docs/SEMANTICS.md: an
+ * arithmetic failure carries the engine's own typed code, its `while:`
+ * context and its `help:` line, and is never reduced to a generic message or
+ * dropped. Every surface that asks the engine to evaluate something reports
+ * through this, so a failure reads the same wherever it happens.
+ *
+ * The control-flow half stays with the caller, because it differs by
+ * position: an expansion marks expansion_error so the enclosing command does
+ * not run, a loop header stops the loop, a builtin returns non-zero. All of
+ * them must refuse the operation.
+ *
+ * @param executor  Executor, for the context stack and error state.
+ * @param loc       Where to point the diagnostic.
+ * @param while_ctx Optional phrase naming the position that failed.
+ */
+void executor_report_arith_failure(executor_t *executor, source_location_t loc,
+                                   const char *while_ctx);
+
 /** Global executor instance */
 extern executor_t *current_executor;
 

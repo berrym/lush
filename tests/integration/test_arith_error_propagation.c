@@ -311,6 +311,54 @@ int main(int argc, char **argv) {
     check(lush, "711 literal specs are unchanged",
           "s=abcdefghij; echo \"[${s:2:3}]\"", 0, "[cde]", NULL);
 
+    /// ------------------------------------ #647: unset's subscript, evaluated
+    /// `unset a[i]` read the subscript with strtoll, so `i` became 0 and the
+    /// FIRST element was destroyed instead of the one asked for -- silently,
+    /// with status 0. Asserted on `declare -p` rather than ${a[@]}, which
+    /// hides which index went.
+    check(lush, "647 a variable subscript removes the element asked for",
+          "a=(e0 e1 e2 e3 e4); i=3; unset \"a[i]\"; declare -p a", 0,
+          "[2]=\"e2\" [4]=\"e4\"", "[3]=");
+    check(lush, "647 ... and leaves index 0 alone",
+          "a=(e0 e1 e2 e3 e4); i=3; unset \"a[i]\"; declare -p a", 0,
+          "[0]=\"e0\"", NULL);
+    check(lush, "647 an expression subscript",
+          "a=(e0 e1 e2 e3 e4); unset \"a[1+1]\"; declare -p a", 0,
+          "[1]=\"e1\" [3]=\"e3\"", "[2]=");
+    check(lush, "647 a hex subscript addresses no element here",
+          "a=(e0 e1 e2); unset \"a[0xa]\"; declare -p a", 0,
+          "[0]=\"e0\" [1]=\"e1\" [2]=\"e2\"", NULL);
+    /// A literal index was always right; it must stay right, sparseness and
+    /// all.
+    check(lush, "647 a literal index still removes exactly that element",
+          "a=(e0 e1 e2 e3 e4); unset \"a[3]\"; declare -p a", 0,
+          "[2]=\"e2\" [4]=\"e4\"", "[3]=");
+
+    /// A failed subscript destroys nothing and says why.
+    check(lush, "647 a failed subscript is reported",
+          "a=(e0 e1 e2); unset \"a[1/0]\"", 1, "division by zero", NULL);
+    check(lush, "647 ... and the array is untouched",
+          "a=(e0 e1 e2); unset \"a[1/0]\" 2>/dev/null; declare -p a", -1,
+          "[0]=\"e0\" [1]=\"e1\" [2]=\"e2\"", NULL);
+
+    /// zsh mode indexes from 1 on every element surface, including this one.
+    /// It read the first element and destroyed the second before.
+    check(lush, "647 zsh mode unsets what zsh mode reads",
+          "mode zsh; a=(e0 e1 e2); unset \"a[1]\"; declare -p a", 0,
+          "[1]=\"e1\" [2]=\"e2\"", "[0]=");
+    check(lush, "647 zsh mode index 0 addresses nothing",
+          "mode zsh; a=(e0 e1 e2); unset \"a[0]\"; declare -p a", 0,
+          "[0]=\"e0\"", NULL);
+
+    /// Neighbouring unset surfaces are unaffected.
+    check(lush, "647 an associative key stays a string",
+          "declare -A m; m[1/0]=V; unset \"m[1/0]\"; declare -p m", 0,
+          "declare -A m=()", NULL);
+    check(lush, "647 a scalar still unsets",
+          "x=1; unset x; echo \"[${x-GONE}]\"", 0, "[GONE]", NULL);
+    check(lush, "647 a whole array still unsets",
+          "a=(1 2); unset a; echo \"[${a[@]-GONE}]\"", 0, "[GONE]", NULL);
+
     /// ------------------------------------------- where silence stays correct
     /// These evaluate SUCCESSFULLY; only a flagged failure becomes loud.
     check(lush, "a valid index with no element stays quiet",
