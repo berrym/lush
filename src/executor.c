@@ -16622,11 +16622,17 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
         return strdup(buffer);
     }
 
-    /// Special case: if var_text is exactly "$", treat it as shell PID
+    /// A lone `$` is a literal `$`, not the shell PID.
+    ///
+    /// `$$` is the PID and is handled above. A single `$` introduces nothing:
+    /// there is no parameter named "", so the only coherent reading is the
+    /// character itself. This used to return the PID, so `echo $` printed a
+    /// number and `v=$` stored one (issue #672). bash, zsh and dash all print
+    /// the literal, and every OTHER position in lush already did too --
+    /// `a$`, `"$"`, `'$'`, `5$` and `$%` were all correct, which is why this
+    /// only showed when the `$` was a whole unquoted word.
     if (strcmp(var_text, "$") == 0) {
-        char buffer[32];
-        snprintf(buffer, sizeof(buffer), "%d", (int)shell_pid);
-        return strdup(buffer);
+        return strdup("$");
     }
 
     /// Special case: if var_text is exactly "$?", treat it as exit status
