@@ -32,6 +32,8 @@
  */
 
 #include "prompt_layer.h"
+
+#include "display/screen_buffer.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/prompt/composer.h"
 #include "lle/prompt/theme.h"
@@ -166,83 +168,55 @@ static void calculate_prompt_metrics(const char *content,
 
     memset(metrics, 0, sizeof(*metrics));
 
+    /// Per-line width comes from screen_buffer_visual_width, the display
+    /// subsystem's one width computation. This function used to count one
+    /// column per non-continuation BYTE, so a CJK character measured 1 column
+    /// instead of 2 and a combining mark 1 instead of 0 -- the same defect
+    /// screen_buffer_visual_width itself carried. A prompt containing wide
+    /// characters therefore reported a max_line_width narrower than it draws,
+    /// and the command column derived from it started too far left.
+    ///
+    /// The bounded (text, byte_length) form is what makes the reuse possible:
+    /// each line is a slice of `content`, not a NUL-terminated string.
     const char *line_start = content;
     const char *current = content;
-    int current_line_width = 0;
-    bool in_ansi_sequence = false;
 
-    while (*current) {
-        /// Skip readline's prompt markers: \001 (RL_PROMPT_START_IGNORE) and
-        /// \002 (RL_PROMPT_END_IGNORE)
-        if (*current == '\001' || *current == '\002') {
-            /// Don't count these control characters
-            current++;
-            continue;
-        }
-
-        if (*current == '\033') {
-            in_ansi_sequence = true;
-            metrics->has_ansi_sequences = true;
-        } else if (in_ansi_sequence) {
-            /// While in ANSI sequence, check if this is the terminator
-            if ((*current >= 'A' && *current <= 'Z') ||
-                (*current >= 'a' && *current <= 'z')) {
-                /// ANSI sequences end with a letter (A-Z or a-z)
-                in_ansi_sequence = false;
+    while (true) {
+        if (*current == '\0' || *current == '\n') {
+            size_t line_len = (size_t)(current - line_start);
+            int width = (int)screen_buffer_visual_width(line_start, line_len);
+            if (width > metrics->max_line_width) {
+                metrics->max_line_width = width;
             }
-            /// Don't count ANY characters while in_ansi_sequence (including
-            /// terminators)
-        } else {
-            /// Not in ANSI sequence - count this character
-            if (*current == '\n') {
-                metrics->line_count++;
-                if (current_line_width > metrics->max_line_width) {
-                    metrics->max_line_width = current_line_width;
+            if (*current == '\0') {
+                /// A trailing line counts only when it has content; an input
+                /// ending in a newline has already counted its last line.
+                if (line_len > 0) {
+                    metrics->line_count++;
                 }
-                current_line_width = 0;
-                line_start = current + 1;
-            } else {
-                /// Only count UTF-8 character start bytes, not continuation
-                /// bytes
-                /// UTF-8 continuation bytes have the form 10xxxxxx (0x80-0xBF)
-                unsigned char byte = (unsigned char)*current;
-                if ((byte & 0xC0) != 0x80) {
-                    /// This is a character start byte (ASCII or UTF-8 lead
-                    /// byte)
-                    current_line_width++;
-
-                    /// Check for Unicode characters
-                    if (byte > 127) {
-                        metrics->has_unicode = true;
-                    }
-                }
-                /// Skip UTF-8 continuation bytes - don't increment counter
+                break;
             }
+            metrics->line_count++;
+            line_start = current + 1;
         }
         current++;
     }
 
-    /// Handle final line if no trailing newline
-    if (current > line_start) {
-        metrics->line_count++;
-        if (current_line_width > metrics->max_line_width) {
-            metrics->max_line_width = current_line_width;
+    /// The flags are a property of the whole content, not of one line.
+    for (const char *p = content; *p; p++) {
+        if (*p == '\033') {
+            metrics->has_ansi_sequences = true;
+        } else if ((unsigned char)*p > 127) {
+            metrics->has_unicode = true;
         }
     }
 
-    /// Ensure at least one line
     if (metrics->line_count == 0) {
         metrics->line_count = 1;
     }
 
     metrics->is_multiline = (metrics->line_count > 1);
     metrics->total_visual_width = metrics->max_line_width;
-
-    /// Estimate command position (best effort)
-    /// Command always starts after the LAST line, so use current_line_width
-    metrics->estimated_command_row = metrics->line_count;
-    metrics->estimated_command_column =
-        current_line_width + 1; /// +1 for 1-indexed columns
 }
 
 /**

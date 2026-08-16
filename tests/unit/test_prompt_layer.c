@@ -779,6 +779,48 @@ static int test_get_metrics_no_content(void) {
     return 1;
 }
 
+/// Width for a prompt containing wide characters. The metrics used to count
+/// one column per non-continuation BYTE, so a CJK character measured 1 column
+/// instead of 2 and the command column derived from max_line_width started too
+/// far left. The measurement now comes from the display subsystem's single
+/// width computation.
+static int test_get_metrics_wide_characters(void) {
+    struct {
+        const char *content;
+        int want_width;
+        int want_lines;
+        const char *what;
+    } cases[] = {
+        {                          "$ ", 2, 1,                                  "ascii"},
+        {                "\xe3\x81\x82", 2, 1,            "one hiragana is two columns"},
+        {  "\xe4\xb8\xad\xe6\x96\x87$ ", 6, 1,             "two ideographs plus prompt"},
+        {                 "e\xcc\x81$ ", 3, 1, "base plus combining mark is one column"},
+        { "\033[31m\xe3\x81\x82\033[0m", 2, 1,                  "wide char inside ANSI"},
+        {"ab\n\xe4\xb8\xad\xe6\x96\x87", 4, 2,                       "widest line wins"},
+        {                        "ab\n", 2, 1, "a trailing newline does not add a line"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        prompt_layer_t *layer = prompt_layer_create();
+        ASSERT_NOT_NULL(layer);
+        layer_event_system_t *events = create_test_event_system();
+        ASSERT_NOT_NULL(events);
+        prompt_layer_init(layer, events);
+        prompt_layer_set_content(layer, cases[i].content);
+
+        prompt_metrics_t metrics;
+        prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
+        ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
+        ASSERT_TRUE(metrics.max_line_width == cases[i].want_width,
+                    cases[i].what);
+        ASSERT_TRUE(metrics.line_count == cases[i].want_lines, cases[i].what);
+
+        prompt_layer_destroy(layer);
+        layer_events_destroy(events);
+    }
+    return 1;
+}
+
 static int test_get_metrics_simple_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
@@ -1354,6 +1396,7 @@ int main(void) {
     RUN_TEST(get_metrics_null_metrics);
     RUN_TEST(get_metrics_no_content);
     RUN_TEST(get_metrics_simple_content);
+    RUN_TEST(get_metrics_wide_characters);
     RUN_TEST(get_metrics_multiline_content);
     RUN_TEST(get_metrics_detects_ansi);
     RUN_TEST(get_metrics_no_ansi);
