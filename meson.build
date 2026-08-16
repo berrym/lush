@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_nested_backticks.c')
+  test_nested_backticks = executable('test_nested_backticks',
+    ['tests/integration/test_nested_backticks.c'])
+  test('an escaped backtick opens a nested substitution',
+       test_nested_backticks,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_err_trap_per_failure.c')
   test_err_trap_per_failure = executable('test_err_trap_per_failure',
     ['tests/integration/test_err_trap_per_failure.c'])

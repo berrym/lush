@@ -1778,6 +1778,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
 
         while (tokenizer->position < tokenizer->input_length &&
                tokenizer->input[tokenizer->position] != '`') {
+            /// A backslash escapes the next byte, so an escaped backtick does
+            /// not close the span: `\`` opens a NESTED substitution one level
+            /// down (POSIX 2.6.3). Without this the span ended at the first
+            /// `\``, and `echo \`printf 4\`` reported an unterminated
+            /// backtick for input every other shell runs (issue #732). The
+            /// double-quoted reader above and lush_dequote_span both already
+            /// scanned it this way; only this unquoted path did not.
+            if (tokenizer->input[tokenizer->position] == '\\' &&
+                tokenizer->position + 1 < tokenizer->input_length) {
+                tokenizer->position++;
+                tokenizer->column++;
+            }
             if (tokenizer->input[tokenizer->position] == '\n') {
                 tokenizer->line++;
                 tokenizer->column = 0;

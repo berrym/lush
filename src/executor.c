@@ -17544,6 +17544,39 @@ static bool cmdsub_try_fast_read(executor_t *executor, const char *command,
     return true;
 }
 
+/// Remove one level of backquote escaping from a `...` body.
+///
+/// POSIX 2.6.3: within the backquoted form a backslash retains its literal
+/// meaning except when followed by `$`, a backtick or a backslash, where it
+/// escapes that character. Removing those backslashes is what turns an
+/// embedded `\`` into the delimiter of a NESTED substitution when the body is
+/// parsed. Every other `\X` is left exactly as it was, so a body like
+/// `printf 'a\tb'` is unaffected.
+///
+/// Returns a fresh string, or NULL on allocation failure (the caller keeps
+/// the original body, which is what it used before this existed).
+static char *lush_backtick_unescape(const char *body) {
+    if (!body) {
+        return NULL;
+    }
+    size_t n = strlen(body);
+    char *out = malloc(n + 1);
+    if (!out) {
+        return NULL;
+    }
+    size_t w = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (body[i] == '\\' && i + 1 < n &&
+            (body[i + 1] == '$' || body[i + 1] == '`' || body[i + 1] == '\\')) {
+            out[w++] = body[++i];
+            continue;
+        }
+        out[w++] = body[i];
+    }
+    out[w] = '\0';
+    return out;
+}
+
 static char *expand_command_substitution(executor_t *executor,
                                          const char *cmd_text) {
     if (!executor || !cmd_text) {
@@ -17576,6 +17609,17 @@ static char *expand_command_substitution(executor_t *executor,
         }
         strncpy(command, cmd_text + 1, len);
         command[len] = '\0';
+        /// POSIX 2.6.3: inside `...` a backslash keeps its literal meaning
+        /// EXCEPT before `$`, a backtick or another backslash, where it
+        /// escapes that byte and is removed before the body is parsed. The
+        /// body used to be parsed verbatim, so `\`` reached the sub-parse as
+        /// a LITERAL backtick and a nested substitution was echoed as its own
+        /// source text instead of being run (issue #732).
+        char *unescaped = lush_backtick_unescape(command);
+        if (unescaped) {
+            free(command);
+            command = unescaped;
+        }
     } else {
         /// Already extracted command
         command = strdup(cmd_text);
