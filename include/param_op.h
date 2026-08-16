@@ -149,6 +149,18 @@ char *lush_case_pattern(const char *str, const char *pattern, bool to_upper,
 /// substitution pattern may match beyond a single literal run.
 bool lush_pattern_opens_extglob_group(const char *pattern);
 
+/// Split a `pattern/replacement` substitution spec at its first UNESCAPED
+/// `/`, returning a malloc'd pattern with `\\/` canonicalized to `/` and
+/// pointing @p replacement at the bytes after the separator (the empty string
+/// when there is none, i.e. a delete).
+///
+/// Exported because the per-element vector dispatch in the executor needs the
+/// same split the scalar path gets. It carried its own copy, and the copy
+/// diverged: its no-separator branch skipped the `\\/` canonicalization, so
+/// `${arr[@]//\\/}` left the slashes that `${v//\\/}` removed (issue #684).
+char *lush_param_op_split_substitution_spec(const char *spec,
+                                            const char **replacement);
+
 /// Replace the first (global == false) or every occurrence of glob
 /// @p pattern in @p str with @p replacement. Honors the `#` / `%` anchors.
 char *lush_pattern_substitute(const char *str, const char *pattern,
