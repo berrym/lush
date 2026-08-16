@@ -19,6 +19,7 @@ enforce: docs/
 enforce: scripts/
 enforce: examples/
 enforce: tests/
+enforce: data/
 enforce: meson.build
 enforce: README.md
 

@@ -8,10 +8,10 @@ analyzer to generate portability warnings.
 
 ```
 data/compat/
-├── builtins/       # Built-in command differences (echo, test, etc.)
-├── expansion/      # Variable/parameter expansion differences
-├── quoting/        # Quoting and escaping differences
-└── syntax/         # Syntax differences (arrays, functions, etc.)
++-- builtins/       # Built-in command differences (echo, test, etc.)
++-- expansion/      # Variable/parameter expansion differences
++-- quoting/        # Quoting and escaping differences
++-- syntax/         # Syntax differences (arrays, functions, etc.)
 ```
 
 ## Schema
