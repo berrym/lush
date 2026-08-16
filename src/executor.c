@@ -1828,6 +1828,75 @@ bool run_pending_signals(executor_t *executor) {
  * @param list First node in the command list
  * @return Exit status of last executed command
  */
+/// Depth of TESTED evaluation the executor is currently inside.
+///
+/// A command whose failure is being tested is not an error: the shell is
+/// ASKING whether it succeeds. That covers an `if` / `while` / `until`
+/// condition, the operand of `!`, and any non-final operand of `&&` / `||`.
+///
+/// Tested-ness is INHERITED, which is why this is a depth rather than a flag
+/// on one site. In `true && false || true` the inner `&&` sits in the tested
+/// left position of the `||`, so its own final operand is not final overall
+/// and must stay silent -- as must every construct nested inside a condition
+/// (`if { false; }; then` notifies in no shell). Every ERR firing site is
+/// gated on this being zero.
+static int g_err_tested_depth = 0;
+
+/// Run `node` in a tested position: its failure, and any failure inside it,
+/// is a question being asked rather than an error to report.
+static int execute_node_tested(executor_t *executor, node_t *node) {
+    g_err_tested_depth++;
+    int r = execute_node(executor, node);
+    g_err_tested_depth--;
+    return r;
+}
+
+/// True when a non-zero status from this node is a status PROPAGATING
+/// outward rather than a command failing here.
+///
+/// The ERR trap reports a command that failed; a compound command carrying
+/// that failure outward is the same event being re-reported, not a second
+/// one. lush fired on any non-zero status reaching a statement walker, so one
+/// failing command notified once per enclosing compound -- three times at two
+/// levels of nesting (issue #729):
+///
+///     trap 'echo T' ERR; for i in 1; do for j in 1; do false; done; done
+///       lush: T T T          bash, zsh: T
+///
+/// The constructs below report their own inner failures where those failures
+/// happen, so the walker must not report them again:
+///
+///   - the loop family runs its body through execute_command_chain,
+///   - `if` runs its branch as a command list,
+///   - a brace group and a `case` arm fire at their own body,
+///   - `&&` / `||` fire for their FINAL operand only, because a non-final
+///     operand sits in a TESTED position (`false && true` notifies in no
+///     shell -- the failure is the condition, not an error),
+///   - `!` inverts a tested operand, so neither its operand's failure nor its
+///     own inverted status is an error to report.
+///
+/// A subshell, a function call, `select`, `time` and a plain command or
+/// pipeline are NOT listed: their status originates at this level, which is
+/// where it must be reported.
+static bool err_trap_status_is_propagated(node_type_t type) {
+    switch (type) {
+    case NODE_FOR:
+    case NODE_FOR_ARITH:
+    case NODE_WHILE:
+    case NODE_UNTIL:
+    case NODE_REPEAT:
+    case NODE_IF:
+    case NODE_BRACE_GROUP:
+    case NODE_CASE:
+    case NODE_LOGICAL_AND:
+    case NODE_LOGICAL_OR:
+    case NODE_NEGATE:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static int execute_command_list(executor_t *executor, node_t *list) {
     if (!list) {
         return 0;
@@ -1916,9 +1985,12 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             printf("DEBUG: Command result: %d\n", last_result);
         }
 
-        /// Bash-style ERR pseudo-signal: fires after a non-zero command
-        /// exit, before set -e gets a chance to abort.
-        if (last_result != 0) {
+        /// ERR pseudo-signal: a command that failed here is reported here,
+        /// before set -e gets a chance to abort. A status merely propagating
+        /// out of a construct that already reported it is not a new failure --
+        /// see err_trap_status_is_propagated.
+        if (last_result != 0 && g_err_tested_depth == 0 &&
+            !err_trap_status_is_propagated(current->type)) {
             fire_err_trap();
         }
 
@@ -3140,10 +3212,11 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
             return executor->shell_exit_status;
         }
 
-        /// Bash-style ERR pseudo-signal: fires after a non-zero command
-        /// exit, before set -e gets a chance to abort. Matches bash's
-        /// "ERR trap before errexit" ordering.
-        if (last_result != 0) {
+        /// ERR pseudo-signal, before set -e gets a chance to abort. As in
+        /// execute_command_list, a status propagating out of a construct that
+        /// already reported its own failure is not a new failure.
+        if (last_result != 0 && g_err_tested_depth == 0 &&
+            !err_trap_status_is_propagated(current->type)) {
             fire_err_trap();
         }
 
@@ -3222,7 +3295,7 @@ static int execute_if(executor_t *executor, node_t *if_node) {
     }
 
     /// Execute the initial if condition
-    int condition_result = execute_node(executor, condition);
+    int condition_result = execute_node_tested(executor, condition);
 
     if (condition_result == 0) { /// Success in shell terms
         /// Execute the then body (second child)
@@ -3249,7 +3322,7 @@ static int execute_if(executor_t *executor, node_t *if_node) {
             break;
 
         /// Execute elif condition
-        condition_result = execute_node(executor, current);
+        condition_result = execute_node_tested(executor, current);
 
         if (condition_result == 0) { /// Success in shell terms
             /// Execute elif body (next sibling)
@@ -3449,7 +3522,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
 
     for (;;) {
         /// Execute condition
-        int condition_result = execute_node(executor, condition);
+        int condition_result = execute_node_tested(executor, condition);
 
         if (executor->debug) {
             printf("DEBUG: WHILE condition result: %d\n", condition_result);
@@ -3584,7 +3657,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
 
     for (;;) {
         /// Execute condition
-        int condition_result = execute_node(executor, condition);
+        int condition_result = execute_node_tested(executor, condition);
 
         if (executor->debug) {
             printf("DEBUG: UNTIL condition result: %d\n", condition_result);
@@ -5120,7 +5193,7 @@ static int execute_logical_and(executor_t *executor, node_t *and_node) {
     }
 
     /// Execute left command
-    int left_result = execute_node(executor, left);
+    int left_result = execute_node_tested(executor, left);
 
     /// A variable-assignment error (readonly) on the left aborts the
     /// whole AND-OR list -- it is not an ordinary failure that the
@@ -5132,7 +5205,15 @@ static int execute_logical_and(executor_t *executor, node_t *and_node) {
 
     /// Only execute right command if left succeeded (exit code 0)
     if (left_result == 0) {
-        return execute_node(executor, right);
+        /// The right operand is the LAST command of the list, so its failure
+        /// is an error to report. The left operand is a tested position and
+        /// never reports -- `false && true` notifies in no shell.
+        int right_result = execute_node(executor, right);
+        if (right_result != 0 && g_err_tested_depth == 0 &&
+            !err_trap_status_is_propagated(right->type)) {
+            fire_err_trap();
+        }
+        return right_result;
     }
 
     /// Left failed, return its exit code without executing right
@@ -5163,7 +5244,7 @@ static int execute_logical_or(executor_t *executor, node_t *or_node) {
     }
 
     /// Execute left command
-    int left_result = execute_node(executor, left);
+    int left_result = execute_node_tested(executor, left);
 
     /// A variable-assignment error (readonly) on the left aborts the
     /// whole AND-OR list -- the `||` must not treat it as an ordinary
@@ -5174,7 +5255,14 @@ static int execute_logical_or(executor_t *executor, node_t *or_node) {
 
     /// Only execute right command if left failed (non-zero exit code)
     if (left_result != 0) {
-        return execute_node(executor, right);
+        /// Same rule as `&&`: only the final operand's failure is an error.
+        /// The left operand failing is what SELECTED this branch.
+        int right_result = execute_node(executor, right);
+        if (right_result != 0 && g_err_tested_depth == 0 &&
+            !err_trap_status_is_propagated(right->type)) {
+            fire_err_trap();
+        }
+        return right_result;
     }
 
     /// Left succeeded, return its exit code without executing right
@@ -8356,7 +8444,7 @@ static int execute_negate(executor_t *executor, node_t *negate_node) {
         return 1;
     }
 
-    int result = execute_node(executor, child);
+    int result = execute_node_tested(executor, child);
 
     /// Invert the exit status: 0 -> 1, non-zero -> 0
     int inverted = (result == 0) ? 1 : 0;
@@ -8422,7 +8510,7 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
         /// errtrace + function scope so the trap is suppressed inside
         /// functions by default and surfaces only when the user opts
         /// in.
-        if (last_result != 0 && last_result < 200) {
+        if (last_result != 0 && last_result < 200 && g_err_tested_depth == 0) {
             fire_err_trap();
         }
 
@@ -11506,6 +11594,14 @@ static int execute_case(executor_t *executor, node_t *node) {
             node_t *commands = case_item->first_child;
             while (commands) {
                 result = execute_node(executor, commands);
+                /// A case arm is a statement list, so a command that fails in
+                /// it is reported here -- the same as a brace group. Without
+                /// this the arm was silent and only the whole `case` reported,
+                /// so two failing statements notified ONCE (issue #729).
+                if (result != 0 && result < 200 && g_err_tested_depth == 0 &&
+                    !err_trap_status_is_propagated(commands->type)) {
+                    fire_err_trap();
+                }
                 if (executor->loop_control != LOOP_NORMAL ||
                     executor->shell_exit_requested || exit_flag) {
                     break;
@@ -11821,12 +11917,16 @@ static int execute_function_call(executor_t *executor,
 
         result = execute_node(executor, command);
 
-        /// Bash-style ERR pseudo-signal: fires on a non-zero exit
-        /// inside the function body. fire_err_trap itself gates on
-        /// errtrace + function scope so the trap is suppressed inside
-        /// functions by default and surfaces only when the user has
-        /// `set -o errtrace`.
-        if (result != 0 && result < 200) {
+        /// A function body is a statement list, so a command that fails in it
+        /// is reported HERE -- the same rule as a brace group or a case arm.
+        /// This used to fire for the body's aggregate result without asking
+        /// what produced it, so a construct that had already reported its own
+        /// failure was reported again; with errtrace on, one failing command
+        /// in a loop body notified three times (issue #729). fire_err_trap
+        /// suppresses in-function notifications unless errtrace is set, which
+        /// is why the count looked right without `-E`.
+        if (result != 0 && result < 200 && g_err_tested_depth == 0 &&
+            !err_trap_status_is_propagated(command->type)) {
             fire_err_trap();
         }
 
