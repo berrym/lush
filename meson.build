@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_case_pattern_substitution.c')
+  test_case_pattern_substitution = executable('test_case_pattern_substitution',
+    ['tests/integration/test_case_pattern_substitution.c'])
+  test('a case pattern may be produced by a substitution',
+       test_case_pattern_substitution,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_nested_backticks.c')
   test_nested_backticks = executable('test_nested_backticks',
     ['tests/integration/test_nested_backticks.c'])

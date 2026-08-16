@@ -5338,6 +5338,19 @@ static node_t *parse_case_statement(parser_t *parser) {
                     }
                     continue;
                 }
+                /// A case pattern is a word, so a substitution is a legal
+                /// part of one: `case $x in $(cmd)) ...` and the backtick and
+                /// `$((...))` spellings all name a pattern to match against.
+                /// This hand-written list carried TOK_VARIABLE but none of the
+                /// three substitution tokens, so `case a in $(printf a))`
+                /// failed with "expected pattern in case statement" -- input
+                /// bash, zsh and dash all accept -- while `$var` and `${v}`
+                /// worked. The two sibling predicates in tokenizer.c
+                /// (token_is_argument_word_token, token_is_assignment_value_
+                /// token) already include all three; this site is deliberately
+                /// its own list because it also accepts `*`, `[[` and `]]` and
+                /// excludes keywords, so the three are added here rather than
+                /// by switching to a predicate with a different set.
                 if (token_is_word_like(pattern_token->type) ||
                     pattern_token->type == TOK_MULTIPLY ||
                     pattern_token->type == TOK_QUESTION ||
@@ -5347,6 +5360,9 @@ static node_t *parse_case_statement(parser_t *parser) {
                     pattern_token->type == TOK_DOUBLE_LBRACKET ||
                     pattern_token->type == TOK_DOUBLE_RBRACKET ||
                     pattern_token->type == TOK_VARIABLE ||
+                    pattern_token->type == TOK_COMMAND_SUB ||
+                    pattern_token->type == TOK_BACKQUOTE ||
+                    pattern_token->type == TOK_ARITH_EXP ||
                     pattern_token->type == TOK_ASSIGN ||
                     pattern_token->type == TOK_COMMA) {
 
