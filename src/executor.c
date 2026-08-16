@@ -16039,53 +16039,20 @@ static char *parse_parameter_expansion(executor_t *executor,
                     case 15: /// /// replace all
                     case 16: /// /  replace first
                     {
-                        /// NOTE: this per-element copy of the spec split has
-                        /// NOT been folded onto split_substitution_spec in
-                        /// param_op.c, and it already diverges -- its
-                        /// no-separator branch skips the `\/` -> `/`
-                        /// canonicalization, so `${arr[@]//\/}` leaves the
-                        /// slashes the scalar `${v//\/}` removes. Tracked as
-                        /// #684; folding it is a behavior change and belongs
-                        /// in its own commit.
-                        /// Split expanded_default at first unescaped '/'.
-                        char *sep = NULL;
-                        for (char *p = expanded_default; p && *p; p++) {
-                            if (*p == '\\' && p[1] == '/') {
-                                p++;
-                                continue;
-                            }
-                            if (*p == '/') {
-                                sep = p;
-                                break;
-                            }
-                        }
-                        bool global = (op_type == 15);
-                        char *pattern = NULL;
+                        /// Split the `pattern/replacement` spec with the SAME
+                        /// function the scalar path uses. This arm carried its
+                        /// own copy, and the copy had drifted: its
+                        /// no-separator branch skipped the `\/` -> `/`
+                        /// canonicalization, so `${arr[@]//\/}` left the
+                        /// slashes that `${v//\/}` removes. One spec, one
+                        /// splitter -- they cannot diverge again (issue #684).
                         const char *replacement = "";
-                        if (sep) {
-                            size_t plen = (size_t)(sep - expanded_default);
-                            pattern = malloc(plen + 1);
-                            if (pattern) {
-                                size_t pj = 0;
-                                for (size_t pi = 0; pi < plen; pi++) {
-                                    if (expanded_default[pi] == '\\' &&
-                                        pi + 1 < plen &&
-                                        expanded_default[pi + 1] == '/') {
-                                        pattern[pj++] = '/';
-                                        pi++;
-                                    } else {
-                                        pattern[pj++] = expanded_default[pi];
-                                    }
-                                }
-                                pattern[pj] = '\0';
-                                replacement = sep + 1;
-                            }
-                        } else if (expanded_default) {
-                            pattern = strdup(expanded_default);
-                        }
+                        char *pattern = lush_param_op_split_substitution_spec(
+                            expanded_default ? expanded_default : "",
+                            &replacement);
                         if (pattern) {
                             converted = lush_pattern_substitute(
-                                elems[i], pattern, replacement, global);
+                                elems[i], pattern, replacement, op_type == 15);
                             free(pattern);
                         }
                         if (!converted) {

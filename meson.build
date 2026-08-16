@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_vector_substitution_spec.c')
+  test_vector_substitution_spec = executable('test_vector_substitution_spec',
+    ['tests/integration/test_vector_substitution_spec.c'])
+  test('element and scalar substitution split the spec identically',
+       test_vector_substitution_spec,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_dangling_dollar.c')
   test_dangling_dollar = executable('test_dangling_dollar',
     ['tests/integration/test_dangling_dollar.c'])

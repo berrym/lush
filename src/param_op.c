@@ -927,8 +927,8 @@ bool lush_param_op_is_pure(int op_type) {
 /// matcher, which handles them per the glob spec. Issue #96.
 /// Returns the owned pattern; *replacement points into @p spec (or "" when the
 /// spec carries no separator, i.e. delete the match).
-static char *split_substitution_spec(const char *spec,
-                                     const char **replacement) {
+char *lush_param_op_split_substitution_spec(const char *spec,
+                                            const char **replacement) {
     *replacement = "";
     const char *sep = NULL;
     for (const char *p = spec; *p; p++) {
@@ -1127,7 +1127,8 @@ char *lush_param_op_apply(int op_type, const char *var_value,
     case 16: /// ${var/pattern/replacement}  - replace the first occurrence
         if (var_value) {
             const char *replacement = "";
-            char *pattern = split_substitution_spec(deflt, &replacement);
+            char *pattern =
+                lush_param_op_split_substitution_spec(deflt, &replacement);
             if (pattern) {
                 result = lush_pattern_substitute(var_value, pattern,
                                                  replacement, op_type == 15);
