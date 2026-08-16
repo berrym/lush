@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_err_trap_per_failure.c')
+  test_err_trap_per_failure = executable('test_err_trap_per_failure',
+    ['tests/integration/test_err_trap_per_failure.c'])
+  test('the ERR trap reports a failing command, not a propagating status',
+       test_err_trap_per_failure,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_arith_cmdsub_separator.c')
   test_arith_cmdsub_separator = executable('test_arith_cmdsub_separator',
     ['tests/integration/test_arith_cmdsub_separator.c'])
