@@ -54,7 +54,7 @@ audit_component() {
 
     # Check if path exists
     if [ ! -e "$path" ]; then
-        echo -e "${YELLOW}⚠ WARNING: Path not found${NC}"
+        echo -e "${YELLOW}WARNING WARNING: Path not found${NC}"
         echo "VERDICT: SKIP (not found)" > "$output_file"
         return 1
     fi
@@ -89,10 +89,10 @@ audit_component() {
     violations=$((write_violations + escape_violations + printf_violations))
 
     if [ $violations -gt 0 ]; then
-        echo -e "  ${RED}✗ VIOLATIONS FOUND: $violations${NC}"
+        echo -e "  ${RED}FAIL VIOLATIONS FOUND: $violations${NC}"
         score=$((score + violations * VIOLATION_CRITICAL))
     else
-        echo -e "  ${GREEN}✓ No architectural violations${NC}"
+        echo -e "  ${GREEN}OK No architectural violations${NC}"
     fi
     echo ""
 
@@ -120,13 +120,13 @@ audit_component() {
     todos=$((todo_count + fixme_count + stub_count + phase2_count))
 
     if [ $todos -gt 5 ]; then
-        echo -e "  ${RED}✗ EXCESSIVE PLACEHOLDERS: $todos${NC}"
+        echo -e "  ${RED}FAIL EXCESSIVE PLACEHOLDERS: $todos${NC}"
         score=$((score + todos * TODO_MAJOR))
     elif [ $todos -gt 0 ]; then
-        echo -e "  ${YELLOW}⚠ Some placeholders: $todos (review required)${NC}"
+        echo -e "  ${YELLOW}WARNING Some placeholders: $todos (review required)${NC}"
         score=$((score + todos * TODO_MINOR))
     else
-        echo -e "  ${GREEN}✓ No placeholder markers${NC}"
+        echo -e "  ${GREEN}OK No placeholder markers${NC}"
     fi
     echo ""
 
@@ -179,24 +179,24 @@ audit_component() {
     if [ $violations -gt 0 ]; then
         verdict="DISCARD"
         verdict_color=$RED
-        verdict_symbol="✗"
+        verdict_symbol="FAIL"
         verdict_reason="Architectural violations present"
         DISCARD_COUNT=$((DISCARD_COUNT + 1))
     elif [ $todos -gt 5 ]; then
         verdict="DISCARD"
         verdict_color=$RED
-        verdict_symbol="✗"
+        verdict_symbol="FAIL"
         verdict_reason="Excessive placeholder markers ($todos)"
         DISCARD_COUNT=$((DISCARD_COUNT + 1))
     elif [ $todos -gt 0 ]; then
         verdict="REVIEW_REQUIRED"
         verdict_color=$YELLOW
-        verdict_symbol="⚠"
+        verdict_symbol="WARNING"
         verdict_reason="Some placeholders present ($todos) - manual review needed"
     else
         verdict="SALVAGEABLE"
         verdict_color=$GREEN
-        verdict_symbol="✓"
+        verdict_symbol="OK"
         verdict_reason="Clean code - no violations, no placeholders"
         SALVAGEABLE_COUNT=$((SALVAGEABLE_COUNT + 1))
     fi
@@ -251,7 +251,7 @@ EOF
 
     if [ "$verdict" = "SALVAGEABLE" ]; then
         cat >> "$output_file" << EOF
-✓ SALVAGE THIS COMPONENT
+OK SALVAGE THIS COMPONENT
 
 This code passed all audit criteria:
 - Zero architectural violations
@@ -271,7 +271,7 @@ Reuse considerations:
 EOF
     elif [ "$verdict" = "REVIEW_REQUIRED" ]; then
         cat >> "$output_file" << EOF
-⚠ MANUAL REVIEW REQUIRED
+WARNING MANUAL REVIEW REQUIRED
 
 This code has minor issues that need review:
 - Violations: $violations
@@ -289,7 +289,7 @@ If salvaged:
 EOF
     else
         cat >> "$output_file" << EOF
-✗ DISCARD THIS COMPONENT
+FAIL DISCARD THIS COMPONENT
 
 This code failed audit criteria:
 $verdict_reason
@@ -389,7 +389,7 @@ EOF
 for report in "$AUDIT_DIR"/*.txt; do
     if grep -q "VERDICT: SALVAGEABLE" "$report"; then
         component=$(basename "$report" .txt | tr '_' ' ')
-        echo "- ✅ $component" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
+        echo "- OK $component" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
     fi
 done
 
@@ -402,7 +402,7 @@ EOF
 for report in "$AUDIT_DIR"/*.txt; do
     if grep -q "VERDICT: REVIEW_REQUIRED" "$report"; then
         component=$(basename "$report" .txt | tr '_' ' ')
-        echo "- ⚠️ $component (see detailed report)" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
+        echo "- WARNING$component (see detailed report)" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
     fi
 done
 
@@ -416,7 +416,7 @@ for report in "$AUDIT_DIR"/*.txt; do
     if grep -q "VERDICT: DISCARD" "$report"; then
         component=$(basename "$report" .txt | tr '_' ' ')
         reason=$(grep "Reason:" "$report" | cut -d: -f2-)
-        echo "- ❌ $component -$reason" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
+        echo "- FAIL $component -$reason" >> "$AUDIT_DIR/AUDIT_SUMMARY.md"
     fi
 done
 

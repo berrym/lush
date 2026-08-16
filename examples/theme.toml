@@ -230,13 +230,13 @@ string_ansic = "#B58900"       # ANSI-C quoting $'...' (yellow)
 variable = "#6C71C4"           # Variable reference $var, ${var} (violet)
 variable_special = "#D33682"   # Special variables $?, $#, $@, $$, $! (magenta)
 
-# Paths -- two-axis classification (shape × kind) with kind-only fallbacks.
+# Paths -- two-axis classification (shape x kind) with kind-only fallbacks.
 #
 # At highlight time each path-shaped argument is classified by:
 #   shape: absolute (`/...`), relative (`./`, `../`, bare), home (`~/...`)
 #   kind:  regular file vs. directory (per stat S_ISDIR), or invalid if missing
 #
-# The 6 shape × kind keys give power-user themes per-bucket control.
+# The 6 shape x kind keys give power-user themes per-bucket control.
 # Most themes only need the 2-3 base keys below: kind-only fallbacks for
 # `path_file` and `path_dir`, plus `path_invalid` (no fallback chain).
 # Resolution at color-application time: shape-specific knob -> kind-only
@@ -344,38 +344,38 @@ show = true
 format = "%H:%M:%S"           # strftime format string (default: "%H:%M:%S")
                                # Examples: "%H:%M" (short), "%I:%M %p" (12-hour)
 
-# Shell level segment — visible when nested (SHLVL > 1)
+# Shell level segment -- visible when nested (SHLVL > 1)
 [segments.shlvl]
 show = true
 min_level = 2                  # Minimum SHLVL to show (default: 2)
 
-# SSH indicator segment — visible when in SSH session
+# SSH indicator segment -- visible when in SSH session
 [segments.ssh]
 show = true
 style = "symbol"               # "symbol" (default) shows SSH indicator,
                                # "full" shows user@host
 
-# Command duration segment — visible when last command was slow
+# Command duration segment -- visible when last command was slow
 [segments.cmd_duration]
 show = true
 min_time = 2000                # Minimum duration in ms to show (default: 2000)
                                # e.g., min_time = 5000 only shows commands > 5s
 
-# Virtual environment segment — visible when Python venv is active
+# Virtual environment segment -- visible when Python venv is active
 [segments.virtualenv]
 show = true
 style = "basename"             # "basename" (default) shows venv name only,
                                # "full" shows entire path
 
-# Container segment — visible inside Docker/Podman/LXC
+# Container segment -- visible inside Docker/Podman/LXC
 [segments.container]
 show = true
 
-# AWS profile segment — visible when $AWS_PROFILE is set
+# AWS profile segment -- visible when $AWS_PROFILE is set
 [segments.aws]
 show = true
 
-# Kubernetes context segment — visible when kubectl context exists
+# Kubernetes context segment -- visible when kubectl context exists
 [segments.kubernetes]
 show = true
 

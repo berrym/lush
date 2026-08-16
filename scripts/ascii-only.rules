@@ -1,0 +1,35 @@
+# Which paths must contain ASCII bytes only.
+#
+# Non-ASCII in source is invisible in review: an em dash, a smart quote or a
+# stray accented character renders exactly like what a reader expects. The
+# rule is therefore mechanical rather than a matter of discipline.
+#
+# Format: one glob per line, prefixed enforce: or exempt:. Exempt wins.
+#
+# The exemptions are all the same category -- files whose BYTES ARE THE
+# PAYLOAD. A fuzz corpus exists to carry arbitrary bytes; a Unicode parity
+# fixture exists so a UTF-8 literal reaches the parser of three shells and
+# their outputs can be compared. Converting those to escapes would not make
+# them safer, it would delete what they test.
+
+enforce: src/
+enforce: include/
+enforce: tools/
+enforce: docs/
+enforce: scripts/
+enforce: examples/
+enforce: tests/
+enforce: meson.build
+enforce: README.md
+
+# Data, not source: bytes are the payload.
+exempt: tests/fuzz/corpus/
+exempt: tests/fuzz/differential/corpus/
+exempt: tests/fuzz/word_corpus/
+exempt: tests/real_world/corpus/
+exempt: tests/real_world/curated/
+exempt: tests/manual/interactive_utf8_test.sh
+exempt: tests/manual/utf8_test_helper.sh
+exempt: tests/manual/quick_utf8_test.sh
+exempt: tests/bash_zsh_compat_test.sh
+exempt: subprojects/
