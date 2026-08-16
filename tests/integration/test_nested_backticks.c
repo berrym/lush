@@ -166,6 +166,44 @@ int main(int argc, char **argv) {
     check(lush, "a trailing literal after a backtick is unchanged",
           "echo `printf 4`y", "4y");
 
+    /// A backtick anywhere in the word is a substitution, not just one at
+    /// the start. The `$` forms already routed a mid-word construct to the
+    /// general expander; the backtick branch tested only text[0], so a word
+    /// with a LEADING literal reached no substitution handler at all and was
+    /// emitted as its own source text (issue #740). A TRAILING literal worked,
+    /// because the backtick was still first -- which is why the nested-case
+    /// reproduction above deliberately has no leading literal.
+    check(lush, "740 a leading literal before a backtick", "echo x`printf 4`y",
+          "x4y");
+    check(lush, "740 a leading literal with nothing after", "echo x`printf 4`",
+          "x4");
+    check(lush, "740 in an assignment", "v=x`printf 4`y; echo \"[$v]\"",
+          "[x4y]");
+    check(lush, "740 two substitutions in one word",
+          "echo pre`printf 4`mid`printf 5`post", "pre4mid5post");
+    check(lush, "740 combined with a nested substitution",
+          "echo x`echo \\`printf 4\\``y", "x4y");
+    check(lush, "740 an empty body still concatenates", "echo x``y", "xy");
+    check(lush, "740 a body with no output still concatenates", "echo x`true`y",
+          "xy");
+    check(lush, "740 two words each with a substitution",
+          "echo x`printf 4`y z`printf 5`w", "x4y z5w");
+    check(lush, "740 the word survives a redirection",
+          "echo x`printf 4`y > /tmp/lush_t740; cat /tmp/lush_t740; rm -f "
+          "/tmp/lush_t740",
+          "x4y");
+    check(lush, "740 the word is one field in a for list",
+          "for i in x`printf 4`y; do printf '[%s]' \"$i\"; done", "[x4y]");
+
+    /// An ESCAPED backtick is a literal and must not become a substitution --
+    /// the mid-word scan has to skip `\X` like every other backtick scanner.
+    check(lush, "740 an escaped backtick mid-word stays literal", "echo x\\`y",
+          "x`y");
+    check(lush, "740 two escaped backticks stay literal", "echo a\\`b\\`c",
+          "a`b`c");
+    check(lush, "740 a single-quoted backtick stays literal", "echo 'x`y'",
+          "x`y");
+
     /// An unterminated backtick must still be DIAGNOSED rather than silently
     /// consuming the rest of the input -- the scanner now skips an escaped
     /// byte, so it must not be able to skip past the end. Asserted by shape,
