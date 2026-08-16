@@ -87,8 +87,15 @@ static void check_agree(const char *lush, const char *label, const char *value,
     char script[1024];
     char out[4096];
     char expect[512];
+    /// The value is SINGLE-QUOTED on both sides. Unquoted, a value with a
+    /// space became a command prefix (`v=a b`) and a value with a glob
+    /// metacharacter was expanded inside the array literal -- which, with
+    /// null_glob on in lush mode, left an EMPTY array and made the element
+    /// side compare against nothing. Both looked like code defects and were
+    /// purely the harness.
     snprintf(script, sizeof(script),
-             "v=%s; arr=(%s); printf '<%%s><%%s>' \"${v%s}\" \"${arr[0]%s}\"",
+             "v='%s'; arr=('%s'); printf '<%%s><%%s>' \"${v%s}\" "
+             "\"${arr[0]%s}\"",
              value, value, spec, spec);
     if (!run_c(lush, script, out, sizeof(out))) {
         fprintf(stderr, "FAIL %s [%s]: harness error\n", TEST, label);
@@ -163,10 +170,11 @@ int main(int argc, char **argv) {
           "arr=(a/b x/y); printf '<%s>' \"${arr[*]//\\/}\"", "<ab xy>");
 
     /// An escaped separator in the REPLACEMENT half: the two paths must give
-    /// the same answer, which is this fix's contract. They currently agree on
-    /// keeping the backslash, where bash and zsh drop it -- pre-existing on
-    /// BOTH paths and filed as #750, so the VALUE is pinned there rather than
-    /// asserted here.
+    /// the same answer, which is this fix's contract. They agree on KEEPING
+    /// the backslash, which is also the curated behavior -- zsh keeps it, bash
+    /// drops it, and lush follows zsh. (An earlier version of this comment
+    /// said bash AND zsh drop it; that was wrong, and it is what made #750
+    /// look like a defect.)
     check_agree(lush, "684 an escaped slash in the replacement agrees", "aXb",
                 "//X/\\/", "a\\/b");
 
@@ -193,6 +201,47 @@ int main(int argc, char **argv) {
           "IFS=,; arr=(ab); printf '<%s>' \"${arr[*]#a}\"", "<b>");
     check(lush, "752 an empty array yields an empty field",
           "IFS=,; arr=(); printf '<%s>' \"${arr[*]#a}\"", "<>");
+
+    /// The PATTERN half is a pattern: `\X` means a literal X. This used to
+    /// take a plain substring search -- `is_glob` saw no metacharacter in
+    /// `\b`, so the search hunted for the two BYTES `\b` and never matched,
+    /// where bash and zsh both substitute and lush's own `${v#\a}` and
+    /// `case abc in a\bc)` already agreed (issue #750).
+    check_agree(lush, "750 an escaped ordinary char in the pattern", "abc",
+                "//\\b/-", "a-c");
+    check_agree(lush, "750 escaping a different ordinary char", "aXb",
+                "//\\X/-", "a-b");
+    check_agree(lush, "750 replace-first with an escaped char", "abcabc",
+                "/\\b/-", "a-cabc");
+    check_agree(lush, "750 two escapes in one pattern", "abc", "//\\a\\b/-",
+                "-c");
+    check_agree(lush, "750 an escaped space", "a b", "//\\ /-", "a-b");
+    check(lush, "750 anchored at the start",
+          "v=abc; printf '<%s>' \"${v/#\\a/-}\"", "<-bc>");
+    check(lush, "750 anchored at the end",
+          "v=abc; printf '<%s>' \"${v/%\\c/-}\"", "<ab->");
+    check(lush, "750 an escaped char that does not occur",
+          "v=abc; printf '<%s>' \"${v//\\z/-}\"", "<abc>");
+
+    /// An escaped METAcharacter already routed to the matcher, because the
+    /// metacharacter itself satisfied the old check. Pinned so the widened
+    /// condition cannot regress them.
+    check_agree(lush, "750 an escaped asterisk still matches literally", "a*b",
+                "//\\*/-", "a-b");
+    check_agree(lush, "750 an escaped bracket", "a[b", "//\\[/-", "a-b");
+    check_agree(lush, "750 an escaped question mark", "a?b", "//\\?/-", "a-b");
+
+    /// CURATED, and deliberately NOT changed: the REPLACEMENT half is literal
+    /// text. lush follows zsh; bash unescapes. No capability is lost, because
+    /// the delimiter is the FIRST unescaped `/`, so a literal slash needs no
+    /// escape at all. Pinned here so a future "fix" toward bash has to argue
+    /// with a test rather than silently flip a curated default.
+    check(lush, "750 the replacement keeps its backslash",
+          "v=aXb; printf '<%s>' \"${v//X/\\a}\"", "<a\\ab>");
+    check(lush, "750 a literal slash needs no escape",
+          "v=aXb; printf '<%s>' \"${v//X//}\"", "<a/b>");
+    check(lush, "750 a replacement may contain slashes",
+          "v=aXb; printf '<%s>' \"${v//X//usr/lib}\"", "<a/usr/libb>");
 
     if (failures) {
         fprintf(stderr, "%s: %d failure(s)\n", TEST, failures);
