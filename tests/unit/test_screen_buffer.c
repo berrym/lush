@@ -316,6 +316,35 @@ static int test_visual_width_utf8_2byte(void) {
     return 1;
 }
 
+static int test_escape_sequences_end_at_the_final_byte(void) {
+    /// An ANSI sequence ends at its FINAL BYTE, which ECMA-48 defines as the
+    /// range 0x40-0x7E -- not "the first letter". Copies of this walk around
+    /// the tree enumerated terminators instead, and every enumeration missed
+    /// something: composition_engine listed m K J H A B C D G f s u, so a
+    /// sequence ending in `h` or `l` never terminated -- and `\033[?25l` /
+    /// `\033[?25h` is the cursor hide/show pair a shell emits constantly.
+    /// Everything after one measured as ZERO width.
+    struct {
+        const char *text;
+        size_t want;
+        const char *what;
+    } cases[] = {
+        {   "\033[31mabc\033[0m", 3,                                      "SGR colour"},
+        {"\033[?25labc\033[?25h", 3,            "cursor hide/show, terminator l and h"},
+        {            "\033[Kabc", 3,                        "erase line, terminator K"},
+        {           "\033[2Jabc", 3,                      "clear screen, terminator J"},
+        {       "\033[10;20Habc", 3,                   "cursor position, terminator H"},
+        {           "\033[3~abc", 3, "terminator ~, a final byte that is not a letter"},
+        {   "\033[1;2;3;4;5mabc", 3,                                 "many parameters"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        size_t w = screen_buffer_calculate_visual_width(cases[i].text, 0);
+        ASSERT_TRUE(w == cases[i].want, cases[i].what);
+    }
+    return 1;
+}
+
 static int test_width_agrees_on_wide_characters(void) {
     /// The two exported width functions must answer the same question the
     /// same way. screen_buffer_visual_width counted EVERY multi-byte
@@ -1337,6 +1366,7 @@ int main(void) {
     RUN_TEST(visual_width_readline_markers);
     RUN_TEST(visual_width_utf8_2byte);
     RUN_TEST(width_agrees_on_wide_characters);
+    RUN_TEST(escape_sequences_end_at_the_final_byte);
 
     printf("\n=== Calculate Visual Width Tests ===\n");
     RUN_TEST(calculate_visual_width_null);
