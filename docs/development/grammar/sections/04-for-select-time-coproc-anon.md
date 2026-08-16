@@ -1,4 +1,4 @@
-# Section 4 — for, select, time, coproc, anonymous functions
+# Section 4 -- for, select, time, coproc, anonymous functions
 
 ## Overview
 
@@ -68,7 +68,7 @@ trailing_redirections ::= redirection {redirection}
 
 ### Distinguishing `for ((` from `for var`
 
-**Location:** `parse_for_statement()` at parser.c:2569, lines 2582–2593
+**Location:** `parse_for_statement()` at parser.c:2569, lines 2582-2593
 
 Immediately after consuming `TOK_FOR`, the parser checks for `TOK_DOUBLE_LPAREN`:
 - If present, parses C-style arithmetic for: `for ((init; test; update)); do ... done`
@@ -78,21 +78,21 @@ No backtracking; the lookahead is deterministic.
 
 ### C-style for loop expression parsing
 
-**Location:** parser.c:2610–2762
+**Location:** parser.c:2610-2762
 
 Expressions are extracted **directly from raw input text** (not from tokenizer output) to preserve operator tokens like `<=` that the tokenizer splits into `<` and `=`:
 
-1. **Parse init expression** (parser.c:2610–2639)
+1. **Parse init expression** (parser.c:2610-2639)
    - Scan tokens until first semicolon at paren depth 0
    - Track nested `(` `)` and `(( ))` to skip nested parentheses
    - Extract raw substring, trim whitespace
    - Expression may be **empty** (zero-length after trimming)
 
-2. **Parse test expression** (parser.c:2670–2702)
+2. **Parse test expression** (parser.c:2670-2702)
    - Same algorithm as init
    - May be **empty**
 
-3. **Parse update expression** (parser.c:2734–2762)
+3. **Parse update expression** (parser.c:2734-2762)
    - Scan until `))` at paren depth 0
    - May be **empty**
 
@@ -100,24 +100,24 @@ Each expression is stored as a child `NODE_ARITH_EXP` with `val.str` containing 
 
 ### POSIX for loop: mandatory vs optional `in`
 
-**Location:** parser.c:2899–2916
+**Location:** parser.c:2899-2916
 
 After consuming variable name and checking for `TOK_IN`:
 
-- **If `in` present:** Parse the word list (parser.c:2928–3058)
-- **If `in` absent AND next token is `;` / `\n` / `do`:** Implicitly iterate "$@" (parser.c:2904–2916)
+- **If `in` present:** Parse the word list (parser.c:2928-3058)
+- **If `in` absent AND next token is `;` / `\n` / `do`:** Implicitly iterate "$@" (parser.c:2904-2916)
   - Parser creates a synthetic NODE_VAR child with val.str = `"$@"`
   - This follows POSIX specification for omitted word list
 - **If `in` absent AND next token is something else:** Error
 
 ### Word-list reassembly in POSIX for
 
-**Location:** parser.c:2928–3058
+**Location:** parser.c:2928-3058
 
 The tokenizer splits `NAME=VALUE` constructs into separate tokens (`NAME`, `=`, `VALUE`). The parser reassembles them by:
 
 1. Collecting adjacent tokens without intervening whitespace
-2. Handling `WORD=VALUE` patterns (parser.c:2993–3050)
+2. Handling `WORD=VALUE` patterns (parser.c:2993-3050)
    - If `=` is adjacent to previous token (no whitespace gap), combine
    - If value is adjacent to `=`, append it
    - Otherwise, word ends with `=` (e.g., `empty=`)
@@ -127,7 +127,7 @@ This allows `for i in a=1 b=2 c=d=e; do ...` to parse correctly, treating `a=1`,
 
 ### Anonymous function vs subshell disambiguation
 
-**Location:** parser.c:891–920
+**Location:** parser.c:891-920
 
 When the parser encounters `TOK_LPAREN` in a primary position (not after a command name):
 
@@ -143,19 +143,19 @@ This lookahead is **deterministic** and avoids backtracking by checking the 3-to
 
 ### `select` statement structure
 
-**Location:** parser.c:3116–3249
+**Location:** parser.c:3116-3249
 
 Mirrors POSIX `for` syntax:
 - Requires variable name immediately after `select`
-- Optional `in` clause (parser.c:3150–3206)
+- Optional `in` clause (parser.c:3150-3206)
 - If `in` absent, no implicit word list (unlike `for`)
-- Word list parsing (parser.c:3161–3203): stops at `;`, `\n`, `do`, or EOF
+- Word list parsing (parser.c:3161-3203): stops at `;`, `\n`, `do`, or EOF
 - Body parsed with `parse_command_body(parser, TOK_DONE)` (same as for/while/until)
-- Trailing redirections allowed (parser.c:3243–3247)
+- Trailing redirections allowed (parser.c:3243-3247)
 
 ### `time` command parsing
 
-**Location:** parser.c:3261–3292
+**Location:** parser.c:3261-3292
 
 - Consumes `TOK_TIME` keyword
 - Checks for optional `-p` flag (POSIX format); stored as `val.sint`
@@ -168,19 +168,19 @@ Mirrors POSIX `for` syntax:
 
 ### `coproc` command parsing
 
-**Location:** parser.c:3308–3381
+**Location:** parser.c:3308-3381
 
 **Feature-gated:** Requires `FEATURE_COPROC` flag (bash/zsh mode); else error
 
-**Name detection algorithm** (parser.c:3340–3363):
+**Name detection algorithm** (parser.c:3340-3363):
 - After `coproc`, peek at next token
 - If it's word-like AND next-next is also word-like OR compound command starter (`{`, `(`, `while`, `until`, `for`, `if`, `case`, `select`), treat current as NAME
 - Otherwise, current token starts the command (no explicit name, use default "COPROC")
 
 **Examples:**
-- `coproc myproc echo hello` → name="myproc", command=echo
-- `coproc { echo hello; }` → name=NULL (default), command={...}
-- `coproc myproc { echo; }` → name="myproc", command={...}
+- `coproc myproc echo hello` -> name="myproc", command=echo
+- `coproc { echo hello; }` -> name=NULL (default), command={...}
+- `coproc myproc { echo; }` -> name="myproc", command={...}
 
 **Command:** Parsed via `parse_pipeline()` (parser.c:3370)
 - Allows simple commands and pipelines
@@ -190,9 +190,9 @@ Mirrors POSIX `for` syntax:
 
 ### Anonymous function parsing
 
-**Location:** parser.c:3394–3412
+**Location:** parser.c:3394-3412
 
-**Called after lookahead detection** (parser.c:891–920 ensures `() {` sequence)
+**Called after lookahead detection** (parser.c:891-920 ensures `() {` sequence)
 
 - Current token is always `TOK_LBRACE` (already verified)
 - Calls `parse_brace_group(parser)` to parse body
@@ -214,15 +214,15 @@ The parser reconstructs expressions from **raw input text** (not tokenizer outpu
 ```bash
 for ((i <= 10;;++i)) do ...  # '<=' preserved, not split to '<' and '='
 ```
-This is critical for later semantic analysis (parser.c:2595–2596 comment explains).
+This is critical for later semantic analysis (parser.c:2595-2596 comment explains).
 
-### 3. POSIX for omits `in` → defaults to "$@"
+### 3. POSIX for omits `in` -> defaults to "$@"
 ```bash
 for i; do               # Equivalent to: for i in "$@"; do
   echo "$i"
 done
 ```
-The parser creates a synthetic word list containing `"$@"` (parser.c:2908–2914).
+The parser creates a synthetic word list containing `"$@"` (parser.c:2908-2914).
 
 ### 4. Word list `=` reassembly in for
 The parser accepts and reassembles `WORD=VALUE` constructs by checking for token adjacency:
@@ -238,7 +238,7 @@ Unlike `for`, `select` does not default to "$@" if `in` is omitted:
 select x; do echo "$x"; done      # Error: select requires word list
 select x in a b c; do echo "$x"; done  # OK
 ```
-This is bash/zsh behavior (parser.c:3150–3206 shows no implicit fallback).
+This is bash/zsh behavior (parser.c:3150-3206 shows no implicit fallback).
 
 ### 6. time -p flag is optional
 ```bash
@@ -246,7 +246,7 @@ time ls                  # OK, no -p
 time -p ls               # OK, with -p (POSIX format output)
 time -p ls | grep foo    # OK, -p with pipeline
 ```
-The `-p` flag is recognized as a word-like token matching literal "-p" (parser.c:3273–3277).
+The `-p` flag is recognized as a word-like token matching literal "-p" (parser.c:3273-3277).
 
 ### 7. coproc name detection uses lookahead
 ```bash
@@ -254,7 +254,7 @@ coproc name cmd          # name = "name", cmd = cmd
 coproc cmd               # name = NULL, cmd = cmd
 coproc name { cmd; }     # name = "name", cmd = { cmd; }
 ```
-The parser must distinguish a NAME from the start of the command. If next-next token is word-like or a compound starter, current is treated as name (parser.c:3350–3358).
+The parser must distinguish a NAME from the start of the command. If next-next token is word-like or a compound starter, current is treated as name (parser.c:3350-3358).
 
 ### 8. Anonymous functions are zsh-only
 The `() { body }` syntax is only recognized when `FEATURE_ANONYMOUS_FUNCTIONS` is enabled (parser.c:893). In non-zsh modes:
@@ -276,7 +276,7 @@ Parsed by `parse_trailing_redirections()` after the closing `done` (parser.c:286
 - **C-style for:** Both bash and zsh (parser.c:2582 check is before mode check)
 - **select:** Both bash and zsh
 - **time -p:** POSIX; recognized by both
-- **coproc:** Bash/zsh only (feature-gated, parser.c:3314–3318)
+- **coproc:** Bash/zsh only (feature-gated, parser.c:3314-3318)
 - **Anonymous functions:** Zsh only (feature-gated, parser.c:893)
 
 ## Parsing algorithm specifics
@@ -366,12 +366,12 @@ All parsing functions use `expect_token()` and `expect_token_with_help()` to enf
 Errors include context-sensitive help messages pointing to expected syntax.
 
 ### Feature flags
-- `coproc` requires `FEATURE_COPROC` enabled (parser.c:3314–3318)
+- `coproc` requires `FEATURE_COPROC` enabled (parser.c:3314-3318)
 - Anonymous functions require `FEATURE_ANONYMOUS_FUNCTIONS` enabled (parser.c:893)
 - Failures to enable result in syntax errors with feature disabled message
 
 ### Token adjacency checks
-Word reassembly in POSIX for checks `position` and `length` of tokens to determine whitespace gaps (parser.c:2998–3004, 3023).
+Word reassembly in POSIX for checks `position` and `length` of tokens to determine whitespace gaps (parser.c:2998-3004, 3023).
 
 ## Open questions
 
@@ -385,7 +385,7 @@ Word reassembly in POSIX for checks `position` and `length` of tokens to determi
 
 5. **Trailing redirections on for/select/time/coproc:** Do redirections apply to the entire loop/command, or only the final command in the body? (Likely the entire construct.)
 
-6. **Word list in select:** Does select word list support all expansions (command substitution, arithmetic, variables)? Code suggests yes (lines 3169–3173); same as for.
+6. **Word list in select:** Does select word list support all expansions (command substitution, arithmetic, variables)? Code suggests yes (lines 3169-3173); same as for.
 
 ---
 

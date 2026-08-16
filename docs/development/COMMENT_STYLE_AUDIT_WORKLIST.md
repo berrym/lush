@@ -1,6 +1,6 @@
 # Comment-Style Audit Worklist
 
-This is a **catalog-only** worklist for the comment-style unification across the lush codebase. No code changes are made by this audit — the file lists violations so the user can pick subdirectories for wave-based commits.
+This is a **catalog-only** worklist for the comment-style unification across the lush codebase. No code changes are made by this audit -- the file lists violations so the user can pick subdirectories for wave-based commits.
 
 ## The unified ruleset (the bar for "violation")
 
@@ -11,21 +11,21 @@ This is a **catalog-only** worklist for the comment-style unification across the
 | `///<` | Trailing same-line | Struct members, enum values, anywhere a one-line description belongs after the declaration. |
 | `/* ... */` | Outside function bodies only | Plain prose: module-level explainers between functions, longer why-notes that don't belong in API docs. |
 
-**Retired:** `//` (→ `///`), `/**< ... */` (→ `///<`).
+**Retired:** `//` (-> `///`), `/**< ... */` (-> `///<`).
 
 **`@` over `\`** for command prefixes. Every `.c` and `.h` should start with a `@file` block.
 
 ## Scope
 
 - Walked all `.c` and `.h` files under `src/`, `include/`, and `tests/`.
-- Skipped `src/strings.c` (deprecated, being phased out — see memory `feedback-strings-c-deprecated`).
+- Skipped `src/strings.c` (deprecated, being phased out -- see memory `feedback-strings-c-deprecated`).
 - Skipped `build/`, `build-asan/`, `build-fuzz/`, `build-linux/`, and any generated files (none found in scope).
 - Skipped `tests/real_world/corpus/*` data fixtures; included `tests/fuzz/*.c` test source.
 - **Total files audited: 529.**
 
 ## Catalog method
 
-This audit is **count-driven** rather than line-by-line itemized, for the simple reason that the codebase contains ~22 000 `//` comments and ~3 800 `/**< */` trailing comments. Line-itemizing every site would balloon the worklist past 100 000 lines and obscure rather than clarify the work. Instead, each per-file row carries a count for each violation category — enough to gauge effort and to drive `sed`-style mechanical sweeps for the bulk categories.
+This audit is **count-driven** rather than line-by-line itemized, for the simple reason that the codebase contains ~22 000 `//` comments and ~3 800 `/**< */` trailing comments. Line-itemizing every site would balloon the worklist past 100 000 lines and obscure rather than clarify the work. Instead, each per-file row carries a count for each violation category -- enough to gauge effort and to drive `sed`-style mechanical sweeps for the bulk categories.
 
 ### Violation categories tracked
 
@@ -33,20 +33,20 @@ This audit is **count-driven** rather than line-by-line itemized, for the simple
 |---|---|---|
 | `//` | Single-line `//` comments (must become `///`) | Mechanical (`sed`) |
 | `/**<` | Trailing `/**< */` (must become `///<`) | Mechanical (`sed`) |
-| `/**` blocks | Count of `/**`-style block comments. **NOT a direct violation count** — needs judgment per occurrence. A `/** */` block above an exported header declaration is correct; the same form above a static function in a `.c` file, above a trivial header decl, or inside a function body is a violation. Use this column as an "attention budget" indicator. |
+| `/**` blocks | Count of `/**`-style block comments. **NOT a direct violation count** -- needs judgment per occurrence. A `/** */` block above an exported header declaration is correct; the same form above a static function in a `.c` file, above a trivial header decl, or inside a function body is a violation. Use this column as an "attention budget" indicator. |
 | static-fn `/**` | `/**`-block comments immediately preceding a `static` function definition. Should collapse to `///` brief / `///` run. | Judgment, mostly mechanical |
 | in-fn `/* */` | Multi-line `/* */` block comments inside function bodies (heuristic: starts with indented `/*` not followed by `*`, and not closed on the same line). Should become `///` runs. | Judgment per site |
 | no @file | File is missing a `@file` block in its first 40 lines. | Mechanical (add header) |
 
 ### Out of scope (verified zero occurrences)
 
-- `\command` backslash Doxygen prefixes — `grep` reports **0** across the audited tree.
+- `\command` backslash Doxygen prefixes -- `grep` reports **0** across the audited tree.
 
 ### Note on duplicate Doxygen between `.h` and `.c`
 
-This pattern is endemic — virtually every `.c` file that implements exported declarations from a paired `.h` repeats the full `/** @brief / @param / @return */` block above the implementation. Per-function itemization at this scale is infeasible; the **per-file `/**` block count for `.c` files** is the proxy. For each non-static exported function the source-side `/** */` block should be replaced with a single-line `/* See foo.h for contract. */` (or simply nothing), and the contract lives only in the header.
+This pattern is endemic -- virtually every `.c` file that implements exported declarations from a paired `.h` repeats the full `/** @brief / @param / @return */` block above the implementation. Per-function itemization at this scale is infeasible; the **per-file `/**` block count for `.c` files** is the proxy. For each non-static exported function the source-side `/** */` block should be replaced with a single-line `/* See foo.h for contract. */` (or simply nothing), and the contract lives only in the header.
 
-A wave-time heuristic when sweeping a `.c` file: every `/** */` block above a non-`static` function whose name matches a `/** */` block in the paired header is duplicate Doxygen — replace with a `/* */` pointer.
+A wave-time heuristic when sweeping a `.c` file: every `/** */` block above a non-`static` function whose name matches a `/** */` block in the paired header is duplicate Doxygen -- replace with a `/* */` pointer.
 
 ---
 
@@ -131,54 +131,54 @@ A wave-time heuristic when sweeping a `.c` file: every `/** */` block above a no
 
 These recommendations balance density (violations per file), risk (small isolated subsystems vs. cross-cutting infrastructure), and review-unit clarity. Pick first-wave targets that are dense AND isolated.
 
-### Wave 1 — small, isolated, high signal-to-review-cost (best first commits)
+### Wave 1 -- small, isolated, high signal-to-review-cost (best first commits)
 
-1. **`src/libhashtable/`** (7 files, total 21 violations) — third-party-pedigree code (Michael Berry's libhashtable, vendored). Only `//` comments to flip; no `/**< */`; no header drift. Single mechanical `sed` pass, low review burden, isolated subsystem. The matching `include/libhashtable/ht.h` (10 violations) is one more file.
-2. **`src/libfuzzy/`** (1 file, 54 violations) — single file. Easy one-shot commit.
-3. **`src/builtins/display/`** (16 files, 85 violations) — already 2 of the 16 are CLEAN (`lle_hook.c`, `lle_status.c`). Tiny per-file footprint; isolated from execution path.
-4. **`tests/fuzz/`** (5 files, 86 violations) — small, no production risk.
-5. **`tests/manual/`** + **`tests/lle/manual/`** + **`tests/lle/benchmarks/`** + **`tests/lle/stress/`** + **`tests/lle/e2e/`** — all small, mostly `//` and missing-`@file` only. Bundle as a single "tests-housekeeping" sweep.
-6. **`include/lle/prompt/`** + **`include/lle/completion/`** — almost pure header-form drift: `/**< */` → `///<` and `/** */`-on-trivial-decl → `///` brief. No code semantics involved; tightly scoped per subsystem.
+1. **`src/libhashtable/`** (7 files, total 21 violations) -- third-party-pedigree code (Michael Berry's libhashtable, vendored). Only `//` comments to flip; no `/**< */`; no header drift. Single mechanical `sed` pass, low review burden, isolated subsystem. The matching `include/libhashtable/ht.h` (10 violations) is one more file.
+2. **`src/libfuzzy/`** (1 file, 54 violations) -- single file. Easy one-shot commit.
+3. **`src/builtins/display/`** (16 files, 85 violations) -- already 2 of the 16 are CLEAN (`lle_hook.c`, `lle_status.c`). Tiny per-file footprint; isolated from execution path.
+4. **`tests/fuzz/`** (5 files, 86 violations) -- small, no production risk.
+5. **`tests/manual/`** + **`tests/lle/manual/`** + **`tests/lle/benchmarks/`** + **`tests/lle/stress/`** + **`tests/lle/e2e/`** -- all small, mostly `//` and missing-`@file` only. Bundle as a single "tests-housekeeping" sweep.
+6. **`include/lle/prompt/`** + **`include/lle/completion/`** -- almost pure header-form drift: `/**< */` -> `///<` and `/** */`-on-trivial-decl -> `///` brief. No code semantics involved; tightly scoped per subsystem.
 
-### Wave 2 — focused subsystems (each its own commit)
+### Wave 2 -- focused subsystems (each its own commit)
 
-- **`src/lle/buffer/`** (4 files) — small, foundational, well-scoped.
-- **`src/lle/widget/`** (3 files) — fresh subsystem, low cross-pollination.
-- **`src/lle/event/`** + **`src/lle/multiline/`** + **`src/lle/adaptive/`** — moderate, each independently reviewable.
-- **`src/lle/input/`** + **`src/lle/terminal/`** — input pipeline, can land as one commit if reviewed together.
-- **`src/debug/`** — 6 files, isolated. Good unit.
+- **`src/lle/buffer/`** (4 files) -- small, foundational, well-scoped.
+- **`src/lle/widget/`** (3 files) -- fresh subsystem, low cross-pollination.
+- **`src/lle/event/`** + **`src/lle/multiline/`** + **`src/lle/adaptive/`** -- moderate, each independently reviewable.
+- **`src/lle/input/`** + **`src/lle/terminal/`** -- input pipeline, can land as one commit if reviewed together.
+- **`src/debug/`** -- 6 files, isolated. Good unit.
 
-### Wave 3 — large but contained LLE subsystems
+### Wave 3 -- large but contained LLE subsystems
 
-- **`src/lle/history/`** (13 files, 749 violations + 76 `/**< */`) — history has `/**< */` in its source files (uncommon), worth a careful sweep.
-- **`src/lle/completion/`** (14 files, 687 violations) — completion-subsystem-internal; respects the postmortem boundary.
-- **`src/lle/keybinding/`** (4 files, 535 violations) — but very dense per file (~134/file).
-- **`src/lle/display/`** + **`src/lle/prompt/`** + **`src/lle/core/`** — display/prompt/core; each its own wave.
-- **`src/lle/unicode/`** (7 files, 1 149 violations, 164/file) — densest LLE subsystem; almost pure `//` → `///` flips, but the volume per file means each file is its own commit.
+- **`src/lle/history/`** (13 files, 749 violations + 76 `/**< */`) -- history has `/**< */` in its source files (uncommon), worth a careful sweep.
+- **`src/lle/completion/`** (14 files, 687 violations) -- completion-subsystem-internal; respects the postmortem boundary.
+- **`src/lle/keybinding/`** (4 files, 535 violations) -- but very dense per file (~134/file).
+- **`src/lle/display/`** + **`src/lle/prompt/`** + **`src/lle/core/`** -- display/prompt/core; each its own wave.
+- **`src/lle/unicode/`** (7 files, 1 149 violations, 164/file) -- densest LLE subsystem; almost pure `//` -> `///` flips, but the volume per file means each file is its own commit.
 
-### Wave 4 — central headers (high blast radius, careful review required)
+### Wave 4 -- central headers (high blast radius, careful review required)
 
-- **`include/lle/`** (49 files, 3 254 violations, 2 104 of them `/**< */`) — the trailing-comment hotspot of the codebase. Almost mechanical, but every consumer header re-reads these so commit hygiene matters. Recommend sweeping in groups of ~10 headers per commit.
-- **`include/`** (38 files, 1 282 violations, 1 001 `/**< */`) — same shape: dense in `/**< */`, mechanical.
-- **`include/display/`** (9 files, 1 043 violations) — see below.
+- **`include/lle/`** (49 files, 3 254 violations, 2 104 of them `/**< */`) -- the trailing-comment hotspot of the codebase. Almost mechanical, but every consumer header re-reads these so commit hygiene matters. Recommend sweeping in groups of ~10 headers per commit.
+- **`include/`** (38 files, 1 282 violations, 1 001 `/**< */`) -- same shape: dense in `/**< */`, mechanical.
+- **`include/display/`** (9 files, 1 043 violations) -- see below.
 
-### Wave 5 — the core trio (separate commits, hardest review)
+### Wave 5 -- the core trio (separate commits, hardest review)
 
-- **`src/`** (33 root-level files, 5 985 violations) — anchored by `src/executor.c` (2 020 violations alone), `src/parser.c` (794), `src/tokenizer.c` (349), `src/config.c` (286), `src/symtable.c` (226). Each of these top-five files deserves its own commit; the remaining 28 root files can be bundled into 2–3 commits.
-- **`src/display/`** (10 files, 1 456 violations, 145.6/file) and the paired **`include/display/`** (9 files, 1 043 violations) — the display layer's clear-and-redraw architecture means heavy in-fn `/* */` blocks explaining cursor math. Should be reviewed by someone who knows screen_buffer.c.
-- **`tests/unit/`** (52 files, 1 609 violations) and **`tests/lle/unit/`** (40 files, 1 402 violations, 21 missing `@file`) — large test corpora, can be batched into 3–4 commits each by feature area.
+- **`src/`** (33 root-level files, 5 985 violations) -- anchored by `src/executor.c` (2 020 violations alone), `src/parser.c` (794), `src/tokenizer.c` (349), `src/config.c` (286), `src/symtable.c` (226). Each of these top-five files deserves its own commit; the remaining 28 root files can be bundled into 2-3 commits.
+- **`src/display/`** (10 files, 1 456 violations, 145.6/file) and the paired **`include/display/`** (9 files, 1 043 violations) -- the display layer's clear-and-redraw architecture means heavy in-fn `/* */` blocks explaining cursor math. Should be reviewed by someone who knows screen_buffer.c.
+- **`tests/unit/`** (52 files, 1 609 violations) and **`tests/lle/unit/`** (40 files, 1 402 violations, 21 missing `@file`) -- large test corpora, can be batched into 3-4 commits each by feature area.
 
 ### Mechanical-pass note
 
 For categories `//` and `/**< */`, the transformation is unambiguous:
 
 ```bash
-# (illustrative only — DO NOT run from this audit)
+# (illustrative only -- DO NOT run from this audit)
 sed -i 's|/\*\*<\([^*]\)|///<\1|g' file.h     # trailing dox
 sed -i 's|^\(\s*\)//\([^/]\)|\1///\2|g' file  # single-line //
 ```
 
-Use `git diff` after each pass — line counts should be identical, only comment-leader characters change.
+Use `git diff` after each pass -- line counts should be identical, only comment-leader characters change.
 
 ---
 
@@ -239,7 +239,7 @@ Almost all are test files. Adding a `@file` block is purely additive.
 
 ---
 
-## CLEAN files (29 files — no violations across any category)
+## CLEAN files (29 files -- no violations across any category)
 
 These files conform to the unified ruleset. **Do not re-edit.**
 
@@ -279,7 +279,7 @@ These files conform to the unified ruleset. **Do not re-edit.**
 
 Each directory below lists every audited file with violation counts.
 - `//` and `/**<` columns are exact violation counts.
-- `/**` blocks column is informational (not all `/** */` blocks are violations — see "Catalog method" above).
+- `/**` blocks column is informational (not all `/** */` blocks are violations -- see "Catalog method" above).
 - `static-fn /**` is a judgment-required violation (collapse to `///` brief).
 - `in-fn /* */` is a judgment-required violation (convert to `///` run).
 - `no @file` = YES means add a `@file` block.

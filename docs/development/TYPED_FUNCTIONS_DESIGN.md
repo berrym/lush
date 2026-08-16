@@ -6,14 +6,14 @@ user choice on 2026-05-23. This document expands those into a full
 spec covering grammar, types, scoping, the `return` statement, the
 debugger surface, and a phased commit plan.
 
-**Scope:** SEMANTICS.md §8 item "The typed-function form" (and the
-coupled §5.3 lexical-scope obligation). On landing, the §7 row
+**Scope:** SEMANTICS.md S8 item "The typed-function form" (and the
+coupled S5.3 lexical-scope obligation). On landing, the S7 row
 "Typed-function form" moves from `large -- form not yet designed`
-to `match`, and the §8 list loses this item.
+to `match`, and the S8 list loses this item.
 
 **Authority:** this document, once landed, is *informative* (a
 record of the design rationale). The *normative* statements live in
-SEMANTICS.md once §5.3 and §7 are updated. Where this doc and
+SEMANTICS.md once S5.3 and S7 are updated. Where this doc and
 SEMANTICS.md ever disagree, SEMANTICS.md wins.
 
 ---
@@ -38,9 +38,9 @@ fn empty() {
 
 The form is `fn name(params) -> ret_kind { body }`. The `fn` keyword
 is the single visible marker; a reader knows from the header alone
-that this function is lexically scoped (§5.3), distinct from a
+that this function is lexically scoped (S5.3), distinct from a
 POSIX-form `name() { ... }` or `function name { ... }` which carry
-dynamic scoping (§5.2).
+dynamic scoping (S5.2).
 
 ### 1.2 Call-site capture
 
@@ -53,7 +53,7 @@ echo "${words[@]}"
 ```
 
 `let result = name(args)` is the call-site form. The existing
-arithmetic-only `let "x = 5+3"` form is preserved (§2.4).
+arithmetic-only `let "x = 5+3"` form is preserved (S2.4).
 
 ---
 
@@ -79,13 +79,13 @@ Notes:
   prints the literal text `fn`).
 - An empty parameter list (`fn foo() { ... }`) is legal.
 - The return-kind annotation is optional. Absence means "no return
-  value" -- a void fn (§2.5).
+  value" -- a void fn (S2.5).
 - Default values, variadic parameters, and `nameref` /
   polymorphic-`any` parameter kinds are **out of scope** for the
-  initial form (§9 deferred).
+  initial form (S9 deferred).
 - A `fn` body is a `compound_command` -- the same body grammar as a
   POSIX function body. Inside the body, `return expression` becomes
-  available (§2.5); outside, `return` retains its POSIX
+  available (S2.5); outside, `return` retains its POSIX
   exit-status-setting semantics.
 
 ### 2.2 Call-expression grammar
@@ -97,10 +97,10 @@ argument        = word ;     (* same word/expansion as elsewhere *)
 ```
 
 A call expression is **only** recognized as the right-hand side of a
-`let` statement (§2.3) for the initial form. Bare `name(args)` at
+`let` statement (S2.3) for the initial form. Bare `name(args)` at
 statement position is not added; users who don't need the return
 value can call the fn as `name args` exactly like a POSIX function
-(see §6 for the call-site discriminator).
+(see S6 for the call-site discriminator).
 
 ### 2.3 `let` grammar extension
 
@@ -171,7 +171,7 @@ the marker hack was approximating.
 
 Exactly three kinds are admitted in parameter and return positions:
 
-| Kind | Maps to SEMANTICS §7 |
+| Kind | Maps to SEMANTICS S7 |
 |------|----------------------|
 | `scalar` | `LUSH_VALUE_SCALAR` |
 | `list`   | `LUSH_VALUE_LIST` |
@@ -186,7 +186,7 @@ Three deliberate omissions for the initial form:
 - **No `any`.** Gradual typing is an anti-feature for the typed
   form -- the point of `fn` is that types are checked. Helpers
   that want to be untyped use the POSIX form. Reintroducing `any`
-  is reversible later if a real need emerges (§9 deferred).
+  is reversible later if a real need emerges (S9 deferred).
 - **No `nameref`.** A typed-fn parameter cannot be a nameref. Use
   `list` or `map` for shared-state patterns.
 - **No `func` parameter kind.** Higher-order functions are
@@ -199,7 +199,7 @@ Three deliberate omissions for the initial form:
 
 ### 3.1 At fn declaration
 
-When a `fn` is parsed, the resolver pass (§5) walks its body and
+When a `fn` is parsed, the resolver pass (S5) walks its body and
 checks:
 
 1. Every parameter reference (`$p` where `p` is a declared param)
@@ -212,8 +212,8 @@ checks:
 
 Type-mismatch findings are reported via the structured-error system
 (`SHELL_ERR_TYPE_MISMATCH`) with file:line citations. Existing
-SEMANTICS §3.9 type errors compose: a `fn` body that does `echo
-"$arr_param"` where `arr_param: list` is a §3.9 violation reported
+SEMANTICS S3.9 type errors compose: a `fn` body that does `echo
+"$arr_param"` where `arr_param: list` is a S3.9 violation reported
 at parse-and-resolve time, not runtime.
 
 ### 3.2 At call site
@@ -240,7 +240,7 @@ For each `let result = name(args)` site, the resolver pass checks:
 
 The static checks above run as part of the existing analyzer
 (`debug_analysis.c`, the same engine `debug analyze` and `lint` use).
-Findings carry the `type` category, same as existing SEMANTICS §3.9
+Findings carry the `type` category, same as existing SEMANTICS S3.9
 type-mismatch flags. Their format is identical to other
 type-category findings.
 
@@ -260,7 +260,7 @@ Executing a `fn` declaration:
 3. Re-declaring an existing fn name replaces the previous record
    (same semantics as POSIX `function` redeclaration).
 
-The captured program scope is the lexical-closure mechanism (§5).
+The captured program scope is the lexical-closure mechanism (S5).
 The registry is a per-executor table, not per-shell-process; a
 sub-shell forking does not get a parent's typed fns unless they were
 declared in a scope the sub-shell still has access to.
@@ -295,7 +295,7 @@ Executing a `name(args)` call expression:
 
 The executor:
 
-1. Performs the call per §4.2 to obtain a typed return value.
+1. Performs the call per S4.2 to obtain a typed return value.
 2. Binds `result` in the current scope (lexical if inside another
    `fn`, dynamic otherwise) with the kind the fn returned.
 
@@ -316,7 +316,7 @@ Inside a `fn` body, name resolution is **lexical (block) scoped**:
 2. A name reference resolves to the **innermost enclosing block**
    that defines that name.
 3. If no enclosing block defines it, resolution falls through to the
-   fn's captured program scope (§4.1).
+   fn's captured program scope (S4.1).
 4. If even the captured scope has no binding, the name is unset; the
    `set -u` / `errunset` policy applies as usual.
 
@@ -358,21 +358,21 @@ A new scope-frame kind `SCOPE_LEXICAL` joins the existing
 - `symtable_push_lexical_scope(captured_parent)` creates a frame
   whose `parent` is the captured scope, not the caller.
 - Variable lookups inside a `SCOPE_LEXICAL` frame use the resolved
-  bindings from §5.2 instead of the dynamic walk.
+  bindings from S5.2 instead of the dynamic walk.
 - `symtable_pop_scope` works identically for both kinds.
 
 ### 5.4 Why compile-time over runtime tagging
 
 Two reasons:
 
-1. **Debugger story.** PHILOSOPHY §7 obligates the debugger to
+1. **Debugger story.** PHILOSOPHY S7 obligates the debugger to
    render typed-fn frames truthfully. Compile-time resolution means
    `debug print x` inside a typed-fn body has a deterministic
    answer that the debugger can render without ambiguity. A runtime
    tagged walk could produce the same answer but with less
    confidence -- and the integration-test gate would be harder to
    write.
-2. **Static analysis.** §3 type checks are a natural extension of
+2. **Static analysis.** S3 type checks are a natural extension of
    the resolver pass. A purely-runtime model would split the type
    checking across two passes (one at parse, one at runtime) and
    produce diagnostics with worse source citations.
@@ -383,7 +383,7 @@ storage. Both are acceptable.
 ### 5.5 Dynamic code execution inside fn bodies
 
 Some constructs introduce code that is not present in the AST at
-parse time and therefore cannot be resolved by the §5.2 compile-
+parse time and therefore cannot be resolved by the S5.2 compile-
 time pass: `source FILE`, `eval STRING`, command substitution
 `$(...)` that runs at fn-execution time, and anything else that
 constructs and executes shell text on the fly.
@@ -411,7 +411,7 @@ expose sourced-file visibility today; the only difference is which
 *locals* are visible (the fn's lexically-declared ones, not a
 dynamic-chain accumulation).
 
-The §7 gate covers this with a dedicated test
+The S7 gate covers this with a dedicated test
 (`test_typed_fn_source_sees_locals`) that asserts a sourced file
 inside a fn body can read and write the fn's declared locals via
 the standard scope-chain walk. `debug analyze` does NOT report
@@ -421,7 +421,7 @@ silent or warns at most, matching the established convention.
 A future hardening pass could add an opt-in
 `set -o strict-fn-isolation` mode that forbids `source` / `eval`
 inside `fn` bodies entirely, restoring full static analysis. Not
-part of the initial form (§9 deferred).
+part of the initial form (S9 deferred).
 
 ---
 
@@ -449,7 +449,7 @@ discarded). Not part of the initial form.
 
 ---
 
-## 7. Debugger obligations (PHILOSOPHY §7)
+## 7. Debugger obligations (PHILOSOPHY S7)
 
 The integration-test gate (`tests/unit/test_debug_integration.c`)
 must turn red until each of these is implemented:
@@ -476,11 +476,11 @@ Resolution uses the lexical chain. The output identifies the binding
 site by file:line:
 
 ```
-│ ┌─ [Variable: words] ────────────────────────────────────────────────
-│ Type:  List
-│ Count: 3 elements
-│ Scope: lexical (declared at demo.sh:4)
-│ └──────────────────────────────────────────────────────────────────
+| +- [Variable: words] ------------------------------------------------
+| Type:  List
+| Count: 3 elements
+| Scope: lexical (declared at demo.sh:4)
+| +------------------------------------------------------------------
 ```
 
 ### 7.4 `debug analyze` new checks
@@ -493,11 +493,11 @@ Four new findings, all in the `type` category:
 3. call-site argument kind mismatch
 4. call-site result kind mismatch (`let scalar_v = list_fn()`)
 
-### 7.5 The §7 gate test
+### 7.5 The S7 gate test
 
 `tests/unit/test_debug_integration.c` gains a `test_typed_fn_*`
 group covering each obligation. The gate is RED until every test
-passes. Per PHILOSOPHY §7, this means the typed-fn work is not
+passes. Per PHILOSOPHY S7, this means the typed-fn work is not
 "done" until the test group is green.
 
 ---
@@ -548,7 +548,7 @@ Commit message prefix: `executor:` or split as needed.
 
 Commit message prefix: `parser+executor:` (touches both).
 
-### Phase D: debugger surface (PHILOSOPHY §7 gate)
+### Phase D: debugger surface (PHILOSOPHY S7 gate)
 
 - D1: `debug stack` annotates frames with `[lexical]` / `[dynamic]`.
 - D2: `debug vars` / `print` / `type` use the lexical chain inside
@@ -561,8 +561,8 @@ Commit message prefix: `LLE+debug:` (debugger touches some LLE).
 
 ### Phase E: documentation
 
-- E1: SEMANTICS.md §5.3 expanded with the resolution model; §7
-  row "Typed-function form" moves to "match"; §8 list loses the
+- E1: SEMANTICS.md S5.3 expanded with the resolution model; S7
+  row "Typed-function form" moves to "match"; S8 list loses the
   item.
 - E2: USER_GUIDE.md + EXTENDED_SYNTAX.md: new sections covering
   the `fn` form and `let` extension.
@@ -579,7 +579,7 @@ Commit message prefix: `docs:`.
 Phases A-D each leave the test suite green. After each phase the
 `test_typed_fn_*` group in `test_debug_integration.c` adds
 incremental coverage (parsing-only in A; call execution in B;
-lexical resolution in C; debugger obligations in D). The §7 gate is
+lexical resolution in C; debugger obligations in D). The S7 gate is
 only required to be green by end of phase D.
 
 ---
@@ -597,17 +597,17 @@ document; they are to be decided against it, as their own work.
   patterns. Needs interaction with lexical scope worked out.
 - **`func` parameter kind / higher-order functions:** closures are
   the harder piece. Defer until there is a concrete motivating use.
-- **`any` parameter / return kind:** explicit non-feature today (§2.5).
+- **`any` parameter / return kind:** explicit non-feature today (S2.5).
   Reversible if a real need emerges.
 - **Anonymous typed fns / lambdas:** `let f = fn(x: scalar) -> scalar { ... }`.
 - **`set -o strict-fn-isolation`** -- a strict mode that forbids
   `source` / `eval` inside `fn` bodies, restoring full static
-  analysis at the cost of the §5.5 escape hatch. Reversible. Not
+  analysis at the cost of the S5.5 escape hatch. Reversible. Not
   required for the initial form.
 - **Calling typed fns at statement position with discarded return**
-  -- already legal per §6 but no lint warning for non-void returns
+  -- already legal per S6 but no lint warning for non-void returns
   being discarded.
-- **Type aliases / type unions** -- not on the table; the §7 kind
+- **Type aliases / type unions** -- not on the table; the S7 kind
   set is intentionally small.
 
 ---
@@ -616,15 +616,15 @@ document; they are to be decided against it, as their own work.
 
 | Rule | Effect on typed fns |
 |------|---------------------|
-| SEMANTICS §3.4 no implicit list-to-string | Applies inside fn bodies and at the call/return boundary. |
-| SEMANTICS §3.9 list-in-scalar-slot type error | Applies; raised at parse-and-resolve time for fn bodies. |
-| SEMANTICS §3.5 transform / presentation split | Applies; fn parameters are values, not text. |
-| SEMANTICS §3.8 word splitting | Word splitting still gates command-substitution and the like *outside* fn calls; inside a `fn` body, declared kinds are authoritative. |
-| SEMANTICS §5.2 POSIX-form dynamic scoping | Untouched. POSIX functions keep their existing scoping. |
-| PHILOSOPHY §2 polyglot translation | The typed form is canonical lush. There is no bash or zsh spelling to bridge to. The form is a lush identity feature. |
-| PHILOSOPHY §4 POSIX as baseline | POSIX scripts that don't use `fn` are unaffected. POSIX mode does not disable `fn` (presets are not restrictions). |
-| PHILOSOPHY §6 architectural correctness over expediency | The compile-time resolver pass (§5.4) is the larger but correct call. |
-| PHILOSOPHY §7 debugger keeps pace | The §7 gate test must pass before the typed-fn work is "done" (§7). |
+| SEMANTICS S3.4 no implicit list-to-string | Applies inside fn bodies and at the call/return boundary. |
+| SEMANTICS S3.9 list-in-scalar-slot type error | Applies; raised at parse-and-resolve time for fn bodies. |
+| SEMANTICS S3.5 transform / presentation split | Applies; fn parameters are values, not text. |
+| SEMANTICS S3.8 word splitting | Word splitting still gates command-substitution and the like *outside* fn calls; inside a `fn` body, declared kinds are authoritative. |
+| SEMANTICS S5.2 POSIX-form dynamic scoping | Untouched. POSIX functions keep their existing scoping. |
+| PHILOSOPHY S2 polyglot translation | The typed form is canonical lush. There is no bash or zsh spelling to bridge to. The form is a lush identity feature. |
+| PHILOSOPHY S4 POSIX as baseline | POSIX scripts that don't use `fn` are unaffected. POSIX mode does not disable `fn` (presets are not restrictions). |
+| PHILOSOPHY S6 architectural correctness over expediency | The compile-time resolver pass (S5.4) is the larger but correct call. |
+| PHILOSOPHY S7 debugger keeps pace | The S7 gate test must pass before the typed-fn work is "done" (S7). |
 | `set -u` / `errunset` | Applies to free names in fn bodies; the resolver warns at resolve time when `set -u` is active. |
 | `errtrace` / `functrace` | ERR / DEBUG / RETURN trap inheritance applies inside `fn` bodies identically to POSIX functions. |
 | Structured-error system | All new diagnostics use direct `shell_error_create` / `executor_error_report`. No helper wrappers. |
@@ -633,10 +633,10 @@ document; they are to be decided against it, as their own work.
 
 ## See also
 
-- [`../SEMANTICS.md`](../SEMANTICS.md) -- the engine spec; §5.3 and
-  §7 are the normative home for this work once landed.
+- [`../SEMANTICS.md`](../SEMANTICS.md) -- the engine spec; S5.3 and
+  S7 are the normative home for this work once landed.
 - [`../PHILOSOPHY.md`](../PHILOSOPHY.md) -- the design contracts;
-  §7 names the gate that enforces the debugger obligation.
+  S7 names the gate that enforces the debugger obligation.
 - [`../DEBUGGER_GUIDE.md`](../DEBUGGER_GUIDE.md) -- the debugger's
   current surface; the new typed-fn obligations extend it.
 - [`COMPLETION_REWRITE_PLAN.md`](COMPLETION_REWRITE_PLAN.md) -- the

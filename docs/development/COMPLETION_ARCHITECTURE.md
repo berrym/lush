@@ -13,28 +13,28 @@ This document supersedes spec 12 as the source of truth for what completion
 *currently does*. Spec 12 describes an ambitious end-state with modules
 (fuzzy matcher, plugin registry, security context, performance monitor) that
 this rewrite has not yet built. The rewrite addressed fundamental
-architectural issues in the previous spec-following attempt — the parallel
+architectural issues in the previous spec-following attempt -- the parallel
 analyzers, the unclear source/engine boundary, the bugs that came from
-sources owning escape policy — and put the foundation in place. The
+sources owning escape policy -- and put the foundation in place. The
 remaining spec components are future work on top of that foundation, not
-dropped scope. [§12 Spec divergences](#12-spec-divergences) and
-[§14 Known gaps](#14-known-gaps-and-open-work) catalog what's missing
+dropped scope. [S12 Spec divergences](#12-spec-divergences) and
+[S14 Known gaps](#14-known-gaps-and-open-work) catalog what's missing
 and where it is on the path forward.
 
 ---
 
 ## Reading order
 
-If you only have ten minutes, read [§2 The pipeline](#2-the-pipeline) and
-[§3 Data structures](#3-data-structures). Those two sections cover 80% of
+If you only have ten minutes, read [S2 The pipeline](#2-the-pipeline) and
+[S3 Data structures](#3-data-structures). Those two sections cover 80% of
 the surface area.
 
 If you are debugging a specific TAB-press, follow the trace in
-[§2.2 End-to-end](#22-end-to-end-tab-press-trace) — every numbered step
+[S2.2 End-to-end](#22-end-to-end-tab-press-trace) -- every numbered step
 cites a file:line you can step through.
 
 If you are *adding a new completion source*, jump to
-[§15 How to add a new completion source](#15-how-to-add-a-new-completion-source).
+[S15 How to add a new completion source](#15-how-to-add-a-new-completion-source).
 The rest of the doc is reference material you can come back to.
 
 ---
@@ -75,7 +75,7 @@ The **strict source/engine boundary** is the most important architectural
 property. Sources receive an analyzed context and emit *literal* candidates.
 They do *not* preserve path prefixes, do *not* manipulate quotes, do *not*
 escape special characters. The engine and splicer own all of that. This
-keeps sources simple to write — see [§15](#15-how-to-add-a-new-completion-source).
+keeps sources simple to write -- see [S15](#15-how-to-add-a-new-completion-source).
 
 This subsystem is the *second* completion implementation. The first
 implementation accumulated parallel analyzers (`lle_context_analyzer_t` in
@@ -161,19 +161,19 @@ Postmortem of the first attempt:
 The user presses TAB. The keybinding manager invokes `lle_complete(editor)`
 at `keybinding_actions.c:2407`. The function walks four cases:
 
-**Case A — completion already active with a visible menu.** Cycle to the
+**Case A -- completion already active with a visible menu.** Cycle to the
 next item. Calls `lle_completion_menu_move_next(menu)`
 (`completion_menu_logic.c`), updates the inline preview via
 `update_inline_completion(editor, menu, state)`, sets
 `display_controller->menu_state_changed = true` so the next render redraws
 the menu, returns. (`keybinding_actions.c:2423-2448`.)
 
-**Case B — completion active but menu not visible.** This means a previous
+**Case B -- completion active but menu not visible.** This means a previous
 single-match completion left stale state behind; clear it via
 `lle_completion_system_clear()` (`keybinding_actions.c:2451-2453`) before
 falling through to fresh generation.
 
-**Case C — fresh generation.** Read the cursor byte offset from the cursor
+**Case C -- fresh generation.** Read the cursor byte offset from the cursor
 manager (`keybinding_actions.c:2456-2458`), then call
 `lle_completion_system_generate(system, buffer, cursor_pos, &result)`
 (`keybinding_actions.c:2464`). That function:
@@ -229,7 +229,7 @@ Back in `lle_complete()`, the result is dispatched by count:
 **N == 1.** Single match. The chosen item is `result->items[0]`. If the
 item is `LLE_COMPLETION_TYPE_COMMAND` and has a `description`, the splicer
 is given a synthetic copy whose `text` is the description (the full
-PATH-resolved path) — this disambiguates an external command that shadows a
+PATH-resolved path) -- this disambiguates an external command that shadows a
 builtin or alias (`keybinding_actions.c:2489-2493`). The buffer is
 re-analyzed for a fresh splice context (`keybinding_actions.c:2500-2501`)
 and `lle_splicer_apply_accept(buffer, cursor_mgr, ctx, item, pool)`
@@ -254,7 +254,7 @@ then hand the menu to the display controller via
 
 ## 3. Data structures
 
-### 3.1 `lle_word_context_t` — analyzer output
+### 3.1 `lle_word_context_t` -- analyzer output
 
 `include/lle/completion/word_context.h:164`. The analyzer's output and the
 single source of truth about what the user is completing.
@@ -286,7 +286,7 @@ calling it with `NULL` is safe.
 can pass it directly to `lle_unicode_is_prefix` for byte-level prefix
 comparison. Sources do not perform their own normalization.
 
-### 3.2 `lle_completion_item_t` — what sources emit
+### 3.2 `lle_completion_item_t` -- what sources emit
 
 `include/lle/completion/completion_types.h:68`.
 
@@ -317,20 +317,20 @@ typedef struct lle_completion_item {
 | Aliases | 950 | User-defined; higher than commands the user did not customize |
 | Builtins | 900 | Always available |
 | Commands (PATH) | 800 | External, common case |
-| SSH hosts | 800–950 (incl. priority) | Configured hosts rank higher than known-only |
-| Files | 600–700 | Range varies; directories rank above files |
+| SSH hosts | 800-950 (incl. priority) | Configured hosts rank higher than known-only |
+| Files | 600-700 | Range varies; directories rank above files |
 | Variables | 500 | Less common in argument position |
 | History | 400 | Tie-breaker tier |
 
 Custom sources are free to pick scores in any range.
 
 **Suffix is usually NULL.** Sources do *not* compute suffixes for normal
-files/dirs — the engine adds the trailing space or `/` based on
-`item->type` via the splicer (see [§6.2 Suffix rules](#62-suffix-rules)).
+files/dirs -- the engine adds the trailing space or `/` based on
+`item->type` via the splicer (see [S6.2 Suffix rules](#62-suffix-rules)).
 Sources that genuinely need a custom suffix (e.g. config-driven sources
 where the user specified `suffix = "="` in TOML) may pass one.
 
-### 3.3 `lle_completion_result_t` — container
+### 3.3 `lle_completion_result_t` -- container
 
 `completion_types.h:85`. Holds an array of items plus per-category counts.
 The category counts are bookkeeping for the menu's category-header
@@ -355,10 +355,10 @@ typedef struct lle_completion_result {
 } lle_completion_result_t;
 ```
 
-Sources do not touch the count fields directly — `lle_completion_result_add`
+Sources do not touch the count fields directly -- `lle_completion_result_add`
 maintains them.
 
-### 3.4 `lle_splicer_splice_t` — what the splicer computes
+### 3.4 `lle_splicer_splice_t` -- what the splicer computes
 
 `splicer.h:98`.
 
@@ -376,21 +376,21 @@ The splice is consumed via `lle_buffer_replace_text` and a cursor move.
 Both `apply_accept` and `apply_preview` perform the consumption; callers
 that want to introspect first use `lle_splicer_compute` directly.
 
-### 3.5 `lle_completion_state_t` — completion session
+### 3.5 `lle_completion_state_t` -- completion session
 
 `completion_state.h:30`. Holds the buffer snapshot, cursor at session
 start, the analyzed context (owned), the result (owned), the cycling
 index, the original word, timing data, and `active`/`menu_mode` flags.
 `lle_completion_state_free()` releases the context and result.
 
-### 3.6 `lle_completion_menu_state_t` — menu UI state
+### 3.6 `lle_completion_menu_state_t` -- menu UI state
 
 `completion_menu_state.h:63`. Holds a pointer to the result (not owned),
 `selected_index`, `first_visible`, `visible_count`, `target_column` (for
 sticky UP/DOWN), terminal/column layout fields, the category position
 table, the active flag, and a config struct.
 
-The result is *not* owned by the menu state — it is owned by the
+The result is *not* owned by the menu state -- it is owned by the
 completion state. `lle_completion_menu_state_free()` does *not* free the
 result (`completion_menu_state.h:120`). When destroying the completion
 system, the menu must be freed *before* the completion state for this
@@ -434,15 +434,15 @@ the next non-whitespace word to `LLE_CONTEXT_REDIRECT_TARGET`.
 
 **Keyword sequence state** for `for X in <list>` and `case X in
 <pattern>)`:
-`KW_NONE` → on `for` → `KW_AFTER_FOR` → next word → `KW_AFTER_FOR_VAR` →
-on `in` → `KW_AFTER_FOR_IN`; statement terminators reset to `KW_NONE`.
+`KW_NONE` -> on `for` -> `KW_AFTER_FOR` -> next word -> `KW_AFTER_FOR_VAR` ->
+on `in` -> `KW_AFTER_FOR_IN`; statement terminators reset to `KW_NONE`.
 The `case` flow is symmetric.
 
 **Heredoc tracking**: a flag set by `<<` or `<<-`, the captured delimiter
 string, and a "in body" state machine that treats body bytes as literal
 until a line that exactly matches the delimiter. Inside the body the
 analyzer reports `LLE_CONTEXT_HEREDOC_BODY` and (today) refuses to
-complete — heredoc-body completion is a future enhancement.
+complete -- heredoc-body completion is a future enhancement.
 
 **Argument capture**: byte ranges of completed arguments before the
 cursor's word, up to `WALKER_MAX_CAPTURED_ARGS` entries. These become the
@@ -453,7 +453,7 @@ for builtin-arg sources to walk subcommand hierarchies.
 
 For path-shaped words, the analyzer resolves single-value expansions by
 calling lush's expansion machinery (`src/expand.c`). This is what
-populates `expanded_directory`. Tildes, parameter, arithmetic — all
+populates `expanded_directory`. Tildes, parameter, arithmetic -- all
 resolve. For multi-value brace expansion, the analyzer populates
 `branches[]` instead and leaves `expanded_directory` as `NULL`; the source
 manager fans out across branches.
@@ -506,28 +506,28 @@ declared at `source_manager.h:84`.
 
 **What sources receive:**
 
-- `pool` — for transient allocations. Items added to `result` via
+- `pool` -- for transient allocations. Items added to `result` via
   `lle_completion_result_add` are duplicated into the result's pool, so
   the source's allocations are short-lived.
-- `context->dequoted_filename_prefix` — the prefix to match against, NFC-
+- `context->dequoted_filename_prefix` -- the prefix to match against, NFC-
   normalized, no quote machinery, no escape backslashes.
-- `context->expanded_directory` — for path sources, the absolute
+- `context->expanded_directory` -- for path sources, the absolute
   directory to scan. Already resolved (tilde expanded, variables
   expanded, parameter expanded). May be `NULL` for sources that don't
   need a directory or in unresolved-expansion contexts; sources can
   default to `"."`.
-- `context->command_name`, `arg_index`, `arguments[]` — for builtin-arg
+- `context->command_name`, `arg_index`, `arguments[]` -- for builtin-arg
   sources to walk subcommand hierarchies.
-- `context->context_type`, `quote_state`, `expansion_kind` — for the
+- `context->context_type`, `quote_state`, `expansion_kind` -- for the
   applicability gate to decide whether to fire. Sources read these but
-  do *not* try to escape based on `quote_state` — that's the splicer's
+  do *not* try to escape based on `quote_state` -- that's the splicer's
   job.
 
 **What sources emit:**
 
-- `lle_completion_result_add(result, text, suffix, type, score)` — most
+- `lle_completion_result_add(result, text, suffix, type, score)` -- most
   common; suffix is usually `NULL`.
-- `lle_completion_result_add_with_description(...)` — when the source
+- `lle_completion_result_add_with_description(...)` -- when the source
   has secondary metadata (e.g. external commands include the full
   PATH-resolved path as the description, used by the splicer to
   disambiguate command-vs-builtin shadowing).
@@ -541,13 +541,13 @@ declared at `source_manager.h:84`.
    filesystem / data, not as it would appear in shell source. No path
    prefix, no quotes, no escape backslashes.
 2. **No quote-state inspection for emission.** The splicer reads
-   `quote_state` and renders escapes per the rules in [§6](#6-the-splicer).
+   `quote_state` and renders escapes per the rules in [S6](#6-the-splicer).
 3. **No suffix unless special.** Use `NULL`. The engine appends `/` for
    directories and ` ` (plus close-quote if applicable) for everything
    else. Custom sources may pass a suffix when the contract is
    genuinely different (e.g. `=` for variable assignments).
-4. **Scores in 0–1000.** Higher ranks first. Stay in the conventional
-   bands (see the table in [§3.2](#32-lle_completion_item_t--what-sources-emit))
+4. **Scores in 0-1000.** Higher ranks first. Stay in the conventional
+   bands (see the table in [S3.2](#32-lle_completion_item_t--what-sources-emit))
    so multi-source ordering is predictable.
 5. **NFC for prefix comparison.** Use `lle_unicode_is_prefix` from
    `unicode_compare.h`. The prefix on the context is already NFC.
@@ -566,13 +566,13 @@ Eight sources are registered at `lle_source_manager_create`
 | `LLE_SOURCE_VARIABLES` | `"variables"` | `lle_completion_source_variables` | `context_type == VARIABLE_NAME` |
 | `LLE_SOURCE_HISTORY` | `"history"` | `lle_completion_source_history` | always |
 | `LLE_SOURCE_CUSTOM` | `"builtin_args"` | `lle_builtin_completions_generate` | `context_type == ARGUMENT` and `command_name` is a builtin with a registered spec |
-| `LLE_SOURCE_SSH_HOSTS` | `"ssh_hosts"` | `ssh_hosts_source_generate` | `context_type == ARGUMENT` and `command_name` ∈ `{ssh, scp, sftp, ssh-copy-id, mosh, slogin, rsync}` |
+| `LLE_SOURCE_SSH_HOSTS` | `"ssh_hosts"` | `ssh_hosts_source_generate` | `context_type == ARGUMENT` and `command_name`  in  `{ssh, scp, sftp, ssh-copy-id, mosh, slogin, rsync}` |
 
 The total source slot count is `MAX_COMPLETION_SOURCES = 16`
 (`source_manager.h:23`). Eight slots are taken by defaults above,
 leaving eight for custom sources registered via the API.
 
-`lle_source_manager_free()` is a no-op (`source_manager.c:211-214`) —
+`lle_source_manager_free()` is a no-op (`source_manager.c:211-214`) --
 all source data is pool-allocated.
 
 ### 5.3 The file source's special routing
@@ -580,7 +580,7 @@ all source data is pool-allocated.
 `file_source_applicable` (`source_manager.c:65-98`) is the most complex
 gate. It fires for:
 
-- `REDIRECT_TARGET` (always — files are valid targets).
+- `REDIRECT_TARGET` (always -- files are valid targets).
 - `ARGUMENT` or `FOR_IN_LIST` where `command_name` either has no spec
   registered with `lle_builtin_get_spec` or has a spec whose
   `default_arg_type` is `FILE` / `DIRECTORY`. If the spec exists *and*
@@ -611,7 +611,7 @@ The source recognizes three prefix forms in
 |---|---|
 | **bare**: `git` | Match against `host->hostname` and `host->alias`. If a `User` directive is configured for the matching Host stanza, emit `<config-user>@<host>`; otherwise emit just `<host>`. |
 | **`user@prefix`**: `alice@git` | Split on `@`; match the post-`@` segment against `host->hostname`. Preserve the user-typed `alice@` literal in the emitted candidate (do *not* override with the Host-stanza `User`, even if one is configured). |
-| **`host:`**: `host:`, `host:p/q` | Remote-path syntax for `scp`/`sftp`/`rsync`. Return zero candidates — defer to a future remote-path source. |
+| **`host:`**: `host:`, `host:p/q` | Remote-path syntax for `scp`/`sftp`/`rsync`. Return zero candidates -- defer to a future remote-path source. |
 
 The same logic applies for both `host->hostname` and the `host->alias`
 field (an alias being the `Host foo` name when `HostName` is different).
@@ -654,7 +654,7 @@ The registry holds up to `MAX_CUSTOM_SOURCES = 32` entries
 manager's 16 slots minus the eight defaults.
 
 A worked example of writing one is in
-[§15.1 Programmatic API](#151-programmatic-api).
+[S15.1 Programmatic API](#151-programmatic-api).
 
 ### 5.6 Custom sources via TOML config
 
@@ -673,7 +673,7 @@ cache_seconds = 5                                # Cache TTL; 0 = no cache
 ```
 
 The reference example file is `examples/completions.toml` (covers git,
-docker, ssh, npm, brew, kubectl, systemctl, make, meson — useful as a
+docker, ssh, npm, brew, kubectl, systemctl, make, meson -- useful as a
 real-world template). The TOML parser is
 `src/lle/completion/completion_config.c` (922 lines; calls into
 `custom_source.c`'s registration API for each loaded source).
@@ -692,7 +692,7 @@ Reload via `display lle completion sources reload` (the shell builtin).
 List active sources via `display lle completion sources list`.
 
 A worked example of adding a TOML source is in
-[§15.2 TOML config](#152-toml-config).
+[S15.2 TOML config](#152-toml-config).
 
 ---
 
@@ -715,7 +715,7 @@ Implemented in `splicer.c`'s `render_none` / `render_double` /
 | `NONE` | Whitespace (space/tab/newline); statement terminators `;|&`; redirect chars `<>`; group chars `(){}`; expansion starters `$\``; the escape itself `\`; both quote chars `"'`; glob chars `*?[`; *position-sensitive*: `~` and `#` only at position 0 of the rendered output; `!` everywhere |
 | `DOUBLE` | Only the four POSIX double-quote escape characters: `$ \` `\` `\\` `"` |
 | `BACKTICK` | POSIX rule: `\ \` `$` |
-| `SINGLE` | Backslash is impossible inside `'…'` per POSIX. A literal single-quote inside is rendered by closing the open quote, emitting `\'`, and re-opening: byte `'` becomes `'\''`. All other bytes pass through |
+| `SINGLE` | Backslash is impossible inside `'...'` per POSIX. A literal single-quote inside is rendered by closing the open quote, emitting `\'`, and re-opening: byte `'` becomes `'\''`. All other bytes pass through |
 | `ESCAPE_PENDING` | Same as `NONE` for now (a future revision may prepend a placeholder to neutralise the pending escape) |
 
 ### 6.2 Suffix rules
@@ -748,12 +748,12 @@ cursor_after  = delete_start + insert_length
 ```
 
 The deletion range covers the user's typed filename-prefix portion only
-— the path operators and any open quote/escape that the analyzer placed
+-- the path operators and any open quote/escape that the analyzer placed
 *before* `filename_portion_start` are preserved in the buffer.
 
 ### 6.4 Worked examples
 
-**Example 1 — directory completion at unquoted path.**
+**Example 1 -- directory completion at unquoted path.**
 
 Buffer: `cd /h` (cursor after `h`). The user has `~/home` on the
 filesystem.
@@ -770,15 +770,15 @@ File source matches `h` against entries of `/`, finds `home/`. Item:
 `{text: "home", type: DIRECTORY, score: 700}`.
 
 Splicer:
-- Render: `render_none("home")` → `"home"` (no shell-special bytes).
-- Accept phase: `type == DIRECTORY` → append `"/"` → `"home/"`. No close-
+- Render: `render_none("home")` -> `"home"` (no shell-special bytes).
+- Accept phase: `type == DIRECTORY` -> append `"/"` -> `"home/"`. No close-
   quote (none open), no trailing space.
 - Delete `[4, 5)` (the `h`).
 - Insert `"home/"` at byte 4.
 
 Buffer becomes `cd /home/` (cursor at byte 9, ready for next TAB).
 
-**Example 2 — single-quoted file with space.**
+**Example 2 -- single-quoted file with space.**
 
 Buffer: `git 'f` (cursor right after the open quote and `f`). Cwd
 contains `file with spaces.txt`.
@@ -795,18 +795,18 @@ File source emits `{text: "file with spaces.txt", type: FILE,
 score: 600}`.
 
 Splicer:
-- Render: `render_single("file with spaces.txt")` → `"file with
+- Render: `render_single("file with spaces.txt")` -> `"file with
   spaces.txt"` (no `'` bytes to escape; spaces are literal in single
   quotes).
-- Accept phase: `type != DIRECTORY` → close char is `'`, append `"'"`,
-  then ` ` → `"file with spaces.txt' "`.
+- Accept phase: `type != DIRECTORY` -> close char is `'`, append `"'"`,
+  then ` ` -> `"file with spaces.txt' "`.
 - Delete `[5, 6)` (the `f`).
 - Insert.
 
 Buffer becomes `git 'file with spaces.txt' ` (cursor after the trailing
 space).
 
-**Example 3 — preview phase during cycling.**
+**Example 3 -- preview phase during cycling.**
 
 Same as Example 2 but the user pressed TAB on a multi-match: there are
 also `foo.txt` and `friend.md` in cwd. Menu opens, first item previewed.
@@ -826,11 +826,11 @@ and space.
 The pure compute layer is paired with two apply functions that perform
 the buffer mutation:
 
-- `lle_splicer_apply_accept(buffer, cursor_mgr, context, item, pool)` —
+- `lle_splicer_apply_accept(buffer, cursor_mgr, context, item, pool)` --
   computes accept-phase splice, calls `lle_buffer_replace_text` to
   delete + insert, calls `lle_cursor_manager_move_to_byte_offset`.
 - `lle_splicer_apply_preview(buffer, cursor_mgr, context, item, pool)`
-  — same but with `accept_phase = false`.
+  -- same but with `accept_phase = false`.
 
 Both are at `splicer.h:197-215`.
 
@@ -845,11 +845,11 @@ Both are at `splicer.h:197-215`.
 
 Each builtin has an `lle_builtin_completion_spec_t` (header line 91) with:
 
-- `name` — the builtin name (e.g. `"cd"`).
-- `options[]` — top-level options as `(name, description)` pairs.
-- `subcommands[]` — recursive `lle_builtin_subcommand_t` array for
+- `name` -- the builtin name (e.g. `"cd"`).
+- `options[]` -- top-level options as `(name, description)` pairs.
+- `subcommands[]` -- recursive `lle_builtin_subcommand_t` array for
   hierarchical builtins (e.g. `display lle theme list`).
-- `default_arg_type` — when no subcommand matches, what kind of dynamic
+- `default_arg_type` -- when no subcommand matches, what kind of dynamic
   argument to complete (`FILE`, `DIRECTORY`, `VARIABLE`, `ALIAS`,
   `COMMAND`, `SIGNAL`, `JOB`, `THEME`, `FEATURE`, or `NONE`).
 
@@ -859,7 +859,7 @@ Subcommands recurse: a subcommand can have its own `options[]`,
 
 Static specs are registered in `builtin_completions.c`'s spec table and
 looked up by name via `lle_builtin_get_spec(name)` (header line 116).
-There is no dynamic registration — adding a new builtin spec means
+There is no dynamic registration -- adding a new builtin spec means
 editing `builtin_completions.c`.
 
 ### 7.2 Dispatch
@@ -871,7 +871,7 @@ returns non-NULL (header line 128).
 `lle_builtin_completions_generate(pool, context, result)` (header line 142):
 
 1. Walks `context->arguments[]` to find the position in the subcommand
-   tree (e.g. `["lle", "theme"]` → navigate from `display` spec into the
+   tree (e.g. `["lle", "theme"]` -> navigate from `display` spec into the
    `lle` subcommand into the `theme` subcommand).
 2. At the resolved level: if the user is mid-flag (prefix starts with
    `-`), emit options. Otherwise, if there are subcommands at this
@@ -893,7 +893,7 @@ Three files, separated by concern:
 
 | File | Concern | Lines |
 |---|---|---|
-| `completion_menu_state.{c,h}` | State, layout, queries — no rendering | 414 / 234 |
+| `completion_menu_state.{c,h}` | State, layout, queries -- no rendering | 414 / 234 |
 | `completion_menu_logic.{c,h}` | Navigation (move_next/down/up/right/left, page up/down, category jump) | 778 / 201 |
 | `completion_menu_renderer.{c,h}` | Multi-column ANSI-styled text formatting | 593 / 220 |
 
@@ -909,18 +909,18 @@ controller via `display_controller_set_completion_menu(dc, menu)`.
 
 `lle_completion_menu_state_t` (`completion_menu_state.h:63`) holds:
 
-- `result` — pointer to the completion result (not owned).
-- `selected_index`, `first_visible`, `visible_count` — viewport state.
-- `target_column` — sticky column for UP/DOWN navigation in
+- `result` -- pointer to the completion result (not owned).
+- `selected_index`, `first_visible`, `visible_count` -- viewport state.
+- `target_column` -- sticky column for UP/DOWN navigation in
   multi-column layouts (preserves "I'm in column 2" through rows of
   varying width).
-- `terminal_width`, `column_width`, `num_columns` — layout state,
+- `terminal_width`, `column_width`, `num_columns` -- layout state,
   recomputed by `lle_completion_menu_update_layout(state,
   terminal_width)`.
-- `category_positions[]`, `category_count` — start indices of each
+- `category_positions[]`, `category_count` -- start indices of each
   category in the sorted result (for category-jump navigation).
-- `menu_active` — set false on cancel.
-- `config` — copy of `lle_completion_menu_config_t`.
+- `menu_active` -- set false on cancel.
+- `config` -- copy of `lle_completion_menu_config_t`.
 
 ### 8.3 Navigation primitives
 
@@ -946,11 +946,11 @@ not the menu.
 ### 8.4 Renderer
 
 `lle_completion_menu_render(state, options) -> output_buffer` produces a
-formatted text block (no I/O — the display layer writes it). ANSI
+formatted text block (no I/O -- the display layer writes it). ANSI
 codes used:
 
-- `\033[7m` … `\033[0m` — reverse video for the selected item.
-- `\033[1;36m` … `\033[0m` — bold cyan for category headers ("BUILTINS",
+- `\033[7m` ... `\033[0m` -- reverse video for the selected item.
+- `\033[1;36m` ... `\033[0m` -- bold cyan for category headers ("BUILTINS",
   "COMMANDS", etc.).
 
 Multi-column layout is computed via
@@ -989,7 +989,7 @@ to `lle_completion_menu_state_create`.
 
 ### 9.2 TOML config (custom sources)
 
-See [§5.6](#56-custom-sources-via-toml-config) for the schema. File
+See [S5.6](#56-custom-sources-via-toml-config) for the schema. File
 location is resolved by `completion_config.c:get_config_path()`:
 `$XDG_CONFIG_HOME/lush/completions.toml` if `XDG_CONFIG_HOME` is set,
 else `~/.config/lush/completions.toml`. Loaded by `lle_editor_create()`
@@ -1003,13 +1003,13 @@ shell builtin `display lle completion sources reload` (which calls
   `completion_system.h:50` but the feature is not implemented).
 - No `completion.max_completions` enforcement (`completion_system.h:51`
   exists but the limit is never applied).
-- No `completion.eval_command_subst` config wiring — the analyzer
+- No `completion.eval_command_subst` config wiring -- the analyzer
   references it, but there is no central-config registry entry. Today
   it behaves as if always-true.
 - Menu defaults (`max_visible_items = 20` etc.) are hardcoded.
 
 These are all candidate central-config additions. See
-[§14 Known gaps](#14-known-gaps-and-open-work).
+[S14 Known gaps](#14-known-gaps-and-open-work).
 
 ---
 
@@ -1027,7 +1027,7 @@ the `needs_refresh` flag is set. Capacity `MAX_SSH_HOSTS = 1000` (line
 
 Refresh walks: `~/.ssh/config`, `/etc/ssh/ssh_config`,
 `~/.ssh/known_hosts`. (Doesn't walk `/etc/hosts` or
-`/etc/ssh/ssh_known_hosts` despite docs claiming it does — tracked as
+`/etc/ssh/ssh_known_hosts` despite docs claiming it does -- tracked as
 issue #92.)
 
 ### 10.2 Per-source TOML cache
@@ -1048,7 +1048,7 @@ explicitly set.
 - Word-context analysis (re-walks the buffer for every TAB; analysis is
   O(buffer length) so this is fast in practice).
 - Completion results between TAB presses (each press is a fresh
-  generation — though the menu state and completion state persist
+  generation -- though the menu state and completion state persist
   during cycling).
 
 If any of these become hot, adding them is a matter of mirroring the
@@ -1062,7 +1062,7 @@ Every callsite from outside `src/lle/completion/`:
 
 ### 11.1 LLE editor lifecycle
 
-`src/lle/lle_editor.c:131-150` — completion subsystem creation:
+`src/lle/lle_editor.c:131-150` -- completion subsystem creation:
 
 ```c
 result = lle_completion_system_create(ed->lle_pool, &ed->completion_system);
@@ -1087,7 +1087,7 @@ lle_keybinding_manager_bind(manager, "TAB", lle_complete, "complete");
 ```
 
 `lle_complete` itself is in `keybinding_actions.c:2407-2543` and is the
-sole entry point (already detailed in [§2.2](#22-end-to-end-tab-press-trace)).
+sole entry point (already detailed in [S2.2](#22-end-to-end-tab-press-trace)).
 
 ### 11.3 ESC binding
 
@@ -1113,9 +1113,9 @@ whether to re-render.
 
 ### 11.6 Shell builtins for inspection / management
 
-`display lle completion sources list` — list registered sources (custom
+`display lle completion sources list` -- list registered sources (custom
 and default).
-`display lle completion sources reload` — `lle_completion_reload_config()`.
+`display lle completion sources reload` -- `lle_completion_reload_config()`.
 Both wired through `src/builtins/builtins.c`.
 
 ---
@@ -1128,22 +1128,22 @@ deliberate rewrite that put correct architectural foundations in place
 first; several spec components have not been built *yet* on top of
 those foundations, and others have been replaced by simpler equivalents
 that fit the new architecture better. Nothing in the spec is rejected
-in principle — items marked "not yet implemented" are tracked future
-work, not dropped scope. Items marked "replaced by …" are deliberate
+in principle -- items marked "not yet implemented" are tracked future
+work, not dropped scope. Items marked "replaced by ..." are deliberate
 substitutions where the rewrite found a cleaner shape.
 
-### 12.1 Components from the spec — current status
+### 12.1 Components from the spec -- current status
 
 | Spec component | Current status |
 |---|---|
-| `lle_completion_engine_t` (top-level engine struct) | **Replaced** by simpler `lle_completion_system_t` — the rewrite split the engine's responsibilities across analyzer / source manager / state / menu, which made the orchestrator small enough that a separate "engine" type wasn't earning its keep |
+| `lle_completion_engine_t` (top-level engine struct) | **Replaced** by simpler `lle_completion_system_t` -- the rewrite split the engine's responsibilities across analyzer / source manager / state / menu, which made the orchestrator small enough that a separate "engine" type wasn't earning its keep |
 | `lle_context_analyzer_t` | **Subsumed** into the unified `lle_word_context_analyze` walker. The previous design had two parallel analyzers that disagreed on word boundaries; consolidating into one was the central point of the rewrite |
 | `lle_fuzzy_matcher_t` | **Not yet implemented.** `enable_fuzzy_matching` flag exists at `completion_system.h:50` as a placeholder; design and wiring are future work on top of the deduplication / sort layer |
-| `lle_completion_cache_t` (general result cache) | **Not yet implemented.** Per-TOML-source caching (§10.2) and SSH cache (§10.1) are the only caches today. A general result cache layer keyed on context fingerprint is candidate future work — see [§14.3](#143-architectural-gaps) |
+| `lle_completion_cache_t` (general result cache) | **Not yet implemented.** Per-TOML-source caching (S10.2) and SSH cache (S10.1) are the only caches today. A general result cache layer keyed on context fingerprint is candidate future work -- see [S14.3](#143-architectural-gaps) |
 | `lle_display_integration_t` | **Replaced** by direct menu-state consumption in the display controller. May be re-introduced if/when display-side concerns grow beyond what the controller can handle inline |
-| `lle_interactive_menu_t` | **Implemented** as `lle_completion_menu_state_t` + logic + renderer (three files; see [§8](#8-the-menu-system)) |
+| `lle_interactive_menu_t` | **Implemented** as `lle_completion_menu_state_t` + logic + renderer (three files; see [S8](#8-the-menu-system)) |
 | `lle_completion_classifier_t` | **Subsumed** into `lle_completion_classify_text` and the type system in `completion_types.c` |
-| `lle_plugin_registry_t` | **Partially implemented**, partially future. The programmatic custom-source API in `custom_source.h` and the TOML config (§5.6) cover the user-extension case; a formal plugin loader (matching what spec 18 describes) is separate future work |
+| `lle_plugin_registry_t` | **Partially implemented**, partially future. The programmatic custom-source API in `custom_source.h` and the TOML config (S5.6) cover the user-extension case; a formal plugin loader (matching what spec 18 describes) is separate future work |
 | `lle_performance_monitor_t` | **Not yet implemented.** A `generation_time_us` field on the completion state captures per-session timing today; a telemetry pipeline is future work |
 | `lle_security_context_t` | **Not yet implemented.** Audit / access-control surfaces are future work; the current implementation has no per-completion permission checks |
 | `lle_error_recovery_t` (multi-strategy recovery) | **Replaced** by simple `lle_result_t` returns at the boundary, with recovery at the call site. The rewrite found that the simpler model handled every real failure mode without ceremony; if specific recovery strategies turn out to need a typed home, they can be added |
@@ -1153,8 +1153,8 @@ substitutions where the rewrite found a cleaner shape.
 - **Context-type classification**: spec describes context-aware
   classification with sub-states for "inside conditional", "inside
   function body", etc. Implementation has the eight context types
-  listed in [§3.1](#31-lle_word_context_t--analyzer-output) and
-  treats function bodies the same as top-level (which is correct —
+  listed in [S3.1](#31-lle_word_context_t--analyzer-output) and
+  treats function bodies the same as top-level (which is correct --
   function dispatch matches top-level).
 - **Brace expansion**: implementation handles multi-value brace
   expansion via the `branches[]` mechanism with fan-out in the source
@@ -1162,12 +1162,12 @@ substitutions where the rewrite found a cleaner shape.
   detail this.
 - **Suffix handling**: spec's source contract doesn't pin down where
   suffix logic lives. Implementation places it strictly in the splicer,
-  not the sources — the source/engine boundary in [§5.1](#51-the-contract).
+  not the sources -- the source/engine boundary in [S5.1](#51-the-contract).
 
 ### 12.3 Implementation-only features
 
 - The **inverted-alias** mechanism (used by `xpg_echo`/`bsd_echo`,
-  documented in `feedback-lush-is-its-own-shell.md`) — not in the
+  documented in `feedback-lush-is-its-own-shell.md`) -- not in the
   completion subsystem itself, but worth noting for context-cross.
 - **TOML-based custom sources** are not in the spec; they are a
   pragmatic substitute for the spec's plugin registry.
@@ -1184,7 +1184,7 @@ Three unit-test binaries plus one compliance test, totalling 178+ tests:
 | File | Tests | Covers |
 |---|---|---|
 | `tests/lle/unit/test_word_context.c` | 126 | `lle_word_context_analyze` across quote/escape state, word boundaries respecting quote state, `filename_portion_start` computation, NFC-normalized dequoting, in-progress expansion detection, context-type classification, command-name + arg-index extraction |
-| `tests/lle/unit/test_splicer.c` | 38 | `lle_splicer_render_for_context` across all `quote_state` rendering rules, `lle_splicer_close_char` lookup, `lle_splicer_compute` across (item type × `quote_state` × accept/preview phase) combinations |
+| `tests/lle/unit/test_splicer.c` | 38 | `lle_splicer_render_for_context` across all `quote_state` rendering rules, `lle_splicer_close_char` lookup, `lle_splicer_compute` across (item type x `quote_state` x accept/preview phase) combinations |
 | `tests/lle/unit/test_completion_types.c` | 14 | `lle_completion_item_t` lifecycle, `lle_completion_result_t` lifecycle, type metadata queries, classification helpers |
 | `tests/lle/unit/test_ssh_completion.c` | 3 | SSH host source: configured-host emission, `user@` prefix preservation, remote-path bypass |
 | `tests/lle/compliance/spec_12_completion_compliance.c` | (varies) | Type-level compliance with spec-12 enums and APIs |
@@ -1230,9 +1230,9 @@ rather than a blocker on the current architecture.
   when typed-but-unclosed `${`, `$((`, etc. are present, sources fall
   back to cwd. Refining this is analyzer work.
 - **`~user`, `~+`, `~-`**: tracked as issue #91 (filed during the path
-  highlighter work — same code path applies to completion).
+  highlighter work -- same code path applies to completion).
 - **Plugin loader**: spec 18 describes a formal plugin system; the
-  programmatic custom-source API and TOML config (§5.6) cover the
+  programmatic custom-source API and TOML config (S5.6) cover the
   user-extension case today, and a plugin loader on top is candidate
   future work.
 - **Performance monitor / telemetry pipeline**: `generation_time_us`
@@ -1265,12 +1265,12 @@ rather than a blocker on the current architecture.
 
 Three options, in increasing order of effort:
 
-1. [TOML-defined source](#152-toml-config) — for "run this shell
+1. [TOML-defined source](#152-toml-config) -- for "run this shell
    command, treat its stdout as candidates" sources. Zero code.
-2. [Programmatic custom source](#151-programmatic-api) — for sources
+2. [Programmatic custom source](#151-programmatic-api) -- for sources
    with custom logic (caching, state, computed candidates) that
    shouldn't shell out.
-3. [Built-in source](#153-built-in-source) — for sources that should
+3. [Built-in source](#153-built-in-source) -- for sources that should
    ship as part of lush itself (like the SSH source). Edits the
    `source_manager.c` registration list.
 
@@ -1428,6 +1428,6 @@ behavior-driven coverage with fixture files where appropriate; mirror
 test target into `meson.build`.
 
 That's the complete checklist. Existing built-in sources are useful
-templates — the SSH source (the most recently added one) is the
+templates -- the SSH source (the most recently added one) is the
 shortest end-to-end example to study (commit `a4252437` for a clean
 diff).

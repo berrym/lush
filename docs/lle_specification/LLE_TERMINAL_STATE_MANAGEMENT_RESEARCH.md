@@ -266,12 +266,12 @@ impl Terminal {
 
 **WRONG (What Original LLE Attempted)**:
 ```
-Line Editor → Terminal State Queries → Terminal Response → Update Internal Model
+Line Editor -> Terminal State Queries -> Terminal Response -> Update Internal Model
 ```
 
 **CORRECT (What Successful Implementations Do)**:
 ```
-Line Editor Internal Model → Generate Terminal Commands → Send Atomic Update → Internal Model Remains Authoritative
+Line Editor Internal Model -> Generate Terminal Commands -> Send Atomic Update -> Internal Model Remains Authoritative
 ```
 
 ---

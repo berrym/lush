@@ -1,9 +1,9 @@
 /// @file LLE_PAGER_DESIGN.md
-/// @brief Design doc — LLE pagination layer
+/// @brief Design doc -- LLE pagination layer
 /// @status Resolved (all 8 open questions answered; implementation gated on user sign-off)
 /// @date 2026-05-25
 
-# LLE Pagination Layer — Design Discussion
+# LLE Pagination Layer -- Design Discussion
 
 **Status**: 8 open questions resolved (see section "Outstanding decisions
 before code" at the bottom). Implementation-ready pending user sign-off
@@ -40,7 +40,7 @@ to the following non-negotiables:
 5. **screen_buffer is the cursor-math source of truth**. It owns
    line wrapping, UTF-8 width, ANSI skipping, line-prefix accounting.
 6. **Continuation-prompt pattern is the working example** of how
-   non-command content reaches the screen — set as line prefixes
+   non-command content reaches the screen -- set as line prefixes
    on screen_buffer *before* render, NOT rendered into command text.
 7. **LLE supports reentrant modal prompts**. The debugger's
    `(lush-debug)` prompt is implemented via `lle_readline_no_history`
@@ -79,7 +79,7 @@ contributes nothing and the prompt+command rendering is unchanged.
 ```
 L1 base_terminal
 L2 terminal_control
-L3 prompt_layer | command_layer | autosuggestions_layer | pager_layer  ← new
+L3 prompt_layer | command_layer | autosuggestions_layer | pager_layer  <- new
 L4 composition_engine
 L5 display_controller
 ```
@@ -87,9 +87,9 @@ L5 display_controller
 The display_controller gains one piece of state (`pager_active`)
 and one render branch:
 
-- `pager_active = false` → existing composition (prompt + command
+- `pager_active = false` -> existing composition (prompt + command
   + suggestions). Pager contributes nothing.
-- `pager_active = true` → composition uses pager content as the
+- `pager_active = true` -> composition uses pager content as the
   primary layer; prompt+command are suppressed for the duration.
 
 The pager_layer follows the standard L3 contract:
@@ -135,7 +135,7 @@ typedef struct lle_pager_layer {
     size_t lines_capacity;
 
     /// View state
-    size_t top_line;            ///< Index into lines[] — first visible
+    size_t top_line;            ///< Index into lines[] -- first visible
     size_t view_rows;           ///< terminal_rows - 1 (status reserves a row)
     int terminal_width;         ///< Cached on activate; recomputed on RESIZE
 
@@ -146,7 +146,7 @@ typedef struct lle_pager_layer {
 
     /// Mode
     enum {
-        LLE_PAGER_VIEW,         ///< Default — navigation keys active
+        LLE_PAGER_VIEW,         ///< Default -- navigation keys active
         LLE_PAGER_SEARCH,       ///< Search prompt active at status line
         LLE_PAGER_HELP,         ///< Help text overlaid
     } mode;
@@ -158,7 +158,7 @@ typedef struct lle_pager_layer {
 
 **OPEN QUESTION 1**: should the pager support styled content
 (syntax highlighting / colored spans from the source content)?
-For the debugger's variable inspector this matters a lot — typed
+For the debugger's variable inspector this matters a lot -- typed
 values should retain their kind color. If yes, `content` becomes
 "raw text + spans" similar to command_layer's highlighted_text.
 If no, the pager is plain-text-only and styled producers (debugger,
@@ -188,7 +188,7 @@ if (controller->pager_layer && controller->pager_layer->active) {
 ```
 
 Both branches end with `display_controller` writing the result to
-stdout — single-writer rule preserved.
+stdout -- single-writer rule preserved.
 
 ---
 
@@ -201,9 +201,9 @@ call; everything else is internal.
 /// @brief Present content, paginating if interactive and overflowing.
 ///
 /// Decides at call time whether pagination applies:
-///   - stdout is not a tty → write content directly, return
-///   - content fits in (terminal_rows - 1) rows → write directly, return
-///   - otherwise → activate pager layer, run pager input loop until
+///   - stdout is not a tty -> write content directly, return
+///   - content fits in (terminal_rows - 1) rows -> write directly, return
+///   - otherwise -> activate pager layer, run pager input loop until
 ///     user quits, deactivate layer, return
 ///
 /// The function blocks until the user exits the pager (q / Esc /
@@ -246,7 +246,7 @@ becomes:
    - Lines `[top_line, top_line + view_rows)` from
      `pager_layer->lines[]`, rendered into screen_buffer cells
      via screen_buffer_render (we feed pager content as the
-     "command" text and the empty string as the prompt — the
+     "command" text and the empty string as the prompt -- the
      existing render path handles UTF-8 width and wrapping)
    - One status line at the bottom: position indicator
      (`Lines X-Y of Z (NN%)`), mode indicator, hint string
@@ -265,7 +265,7 @@ The status line is rendered using the existing screen_buffer
 use). Line `view_rows` gets prefixed with the status string;
 screen_buffer_render handles the column-accounting.
 
-**OPEN QUESTION 3**: status line behavior during fast scroll —
+**OPEN QUESTION 3**: status line behavior during fast scroll --
 flush on every scroll, or rate-limit at, say, 60Hz? screen_buffer
 + clear-and-redraw is fast enough on modern terminals that flushing
 every keystroke shouldn't visibly tear, but on slow tmux-over-ssh
@@ -296,14 +296,14 @@ Default bindings (`display lle pager bindings` to inspect / customize):
 | ? | Begin search (backward) |
 | n | Next match |
 | N | Previous match |
-| Esc | Cancel sub-mode (search → view) OR light quit (view → exit) |
+| Esc | Cancel sub-mode (search -> view) OR light quit (view -> exit) |
 | q | Quit pager (alias for Esc-from-view) |
 | Ctrl-C | Quit pager (standard) |
-| Ctrl-G ×3 (rapid) | Force-exit pager (nuclear) |
+| Ctrl-G x3 (rapid) | Force-exit pager (nuclear) |
 | h | Help overlay |
 
 Navigation keys mirror `less(1)` so muscle memory transfers. The
-quit hierarchy (Esc/q → Ctrl-C → Ctrl-G ×3) follows lush's
+quit hierarchy (Esc/q -> Ctrl-C -> Ctrl-G x3) follows lush's
 project-wide modal-exit convention, not less's. A future config
 surface (`display lle pager bind KEY ACTION`) can override per
 key.
@@ -338,7 +338,7 @@ At the `/` search prompt, should tab-completion offer search
 history? Default to no; the search prompt is intentionally
 minimal.
 
-**OPEN QUESTION 5**: signal handling — Ctrl-C inside pager. Less
+**OPEN QUESTION 5**: signal handling -- Ctrl-C inside pager. Less
 treats it as "interrupt search, return to view"; more treats it
 as "quit". I'd default to less's behavior (interrupt-then-quit
 on second Ctrl-C).
@@ -377,26 +377,26 @@ int bin_alias(int argc, char **argv) {
 Initial candidate builtins (the ones where output regularly
 overflows the screen):
 
-- `help` / `help <cmd>` — already long
+- `help` / `help <cmd>` -- already long
 - `alias` (no args; list all)
 - `history` (no args; list all)
 - `set -o` / `setopt` (list)
 - `dirs -v`
 - `jobs -l`
 - `type` for complex multi-line types
-- `unset` — no (output is empty or trivial)
+- `unset` -- no (output is empty or trivial)
 - Debugger `bt`, `vars`, `inspect`, `breakpoints`
 
 **OPEN QUESTION 6**: should `lle_pager_present` honor
 `set -o pager off` / a `display lle pager off` config flag that
-disables pagination project-wide? Yes — pagination is a behavior
+disables pagination project-wide? Yes -- pagination is a behavior
 the user must be able to turn off, especially for scripts that
 were designed against the old printf path. Default: on when
 stdout is a tty.
 
 **OPEN QUESTION 7**: when pager is disabled (config OFF) but
 content overflows, do we still write everything to stdout (let
-the user scroll the terminal)? Yes — that's the bash/zsh
+the user scroll the terminal)? Yes -- that's the bash/zsh
 behavior and breaking it would be a worse surprise than missing
 pagination.
 
@@ -421,7 +421,7 @@ its own input loop until quit, returns to debugger which renders
 pattern; no conflict.
 
 **OPEN QUESTION 8**: should the debugger's `inspect` output retain
-kind coloring inside the pager? See OPEN QUESTION 1 — answering
+kind coloring inside the pager? See OPEN QUESTION 1 -- answering
 yes there answers yes here. (My recommendation: yes; the kind
 colors are exactly the information density a paginated inspect
 view needs to keep.)
@@ -430,7 +430,7 @@ view needs to keep.)
 
 ## 10. Configuration surfaces
 
-Following the standard CONFIGURATION doc rules — pager
+Following the standard CONFIGURATION doc rules -- pager
 configuration lives in the central config registry, exposed via
 the `display lle pager` builtin path that already exists for
 LLE-facing settings:
@@ -465,16 +465,16 @@ pattern (memory: project-central-config-architecture).
   - Scroll math (top_line bounded by [0, line_count - view_rows])
   - Search forward/backward, wraparound
   - Mode transitions
-  - Resize handling — terminal_width changes invalidate visual
+  - Resize handling -- terminal_width changes invalidate visual
     heights, rebuild line index
   - Empty content (defensive)
   - Single-line content (no pagination)
 - **Integration tests** in `tests/unit/test_pager_integration.c`:
-  - `lle_pager_present` with content that fits → direct write,
+  - `lle_pager_present` with content that fits -> direct write,
     no mode entry
-  - With overflow content → mode entry, simulated keys, mode exit
-  - Non-tty stdout → bypass entirely
-  - Re-entrancy — pager invoked while another pager is active
+  - With overflow content -> mode entry, simulated keys, mode exit
+  - Non-tty stdout -> bypass entirely
+  - Re-entrancy -- pager invoked while another pager is active
     (refuse; return error)
 - **Functional tests** under `tests/lle-functional/`:
   - `help` produces paginated output
@@ -494,29 +494,29 @@ This is the order I'd propose for landing the work. Each step
 ships independently, behind config-gating where appropriate, with
 its own tests and commit.
 
-1. **screen_buffer line-index helper** — extract the
+1. **screen_buffer line-index helper** -- extract the
    "split content into logical lines + compute visual heights"
    utility from what will become pager_layer. Lives in screen_buffer
    because it's pure cursor math. *Implemented; see
    `screen_line_index_*` in `include/display/screen_buffer.h`.*
-2. **pager_layer skeleton** — struct, lifecycle, no rendering.
+2. **pager_layer skeleton** -- struct, lifecycle, no rendering.
    Tests for line index and scroll math only.
-3. **Display controller `pager_active` branch** — render cycle
+3. **Display controller `pager_active` branch** -- render cycle
    chooses between normal and pager rendering. Pager render
    produces the visible view + status line via screen_buffer.
-4. **Pager input loop** — keybinding table, navigation, mode
+4. **Pager input loop** -- keybinding table, navigation, mode
    transitions, search. Reentrant-readline pattern; `lle_in_pager()`
    probe.
-5. **`lle_pager_present` public API** — the consumer-facing
-   entry; wires steps 1–4 together.
-6. **Config wiring** — `display.lle.pager.*` keys, builtin
-   surface (`display lle pager …`).
-7. **Builtin refactors** — convert producers (alias, history,
+5. **`lle_pager_present` public API** -- the consumer-facing
+   entry; wires steps 1-4 together.
+6. **Config wiring** -- `display.lle.pager.*` keys, builtin
+   surface (`display lle pager ...`).
+7. **Builtin refactors** -- convert producers (alias, history,
    help, etc.) to use `lle_pager_present`. One builtin per commit;
    each commit is reviewable.
-8. **Debugger integration** — convert bt / vars / inspect /
+8. **Debugger integration** -- convert bt / vars / inspect /
    breakpoints. Independent commits.
-9. **Documentation** — DEBUGGER_GUIDE.md addition, user-facing
+9. **Documentation** -- DEBUGGER_GUIDE.md addition, user-facing
    pager docs, update SCREEN_BUFFER_SPECIFICATION with the
    line-index helper's contract.
 
@@ -541,7 +541,7 @@ Numbered to match the OPEN QUESTION markers above. Resolved
 2026-05-25; see the design discussion that produced these answers
 for fuller reasoning.
 
-### Q1 — Styled content (ANSI in pager content): RESOLVED YES.
+### Q1 -- Styled content (ANSI in pager content): RESOLVED YES.
 
 The pager preserves ANSI escape sequences in `content`. No
 separate spans data structure; `content` is a `const char *` that
@@ -555,7 +555,7 @@ byte offsets in the original content for hit-position highlight
 rendering. Reuse `screen_buffer_visual_width`'s ANSI-skip helper
 or factor it out so search and rendering share one stripper.
 
-### Q2 — Streaming variant: RESOLVED DEFER.
+### Q2 -- Streaming variant: RESOLVED DEFER.
 
 Non-streaming `lle_pager_present(executor, const char *)` only
 for the MVP. The corpus producers (help, alias, history, dirs,
@@ -564,20 +564,20 @@ KB; a 100K-entry history page is hypothetical. Adding
 `lle_pager_present_streaming(executor, chunk_fn, ud)` later is a
 pure addition with no ABI lock-in.
 
-### Q3 — Status-line flush cadence: RESOLVED FLUSH EVERY SCROLL.
+### Q3 -- Status-line flush cadence: RESOLVED FLUSH EVERY SCROLL.
 
 The clear-and-redraw model is already proven fast enough at
 keystroke rate (the editing loop). Scroll fires less often than
 typing. No rate limiting at MVP. Revisit only if tmux-over-ssh
 measurements show observable tearing.
 
-### Q4 — Tab in search prompt: RESOLVED NO COMPLETION.
+### Q4 -- Tab in search prompt: RESOLVED NO COMPLETION.
 
 Tab inserts a literal tab character into the search pattern
 (matches `less(1)`). The search prompt is one-shot per session
 with no meaningful candidate universe to offer.
 
-### Q5 — Quit-key hierarchy: RESOLVED to match lush convention.
+### Q5 -- Quit-key hierarchy: RESOLVED to match lush convention.
 
 Lush has a canonical three-tier modal-quit hierarchy used
 consistently across LLE modes:
@@ -586,15 +586,15 @@ consistently across LLE modes:
 |---|---|---|
 | `Esc` | Lightest, most convenient | Cancel current sub-mode (e.g. abandon in-progress search), return to outer mode |
 | `Ctrl-C` | Standard quit | Exit current modal cleanly |
-| `Ctrl-G ×3` (rapid) | Nuclear | Force-exit with state cleanup; used when normal quit isn't responsive |
+| `Ctrl-G x3` (rapid) | Nuclear | Force-exit with state cleanup; used when normal quit isn't responsive |
 
 Pager-mode bindings update to follow this hierarchy:
 
 | Key | Pager-mode action |
 |---|---|
-| `Esc` | Cancel current sub-mode: in `LLE_PAGER_SEARCH` → return to `LLE_PAGER_VIEW`; in `LLE_PAGER_VIEW` → quit pager (light exit) |
+| `Esc` | Cancel current sub-mode: in `LLE_PAGER_SEARCH` -> return to `LLE_PAGER_VIEW`; in `LLE_PAGER_VIEW` -> quit pager (light exit) |
 | `Ctrl-C` | Quit pager (standard exit) |
-| `Ctrl-G ×3` (rapid) | Force-exit pager with state reset (nuclear; matches the project-wide pattern) |
+| `Ctrl-G x3` (rapid) | Force-exit pager with state reset (nuclear; matches the project-wide pattern) |
 | `q` | Alias for `Esc` from VIEW (quit pager via the conventional reader key) |
 
 The three-tier model is internally consistent: light cancellation
@@ -602,20 +602,20 @@ nests inside standard quit nests inside the nuclear option. Code
 in the input loop checks bindings in that order so the lighter
 semantic always wins where it applies.
 
-### Q6 — Master config switch: RESOLVED YES.
+### Q6 -- Master config switch: RESOLVED YES.
 
 `display.lle.pager.enabled = true` by default for interactive
 sessions. Non-interactive (`!isatty(STDOUT_FILENO)`) automatically
 bypasses regardless of the config setting.
 
-### Q7 — Pager disabled + overflow: RESOLVED WRITE THROUGH.
+### Q7 -- Pager disabled + overflow: RESOLVED WRITE THROUGH.
 
 When `display.lle.pager.enabled = false` and content exceeds the
 viewport, write everything directly to stdout. Matches bash/zsh
 behavior; breaking it would be a worse surprise than missing
 pagination.
 
-### Q8 — Debugger inspect kind colors through pager: RESOLVED YES.
+### Q8 -- Debugger inspect kind colors through pager: RESOLVED YES.
 
 Follows from Q1. Kind colors are exactly the information density
 a paginated inspect view needs to keep; stripping them defeats

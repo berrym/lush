@@ -35,8 +35,8 @@ set -o posix  # Restricts bash to POSIX-only features
 ### The Limitation
 
 Traditional emulation forces a choice:
-- Use bash syntax → lose zsh features
-- Use zsh syntax → lose bash compatibility
+- Use bash syntax -> lose zsh features
+- Use zsh syntax -> lose bash compatibility
 - Scripts written for one shell don't work in another
 
 ---
@@ -49,10 +49,10 @@ Lush treats syntax as an **interface layer** that maps to a **unified feature en
 
 ```
 User Input               Translation Layer           Feature Engine
-─────────────────────────────────────────────────────────────────────
-shopt -s extglob    →    bin_shopt()           →    FEATURE_EXTENDED_GLOB
-setopt extended_glob →   bin_setopt()          →    FEATURE_EXTENDED_GLOB
-                                ↓
+---------------------------------------------------------------------
+shopt -s extglob    ->    bin_shopt()           ->    FEATURE_EXTENDED_GLOB
+setopt extended_glob ->   bin_setopt()          ->    FEATURE_EXTENDED_GLOB
+                                v
                          Same result: extended glob enabled
 ```
 
@@ -62,10 +62,10 @@ Both commands enable the exact same feature. The syntax is just a preference.
 
 ```
 Bash Syntax              Zsh Syntax              Result
-───────────────────────────────────────────────────────
-${var^^}            ≡    ${(U)var}          →   UPPERCASE
-${var,,}            ≡    ${(L)var}          →   lowercase
-${var^}             ≡    ${(C)var}          →   Capitalize
+-------------------------------------------------------
+${var^^}            ==    ${(U)var}          ->   UPPERCASE
+${var,,}            ==    ${(L)var}          ->   lowercase
+${var^}             ==    ${(C)var}          ->   Capitalize
 ```
 
 Both syntaxes are available in ALL profiles. A user can mix them:
@@ -73,19 +73,19 @@ Both syntaxes are available in ALL profiles. A user can mix them:
 ```bash
 # This works in lush regardless of profile:
 name="hello"
-echo "${name^^}"      # Bash syntax → HELLO
-echo "${(U)name}"     # Zsh syntax  → HELLO
+echo "${name^^}"      # Bash syntax -> HELLO
+echo "${(U)name}"     # Zsh syntax  -> HELLO
 ```
 
 ### Extended Glob Example
 
 ```
 Bash Extglob            Zsh Extglob             Pattern
-───────────────────────────────────────────────────────
-*(pattern)         ≡    pattern#           →   zero or more
-+(pattern)         ≡    pattern##          →   one or more
-@(a|b)             ≡    (a|b)              →   alternation
-!(pattern)         ≡    ^pattern           →   negation
+-------------------------------------------------------
+*(pattern)         ==    pattern#           ->   zero or more
++(pattern)         ==    pattern##          ->   one or more
+@(a|b)             ==    (a|b)              ->   alternation
+!(pattern)         ==    ^pattern           ->   negation
 ```
 
 Both syntaxes work. The underlying glob engine handles both.
@@ -252,7 +252,7 @@ ls *(.)                    # Only regular files
 | `associative_arrays` | OFF | ON | ON | ON | `declare -A` |
 | `array_zero_indexed` | N/A | ON | OFF | ON | Bash=0, Zsh=1 |
 | `extended_glob` | OFF | OFF | ON | ON | extglob patterns |
-| `null_glob` | OFF | OFF | ON | ON | Unmatched → nothing |
+| `null_glob` | OFF | OFF | ON | ON | Unmatched -> nothing |
 | `glob_qualifiers` | OFF | OFF | ON | ON | `*(.)` `*(/)` |
 | `word_split` | ON | ON | OFF | OFF | IFS splitting |
 | `case_modification` | OFF | ON | ON | ON | `${var^^}` |

@@ -244,10 +244,10 @@ LLE_REGISTER_TEST(buffer_utf8_handling, LLE_TEST_TYPE_UNIT,
     // Test complex UTF-8 sequences
     const char *test_strings[] = {
         "Hello World",                             // ASCII
-        "café",                                    // Latin-1 supplement
-        "🚀💻🎯",                                   // Emoji
-        "नमस्ते",                                   // Devanagari
-        "👨‍💻",                                     // Compound emoji with ZWJ
+        "caf\xc3\xa9",                                    // Latin-1 supplement
+        "\xf0\x9f\x9a\x80\xf0\x9f\x92\xbb\xf0\x9f\x8e\xaf",                                   // Emoji
+        "\xe0\xa4\xa8\xe0\xa4\xae\xe0\xa4\xb8\xe0\xa5\x8d\xe0\xa4\xa4\xe0\xa5\x87",                                   // Devanagari
+        "\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x92\xbb",                                     // Compound emoji with ZWJ
         NULL
     };
     
@@ -305,7 +305,7 @@ LLE_REGISTER_TEST(event_processing_performance, LLE_TEST_TYPE_UNIT,
 // Memory management unit tests
 LLE_REGISTER_TEST(memory_pool_allocation_performance, LLE_TEST_TYPE_UNIT,
                   LLE_TEST_PRIORITY_CRITICAL,
-                  "Validate memory pool allocation meets sub-100μs requirements") {
+                  "Validate memory pool allocation meets sub-100us requirements") {
     lle_memory_pool_t *pool = lle_memory_pool_create(LLE_POOL_TYPE_EDITING, 
                                                      1024 * 1024); // 1MB pool
     LLE_ASSERT_NOT_NULL(pool, "Memory pool creation failed");
@@ -427,7 +427,7 @@ LLE_REGISTER_TEST(display_buffer_integration, LLE_TEST_TYPE_INTEGRATION,
     uint64_t render_duration = lle_get_microsecond_timestamp() - start_time;
     
     // Validate sub-millisecond rendering performance
-    if (render_duration > 1000) { // 1ms = 1000μs
+    if (render_duration > 1000) { // 1ms = 1000us
         lle_test_record_performance_failure(ctx, __FILE__, __LINE__,
             "Display rendering too slow: %llu us > 1000 us",
             render_duration);
@@ -739,10 +739,10 @@ LLE_REGISTER_TEST(comprehensive_performance_benchmark, LLE_TEST_TYPE_PERFORMANCE
         test_event_processing_performance, NULL, &event_result);
     LLE_ASSERT_EQ(LLE_SUCCESS, result, "Event processing performance test failed");
     
-    // Validate event processing requirements (sub-500μs)
-    if (event_result.statistics.mean_duration_ns > 500000) { // 500μs in nanoseconds
+    // Validate event processing requirements (sub-500us)
+    if (event_result.statistics.mean_duration_ns > 500000) { // 500us in nanoseconds
         lle_test_record_performance_failure(ctx, __FILE__, __LINE__,
-            "Event processing too slow: %.2f μs > 500 μs",
+            "Event processing too slow: %.2f us > 500 us",
             event_result.statistics.mean_duration_ns / 1000.0);
         return LLE_TEST_RESULT_PERFORMANCE_FAILED;
     }
@@ -754,10 +754,10 @@ LLE_REGISTER_TEST(comprehensive_performance_benchmark, LLE_TEST_TYPE_PERFORMANCE
         test_memory_allocation_performance, NULL, &memory_result);
     LLE_ASSERT_EQ(LLE_SUCCESS, result, "Memory allocation performance test failed");
     
-    // Validate memory allocation requirements (sub-100μs)
-    if (memory_result.statistics.mean_duration_ns > 100000) { // 100μs in nanoseconds
+    // Validate memory allocation requirements (sub-100us)
+    if (memory_result.statistics.mean_duration_ns > 100000) { // 100us in nanoseconds
         lle_test_record_performance_failure(ctx, __FILE__, __LINE__,
-            "Memory allocation too slow: %.2f μs > 100 μs",
+            "Memory allocation too slow: %.2f us > 100 us",
             memory_result.statistics.mean_duration_ns / 1000.0);
         return LLE_TEST_RESULT_PERFORMANCE_FAILED;
     }
@@ -1854,8 +1854,8 @@ LLE_REGISTER_TEST(complete_system_integration_validation, LLE_TEST_TYPE_INTEGRAT
             .requires_zero_allocation_testing = true,
             .requires_leak_detection = true,
             .requires_pool_stress_testing = true,
-            .max_allocation_time_ns = 100000,    // 100μs
-            .max_deallocation_time_ns = 50000,   // 50μs
+            .max_allocation_time_ns = 100000,    // 100us
+            .max_deallocation_time_ns = 50000,   // 50us
             .min_pool_utilization_percent = 85   // 85% minimum utilization
         },
         .display_integration = {
@@ -1867,7 +1867,7 @@ LLE_REGISTER_TEST(complete_system_integration_validation, LLE_TEST_TYPE_INTEGRAT
             .requires_cursor_synchronization = true
         },
         .performance_integration = {
-            .max_response_time_ns = 500000,      // 500μs
+            .max_response_time_ns = 500000,      // 500us
             .min_cache_hit_rate_percent = 75.0,  // 75% minimum
             .max_memory_overhead_bytes = 1048576, // 1MB maximum
             .max_cpu_usage_percent = 10,         // 10% maximum
@@ -1959,10 +1959,10 @@ LLE_REGISTER_TEST(complete_system_integration_validation, LLE_TEST_TYPE_INTEGRAT
 
 **Critical Performance Requirements:**
 
-- **Response Time**: All interactive operations must complete within 500μs
-- **Memory Allocation**: Memory pool allocations must complete within 100μs
+- **Response Time**: All interactive operations must complete within 500us
+- **Memory Allocation**: Memory pool allocations must complete within 100us
 - **Display Rendering**: Screen updates must complete within 1ms
-- **Event Processing**: Input events must be processed within 250μs
+- **Event Processing**: Input events must be processed within 250us
 - **Cache Performance**: Cache hit rates must exceed 75%
 - **Memory Efficiency**: Memory utilization must exceed 85%
 - **Zero Regression**: No performance degradation exceeding 10%
@@ -1970,20 +1970,20 @@ LLE_REGISTER_TEST(complete_system_integration_validation, LLE_TEST_TYPE_INTEGRAT
 ```c
 // Performance requirement validation
 typedef struct {
-    uint64_t max_response_time_ns;              // 500,000 ns (500μs)
-    uint64_t max_allocation_time_ns;            // 100,000 ns (100μs)
+    uint64_t max_response_time_ns;              // 500,000 ns (500us)
+    uint64_t max_allocation_time_ns;            // 100,000 ns (100us)
     uint64_t max_render_time_ns;                // 1,000,000 ns (1ms)
-    uint64_t max_event_processing_time_ns;      // 250,000 ns (250μs)
+    uint64_t max_event_processing_time_ns;      // 250,000 ns (250us)
     double min_cache_hit_rate_percent;          // 75.0%
     double min_memory_utilization_percent;      // 85.0%
     double max_regression_percent;              // 10.0%
 } lle_performance_requirements_t;
 
 // Performance validation constants
-#define LLE_PERF_MAX_RESPONSE_TIME_NS      500000ULL    // 500μs
-#define LLE_PERF_MAX_ALLOCATION_TIME_NS    100000ULL    // 100μs
+#define LLE_PERF_MAX_RESPONSE_TIME_NS      500000ULL    // 500us
+#define LLE_PERF_MAX_ALLOCATION_TIME_NS    100000ULL    // 100us
 #define LLE_PERF_MAX_RENDER_TIME_NS        1000000ULL   // 1ms
-#define LLE_PERF_MAX_EVENT_PROCESSING_NS   250000ULL    // 250μs
+#define LLE_PERF_MAX_EVENT_PROCESSING_NS   250000ULL    // 250us
 #define LLE_PERF_MIN_CACHE_HIT_RATE        75.0         // 75%
 #define LLE_PERF_MIN_MEMORY_UTILIZATION    85.0         // 85%
 #define LLE_PERF_MAX_REGRESSION_PERCENT    10.0         // 10%
@@ -2041,14 +2041,14 @@ typedef struct {
 This comprehensive Testing Framework specification provides **implementation-ready** documentation ensuring guaranteed development success:
 
 **Complete Implementation Coverage:**
-- ✅ **Comprehensive Test Types**: Unit, integration, performance, memory, error recovery, and end-to-end testing
-- ✅ **Automated Quality Assurance**: Continuous validation with real-time feedback and regression detection
-- ✅ **Enterprise-Grade Reporting**: Multi-format reporting with analytics, dashboards, and trend analysis
-- ✅ **Professional CI/CD Integration**: Complete pipeline automation with artifact management and notifications
-- ✅ **Memory Safety Guarantees**: Zero-tolerance memory leak and corruption detection with comprehensive validation
-- ✅ **Performance Validation**: Sub-millisecond response time validation with statistical analysis and benchmarking
-- ✅ **Cross-Platform Compatibility**: Multi-platform testing with behavior consistency validation
-- ✅ **Future Extensibility**: Plugin architecture supporting unlimited customization and evolution
+- OK **Comprehensive Test Types**: Unit, integration, performance, memory, error recovery, and end-to-end testing
+- OK **Automated Quality Assurance**: Continuous validation with real-time feedback and regression detection
+- OK **Enterprise-Grade Reporting**: Multi-format reporting with analytics, dashboards, and trend analysis
+- OK **Professional CI/CD Integration**: Complete pipeline automation with artifact management and notifications
+- OK **Memory Safety Guarantees**: Zero-tolerance memory leak and corruption detection with comprehensive validation
+- OK **Performance Validation**: Sub-millisecond response time validation with statistical analysis and benchmarking
+- OK **Cross-Platform Compatibility**: Multi-platform testing with behavior consistency validation
+- OK **Future Extensibility**: Plugin architecture supporting unlimited customization and evolution
 
 **Quality Assurance Excellence:**
 - **Zero Regression Policy**: Automated detection and prevention of performance or functional regressions

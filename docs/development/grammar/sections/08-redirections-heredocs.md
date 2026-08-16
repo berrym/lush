@@ -1,4 +1,4 @@
-# Section 8 — Redirections and Heredocs
+# Section 8 -- Redirections and Heredocs
 
 ## EBNF productions
 
@@ -12,7 +12,7 @@ redirection_operator =
     | '&>'                      (* redirect both stdout+stderr to file *)
     | '&>>'                     (* append both stdout+stderr to file *)
     | '|&'                      (* pipe both stdout+stderr *)
-    | '>|'                      (* clobber — unconditional overwrite *)
+    | '>|'                      (* clobber -- unconditional overwrite *)
     | FD_NUMBER '<'             (* redirect from fd to stdin *)
     | FD_NUMBER '>'             (* redirect from stdout to fd *)
     | FD_NUMBER '>>'            (* append stdout to fd *)
@@ -71,11 +71,11 @@ compound_command =
 | `N<&M` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (M, -, or $VAR) | Duplicate input fd: fd N from fd M |
 | `N<&-` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (-) | Close input fd N |
 | `N<&$VAR` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded ($VAR or ${VAR}) | Redirect from fd from variable |
-| `>&M` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (M, -, or $VAR) | Implicit `1>&M` — redirect stdout to fd M |
-| `>&-` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (-) | Implicit `1>&-` — close stdout |
+| `>&M` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (M, -, or $VAR) | Implicit `1>&M` -- redirect stdout to fd M |
+| `>&-` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (-) | Implicit `1>&-` -- close stdout |
 | `>&$VAR` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded ($VAR or ${VAR}) | Implicit `1>&$VAR` |
-| `<&M` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (M, -, or $VAR) | Implicit `0<&M` — redirect stdin from fd M |
-| `<&-` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (-) | Implicit `0<&-` — close stdin |
+| `<&M` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (M, -, or $VAR) | Implicit `0<&M` -- redirect stdin from fd M |
+| `<&-` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded (-) | Implicit `0<&-` -- close stdin |
 | `<&$VAR` | TOK_REDIRECT_FD | NODE_REDIR_FD | embedded | embedded ($VAR or ${VAR}) | Implicit `0<&$VAR` |
 | `{var}>` | TOK_REDIRECT_FD_ALLOC | NODE_REDIR_FD_ALLOC | dynamic | filename (or embedded if >&- or >&N) | Bash 4.1+/Zsh: dynamically allocate fd, store in variable |
 | `{var}>>` | TOK_REDIRECT_FD_ALLOC | NODE_REDIR_FD_ALLOC | dynamic | filename (or embedded if >&- or >&N) | Bash 4.1+/Zsh: allocate and append |
@@ -102,71 +102,71 @@ compound_command =
 | NODE_REDIR_FD_ALLOC | `{var}>`, `{var}<`, `{var}>>`, `{var}>&-`, `{var}>&N` | Bash 4.1+/Zsh fd allocation; target encoded or separate | target (filename or fd), if not embedded in token |
 | NODE_REDIR_CLOBBER | `>&#124;` | Unconditional overwrite | target (filename) |
 
-## Heredoc collection — the context-sensitive bit
+## Heredoc collection -- the context-sensitive bit
 
 ### Overview
-Heredoc body collection is triggered immediately in `parse_redirection()` (parser.c:1900–1955). The entire mechanism is context-sensitive: it reads directly from the raw input buffer, bypassing the normal token stream, to preserve whitespace and detect line-based delimiters accurately.
+Heredoc body collection is triggered immediately in `parse_redirection()` (parser.c:1900-1955). The entire mechanism is context-sensitive: it reads directly from the raw input buffer, bypassing the normal token stream, to preserve whitespace and detect line-based delimiters accurately.
 
 ### Step-by-step execution
 
 **1. Delimiter extraction (parser.c:1904)**
 - The delimiter token (next token after `<<` or `<<-`) is extracted as-is: `target_token->text`
 - If the delimiter is quoted (`TOK_STRING` or `TOK_EXPANDABLE_STRING`), an expansion flag is set to `false`; otherwise `true`
-- The token text may include quotes (e.g., `"EOF"`, `'EOF'`) — these are preserved for later unquoting
+- The token text may include quotes (e.g., `"EOF"`, `'EOF'`) -- these are preserved for later unquoting
 
-**2. Expansion flag determination (parser.c:1909–1914)**
+**2. Expansion flag determination (parser.c:1909-1914)**
 - If `target_token->type == TOK_STRING` or `TOK_EXPANDABLE_STRING`: disable expansion (any quoted form)
 - Otherwise: enable expansion (unquoted delimiter allows variable expansion in body)
-- **Note:** POSIX rule — any quoting of the delimiter disables expansion of the body
+- **Note:** POSIX rule -- any quoting of the delimiter disables expansion of the body
 
 **3. Tokenizer advance (parser.c:1918)**
 - The tokenizer is advanced past the delimiter token to position just after it on the same line
 - This positions the stream for `collect_heredoc_content()` to find the heredoc operator and begin collecting
 
-**4. Body collection (parser.c:1922–1923, invoked function at 2030–2227)**
+**4. Body collection (parser.c:1922-1923, invoked function at 2030-2227)**
 
-#### Finding the heredoc start in raw input (2030–2131)
+#### Finding the heredoc start in raw input (2030-2131)
 The function `collect_heredoc_content()` scans the raw tokenizer input buffer backward from the current tokenizer position to locate the `<<` or `<<-` operator:
 
 - Loop through `tokenizer->input` searching for `<<` (2062)
-- When `<<` is found, check for optional `-` flag (2067–2069)
-- Skip optional whitespace (spaces and tabs) after the `-` (2073–2076)
+- When `<<` is found, check for optional `-` flag (2067-2069)
+- Skip optional whitespace (spaces and tabs) after the `-` (2073-2076)
 - Check if the next text matches the unquoted delimiter:
-  - If the input has a quoted delimiter (e.g., `<<'EOF'`), extract the unquoted content and compare (2084–2106)
-  - Otherwise, match unquoted delimiter directly (2108–2116)
-- When match is found, position is at the end of the delimiter in input; advance to end of that line (2119–2127)
+  - If the input has a quoted delimiter (e.g., `<<'EOF'`), extract the unquoted content and compare (2084-2106)
+  - Otherwise, match unquoted delimiter directly (2108-2116)
+- When match is found, position is at the end of the delimiter in input; advance to end of that line (2119-2127)
 - Move to the next line: `content_start` is now at the first character of the first heredoc body line (2126)
 
-#### Collecting lines until delimiter found (2133–2203)
+#### Collecting lines until delimiter found (2133-2203)
 Loop through input starting at `content_start`:
 
-- Extract each line (from line start to `\n`) (2145–2149)
-- If `<<-` variant: strip leading **tabs only** from the line (2163–2166)
+- Extract each line (from line start to `\n`) (2145-2149)
+- If `<<-` variant: strip leading **tabs only** from the line (2163-2166)
   - **Important:** Only tabs are stripped, not spaces; this is per POSIX `<<-` semantics
   - Stripping is done character-by-character: `while (*line_content == '\t')`
 - Compare the (possibly stripped) line to the unquoted delimiter (2170)
-- If exact match: stop collection (2171–2173)
-- Otherwise: append line + newline to content buffer (2176–2197)
+- If exact match: stop collection (2171-2173)
+- Otherwise: append line + newline to content buffer (2176-2197)
 - Move to next line: `line_start = line_end + 1` (2202)
 
-#### Final state update (2205–2219)
+#### Final state update (2205-2219)
 - Update tokenizer position to after the delimiter line: `tokenizer->position = line_start`
-- Recalculate line and column tracking for all consumed input (2209–2216)
+- Recalculate line and column tracking for all consumed input (2209-2216)
 - Call `tokenizer_refresh_from_position()` to re-tokenize from the new position (2219)
-- Free temporary unquoted delimiter if allocated (2222–2223)
+- Free temporary unquoted delimiter if allocated (2222-2223)
 - Return the collected content string (2226)
 
 ### Delimiter matching rules
 
 1. **Quoted vs. unquoted:** The delimiter is matched against the **unquoted** form (internal representation in memory)
 2. **Input detection:** The input may contain the delimiter in various forms:
-   - Unquoted: `<<EOF` → search for literal `EOF`
-   - Single-quoted: `<<'EOF'` → search for literal `EOF` (quotes are parsing-level, not in body)
-   - Double-quoted: `<<"EOF"` → search for literal `EOF` (quotes are parsing-level, not in body)
-   - Escaped: `<<\EOF` → search for literal `EOF` (escape is parsing-level)
+   - Unquoted: `<<EOF` -> search for literal `EOF`
+   - Single-quoted: `<<'EOF'` -> search for literal `EOF` (quotes are parsing-level, not in body)
+   - Double-quoted: `<<"EOF"` -> search for literal `EOF` (quotes are parsing-level, not in body)
+   - Escaped: `<<\EOF` -> search for literal `EOF` (escape is parsing-level)
 3. **Line-based:** Delimiter must match **exactly** (after stripping if `<<-`) and must be **alone on a line** (followed only by the newline)
 4. **Whitespace handling:** 
-   - **Before delimiter:** optional spaces and tabs are skipped after `<<` or `<<-` (2073–2076)
+   - **Before delimiter:** optional spaces and tabs are skipped after `<<` or `<<-` (2073-2076)
    - **Leading tabs in body:** only tabs are stripped by `<<-`, not spaces (2164)
    - **Trailing whitespace on lines:** preserved in the body
 
@@ -174,15 +174,15 @@ Loop through input starting at `content_start`:
 
 | Form | Expansion? | Unquoting | Example |
 |------|-----------|-----------|---------|
-| `<<EOF` | yes | none | `cat <<EOF` → body expands |
-| `<<'EOF'` | no | strip quotes | `cat <<'EOF'` → body literal |
-| `<<"EOF"` | no | strip quotes | `cat <<"EOF"` → body literal |
-| `<<\EOF` | no | strip backslash | `cat <<\EOF` → body literal |
-| `<<E"O"F` | no (any quoting disables) | mixed unquoting | `cat <<E"O"F` → body literal |
+| `<<EOF` | yes | none | `cat <<EOF` -> body expands |
+| `<<'EOF'` | no | strip quotes | `cat <<'EOF'` -> body literal |
+| `<<"EOF"` | no | strip quotes | `cat <<"EOF"` -> body literal |
+| `<<\EOF` | no | strip backslash | `cat <<\EOF` -> body literal |
+| `<<E"O"F` | no (any quoting disables) | mixed unquoting | `cat <<E"O"F` -> body literal |
 
 ### Error cases
 
-1. **EOF before delimiter:** The loop (2143–2203) will scan to end of input without finding a match. In this case, all remaining input is collected as the body, and the function returns normally (no explicit error). **No error is reported in the current code.**
+1. **EOF before delimiter:** The loop (2143-2203) will scan to end of input without finding a match. In this case, all remaining input is collected as the body, and the function returns normally (no explicit error). **No error is reported in the current code.**
 2. **Empty delimiter:** Allowed; matches an empty line
 3. **Delimiter with internal quotes:** Handled at the parsing level; once tokenized, quotes are processed and the unquoted form is used for matching
 
@@ -206,16 +206,16 @@ B
 
 ### Redirection operator tokenization
 
-- **FD prefix as single token:** When a number appears at the start of a word, the tokenizer checks the next character(s). If it is `<`, `>`, `>>`, `<&`, or `>&`, the entire fd+operator is returned as a single token (e.g., `2>` as TOK_REDIRECT_ERR). **The fd and operator are NOT separate tokens** (tokenizer.c:1850–1973).
+- **FD prefix as single token:** When a number appears at the start of a word, the tokenizer checks the next character(s). If it is `<`, `>`, `>>`, `<&`, or `>&`, the entire fd+operator is returned as a single token (e.g., `2>` as TOK_REDIRECT_ERR). **The fd and operator are NOT separate tokens** (tokenizer.c:1850-1973).
 
 - **Variable-expansion in FD targets:** Patterns like `N>&$VAR` and `N>&${VAR}` are tokenized as single tokens (TOK_REDIRECT_FD), with the variable syntax embedded. The parser and executor later expand the variable to determine the target fd.
 
 ### {varname}> fd allocation syntax
 
-- The tokenizer recognizes `{identifier}` followed by `>`, `<`, `>>`, `>&`, etc. as a single token (TOK_REDIRECT_FD_ALLOC) (tokenizer.c:1650–1700).
+- The tokenizer recognizes `{identifier}` followed by `>`, `<`, `>>`, `>&`, etc. as a single token (TOK_REDIRECT_FD_ALLOC) (tokenizer.c:1650-1700).
 - Pattern: `{[a-zA-Z_][a-zA-Z0-9_]*}[<>|&-]+` is recognized as a single token.
 - Variants include `{var}>&-`, `{var}>&N`, `{var}>&${VAR}`, etc.
-- In `parse_redirection()`: if the token ends with `>&-` or `>&N`, no separate target is needed; otherwise, a filename follows (parser.c:1849–1862).
+- In `parse_redirection()`: if the token ends with `>&-` or `>&N`, no separate target is needed; otherwise, a filename follows (parser.c:1849-1862).
 
 ### Heredoc body outside normal token stream
 
@@ -226,7 +226,7 @@ B
 
 ### Keyword recognition disabled for redirection targets
 
-- When parsing a redirection target (after `>`, `<`, etc.), keyword recognition is temporarily disabled (parser.c:1831–1832).
+- When parsing a redirection target (after `>`, `<`, etc.), keyword recognition is temporarily disabled (parser.c:1831-1832).
 - This allows filenames like `in`, `do`, `done`, `while` to be treated as regular words, not keywords.
 - Keyword recognition is re-enabled after parsing the target (parser.c:1839).
 
@@ -241,7 +241,7 @@ if true; then echo yes; fi 2> errors.txt
 while true; do sleep 1; done < input.txt
 ```
 
-The function `parse_trailing_redirections()` (parser.c:1734–1751) loops and parses any redirection operators that follow a compound command, attaching each redirection node as a child of the compound node.
+The function `parse_trailing_redirections()` (parser.c:1734-1751) loops and parses any redirection operators that follow a compound command, attaching each redirection node as a child of the compound node.
 
 **Compound commands supporting trailing redirections** (parser.c calls to `parse_trailing_redirections`):
 - Brace groups: `{ ... }` (line 1604)
@@ -260,10 +260,10 @@ The function `parse_trailing_redirections()` (parser.c:1734–1751) loops and pa
 The code explicitly checks `*line_content == '\t'` (parser.c:2164), not `isspace()`. This means leading spaces are NOT stripped by `<<-`; only tabs are. This is per POSIX 2008 specification.
 
 ### 2. Expansion flag stored in AST
-For heredocs, the `expand_variables` flag is stored as a second child node (NODE_VAR with value "1" or "0") (parser.c:1945–1953). This defers the actual expansion to the execution phase, allowing the interpreter to handle it contextually.
+For heredocs, the `expand_variables` flag is stored as a second child node (NODE_VAR with value "1" or "0") (parser.c:1945-1953). This defers the actual expansion to the execution phase, allowing the interpreter to handle it contextually.
 
 ### 3. FD embedding in tokens
-Patterns like `N>&M`, `N<&-`, and `N>&$VAR` are fully embedded in the redirection token text. The `parse_redirection()` function returns the node without a separate target child for `NODE_REDIR_FD` (parser.c:1842–1845). This is different from filename redirections, which have a separate target child.
+Patterns like `N>&M`, `N<&-`, and `N>&$VAR` are fully embedded in the redirection token text. The `parse_redirection()` function returns the node without a separate target child for `NODE_REDIR_FD` (parser.c:1842-1845). This is different from filename redirections, which have a separate target child.
 
 ### 4. {varname}> detection happens at tokenizer level
 The tokenizer (not the parser) detects `{identifier}>` syntax and produces a single TOK_REDIRECT_FD_ALLOC token. The parser then decides whether to expect a separate target file.
@@ -275,13 +275,13 @@ The `>|` operator (tokenizer.c:1430) unconditionally overwrites, even if the `no
 These operators redirect **both** stdout and stderr to the same file, equivalent to `1> file 2>&1` and `1>> file 2>&1` respectively. They are tokenized as TOK_REDIRECT_BOTH and TOK_APPEND_BOTH.
 
 ### 7. Process substitution as redirection target
-The parser recognizes `<(cmd)` and `>(cmd)` as valid redirection targets (parser.c:1864–1876). These are parsed as process substitution nodes and attached as children of the redirection node.
+The parser recognizes `<(cmd)` and `>(cmd)` as valid redirection targets (parser.c:1864-1876). These are parsed as process substitution nodes and attached as children of the redirection node.
 
 ### 8. Variable reference in fd duplication: `N>&${varname}`
 When duplication targets a variable (e.g., `2>&${FD}`), the tokenizer includes the full `${VAR}` syntax in the token text. Variable expansion happens at execution time.
 
 ### 9. Token concatenation for redirection targets
-For non-heredoc, non-fd redirections, the parser concatenates consecutive word-like tokens without whitespace (parser.c:1956–2001). This allows targets like `/tmp/file_$VAR` to be treated as a single filename.
+For non-heredoc, non-fd redirections, the parser concatenates consecutive word-like tokens without whitespace (parser.c:1956-2001). This allows targets like `/tmp/file_$VAR` to be treated as a single filename.
 
 ### 10. Immediate vs. deferred heredoc collection
 Heredoc bodies are collected **immediately** during parsing, not deferred to a later phase. This means the parser must consume the heredoc body right away and store it in the AST. This is different from some other shell implementations that defer body collection.

@@ -26,7 +26,7 @@ Every major shell wraps GNU Readline or implements something similar. Bash uses 
 
 Lush took a different approach. LLE (Lush Line Editor) is a line editor designed from the ground up for interactive shell use. This isn't academic distinction - it enables capabilities that bolted-on solutions can't provide:
 
-- **Deep completion integration**: LLE's completion system understands shell syntax at a fundamental level. It doesn't just complete filenames — it knows what arguments each shell builtin accepts and presents context-appropriate options. It also switches its first-word vocabulary to the debugger command set at the `(lush-debug)` break prompt.
+- **Deep completion integration**: LLE's completion system understands shell syntax at a fundamental level. It doesn't just complete filenames -- it knows what arguments each shell builtin accepts and presents context-appropriate options. It also switches its first-word vocabulary to the debugger command set at the `(lush-debug)` break prompt.
 
 - **Real-time syntax highlighting**: Every character you type is tokenized and colored. Commands are validated as you type. You see errors before pressing Enter.
 
@@ -48,7 +48,7 @@ Emacs-style editing is the default and provides complete functionality. The full
 
 ### Vi Mode (In Development)
 
-Vi mode has the framework in place — mode switching, state machine, command parsing — but is not yet wired to editing operations. Track progress in [lle_specification/](lle_specification/) and the issue tracker. Use Emacs mode in the meantime.
+Vi mode has the framework in place -- mode switching, state machine, command parsing -- but is not yet wired to editing operations. Track progress in [lle_specification/](lle_specification/) and the issue tracker. Use Emacs mode in the meantime.
 
 To check the current mode:
 
@@ -481,8 +481,8 @@ These operations add to the kill ring:
 
 ## Customization
 
-LLE exposes three first-class customization surfaces — widgets,
-hooks, and segments — all routed through the central configuration
+LLE exposes three first-class customization surfaces -- widgets,
+hooks, and segments -- all routed through the central configuration
 registry. They are the LLE Phase 3 customization trio.
 
 ### Widgets: User-Defined Editing Actions

@@ -11,7 +11,7 @@
 
 ---
 
-## 📋 **EXECUTIVE SUMMARY**
+## **EXECUTIVE SUMMARY**
 
 This specification defines a comprehensive user customization system enabling unlimited personalization of the Lush Line Editor through user-programmable editing operations, flexible key binding management, integrated scripting capabilities, and enterprise-grade configuration management. The system provides complete control over editor behavior while maintaining security, performance, and seamless integration with all LLE core systems.
 
@@ -28,14 +28,14 @@ This specification defines a comprehensive user customization system enabling un
 - **Enterprise Security**: Comprehensive sandboxing and permission management
 
 **Performance Targets**:
-- Sub-500µs customization lookup and execution
+- Sub-500us customization lookup and execution
 - Zero-allocation customization processing during runtime
 - <1ms script execution for user-defined operations
 - >90% cache hit rate for customization data
 
 ---
 
-## 👥 **HOW TO USE THE CUSTOMIZATION SYSTEM**
+## **HOW TO USE THE CUSTOMIZATION SYSTEM**
 
 This section explains how users take advantage of the LLE User Customization System through practical examples and common use cases.
 
@@ -187,39 +187,39 @@ display lle performance report detail       # See impact of customizations
 
 ---
 
-## 🏗️ **SYSTEM ARCHITECTURE**
+## **SYSTEM ARCHITECTURE**
 
 ### **Core Components Overview**
 
 ```
 User Customization System Architecture:
 
-┌─────────────────────────────────────────────────────────────────┐
-│                    LLE USER CUSTOMIZATION SYSTEM                │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   Key Binding   │  │  Configuration  │  │     Script      │  │
-│  │    Manager      │  │    Manager      │  │   Integration   │  │
-│  │                 │  │                 │  │                 │  │
-│  │ • Key Maps      │  │ • Schema Valid. │  │ • Lua Engine    │  │
-│  │ • Chord Support │  │ • Type Safety   │  │ • Python Engine │  │
-│  │ • Context Aware │  │ • Live Reload   │  │ • Sandboxing    │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│           │                     │                     │          │
-│           └─────────────────────┼─────────────────────┘          │
-│                                 │                                │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │    Widget       │  │   Customization │  │   Security &    │  │
-│  │   Framework     │  │     Cache       │  │   Permissions   │  │
-│  │                 │  │                 │  │                 │  │
-│  │ • User Widgets  │  │ • Fast Lookup   │  │ • Sandboxing    │  │
-│  │ • Edit Ops      │  │ • Memory Pool   │  │ • Access Control│  │
-│  │ • Plugin Integration│ • Invalidation │  │ • Audit Logging │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-├─────────────────────────────────────────────────────────────────┤
-│              INTEGRATION WITH CORE LLE SYSTEMS                  │
-│  Event System │ Display │ Plugin System │ Memory Pool │ History │
-└─────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------+
+|                    LLE USER CUSTOMIZATION SYSTEM                |
++-----------------------------------------------------------------+
+|  +-----------------+  +-----------------+  +-----------------+  |
+|  |   Key Binding   |  |  Configuration  |  |     Script      |  |
+|  |    Manager      |  |    Manager      |  |   Integration   |  |
+|  |                 |  |                 |  |                 |  |
+|  | * Key Maps      |  | * Schema Valid. |  | * Lua Engine    |  |
+|  | * Chord Support |  | * Type Safety   |  | * Python Engine |  |
+|  | * Context Aware |  | * Live Reload   |  | * Sandboxing    |  |
+|  +-----------------+  +-----------------+  +-----------------+  |
+|           |                     |                     |          |
+|           +---------------------+---------------------+          |
+|                                 |                                |
+|  +-----------------+  +-----------------+  +-----------------+  |
+|  |    Widget       |  |   Customization |  |   Security &    |  |
+|  |   Framework     |  |     Cache       |  |   Permissions   |  |
+|  |                 |  |                 |  |                 |  |
+|  | * User Widgets  |  | * Fast Lookup   |  | * Sandboxing    |  |
+|  | * Edit Ops      |  | * Memory Pool   |  | * Access Control|  |
+|  | * Plugin Integration| * Invalidation |  | * Audit Logging |  |
+|  +-----------------+  +-----------------+  +-----------------+  |
++-----------------------------------------------------------------+
+|              INTEGRATION WITH CORE LLE SYSTEMS                  |
+|  Event System | Display | Plugin System | Memory Pool | History |
++-----------------------------------------------------------------+
 ```
 
 ### **Integration Points**
@@ -266,7 +266,7 @@ typedef struct lle_customization_system {
 
 ---
 
-## 🔤 **KEYBINDING INTEGRATION SYSTEM**
+## **KEYBINDING INTEGRATION SYSTEM**
 
 ### **Keybinding Integration Architecture**
 
@@ -392,7 +392,7 @@ lle_result_t lle_customization_switch_keybinding_mode(
 
 ---
 
-## 🔧 **WIDGET HOOK CUSTOMIZATION SYSTEM**
+## **WIDGET HOOK CUSTOMIZATION SYSTEM**
 
 ### **Widget Customization Architecture**
 
@@ -440,7 +440,7 @@ typedef struct lle_widget_customization_engine {
 
 ---
 
-## 🎯 **COMPLETION MENU CUSTOMIZATION SYSTEM**
+## **COMPLETION MENU CUSTOMIZATION SYSTEM**
 
 ### **Completion Customization Architecture**
 
@@ -663,14 +663,14 @@ lle_result_t lle_customization_system_init_with_integrations(
 
 ### **Integration Performance Requirements**
 
-- **Keybinding Mode Switching**: <20μs for switching between Emacs/Vi modes
-- **Widget Customization Loading**: <100μs for applying widget customizations
-- **Completion Category Customization**: <50μs for applying category configurations
-- **Total Integration Overhead**: <200μs maintaining sub-500μs customization targets
+- **Keybinding Mode Switching**: <20us for switching between Emacs/Vi modes
+- **Widget Customization Loading**: <100us for applying widget customizations
+- **Completion Category Customization**: <50us for applying category configurations
+- **Total Integration Overhead**: <200us maintaining sub-500us customization targets
 
 ---
 
-## 🔤 **KEY BINDING MANAGEMENT SYSTEM (ENHANCED)**
+## **KEY BINDING MANAGEMENT SYSTEM (ENHANCED)**
 
 ### **Key Binding Architecture**
 
@@ -1170,7 +1170,7 @@ lle_result_t lle_keybinding_process_key_input(
 
 ---
 
-## ⚙️ **CONFIGURATION MANAGEMENT SYSTEM**
+## **CONFIGURATION MANAGEMENT SYSTEM**
 
 ### **Configuration Architecture**
 
@@ -1575,7 +1575,7 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 🐍 **SCRIPT INTEGRATION SYSTEM**
+    ## **SCRIPT INTEGRATION SYSTEM**
 
     The script integration system provides seamless Lua and Python scripting support for advanced customization capabilities.
 
@@ -1826,7 +1826,7 @@ lle_result_t lle_config_manager_init(
         // Check execution time threshold
         if (execution_time > 1000) { // 1ms threshold
             integration->stats.slow_executions++;
-            lle_log_warn("Slow script execution: %s::%s took %llu μs", 
+            lle_log_warn("Slow script execution: %s::%s took %llu us", 
                          script_name, function_name, execution_time);
         }
     
@@ -1998,7 +1998,7 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 🧩 **WIDGET FRAMEWORK SYSTEM**
+    ## **WIDGET FRAMEWORK SYSTEM**
 
     The widget framework enables users to create custom editing operations and behaviors through a flexible, extensible architecture.
 
@@ -2358,9 +2358,9 @@ lle_result_t lle_config_manager_init(
         }
 
         // Check execution time threshold
-        if (execution_time > 500) { // 500μs threshold
+        if (execution_time > 500) { // 500us threshold
             framework->stats.slow_executions++;
-            lle_log_warn("Slow widget execution: %s took %llu μs", widget_name, execution_time);
+            lle_log_warn("Slow widget execution: %s took %llu us", widget_name, execution_time);
         }
 
         return execution_result;
@@ -2369,7 +2369,7 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 🔒 **SECURITY AND PERMISSIONS SYSTEM**
+    ## **SECURITY AND PERMISSIONS SYSTEM**
 
     ### **Security Architecture**
 
@@ -2554,7 +2554,7 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## ⚡ **PERFORMANCE OPTIMIZATION SYSTEM**
+    ## **PERFORMANCE OPTIMIZATION SYSTEM**
 
     ### **Performance Architecture**
 
@@ -2634,7 +2634,7 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 🔗 **INTEGRATION AND TESTING FRAMEWORK**
+    ## **INTEGRATION AND TESTING FRAMEWORK**
 
     ### **Integration Testing**
 
@@ -2700,31 +2700,31 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 📊 **PERFORMANCE TARGETS AND SUCCESS CRITERIA**
+    ## **PERFORMANCE TARGETS AND SUCCESS CRITERIA**
 
     ### **Performance Requirements**
 
     | Component | Target | Measurement |
     |-----------|--------|-------------|
-    | Key Binding Lookup | <500μs | Average response time |
-    | Configuration Access | <250μs | Cache hit scenario |
+    | Key Binding Lookup | <500us | Average response time |
+    | Configuration Access | <250us | Cache hit scenario |
     | Script Execution | <1ms | Simple script functions |
-    | Widget Execution | <500μs | Built-in widgets |
+    | Widget Execution | <500us | Built-in widgets |
     | Cache Hit Rate | >90% | Customization operations |
     | Memory Usage | <10MB | Peak system usage |
 
     ### **Success Criteria**
 
-    ✅ **Comprehensive Customization**: Complete control over all aspects of LLE behavior  
-    ✅ **Performance Excellence**: Sub-millisecond response times for all operations  
-    ✅ **Security Excellence**: Enterprise-grade security with comprehensive sandboxing  
-    ✅ **Integration Excellence**: Seamless integration with all LLE core systems  
-    ✅ **Extensibility Excellence**: Unlimited customization through scripts and widgets  
-    ✅ **Usability Excellence**: Intuitive configuration and management interfaces  
+    OK **Comprehensive Customization**: Complete control over all aspects of LLE behavior  
+    OK **Performance Excellence**: Sub-millisecond response times for all operations  
+    OK **Security Excellence**: Enterprise-grade security with comprehensive sandboxing  
+    OK **Integration Excellence**: Seamless integration with all LLE core systems  
+    OK **Extensibility Excellence**: Unlimited customization through scripts and widgets  
+    OK **Usability Excellence**: Intuitive configuration and management interfaces  
 
     ---
 
-    ## 🎯 **IMPLEMENTATION ROADMAP**
+    ## **IMPLEMENTATION ROADMAP**
 
     ### **Phase 1: Integration Foundation (Weeks 1-2)**
     **Priority**: Critical integration architecture setup
@@ -2735,7 +2735,7 @@ lle_result_t lle_config_manager_init(
        - Create `lle_custom_keybinding_engine_t` system
        - Set up mode switching manager (Emacs/Vi)
        - **Dependencies**: 25_default_keybindings_complete.md
-       - **Success Criteria**: Mode switching <20μs
+       - **Success Criteria**: Mode switching <20us
 
     2. **Custom Keybinding System**
        - Implement user keybinding parser and validator
@@ -2749,7 +2749,7 @@ lle_result_t lle_config_manager_init(
        - Create widget customization engine
        - Set up bottom-prompt customization
        - **Dependencies**: 24_advanced_prompt_widget_hooks_complete.md
-       - **Success Criteria**: Widget customization <100μs
+       - **Success Criteria**: Widget customization <100us
 
     2. **Completion Customization Integration**
        - Implement `lle_completion_customization_t` structure
@@ -2767,7 +2767,7 @@ lle_result_t lle_config_manager_init(
        - Implement cross-system configuration sharing
        - Create unified customization validation
        - **Integration**: All customizations work cohesively
-       - **Performance**: Configuration updates <50μs
+       - **Performance**: Configuration updates <50us
 
     2. **Enhanced Script Integration**
        - Upgrade script engines with integration APIs
@@ -2777,10 +2777,10 @@ lle_result_t lle_config_manager_init(
 
     **Week 4: Performance Integration**
     1. **Integration Performance Optimization**
-       - Optimize customization loading overhead <200μs
+       - Optimize customization loading overhead <200us
        - Implement integration-specific caching
        - Create performance monitoring for customizations
-       - **Performance**: Total integration overhead <200μs
+       - **Performance**: Total integration overhead <200us
 
     2. **Integration Testing Framework**
        - Build cross-system customization tests
@@ -2814,14 +2814,14 @@ lle_result_t lle_config_manager_init(
 
     ---
 
-    ## 📋 **CONCLUSION**
+    ## **CONCLUSION**
 
     This User Customization System specification v2.0.0 provides a comprehensive foundation for implementing unlimited personalization capabilities in the Lush Line Editor with complete Phase 2 integration support. The system delivers enterprise-grade security, sub-millisecond performance, and seamless integration with all critical core systems while maintaining the highest standards of professional development.
 
     **Key Achievements**:
     - **Complete Integration Implementation**: Every component specified with full integration support for keybinding, widget, and completion customization
     - **Cross-System Coordination**: Seamless integration with default keybindings, widget hooks, and completion menu systems
-    - **Enhanced Performance**: Sub-500μs customization targets with <200μs total integration overhead
+    - **Enhanced Performance**: Sub-500us customization targets with <200us total integration overhead
     - **Security Excellence**: Comprehensive sandboxing and permission management across all integration systems
     - **Professional Standards**: Enterprise-grade security, performance, and reliability maintained throughout integration
     - **Extensibility Excellence**: Unlimited customization through scripts and widgets with full integration API support
@@ -2848,7 +2848,7 @@ The system follows the principle that **users should never be limited by the ori
 
     ---
 
-    ## 🎨 **THEME COMMAND INTEGRATION**
+    ## **THEME COMMAND INTEGRATION**
 
     ### **Visual Control Interface**
 
@@ -3162,7 +3162,7 @@ The system follows the principle that **users should never be limited by the ori
 
     ---
 
-    **Document Status**: ✅ **INTEGRATION-READY** (Phase 2 Integration Complete)
-    **Phase 2 Status**: ✅ **COMPLETE** - All 3 Phase 2 specifications successfully refactored  
+    **Document Status**: OK **INTEGRATION-READY** (Phase 2 Integration Complete)
+    **Phase 2 Status**: OK **COMPLETE** - All 3 Phase 2 specifications successfully refactored  
     **Next Priority**: Phase 3 Enhancement Integration - Performance Optimization, Memory Management, Error Handling
     **LLE Integration Progress**: 5/5 Integration Specifications Complete (100% success rate)

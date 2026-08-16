@@ -11,7 +11,7 @@
 
 ---
 
-## 📋 **EXECUTIVE SUMMARY**
+## **EXECUTIVE SUMMARY**
 
 This specification defines the complete user interface system for the Lush Line Editor (LLE), providing professional command-line interfaces through the existing `display` and `theme` builtin commands. The system follows established Lush architectural patterns with logical separation of functional control (display command) and visual control (theme command), ensuring intuitive user experience and seamless integration with existing shell workflows.
 
@@ -26,47 +26,47 @@ This specification defines the complete user interface system for the Lush Line 
 - **Help System Integration**: Complete documentation accessible through shell interface
 
 **Performance Targets**:
-- Sub-100µs command parsing and validation
+- Sub-100us command parsing and validation
 - <10ms configuration changes with immediate effect
 - Zero-allocation command processing during runtime
 - 100% command completion accuracy for all LLE options
 
 ---
 
-## 🏗️ **SYSTEM ARCHITECTURE**
+## **SYSTEM ARCHITECTURE**
 
 ### **Core Components Overview**
 
 ```
 LLE User Interface System Architecture:
 
-┌─────────────────────────────────────────────────────────────────┐
-│                    LLE USER INTERFACE SYSTEM                    │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │    Display      │  │     Theme       │  │  Configuration  │  │
-│  │   Command       │  │   Command       │  │   Integration   │  │
-│  │  Integration    │  │  Integration    │  │                 │  │
-│  │                 │  │                 │  │ • Schema Valid. │  │
-│  │ • System Control│  │ • Visual Control│  │ • Persistence   │  │
-│  │ • Performance   │  │ • Color Schemes │  │ • Sync Manager  │  │
-│  │ • Diagnostics   │  │ • Styling       │  │ • Validation    │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│           │                     │                     │          │
-│           └─────────────────────┼─────────────────────┘          │
-│                                 │                                │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │    Command      │  │      Help       │  │    Command      │  │
-│  │   Completion    │  │     System      │  │   Validation    │  │
-│  │                 │  │                 │  │                 │  │
-│  │ • Context Aware │  │ • Usage Guide   │  │ • Syntax Check  │  │
-│  │ • Options List  │  │ • Examples      │  │ • Parameter Val │  │
-│  │ • Dynamic Cache │  │ • Error Help    │  │ • Error Report  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-├─────────────────────────────────────────────────────────────────┤
-│            INTEGRATION WITH LUSH BUILTIN COMMANDS             │
-│   Display Builtin  │  Theme Builtin  │  Config System  │  Help  │
-└─────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------+
+|                    LLE USER INTERFACE SYSTEM                    |
++-----------------------------------------------------------------+
+|  +-----------------+  +-----------------+  +-----------------+  |
+|  |    Display      |  |     Theme       |  |  Configuration  |  |
+|  |   Command       |  |   Command       |  |   Integration   |  |
+|  |  Integration    |  |  Integration    |  |                 |  |
+|  |                 |  |                 |  | * Schema Valid. |  |
+|  | * System Control|  | * Visual Control|  | * Persistence   |  |
+|  | * Performance   |  | * Color Schemes |  | * Sync Manager  |  |
+|  | * Diagnostics   |  | * Styling       |  | * Validation    |  |
+|  +-----------------+  +-----------------+  +-----------------+  |
+|           |                     |                     |          |
+|           +---------------------+---------------------+          |
+|                                 |                                |
+|  +-----------------+  +-----------------+  +-----------------+  |
+|  |    Command      |  |      Help       |  |    Command      |  |
+|  |   Completion    |  |     System      |  |   Validation    |  |
+|  |                 |  |                 |  |                 |  |
+|  | * Context Aware |  | * Usage Guide   |  | * Syntax Check  |  |
+|  | * Options List  |  | * Examples      |  | * Parameter Val |  |
+|  | * Dynamic Cache |  | * Error Help    |  | * Error Report  |  |
+|  +-----------------+  +-----------------+  +-----------------+  |
++-----------------------------------------------------------------+
+|            INTEGRATION WITH LUSH BUILTIN COMMANDS             |
+|   Display Builtin  |  Theme Builtin  |  Config System  |  Help  |
++-----------------------------------------------------------------+
 ```
 
 ### **Integration Points**
@@ -106,7 +106,7 @@ typedef struct lle_user_interface_system {
 
 ---
 
-## 🎮 **DISPLAY COMMAND INTEGRATION**
+## **DISPLAY COMMAND INTEGRATION**
 
 ### **Functional Control Domain**
 
@@ -286,7 +286,7 @@ void lle_display_show_help(void) {
 
 ---
 
-## 🎨 **THEME COMMAND INTEGRATION**
+## **THEME COMMAND INTEGRATION**
 
 ### **Visual Control Domain**
 
@@ -469,7 +469,7 @@ void lle_theme_show_help(void) {
 
 ---
 
-## ⚙️ **CONFIGURATION SYSTEM INTEGRATION**
+## **CONFIGURATION SYSTEM INTEGRATION**
 
 ### **Unified Configuration Management**
 
@@ -1098,10 +1098,10 @@ int lle_config_validate(void) {
             customization_system->config_manager, required_keys[i], &value);
             
         if (result != LLE_SUCCESS) {
-            printf("  ✗ Missing required key: %s\n", required_keys[i]);
+            printf("  FAIL Missing required key: %s\n", required_keys[i]);
             validation_passed = false;
         } else {
-            printf("  ✓ %s: valid\n", required_keys[i]);
+            printf("  OK %s: valid\n", required_keys[i]);
         }
     }
     
@@ -1116,7 +1116,7 @@ int lle_config_validate(void) {
 
 ---
 
-## 🔍 **COMMAND COMPLETION SYSTEM**
+## **COMMAND COMPLETION SYSTEM**
 
 ### **Context-Aware Completion**
 
@@ -1198,7 +1198,7 @@ char **lle_complete_theme_command(const char *text, int start, int end) {
 
 ---
 
-## 📚 **HELP SYSTEM INTEGRATION**
+## **HELP SYSTEM INTEGRATION**
 
 ### **Comprehensive Help Framework**
 
@@ -1279,7 +1279,7 @@ int lle_show_display_command_help(lle_command_context_t *ctx) {
 
 ---
 
-## 🔧 **IMPLEMENTATION DETAILS**
+## **IMPLEMENTATION DETAILS**
 
 ### **Integration with Existing Builtins**
 
@@ -1349,7 +1349,7 @@ lle_result_t lle_user_interface_initialize(void) {
 
 ---
 
-## 📋 **DIVISION OF LABOR SPECIFICATION**
+## **DIVISION OF LABOR SPECIFICATION**
 
 ### Complete System Integration Responsibilities
 
@@ -1432,14 +1432,14 @@ The config builtin handles ALL **persistence operations** - making changes perma
 
 #### Implementation Integration Points
 
-**Display → Config Integration:**
+**Display -> Config Integration:**
 ```c
 // Display commands update session config and remind about persistence
 config_set_value("lle.autosuggestions", value);  // Updates session
 printf("Use 'config save' to persist changes between sessions\n");
 ```
 
-**Theme → Config Integration:**
+**Theme -> Config Integration:**
 ```c
 // Theme commands update session config for visual settings
 config_set_value("lle.theme", theme_name);       // Updates session
@@ -1459,12 +1459,12 @@ if (section == CONFIG_SECTION_LLE) {
 #### User Mental Model
 
 **Session Changes (Immediate Effect):**
-- `display lle syntax on` → Works immediately, lost on shell restart
-- `theme lle colors set dark` → Applied immediately, lost on shell restart
+- `display lle syntax on` -> Works immediately, lost on shell restart
+- `theme lle colors set dark` -> Applied immediately, lost on shell restart
 
 **Persistent Changes (Survive Shell Restart):**
-- After session changes: `config save` → Changes survive shell restart
-- `config reload` → Discards session changes, reloads from persistent storage
+- After session changes: `config save` -> Changes survive shell restart
+- `config reload` -> Discards session changes, reloads from persistent storage
 
 This division ensures:
 - **Clear Separation**: Function vs. appearance vs. persistence
@@ -1474,8 +1474,8 @@ This division ensures:
 
 ---
 
-## 🔍 **COMMAND COMPLETION SYSTEM**
-## 📋 **DIVISION OF LABOR: SYSTEM INTEGRATION RESPONSIBILITIES**
+## **COMMAND COMPLETION SYSTEM**
+## **DIVISION OF LABOR: SYSTEM INTEGRATION RESPONSIBILITIES**
 
 ### System Responsibilities Matrix
 
@@ -1755,7 +1755,7 @@ void lle_report_command_error(lle_validation_result_t *validation) {
 
 ---
 
-## 📈 **PERFORMANCE SPECIFICATIONS**
+## **PERFORMANCE SPECIFICATIONS**
 
 ### **Performance Requirements**
 
@@ -1763,14 +1763,14 @@ void lle_report_command_error(lle_validation_result_t *validation) {
 // Performance targets for UI system
 typedef struct lle_ui_performance_targets {
     // Command processing performance
-    uint64_t max_command_parse_time_us;      // <100µs command parsing
-    uint64_t max_validation_time_us;         // <50µs command validation
+    uint64_t max_command_parse_time_us;      // <100us command parsing
+    uint64_t max_validation_time_us;         // <50us command validation
     uint64_t max_execution_time_ms;          // <10ms command execution
     
     // Configuration performance
-    uint64_t max_config_read_time_us;        // <200µs configuration read
+    uint64_t max_config_read_time_us;        // <200us configuration read
     uint64_t max_config_write_time_ms;       // <5ms configuration write
-    uint64_t max_config_sync_time_us;        // <500µs config synchronization
+    uint64_t max_config_sync_time_us;        // <500us config synchronization
     
     // Completion performance
     uint64_t max_completion_time_ms;         // <50ms completion generation
@@ -1802,7 +1802,7 @@ typedef struct lle_ui_performance_monitor {
 
 ---
 
-## 🧪 **TESTING FRAMEWORK**
+## **TESTING FRAMEWORK**
 
 ### **Comprehensive Testing Strategy**
 
@@ -1860,7 +1860,7 @@ lle_test_result_t test_theme_lle_colors_show_command(void) {
 
 ---
 
-## 📋 **IMPLEMENTATION ROADMAP**
+## **IMPLEMENTATION ROADMAP**
 
 ### **Development Phases**
 
@@ -1896,30 +1896,30 @@ lle_test_result_t test_theme_lle_colors_show_command(void) {
 
 ---
 
-## ✅ **SUCCESS CRITERIA**
+## OK **SUCCESS CRITERIA**
 
 ### **Functional Requirements**
 
-- ✅ **Complete Command Integration**: All LLE functions accessible through display/theme commands
-- ✅ **Intuitive User Interface**: Logical separation of functional vs visual controls
-- ✅ **Configuration Management**: Unified configuration with schema validation
-- ✅ **Professional Help System**: Comprehensive help with examples and context
-- ✅ **Command Completion**: Context-aware completion for all commands
-- ✅ **Error Handling**: User-friendly error messages with suggestions
+- OK **Complete Command Integration**: All LLE functions accessible through display/theme commands
+- OK **Intuitive User Interface**: Logical separation of functional vs visual controls
+- OK **Configuration Management**: Unified configuration with schema validation
+- OK **Professional Help System**: Comprehensive help with examples and context
+- OK **Command Completion**: Context-aware completion for all commands
+- OK **Error Handling**: User-friendly error messages with suggestions
 
 ### **Performance Requirements**
 
-- ✅ **Fast Command Processing**: <100µs command parsing, <10ms execution
-- ✅ **Responsive Configuration**: <5ms configuration changes with immediate effect
-- ✅ **Efficient Completion**: <50ms completion generation with intelligent caching
-- ✅ **Memory Efficiency**: Zero-allocation command processing during runtime
+- OK **Fast Command Processing**: <100us command parsing, <10ms execution
+- OK **Responsive Configuration**: <5ms configuration changes with immediate effect
+- OK **Efficient Completion**: <50ms completion generation with intelligent caching
+- OK **Memory Efficiency**: Zero-allocation command processing during runtime
 
 ### **Integration Requirements**
 
-- ✅ **Seamless Integration**: Natural extension of existing builtin commands
-- ✅ **Consistent Interface**: Follows established Lush command patterns
-- ✅ **Backward Compatibility**: Existing commands continue to work unchanged
-- ✅ **Professional Standards**: Enterprise-grade command interface design
+- OK **Seamless Integration**: Natural extension of existing builtin commands
+- OK **Consistent Interface**: Follows established Lush command patterns
+- OK **Backward Compatibility**: Existing commands continue to work unchanged
+- OK **Professional Standards**: Enterprise-grade command interface design
 
 ---
 

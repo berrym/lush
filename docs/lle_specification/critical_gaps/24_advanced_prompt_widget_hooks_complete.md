@@ -686,7 +686,7 @@ typedef struct lle_historical_prompt_entry {
     bool owns_prompt_memory;                            // Memory ownership flag
 } lle_historical_prompt_entry_t;
 
-// Simplify historical prompts to basic indicator (like ❯ character)
+// Simplify historical prompts to basic indicator (like > character)
 lle_result_t lle_simplify_historical_prompts(
     lle_prompt_history_manager_t *history_mgr,
     const char *simple_indicator,

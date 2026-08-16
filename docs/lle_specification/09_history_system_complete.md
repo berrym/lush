@@ -1432,9 +1432,9 @@ cleanup_on_error:
  * recommendations across all LLE components.
  * 
  * Performance targets:
- * - Add operations: 250μs target
- * - Search operations: 500μs target  
- * - Retrieval operations: 100μs target
+ * - Add operations: 250us target
+ * - Search operations: 500us target  
+ * - Retrieval operations: 100us target
  * - Cache hit ratio: >75% target
  */
 
@@ -2202,7 +2202,7 @@ bool benchmark_memory_usage(void);
 
 ### 15.2 Success Criteria
 
-- **Sub-millisecond Performance**: All operations under 250μs average
+- **Sub-millisecond Performance**: All operations under 250us average
 - **Zero Data Loss**: Complete reliability with corruption recovery
 - **Enterprise Security**: Full privacy controls and audit capabilities
 - **Seamless Integration**: Perfect compatibility with existing Lush systems

@@ -1196,10 +1196,10 @@ lle_result_t lle_error_context_handle_error(lle_error_context_t *ctx,
 
 **RESEARCH-VALIDATED PERFORMANCE TARGETS**:
 
-- **Internal State Updates**: < 100μs average (no terminal interaction)
-- **Display Content Generation**: < 500μs average (pure computation)
+- **Internal State Updates**: < 100us average (no terminal interaction)
+- **Display Content Generation**: < 500us average (pure computation)
 - **Lush Display Submission**: < 1ms average (display layer coordination)  
-- **Input Event Processing**: < 250μs average (buffer operations only)
+- **Input Event Processing**: < 250us average (buffer operations only)
 - **Memory Usage**: < 32KB for internal state model
 - **CPU Usage**: < 0.5% during idle, < 2% during active editing
 

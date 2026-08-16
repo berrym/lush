@@ -5,7 +5,7 @@
 structured-error system.**
 
 **Status**: shipped.
-**Spec lineage**: `docs/SEMANTICS.md` §8 (formerly deferred line
+**Spec lineage**: `docs/SEMANTICS.md` S8 (formerly deferred line
 "a modern alternative to `pipefail`").
 
 ---
@@ -160,7 +160,7 @@ subshell as a single stage and its `PIPESTATUS` reflects that.
   immediately after the pipeline if you need it later: `last_ps=("${PIPESTATUS[@]}")`.
 
 - **`"${PIPESTATUS[@]}"` in a scalar slot raises `SHELL_ERR_TYPE_MISMATCH`**
-  per the SEMANTICS §3.9 no-implicit-list-to-string rule. Use one of:
+  per the SEMANTICS S3.9 no-implicit-list-to-string rule. Use one of:
   - `"${PIPESTATUS[*]}"` -- explicit space-join.
   - `for s in ${PIPESTATUS[@]}; do ...; done` -- vector context.
   - `@PIPESTATUS` -- the same vector context, lush-mode short form
@@ -178,7 +178,7 @@ subshell as a single stage and its `PIPESTATUS` reflects that.
 
 ## See also
 
-- `docs/SEMANTICS.md` §3.9 -- no implicit list-to-string coercion;
+- `docs/SEMANTICS.md` S3.9 -- no implicit list-to-string coercion;
   why `"${PIPESTATUS[@]}"` in a scalar slot raises.
 - `docs/features/sigil-conventions.md` -- the lush-mode `@`
   short form for vector context.

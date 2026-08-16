@@ -4,7 +4,7 @@
 **Document**: Memory Management Architecture Redesign  
 **Version**: 1.1.0  
 **Date**: 2026-01-02  
-**Status**: ✅ IMPLEMENTED (Phases 1-5 Complete)
+**Status**: OK IMPLEMENTED (Phases 1-5 Complete)
 
 ---
 
@@ -12,12 +12,12 @@
 
 | Phase | Description | Status | Date |
 |-------|-------------|--------|------|
-| Phase 1 | Arena infrastructure (`arena.h`, `arena.c`) | ✅ Complete | 2026-01-02 |
-| Phase 2 | Session arena in `lle_shell_integration.c` | ✅ Complete | 2026-01-02 |
-| Phase 3 | Edit-session arena in `lle_readline.c` | ✅ Complete | 2026-01-02 |
-| Phase 4 | Event arena - critical input leak fix | ✅ Complete | 2026-01-02 |
-| Phase 5 | Frame arena in `render_controller.c` | ✅ Complete | 2026-01-02 |
-| Phase 6 | Cleanup unused GC code | 🔄 Deferred | - |
+| Phase 1 | Arena infrastructure (`arena.h`, `arena.c`) | OK Complete | 2026-01-02 |
+| Phase 2 | Session arena in `lle_shell_integration.c` | OK Complete | 2026-01-02 |
+| Phase 3 | Edit-session arena in `lle_readline.c` | OK Complete | 2026-01-02 |
+| Phase 4 | Event arena - critical input leak fix | OK Complete | 2026-01-02 |
+| Phase 5 | Frame arena in `render_controller.c` | OK Complete | 2026-01-02 |
+| Phase 6 | Cleanup unused GC code | Deferred | - |
 
 ### Files Created
 - `include/lle/arena.h` - Complete arena API (~180 lines)
@@ -149,12 +149,12 @@ Child arenas are automatically freed when their parent is freed:
 
 ```
 Session Arena (freed on shell exit)
-    │
-    └── Edit Arena (freed on readline return)
-            │
-            ├── Event Arena (freed after each keystroke)
-            │
-            └── Frame Arena (freed after each render)
+    |
+    +-- Edit Arena (freed on readline return)
+            |
+            +-- Event Arena (freed after each keystroke)
+            |
+            +-- Frame Arena (freed after each render)
 ```
 
 ---
@@ -730,7 +730,7 @@ lle_event_t *lle_event_create(lle_arena_t *arena, lle_event_type_t type,
 
 | Metric | Target | Verification |
 |--------|--------|--------------|
-| Allocation time | ≤ 100μs (likely <1μs with bump pointer) | Benchmark |
+| Allocation time | <= 100us (likely <1us with bump pointer) | Benchmark |
 | Memory overhead | < 10% fragmentation waste | Memory analysis |
 | No memory growth | Stable over 10,000 keystrokes | Long-running test |
 

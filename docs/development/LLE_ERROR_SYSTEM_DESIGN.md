@@ -1,7 +1,7 @@
 # LLE Error System: Architecture and Integration Design
 
 Status: Proposed
-Scope: Issue #312 — implement and wire the Spec 16 error-handling subsystem
+Scope: Issue #312 -- implement and wire the Spec 16 error-handling subsystem
 Related: `docs/lle_specification/16_error_handling_complete.md` (Spec 16),
 `include/shell_error.h` / `src/shell_error.c` (shell structured errors),
 `include/debug.h` (developer trace channel)
@@ -23,7 +23,7 @@ All facts below were confirmed by reading the tree, not inferred from the spec.
   reporters, the atomic counters (`g_error_atomic_counters`), and the
   100-slot pre-allocated context pool are all implemented. The owning
   singleton `g_error_reporting_system` (`error_handling.c:64`) is declared
-  `static` and **assigned nowhere in the tree** — there is no init function.
+  `static` and **assigned nowhere in the tree** -- there is no init function.
 - **There are exactly two callers of `lle_report_error`**, both inside
   `error_handling.c` itself (lines 1729, 1835). No LLE subsystem reports
   through it. Error surfacing across all 13 subsystems is pure
@@ -31,7 +31,7 @@ All facts below were confirmed by reading the tree, not inferred from the spec.
 - **`lle_report_error` always writes to the console** (`error_handling.c:973`,
   `lle_report_error_to_console`) before it ever consults
   `g_error_reporting_system`. The console format is LLE-native and
-  developer-oriented (`[LLE CRITICAL] msg (CODE) … Thread: 0x… Time: …ns`).
+  developer-oriented (`[LLE CRITICAL] msg (CODE) ... Thread: 0x... Time: ...ns`).
   The global only gates the log-file/syslog/callback/statistics tail.
 - **Forensics is non-functional.** `lle_create_forensic_log_entry`
   (`error_handling.c:1276`) depends on `lle_capture_system_snapshot`
@@ -69,18 +69,18 @@ All facts below were confirmed by reading the tree, not inferred from the spec.
    LLE-native console reporter is retired as a user-facing path.
 2. **Report genuine faults, propagate normal control flow.** Most error
    returns are defensive guards and expected misses. Central reporting is
-   opt-in at the minority of sites that represent real faults (see §3).
+   opt-in at the minority of sites that represent real faults (see S3).
 3. **Zero cost when nothing is wrong.** The success path adds nothing. The
    fault path is bounded and, on the editing-critical path, allocation-free
    using the existing pre-allocated context pool.
 4. **Harmonize, do not duplicate.** LLE owns detection and classification;
    the shell owns user presentation. The bridge maps between them; it does
    not reimplement either side.
-5. **No declared-but-unreachable surface — but one live seam is allowed.**
+5. **No declared-but-unreachable surface -- but one live seam is allowed.**
    Every public symbol this work touches is either wired and exercised by a
    test, or removed with a recorded decision. This is the core remediation
    #312 asks for. The single sanctioned exception is the fault-lifecycle
-   dispatch seam (§5): it is *invoked on every fault and asserted by a test*
+   dispatch seam (S5): it is *invoked on every fault and asserted by a test*
    from day one, so it is a no-op default with a real call site, not dead
    code. A seam that is actually called is live; a declared type with no
    caller is the disease.
@@ -89,7 +89,7 @@ All facts below were confirmed by reading the tree, not inferred from the spec.
 
 ---
 
-## 3. Decision 1 — report-versus-propagate taxonomy
+## 3. Decision 1 -- report-versus-propagate taxonomy
 
 A 93-site sample across the seven largest subsystems categorizes every
 `return LLE_ERROR_*` into:
@@ -104,16 +104,16 @@ A 93-site sample across the seven largest subsystems categorizes every
 
 **Rule:** report at C/D/E sites; never at A/B. That is roughly **150 sites,
 not 1,437.** Blanket-wrapping every return would manufacture alert fatigue
-and would itself be a form of theater — exactly what this epic exists to
+and would itself be a form of theater -- exactly what this epic exists to
 remove.
 
 Fault density varies by subsystem and guides where to start:
 
 - **Terminal ~71%** (syscall-heavy: `tcsetattr`, `sigaction`, `select`,
-  `read`) — highest value.
-- **Display ~54%**, **Completion ~46%**, **Buffer ~42%**, **Event ~39%** —
+  `read`) -- highest value.
+- **Display ~54%**, **Completion ~46%**, **Buffer ~42%**, **Event ~39%** --
   mostly allocation and corruption.
-- **Keybinding ~30%**, **History ~23%** — lowest; config-load misses are
+- **Keybinding ~30%**, **History ~23%** -- lowest; config-load misses are
   normal, not faults.
 
 The taxonomy is encoded as a one-line helper used only at C/D/E sites:
@@ -133,7 +133,7 @@ Category A/B sites are left exactly as they are.
 
 ---
 
-## 4. Decision 2 — two-channel routing
+## 4. Decision 2 -- two-channel routing
 
 `lle_fault_report` classifies severity (reusing the existing
 `lle_determine_error_severity`) and routes:
@@ -171,7 +171,7 @@ stage 7); the developer channel replaces it.
 
 ### Crossing the liblle boundary (registration sinks)
 
-The router lives in `error_handling.c`, which compiles into **liblle.a** — a
+The router lives in `error_handling.c`, which compiles into **liblle.a** -- a
 library that links standalone and must not hard-depend on shell symbols. But
 both output channels are shell-side: `shell_error_create` /
 `shell_error_display` live in the lush executable (`src/shell_error.c`), and
@@ -183,8 +183,8 @@ symbols are a non-portable GNU extension; this codebase is strict portable
 C11). liblle exposes two function-pointer sinks that default to no-op:
 
 ```c
-/// A single fault, captured at the report site. Plain fields only — no
-/// shell types — so liblle stays decoupled from the shell renderer.
+/// A single fault, captured at the report site. Plain fields only -- no
+/// shell types -- so liblle stays decoupled from the shell renderer.
 typedef struct lle_fault {
     lle_result_t code;
     lle_error_severity_t severity;
@@ -205,7 +205,7 @@ The shell installs strong implementations at startup (a new bridge file in
 `lle_shell_sources`, executable-side): the user sink maps the `lle_fault_t`
 to a `shell_error_t` and calls `shell_error_display`; the dev sink calls
 `debug_trace_printf`. When liblle is used standalone (unit tests), no sink is
-registered and the router is silent — no per-test stubs required, which is the
+registered and the router is silent -- no per-test stubs required, which is the
 decoupling this codebase already favors for liblle/shell bridging. The
 `lle_result_t -> shell_error_code_t` mapping therefore lives on the **shell
 side**, inside the user sink, not in liblle.
@@ -224,19 +224,19 @@ Representative rows:
 | `LLE_ERROR_TERMINAL_ABSTRACTION` | `SHELL_ERR_SUBSYSTEM_INIT_FAILED` | ERROR |
 
 The full table is built incrementally as subsystems are wired; the six
-severity levels collapse to the shell's four (MINOR→WARNING, MAJOR/CRITICAL→
-ERROR, FATAL→FATAL, INFO/WARNING→NOTE/WARNING).
+severity levels collapse to the shell's four (MINOR->WARNING, MAJOR/CRITICAL->
+ERROR, FATAL->FATAL, INFO/WARNING->NOTE/WARNING).
 
 ---
 
-## 5. Decision 3 — adopt versus reject against Spec 16 (Option 1.5: foundation first, seam reserved)
+## 5. Decision 3 -- adopt versus reject against Spec 16 (Option 1.5: foundation first, seam reserved)
 
 Spec 16 is 1,561 lines that mix a sound reporting core with enterprise
 aspiration (ML-based recovery, distributed error correlation, compliance
 audit trails, a recovery-strategy scoring engine, a circuit-breaker event
 subsystem, a graceful-degradation controller, an error state machine).
 Implementing the aspirational layers now would add large
-declared-but-unreachable surface — the precise defect #312 exists to remove.
+declared-but-unreachable surface -- the precise defect #312 exists to remove.
 The issue explicitly sanctions documented non-adoption.
 
 The chosen path is **foundation first, scaffolding hooked**: build the tight
@@ -250,7 +250,7 @@ strategies from measurement instead of guesswork.
 
 ### The reserved seam
 
-The fault router (`lle_fault_report`, §3/§4) calls exactly one dispatch
+The fault router (`lle_fault_report`, S3/S4) calls exactly one dispatch
 function on every fault:
 
 ```c
@@ -267,13 +267,13 @@ typedef enum {
 lle_fault_disposition_t lle_handle_fault_lifecycle(const lle_fault_t *fault);
 ```
 
-Today `lle_handle_fault_lifecycle` does only: classify severity → route to the
-user/developer channels → bump counters → `return LLE_FAULT_SURFACED`. A test
+Today `lle_handle_fault_lifecycle` does only: classify severity -> route to the
+user/developer channels -> bump counters -> `return LLE_FAULT_SURFACED`. A test
 asserts it is invoked on every fault, so it is **live no-op code, not dead
 surface** (principle 5). The future milestone inserts a strategy-consultation
 step before surfacing; recovery and degradation share this one seam rather
 than scattering separate hooks. (Strict-honesty variant: ship with only
-`LLE_FAULT_SURFACED` and add the reserved enumerators when recovery lands —
+`LLE_FAULT_SURFACED` and add the reserved enumerators when recovery lands --
 the load-bearing reservation is the function boundary returning a disposition,
 not the unused enum values.)
 
@@ -286,20 +286,20 @@ not the unused enum values.)
 - Severity classification (`lle_determine_error_severity`; keep).
 - Atomic statistics counters (keep; they become observable via a debug
   command).
-- The reporting pipeline, refit to the two-channel router in §4.
+- The reporting pipeline, refit to the two-channel router in S4.
 - Forensic log entry, with **real** `lle_capture_system_snapshot` and
   `lle_dump_component_states` implementations (memory stats, active-component
   mask, buffer/event/terminal state strings). Off by default, enabled by a
   config/env switch; writes to a file, never to the user's screen.
-- Lifecycle init/teardown and the init-guard idiom (§6).
+- Lifecycle init/teardown and the init-guard idiom (S6).
 
-**Defer behind the seam (REMOVED — implementations and declarations deleted):**
+**Defer behind the seam (REMOVED -- implementations and declarations deleted):**
 The recovery and degradation logic is a future milestone reached through
 `lle_handle_fault_lifecycle`. Its Spec-16 implementations and function
 declarations are removed (1029 lines: recovery strategies + scoring/selection,
 degradation controller, error state machine, circuit breakers, per-component
 handlers, runtime error injection, the forensic-log entry path, and the dead
-validation suite) — we keep the door, not the half-built rooms — and the logic
+validation suite) -- we keep the door, not the half-built rooms -- and the logic
 is redesigned fresh when the milestone lands, informed by real forensic data.
 The unused struct typedefs are pruned alongside the old context/report path:
 
@@ -347,7 +347,7 @@ honestly exercised is gone.
 
 ---
 
-## 6. Decision 4 — lifecycle and initialization
+## 6. Decision 4 -- lifecycle and initialization
 
 - **Ownership.** The reporting system is a process singleton
   (`g_error_reporting_system`), matching the established `g_lle_integration`
@@ -355,7 +355,7 @@ honestly exercised is gone.
   idempotent init, graceful no-op on use-before-init.
 - **Init attach point.** Inside `lle_shell_integration_init`
   (`src/lle/lle_shell_integration.c`), after the event hub is created and
-  **before** the editor is created — so a failing editor creation can already
+  **before** the editor is created -- so a failing editor creation can already
   report. Non-fatal: if init fails, faults still reach the developer channel
   and the counters; only the optional log-file tail is unavailable.
 - **Teardown attach point.** Inside `lle_shell_integration_shutdown`, after
@@ -370,7 +370,7 @@ honestly exercised is gone.
 
 ---
 
-## 7. Decision 5 — thread-safety
+## 7. Decision 5 -- thread-safety
 
 - The async git-segment worker (`async_worker.c:103`) is the one real
   off-main-thread error producer today. The design treats reporting as
@@ -387,14 +387,14 @@ honestly exercised is gone.
 
 ---
 
-## 8. Decision 6 — forensics, done honestly or not at all
+## 8. Decision 6 -- forensics, done honestly or not at all
 
 Forensic logging is the one adopted feature with missing implementations.
 Rather than ship stubs:
 
 - `lle_capture_system_snapshot` is implemented against real sources:
   memory-usage stats from the LLE pool, the active-component mask, and
-  process timing. No fabricated CPU/op-rate fields — fields we cannot source
+  process timing. No fabricated CPU/op-rate fields -- fields we cannot source
   truthfully are removed from the struct, not zero-filled.
 - `lle_dump_component_states` serializes the buffer, event-queue, and
   terminal-interface states that are actually reachable from the editor.
@@ -402,7 +402,7 @@ Rather than ship stubs:
   and writes to a file. It is a debugging aid, never user-facing output.
 
 If, during implementation, a snapshot field cannot be sourced honestly, the
-field is dropped and the decision noted — consistent with principle 5.
+field is dropped and the decision noted -- consistent with principle 5.
 
 ---
 
@@ -422,7 +422,7 @@ Earlier stages deliver value without the later ones.
 2a. **The router + lifecycle seam + sinks, in liblle.** Add `LLE_FAULT` /
    `lle_fault_report`, the `lle_fault_t` struct, the two registration sinks
    (`lle_fault_set_user_sink` / `_set_dev_sink`, default no-op), and the
-   `lle_handle_fault_lifecycle` seam (§5) — today a no-op default returning
+   `lle_handle_fault_lifecycle` seam (S5) -- today a no-op default returning
    `LLE_FAULT_SURFACED` after bumping counters and invoking whichever sinks
    are registered (dev always; user when severity is high). No shell
    dependency; no call sites converted. Unit-test in isolation with a
@@ -447,10 +447,10 @@ Earlier stages deliver value without the later ones.
    terminal fault renders one shell-style error to the user.
 4. **Wire buffer + display.** Corruption (D) and allocation (C) sites.
 5. **Wire event + completion + history + keybinding.** Allocation sites;
-   subsystem-gated per §3 density.
+   subsystem-gated per S3 density.
 6. **Forensics.** Real `lle_capture_system_snapshot` /
    `lle_dump_component_states`, behind the switch, with a behavioral test.
-7. **Remove the rejected surface (§5)** and reconcile the spec/guide docs to
+7. **Remove the rejected surface (S5)** and reconcile the spec/guide docs to
    describe what was actually built.
 8. **Restore the behavioral test.** Replace the retired
    `test_lle_error_handling.c` orphan with a suite that asserts real routing:
@@ -458,8 +458,8 @@ Earlier stages deliver value without the later ones.
    line, counters increment, and the user channel stays silent for A/B
    returns. Wire into meson.
 
-Stages 1–2 are the foundation and should land before any call-site
-conversion. Stages 3–5 are mechanical once the helper exists. Stage 7's
+Stages 1-2 are the foundation and should land before any call-site
+conversion. Stages 3-5 are mechanical once the helper exists. Stage 7's
 removals are gated behind the rest so nothing is deleted while still
 referenced.
 
@@ -470,14 +470,14 @@ referenced.
 - **Router/mapping unit tests** (stage 2): every LLE range maps to the
   expected shell code and collapsed severity; the guard makes
   use-before-init a no-op; counters increment exactly once per fault.
-- **Per-subsystem behavioral tests** (stages 3–5): inject a real fault
+- **Per-subsystem behavioral tests** (stages 3-5): inject a real fault
   (e.g. force an allocation failure or a `tcsetattr` failure via a seam) and
-  assert the user-channel render and the counter delta — not "the function
+  assert the user-channel render and the counter delta -- not "the function
   returned non-NULL."
 - **Forensic test** (stage 6): a captured snapshot reflects real memory/
   component state; the dump is well-formed and contains the seeded state.
 - **Negative tests:** Category A/B returns produce **no** user output and
-  **no** counter increment — proving the opt-in boundary holds.
+  **no** counter increment -- proving the opt-in boundary holds.
 - Each change is gate-proven (mutate the expected literal, rebuild, confirm
   RC=1, restore), run under LeakSanitizer via the Homebrew LLVM clang, and
   verified on macOS and Linux before landing.
@@ -486,7 +486,7 @@ referenced.
 
 ## 11. Open design questions (for approval)
 
-1. **Adopt/reject scope (§5) — RESOLVED: Option 1.5, foundation first,
+1. **Adopt/reject scope (S5) -- RESOLVED: Option 1.5, foundation first,
    seam reserved.** Build the reporting + forensics + shell-bridge core now;
    remove the speculative recovery/degradation/state-machine/circuit-breaker
    types; reserve their insertion point with the single live
@@ -494,9 +494,9 @@ referenced.
    a dedicated later milestone informed by the forensic data this core
    produces.
 2. **Forensics default and destination.** Off by default, file-only, behind
-   an explicit switch (§8) — confirm, or specify a different default.
-3. **User-channel threshold.** Route severity ≥ ERROR-equivalent to the user
-   channel, everything else developer-only (§4) — confirm the cut line.
+   an explicit switch (S8) -- confirm, or specify a different default.
+3. **User-channel threshold.** Route severity >= ERROR-equivalent to the user
+   channel, everything else developer-only (S4) -- confirm the cut line.
 
 Questions 2 and 3 are low-stakes and have sensible defaults; they can be
 confirmed in passing or settled during stage 1.

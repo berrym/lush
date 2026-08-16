@@ -9,7 +9,7 @@
 line-wrapped cursor calculation and rendering
 
 **Reading note (2026-05-23):** the original "Foundation for
-Optimization: differential updates" framing in §2 is **not the
+Optimization: differential updates" framing in S2 is **not the
 current implementation**. Lush uses prompt-once + clear-and-redraw
 (`display_controller` is the sole stdout writer for the REPL); the
 `dirty` flag, `screen_buffer_diff`, and `screen_buffer_apply_diff`
@@ -90,8 +90,8 @@ cursor_position++;
 ```
 
 This broke with:
-- Multi-byte UTF-8 characters (emoji: 🔥 is 4 bytes but 2 columns)
-- Wide characters (CJK: 中 is 3 bytes but 2 columns)
+- Multi-byte UTF-8 characters (emoji: U+1F525 (Fire) is 4 bytes but 2 columns)
+- Wide characters (CJK: U+4E2D is 3 bytes but 2 columns)
 - ANSI escape sequences (shouldn't count toward position)
 
 ### The Solution: Virtual Screen Representation
@@ -99,12 +99,12 @@ This broke with:
 The screen buffer creates a **virtual representation** of how the terminal will look:
 
 ```
-┌─────────────────────────────────┐
-│ $ echo "this wraps to multiple" │  Row 0
-│ lines"                          │  Row 1
-│                                 │
-│ Cursor: (row=1, col=7)         │
-└─────────────────────────────────┘
++---------------------------------+
+| $ echo "this wraps to multiple" |  Row 0
+| lines"                          |  Row 1
+|                                 |
+| Cursor: (row=1, col=7)         |
++---------------------------------+
 ```
 
 **Key Insight**: Calculate the entire screen layout ONCE, then use that information for output and cursor positioning. Don't try to track position during output.
@@ -167,42 +167,42 @@ typedef struct {
 ### Component Relationships
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                  Display Controller                      │
-│  (Handles terminal output and ANSI escape sequences)    │
-└────────────┬────────────────────────────┬───────────────┘
-             │ calls                       │ uses
-             │                             │ cursor_row/col
-             ↓                             ↓
-    ┌────────────────────┐       ┌────────────────────┐
-    │  screen_buffer_    │       │  screen_buffer_t   │
-    │  render()          │──────→│  (virtual screen)  │
-    └────────────────────┘       └────────────────────┘
-             ↑                             
-             │ uses UTF-8 functions
-             │
-    ┌────────────────────┐
-    │ LLE UTF-8 Module   │
-    │ - utf8_decode_     │
-    │   codepoint()      │
-    │ - utf8_codepoint_  │
-    │   width()          │
-    └────────────────────┘
++---------------------------------------------------------+
+|                  Display Controller                      |
+|  (Handles terminal output and ANSI escape sequences)    |
++------------+----------------------------+---------------+
+             | calls                       | uses
+             |                             | cursor_row/col
+             v                             v
+    +--------------------+       +--------------------+
+    |  screen_buffer_    |       |  screen_buffer_t   |
+    |  render()          |------->|  (virtual screen)  |
+    +--------------------+       +--------------------+
+             ^                             
+             | uses UTF-8 functions
+             |
+    +--------------------+
+    | LLE UTF-8 Module   |
+    | - utf8_decode_     |
+    |   codepoint()      |
+    | - utf8_codepoint_  |
+    |   width()          |
+    +--------------------+
 ```
 
 ### Processing Flow
 
 ```
 1. INPUT: prompt_text, command_text, cursor_byte_offset, terminal_width
-           ↓
+           v
 2. PARSE PROMPT: Calculate visual width, handle ANSI codes
-           ↓
+           v
 3. PARSE COMMAND: Decode UTF-8, calculate widths, track wrapping
-           ↓
+           v
 4. TRACK CURSOR: When byte_offset reached, save (row, col)
-           ↓
+           v
 5. OUTPUT: screen_buffer_t with cursor_row/col calculated
-           ↓
+           v
 6. DISPLAY: Use cursor_row/col for terminal positioning
 ```
 
@@ -316,7 +316,7 @@ screen_buffer_t buffer;
 screen_buffer_init(&buffer, 80);
 
 const char *prompt = "\033[32m$\033[0m ";  // Green $
-const char *command = "echo hello 世界";    // Contains wide chars
+const char *command = "echo hello \xe4\xb8\x96\xe7\x95\x8c";    // Contains wide chars
 size_t cursor_pos = 11;  // After "echo hello "
 
 screen_buffer_render(&buffer, prompt, command, cursor_pos);
@@ -377,9 +377,9 @@ int char_bytes = lle_utf8_decode_codepoint(
 int visual_width = lle_utf8_codepoint_width(codepoint);
 
 // Example results:
-// 'A'  → char_bytes=1, visual_width=1
-// '中' → char_bytes=3, visual_width=2 (wide character)
-// '🔥' → char_bytes=4, visual_width=2 (emoji)
+// 'A'  -> char_bytes=1, visual_width=1
+// '\xe4\xb8\xad' -> char_bytes=3, visual_width=2 (wide character)
+// '\xf0\x9f\x94\xa5' -> char_bytes=4, visual_width=2 (emoji)
 ```
 
 **Key Points**:
@@ -548,17 +548,17 @@ void render_unicode_command(void) {
     screen_buffer_init(&buffer, 80);
     
     const char *prompt = "$ ";
-    const char *command = "echo 你好世界 🔥";  // Chinese + emoji
+    const char *command = "echo \xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c \xf0\x9f\x94\xa5";  // Chinese + emoji
     size_t cursor_pos = 5;  // At space before Chinese
     
     screen_buffer_render(&buffer, prompt, command, cursor_pos);
     
     // Wide characters correctly handled
-    // 你 (3 bytes, 2 columns)
-    // 好 (3 bytes, 2 columns)
-    // 世 (3 bytes, 2 columns)
-    // 界 (3 bytes, 2 columns)
-    // 🔥 (4 bytes, 2 columns)
+    // \xe4\xbd\xa0 (3 bytes, 2 columns)
+    // \xe5\xa5\xbd (3 bytes, 2 columns)
+    // \xe4\xb8\x96 (3 bytes, 2 columns)
+    // \xe7\x95\x8c (3 bytes, 2 columns)
+    // \xf0\x9f\x94\xa5 (4 bytes, 2 columns)
     
     printf("Cursor at (%d, %d)\n", buffer.cursor_row, buffer.cursor_col);
 }
@@ -619,7 +619,7 @@ void display_controller_redraw(void) {
 
 ### DO: Pre-calculate Then Use
 
-✅ **CORRECT**:
+OK **CORRECT**:
 ```c
 // Calculate layout first
 screen_buffer_render(&buffer, prompt, command, cursor_pos);
@@ -628,7 +628,7 @@ screen_buffer_render(&buffer, prompt, command, cursor_pos);
 move_cursor_to(buffer.cursor_row, buffer.cursor_col);
 ```
 
-❌ **WRONG**:
+FAIL **WRONG**:
 ```c
 // Don't try to track during output
 int pos = 0;
@@ -640,7 +640,7 @@ for (char *p = command; *p; p++) {
 
 ### DO: Handle Edge Cases
 
-✅ **CORRECT**:
+OK **CORRECT**:
 ```c
 // Check cursor found
 if (!cursor_set) {
@@ -666,14 +666,14 @@ char command[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE];
 
 ### DON'T: Assume Single-Byte Characters
 
-❌ **WRONG**:
+FAIL **WRONG**:
 ```c
 for (int i = 0; i < strlen(text); i++) {
     // Treats each byte as character - BREAKS on UTF-8
 }
 ```
 
-✅ **CORRECT**:
+OK **CORRECT**:
 ```c
 size_t i = 0;
 while (i < text_len) {
@@ -686,12 +686,12 @@ while (i < text_len) {
 
 ### DON'T: Count ANSI Sequences in Positions
 
-❌ **WRONG**:
+FAIL **WRONG**:
 ```c
 bytes_processed++;  // For every byte including ANSI
 ```
 
-✅ **CORRECT**:
+OK **CORRECT**:
 ```c
 if (is_ansi_sequence) {
     // Skip without incrementing bytes_processed
@@ -781,11 +781,11 @@ typedef struct {
 
 The Screen Buffer component provides a robust foundation for terminal display rendering with proper support for:
 
-- ✅ UTF-8 and wide characters
-- ✅ ANSI escape sequences
-- ✅ Line wrapping
-- ✅ Accurate cursor positioning
-- ✅ Future optimization opportunities
+- OK UTF-8 and wide characters
+- OK ANSI escape sequences
+- OK Line wrapping
+- OK Accurate cursor positioning
+- OK Future optimization opportunities
 
 **Key Principle**: Calculate the complete screen layout once, then use that information for both rendering and cursor positioning. This separation of concerns creates a clean, maintainable architecture that works correctly in all scenarios.
 

@@ -36,7 +36,7 @@ The LLE Memory Management system provides enterprise-grade memory allocation, tr
 
 **Core Capabilities:**
 - **Zero Memory Leaks**: Comprehensive tracking and automatic cleanup
-- **Sub-Millisecond Allocation**: Pool-based allocation with <100μs allocation time
+- **Sub-Millisecond Allocation**: Pool-based allocation with <100us allocation time
 - **Memory Pool Integration**: Native integration with Lush memory architecture
 - **Intelligent Optimization**: Automatic pool sizing and garbage collection
 - **Enterprise Security**: Memory encryption, bounds checking, and leak prevention

@@ -4,8 +4,8 @@
 presentation contexts.**
 
 **Status**: shipped (lush mode, curated default true).
-**Spec lineage**: `docs/SEMANTICS.md` §3 (value kinds), §3.6 (quoting
-irrelevant to presentation), §8 (kind sigils, formerly deferred).
+**Spec lineage**: `docs/SEMANTICS.md` S3 (value kinds), S3.6 (quoting
+irrelevant to presentation), S8 (kind sigils, formerly deferred).
 
 ---
 
@@ -18,7 +18,7 @@ variable binding tokenizes at the call site:
 |-------|----------------------|--------------|
 | `$x`  | Scalar               | Exactly one word (joined scalar text) |
 | `@x`  | Vector               | N words: payload elements (list values, map values, or a single-element widen for a scalar) |
-| `%x`  | Pair                 | 2N words: structural pairs (list → `index value index value …`, map → `key value key value …`, scalar → type mismatch) |
+| `%x`  | Pair                 | 2N words: structural pairs (list -> `index value index value ...`, map -> `key value key value ...`, scalar -> type mismatch) |
 
 The sigil **selects how a binding tokenizes**; it does not select
 *which* binding to resolve. `$x`, `@x`, and `%x` all walk the same
@@ -48,7 +48,7 @@ presentation decision:
   `~` tilde expansion. `@x` fires the sigil; `"@x"` is the literal
   text `@x`. List *presentation* remains quote-irrelevant through the
   `$` forms -- `"${x[@]}"` is the N-word vector either way, per
-  SEMANTICS.md §3.6.
+  SEMANTICS.md S3.6.
 - A user who wants element-stream semantics writes `@x`. A user who
   wants pair-stream iteration writes `%x`. There is no hidden
   joining behavior; there is no `IFS`-dependent surprise.
@@ -85,8 +85,8 @@ done
 | Variable kind | `$x` (scalar)   | `@x` (vector)              | `%x` (pair)                              |
 |---------------|-----------------|----------------------------|------------------------------------------|
 | scalar        | The value       | One-element widening       | **`SHELL_ERR_TYPE_MISMATCH`**            |
-| list          | First element   | N words: each element      | 2N words: `i₀ v₀ i₁ v₁ …`                |
-| map           | First value     | N words: values (insertion order) | 2N words: `k₀ v₀ k₁ v₁ …`                |
+| list          | First element   | N words: each element      | 2N words: `i0 v0 i1 v1 ...`                |
+| map           | First value     | N words: values (insertion order) | 2N words: `k0 v0 k1 v1 ...`                |
 | unset         | empty           | empty                      | empty                                    |
 
 A scalar widens to a one-element list under `@` because a scalar IS a
@@ -123,15 +123,15 @@ Worked examples:
 
 | Input          | Post-sigil span | Identifier? | Result |
 |----------------|-----------------|-------------|--------|
-| `@arr`         | `arr`           | yes         | sigil → expand `arr` in vector context |
-| `%map`         | `map`           | yes         | sigil → expand `map` in pair context |
+| `@arr`         | `arr`           | yes         | sigil -> expand `arr` in vector context |
+| `%map`         | `map`           | yes         | sigil -> expand `map` in pair context |
 | `user@host`    | `@host` is mid-word | n/a     | bare word (sigil never fires) |
-| `@(foo\|bar)`  | `(foo\|bar)`    | no          | bare word → extended-glob path |
+| `@(foo\|bar)`  | `(foo\|bar)`    | no          | bare word -> extended-glob path |
 | `@{name}`      | `{name}`        | no          | bare word (brace not identifier-start) |
-| `@{-1}`        | `{-1}`          | no          | bare word → git ref preserved |
-| `@123`         | `123`           | no (digit start) | bare word → Jira-style refs preserved |
-| `%1`           | `1`             | no          | bare word → job spec preserved |
-| `make %.o`     | `.o`            | no          | bare word → Makefile target preserved |
+| `@{-1}`        | `{-1}`          | no          | bare word -> git ref preserved |
+| `@123`         | `123`           | no (digit start) | bare word -> Jira-style refs preserved |
+| `%1`           | `1`             | no          | bare word -> job spec preserved |
+| `make %.o`     | `.o`            | no          | bare word -> Makefile target preserved |
 
 The strict-identifier check is the entire disambiguation logic. No
 context-sensitive parsing, no ambiguity scoring, no escape hatches.
@@ -168,14 +168,14 @@ error. Always quote the format: `printf "%s\n" "$x"` or `printf '%q'
 it most often surprises people coming from bash, where `%` has no
 special meaning.
 
-**On SEMANTICS.md §3.6.** §3.6 ("quoting is irrelevant to
+**On SEMANTICS.md S3.6.** S3.6 ("quoting is irrelevant to
 presentation") governs *list structure*: `${arr[@]}` is a vector and
 `${arr[*]}` a joined scalar whether quoted or not. It does **not**
 make the `@`/`%` *sigil surface* fire inside quotes. The sigil is a
 bare-word reference form, and bare must agree with quoted -- `echo
 user@host` and `echo "user@host"` both yield `user@host`, so a sigil
 that expanded inside quotes (but not mid-word when bare) would itself
-break §3.6. Expanding sigils inside quotes was removed for exactly
+break S3.6. Expanding sigils inside quotes was removed for exactly
 this reason.
 
 ## Curated defaults by mode
@@ -199,37 +199,37 @@ the call). This is the same rule that already applies to `$x`.
 
 **LLE tandem updates** shipped alongside:
 
-- **Syntax highlighting** — `@name` and `%name` highlight identically
+- **Syntax highlighting** -- `@name` and `%name` highlight identically
   to `$name`.
-- **Completion** — `@arr<TAB>` and `%arr<TAB>` offer variable-name
+- **Completion** -- `@arr<TAB>` and `%arr<TAB>` offer variable-name
   completion the same way `$arr<TAB>` does.
-- **Debugger** — `inspect`, `watch`, and `type` accept any of `$NAME`,
+- **Debugger** -- `inspect`, `watch`, and `type` accept any of `$NAME`,
   `@NAME`, `%NAME`, or bare `NAME`. The sigil is stripped before
   symbol-table lookup; the binding it names is the same.
 
 ## Gotchas
 
 - **`@reboot` resolves to empty if `reboot` isn't bound.** This
-  matches default `$reboot` behavior in lush, bash, and zsh — unset
+  matches default `$reboot` behavior in lush, bash, and zsh -- unset
   variables expand to empty. Use `set -u` (`nounset`) to promote that
   to a runtime error. Static catching of "this looks like a typo" or
   "you wrote `@reboot` but `reboot` is never declared" is the job of
   `debug analyze`.
 - **Mode matters.** If a script needs to run in both bash and lush
-  modes, write `${arr[@]}` rather than `@arr` — the long form works
+  modes, write `${arr[@]}` rather than `@arr` -- the long form works
   in every mode, the sigil only in lush mode. The polyglot rule is
   not "lush works everywhere"; it is "the shell can speak the dialect
   you need." Use the dialect that fits the audience.
 - **Pair-sigil on a scalar is a hard error**, not a silent empty.
   This is intentional: there is no defensible reading, so the
   diagnostic is the right output. If your code might hit this path
-  legitimately, branch on kind first (see SEMANTICS.md §3 for the
+  legitimately, branch on kind first (see SEMANTICS.md S3 for the
   kind-tagged value model).
 
 ## See also
 
-- `docs/SEMANTICS.md` — full value-model and presentation spec.
-- `docs/CONFIGURATION.md` — the four configuration surfaces (`mode`,
+- `docs/SEMANTICS.md` -- full value-model and presentation spec.
+- `docs/CONFIGURATION.md` -- the four configuration surfaces (`mode`,
   `set`, `setopt`/`shopt`, `config`).
-- `docs/PHILOSOPHY.md` §2 — identity vs. polyglot, why curated
+- `docs/PHILOSOPHY.md` S2 -- identity vs. polyglot, why curated
   defaults in lush mode are principled and not arbitrary.

@@ -72,91 +72,91 @@ The Prompt and Theme System provides a unified, first-class architecture for pro
 ### 2.1 System Component Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      LLE Prompt/Theme System                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                        Theme Registry                                │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │    │
-│  │  │ Built-in    │  │ User        │  │ Active      │                  │    │
-│  │  │ Themes      │  │ Themes      │  │ Theme Ptr   │                  │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                  │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                       Prompt Composer                                │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │    │
-│  │  │ Segment     │  │ Template    │  │ Layout      │                  │    │
-│  │  │ Registry    │  │ Engine      │  │ Manager     │                  │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                  │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                      Data Providers                                  │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │    │
-│  │  │ Git         │  │ Directory   │  │ User        │  │ Time       │  │    │
-│  │  │ (async)     │  │ (sync)      │  │ (cached)    │  │ (sync)     │  │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                   Shell Event Hub Integration (Spec 26)              │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │    │
-│  │  │ DIR_CHANGED │  │ PRE_COMMAND │  │ POST_COMMAND│                  │    │
-│  │  │ Handler     │  │ Handler     │  │ Handler     │                  │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                  │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                      Display Integration                             │    │
-│  │                      (screen_buffer)                                 │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------------+
+|                      LLE Prompt/Theme System                                 |
++-----------------------------------------------------------------------------+
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                        Theme Registry                                |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  |  | Built-in    |  | User        |  | Active      |                  |    |
+|  |  | Themes      |  | Themes      |  | Theme Ptr   |                  |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                       Prompt Composer                                |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  |  | Segment     |  | Template    |  | Layout      |                  |    |
+|  |  | Registry    |  | Engine      |  | Manager     |                  |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                      Data Providers                                  |    |
+|  |  +-------------+  +-------------+  +-------------+  +------------+  |    |
+|  |  | Git         |  | Directory   |  | User        |  | Time       |  |    |
+|  |  | (async)     |  | (sync)      |  | (cached)    |  | (sync)     |  |    |
+|  |  +-------------+  +-------------+  +-------------+  +------------+  |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                   Shell Event Hub Integration (Spec 26)              |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  |  | DIR_CHANGED |  | PRE_COMMAND |  | POST_COMMAND|                  |    |
+|  |  | Handler     |  | Handler     |  | Handler     |                  |    |
+|  |  +-------------+  +-------------+  +-------------+                  |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                      Display Integration                             |    |
+|  |                      (screen_buffer)                                 |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
++-----------------------------------------------------------------------------+
 ```
 
 ### 2.2 Data Flow
 
 ```
 User Action (cd, command, etc.)
-        │
-        ▼
-┌───────────────────────────────┐
-│ Shell Event Hub (Spec 26)     │
-│  lle_fire_directory_changed() │──── DIR_CHANGED ────┐
-│  lle_fire_pre_command()       │──── PRE_COMMAND ────┤
-│  lle_fire_post_command()      │──── POST_COMMAND ───┤
-└───────────────────────────────┘                     │
-                                                      ▼
-                                            ┌─────────────────────┐
-                                            │ Prompt Handlers     │
-                                            │ (cache invalidation)│
-                                            └─────────────────────┘
-                                             │
-                                             ▼
-                                   ┌─────────────────────┐
-                                   │ Async Data Request  │
-                                   │ (background thread) │
-                                   └─────────────────────┘
-                                             │
-                                             ▼
-┌───────────────────┐            ┌─────────────────────┐
-│ Prompt Composer   │◄───────────│ Data Ready Event    │
-│                   │            └─────────────────────┘
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ Template Engine   │
-│ (segment render)  │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ screen_buffer     │
-│ (display)         │
-└───────────────────┘
+        |
+        v
++-------------------------------+
+| Shell Event Hub (Spec 26)     |
+|  lle_fire_directory_changed() |---- DIR_CHANGED ----+
+|  lle_fire_pre_command()       |---- PRE_COMMAND ----+
+|  lle_fire_post_command()      |---- POST_COMMAND ---+
++-------------------------------+                     |
+                                                      v
+                                            +---------------------+
+                                            | Prompt Handlers     |
+                                            | (cache invalidation)|
+                                            +---------------------+
+                                             |
+                                             v
+                                   +---------------------+
+                                   | Async Data Request  |
+                                   | (background thread) |
+                                   +---------------------+
+                                             |
+                                             v
++-------------------+            +---------------------+
+| Prompt Composer   |<-----------| Data Ready Event    |
+|                   |            +---------------------+
++-------------------+
+        |
+        v
++-------------------+
+| Template Engine   |
+| (segment render)  |
++-------------------+
+        |
+        v
++-------------------+
+| screen_buffer     |
+| (display)         |
++-------------------+
 ```
 
 ### 2.3 Configuration Hierarchy
@@ -165,20 +165,20 @@ User Action (cd, command, etc.)
 Priority (highest to lowest):
 
 1. Shell Variable Override ($LUSH_PROMPT)
-   └── Immediate effect, no file needed
+   +-- Immediate effect, no file needed
    
 2. User Config File (~/.config/lush/prompt.toml)
-   └── Full control, persistent
+   +-- Full control, persistent
    
 3. System Config (/etc/lush/prompt.toml)
-   └── System-wide defaults
+   +-- System-wide defaults
    
 4. Built-in Defaults (compiled in)
-   └── Always available fallback
+   +-- Always available fallback
    
 Special Mode:
-- use_theme_prompt = false → LLE respects user PS1/PS2, no overwrite
-- external_prompt = "starship" → Defer to external program
+- use_theme_prompt = false -> LLE respects user PS1/PS2, no overwrite
+- external_prompt = "starship" -> Defer to external program
 ```
 
 ---
@@ -348,7 +348,7 @@ typedef enum lle_symbol_mode {
  * Symbol mapping for Unicode to ASCII fallback
  */
 typedef struct lle_symbol_mapping {
-    const char *unicode;       // Unicode symbol (e.g., "➜")
+    const char *unicode;       // Unicode symbol (e.g., ">")
     const char *ascii;         // ASCII fallback (e.g., "->")
     const char *description;   // Human-readable description
 } lle_symbol_mapping_t;
@@ -357,27 +357,27 @@ typedef struct lle_symbol_mapping {
  * Symbol set for a theme
  */
 typedef struct lle_symbol_set {
-    char prompt_symbol[8];           // Main prompt symbol (e.g., "❯")
+    char prompt_symbol[8];           // Main prompt symbol (e.g., ">")
     char prompt_symbol_ascii[8];     // ASCII fallback (e.g., ">")
-    char continuation_symbol[8];     // PS2 symbol (e.g., "…")
+    char continuation_symbol[8];     // PS2 symbol (e.g., "...")
     char continuation_ascii[8];      // ASCII fallback (e.g., "...")
     char separator_left[8];          // Powerline left (e.g., "")
     char separator_right[8];         // Powerline right (e.g., "")
     char branch_symbol[8];           // Git branch (e.g., "")
-    char staged_symbol[8];           // Staged changes (e.g., "●")
-    char unstaged_symbol[8];         // Unstaged changes (e.g., "○")
+    char staged_symbol[8];           // Staged changes (e.g., "*")
+    char unstaged_symbol[8];         // Unstaged changes (e.g., "o")
     char untracked_symbol[8];        // Untracked files (e.g., "?")
-    char ahead_symbol[8];            // Commits ahead (e.g., "↑")
-    char behind_symbol[8];           // Commits behind (e.g., "↓")
-    char stash_symbol[8];            // Stashes (e.g., "≡")
+    char ahead_symbol[8];            // Commits ahead (e.g., "^")
+    char behind_symbol[8];           // Commits behind (e.g., "v")
+    char stash_symbol[8];            // Stashes (e.g., "==")
     char conflict_symbol[8];         // Merge conflicts (e.g., "!")
     char directory_symbol[8];        // Directory (e.g., "")
     char home_symbol[8];             // Home directory (e.g., "~")
     char root_symbol[8];             // Root user (e.g., "#")
-    char error_symbol[8];            // Command error (e.g., "✗")
-    char success_symbol[8];          // Command success (e.g., "✓")
+    char error_symbol[8];            // Command error (e.g., "FAIL")
+    char success_symbol[8];          // Command success (e.g., "OK")
     char time_symbol[8];             // Time display (e.g., "")
-    char jobs_symbol[8];             // Background jobs (e.g., "⚙")
+    char jobs_symbol[8];             // Background jobs (e.g., "")
 } lle_symbol_set_t;
 ```
 
@@ -1467,8 +1467,8 @@ Examples:
 ${directory}${git} ${symbol}     - Simple prompt
 ${user}@${host}:${directory}$    - Traditional bash-style
 ${?git:${git} :}${symbol}        - Show git only in repos
-╭─[${directory}]${?git: ${git}:}
-╰─${symbol}                       - Multi-line with conditional
++-[${directory}]${?git: ${git}:}
++-${symbol}                       - Multi-line with conditional
 ```
 
 ### 6.2 Template Parser Types
@@ -3119,8 +3119,8 @@ git_branch = "green"
 prompt_char = "cyan"
 
 [themes.my_custom_theme.symbols]
-prompt = "❯"
-continuation = "…"
+prompt = ">"
+continuation = "..."
 
 # Segment configuration
 [segments.git]
@@ -3718,7 +3718,7 @@ static lle_prompt_result_t segment_status_render(
         // Symbol mode - show indicator on failure
         if (exit_code != 0) {
             snprintf(output, output_size, "%s", 
-                     ctx->prompt_ctx->symbols.error ?: "✗");
+                     ctx->prompt_ctx->symbols.error ?: "FAIL");
         } else {
             output[0] = '\0';
         }
@@ -3771,7 +3771,7 @@ static lle_prompt_result_t segment_jobs_render(
         snprintf(output, output_size, "%d", job_count);
     } else {
         snprintf(output, output_size, "%s%d", 
-                 ctx->prompt_ctx->symbols.jobs ?: "⚙", job_count);
+                 ctx->prompt_ctx->symbols.jobs ?: "", job_count);
     }
     
     return LLE_PROMPT_SUCCESS;
@@ -3829,9 +3829,9 @@ static const lle_theme_definition_t builtin_themes[] = {
             .directory = LLE_COLOR_BLUE,
         },
         .symbols = {
-            .prompt = "❯",
+            .prompt = ">",
             .prompt_root = "#",
-            .continuation = "…",
+            .continuation = "...",
         },
     },
     
@@ -3857,9 +3857,9 @@ static const lle_theme_definition_t builtin_themes[] = {
             .time = LLE_COLOR_WHITE,
         },
         .symbols = {
-            .prompt = "❯",
+            .prompt = ">",
             .prompt_root = "#",
-            .continuation = "…",
+            .continuation = "...",
             .git_branch = "",
             .git_staged = "+",
             .git_unstaged = "!",
@@ -3896,7 +3896,7 @@ static const lle_theme_definition_t builtin_themes[] = {
             .ps1 = "${color.cyan}${username}${color.reset}@${color.cyan}${hostname}${color.reset}:"
                    "${color.blue}${directory}${color.reset}"
                    "${?git:\n${color.magenta}git:(${git.branch})${color.reset}"
-                   "${?git.ahead: ↑${git.ahead}}${?git.behind: ↓${git.behind}}"
+                   "${?git.ahead: ^${git.ahead}}${?git.behind: v${git.behind}}"
                    "${?git.staged: ${color.green}+${git.staged}${color.reset}}"
                    "${?git.unstaged: ${color.yellow}!${git.unstaged}${color.reset}}"
                    "${?git.untracked: ${color.red}?${git.untracked}${color.reset}}}"
@@ -3912,7 +3912,7 @@ static const lle_theme_definition_t builtin_themes[] = {
             .error = LLE_COLOR_RED,
         },
         .symbols = {
-            .prompt = "❯",
+            .prompt = ">",
             .prompt_root = "#",
             .continuation = "...",
         },
@@ -3923,8 +3923,8 @@ static const lle_theme_definition_t builtin_themes[] = {
         .name = "two-line",
         .parent = NULL,
         .templates = {
-            .ps1 = "┌─[${username}@${hostname}]─[${directory}]${?git:─[${git.branch}${git.status}]}\n"
-                   "└─${symbol.prompt} ",
+            .ps1 = "+-[${username}@${hostname}]-[${directory}]${?git:-[${git.branch}${git.status}]}\n"
+                   "+-${symbol.prompt} ",
             .ps2 = "   ${symbol.continuation} ",
             .rprompt = NULL,
         },
@@ -3935,9 +3935,9 @@ static const lle_theme_definition_t builtin_themes[] = {
             .git_branch = LLE_COLOR_YELLOW,
         },
         .symbols = {
-            .prompt = "❯",
+            .prompt = ">",
             .prompt_root = "#",
-            .continuation = "…",
+            .continuation = "...",
         },
     },
 };
@@ -3972,21 +3972,21 @@ static const lle_symbol_set_t symbol_sets[] = {
     {
         .name = "unicode",
         .symbols = {
-            .prompt = "❯",
+            .prompt = ">",
             .prompt_root = "#",
-            .continuation = "…",
+            .continuation = "...",
             .git_branch = "",
-            .git_staged = "✚",
-            .git_unstaged = "●",
-            .git_untracked = "…",
-            .git_ahead = "⇡",
-            .git_behind = "⇣",
+            .git_staged = "",
+            .git_unstaged = "*",
+            .git_untracked = "...",
+            .git_ahead = "^",
+            .git_behind = "v",
             .separator = "",
             .separator_thin = "",
-            .error = "✗",
-            .success = "✓",
-            .jobs = "⚙",
-            .root = "⚡",
+            .error = "FAIL",
+            .success = "OK",
+            .jobs = "",
+            .root = "",
         },
     },
     {
@@ -4136,14 +4136,14 @@ starship's transient prompt feature.
 
 ```
 Before command execution:
-┌─[user@host]─[~/projects/lush]─[feature/lle +3!2]
-└─❯ make
++-[user@host]-[~/projects/lush]-[feature/lle +3!2]
++-> make
 
 After command execution (transient applied to previous prompt):
-❯ make
+> make
 ...build output...
-┌─[user@host]─[~/projects/lush]─[feature/lle +3!2]
-└─❯ 
++-[user@host]-[~/projects/lush]-[feature/lle +3!2]
++-> 
 ```
 
 ### 12.2 Transient Prompt Configuration
@@ -5202,10 +5202,10 @@ void lle_prompt_run_all_tests(void) {
         lle_prompt_test_result_t result = lle_prompt_run_test(&all_tests[i]);
         
         if (result.passed) {
-            printf("✓ %s (%lu ns)\n", result.test_name, result.duration_ns);
+            printf("OK %s (%lu ns)\n", result.test_name, result.duration_ns);
             passed++;
         } else {
-            printf("✗ %s: %s\n", result.test_name, 
+            printf("FAIL %s: %s\n", result.test_name, 
                    result.error_message ?: "failed");
         }
     }

@@ -47,14 +47,14 @@ This policy is **ENFORCED** not suggested. The pre-commit hook system will **REJ
 **Required Structure**:
 ```
 docs/
-├── DOCUMENTATION_POLICY.md        # THIS FILE
-├── VISION.md                      # Project philosophy
-├── user/                          # End-user documentation
-├── project/                       # Project-level documentation
-├── development/                   # Development docs
-├── lle_specification/             # LLE specifications
-├── lle_implementation/            # LLE implementation docs
-└── archived/                      # Historical/completed documents
++-- DOCUMENTATION_POLICY.md        # THIS FILE
++-- VISION.md                      # Project philosophy
++-- user/                          # End-user documentation
++-- project/                       # Project-level documentation
++-- development/                   # Development docs
++-- lle_specification/             # LLE specifications
++-- lle_implementation/            # LLE implementation docs
++-- archived/                      # Historical/completed documents
 ```
 
 **Enforcement**: Pre-commit hook will **WARN** if new markdown files are added outside this structure.

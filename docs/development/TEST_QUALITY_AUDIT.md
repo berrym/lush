@@ -59,7 +59,7 @@ The order disagreement between `(a, b, msg)` and `(actual, expected, msg)`
 is dangerous: a test author who writes `ASSERT_EQ(actual, expected, ...)`
 in a file that defines the parameters as `(a, b, msg)` is silently fine
 (both sides are just compared), but the failure message will print
-"Expected X, got Y" with X and Y swapped — making debugging confusing.
+"Expected X, got Y" with X and Y swapped -- making debugging confusing.
 That confusion has cost real time.
 
 The shared framework standardizes on `(actual, expected, msg)` with
@@ -94,7 +94,7 @@ TEST(thing_init_success) {
 ```
 
 This proves init returns success and produces a non-NULL pointer. It
-does **not** prove the thing's *behavior* is correct — that
+does **not** prove the thing's *behavior* is correct -- that
 `thing_store(t, key, value)` followed by `thing_lookup(t, key)` returns
 `value`, that `thing_invalidate(t, key)` removes it, that `thing_count(t)`
 is consistent with what was stored, etc. Many test files for stateful
@@ -109,7 +109,7 @@ number creates false confidence.**
 
 ## Concrete examples
 
-### test_render_cache.c — surface-only
+### test_render_cache.c -- surface-only
 
 The cache module exposes `init`, `cleanup`, `store`, `lookup`,
 `invalidate`, `invalidate_all`. The test file exercises only `init`
@@ -124,7 +124,7 @@ The cache module exposes `init`, `cleanup`, `store`, `lookup`,
 In other words, the cache could not actually cache and the tests
 would still pass.
 
-### test_async_worker.c — initialization-heavy
+### test_async_worker.c -- initialization-heavy
 
 33 assertions, most clustered around init/destroy and parameter
 validation. Once the worker is created, what it actually *does* (queue
@@ -136,7 +136,7 @@ tested thinly or not at all.
 `test_render_pipeline.c`, `test_display_bridge.c`, `test_keybinding.c`
 (only 5 assertions excluding the framework macros), several others.
 
-### test_unicode_case_compare.c — the counterexample
+### test_unicode_case_compare.c -- the counterexample
 
 This file does it right: each TEST drives the function with concrete
 input and asserts the concrete output. ASCII upper/lower, mixed case,
@@ -174,20 +174,20 @@ exact byte sequence". That is what tests are for.
 Highest leverage (worst current quality, clearest API to test
 properly):
 
-1. `test_render_cache.c` — replace surface tests with real cache
+1. `test_render_cache.c` -- replace surface tests with real cache
    semantics (store, lookup, eviction, invalidation)
-2. `test_render_pipeline.c` — same shape as render_cache, similar work
-3. `test_async_worker.c` — exercise actual task submission and result
+2. `test_render_pipeline.c` -- same shape as render_cache, similar work
+3. `test_async_worker.c` -- exercise actual task submission and result
    delivery, not just init/destroy
-4. The five `exit(1)`-using files — at minimum, migrate the framework
+4. The five `exit(1)`-using files -- at minimum, migrate the framework
    so failures stop hiding each other
-5. `test_keybinding.c` — only 5 assertions in 499 lines; almost
+5. `test_keybinding.c` -- only 5 assertions in 499 lines; almost
    certainly a smoke test wearing the clothes of a real test suite
 
 The other files that are *already* testing real behavior
 (`test_unicode_case_compare.c`, `test_powerline_renderer.c`,
 `test_event_phase2.c`) should migrate framework-only and otherwise be
-left alone — they are doing it right.
+left alone -- they are doing it right.
 
 ## What this audit does not say
 

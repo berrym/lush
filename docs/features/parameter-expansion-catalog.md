@@ -6,8 +6,8 @@ lists and maps fire on every element rather than coercing to a
 joined scalar.**
 
 **Status**: shipped.
-**Spec lineage**: `docs/SEMANTICS.md` §3.5 (transformation always
-fires), §3.9 (no implicit list-to-string), §8 (formerly deferred
+**Spec lineage**: `docs/SEMANTICS.md` S3.5 (transformation always
+fires), S3.9 (no implicit list-to-string), S8 (formerly deferred
 line "Error catalog for misapplied transformations").
 
 ---
@@ -215,7 +215,7 @@ The help line names the correct form for the operator. Examples:
 - **The `(@)` flag is a presentation no-op.** `${(@)arr}` and
   `${arr[@]}` mean the same thing. The flag is accepted as a
   spelling alias, not a redundant separate feature -- it doesn't
-  alter the operator's behavior. (Per SEMANTICS §3.7.)
+  alter the operator's behavior. (Per SEMANTICS S3.7.)
 
 - **Map iteration order is insertion order.** A `${m[@]^^}` over a
   map fires on values in the order keys were assigned to the map.
@@ -224,7 +224,7 @@ The help line names the correct form for the operator. Examples:
 
 ## See also
 
-- `docs/SEMANTICS.md` §3.5 (transformation always fires), §3.9 (no
+- `docs/SEMANTICS.md` S3.5 (transformation always fires), S3.9 (no
   implicit list-to-string coercion).
 - `docs/features/sigil-conventions.md` -- the `@x` lush-mode
   shorthand for the `${x[@]}` form covered here.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document details the exact proven mechanisms used by ZSH/ZLE, Fish, and Replxx for differential display updates. The goal is to understand how these editors track internal state, use terminal escape sequences, and integrate with their display systems—then determine how this applies to Lush LLE.
+This document details the exact proven mechanisms used by ZSH/ZLE, Fish, and Replxx for differential display updates. The goal is to understand how these editors track internal state, use terminal escape sequences, and integrate with their display systems--then determine how this applies to Lush LLE.
 
 **Created**: 2026-01-01 (Session 95)
 **Purpose**: Research reference for future differential display work
@@ -18,7 +18,7 @@ All three editors (ZLE, Fish, Replxx) use the same fundamental pattern:
 2. **Line-by-Line Diff**: Compare buffers to identify changed rows
 3. **Relative Cursor Movement**: Use `\033[nA` (up), `\033[nB` (down), `\033[nG` (absolute column)
 4. **Prompt-Once Architecture**: Draw prompt once, never redraw
-5. **No Terminal Queries**: Never ask terminal for cursor position—internal state is authoritative
+5. **No Terminal Queries**: Never ask terminal for cursor position--internal state is authoritative
 
 ---
 
@@ -263,7 +263,7 @@ Subsequent renders:
   5. Update "current" state
 ```
 
-Key: Never move to column 0 after first render—this protects the prompt from `\033[J`.
+Key: Never move to column 0 after first render--this protects the prompt from `\033[J`.
 
 ### 4.3 Relative vs Absolute Positioning
 
@@ -271,7 +271,7 @@ Key: Never move to column 0 after first render—this protects the prompt from `
 |----------|----------|-------------|
 | Vertical relative | `\033[nA/B` | Moving within display |
 | Horizontal absolute | `\033[nG` | Positioning on a line |
-| Full absolute | `\033[row;colH` | Rarely—requires knowing physical row |
+| Full absolute | `\033[row;colH` | Rarely--requires knowing physical row |
 
 **Critical**: All use **relative vertical** + **absolute horizontal**. None use full absolute positioning because physical row numbers are unknown.
 
@@ -333,7 +333,7 @@ LLE uses "clear and redraw command area":
 5. Position cursor with relative movement
 ```
 
-This works but isn't differential—it redraws the entire command area every time.
+This works but isn't differential--it redraws the entire command area every time.
 
 ---
 
@@ -343,12 +343,12 @@ This works but isn't differential—it redraws the entire command area every tim
 
 | Feature | Status |
 |---------|--------|
-| Virtual screen buffer | ✅ Has it |
-| Cell-level UTF-8 tracking | ✅ Has it |
-| Prompt-once architecture | ✅ Implemented |
-| Relative cursor movement | ✅ Uses `\033[nA/B` |
-| Absolute column positioning | ✅ Uses `\033[nG` |
-| Character-by-character width | ✅ Has it |
+| Virtual screen buffer | OK Has it |
+| Cell-level UTF-8 tracking | OK Has it |
+| Prompt-once architecture | OK Implemented |
+| Relative cursor movement | OK Uses `\033[nA/B` |
+| Absolute column positioning | OK Uses `\033[nG` |
+| Character-by-character width | OK Has it |
 
 ### What LLE Is Missing for True Differential
 
@@ -367,7 +367,7 @@ The "clear and redraw" approach is:
 - Sufficient for typical line editing performance
 - Avoids complex coordinate translation bugs
 
-The removed code failed because it tried to use virtual screen row numbers as physical terminal row numbers—a fundamental architectural error.
+The removed code failed because it tried to use virtual screen row numbers as physical terminal row numbers--a fundamental architectural error.
 
 ---
 
@@ -396,7 +396,7 @@ Render cycle:
 1. **Track "current physical position"** during output, not "physical row number"
 2. **Use relative vertical movement** (`\033[nA/B`) exclusively
 3. **Use absolute horizontal** (`\033[nG`) for column positioning
-4. **Never assume physical row numbers**—only relative deltas
+4. **Never assume physical row numbers**--only relative deltas
 
 ### Data Structure Needs
 

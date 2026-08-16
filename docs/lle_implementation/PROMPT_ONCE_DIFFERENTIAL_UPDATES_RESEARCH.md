@@ -444,7 +444,7 @@ if (!prompt_rendered) {
     // WRONG: Using ABSOLUTE terminal coordinates
     char cursor_seq[32];
     snprintf(cursor_seq, sizeof(cursor_seq), "\033[%d;%dH", 
-             desired_screen.cursor_row + 1,  // ← This is VIRTUAL row, not terminal row!
+             desired_screen.cursor_row + 1,  // <- This is VIRTUAL row, not terminal row!
              desired_screen.cursor_col + 1);
     write(STDOUT_FILENO, cursor_seq, cursor_len);
 }
@@ -624,9 +624,9 @@ The virtual screen ALWAYS starts at row 0, regardless of where the prompt was dr
 
 ```
 State 1: First Render
-  - Write prompt → terminal cursor at (38, 0) physical
-  - Build desired_screen → virtual coordinates
-  - Write command/menu → using relative movements from (38, 0)
+  - Write prompt -> terminal cursor at (38, 0) physical
+  - Build desired_screen -> virtual coordinates
+  - Write command/menu -> using relative movements from (38, 0)
   - Initialize current_screen = desired_screen
   - Virtual (0,0) corresponds to physical (38,0)
 

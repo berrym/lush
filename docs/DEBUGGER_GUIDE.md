@@ -122,16 +122,16 @@ debug off
 gutter, with kind-aware labels for every binding:
 
 ```
-│ ┌─ [Shell Variables] ───────────────────────────────────────────────────
-│ scalar       = "hello"
-│ arr          List    (3 elements)
-│ m            Map     (2 elements)
-│ └──────────────────────────────────────────────────────────────────────
-│ ┌─ [System Variables] ──────────────────────────────────────────────────
-│ PWD          = "/home/user/project"
-│ ?            = "0"
-│ $            = "12345"
-│ └──────────────────────────────────────────────────────────────────────
+| +- [Shell Variables] ---------------------------------------------------
+| scalar       = "hello"
+| arr          List    (3 elements)
+| m            Map     (2 elements)
+| +----------------------------------------------------------------------
+| +- [System Variables] --------------------------------------------------
+| PWD          = "/home/user/project"
+| ?            = "0"
+| $            = "12345"
+| +----------------------------------------------------------------------
 ```
 
 The `Scalar` / `List` / `Map` labels are derived directly from the
@@ -160,7 +160,7 @@ interactive shell prompt, with:
   (`step`, `next`, `out`, `continue`, `print`, `vars`, `stack`, `type`,
   `watch`, `break`, `quit`, ...) with first-word switching when the
   source manager detects `lle_in_debug_prompt()`
-- **Framed-gutter UI** -- responses render with a `│` left gutter so
+- **Framed-gutter UI** -- responses render with a `|` left gutter so
   debugger output is visually distinct from script output that may
   follow on the same terminal
 
@@ -358,13 +358,13 @@ Shows every binding reachable from the current scope, grouped by
 category, with the kind label printed inline for non-scalars:
 
 ```
-│ ┌─ [Shell Variables] ───────────────────────────────────────────────────
-│ counter      = "3"
-│ words        List    (5 elements)
-│ env_map      Map     (12 elements)
-│ greeter      Func
-│ alias_ref    Nameref -> counter
-│ └──────────────────────────────────────────────────────────────────────
+| +- [Shell Variables] ---------------------------------------------------
+| counter      = "3"
+| words        List    (5 elements)
+| env_map      Map     (12 elements)
+| greeter      Func
+| alias_ref    Nameref -> counter
+| +----------------------------------------------------------------------
 ```
 
 The scope-chain walk follows the same rules as variable expansion:
@@ -376,23 +376,23 @@ local bindings shadow globals, and `nameref` entries are reported as
 Renders the binding's contents, format chosen by kind:
 
 ```
-│ ┌─ [Variable: counter] ──────────────────────────────────────────────────
-│ Type:  Scalar
-│ Value: "3"
-│ Length: 1 characters
-│ Scope: global
-│ └──────────────────────────────────────────────────────────────────────
+| +- [Variable: counter] --------------------------------------------------
+| Type:  Scalar
+| Value: "3"
+| Length: 1 characters
+| Scope: global
+| +----------------------------------------------------------------------
 
-│ ┌─ [Variable: words] ────────────────────────────────────────────────────
-│ Type:  List
-│ Count: 5 elements
-│ [0] = "alpha"
-│ [1] = "beta"
-│ [2] = "gamma"
-│ [3] = "delta"
-│ [4] = "epsilon"
-│ Scope: global
-│ └──────────────────────────────────────────────────────────────────────
+| +- [Variable: words] ----------------------------------------------------
+| Type:  List
+| Count: 5 elements
+| [0] = "alpha"
+| [1] = "beta"
+| [2] = "gamma"
+| [3] = "delta"
+| [4] = "epsilon"
+| Scope: global
+| +----------------------------------------------------------------------
 ```
 
 Maps render with key=value rows; functions render the location of
@@ -545,7 +545,7 @@ analyzer raises it at edit time instead of crash time.
 
 ```bash
 $ debug analyze script.sh
-script.sh:7  type     'arr' is List; cannot expand into scalar slot — use ${arr[@]} or ${arr[*]}
+script.sh:7  type     'arr' is List; cannot expand into scalar slot -- use ${arr[@]} or ${arr[*]}
 script.sh:12 warning  unquoted "$file" in test condition; quote to handle empty/space values
 script.sh:18 style    prefer "$(...)" over backticks
 ```
@@ -795,13 +795,13 @@ $ source demo.sh
 (lush-debug) t words
 words: List (3 elements)
 (lush-debug) print words
-│ ┌─ [Variable: words] ────────────────────────────────────────────────────
-│ Type:  List
-│ Count: 3 elements
-│ [0] = "alpha"
-│ [1] = "beta"
-│ [2] = "gamma"
-│ └──────────────────────────────────────────────────────────────────────
+| +- [Variable: words] ----------------------------------------------------
+| Type:  List
+| Count: 3 elements
+| [0] = "alpha"
+| [1] = "beta"
+| [2] = "gamma"
+| +----------------------------------------------------------------------
 (lush-debug) t counter
 counter: Scalar
 (lush-debug) print counter

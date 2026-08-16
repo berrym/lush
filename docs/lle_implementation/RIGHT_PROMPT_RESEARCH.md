@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document details how ZSH/ZLE, Fish, and Replxx handle right-side prompts (RPROMPT/RPS1). The goal is to understand the exact rendering mechanism, escape sequences, and behavioral rules—then determine how to implement this in Lush LLE.
+This document details how ZSH/ZLE, Fish, and Replxx handle right-side prompts (RPROMPT/RPS1). The goal is to understand the exact rendering mechanism, escape sequences, and behavioral rules--then determine how to implement this in Lush LLE.
 
 **Created**: 2026-01-01 (Session 95)
 **Purpose**: Research reference for right prompt implementation

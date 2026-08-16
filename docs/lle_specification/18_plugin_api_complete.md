@@ -46,7 +46,7 @@ The LLE Plugin API provides comprehensive, stable access to all LLE systems incl
 - **History Editing Integration**: Interactive history editing with multiline support API
 - **Completion Source API**: Custom completion sources with interactive menu integration
 - **Stable ABI Interface**: Version-compatible plugin interface with backward compatibility
-- **Performance Excellence**: <100μs API call response time with comprehensive monitoring
+- **Performance Excellence**: <100us API call response time with comprehensive monitoring
 - **Security Framework**: Comprehensive sandboxing and permission system
 - **Development Tools**: Complete plugin development SDK with debugging support
 
@@ -54,7 +54,7 @@ The LLE Plugin API provides comprehensive, stable access to all LLE systems incl
 
 1. **Unlimited Extensibility**: ANY functionality can be implemented through plugins
 2. **API Stability**: Backward compatibility guaranteed across LLE versions
-3. **Performance First**: All APIs maintain sub-100μs response time requirements
+3. **Performance First**: All APIs maintain sub-100us response time requirements
 4. **Security By Design**: All plugin operations execute in controlled sandbox environment
 5. **Integration First**: Seamless integration with all core LLE systems
 
@@ -1511,17 +1511,17 @@ lle_result_t lle_plugin_initialize_in_order(lle_plugin_manager_t *manager,
         if (init_result == LLE_SUCCESS) {
             plugin->state = LLE_PLUGIN_STATE_INITIALIZED;
             plugin->initialization_time_us = init_duration;
-            lle_log_info("Plugin %s: initialized successfully (%llu μs)", 
+            lle_log_info("Plugin %s: initialized successfully (%llu us)", 
                         plugin->name, init_duration);
         } else {
             plugin->state = LLE_PLUGIN_STATE_FAILED;
-            lle_log_error("Plugin %s: initialization failed (%llu μs)", 
+            lle_log_error("Plugin %s: initialization failed (%llu us)", 
                          plugin->name, init_duration);
         }
         
         // Step 4: Handle initialization timeout
         if (init_duration > LLE_PLUGIN_INIT_TIMEOUT_MICROSECONDS) {
-            lle_log_warning("Plugin %s: initialization exceeded timeout (%llu μs)", 
+            lle_log_warning("Plugin %s: initialization exceeded timeout (%llu us)", 
                            plugin->name, init_duration);
         }
     }
@@ -1621,7 +1621,7 @@ lle_result_t lle_plugin_detect_circular_dependencies(lle_plugin_dependency_graph
  * - Modified Kahn's algorithm with priority-based tie-breaking
  * - Circular dependency detection using DFS with recursion stack
  * - Graceful handling of missing optional dependencies
- * - Timeout protection for plugin initialization (default: 5000μs)
+ * - Timeout protection for plugin initialization (default: 5000us)
  * 
  * Initialization Sequence:
  * 1. Load all plugin files and validate metadata
@@ -1645,13 +1645,13 @@ lle_result_t lle_plugin_detect_circular_dependencies(lle_plugin_dependency_graph
 ### 18.1 API Performance Targets
 
 **Critical Performance Requirements**:
-- **API Call Response Time**: < 100μs for all API functions
-- **Widget Hook Execution**: < 25μs per hook callback  
-- **Keybinding Resolution**: < 10μs per keybinding lookup
-- **History Callback Execution**: < 100μs per history operation
+- **API Call Response Time**: < 100us for all API functions
+- **Widget Hook Execution**: < 25us per hook callback  
+- **Keybinding Resolution**: < 10us per keybinding lookup
+- **History Callback Execution**: < 100us per history operation
 - **Completion Generation**: < 5ms per completion request
-- **Memory Allocation**: < 50μs for plugin memory operations
-- **Security Validation**: < 10μs per permission check
+- **Memory Allocation**: < 50us for plugin memory operations
+- **Security Validation**: < 10us per permission check
 
 ### 18.2 Performance Monitoring Integration
 

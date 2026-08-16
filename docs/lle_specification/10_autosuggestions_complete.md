@@ -1024,10 +1024,10 @@ lle_result_t lle_test_integration_performance(
 ### 15.3 Integration Testing
 ### 7.4 Performance Requirements (Updated with Integration)
 
-- **History Integration Lookup**: <25μs for accessing history-buffer integration data
-- **Multiline Pattern Matching**: <50μs for complex shell construct analysis
-- **Coordination Mode Switching**: <5μs for mode transitions
-- **Enhanced Suggestion Generation**: <100μs total including history-buffer data
+- **History Integration Lookup**: <25us for accessing history-buffer integration data
+- **Multiline Pattern Matching**: <50us for complex shell construct analysis
+- **Coordination Mode Switching**: <5us for mode transitions
+- **Enhanced Suggestion Generation**: <100us total including history-buffer data
 
 ---
 
@@ -1222,10 +1222,10 @@ lle_result_t lle_generate_complementary_suggestions(
 
 #### 6.1.3 Coordination Performance Requirements
 
-- **Menu State Detection**: <5μs for detecting completion menu state changes
-- **Coordination Mode Switching**: <10μs for switching between coordination modes
-- **Complementary Suggestion Generation**: <150μs including menu context analysis
-- **Conflict Resolution**: <25μs for resolving display conflicts
+- **Menu State Detection**: <5us for detecting completion menu state changes
+- **Coordination Mode Switching**: <10us for switching between coordination modes
+- **Complementary Suggestion Generation**: <150us including menu context analysis
+- **Conflict Resolution**: <25us for resolving display conflicts
 
 ---
 
@@ -3255,7 +3255,7 @@ lle_validation_result_t lle_validate_suggestion_quality(lle_suggestion_validator
    - Create coordination state management
    - Set up menu event callback system
    - **Dependencies**: 23_interactive_completion_menu_complete.md
-   - **Success Criteria**: Menu state detection <5μs
+   - **Success Criteria**: Menu state detection <5us
 
 2. **Conflict Resolution System**
    - Implement suggestion suppression logic
@@ -3272,7 +3272,7 @@ lle_validation_result_t lle_validate_suggestion_quality(lle_suggestion_validator
    - Implement cross-system context sharing
    - Create context consistency validation
    - **Integration**: All systems share unified context state
-   - **Performance**: Context updates <25μs
+   - **Performance**: Context updates <25us
 
 2. **Enhanced Suggestion Generation**
    - Implement integration-aware suggestion algorithms
@@ -3282,10 +3282,10 @@ lle_validation_result_t lle_validate_suggestion_quality(lle_suggestion_validator
 
 **Week 4: Performance Integration**
 1. **Integration Performance Optimization**
-   - Optimize coordination overhead <10μs
+   - Optimize coordination overhead <10us
    - Implement integration-specific caching
    - Create performance monitoring for integrations
-   - **Performance**: Total integration overhead <50μs
+   - **Performance**: Total integration overhead <50us
 
 2. **Integration Testing Framework**
    - Build cross-system integration tests
@@ -3457,7 +3457,7 @@ static const lle_implementation_phase_t AUTOSUGGESTIONS_IMPLEMENTATION_PHASES[] 
 // Success metrics and validation criteria
 typedef struct lle_autosuggestions_success_metrics {
     // Performance targets
-    uint64_t max_suggestion_generation_time_us;       // Maximum suggestion generation time (500μs target)
+    uint64_t max_suggestion_generation_time_us;       // Maximum suggestion generation time (500us target)
     double min_cache_hit_rate;                        // Minimum cache hit rate (75% target)
     size_t max_memory_usage_mb;                       // Maximum memory usage limit (10MB target)
     
@@ -3469,7 +3469,7 @@ typedef struct lle_autosuggestions_success_metrics {
     // Reliability targets
     double max_error_rate;                            // Maximum error rate (1% target)
     double min_system_uptime;                         // Minimum system uptime (99.9% target)
-    uint64_t max_recovery_time_us;                    // Maximum error recovery time (1000μs target)
+    uint64_t max_recovery_time_us;                    // Maximum error recovery time (1000us target)
     
     // Integration targets
     bool seamless_lush_integration;                 // Seamless integration with Lush systems

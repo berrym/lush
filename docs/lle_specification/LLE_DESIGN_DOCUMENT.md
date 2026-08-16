@@ -47,18 +47,18 @@ LLE solves these problems through a **buffer-oriented, event-driven architecture
 ### 1.3 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    LLE CORE SYSTEM                          │
-├─────────────────┬───────────────────┬─────────────────────────┤
-│  Buffer Manager │   Event System    │   History Manager      │
-│   (Commands)    │   (Modern UX)     │  (Sophisticated)       │
-├─────────────────┴───────────────────┴─────────────────────────┤
-│              Native Display Integration                      │
-│           (Lush Layered Display System)                   │
-├─────────────────────────────────────────────────────────────┤
-│                Terminal Abstraction                         │
-│              (Universal Compatibility)                      │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                    LLE CORE SYSTEM                          |
++-----------------+-------------------+-------------------------+
+|  Buffer Manager |   Event System    |   History Manager      |
+|   (Commands)    |   (Modern UX)     |  (Sophisticated)       |
++-----------------+-------------------+-------------------------+
+|              Native Display Integration                      |
+|           (Lush Layered Display System)                   |
++-------------------------------------------------------------+
+|                Terminal Abstraction                         |
+|              (Universal Compatibility)                      |
++-------------------------------------------------------------+
 ```
 
 ## 2. Core Design Principles
@@ -78,7 +78,7 @@ Unlike Readline's line-oriented approach, LLE uses a **buffer-oriented design** 
 **Principle**: Modern async-capable event model.
 
 ```c
-LLE_EVENT_KEY_PRESS → LLE_EVENT_BUFFER_CHANGE → LLE_EVENT_SUGGESTION_UPDATE
+LLE_EVENT_KEY_PRESS -> LLE_EVENT_BUFFER_CHANGE -> LLE_EVENT_SUGGESTION_UPDATE
 ```
 
 Events flow through the system enabling:

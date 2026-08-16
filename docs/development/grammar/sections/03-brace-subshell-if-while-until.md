@@ -1,4 +1,4 @@
-# Section 3 — Brace Groups, Subshells, if/while/until
+# Section 3 -- Brace Groups, Subshells, if/while/until
 
 ## EBNF productions
 
@@ -34,8 +34,8 @@ separator       = (TOKEN_SEMICOLON | TOKEN_NEWLINE | TOKEN_WHITESPACE)*
 
 | Node type | Produced by | Notes |
 |-----------|-------------|-------|
-| NODE_BRACE_GROUP | parse_brace_group (parser.c:1536) | Contains children as parsed logical expressions. Flat structure—multiple commands are siblings, not wrapped in NODE_COMMAND_LIST. |
-| NODE_SUBSHELL | parse_subshell (parser.c:1622) | Contains children as parsed logical expressions. Flat structure—commands are siblings. |
+| NODE_BRACE_GROUP | parse_brace_group (parser.c:1536) | Contains children as parsed logical expressions. Flat structure--multiple commands are siblings, not wrapped in NODE_COMMAND_LIST. |
+| NODE_SUBSHELL | parse_subshell (parser.c:1622) | Contains children as parsed logical expressions. Flat structure--commands are siblings. |
 | NODE_IF | parse_if_statement (parser.c:2237) | Flat, alternating structure: [condition, then_body, elif_condition, elif_body, ..., else_body]. elif chains are **flat** (all conditions and bodies are direct children of the single NODE_IF node), not recursive. |
 | NODE_WHILE | parse_while_statement (parser.c:2388) | Children: [condition, body]. Condition parsed as simple_cmd or pipeline (not full logical_expr). Body is result of parse_command_body(TOK_DONE). |
 | NODE_UNTIL | parse_until_statement (parser.c:2481) | Children: [condition, body]. Identical condition/body structure to WHILE. |
@@ -46,25 +46,25 @@ separator       = (TOKEN_SEMICOLON | TOKEN_NEWLINE | TOKEN_WHITESPACE)*
 
 ### Token reservation and keyword recognition
 
-- **`then`, `else`, `elif`, `fi`, `do`, `done`**: Tokenized as reserved keywords **unconditionally** (see tokenizer.h:87–104). The tokenizer has no context-sensitive keyword disabling for these. They are always token types TOK_THEN, TOK_ELSE, etc.
+- **`then`, `else`, `elif`, `fi`, `do`, `done`**: Tokenized as reserved keywords **unconditionally** (see tokenizer.h:87-104). The tokenizer has no context-sensitive keyword disabling for these. They are always token types TOK_THEN, TOK_ELSE, etc.
 
-- **`{` and `}`**: Tokenized as distinct token types TOK_LBRACE and TOK_RBRACE (tokenizer.c:1800, 1806). These are **single-character tokens** that do not require special whitespace handling—the tokenizer consumes them as individual tokens.
+- **`{` and `}`**: Tokenized as distinct token types TOK_LBRACE and TOK_RBRACE (tokenizer.c:1800, 1806). These are **single-character tokens** that do not require special whitespace handling--the tokenizer consumes them as individual tokens.
 
-- **Keyword disabling for redirections**: The parser **disables keyword recognition around redirection targets** (parser.c:1831–1839). This is to allow filenames like `in`, `do`, `done`, `fi` to be treated as ordinary words in redirections. However, this affects only the redirection target itself, not the core reserved words in control structures.
+- **Keyword disabling for redirections**: The parser **disables keyword recognition around redirection targets** (parser.c:1831-1839). This is to allow filenames like `in`, `do`, `done`, `fi` to be treated as ordinary words in redirections. However, this affects only the redirection target itself, not the core reserved words in control structures.
 
 ### Whitespace requirements around `{` and `}`
 
-- **`{` must be tokenizable**: The `{` token must appear as a separate token in the token stream. There is **no special requirement** that it be preceded or followed by whitespace—the tokenizer treats `{` as a complete token unit, one character wide.
+- **`{` must be tokenizable**: The `{` token must appear as a separate token in the token stream. There is **no special requirement** that it be preceded or followed by whitespace--the tokenizer treats `{` as a complete token unit, one character wide.
 
-- **Trailing `}`**: The closing `}` in a brace group must be a separate token (parser.c:1593–1598, expect_token_with_help). Like `{`, it has no whitespace prerequisites.
+- **Trailing `}`**: The closing `}` in a brace group must be a separate token (parser.c:1593-1598, expect_token_with_help). Like `{`, it has no whitespace prerequisites.
 
 - **Practical note**: In shell syntax, `cmd}` would tokenize as a single WORD token containing both "cmd" and "}", so braces genuinely must be separated. But this is a tokenizer behavior, not an explicit parser whitespace rule.
 
 ### Separator handling
 
 All control structures call `skip_separators()` before and after parsing bodies/conditions:
-- After opening `{`, `(`, `if`/`while`/`until`, `then`, `else`, `do`: separators are skipped (parser.c:1569, 1655, 2265–2276, 2440–2441, 2528–2529, etc.)
-- After closing `}`, `)`, `fi`, `done`: separators are skipped, and then trailing redirections are parsed (parser.c:1589, 1675, 2357–2358, 2452–2453, 2540–2541)
+- After opening `{`, `(`, `if`/`while`/`until`, `then`, `else`, `do`: separators are skipped (parser.c:1569, 1655, 2265-2276, 2440-2441, 2528-2529, etc.)
+- After closing `}`, `)`, `fi`, `done`: separators are skipped, and then trailing redirections are parsed (parser.c:1589, 1675, 2357-2358, 2452-2453, 2540-2541)
 - **Separators include**: semicolons, newlines, and whitespace (skip_separators is context-agnostic)
 
 ### `elif` chaining
@@ -72,22 +72,22 @@ All control structures call `skip_separators()` before and after parsing bodies/
 The `elif` chain is **flat**, not recursive. `parse_if_statement` builds a single NODE_IF with alternating children:
 ```
 NODE_IF
-├─ condition (from "if")
-├─ then_body (NODE_COMMAND_LIST)
-├─ condition (from first "elif")
-├─ elif_body (NODE_COMMAND_LIST)
-├─ condition (from second "elif")
-├─ elif_body (NODE_COMMAND_LIST)
-└─ else_body (NODE_COMMAND_LIST) [optional]
++- condition (from "if")
++- then_body (NODE_COMMAND_LIST)
++- condition (from first "elif")
++- elif_body (NODE_COMMAND_LIST)
++- condition (from second "elif")
++- elif_body (NODE_COMMAND_LIST)
++- else_body (NODE_COMMAND_LIST) [optional]
 ```
 
-This is not three nested NODE_IF nodes; all conditions and bodies are direct children of a single root if node. The structure is appended to as each `elif` is encountered in the while loop (parser.c:2297–2339).
+This is not three nested NODE_IF nodes; all conditions and bodies are direct children of a single root if node. The structure is appended to as each `elif` is encountered in the while loop (parser.c:2297-2339).
 
 ### `if` body termination
 
-`parse_if_body()` (parser.c:599–639) creates a NODE_COMMAND_LIST and parses logical expressions until it sees TOKEN_ELSE, TOKEN_ELIF, TOKEN_FI, or TOKEN_EOF. It **does not consume** the terminator—the terminator is left in the token stream for the outer if_statement parser to handle.
+`parse_if_body()` (parser.c:599-639) creates a NODE_COMMAND_LIST and parses logical expressions until it sees TOKEN_ELSE, TOKEN_ELIF, TOKEN_FI, or TOKEN_EOF. It **does not consume** the terminator--the terminator is left in the token stream for the outer if_statement parser to handle.
 
-`while`/`until` bodies, by contrast, use `parse_command_body(TOK_DONE)` (parser.c:553–588), which is a different loop that also stops before the terminator token. Both functions halt before, not after, consuming the terminator.
+`while`/`until` bodies, by contrast, use `parse_command_body(TOK_DONE)` (parser.c:553-588), which is a different loop that also stops before the terminator token. Both functions halt before, not after, consuming the terminator.
 
 ## Notable behaviors and surprises
 
@@ -95,7 +95,7 @@ This is not three nested NODE_IF nodes; all conditions and bodies are direct chi
 
 **Lush restricts while/until conditions to simple_cmd or pipeline, not full logical_expr:**
 ```c
-// parser.c:2411–2416
+// parser.c:2411-2416
 if (tokenizer_match(parser->tokenizer, TOK_LBRACKET)) {
     condition = parse_simple_command(parser);
 } else {
@@ -103,13 +103,13 @@ if (tokenizer_match(parser->tokenizer, TOK_LBRACKET)) {
 }
 ```
 
-This means `while a && b; do ...` would **not** parse as expected—it would parse `a` as the condition and treat `&& b; do` as part of the body. This differs from bash/zsh, which allow logical operators in conditions. (Likely intentional to avoid ambiguity with body parsing, since both use the same separator-delimited syntax.)
+This means `while a && b; do ...` would **not** parse as expected--it would parse `a` as the condition and treat `&& b; do` as part of the body. This differs from bash/zsh, which allow logical operators in conditions. (Likely intentional to avoid ambiguity with body parsing, since both use the same separator-delimited syntax.)
 
 ### Brace group and subshell command structure
 
 Both NODE_BRACE_GROUP and NODE_SUBSHELL parse commands directly as siblings:
 ```c
-// parser.c:1575–1586 (brace group)
+// parser.c:1575-1586 (brace group)
 while (!tokenizer_match(parser->tokenizer, TOK_RBRACE) ...) {
     node_t *command = parse_logical_expression(parser);
     add_child_node(group_node, command);  // Direct child, not in a list
@@ -118,8 +118,8 @@ while (!tokenizer_match(parser->tokenizer, TOK_RBRACE) ...) {
 ```
 
 They **do not** wrap multiple commands in a NODE_COMMAND_LIST. Compare to `if` bodies, which are wrapped in NODE_COMMAND_LIST. This asymmetry means the AST shape differs:
-- `{ a; b; }` → NODE_BRACE_GROUP with two logical_expr children
-- `if true; then a; b; fi` → NODE_IF with then_body=NODE_COMMAND_LIST([a, b])
+- `{ a; b; }` -> NODE_BRACE_GROUP with two logical_expr children
+- `if true; then a; b; fi` -> NODE_IF with then_body=NODE_COMMAND_LIST([a, b])
 
 ### Trailing redirections on compound structures
 
@@ -131,23 +131,23 @@ if ...; fi < input
 while ...; done >&2
 ```
 
-These are parsed by `parse_trailing_redirections()` (parser.c:1734–1751) and appended as child nodes of the compound structure. The redirection nodes are appended *after* the body/commands.
+These are parsed by `parse_trailing_redirections()` (parser.c:1734-1751) and appended as child nodes of the compound structure. The redirection nodes are appended *after* the body/commands.
 
 ### Error behavior on missing delimiters
 
 The parser is **not** permissive about missing delimiters:
-- Missing `}` → error (parser.c:1593–1598)
-- Missing `)` → error (parser.c:1679–1684)
-- Missing `then` → error (parser.c:2268–2272)
-- Missing `fi` → error (parser.c:2362–2366)
-- Missing `do` → error (parser.c:2433–2437)
-- Missing `done` → error (parser.c:2455–2459)
+- Missing `}` -> error (parser.c:1593-1598)
+- Missing `)` -> error (parser.c:1679-1684)
+- Missing `then` -> error (parser.c:2268-2272)
+- Missing `fi` -> error (parser.c:2362-2366)
+- Missing `do` -> error (parser.c:2433-2437)
+- Missing `done` -> error (parser.c:2455-2459)
 
 The error messages are descriptive and provide help context.
 
 ### Optional semicolons before terminators
 
-The parser **optionally consumes** semicolons before `elif`, `else`, `fi` (parser.c:2288–2290, 2333–2335), but does **not** require them. The grammar allows:
+The parser **optionally consumes** semicolons before `elif`, `else`, `fi` (parser.c:2288-2290, 2333-2335), but does **not** require them. The grammar allows:
 ```
 if cond; then body fi
 if cond; then body; elif ...

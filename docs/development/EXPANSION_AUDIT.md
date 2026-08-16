@@ -1,17 +1,17 @@
 # Expansion Engine Audit: list-to-string conversion
 
 **Status (2026-05-23):** **AUDIT COMPLETE; WORK LIST CLOSED.** The
-single identified §3.4 gap (`${arr[@]}` joining like `${arr[*]}` in
+single identified S3.4 gap (`${arr[@]}` joining like `${arr[*]}` in
 the general parameter-expansion fallthrough) was fixed in
-`1c5e587f`; bare `${arr}` §3.9 conformance landed in `78a7db6c`.
-The full list→string surface in SEMANTICS §7 is now closed. This
+`1c5e587f`; bare `${arr}` S3.9 conformance landed in `78a7db6c`.
+The full list->string surface in SEMANTICS S7 is now closed. This
 document is preserved as the audit record that justified the fixes.
 
-**Purpose**: ground SEMANTICS.md §3.4 ("no implicit list→string
+**Purpose**: ground SEMANTICS.md S3.4 ("no implicit list->string
 coercion") against the actual expansion engine. This document maps
 every site where a list (indexed array) or map (associative array)
 value is converted to a flat string, classifies each as legitimate or
-a conformance gap, and produces the work list for §3.4 conformance.
+a conformance gap, and produces the work list for S3.4 conformance.
 
 **Point-in-time**: master at `a0442af8` (PR #113 merge), 2026-05-22.
 Re-verify file:line references against current code before acting.
@@ -20,7 +20,7 @@ Re-verify file:line references against current code before acting.
 the array join helper in `src/symtable.c`; enumerated every call site
 of the join helper and classified by what triggered the join. Manual
 verification of the two load-bearing sites (12437, 4789). Coverage is
-high for the core expansion paths; §6 lists what was not exhaustively
+high for the core expansion paths; S6 lists what was not exhaustively
 traced.
 
 ---
@@ -47,7 +47,7 @@ Its call sites are therefore the entire audit surface:
 
 | Site | What triggers the join | Classification |
 |------|------------------------|----------------|
-| `executor.c:4801` (`expand_array_unsubscripted`) | bare `$arr` / `${arr}`, no subscript, zsh/lush mode | **DEFERRED** (§8 of SEMANTICS.md) |
+| `executor.c:4801` (`expand_array_unsubscripted`) | bare `$arr` / `${arr}`, no subscript, zsh/lush mode | **DEFERRED** (S8 of SEMANTICS.md) |
 | `executor.c:12437` | `${arr[@]}` **or** `${arr[*]}` -- same branch | **GAP** (the `[@]` half) / legitimate (the `[*]` half) |
 | `executor.c:11245`, `11309` | `${(kv)arr}`, `${(k)arr}` zsh flags | legitimate -- explicit flag |
 
@@ -68,10 +68,10 @@ hand-rolled joins, both explicitly requested -- legitimate.
 ```
 
 `[@]` and `[*]` share one branch and are **both joined into a scalar
-string**. Per SEMANTICS.md §3.5:
+string**. Per SEMANTICS.md S3.5:
 
-- `${arr[*]}` → joined scalar. Joining here is **correct**.
-- `${arr[@]}` → vector (N distinct elements). Joining here is the
+- `${arr[*]}` -> joined scalar. Joining here is **correct**.
+- `${arr[@]}` -> vector (N distinct elements). Joining here is the
   **conformance gap**: `[@]` must present as a vector, not a string.
 
 Important nuance: `${arr[@]}` *is* already handled correctly as a
@@ -83,10 +83,10 @@ a larger expansion, a command substitution, a scalar assignment).
 There, `[@]` is wrongly collapsed to a joined scalar.
 
 The corrective shape -- splitting the `@` and `*` cases so `[*]` joins
-and `[@]` yields a vector -- is partially coupled to the §8-deferred
+and `[@]` yields a vector -- is partially coupled to the S8-deferred
 question of what a vector does when it genuinely reaches a
 scalar-only slot. The split itself is clear; its interaction with
-scalar-context fallback should be settled alongside §8.
+scalar-context fallback should be settled alongside S8.
 
 ## 4. Finding 2 -- bare unsubscripted reference (deferred)
 
@@ -95,9 +95,9 @@ scalar-context fallback should be settled alongside §8.
 first element in bash/posix mode, space-joined in zsh/lush mode (an
 implicit join).
 
-SEMANTICS.md §8 **explicitly defers** the bare-unsubscripted-reference
+SEMANTICS.md S8 **explicitly defers** the bare-unsubscripted-reference
 decision. This is therefore recorded as current behavior, not a
-violation to fix now. It is blocked on the §8 resolution; once §8 is
+violation to fix now. It is blocked on the S8 resolution; once S8 is
 decided, this site is updated to match.
 
 ## 5. Conformant -- no action
@@ -112,7 +112,7 @@ decided, this site is updated to match.
 
 ## 6. Audit coverage gaps
 
-Not exhaustively traced; close before §3.4 conformance is declared
+Not exhaustively traced; close before S3.4 conformance is declared
 complete:
 
 - **Arithmetic expansion** (`src/arithmetic.c`) -- variable resolution
@@ -122,26 +122,26 @@ complete:
   expand an array to a string) but unverified.
 
 Command substitution captures output as a scalar by design
-(SEMANTICS.md §4.1) -- no implicit array coercion risk there.
+(SEMANTICS.md S4.1) -- no implicit array coercion risk there.
 
 ## 7. Work list
 
 1. **Split `executor.c:12434-12437`** so `${arr[*]}` joins and
    `${arr[@]}` yields a vector in the general expansion path. The one
-   genuine §3.5 conformance fix. Settle the vector-meets-scalar-slot
-   behavior alongside SEMANTICS.md §8.
+   genuine S3.5 conformance fix. Settle the vector-meets-scalar-slot
+   behavior alongside SEMANTICS.md S8.
 2. **Bare `${arr}`** (`expand_array_unsubscripted`) -- blocked on the
-   §8 decision; update once §8 resolves.
-3. **Close the coverage gaps** (§6) -- trace arithmetic.c and process
+   S8 decision; update once S8 resolves.
+3. **Close the coverage gaps** (S6) -- trace arithmetic.c and process
    substitution.
 
 The headline result: the expansion engine is substantially conformant
-already. The list→string surface reduces to a single join helper, and
+already. The list->string surface reduces to a single join helper, and
 of its call sites exactly one (`[@]` at 12437) is a genuine gap; the
-rest are explicit joins or the §8-deferred bare reference. SEMANTICS.md
-§3.4 is closer to met than the spec's §7 gap table assumed.
+rest are explicit joins or the S8-deferred bare reference. SEMANTICS.md
+S3.4 is closer to met than the spec's S7 gap table assumed.
 
 ## See also
 
-- [../SEMANTICS.md](../SEMANTICS.md) -- §3.4, §3.5, §8.
+- [../SEMANTICS.md](../SEMANTICS.md) -- S3.4, S3.5, S8.
 - `src/symtable.c` `symtable_array_expand` -- the join helper.
