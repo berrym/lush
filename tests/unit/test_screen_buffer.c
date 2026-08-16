@@ -316,6 +316,44 @@ static int test_visual_width_utf8_2byte(void) {
     return 1;
 }
 
+static int test_width_agrees_on_wide_characters(void) {
+    /// The two exported width functions must answer the same question the
+    /// same way. screen_buffer_visual_width counted EVERY multi-byte
+    /// character as one column, so a CJK character (3 bytes, 2 columns) came
+    /// back as 1 and a combining mark (0 columns) came back as 1 -- while
+    /// screen_buffer_calculate_visual_width, which walks grapheme clusters
+    /// and asks the width table, got them right. Anything positioned with the
+    /// first function (the right prompt) therefore drifted by one column per
+    /// wide character.
+    ///
+    /// Asserted as AGREEMENT plus the absolute value, so a future change that
+    /// breaks both in the same way still fails.
+    struct {
+        const char *text;
+        size_t want;
+        const char *what;
+    } cases[] = {
+        {                      "hello", 5,                                  "ascii"},
+        {                "caf\xc3\xa9", 4,                       "2-byte, 1 column"},
+        {               "\xe3\x81\x82", 2,       "CJK hiragana, 3 bytes, 2 columns"},
+        {                 "a\xe3\x81\x82"
+                 "b", 4,                      "CJK between ascii"         },
+        {   "\xe4\xb8\xad\xe6\x96\x87", 4,                     "two CJK ideographs"},
+        {                  "e\xcc\x81", 1, "base plus combining mark is one column"},
+        {"\033[31m\xe3\x81\x82\033[0m", 2,                        "CJK inside ANSI"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        size_t a =
+            screen_buffer_visual_width(cases[i].text, strlen(cases[i].text));
+        size_t b = screen_buffer_calculate_visual_width(cases[i].text, 0);
+        ASSERT_TRUE(a == cases[i].want, cases[i].what);
+        ASSERT_TRUE(b == cases[i].want, cases[i].what);
+        ASSERT_TRUE(a == b, "the two width functions agree");
+    }
+    return 1;
+}
+
 /* ============================================================
  * CALCULATE VISUAL WIDTH TESTS (with start_col for tabs)
  * ============================================================ */
@@ -1298,6 +1336,7 @@ int main(void) {
     RUN_TEST(visual_width_multiple_ansi);
     RUN_TEST(visual_width_readline_markers);
     RUN_TEST(visual_width_utf8_2byte);
+    RUN_TEST(width_agrees_on_wide_characters);
 
     printf("\n=== Calculate Visual Width Tests ===\n");
     RUN_TEST(calculate_visual_width_null);
