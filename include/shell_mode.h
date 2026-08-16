@@ -105,6 +105,15 @@ typedef enum {
     FEATURE_TIME_KEYWORD,     ///< time command with TIMEFORMAT
 
     /// Behavior Defaults
+    FEATURE_UNSET_REVEALS_OUTER, ///< `unset` run in a frame DEEPER than the
+                                 ///< binding it targets removes that binding,
+                                 ///< so the next one outward becomes visible
+                                 ///< again. bash does this; zsh and dash both
+                                 ///< keep the name unset for the rest of the
+                                 ///< frame. Gates only the deeper-frame case:
+                                 ///< unsetting a binding owned by the CURRENT
+                                 ///< frame shadows in every mode, which is
+                                 ///< where all three peers agree (issue #623).
     FEATURE_STRICT_VALUE_TYPING, ///< SEMANTICS section 3.9 list/scalar type
                                  ///< safety: a list/map value in a scalar slot
                                  ///< is a type error (E1134), not a silent

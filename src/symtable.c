@@ -359,13 +359,66 @@ void symtable_manager_set_debug(symtable_manager_t *manager, bool debug) {
  * @brief Find a variable in the scope chain
  *
  * Searches from the given scope up through parent scopes until a variable
- * with the given name is found. Skips variables marked as unset.
+ * with the given name is found. An unset tombstone STOPS the search: the
+ * name is unset from this scope's point of view.
+ *
+ * The search used to SKIP tombstones and keep walking outward, so
+ * `unset` of a function-local revealed the enclosing binding for the rest
+ * of the function instead of leaving the name unset (issue #623):
+ *
+ *     x=global; f() { local x=lcl; unset x; echo "[$x]"; }   ->  [global]
+ *
+ * bash, zsh and dash all report the name as unset there, and lush's own
+ * scope model says the same: a tombstone records that the name is unset in
+ * the scope that owns it, and that scope pops on return, which is exactly
+ * when the outer binding should reappear. Skipping the tombstone also let a
+ * later write in the frame reach THROUGH it -- `unset a; a+=(z)` appended to
+ * the caller's array and corrupted it.
  *
  * @param scope Starting scope for the search
  * @param name Variable name to find
- * @return Allocated symvar_t if found, NULL otherwise
+ * @return Allocated symvar_t if found, NULL if unbound or tombstoned
  */
 static symvar_t *find_var(symtable_scope_t *scope, const char *name) {
+    if (!scope || !name) {
+        return NULL;
+    }
+
+    while (scope) {
+        const char *serialized = ht_strstr_get(scope->vars_ht, name);
+        if (serialized) {
+            symvar_t *var = deserialize_variable(name, serialized);
+            if (var && !(var->flags & SYMVAR_UNSET)) {
+                return var;
+            }
+            /// A tombstone is an answer, not a miss: stop here.
+            free_symvar(var);
+            return NULL;
+        }
+        scope = scope->parent;
+    }
+
+    return NULL;
+}
+
+/**
+ * @brief Find a binding, looking THROUGH unset tombstones
+ *
+ * The scope-chain walk find_var performed before issue #623: a tombstone is
+ * skipped and the search continues outward.
+ *
+ * This exists for exactly one caller. Exported variables are a process-level
+ * axis that the scope model does not govern (SEMANTICS section 5.5): the
+ * process environ is global to the process, and `unsetenv` is permanent while
+ * a tombstone is not. Resolving the environ mirror with the frame-local view
+ * made a function-local `unset` of a shadowing local delete the GLOBAL's
+ * export for the rest of the session -- the shell variable came back when the
+ * frame popped, but the child environment never did.
+ *
+ * Name resolution proper must NOT use this: a tombstone is an answer there.
+ */
+static symvar_t *find_var_through_tombstones(symtable_scope_t *scope,
+                                             const char *name) {
     if (!scope || !name) {
         return NULL;
     }
@@ -383,6 +436,31 @@ static symvar_t *find_var(symtable_scope_t *scope, const char *name) {
     }
 
     return NULL;
+}
+
+/**
+ * @brief Is `owner` inside the function frame the shell is executing in?
+ *
+ * Walks outward from the current scope. Reaching `owner` before crossing a
+ * SCOPE_FUNCTION boundary means the binding belongs to this frame (or to a
+ * loop/conditional scope nested inside it). Crossing the boundary first
+ * means it belongs to an enclosing function, or to the global scope.
+ *
+ * This distinction is the one place bash, zsh and dash disagree about
+ * `unset`, so it gates FEATURE_UNSET_REVEALS_OUTER rather than deciding the
+ * behavior outright (issue #623).
+ */
+static bool owner_is_in_current_function(symtable_manager_t *manager,
+                                         symtable_scope_t *owner) {
+    for (symtable_scope_t *s = manager->current_scope; s; s = s->parent) {
+        if (s == owner) {
+            return true;
+        }
+        if (s->scope_type == SCOPE_FUNCTION) {
+            return false;
+        }
+    }
+    return false;
 }
 
 /**
@@ -1084,8 +1162,10 @@ static char *symtable_get_var_impl(symtable_manager_t *manager,
  * exported-scalar form) -- must update the mirror, the DROP counterpart to
  * export's ADD. Reading the currently-visible binding rather than a blind
  * unsetenv keeps a shadowed exported binding correct: unsetting a non-exported
- * local shadow re-exposes the exported global. find_var skips UNSET tombstones,
- * so after a tombstone or an array store it returns the next visible binding.
+ * local shadow re-exposes the exported global. The lookup deliberately looks
+ * THROUGH unset tombstones (find_var itself stops at one since issue #623):
+ * the environ is process-level and unsetenv is permanent, so resolving it with
+ * a frame-local view would let a local `unset` destroy the global's export.
  * `name` is expected already NFC-canonical (callers pass their canonical key).
  * Idempotent; a no-op for names that were never exported.
  */
@@ -1095,7 +1175,7 @@ static void symtable_environ_resync(symtable_manager_t *manager,
         return;
     }
     unsetenv(name);
-    symvar_t *v = find_var(manager->current_scope, name);
+    symvar_t *v = find_var_through_tombstones(manager->current_scope, name);
     if (v && (v->flags & SYMVAR_EXPORTED) && v->type != SYMVAR_ARRAY) {
         setenv(name, v->value ? v->value : "", 1);
     }
@@ -1176,11 +1256,33 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
     }
     free_symvar(var);
 
-    /// Mark as unset rather than removing, in the OWNING scope.
-    symtable_scope_t *old_scope = manager->current_scope;
-    manager->current_scope = owner;
-    int rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
-    manager->current_scope = old_scope;
+    /// Where the three peers split (issue #623). Unsetting a binding owned by
+    /// the CURRENT frame leaves the name unset for the rest of that frame in
+    /// all of bash, zsh and dash, and the tombstone below does exactly that.
+    /// They disagree only when the unset runs in a frame DEEPER than the
+    /// binding it targets:
+    ///
+    ///     x=g; g() { unset x; }; f() { local x=outer; g; echo "[${x-U}]"; }
+    ///       bash -> [g]   the local is removed, the global shows through
+    ///       zsh  -> [U]   the name stays unset for the rest of the frame
+    ///       dash -> [U]
+    ///
+    /// bash is the outlier, so lush curates the zsh/dash reading as its
+    /// default and reproduces bash's under `mode bash`. Removing the entry is
+    /// what makes the next binding outward visible again; a tombstone is what
+    /// hides it.
+    int rc;
+    if (!owner_is_in_current_function(manager, owner) &&
+        shell_mode_allows(FEATURE_UNSET_REVEALS_OUTER)) {
+        ht_strstr_remove(owner->vars_ht, name);
+        rc = 0;
+    } else {
+        /// Mark as unset rather than removing, in the OWNING scope.
+        symtable_scope_t *old_scope = manager->current_scope;
+        manager->current_scope = owner;
+        rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
+        manager->current_scope = old_scope;
+    }
     /// Sync the child environ mirror: drop the unset name, re-exposing any
     /// shadowed exported binding now visible (issue #625).
     symtable_environ_resync(manager, name);
