@@ -273,6 +273,9 @@ static void initialize_job_control(executor_t *executor);
 static char *expand_arithmetic(executor_t *executor, const char *arith_text);
 static char *expand_command_substitution(executor_t *executor,
                                          const char *cmd_text);
+static char *expand_command_substitution_ex(executor_t *executor,
+                                            const char *cmd_text,
+                                            bool in_dquotes);
 static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
 static char *expand_quoted_string(executor_t *executor, const char *str,
@@ -17574,18 +17577,30 @@ static bool cmdsub_try_fast_read(executor_t *executor, const char *command,
     return true;
 }
 
+/// Expand a command substitution written outside double quotes.
+static char *expand_command_substitution(executor_t *executor,
+                                         const char *cmd_text) {
+    return expand_command_substitution_ex(executor, cmd_text, false);
+}
+
 /// Remove one level of backquote escaping from a `...` body.
 ///
 /// POSIX 2.6.3: within the backquoted form a backslash retains its literal
 /// meaning except when followed by `$`, a backtick or a backslash, where it
-/// escapes that character. Removing those backslashes is what turns an
-/// embedded `\`` into the delimiter of a NESTED substitution when the body is
-/// parsed. Every other `\X` is left exactly as it was, so a body like
+/// escapes that character. When the backquoted form appears INSIDE double
+/// quotes, `\\"` joins that set and yields a plain `"`, which then acts as a
+/// quote delimiter when the body is parsed -- so `"`printf \\"a b\\"`"` passes
+/// ONE argument. Leaving the backslashes in place passed TWO, and printf
+/// rendered only the first, truncating the word (issue #743). The rule really
+/// is context-dependent: unquoted, `\\"` keeps its backslash, and lush and
+/// every peer already agree on that. Removing those backslashes is what turns
+/// an embedded `\`` into the delimiter of a NESTED substitution when the body
+/// is parsed. Every other `\X` is left exactly as it was, so a body like
 /// `printf 'a\tb'` is unaffected.
 ///
 /// Returns a fresh string, or NULL on allocation failure (the caller keeps
 /// the original body, which is what it used before this existed).
-static char *lush_backtick_unescape(const char *body) {
+static char *lush_backtick_unescape(const char *body, bool in_dquotes) {
     if (!body) {
         return NULL;
     }
@@ -17597,7 +17612,8 @@ static char *lush_backtick_unescape(const char *body) {
     size_t w = 0;
     for (size_t i = 0; i < n; i++) {
         if (body[i] == '\\' && i + 1 < n &&
-            (body[i + 1] == '$' || body[i + 1] == '`' || body[i + 1] == '\\')) {
+            (body[i + 1] == '$' || body[i + 1] == '`' || body[i + 1] == '\\' ||
+             (in_dquotes && body[i + 1] == '"'))) {
             out[w++] = body[++i];
             continue;
         }
@@ -17607,8 +17623,13 @@ static char *lush_backtick_unescape(const char *body) {
     return out;
 }
 
-static char *expand_command_substitution(executor_t *executor,
-                                         const char *cmd_text) {
+/// The `$( )` form is NOT affected by the enclosing quotes: its body is a
+/// fresh command and a `\\"` inside it keeps its backslash, which is what
+/// every peer does. Only the backquoted body takes the extra escape, so the
+/// flag reaches lush_backtick_unescape and nothing else.
+static char *expand_command_substitution_ex(executor_t *executor,
+                                            const char *cmd_text,
+                                            bool in_dquotes) {
     if (!executor || !cmd_text) {
         return strdup("");
     }
@@ -17645,7 +17666,7 @@ static char *expand_command_substitution(executor_t *executor,
         /// body used to be parsed verbatim, so `\`` reached the sub-parse as
         /// a LITERAL backtick and a nested substitution was echoed as its own
         /// source text instead of being run (issue #732).
-        char *unescaped = lush_backtick_unescape(command);
+        char *unescaped = lush_backtick_unescape(command, in_dquotes);
         if (unescaped) {
             free(command);
             command = unescaped;
@@ -18321,9 +18342,12 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
                     strncpy(full_cmd_expr, &str[cmd_start], full_cmd_len);
                     full_cmd_expr[full_cmd_len] = '\0';
 
-                    /// Expand command substitution
-                    char *cmd_result =
-                        expand_command_substitution(executor, full_cmd_expr);
+                    /// Expand command substitution. This expander IS the
+                    /// double-quoted one and carries the context in its own
+                    /// parameter, so the backquoted body is unescaped by the
+                    /// rule that actually applies here (issue #743).
+                    char *cmd_result = expand_command_substitution_ex(
+                        executor, full_cmd_expr, in_double_quotes);
                     if (cmd_result) {
                         size_t result_len = strlen(cmd_result);
                         /// Ensure buffer is large enough
