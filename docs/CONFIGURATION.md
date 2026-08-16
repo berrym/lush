@@ -478,6 +478,67 @@ $ mode lush; unsetopt octal_zeroes   # opt out of the curated default
 $ mode bash; shopt -u octal_zeroes   # bash-spelling sugar, same state
 ```
 
+### Example: `unset_reveals_outer` (feature matrix)
+
+A worked example of the other kind of curation: the case where the
+references genuinely disagree and lush has to pick.
+
+`unset` of a variable that the *current* function owns leaves the name unset
+for the rest of that function in bash, zsh and dash alike. That is consensus,
+so it holds in every lush mode and is not configurable:
+
+```sh
+$ x=global
+$ f() { local x=lcl; unset x; echo "[${x-unset}]"; }
+$ f
+[unset]
+$ echo "$x"
+global            # the outer binding returns when the frame pops
+```
+
+They disagree when the `unset` runs in a frame *deeper* than the binding it
+targets. bash removes the binding, so the next one outward becomes visible;
+zsh and dash keep the name unset:
+
+| Mode | `unset_reveals_outer` | `g` sees |
+|---|---|---|
+| `lush` | off | `unset` (curated) |
+| `bash` | on | the outer binding |
+| `zsh` | off | `unset` (matches zsh) |
+| `posix` | off | `unset` (matches dash) |
+
+```sh
+$ g() { unset x; echo "[${x-unset}]"; }
+$ f() { local x=outer; g; }
+$ x=global; f
+[unset]           # mode lush
+
+$ mode bash; x=global; f
+[global]          # the local was removed, the global shows through
+```
+
+lush curates the zsh/dash reading because it keeps name resolution readable
+from the reference alone (SEMANTICS section 2): a name is unset or it is not,
+without the reader having to know which frame ran the `unset`. bash is
+reproduced under `mode bash` rather than discarded, and either behavior is
+reachable from any mode:
+
+```sh
+$ mode lush; setopt unset_reveals_outer     # opt in to bash's reading
+$ mode bash; unsetopt unset_reveals_outer   # opt out of it
+```
+
+Exported variables are a separate axis and are unaffected by this option.
+The process environ is process-level (SEMANTICS section 5.5), so a
+function-local `unset` never removes an enclosing binding's export:
+
+```sh
+$ export x=g
+$ f() { local x=l; unset x; }; f
+$ sh -c 'echo "$x"'
+g
+```
+
 ### Re-seed semantic
 
 Mode change re-seeds *every time*, including mid-session. Picking a preset

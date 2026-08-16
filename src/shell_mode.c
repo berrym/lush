@@ -97,6 +97,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = false,
 
                             /// Behavior Defaults
+            [FEATURE_UNSET_REVEALS_OUTER] =
+                false, /// dash, the POSIX oracle, keeps the name unset
             [FEATURE_STRICT_VALUE_TYPING] =
                 false, /// no POSIX array oracle; curate to the bash-family
                        /// flatten (element 0 / space-join) for compatibility
@@ -200,6 +202,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults
+            [FEATURE_UNSET_REVEALS_OUTER] =
+                true, /// bash reveals the next binding outward
             [FEATURE_STRICT_VALUE_TYPING] =
                 false, /// bash flattens a list in a scalar slot (space-join /
                        /// element 0), does not diagnose it
@@ -317,6 +321,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults
+            [FEATURE_UNSET_REVEALS_OUTER] = false, /// zsh keeps the name unset
             [FEATURE_STRICT_VALUE_TYPING] =
                 false, /// zsh flattens a list in a scalar slot on IFS[0],
                        /// does not diagnose it
@@ -425,6 +430,10 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_TIME_KEYWORD] = true,
 
                             /// Behavior Defaults - Zsh's safer defaults
+            [FEATURE_UNSET_REVEALS_OUTER] =
+                false, /// curated: agrees with zsh and dash, and keeps name
+                       /// resolution readable without knowing WHERE the
+                       /// unset ran (SEMANTICS section 2)
             [FEATURE_STRICT_VALUE_TYPING] =
                 true, /// flagship: a list/map in a scalar slot is a type error
                       /// (SEMANTICS section 3.9), not a silent flatten
@@ -576,6 +585,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_EMPTY_PARAMS_UNSET] = "empty_params_unset",
 
     /// Behavior Defaults
+    [FEATURE_UNSET_REVEALS_OUTER] = "unset_reveals_outer",
     [FEATURE_STRICT_VALUE_TYPING] = "strict_value_typing",
     [FEATURE_WORD_SPLIT_DEFAULT] = "word_split",
     [FEATURE_CMDSUB_WORD_SPLIT] = "cmdsub_word_split",

@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_unset_local_shadowing.c')
+  test_unset_local_shadowing = executable('test_unset_local_shadowing',
+    ['tests/integration/test_unset_local_shadowing.c'])
+  test('unset of a local leaves the name unset',
+       test_unset_local_shadowing,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_loop_redirection_status.c')
   test_loop_redirection_status = executable('test_loop_redirection_status',
     ['tests/integration/test_loop_redirection_status.c'])
