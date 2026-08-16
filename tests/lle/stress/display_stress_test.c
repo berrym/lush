@@ -67,13 +67,13 @@ static int tests_failed = 0;
 
 #define PASS()                                                                 \
     do {                                                                       \
-        printf("✓ PASS\n");                                                    \
+        printf("\xe2\x9c\x93 PASS\n");                                         \
         tests_passed++;                                                        \
     } while (0)
 
 #define FAIL(msg)                                                              \
     do {                                                                       \
-        printf("✗ FAIL: %s\n", msg);                                           \
+        printf("\xe2\x9c\x97 FAIL: %s\n", msg);                                \
         tests_failed++;                                                        \
     } while (0)
 
@@ -221,12 +221,12 @@ void stress_test_large_buffers(void) {
     double avg_us = elapsed_us / 100.0;
 
     printf("Results:\n");
-    printf("  Total time: %.2f μs\n", elapsed_us);
-    printf("  Average per render: %.2f μs\n", avg_us);
-    printf("  Target: < 500 μs\n");
+    printf("  Total time: %.2f \xce\xbcs\n", elapsed_us);
+    printf("  Average per render: %.2f \xce\xbcs\n", avg_us);
+    printf("  Target: < 500 \xce\xbcs\n");
 
     if (avg_us > 500.0) {
-        FAIL("Average render time exceeded 500μs");
+        FAIL("Average render time exceeded 500\xce\xbcs");
     } else {
         PASS();
     }
@@ -288,7 +288,8 @@ void stress_test_cache_churn(void) {
     printf("Results:\n");
     printf("  Total time: %.2f ms\n", elapsed_ms);
     printf("  Store failures: %d\n", store_failures);
-    printf("  Average store time: %.2f μs\n", (elapsed_ms * 1000.0) / 1000.0);
+    printf("  Average store time: %.2f \xce\xbcs\n",
+           (elapsed_ms * 1000.0) / 1000.0);
 
     /// Verify cache still works after churn
     void *data = NULL;
@@ -355,10 +356,10 @@ void stress_test_dirty_tracker_pressure(void) {
     double query_time_us = (time_end - time_mid) / 1000.0;
 
     printf("Results:\n");
-    printf("  Mark time: %.2f μs (%.4f μs per region)\n", mark_time_us,
-           mark_time_us / 10000.0);
-    printf("  Query time: %.2f μs (%.4f μs per query)\n", query_time_us,
-           query_time_us / 10000.0);
+    printf("  Mark time: %.2f \xce\xbcs (%.4f \xce\xbcs per region)\n",
+           mark_time_us, mark_time_us / 10000.0);
+    printf("  Query time: %.2f \xce\xbcs (%.4f \xce\xbcs per query)\n",
+           query_time_us, query_time_us / 10000.0);
     printf("  Dirty regions found: %d/10000\n", dirty_count);
 
     /// Clear and verify
@@ -413,7 +414,7 @@ void stress_test_error_recovery(void) {
     if (lle_render_pipeline_execute(pipeline, &context, &output) !=
         LLE_SUCCESS) {
         errors_handled++;
-        printf("  ✓ NULL buffer rejected\n");
+        printf("  \xe2\x9c\x93 NULL buffer rejected\n");
     }
 
     /// Test 2: NULL cache lookup
@@ -422,7 +423,7 @@ void stress_test_error_recovery(void) {
     size_t size = 0;
     if (lle_display_cache_lookup(NULL, 123, &data, &size) != LLE_SUCCESS) {
         errors_handled++;
-        printf("  ✓ NULL cache rejected\n");
+        printf("  \xe2\x9c\x93 NULL cache rejected\n");
     }
 
     /// Test 3: NULL tracker query
@@ -430,7 +431,7 @@ void stress_test_error_recovery(void) {
     bool result = lle_dirty_tracker_is_region_dirty(NULL, 100);
     if (result == true) { /// Safe default
         errors_handled++;
-        printf("  ✓ NULL tracker returns safe default (true)\n");
+        printf("  \xe2\x9c\x93 NULL tracker returns safe default (true)\n");
     }
 
     /// Test 4: Invalid cache key lookup
@@ -438,7 +439,7 @@ void stress_test_error_recovery(void) {
     if (lle_display_cache_lookup(cache, 99999999, &data, &size) !=
         LLE_SUCCESS) {
         errors_handled++;
-        printf("  ✓ Invalid cache key handled\n");
+        printf("  \xe2\x9c\x93 Invalid cache key handled\n");
     }
 
     /// Test 5: System continues after errors
@@ -451,7 +452,7 @@ void stress_test_error_recovery(void) {
     if (lle_render_pipeline_execute(pipeline, &context, &output) ==
         LLE_SUCCESS) {
         errors_handled++;
-        printf("  ✓ System recovers after errors\n");
+        printf("  \xe2\x9c\x93 System recovers after errors\n");
         lle_render_output_free(output);
     }
 
@@ -525,11 +526,12 @@ void stress_test_memory_leaks(void) {
     printf("  Memory delta: %zu KB\n", mem_delta);
 
     if (mem_delta > 100) {
-        printf("  ⚠ WARNING: Memory usage increased by %zu KB\n", mem_delta);
+        printf("  \xe2\x9a\xa0 WARNING: Memory usage increased by %zu KB\n",
+               mem_delta);
         printf("  Run with Valgrind to check for leaks\n");
         FAIL("Potential memory leak detected");
     } else {
-        printf("  ✓ No significant memory growth\n");
+        printf("  \xe2\x9c\x93 No significant memory growth\n");
         PASS();
     }
 }
@@ -575,10 +577,11 @@ int main(void) {
         "=================================================================\n");
 
     if (tests_failed > 0) {
-        printf("\n⚠ STRESS TESTS FAILED - System not production ready\n");
+        printf("\n\xe2\x9a\xa0 STRESS TESTS FAILED - System not production "
+               "ready\n");
     } else {
-        printf(
-            "\n✓ ALL STRESS TESTS PASSED - System validated for production\n");
+        printf("\n\xe2\x9c\x93 ALL STRESS TESTS PASSED - System validated for "
+               "production\n");
     }
 
     printf("\nNOTE: For complete memory leak validation, run:\n");

@@ -17,9 +17,9 @@
  *
  * Test Coverage:
  * - ASCII characters (1 byte)
- * - Latin extended characters (2 bytes: é, ñ)
- * - CJK characters (3 bytes: 中, 文)
- * - Emoji (4 bytes: 🔥, 🎯)
+ * - Latin extended characters (2 bytes: e-acute, n-tilde)
+ * - CJK characters (3 bytes: U+4E2D, U+6587)
+ * - Emoji (4 bytes: U+1F525, U+1F3AF)
  * - Combining diacritics (multi-codepoint graphemes)
  * - Mixed ASCII and multi-byte
  * - Word boundaries with UTF-8
@@ -52,7 +52,7 @@ static int tests_failed = 0;
 #define TEST_ASSERT(condition, message)                                        \
     do {                                                                       \
         if (!(condition)) {                                                    \
-            printf("  ✗ FAILED: %s\n", message);                               \
+            printf("  \xe2\x9c\x97 FAILED: %s\n", message);                    \
             printf("    at %s:%d\n", __FILE__, __LINE__);                      \
             tests_failed++;                                                    \
             return;                                                            \
@@ -61,7 +61,7 @@ static int tests_failed = 0;
 
 #define TEST_PASS()                                                            \
     do {                                                                       \
-        printf("  ✓ PASSED\n");                                                \
+        printf("  \xe2\x9c\x93 PASSED\n");                                     \
         tests_passed++;                                                        \
     } while (0)
 
@@ -155,9 +155,9 @@ static void test_forward_char_ascii(lush_memory_pool_t *pool) {
 static void test_forward_char_utf8_2byte(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: 2-byte UTF-8 (Latin extended)");
 
-    /// "café" - é is 2 bytes (0xC3 0xA9)
-    /// Byte layout: c(0) a(1) f(2) é(3-4)
-    lle_editor_t *editor = create_editor_with_content("café", pool);
+    /// "cafe-acute" - e-acute is 2 bytes (0xC3 0xA9)
+    /// Byte layout: c(0) a(1) f(2) e-acute(3-4)
+    lle_editor_t *editor = create_editor_with_content("caf\xc3\xa9", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     size_t byte_off, gr_idx;
@@ -174,17 +174,17 @@ static void test_forward_char_utf8_2byte(lush_memory_pool_t *pool) {
     TEST_ASSERT(byte_off == 2 && gr_idx == 2,
                 "Position after 2 forwards incorrect");
 
-    /// Move forward 3: should be at 'é' start (byte 3)
+    /// Move forward 3: should be at 'e-acute' start (byte 3)
     lle_forward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(byte_off == 3 && gr_idx == 3,
                 "Position after 3 forwards incorrect");
 
-    /// Move forward 4: should be past 'é' (byte 5, end of string)
+    /// Move forward 4: should be past 'e-acute' (byte 5, end of string)
     lle_forward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(byte_off == 5 && gr_idx == 4,
-                "Position after 'é' incorrect (2-byte char)");
+                "Position after '\xc3\xa9' incorrect (2-byte char)");
 
     lle_editor_destroy(editor);
     TEST_PASS();
@@ -193,8 +193,9 @@ static void test_forward_char_utf8_2byte(lush_memory_pool_t *pool) {
 static void test_forward_char_utf8_3byte(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: 3-byte UTF-8 (CJK)");
 
-    /// "中文" - each character is 3 bytes
-    lle_editor_t *editor = create_editor_with_content("中文", pool);
+    /// "U+4E2D U+6587" - each character is 3 bytes
+    lle_editor_t *editor =
+        create_editor_with_content("\xe4\xb8\xad\xe6\x96\x87", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     size_t byte_off, gr_idx;
@@ -222,8 +223,9 @@ static void test_forward_char_utf8_3byte(lush_memory_pool_t *pool) {
 static void test_forward_char_utf8_4byte(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: 4-byte UTF-8 (Emoji)");
 
-    /// "🔥🎯" - each emoji is 4 bytes
-    lle_editor_t *editor = create_editor_with_content("🔥🎯", pool);
+    /// "U+1F525 U+1F3AF" - each emoji is 4 bytes
+    lle_editor_t *editor =
+        create_editor_with_content("\xf0\x9f\x94\xa5\xf0\x9f\x8e\xaf", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     size_t byte_off, gr_idx;
@@ -247,8 +249,11 @@ static void test_forward_char_utf8_4byte(lush_memory_pool_t *pool) {
 static void test_forward_char_mixed(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: Mixed ASCII and multi-byte");
 
-    /// "a中b🔥c" - mix of 1, 3, 1, 4, 1 bytes
-    lle_editor_t *editor = create_editor_with_content("a中b🔥c", pool);
+    /// "aU+4E2DbU+1F525c" - mix of 1, 3, 1, 4, 1 bytes
+    lle_editor_t *editor = create_editor_with_content("a\xe4\xb8\xad"
+                                                      "b\xf0\x9f\x94\xa5"
+                                                      "c",
+                                                      pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     size_t byte_off, gr_idx;
@@ -258,20 +263,20 @@ static void test_forward_char_mixed(lush_memory_pool_t *pool) {
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(byte_off == 1 && gr_idx == 1, "After 'a'");
 
-    /// '中' (3 bytes)
+    /// 'U+4E2D' (3 bytes)
     lle_forward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
-    TEST_ASSERT(byte_off == 4 && gr_idx == 2, "After '中'");
+    TEST_ASSERT(byte_off == 4 && gr_idx == 2, "After '\xe4\xb8\xad'");
 
     /// 'b' (1 byte)
     lle_forward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(byte_off == 5 && gr_idx == 3, "After 'b'");
 
-    /// '🔥' (4 bytes)
+    /// 'U+1F525' (4 bytes)
     lle_forward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
-    TEST_ASSERT(byte_off == 9 && gr_idx == 4, "After '🔥'");
+    TEST_ASSERT(byte_off == 9 && gr_idx == 4, "After '\xf0\x9f\x94\xa5'");
 
     /// 'c' (1 byte)
     lle_forward_char(editor);
@@ -290,32 +295,33 @@ static void test_forward_char_mixed(lush_memory_pool_t *pool) {
 static void test_backward_char_utf8(lush_memory_pool_t *pool) {
     TEST_START("lle_backward_char: UTF-8 text");
 
-    /// "hello中文🔥"
-    lle_editor_t *editor = create_editor_with_content("hello中文🔥", pool);
+    /// "helloU+4E2D U+6587 U+1F525"
+    lle_editor_t *editor = create_editor_with_content(
+        "hello\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x94\xa5", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     /// Move to end
-    size_t end_byte = strlen("hello中文🔥");
+    size_t end_byte = strlen("hello\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x94\xa5");
     lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, end_byte);
 
     size_t byte_off, gr_idx;
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(gr_idx == 8, "Not at end (should be 8 graphemes)");
 
-    /// Backward from 🔥 (4 bytes)
+    /// Backward from U+1F525 (4 bytes)
     lle_backward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
     TEST_ASSERT(gr_idx == 7, "After backward from emoji");
 
-    /// Backward from 文 (3 bytes)
+    /// Backward from U+6587 (3 bytes)
     lle_backward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
-    TEST_ASSERT(gr_idx == 6, "After backward from 文");
+    TEST_ASSERT(gr_idx == 6, "After backward from \xe6\x96\x87");
 
-    /// Backward from 中 (3 bytes)
+    /// Backward from U+4E2D (3 bytes)
     lle_backward_char(editor);
     get_cursor_position(editor, &byte_off, NULL, &gr_idx);
-    TEST_ASSERT(gr_idx == 5, "After backward from 中");
+    TEST_ASSERT(gr_idx == 5, "After backward from \xe4\xb8\xad");
 
     /// Continue backward through ASCII
     lle_backward_char(editor);
@@ -371,8 +377,9 @@ static void test_forward_word_ascii(lush_memory_pool_t *pool) {
 static void test_forward_word_utf8(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_word: UTF-8 words");
 
-    /// "hello 中文 world"
-    lle_editor_t *editor = create_editor_with_content("hello 中文 world", pool);
+    /// "hello U+4E2D U+6587 world"
+    lle_editor_t *editor = create_editor_with_content(
+        "hello \xe4\xb8\xad\xe6\x96\x87 world", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     size_t byte_off;
@@ -382,16 +389,17 @@ static void test_forward_word_utf8(lush_memory_pool_t *pool) {
     get_cursor_position(editor, &byte_off, NULL, NULL);
     TEST_ASSERT(byte_off == 5, "Should be at end of 'hello'");
 
-    /// Forward to end of "中文" - this is 6 bytes (3+3)
+    /// Forward to end of "U+4E2D U+6587" - this is 6 bytes (3+3)
     lle_forward_word(editor);
     get_cursor_position(editor, &byte_off, NULL, NULL);
-    TEST_ASSERT(byte_off == 12,
-                "Should be at end of '中文' (6 bytes after space)");
+    TEST_ASSERT(
+        byte_off == 12,
+        "Should be at end of '\xe4\xb8\xad\xe6\x96\x87' (6 bytes after space)");
 
     /// Forward to end of "world"
     lle_forward_word(editor);
     get_cursor_position(editor, &byte_off, NULL, NULL);
-    size_t expected = 12 + 1 + 5; /// 中文 + space + world
+    size_t expected = 12 + 1 + 5; /// U+4E2D U+6587 + space + world
     TEST_ASSERT(byte_off == expected, "Should be at end of 'world'");
 
     lle_editor_destroy(editor);
@@ -431,12 +439,13 @@ static void test_backward_word_ascii(lush_memory_pool_t *pool) {
 static void test_backward_word_utf8(lush_memory_pool_t *pool) {
     TEST_START("lle_backward_word: UTF-8 words");
 
-    /// "hello 中文 world"
-    lle_editor_t *editor = create_editor_with_content("hello 中文 world", pool);
+    /// "hello U+4E2D U+6587 world"
+    lle_editor_t *editor = create_editor_with_content(
+        "hello \xe4\xb8\xad\xe6\x96\x87 world", pool);
     TEST_ASSERT(editor != NULL, "Failed to create editor");
 
     /// Move to end
-    size_t end_byte = strlen("hello 中文 world");
+    size_t end_byte = strlen("hello \xe4\xb8\xad\xe6\x96\x87 world");
     lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, end_byte);
 
     size_t byte_off;
@@ -446,10 +455,11 @@ static void test_backward_word_utf8(lush_memory_pool_t *pool) {
     get_cursor_position(editor, &byte_off, NULL, NULL);
     TEST_ASSERT(byte_off == 13, "Should be at start of 'world'");
 
-    /// Backward to start of "中文"
+    /// Backward to start of "U+4E2D U+6587"
     lle_backward_word(editor);
     get_cursor_position(editor, &byte_off, NULL, NULL);
-    TEST_ASSERT(byte_off == 6, "Should be at start of '中文'");
+    TEST_ASSERT(byte_off == 6,
+                "Should be at start of '\xe4\xb8\xad\xe6\x96\x87'");
 
     /// Backward to start of "hello"
     lle_backward_word(editor);
@@ -508,10 +518,10 @@ int main(void) {
     printf("========================================\n");
 
     if (tests_failed == 0) {
-        printf("✓ ALL TESTS PASSED\n");
+        printf("\xe2\x9c\x93 ALL TESTS PASSED\n");
         return 0;
     } else {
-        printf("✗ SOME TESTS FAILED\n");
+        printf("\xe2\x9c\x97 SOME TESTS FAILED\n");
         return 1;
     }
 }

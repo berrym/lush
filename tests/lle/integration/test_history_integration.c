@@ -11,7 +11,7 @@
  * Integration Test: History system
  *
  * Tests complete workflows combining multiple features:
- * - End-to-end: add → save → load → retrieve
+ * - End-to-end: add -> save -> load -> retrieve
  * - Large datasets (10000 entries)
  * - Performance benchmarks
  * - Multi-process file locking simulation
@@ -57,7 +57,8 @@ static uint64_t get_time_us(void) {
  * Test 1: Complete workflow - add, save, load, retrieve
  */
 void test_complete_workflow(void) {
-    TEST("Complete workflow: add → save → load → retrieve");
+    TEST("Complete workflow: add \xe2\x86\x92 save \xe2\x86\x92 load "
+         "\xe2\x86\x92 retrieve");
 
     lle_history_core_t *core1 = NULL;
     lle_history_core_t *core2 = NULL;
@@ -427,7 +428,7 @@ void test_stress_rapid_operations(void) {
 
     uint64_t end = get_time_us();
 
-    printf("  100 cycles × 100 add+retrieve: %lu us (%.2f ms)\n",
+    printf("  100 cycles \xc3\x97 100 add+retrieve: %lu us (%.2f ms)\n",
            (unsigned long)(end - start), (end - start) / 1000.0);
 
     /// Verify final count

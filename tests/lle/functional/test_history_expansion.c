@@ -689,10 +689,10 @@ int main(void) {
     printf("\n");
 
     if (tests_failed == 0) {
-        printf("RESULT: ALL TESTS PASSED ✓\n");
+        printf("RESULT: ALL TESTS PASSED \xe2\x9c\x93\n");
         return 0;
     } else {
-        printf("RESULT: %d TEST(S) FAILED ✗\n", tests_failed);
+        printf("RESULT: %d TEST(S) FAILED \xe2\x9c\x97\n", tests_failed);
         return 1;
     }
 }

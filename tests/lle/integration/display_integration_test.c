@@ -41,7 +41,7 @@ static int tests_failed = 0;
 #define ASSERT_SUCCESS(result, msg)                                            \
     do {                                                                       \
         if ((result) != LLE_SUCCESS) {                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             printf("    at %s:%d\n", __FILE__, __LINE__);                      \
             printf("    Result code: %d\n", (int)(result));                    \
             tests_failed++;                                                    \
@@ -52,7 +52,7 @@ static int tests_failed = 0;
 #define ASSERT_TRUE(cond, msg)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             printf("    at %s:%d\n", __FILE__, __LINE__);                      \
             tests_failed++;                                                    \
             return;                                                            \

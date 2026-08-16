@@ -3,11 +3,11 @@
  * @brief Performance benchmarks for LLE Spec 08 Display Integration
  *
  * Validates that display operations meet spec performance requirements:
- * - Display update latency: < 250μs average
+ * - Display update latency: < 250mus average
  * - Cache hit rate: > 75%
- * - Cache lookup: < 10μs
- * - Event processing: < 50μs
- * - Pipeline execution: < 500μs
+ * - Cache lookup: < 10mus
+ * - Event processing: < 50mus
+ * - Pipeline execution: < 500mus
  *
  * Reference: docs/lle_specification/08_display_integration_complete.md
  */
@@ -31,8 +31,8 @@ static uint64_t get_nanos(void) {
 }
 
 /// Spec requirements (in nanoseconds)
-#define SPEC_CACHE_LOOKUP_MAX_NS 10000ULL   /// 10μs
-#define SPEC_PIPELINE_EXEC_MAX_NS 500000ULL /// 500μs
+#define SPEC_CACHE_LOOKUP_MAX_NS 10000ULL   /// 10mus
+#define SPEC_PIPELINE_EXEC_MAX_NS 500000ULL /// 500mus
 #define SPEC_CACHE_HIT_RATE_MIN 0.75        /// 75%
 
 #define BENCHMARK(name)                                                        \
@@ -46,15 +46,16 @@ static uint64_t get_nanos(void) {
     do {                                                                       \
         double ms = elapsed_ns / 1000000.0;                                    \
         double us = elapsed_ns / 1000.0;                                       \
-        printf("  %-30s: %.3f μs (%.6f ms)\n", label, us, ms);                 \
+        printf("  %-30s: %.3f \xce\xbcs (%.6f ms)\n", label, us, ms);          \
         if (spec_max_ns > 0) {                                                 \
-            printf("  %-30s: < %.3f μs\n", "Spec requirement",                 \
+            printf("  %-30s: < %.3f \xce\xbcs\n", "Spec requirement",          \
                    spec_max_ns / 1000.0);                                      \
             if (elapsed_ns <= spec_max_ns) {                                   \
-                printf("  %-30s: ✓ PASS\n", "Result");                         \
+                printf("  %-30s: \xe2\x9c\x93 PASS\n", "Result");              \
             } else {                                                           \
-                printf("  %-30s: ✗ FAIL (exceeds by %.3f μs)\n", "Result",     \
-                       (elapsed_ns - spec_max_ns) / 1000.0);                   \
+                printf("  %-30s: \xe2\x9c\x97 FAIL (exceeds by %.3f "          \
+                       "\xce\xbcs)\n",                                         \
+                       "Result", (elapsed_ns - spec_max_ns) / 1000.0);         \
             }                                                                  \
         }                                                                      \
     } while (0)
@@ -134,9 +135,9 @@ static void benchmark_cache_operations(void) {
     printf("  Spec requirement: > %.1f%%\n", SPEC_CACHE_HIT_RATE_MIN * 100.0);
 
     if (hit_rate >= SPEC_CACHE_HIT_RATE_MIN) {
-        printf("  Result: ✓ PASS\n");
+        printf("  Result: \xe2\x9c\x93 PASS\n");
     } else {
-        printf("  Result: ✗ FAIL (%.1f%% below target)\n",
+        printf("  Result: \xe2\x9c\x97 FAIL (%.1f%% below target)\n",
                (SPEC_CACHE_HIT_RATE_MIN - hit_rate) * 100.0);
     }
 

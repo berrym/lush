@@ -267,8 +267,8 @@ TEST(analyze_script_security_eval) {
 }
 
 TEST(analyze_script_security_mixed_script_identifier) {
-    /// `$pаsswd` references a name whose `а` is Cyrillic (U+0430), not
-    /// Latin -- a homograph of `passwd`. The analyzer flags it as a
+    /// `$pU+0430sswd` references a name whose `U+0430` is Cyrillic (U+0430),
+    /// not Latin -- a homograph of `passwd`. The analyzer flags it as a
     /// security advisory naming both scripts. Always on, independent of
     /// the reject_mixed_script_idents runtime flag.
     setup_test_dir();
@@ -663,11 +663,11 @@ TEST(analyze_script_sigil_at_on_scalar_is_warning) {
 
 TEST(analyze_script_sigil_unicode_name_full_extent) {
     /// The predictive sigil analyzer must read the whole unicode name
-    /// on both the binding scan and the @-reference scan. `café` (with a
-    /// final multibyte é) is a scalar binding; `@café` widens it, so the
-    /// warning message must name the full `@café`. The byte-test this
-    /// replaced truncated the name at é, emitting `@caf` instead. This
-    /// binary links the strong feature-flag-aware predicate.
+    /// on both the binding scan and the @-reference scan. `cafe-acute` (with a
+    /// final multibyte e-acute) is a scalar binding; `@cafe-acute` widens it,
+    /// so the warning message must name the full `@cafe-acute`. The byte-test
+    /// this replaced truncated the name at e-acute, emitting `@caf` instead.
+    /// This binary links the strong feature-flag-aware predicate.
     setup_test_dir();
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
@@ -689,8 +689,8 @@ TEST(analyze_script_sigil_unicode_name_full_extent) {
             break;
         }
     }
-    ASSERT_TRUE(found,
-                "@café names the full unicode identifier in the warning");
+    ASSERT_TRUE(
+        found, "@caf\xc3\xa9 names the full unicode identifier in the warning");
 
     debug_cleanup(ctx);
     cleanup_test_dir();

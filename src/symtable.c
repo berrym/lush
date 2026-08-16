@@ -546,7 +546,7 @@ void *symtable_capture_scope_for_lexical(symtable_manager_t *manager) {
  * Identical to symtable_push_scope(SCOPE_LEXICAL, name) except that
  * the new frame's `parent` is the supplied captured pointer, not the
  * dynamic current_scope. This is what gives typed-function (`fn`)
- * bodies lexical (closure) semantics per SEMANTICS U+00A75.3: free names
+ * bodies lexical (closure) semantics per SEMANTICS S5.3: free names
  * inside the body resolve through the declaration-site scope chain,
  * not the call-site chain.
  *

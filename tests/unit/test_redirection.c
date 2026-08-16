@@ -380,7 +380,7 @@ TEST(redirection_error_null_message) {
  * ============================================================================
  *
  * These verify that `exec {var}<file` allocations are tracked by the
- * executor and reclaimed when executor_free runs — a script that opens
+ * executor and reclaimed when executor_free runs -- a script that opens
  * but never closes a {var}<file fd must not leak past shell exit.
  */
 

@@ -64,7 +64,7 @@ typedef enum lle_syntax_token_type {
 
     /* Paths -- two-axis classification.
      *
-     * Shape (per spec U+00A7 6.2): absolute (`/...`), relative (`./`, `../`,
+     * Shape (per spec S6.2): absolute (`/...`), relative (`./`, `../`,
      * bare with a slash), home (`~/...`).
      * Kind: regular file vs. directory, determined by stat() at
      * highlight time when validate_paths is on.

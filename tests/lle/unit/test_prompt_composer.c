@@ -20,7 +20,7 @@
 
 #include "test_framework.h"
 
-/* Local 1-arg ASSERT family (cond only — no message) wrapping the
+/* Local 1-arg ASSERT family (cond only -- no message) wrapping the
  * framework's failure mechanism, replacing the historical exit(1)
  * pattern with longjmp-based isolation per RUN_TEST. */
 #undef ASSERT

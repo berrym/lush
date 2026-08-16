@@ -239,10 +239,10 @@ static int run_test(test_context_t *ctx) {
             if (buf[0] == 27 && n > 1) {
                 const char *seq = detect_sequence(buf, n);
                 if (seq) {
-                    printf("\n  → Sequence detected: %s\n", seq);
+                    printf("\n  \xe2\x86\x92 Sequence detected: %s\n", seq);
                     ctx->sequence_count++;
                 } else {
-                    printf("\n  → Escape pressed\n");
+                    printf("\n  \xe2\x86\x92 Escape pressed\n");
                 }
 
                 /// Show raw bytes
@@ -258,12 +258,12 @@ static int run_test(test_context_t *ctx) {
                     ctx->running = false;
                     break;
                 } else if (buf[0] == 13) { /// Enter
-                    printf("\n  → Enter pressed\n");
+                    printf("\n  \xe2\x86\x92 Enter pressed\n");
                 } else if (buf[0] == 127 || buf[0] == 8) { /// Backspace
-                    printf("\n  → Backspace pressed\n");
+                    printf("\n  \xe2\x86\x92 Backspace pressed\n");
                 } else {
-                    printf("\n  → Control char: ^%c (0x%02X)\n", buf[0] + 64,
-                           buf[0]);
+                    printf("\n  \xe2\x86\x92 Control char: ^%c (0x%02X)\n",
+                           buf[0] + 64, buf[0]);
                 }
             }
             /// Regular character

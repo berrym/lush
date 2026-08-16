@@ -573,7 +573,8 @@ static int test_set_content_ascii_art_prompt(void) {
 
     prompt_layer_init(layer, events);
 
-    const char *ascii_art = "┌─[user@host]─[~/path]\n└─$ ";
+    const char *ascii_art = "\xe2\x94\x8c\xe2\x94\x80[user@host]\xe2\x94\x80[~/"
+                            "path]\n\xe2\x94\x94\xe2\x94\x80$ ";
     prompt_layer_error_t result = prompt_layer_set_content(layer, ascii_art);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
 
@@ -594,7 +595,7 @@ static int test_set_content_unicode_prompt(void) {
 
     prompt_layer_init(layer, events);
 
-    const char *unicode_prompt = "λ ~/code » ";
+    const char *unicode_prompt = "\xce\xbb ~/code \xc2\xbb ";
     prompt_layer_error_t result =
         prompt_layer_set_content(layer, unicode_prompt);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);

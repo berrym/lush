@@ -18023,7 +18023,7 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
         /// literal -- `printf "%s\n"`, `"user@host"`, and `"100% off"` all
         /// survive.  The tokenizer recognizes a bare sigil only at word start
         /// (never mid-word), so expanding `@`/`%` anywhere inside quotes here
-        /// would itself violate the SEMANTICS U+00A73.6 invariant that quoting
+        /// would itself violate the SEMANTICS S3.6 invariant that quoting
         /// does not change presentation: `echo user@host` and `echo
         /// "user@host"` must agree.  Inside quotes, list interpolation uses the
         /// `$` form,
@@ -20794,9 +20794,9 @@ static int execute_extended_test(executor_t *executor, node_t *test_node) {
  * @return 0 on success, 1 on error
  */
 /// Report a scalar->array kind-transition error (issue #621) -- the mirror of
-/// the U+00A73.9 list->scalar E1134. Emitted only under strict value typing
+/// the S3.9 list->scalar E1134. Emitted only under strict value typing
 /// (lush mode), when an array element write or append would implicitly re-kind
-/// an existing scalar into a list. Requests a POSIX exit like the U+00A73.9
+/// an existing scalar into a list. Requests a POSIX exit like the S3.9
 /// gate.
 static void report_scalar_kind_error(executor_t *executor,
                                      source_location_t loc, const char *name) {

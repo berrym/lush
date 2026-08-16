@@ -456,7 +456,7 @@ TEST(heredoc_invalid_delimiter) {
 }
 
 /* Issue #44: a heredoc whose delimiter is never reached (EOF first) was
- * previously accepted silently — the body was treated as valid input and
+ * previously accepted silently -- the body was treated as valid input and
  * `lush -n` reported success. Bash warns. Lush now treats this as a
  * parse error so that incomplete input is signaled to tooling and to
  * the user, since silent acceptance is dangerous and indistinguishable
@@ -469,7 +469,7 @@ TEST(heredoc_unclosed_strip) {
 }
 
 TEST(heredoc_unclosed_quoted_delim) {
-    /// Quoted delimiter (no expansion) — same diagnostic should apply
+    /// Quoted delimiter (no expansion) -- same diagnostic should apply
     ASSERT_PARSE_FAILS("cat <<'EOF'\nbody line\n");
 }
 
@@ -636,7 +636,7 @@ TEST(heredoc_repeated_delimiter_no_loop) {
  * input scan-from-zero couldn't find the literal `<< 'ai'` substring
  * (the input has `<< ''ai`), defaulted content_start to 0, and then
  * body collection from byte 0 found a spurious "ai" terminator and
- * reset tokenizer->position back into the live parse — triggering
+ * reset tokenizer->position back into the live parse -- triggering
  * O(N^2) command-list growth in the case-arm body parser. The fix
  * computes content_start from the operator's source_location_t
  * directly, eliminating the input scan entirely.

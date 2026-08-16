@@ -56,7 +56,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 print_section() {
@@ -75,18 +75,18 @@ test_result() {
 
     case $result in
         0)
-            echo -e "  ${GREEN}✓${NC} $test_name"
+            echo -e "  ${GREEN}OK${NC} $test_name"
             PASSED_TESTS=$((PASSED_TESTS + 1))
             ;;
         1)
-            echo -e "  ${RED}✗${NC} $test_name"
+            echo -e "  ${RED}FAIL${NC} $test_name"
             [[ -n "$details" ]] && echo -e "    ${YELLOW}Details:${NC} $details"
             [[ -n "$expected" ]] && echo -e "    ${YELLOW}Expected:${NC} $expected"
             [[ -n "$actual" ]] && echo -e "    ${YELLOW}Actual:${NC} $actual"
             FAILED_TESTS=$((FAILED_TESTS + 1))
             ;;
         2)
-            echo -e "  ${YELLOW}⚠${NC} $test_name (SKIPPED)"
+            echo -e "  ${YELLOW}WARN${NC} $test_name (SKIPPED)"
             [[ -n "$details" ]] && echo -e "    ${YELLOW}Reason:${NC} $details"
             SKIPPED_TESTS=$((SKIPPED_TESTS + 1))
             ;;
@@ -576,7 +576,7 @@ generate_report() {
     # Determine overall result
     local exit_code
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL TESTS PASSED! ${NC}"
         echo -e "${GREEN}Lush v1.3.0 demonstrates excellent quality and POSIX compliance!${NC}"
         echo -e "${GREEN}Ready for pre-release distribution and further quality assurance.${NC}"
         exit_code=0
@@ -599,16 +599,16 @@ generate_report() {
     fi
 
     echo -e "\n${CYAN}Validated Feature Areas:${NC}"
-    echo "✓ Basic Shell Functionality (execution, help, version)"
-    echo "✓ POSIX Options Implementation (all 24 required options)"
-    echo "✓ Command Line Options (short options and behaviors)"
-    echo "✓ Built-in Commands (printf, echo, test with POSIX compliance)"
-    echo "✓ Option State Management (set commands, combinations)"
-    echo "✓ Error Handling (invalid options, syntax errors)"
-    echo "✓ Advanced Features (comments, expansion, functions)"
-    echo "✓ POSIX Compliance (parameters, exit codes, variables)"
-    echo "✓ Performance & Stability (execution speed, memory handling)"
-    echo "✓ Integration Scenarios (real-world usage patterns)"
+    echo "OK Basic Shell Functionality (execution, help, version)"
+    echo "OK POSIX Options Implementation (all 24 required options)"
+    echo "OK Command Line Options (short options and behaviors)"
+    echo "OK Built-in Commands (printf, echo, test with POSIX compliance)"
+    echo "OK Option State Management (set commands, combinations)"
+    echo "OK Error Handling (invalid options, syntax errors)"
+    echo "OK Advanced Features (comments, expansion, functions)"
+    echo "OK POSIX Compliance (parameters, exit codes, variables)"
+    echo "OK Performance & Stability (execution speed, memory handling)"
+    echo "OK Integration Scenarios (real-world usage patterns)"
 
     echo -e "\n${BLUE}Quality Assurance Status:${NC}"
     echo "This comprehensive regression test validates the core functionality"

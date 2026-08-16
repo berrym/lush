@@ -28,10 +28,9 @@ extern lush_memory_pool_t *global_memory_pool;
 
 /// Buffer content, written with explicit UTF-8 bytes so the layout does not
 /// depend on the source file encoding:
-///   line 0 "café" spelled "caf" + U+00E9 (C3 A9)  -> 5 bytes, 4 codepoints
-///   line 1 "alpha beta gamma" U+03B1 U+03B2 U+03B3       -> 6 bytes, 3
-///   codepoints line 2 "hi"                                          -> 2
-///   bytes, 2 codepoints
+///   line 0 "cafeU+0301" spelled "caf" + U+00E9 (C3 A9)  -> 5 bytes, 4
+///   codepoints line 1 "alpha beta gamma" U+03B1 U+03B2 U+03B3       -> 6
+///   bytes, 3 codepoints line 2 "hi" -> 2 bytes, 2 codepoints
 /// Plus two '\n' separators: 15 bytes, 11 codepoints, 11 graphemes total.
 #define CONTENT "caf\xC3\xA9\n\xCE\xB1\xCE\xB2\xCE\xB3\nhi"
 

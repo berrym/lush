@@ -63,20 +63,20 @@ char **environ = NULL;
  * link and give tests a knob to control the simulated expansion result.
  *
  * Mock controls:
- *   mock_expand_result        — string returned by expand_if_needed (NULL
+ *   mock_expand_result        -- string returned by expand_if_needed (NULL
  *                               causes expand_if_needed to return NULL)
- *   mock_brace_branches[]     — pre-set branch list returned by
+ *   mock_brace_branches[]     -- pre-set branch list returned by
  *                               expand_brace_pattern when its input
  *                               contains a brace; NULL/0 means pass
  *                               through (single-element with the input)
- *   mock_brace_branch_count   — count for the above
+ *   mock_brace_branch_count   -- count for the above
  *
  * The analyzer treats current_executor == NULL as "no executor available,
  * skip resolution"; tests that want resolution to run set this to any
  * non-NULL value.
  */
 
-/// Forward-declared opaque type — the stubs never dereference it.
+/// Forward-declared opaque type -- the stubs never dereference it.
 typedef struct executor executor_t;
 
 executor_t *current_executor = NULL;

@@ -69,10 +69,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}$details${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -159,7 +159,7 @@ run_test "Array element assignment" \
 # run_test "Array append" \
 #     'arr=(a b); arr+=(c d); echo ${arr[@]}' \
 #     "a b c d"
-echo -e "  ${YELLOW}⚠${NC} Array append += has known issues - skipping test"
+echo -e "  ${YELLOW}WARN${NC} Array append += has known issues - skipping test"
 
 print_section "Negative Array Indices"
 
@@ -196,7 +196,7 @@ print_section "Associative Array Operations"
 # and literal initialization syntax. These tests document expected behavior.
 # TODO: Fix associative array implementation
 
-echo -e "  ${YELLOW}⚠${NC} Associative arrays have known issues - skipping tests"
+echo -e "  ${YELLOW}WARN${NC} Associative arrays have known issues - skipping tests"
 
 # =============================================================================
 print_category "EXTENDED TEST [[ ]]"

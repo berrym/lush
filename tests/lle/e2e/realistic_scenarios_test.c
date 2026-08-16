@@ -155,13 +155,14 @@ TEST(scenario_typo_correction_with_utf8) {
 
     buffer->change_tracking_enabled = true;
 
-    /// User types: "echo 'Hello 🌍 Wrold'" (typo: Wrold)
+    /// User types: "echo 'Hello U+1F30D Wrold'" (typo: Wrold)
     lle_change_sequence_t *seq = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "type with typo", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
     buffer->current_sequence = seq;
 
-    result = lle_buffer_insert_text(buffer, 0, "echo 'Hello 🌍 Wrold'", 23);
+    result = lle_buffer_insert_text(buffer, 0,
+                                    "echo 'Hello \xf0\x9f\x8c\x8d Wrold'", 23);
     ASSERT_SUCCESS(result, "Insert text with UTF-8");
 
     result = lle_change_tracker_complete_sequence(tracker);
@@ -188,18 +189,18 @@ TEST(scenario_typo_correction_with_utf8) {
     ASSERT_SUCCESS(result, "Complete fix");
 
     /// Verify corrected text
-    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 World'",
+    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello \xf0\x9f\x8c\x8d World'",
                   "Corrected text");
 
     /// Undo and redo work correctly
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo correction");
-    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 Wrold'",
+    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello \xf0\x9f\x8c\x8d Wrold'",
                   "Back to typo");
 
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo correction");
-    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 World'",
+    ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello \xf0\x9f\x8c\x8d World'",
                   "Corrected again");
 
     /// Cleanup

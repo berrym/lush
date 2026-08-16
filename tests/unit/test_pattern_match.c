@@ -181,17 +181,18 @@ TEST(unbalanced_paren_treated_as_literal) {
  */
 
 TEST(question_matches_unicode_codepoint) {
-    ASSERT(lush_pattern_match("café", "c?fé"),
-           "? matches multi-byte é as one codepoint");
-    ASSERT(lush_pattern_match("Naïve", "Na?ve"), "? matches ï in middle");
-    ASSERT(!lush_pattern_match("café", "c?f"),
+    ASSERT(lush_pattern_match("caf\xc3\xa9", "c?f\xc3\xa9"),
+           "? matches multi-byte \xc3\xa9 as one codepoint");
+    ASSERT(lush_pattern_match("Na\xc3\xafve", "Na?ve"),
+           "? matches \xc3\xaf in middle");
+    ASSERT(!lush_pattern_match("caf\xc3\xa9", "c?f"),
            "? + literal mismatch fails cleanly");
 }
 
 TEST(question_matches_decomposed_grapheme_cluster) {
     /// THE DISCRIMINATING CASE. Every pre-existing Unicode test here uses
-    /// PRECOMPOSED literals ("café" = U+00E9), where one codepoint and one
-    /// TR#29 grapheme cluster are the same thing -- so they pass under
+    /// PRECOMPOSED literals ("cafe-acute" = U+00E9), where one codepoint and
+    /// one TR#29 grapheme cluster are the same thing -- so they pass under
     /// codepoint-only semantics and cannot detect the difference. A DECOMPOSED
     /// sequence separates them: "cafe" + U+0301 is five codepoints but four
     /// characters.
@@ -291,51 +292,65 @@ TEST(bracket_class_anchors_on_grapheme_boundaries) {
 }
 
 TEST(literal_multibyte_matches) {
-    ASSERT(lush_pattern_match("café", "café"),
+    ASSERT(lush_pattern_match("caf\xc3\xa9", "caf\xc3\xa9"),
            "literal multi-byte pattern matches identical input");
-    ASSERT(lush_pattern_match("中文", "中文"), "CJK literal matches");
-    ASSERT(!lush_pattern_match("café", "cafe"),
-           "é != e, no first-byte ambiguity");
+    ASSERT(lush_pattern_match("\xe4\xb8\xad\xe6\x96\x87",
+                              "\xe4\xb8\xad\xe6\x96\x87"),
+           "CJK literal matches");
+    ASSERT(!lush_pattern_match("caf\xc3\xa9", "cafe"),
+           "\xc3\xa9 != e, no first-byte ambiguity");
 }
 
 TEST(star_matches_with_unicode_tail) {
-    ASSERT(lush_pattern_match("café", "c*é"), "* + multi-byte tail");
-    ASSERT(lush_pattern_match("café au lait", "c*lait"),
+    ASSERT(lush_pattern_match("caf\xc3\xa9", "c*\xc3\xa9"),
+           "* + multi-byte tail");
+    ASSERT(lush_pattern_match("caf\xc3\xa9 au lait", "c*lait"),
            "* across multi-byte content");
 }
 
 TEST(bracket_range_unicode_lowercase) {
-    ASSERT(lush_pattern_match("α", "[α-ω]"), "α at lower bound of Greek range");
-    ASSERT(lush_pattern_match("ω", "[α-ω]"), "ω at upper bound");
-    ASSERT(lush_pattern_match("ν", "[α-ω]"), "ν in middle of Greek range");
-    ASSERT(!lush_pattern_match("Α", "[α-ω]"),
-           "uppercase Α outside lowercase Greek range");
+    ASSERT(lush_pattern_match("\xce\xb1", "[\xce\xb1-\xcf\x89]"),
+           "\xce\xb1 at lower bound of Greek range");
+    ASSERT(lush_pattern_match("\xcf\x89", "[\xce\xb1-\xcf\x89]"),
+           "\xcf\x89 at upper bound");
+    ASSERT(lush_pattern_match("\xce\xbd", "[\xce\xb1-\xcf\x89]"),
+           "\xce\xbd in middle of Greek range");
+    ASSERT(!lush_pattern_match("\xce\x91", "[\xce\xb1-\xcf\x89]"),
+           "uppercase \xce\x91 outside lowercase Greek range");
 }
 
 TEST(bracket_range_latin1_supplement) {
-    ASSERT(lush_pattern_match("À", "[À-ÿ]"),
-           "À at lower bound of Latin-1 Supplement range");
-    ASSERT(lush_pattern_match("é", "[À-ÿ]"), "é in Latin-1 Supplement range");
-    ASSERT(!lush_pattern_match("a", "[À-ÿ]"), "ASCII a outside Latin-1 range");
+    ASSERT(lush_pattern_match("\xc3\x80", "[\xc3\x80-\xc3\xbf]"),
+           "\xc3\x80 at lower bound of Latin-1 Supplement range");
+    ASSERT(lush_pattern_match("\xc3\xa9", "[\xc3\x80-\xc3\xbf]"),
+           "\xc3\xa9 in Latin-1 Supplement range");
+    ASSERT(!lush_pattern_match("a", "[\xc3\x80-\xc3\xbf]"),
+           "ASCII a outside Latin-1 range");
 }
 
 TEST(bracket_literal_unicode_chars) {
-    ASSERT(lush_pattern_match("ä", "[äöü]"), "literal ä in Unicode bracket");
-    ASSERT(lush_pattern_match("ö", "[äöü]"), "literal ö in Unicode bracket");
-    ASSERT(!lush_pattern_match("a", "[äöü]"), "ASCII a not in Unicode bracket");
+    ASSERT(lush_pattern_match("\xc3\xa4", "[\xc3\xa4\xc3\xb6\xc3\xbc]"),
+           "literal \xc3\xa4 in Unicode bracket");
+    ASSERT(lush_pattern_match("\xc3\xb6", "[\xc3\xa4\xc3\xb6\xc3\xbc]"),
+           "literal \xc3\xb6 in Unicode bracket");
+    ASSERT(!lush_pattern_match("a", "[\xc3\xa4\xc3\xb6\xc3\xbc]"),
+           "ASCII a not in Unicode bracket");
 }
 
 TEST(bracket_mixed_ascii_and_unicode) {
-    ASSERT(lush_pattern_match("a", "[a-zα-ω]"), "ASCII alpha in mixed bracket");
-    ASSERT(lush_pattern_match("ν", "[a-zα-ω]"), "Greek alpha in mixed bracket");
-    ASSERT(!lush_pattern_match("5", "[a-zα-ω]"), "digit not in any range");
+    ASSERT(lush_pattern_match("a", "[a-z\xce\xb1-\xcf\x89]"),
+           "ASCII alpha in mixed bracket");
+    ASSERT(lush_pattern_match("\xce\xbd", "[a-z\xce\xb1-\xcf\x89]"),
+           "Greek alpha in mixed bracket");
+    ASSERT(!lush_pattern_match("5", "[a-z\xce\xb1-\xcf\x89]"),
+           "digit not in any range");
 }
 
 TEST(bracket_negation_unicode) {
-    ASSERT(lush_pattern_match("Α", "[!α-ω]"),
-           "uppercase Α matches negated lowercase range");
-    ASSERT(!lush_pattern_match("α", "[!α-ω]"),
-           "α excluded by negated lowercase range");
+    ASSERT(lush_pattern_match("\xce\x91", "[!\xce\xb1-\xcf\x89]"),
+           "uppercase \xce\x91 matches negated lowercase range");
+    ASSERT(!lush_pattern_match("\xce\xb1", "[!\xce\xb1-\xcf\x89]"),
+           "\xce\xb1 excluded by negated lowercase range");
 }
 
 /* ============================================================================

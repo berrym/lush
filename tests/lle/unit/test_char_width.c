@@ -172,10 +172,10 @@ TEST(cjk_extension_c_through_g_wide) {
 
 TEST(hangul_syllables_wide) {
     /// U+AC00..U+D7A3
-    ASSERT_EQ(lle_codepoint_width(0xAC00), 2, "first syllable (가)");
-    ASSERT_EQ(lle_codepoint_width(0xC548), 2, "안");
-    ASSERT_EQ(lle_codepoint_width(0xB155), 2, "녕");
-    ASSERT_EQ(lle_codepoint_width(0xD7A3), 2, "last syllable (힣)");
+    ASSERT_EQ(lle_codepoint_width(0xAC00), 2, "first syllable (\xea\xb0\x80)");
+    ASSERT_EQ(lle_codepoint_width(0xC548), 2, "\xec\x95\x88");
+    ASSERT_EQ(lle_codepoint_width(0xB155), 2, "\xeb\x85\x95");
+    ASSERT_EQ(lle_codepoint_width(0xD7A3), 2, "last syllable (\xed\x9e\xa3)");
 }
 
 /* ============================================================================
@@ -187,14 +187,14 @@ TEST(hiragana_wide) {
     /// Per TR11, the Hiragana 'W' range is U+3041..U+3096 plus
     /// U+3099..U+309F. U+3040 itself is reserved/Neutral.
     ASSERT_EQ(lle_codepoint_width(0x3041), 2, "HIRAGANA LETTER SMALL A");
-    ASSERT_EQ(lle_codepoint_width(0x3042), 2, "あ");
+    ASSERT_EQ(lle_codepoint_width(0x3042), 2, "\xe3\x81\x82");
     ASSERT_EQ(lle_codepoint_width(0x309F), 2, "last hiragana block");
 }
 
 TEST(katakana_wide) {
     /// U+30A0..U+30FF
     ASSERT_EQ(lle_codepoint_width(0x30A0), 2, "first katakana block");
-    ASSERT_EQ(lle_codepoint_width(0x30AB), 2, "カ");
+    ASSERT_EQ(lle_codepoint_width(0x30AB), 2, "\xe3\x82\xab");
     ASSERT_EQ(lle_codepoint_width(0x30FF), 2, "last katakana block");
 }
 
@@ -229,7 +229,7 @@ TEST(fullwidth_forms_secondary_range_wide) {
  */
 
 TEST(emoji_main_block_wide) {
-    /// U+1F300..U+1F9FF — the dominant emoji blocks
+    /// U+1F300..U+1F9FF -- the dominant emoji blocks
     ASSERT_EQ(lle_codepoint_width(0x1F300), 2, "first emoji block");
     ASSERT_EQ(lle_codepoint_width(0x1F600), 2, "smiley");
     ASSERT_EQ(lle_codepoint_width(0x1F9FF), 2, "last in emoji block");
@@ -302,7 +302,7 @@ TEST(emoji_skin_tone_modifiers_wide) {
  */
 
 TEST(regional_indicators_wide) {
-    /// U+1F1E6..U+1F1FF — flag letters
+    /// U+1F1E6..U+1F1FF -- flag letters
     ASSERT_EQ(lle_codepoint_width(0x1F1E6), 2, "REGIONAL INDICATOR A");
     ASSERT_EQ(lle_codepoint_width(0x1F1FA), 2, "REGIONAL INDICATOR U");
     ASSERT_EQ(lle_codepoint_width(0x1F1FF), 2, "REGIONAL INDICATOR Z");
@@ -531,7 +531,7 @@ TEST(boundary_just_after_block_elements) {
 }
 
 /* ============================================================================
- * lle_is_wide_character() — should agree with width == 2
+ * lle_is_wide_character() -- should agree with width == 2
  * ============================================================================
  */
 

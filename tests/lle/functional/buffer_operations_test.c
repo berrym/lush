@@ -310,13 +310,14 @@ static void test_insert_utf8_text() {
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
     /// Insert text with Chinese characters
-    const char *text = "Hello 世界";
+    const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
 
     ASSERT_EQ(buffer->length, 12,
               "Buffer length correct (6 ASCII + 6 UTF-8 bytes)");
-    ASSERT_STR_EQ(buffer->data, "Hello 世界", "Buffer content correct");
+    ASSERT_STR_EQ(buffer->data, "Hello \xe4\xb8\x96\xe7\x95\x8c",
+                  "Buffer content correct");
 
     lle_buffer_destroy(buffer);
     PASS();

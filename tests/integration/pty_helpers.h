@@ -259,7 +259,7 @@ static inline int pty_spawn(pty_session_t *session, const char *lush_path,
 
     /// Parent: keep the master + stdin-write ends. Drop the slave +
     /// stdin-read ends so the child's hangup detection works
-    /// (master close → SIGHUP on slave).
+    /// (master close -> SIGHUP on slave).
     close(in_pipe[0]);
     close(slave);
 

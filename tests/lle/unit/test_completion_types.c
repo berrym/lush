@@ -43,7 +43,7 @@ TEST(type_info_queries) {
 }
 
 TEST(completion_item_lifecycle) {
-    /// LLE uses a global memory pool — pass a dummy non-NULL pool.
+    /// LLE uses a global memory pool -- pass a dummy non-NULL pool.
     lle_memory_pool_t *pool = (lle_memory_pool_t *)1;
 
     lle_completion_item_t *item = NULL;

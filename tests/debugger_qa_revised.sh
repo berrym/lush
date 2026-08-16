@@ -57,7 +57,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 print_section() {
@@ -72,10 +72,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}Details:${NC} $details"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -546,7 +546,7 @@ generate_debugger_report() {
     # Determine overall result
     local exit_code
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL DEBUGGER TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL DEBUGGER TESTS PASSED! ${NC}"
         echo -e "${GREEN}The integrated debugger is production-ready!${NC}"
         echo -e "${GREEN}This unique feature sets Lush apart from other shells.${NC}"
         exit_code=0
@@ -567,18 +567,18 @@ generate_debugger_report() {
     fi
 
     echo -e "\n${CYAN}Validated Debugger Features:${NC}"
-    echo "✓ Debug builtin command interface and help system"
-    echo "✓ Debug mode control (on/off) and level management"
-    echo "✓ Execution tracing capabilities"
-    echo "✓ Variable inspection commands (vars, print)"
-    echo "✓ Profiling functionality (on/off/report/reset)"
-    echo "✓ Function introspection and analysis"
-    echo "✓ Step execution commands (step, next, continue)"
-    echo "✓ Stack trace functionality"
-    echo "✓ Script static analysis capabilities"
-    echo "✓ Error handling and graceful failure modes"
-    echo "✓ Integration with shell features and options"
-    echo "✓ Performance characteristics under load"
+    echo "OK Debug builtin command interface and help system"
+    echo "OK Debug mode control (on/off) and level management"
+    echo "OK Execution tracing capabilities"
+    echo "OK Variable inspection commands (vars, print)"
+    echo "OK Profiling functionality (on/off/report/reset)"
+    echo "OK Function introspection and analysis"
+    echo "OK Step execution commands (step, next, continue)"
+    echo "OK Stack trace functionality"
+    echo "OK Script static analysis capabilities"
+    echo "OK Error handling and graceful failure modes"
+    echo "OK Integration with shell features and options"
+    echo "OK Performance characteristics under load"
 
     echo -e "\n${BLUE}Unique Value Proposition:${NC}"
     echo "The integrated debugger accessible via the 'debug' builtin command"
@@ -587,24 +587,24 @@ generate_debugger_report() {
     echo "from all other shells in the market."
 
     echo -e "\n${CYAN}Key Debugger Capabilities Confirmed:${NC}"
-    echo "• Complete debug interface via builtin command"
-    echo "• Multi-level debugging (0-4 levels of detail)"
-    echo "• Real-time execution tracing and profiling"
-    echo "• Interactive variable inspection and modification"
-    echo "• Advanced function introspection and analysis"
-    echo "• Script static analysis and issue detection"
-    echo "• Integration with all shell features and POSIX options"
+    echo "* Complete debug interface via builtin command"
+    echo "* Multi-level debugging (0-4 levels of detail)"
+    echo "* Real-time execution tracing and profiling"
+    echo "* Interactive variable inspection and modification"
+    echo "* Advanced function introspection and analysis"
+    echo "* Script static analysis and issue detection"
+    echo "* Integration with all shell features and POSIX options"
 
     echo -e "\n${CYAN}Recommendations:${NC}"
     if [[ $exit_code -eq 0 ]]; then
-        echo "✅ The integrated debugger is ready for v1.3.0 release"
-        echo "✅ Highlight this unique competitive advantage in documentation"
-        echo "✅ Include debugger examples in user guides and tutorials"
-        echo "✅ This feature justifies Lush's position as an advanced shell"
+        echo "[OK] The integrated debugger is ready for v1.3.0 release"
+        echo "[OK] Highlight this unique competitive advantage in documentation"
+        echo "[OK] Include debugger examples in user guides and tutorials"
+        echo "[OK] This feature justifies Lush's position as an advanced shell"
     else
-        echo "⚠ Address failing test cases before highlighting debugger in release"
-        echo "⚠ Focus on stability and core functionality improvements"
-        echo "⚠ Consider additional testing scenarios for edge cases"
+        echo "WARN Address failing test cases before highlighting debugger in release"
+        echo "WARN Focus on stability and core functionality improvements"
+        echo "WARN Consider additional testing scenarios for edge cases"
     fi
 
     echo -e "\nDebugger QA completed at: $(date)"

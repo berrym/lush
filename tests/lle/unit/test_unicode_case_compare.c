@@ -20,7 +20,7 @@
 /* This file uses an unusual test pattern: each test function manually
  * declares itself static void test_X(void) and calls TEST("string"),
  * PASS(), FAIL(...) inside its body. The framework's TEST(name)
- * macro defines a function — incompatible with the in-body usage —
+ * macro defines a function -- incompatible with the in-body usage --
  * so it is undef'd and the in-body calls are made no-ops. The
  * framework's RUN_TEST(name) still calls test_##name(), which
  * matches the function naming convention here, so the runner works.
@@ -423,7 +423,7 @@ static void test_nfc_alloc_ascii_fast_path(void) {
 
 static void test_nfc_alloc_precomposed_unchanged(void) {
     TEST("NFC alloc - precomposed e-acute round-trips");
-    /// "café" with precomposed e-acute (U+00E9 = 0xC3 0xA9).
+    /// "cafe-acute" with precomposed e-acute (U+00E9 = 0xC3 0xA9).
     const char *input = "caf\xC3\xA9";
     char *got = lle_unicode_normalize_nfc_alloc(input);
     ASSERT_TRUE(got != NULL, "alloc succeeded");

@@ -942,8 +942,8 @@ TEST(command_layer_unicode) {
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
     /// Unicode in command
-    command_layer_error_t err =
-        command_layer_set_command(layer, "echo 日本語", 0);
+    command_layer_error_t err = command_layer_set_command(
+        layer, "echo \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e", 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Unicode should be handled");
 
     destroy_initialized_layer(layer, events);

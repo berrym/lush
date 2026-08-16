@@ -59,7 +59,8 @@ static void test_teardown(void) { lush_pool_shutdown(); }
 #define SKIP_IF_NO_MEMORY_POOL()                                               \
     do {                                                                       \
         if (global_memory_pool == NULL) {                                      \
-            printf("  ⊘ SKIPPED (global_memory_pool not initialized)\n");      \
+            printf("  \xe2\x8a\x98 SKIPPED (global_memory_pool not "           \
+                   "initialized)\n");                                          \
             return;                                                            \
         }                                                                      \
     } while (0)

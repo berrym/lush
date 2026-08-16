@@ -56,7 +56,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 print_section() {
@@ -71,10 +71,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}Details:${NC} $details"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -394,7 +394,7 @@ generate_final_report() {
     # Determine overall result
     local exit_code
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL DEBUGGER CORE TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL DEBUGGER CORE TESTS PASSED! ${NC}"
         echo -e "${GREEN}The integrated debugger core functionality is production-ready!${NC}"
         exit_code=0
     elif [[ $pass_rate -ge 90 ]]; then
@@ -416,36 +416,36 @@ generate_final_report() {
     fi
 
     echo -e "\n${CYAN}Debugger Core Features Validated:${NC}"
-    echo "✓ Debug builtin command interface and comprehensive help"
-    echo "✓ Debug mode enable/disable functionality"
-    echo "✓ Debug level control (0-4 levels)"
-    echo "✓ Integration with shell command execution"
-    echo "✓ Variable operations and function debugging"
-    echo "✓ Debug command suite (vars, print, functions)"
-    echo "✓ Error handling and graceful failure modes"
-    echo "✓ Execution tracing capabilities"
-    echo "✓ Profiling functionality"
-    echo "✓ Performance characteristics and overhead"
+    echo "OK Debug builtin command interface and comprehensive help"
+    echo "OK Debug mode enable/disable functionality"
+    echo "OK Debug level control (0-4 levels)"
+    echo "OK Integration with shell command execution"
+    echo "OK Variable operations and function debugging"
+    echo "OK Debug command suite (vars, print, functions)"
+    echo "OK Error handling and graceful failure modes"
+    echo "OK Execution tracing capabilities"
+    echo "OK Profiling functionality"
+    echo "OK Performance characteristics and overhead"
 
     echo -e "\n${BLUE}Unique Competitive Advantage:${NC}"
     echo "Lush's integrated debugger, accessible via the 'debug' builtin,"
     echo "provides capabilities no other shell offers. This makes Lush"
     echo "uniquely valuable for:"
-    echo "• Shell script development and debugging"
-    echo "• DevOps and automation troubleshooting"
-    echo "• Educational environments for learning shell scripting"
-    echo "• Professional development workflows requiring debugging"
+    echo "* Shell script development and debugging"
+    echo "* DevOps and automation troubleshooting"
+    echo "* Educational environments for learning shell scripting"
+    echo "* Professional development workflows requiring debugging"
 
     echo -e "\n${CYAN}Production Readiness Assessment:${NC}"
     if [[ $exit_code -eq 0 ]]; then
-        echo "✅ READY FOR v1.3.0 RELEASE"
-        echo "✅ Core debugger functionality is stable and usable"
-        echo "✅ Unique feature provides significant market differentiation"
-        echo "✅ Documentation should highlight this competitive advantage"
+        echo "[OK] READY FOR v1.3.0 RELEASE"
+        echo "[OK] Core debugger functionality is stable and usable"
+        echo "[OK] Unique feature provides significant market differentiation"
+        echo "[OK] Documentation should highlight this competitive advantage"
     else
-        echo "⚠ Needs attention before release"
-        echo "⚠ Focus on failing core functionality areas"
-        echo "⚠ Ensure basic debugger operations are stable"
+        echo "WARN Needs attention before release"
+        echo "WARN Focus on failing core functionality areas"
+        echo "WARN Ensure basic debugger operations are stable"
     fi
 
     echo -e "\nDebugger Core QA completed at: $(date)"

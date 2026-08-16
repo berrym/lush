@@ -17,7 +17,7 @@
 
 #include "test_framework.h"
 
-/* Local 1-arg ASSERT family (cond only — no message) wrapping the
+/* Local 1-arg ASSERT family (cond only -- no message) wrapping the
  * framework's failure mechanism. */
 #undef ASSERT
 #undef ASSERT_EQ
@@ -368,10 +368,10 @@ TEST(symbol_set_unicode) {
 
     ASSERT_STR_EQ(symbols.prompt, "$");
     ASSERT_STR_EQ(symbols.prompt_root, "#");
-    ASSERT_STR_EQ(symbols.ahead, "↑");
-    ASSERT_STR_EQ(symbols.behind, "↓");
-    ASSERT_STR_EQ(symbols.error, "✗");
-    ASSERT_STR_EQ(symbols.success, "✓");
+    ASSERT_STR_EQ(symbols.ahead, "\xe2\x86\x91");
+    ASSERT_STR_EQ(symbols.behind, "\xe2\x86\x93");
+    ASSERT_STR_EQ(symbols.error, "\xe2\x9c\x97");
+    ASSERT_STR_EQ(symbols.success, "\xe2\x9c\x93");
 }
 
 TEST(symbol_set_ascii) {

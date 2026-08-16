@@ -45,16 +45,16 @@ test_posix() {
 
     if [ $exit_code -eq 0 ]; then
         if echo "$output" | grep -q "$expected_pattern"; then
-            echo -e "${GREEN}✓ PASSED${NC}"
+            echo -e "${GREEN}OK PASSED${NC}"
             PASSED_COUNT=$((PASSED_COUNT + 1))
         else
-            echo -e "${RED}✗ FAILED - Expected pattern '$expected_pattern' not found${NC}"
+            echo -e "${RED}FAIL FAILED - Expected pattern '$expected_pattern' not found${NC}"
             echo "  Input: $input"
             echo "  Output: '$output'"
             FAILED_COUNT=$((FAILED_COUNT + 1))
         fi
     else
-        echo -e "${RED}✗ FAILED - Exit code $exit_code${NC}"
+        echo -e "${RED}FAIL FAILED - Exit code $exit_code${NC}"
         echo "  Input: $input"
         echo "  Output: '$output'"
         FAILED_COUNT=$((FAILED_COUNT + 1))
@@ -300,12 +300,12 @@ echo -e "${RED}Failed: $FAILED_COUNT${NC}"
 echo
 
 if [ $FAILED_COUNT -eq 0 ]; then
-    echo -e "${GREEN}✓ NO REGRESSIONS DETECTED${NC}"
+    echo -e "${GREEN}OK NO REGRESSIONS DETECTED${NC}"
     echo "All existing POSIX functionality appears to be working correctly."
     echo "The multiline parser changes have not broken backward compatibility."
     exit 0
 else
-    echo -e "${RED}⚠ REGRESSIONS DETECTED${NC}"
+    echo -e "${RED}WARN REGRESSIONS DETECTED${NC}"
     echo "$FAILED_COUNT out of $TEST_COUNT tests failed."
     echo "Please review the failed tests and fix any regressions before proceeding."
     exit 1

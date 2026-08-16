@@ -54,10 +54,10 @@ test_missing_feature() {
     output=$("$SHELL_PATH" "$temp_script" 2>&1) || exit_code=$?
 
     if [ $exit_code -eq 0 ] && echo "$output" | grep -Fq "$expected_output"; then
-        echo -e "${GREEN}✓ PASSED${NC}"
+        echo -e "${GREEN}OK PASSED${NC}"
         PASSED_COUNT=$((PASSED_COUNT + 1))
     else
-        echo -e "${RED}✗ FAILED/MISSING${NC}"
+        echo -e "${RED}FAIL FAILED/MISSING${NC}"
         echo "  Description: $description"
         echo "  Expected: $expected_output"
         echo "  Got: '$output'"
@@ -94,10 +94,10 @@ test_cmdline_args() {
     output=$(eval "$cmd" 2>&1) || exit_code=$?
 
     if [ $exit_code -eq 0 ] && echo "$output" | grep -q "$expected_output"; then
-        echo -e "${GREEN}✓ PASSED${NC}"
+        echo -e "${GREEN}OK PASSED${NC}"
         PASSED_COUNT=$((PASSED_COUNT + 1))
     else
-        echo -e "${RED}✗ FAILED/MISSING${NC}"
+        echo -e "${RED}FAIL FAILED/MISSING${NC}"
         echo "  Description: $description"
         echo "  Command: $cmd"
         echo "  Expected: $expected_output"
@@ -130,10 +130,10 @@ chmod +x "$temp_script"
 # This should work - script args should not be parsed as shell options
 output=$("$SHELL_PATH" "$temp_script" -a -b value 2>&1) || exit_code=$?
 if echo "$output" | grep -q "Args: -a -b value"; then
-    echo -e "${GREEN}✓ PASSED${NC}"
+    echo -e "${GREEN}OK PASSED${NC}"
     PASSED_COUNT=$((PASSED_COUNT + 1))
 else
-    echo -e "${RED}✗ FAILED - Critical POSIX compliance gap${NC}"
+    echo -e "${RED}FAIL FAILED - Critical POSIX compliance gap${NC}"
     echo "  Shell is parsing script arguments as shell options"
     echo "  This violates POSIX: shell [options] script [script-args]"
     echo "  Got: '$output'"
@@ -253,11 +253,11 @@ output=$("$SHELL_PATH" "$temp_script" 2>&1) || exit_code=$?
 
 # Check if the expected output is present (functionality works)
 if echo "$output" | grep -Fq "Result: world"; then
-    echo -e "${GREEN}✓ PASSED${NC}"
+    echo -e "${GREEN}OK PASSED${NC}"
     echo "  Note: Functionality works correctly (output matches expected)"
     PASSED_COUNT=$((PASSED_COUNT + 1))
 else
-    echo -e "${RED}✗ FAILED/MISSING${NC}"
+    echo -e "${RED}FAIL FAILED/MISSING${NC}"
     echo "  Description: Command substitution should work with complex pipelines"
     echo "  Expected: Result: world"
     echo "  Got: '$output'"
@@ -361,16 +361,16 @@ if [ $FAILED_COUNT -gt 0 ]; then
     echo
     echo -e "${RED}MISSING FEATURES IDENTIFIED:${NC}"
     for feature in "${MISSING_FEATURES[@]}"; do
-        echo -e "${RED}  ✗ $feature${NC}"
+        echo -e "${RED}  FAIL $feature${NC}"
     done
 fi
 
 echo
 if [ $FAILED_COUNT -eq 0 ]; then
-    echo -e "${GREEN}🎉 ALL POSIX FEATURES IMPLEMENTED!${NC}"
+    echo -e "${GREEN}ALL POSIX FEATURES IMPLEMENTED!${NC}"
     exit 0
 else
-    echo -e "${RED}⚠️  POSIX COMPLIANCE GAPS FOUND: $FAILED_COUNT features need implementation${NC}"
+    echo -e "${RED}WARN POSIX COMPLIANCE GAPS FOUND: $FAILED_COUNT features need implementation${NC}"
     echo
     echo -e "${YELLOW}CRITICAL GAPS FOR PRODUCTION RELEASE:${NC}"
     echo -e "${YELLOW}  1. Command line argument parsing (script args parsed as shell options)${NC}"

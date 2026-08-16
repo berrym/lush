@@ -125,7 +125,7 @@ TEST(no_trailing_newline_after_multiple_lines) {
 
 TEST(narrow_terminal_wraps_long_line) {
     screen_line_index_t idx = {0};
-    /// 20 columns at width=10 → 2 rows
+    /// 20 columns at width=10 -> 2 rows
     const char *content = "abcdefghijklmnopqrst\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 10);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -138,7 +138,7 @@ TEST(narrow_terminal_wraps_long_line) {
 
 TEST(exact_terminal_width_one_row) {
     screen_line_index_t idx = {0};
-    /// 10 columns at width=10 → 1 row exactly
+    /// 10 columns at width=10 -> 1 row exactly
     const char *content = "abcdefghij\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 10);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -149,7 +149,7 @@ TEST(exact_terminal_width_one_row) {
 
 TEST(one_over_width_two_rows) {
     screen_line_index_t idx = {0};
-    /// 11 columns at width=10 → 2 rows (1 over wraps)
+    /// 11 columns at width=10 -> 2 rows (1 over wraps)
     const char *content = "abcdefghijk\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 10);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -165,7 +165,7 @@ TEST(one_over_width_two_rows) {
 
 TEST(ansi_escapes_excluded_from_visual_width) {
     screen_line_index_t idx = {0};
-    /// "\033[31mhi\033[0m" — visual width is 2 ("hi"), not the byte count
+    /// "\033[31mhi\033[0m" -- visual width is 2 ("hi"), not the byte count
     const char *content = "\033[31mhi\033[0m\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 80);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -179,7 +179,7 @@ TEST(ansi_escapes_excluded_from_visual_width) {
 
 TEST(ansi_styled_long_line_still_wraps_by_visual_width) {
     screen_line_index_t idx = {0};
-    /// 12 visible columns of "x" wrapped in ANSI; width=5 → 3 rows
+    /// 12 visible columns of "x" wrapped in ANSI; width=5 -> 3 rows
     const char *content = "\033[1mxxxxxxxxxxxx\033[0m\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 5);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -195,8 +195,8 @@ TEST(ansi_styled_long_line_still_wraps_by_visual_width) {
 
 TEST(cjk_wide_char_takes_two_columns) {
     screen_line_index_t idx = {0};
-    /// "中" is one codepoint, 3 UTF-8 bytes, 2 visual columns.
-    /// "中文" = 6 bytes, 4 visual columns. At width=3 → 2 rows.
+    /// "U+4E2D" is one codepoint, 3 UTF-8 bytes, 2 visual columns.
+    /// "U+4E2D U+6587" = 6 bytes, 4 visual columns. At width=3 -> 2 rows.
     const char *content = "\xe4\xb8\xad\xe6\x96\x87\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 3);
     ASSERT_EQ(rc, 0, "build succeeds");
@@ -209,7 +209,7 @@ TEST(cjk_wide_char_takes_two_columns) {
 
 TEST(mixed_ascii_and_wide_char) {
     screen_line_index_t idx = {0};
-    /// "a中" = 4 bytes, 3 visual cols (a=1 + 中=2)
+    /// "aU+4E2D" = 4 bytes, 3 visual cols (a=1 + U+4E2D=2)
     const char *content = "a\xe4\xb8\xad\n";
     int rc = screen_line_index_build(&idx, content, strlen(content), 80);
     ASSERT_EQ(rc, 0, "build succeeds");

@@ -40,10 +40,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
 }
@@ -246,7 +246,7 @@ main() {
     echo -e "${RED}Failed:${NC} $FAILED_TESTS"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL TESTS PASSED! ${NC}"
         echo -e "${GREEN}Lush demonstrates excellent POSIX compliance!${NC}"
         echo -e "\n${GREEN}VALIDATION COMPLETE: All 24 POSIX options are implemented and functional${NC}"
         exit_code=0
@@ -270,11 +270,11 @@ main() {
     fi
 
     echo -e "\n${CYAN}Validated POSIX Options (24 total):${NC}"
-    echo "✓ Basic Options: errexit(-e), xtrace(-x), noexec(-n), nounset(-u), verbose(-v), noglob(-f)"
-    echo "✓ Control Options: hashall(-h), monitor(-m), allexport(-a), noclobber(-C), onecmd(-t), notify(-b)"
-    echo "✓ Interactive Options: ignoreeof, nolog, emacs, vi, interactive-comments, histexpand, history"
-    echo "✓ Advanced Options: posix, pipefail, braceexpand, physical, privileged"
-    echo "✓ Functionality: Option state management, error handling, POSIX compliance"
+    echo "OK Basic Options: errexit(-e), xtrace(-x), noexec(-n), nounset(-u), verbose(-v), noglob(-f)"
+    echo "OK Control Options: hashall(-h), monitor(-m), allexport(-a), noclobber(-C), onecmd(-t), notify(-b)"
+    echo "OK Interactive Options: ignoreeof, nolog, emacs, vi, interactive-comments, histexpand, history"
+    echo "OK Advanced Options: posix, pipefail, braceexpand, physical, privileged"
+    echo "OK Functionality: Option state management, error handling, POSIX compliance"
 
     echo -e "\n${BLUE}This validation confirms the comprehensive POSIX options implementation${NC}"
     echo -e "${BLUE}as documented in the handoff document for Lush v1.3.0${NC}"

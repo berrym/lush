@@ -294,47 +294,53 @@ TEST(rank_puts_transposition_first_despite_lower_score) {
 }
 
 TEST(levenshtein_unicode_case_insensitive_latin1) {
-    /// Latin-1 Supplement: É (U+00C9) folds to é (U+00E9). The byte
+    /// Latin-1 Supplement: E-acute (U+00C9) folds to e-acute (U+00E9). The byte
     /// length differs from codepoint length, so a byte-by-byte fold
     /// would mismatch even between identical inputs of opposite case.
-    int dist = autocorrect_levenshtein_distance("café", "CAFÉ");
-    ASSERT_EQ(dist, 0, "Case-insensitive Café/CAFÉ should fold to distance 0");
+    int dist = autocorrect_levenshtein_distance("caf\xc3\xa9", "CAF\xc3\x89");
+    ASSERT_EQ(
+        dist, 0,
+        "Case-insensitive Caf\xc3\xa9/CAF\xc3\x89 should fold to distance 0");
 }
 
 TEST(levenshtein_unicode_one_codepoint_typo) {
     /// One-codepoint substitution at a non-ASCII position.
-    /// "café" -> "cafe": é (multi-byte) replaced by ASCII e. A bytewise
-    /// Levenshtein would count the multi-byte difference as two edits
+    /// "cafe-acute" -> "cafe": e-acute (multi-byte) replaced by ASCII e. A
+    /// bytewise Levenshtein would count the multi-byte difference as two edits
     /// (one per replaced byte) plus a deletion; codepoint-wise this
     /// is one substitution.
-    int dist = autocorrect_levenshtein_distance("café", "cafe");
-    ASSERT_EQ(dist, 1, "café -> cafe should be one codepoint substitution");
+    int dist = autocorrect_levenshtein_distance("caf\xc3\xa9", "cafe");
+    ASSERT_EQ(dist, 1,
+              "caf\xc3\xa9 -> cafe should be one codepoint substitution");
 }
 
 TEST(levenshtein_unicode_extended_a) {
-    /// Latin Extended-A: Č (U+010C) folds to č (U+010D). Without the
+    /// Latin Extended-A: U+010C (U+010C) folds to U+010D (U+010D). Without the
     /// lle_unicode_tolower_codepoint path, libfuzzy's prior fold only
     /// covered ASCII + Latin-1 Supplement and would mishandle this.
-    int dist = autocorrect_levenshtein_distance("ČAJ", "čaj");
+    int dist = autocorrect_levenshtein_distance("\xc4\x8c"
+                                                "AJ",
+                                                "\xc4\x8d"
+                                                "aj");
     ASSERT_EQ(dist, 0, "Latin Extended-A case-fold should match identically");
 }
 
 TEST(levenshtein_unicode_greek) {
-    /// Greek: Α (U+0391) folds to α (U+03B1). Same reasoning -- prior
+    /// Greek: U+0391 (U+0391) folds to alpha (U+03B1). Same reasoning -- prior
     /// code wouldn't have touched Greek codepoints.
-    int dist = autocorrect_levenshtein_distance("ΑΒΓ", "αβγ");
+    int dist = autocorrect_levenshtein_distance("\xce\x91\xce\x92\xce\x93",
+                                                "\xce\xb1\xce\xb2\xce\xb3");
     ASSERT_EQ(dist, 0, "Greek case-fold should match identically");
 }
 
 TEST(levenshtein_unicode_codepoint_distance_not_byte) {
-    /// "café" is 4 codepoints / 5 bytes. "naïve" is 5 codepoints / 6
-    /// bytes. The edit distance should reflect codepoint differences,
-    /// not byte differences: substitutions on c/n, a/n... vs a, f/i,
-    /// é/v, plus an insertion of e -- net 4 edits over codepoints.
-    /// A bytewise count would inflate this past the codepoint figure
-    /// because the multi-byte é and ï each look like multiple byte
-    /// edits.
-    int dist = autocorrect_levenshtein_distance("café", "naïve");
+    /// "cafe-acute" is 4 codepoints / 5 bytes. "nai-umlautve" is 5 codepoints /
+    /// 6 bytes. The edit distance should reflect codepoint differences, not
+    /// byte differences: substitutions on c/n, a/n... vs a, f/i, e-acute/v,
+    /// plus an insertion of e -- net 4 edits over codepoints. A bytewise count
+    /// would inflate this past the codepoint figure because the multi-byte
+    /// e-acute and i-umlaut each look like multiple byte edits.
+    int dist = autocorrect_levenshtein_distance("caf\xc3\xa9", "na\xc3\xafve");
     ASSERT(dist <= 5, "Codepoint-level distance should be bounded by max len");
 }
 
@@ -487,20 +493,21 @@ TEST(learn_command_nfc_nfd_dedup) {
 
     int offered, accepted, learned;
     autocorrect_get_stats(&offered, &accepted, &learned);
-    ASSERT_EQ(learned, 1,
-              "NFC and NFD encodings of café must collapse to one entry");
+    ASSERT_EQ(
+        learned, 1,
+        "NFC and NFD encodings of caf\xc3\xa9 must collapse to one entry");
 
     autocorrect_cleanup();
 }
 
 TEST(learn_command_distinct_under_case) {
     /// NFC equivalence does not paper over case differences --
-    /// "café" and "CAFÉ" remain separate learned entries.
+    /// "cafe-acute" and "CAFE-acute" remain separate learned entries.
     autocorrect_init();
     autocorrect_reset_stats();
 
-    autocorrect_learn_command("caf\xC3\xA9"); /// café (lowercase)
-    autocorrect_learn_command("CAF\xC3\x89"); /// CAFÉ (uppercase)
+    autocorrect_learn_command("caf\xC3\xA9"); /// cafe-acute (lowercase)
+    autocorrect_learn_command("CAF\xC3\x89"); /// CAFE-acute (uppercase)
 
     int offered, accepted, learned;
     autocorrect_get_stats(&offered, &accepted, &learned);

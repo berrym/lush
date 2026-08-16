@@ -130,7 +130,7 @@ TEST(system_dispatch_fires_compdef_source) {
     compdef_set("git", "_subs");
 
     lle_completion_result_t *result = NULL;
-    /// "git " — cursor at position 4 (just past the space), starting
+    /// "git " -- cursor at position 4 (just past the space), starting
     /// the next word. command_name = "git", prefix empty. compdef
     /// fires, _subs emits three candidates, all should land in the
     /// result because the empty prefix matches everything.

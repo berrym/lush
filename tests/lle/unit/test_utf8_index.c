@@ -12,9 +12,9 @@
  *   - Multi-byte UTF-8 (CJK, Latin-1) where bytes != codepoints
  *   - Combining marks where codepoints != graphemes
  *   - Wide characters where graphemes != display columns
- *   - Round-trip: byte → codepoint → byte and similar
+ *   - Round-trip: byte -> codepoint -> byte and similar
  *   - Error paths: NULL pointers, invalid state, out-of-range indices
- *   - State machine: init → rebuild → invalidate → is_valid
+ *   - State machine: init -> rebuild -> invalidate -> is_valid
  *   - Invalid UTF-8 input handling
  *
  * @author Michael Berry <trismegustis@gmail.com>
@@ -66,7 +66,7 @@ TEST(is_valid_returns_false_on_null) {
 }
 
 /* ============================================================================
- * rebuild — basic shapes
+ * rebuild -- basic shapes
  * ============================================================================
  */
 
@@ -97,12 +97,12 @@ TEST(rebuild_pure_ascii) {
 }
 
 TEST(rebuild_multibyte_cjk) {
-    /// "中" (U+4E2D) is 3 bytes, 1 codepoint, 1 grapheme, 2 columns wide
+    /// "U+4E2D" (U+4E2D) is 3 bytes, 1 codepoint, 1 grapheme, 2 columns wide
     const char *text = "\xE4\xB8\xAD";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 3), LLE_SUCCESS,
-              "rebuild('中') succeeds");
+              "rebuild('\xe4\xb8\xad') succeeds");
     ASSERT_EQ(idx.byte_count, 3, "byte_count for one CJK char");
     ASSERT_EQ(idx.codepoint_count, 1, "codepoint_count for one CJK char");
     ASSERT_EQ(idx.grapheme_count, 1, "grapheme_count for one CJK char");
@@ -111,7 +111,7 @@ TEST(rebuild_multibyte_cjk) {
 }
 
 TEST(rebuild_combining_mark_collapses_graphemes) {
-    /// "e" + U+0301 (combining acute) = "é" as 2 codepoints, 1 grapheme.
+    /// "e" + U+0301 (combining acute) = "e-acute" as 2 codepoints, 1 grapheme.
     /// "e" is 1 byte, U+0301 is 2 bytes (0xCC 0x81).
     const char *text = "e\xCC\x81";
     lle_utf8_index_t idx;
@@ -126,7 +126,7 @@ TEST(rebuild_combining_mark_collapses_graphemes) {
 }
 
 TEST(rebuild_mixed_ascii_and_cjk) {
-    /// "A中B": 1 + 3 + 1 = 5 bytes, 3 codepoints, 3 graphemes,
+    /// "AU+4E2DB": 1 + 3 + 1 = 5 bytes, 3 codepoints, 3 graphemes,
     /// 1 + 2 + 1 = 4 columns.
     const char *text = "A\xE4\xB8\xAD"
                        "B";
@@ -188,11 +188,10 @@ TEST(rebuild_rejects_invalid_utf8_overlong) {
 /* ============================================================================
  * Round-trip lookups on a known shape
  *
- * Use "A中B" — three graphemes, three codepoints, five bytes, four columns.
- * Byte map (0-indexed):
- *   0    : 'A'   (codepoint 0, grapheme 0, column 0)
- *   1-3  : '中'  (codepoint 1, grapheme 1, column 1)
- *   4    : 'B'   (codepoint 2, grapheme 2, column 3)
+ * Use "AU+4E2DB" -- three graphemes, three codepoints, five bytes, four
+ * columns. Byte map (0-indexed): 0    : 'A'   (codepoint 0, grapheme 0, column
+ * 0) 1-3  : 'U+4E2D'  (codepoint 1, grapheme 1, column 1) 4    : 'B' (codepoint
+ * 2, grapheme 2, column 3)
  * ============================================================================
  */
 
@@ -209,7 +208,7 @@ TEST(roundtrip_byte_codepoint_and_back) {
               "byte 0 lookup");
     ASSERT_EQ(cp, 0, "byte 0 -> codepoint 0");
 
-    /// Byte 1 (start of '中') -> codepoint 1
+    /// Byte 1 (start of 'U+4E2D') -> codepoint 1
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 1, &cp), LLE_SUCCESS,
               "byte 1 lookup");
     ASSERT_EQ(cp, 1, "byte 1 (CJK lead byte) -> codepoint 1");
@@ -238,7 +237,7 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
     /// "e\xCC\x81X": 'e', combining acute, 'X'.
     ///   bytes: 0='e', 1-2 = combining, 3='X'
     ///   codepoints: 0='e', 1=combining, 2='X'
-    ///   graphemes:  0=é (cp 0+1), 1=X (cp 2)
+    ///   graphemes:  0=e-acute (cp 0+1), 1=X (cp 2)
     const char *text = "e\xCC\x81"
                        "X";
     lle_utf8_index_t idx;
@@ -277,8 +276,9 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
 }
 
 TEST(roundtrip_grapheme_display_and_back) {
-    /// "A中B": graphemes at columns 0, 1, 3.
-    /// display columns: 0 -> 'A', 1 -> '中' (start), 2 -> '中' (cont), 3 -> 'B'
+    /// "AU+4E2DB": graphemes at columns 0, 1, 3.
+    /// display columns: 0 -> 'A', 1 -> 'U+4E2D' (start), 2 -> 'U+4E2D' (cont),
+    /// 3 -> 'B'
     const char *text = "A\xE4\xB8\xAD"
                        "B";
     lle_utf8_index_t idx;
@@ -292,10 +292,11 @@ TEST(roundtrip_grapheme_display_and_back) {
     ASSERT_EQ(col, 0, "grapheme 0 ('A') at column 0");
     ASSERT_EQ(lle_utf8_index_grapheme_to_display(&idx, 1, &col), LLE_SUCCESS,
               "g 1");
-    ASSERT_EQ(col, 1, "grapheme 1 ('中') at column 1");
+    ASSERT_EQ(col, 1, "grapheme 1 ('\xe4\xb8\xad') at column 1");
     ASSERT_EQ(lle_utf8_index_grapheme_to_display(&idx, 2, &col), LLE_SUCCESS,
               "g 2");
-    ASSERT_EQ(col, 3, "grapheme 2 ('B') at column 3 (after 中's 2 cols)");
+    ASSERT_EQ(col, 3,
+              "grapheme 2 ('B') at column 3 (after \xe4\xb8\xad's 2 cols)");
 
     /// display -> grapheme
     size_t g;
@@ -304,8 +305,8 @@ TEST(roundtrip_grapheme_display_and_back) {
     ASSERT_EQ(g, 0, "column 0 -> grapheme 0");
     ASSERT_EQ(lle_utf8_index_display_to_grapheme(&idx, 1, &g), LLE_SUCCESS,
               "col 1");
-    ASSERT_EQ(g, 1, "column 1 -> grapheme 1 (lead column of 中)");
-    /// Column 2 is the continuation column of 中 — implementation-defined,
+    ASSERT_EQ(g, 1, "column 1 -> grapheme 1 (lead column of \xe4\xb8\xad)");
+    /// Column 2 is the continuation column of U+4E2D -- implementation-defined,
     /// must be either grapheme 1 or grapheme 2 (the next cluster).
     ASSERT_EQ(lle_utf8_index_display_to_grapheme(&idx, 2, &g), LLE_SUCCESS,
               "col 2");

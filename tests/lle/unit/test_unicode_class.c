@@ -32,29 +32,29 @@ TEST(alpha_ascii_letters) {
 }
 
 TEST(alpha_latin_supplement) {
-    ASSERT(lle_unicode_is_alpha(0x00E9), "é (U+00E9)");
-    ASSERT(lle_unicode_is_alpha(0x00C4), "Ä (U+00C4)");
-    ASSERT(lle_unicode_is_alpha(0x00F1), "ñ (U+00F1)");
-    ASSERT(lle_unicode_is_alpha(0x00FF), "ÿ (U+00FF)");
+    ASSERT(lle_unicode_is_alpha(0x00E9), "\xc3\xa9 (U+00E9)");
+    ASSERT(lle_unicode_is_alpha(0x00C4), "\xc3\x84 (U+00C4)");
+    ASSERT(lle_unicode_is_alpha(0x00F1), "\xc3\xb1 (U+00F1)");
+    ASSERT(lle_unicode_is_alpha(0x00FF), "\xc3\xbf (U+00FF)");
     ASSERT(!lle_unicode_is_alpha(0x00A0), "NBSP is not alpha");
-    ASSERT(!lle_unicode_is_alpha(0x00B1), "± is not alpha");
+    ASSERT(!lle_unicode_is_alpha(0x00B1), "\xc2\xb1 is not alpha");
 }
 
 TEST(alpha_latin_extended) {
-    ASSERT(lle_unicode_is_alpha(0x0100), "Ā (Latin Ext-A)");
-    ASSERT(lle_unicode_is_alpha(0x017F), "ſ (long s, Latin Ext-A)");
-    ASSERT(lle_unicode_is_alpha(0x0180), "ƀ (Latin Ext-B)");
+    ASSERT(lle_unicode_is_alpha(0x0100), "\xc4\x80 (Latin Ext-A)");
+    ASSERT(lle_unicode_is_alpha(0x017F), "\xc5\xbf (long s, Latin Ext-A)");
+    ASSERT(lle_unicode_is_alpha(0x0180), "\xc6\x80 (Latin Ext-B)");
 }
 
 TEST(alpha_greek) {
-    ASSERT(lle_unicode_is_alpha(0x03B1), "α (Greek alpha)");
-    ASSERT(lle_unicode_is_alpha(0x03A9), "Ω (Greek capital omega)");
+    ASSERT(lle_unicode_is_alpha(0x03B1), "\xce\xb1 (Greek alpha)");
+    ASSERT(lle_unicode_is_alpha(0x03A9), "\xce\xa9 (Greek capital omega)");
 }
 
 TEST(alpha_cjk_out_of_scope) {
     /// CJK ideographs are category Lo, which the case-mapping-based
     /// approach does not cover. Documented limitation.
-    ASSERT(!lle_unicode_is_alpha(0x4E2D), "中 (CJK) out of scope");
+    ASSERT(!lle_unicode_is_alpha(0x4E2D), "\xe4\xb8\xad (CJK) out of scope");
 }
 
 /* ============================================================================
@@ -72,7 +72,7 @@ TEST(digit_ascii) {
 
 TEST(digit_arabic_indic) {
     ASSERT(lle_unicode_is_digit(0x0660), "Arabic-Indic 0");
-    ASSERT(lle_unicode_is_digit(0x0663), "Arabic-Indic 3 (٣)");
+    ASSERT(lle_unicode_is_digit(0x0663), "Arabic-Indic 3 (\xd9\xa3)");
     ASSERT(lle_unicode_is_digit(0x0669), "Arabic-Indic 9");
     ASSERT(!lle_unicode_is_digit(0x066A), "U+066A (percent) not a digit");
 }
@@ -86,8 +86,8 @@ TEST(digit_devanagari_and_others) {
 }
 
 TEST(digit_letters_are_not_digits) {
-    ASSERT(!lle_unicode_is_digit(0x00E9), "é is not digit");
-    ASSERT(!lle_unicode_is_digit(0x03B1), "α is not digit");
+    ASSERT(!lle_unicode_is_digit(0x00E9), "\xc3\xa9 is not digit");
+    ASSERT(!lle_unicode_is_digit(0x03B1), "\xce\xb1 is not digit");
 }
 
 /* ============================================================================
@@ -102,9 +102,9 @@ TEST(alnum_ascii) {
 }
 
 TEST(alnum_mixed_scripts) {
-    ASSERT(lle_unicode_is_alnum(0x00E9), "é");
+    ASSERT(lle_unicode_is_alnum(0x00E9), "\xc3\xa9");
     ASSERT(lle_unicode_is_alnum(0x0663), "Arabic-Indic 3");
-    ASSERT(lle_unicode_is_alnum(0x03B1), "α");
+    ASSERT(lle_unicode_is_alnum(0x03B1), "\xce\xb1");
 }
 
 /* ============================================================================
@@ -128,7 +128,7 @@ TEST(space_unicode) {
     ASSERT(lle_unicode_is_space(0x2029), "PARAGRAPH SEPARATOR");
     ASSERT(lle_unicode_is_space(0x2003), "EM SPACE");
     ASSERT(lle_unicode_is_space(0x3000), "IDEOGRAPHIC SPACE");
-    ASSERT(!lle_unicode_is_space(0x00E9), "é is not space");
+    ASSERT(!lle_unicode_is_space(0x00E9), "\xc3\xa9 is not space");
 }
 
 /* ============================================================================
@@ -161,7 +161,7 @@ TEST(cntrl_c1) {
     ASSERT(lle_unicode_is_cntrl(0x80), "C1 first");
     ASSERT(lle_unicode_is_cntrl(0x9F), "C1 last");
     ASSERT(!lle_unicode_is_cntrl(0xA0), "NBSP is not cntrl");
-    ASSERT(!lle_unicode_is_cntrl(0x00E9), "é is not cntrl");
+    ASSERT(!lle_unicode_is_cntrl(0x00E9), "\xc3\xa9 is not cntrl");
 }
 
 /* ============================================================================
@@ -174,7 +174,7 @@ TEST(print_excludes_controls) {
     ASSERT(!lle_unicode_is_print(0x1B), "ESC not printable");
     ASSERT(lle_unicode_is_print(' '), "space printable");
     ASSERT(lle_unicode_is_print('a'), "letter printable");
-    ASSERT(lle_unicode_is_print(0x00E9), "é printable");
+    ASSERT(lle_unicode_is_print(0x00E9), "\xc3\xa9 printable");
 }
 
 TEST(print_excludes_zero_width_formatters) {
@@ -188,7 +188,7 @@ TEST(graph_excludes_spaces) {
     ASSERT(!lle_unicode_is_graph('\t'), "tab is not graph");
     ASSERT(!lle_unicode_is_graph(0x00A0), "NBSP is not graph");
     ASSERT(lle_unicode_is_graph('a'), "letter is graph");
-    ASSERT(lle_unicode_is_graph(0x00E9), "é is graph");
+    ASSERT(lle_unicode_is_graph(0x00E9), "\xc3\xa9 is graph");
 }
 
 /* ============================================================================
@@ -247,24 +247,27 @@ TEST(xdigit_ascii_only) {
 TEST(script_of_latin) {
     ASSERT(lle_unicode_script_of('a') == LLE_SCRIPT_LATIN, "ascii a");
     ASSERT(lle_unicode_script_of('Z') == LLE_SCRIPT_LATIN, "ascii Z");
-    ASSERT(lle_unicode_script_of(0x00E9) == LLE_SCRIPT_LATIN, "é Latin-1");
-    ASSERT(lle_unicode_script_of(0x0151) == LLE_SCRIPT_LATIN, "ő Latin Ext-A");
-    ASSERT(lle_unicode_script_of(0x0250) == LLE_SCRIPT_LATIN, "ɐ IPA");
+    ASSERT(lle_unicode_script_of(0x00E9) == LLE_SCRIPT_LATIN,
+           "\xc3\xa9 Latin-1");
+    ASSERT(lle_unicode_script_of(0x0151) == LLE_SCRIPT_LATIN,
+           "\xc5\x91 Latin Ext-A");
+    ASSERT(lle_unicode_script_of(0x0250) == LLE_SCRIPT_LATIN, "\xc9\x90 IPA");
 }
 
 TEST(script_of_greek_and_cyrillic) {
-    ASSERT(lle_unicode_script_of(0x03A3) == LLE_SCRIPT_GREEK, "Σ greek");
-    ASSERT(lle_unicode_script_of(0x03B1) == LLE_SCRIPT_GREEK, "α greek");
-    ASSERT(lle_unicode_script_of(0x0430) == LLE_SCRIPT_CYRILLIC, "а cyrillic");
+    ASSERT(lle_unicode_script_of(0x03A3) == LLE_SCRIPT_GREEK, "\xce\xa3 greek");
+    ASSERT(lle_unicode_script_of(0x03B1) == LLE_SCRIPT_GREEK, "\xce\xb1 greek");
+    ASSERT(lle_unicode_script_of(0x0430) == LLE_SCRIPT_CYRILLIC,
+           "\xd0\xb0 cyrillic");
     ASSERT(lle_unicode_script_of(0x0521) == LLE_SCRIPT_CYRILLIC,
-           "ԡ cyrillic supplement");
+           "\xd4\xa1 cyrillic supplement");
 }
 
 TEST(script_of_common_and_inherited) {
     ASSERT(lle_unicode_script_of('0') == LLE_SCRIPT_COMMON, "ascii digit");
     ASSERT(lle_unicode_script_of('_') == LLE_SCRIPT_COMMON, "underscore");
     ASSERT(lle_unicode_script_of(0x00D7) == LLE_SCRIPT_COMMON,
-           "× multiplication sign is not a Latin letter");
+           "\xc3\x97 multiplication sign is not a Latin letter");
     ASSERT(lle_unicode_script_of(0x0301) == LLE_SCRIPT_INHERITED,
            "combining acute is inherited");
 }

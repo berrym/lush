@@ -113,7 +113,8 @@ static void test_insert_updates_utf8_index() {
     ASSERT_EQ(buffer->codepoint_count, 5, "Codepoint count correct for ASCII");
 
     /// Insert UTF-8 text with multibyte characters
-    const char *text2 = "世界"; /// 2 Chinese characters, 6 bytes
+    const char *text2 =
+        "\xe4\xb8\x96\xe7\x95\x8c"; /// 2 Chinese characters, 6 bytes
     result = lle_buffer_insert_text(buffer, 5, text2, strlen(text2));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
 
@@ -139,7 +140,7 @@ static void test_delete_updates_utf8_index() {
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
     /// Insert mixed ASCII and UTF-8
-    const char *text = "Hello世界World";
+    const char *text = "Hello\xe4\xb8\x96\xe7\x95\x8cWorld";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
 
@@ -216,8 +217,10 @@ static void test_cursor_movement_with_utf8() {
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
     /// Insert UTF-8 text
-    const char *text = "a世b界c"; /* a + 世(3 bytes) + b + 界(3 bytes) + c = 9
-                                     bytes, 5 codepoints */
+    const char *text = "a\xe4\xb8\x96"
+                       "b\xe7\x95\x8c"
+                       "c"; /* a + U+4E16(3 bytes) + b + U+754C(3
+     bytes) + c = 9 bytes, 5 codepoints */
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
 
@@ -237,7 +240,7 @@ static void test_cursor_movement_with_utf8() {
     ASSERT_EQ(buffer->cursor.byte_offset, 1, "At byte 1");
     ASSERT_EQ(buffer->cursor.codepoint_index, 1, "At codepoint 1");
 
-    /// Move forward by 1 more codepoint (should skip 3 bytes for '世')
+    /// Move forward by 1 more codepoint (should skip 3 bytes for 'U+4E16')
     result = lle_cursor_manager_move_by_codepoints(cursor_mgr, 1);
     ASSERT_SUCCESS(result, "Move by 1 codepoint succeeds");
     ASSERT_EQ(buffer->cursor.byte_offset, 4, "At byte 4");
@@ -311,7 +314,7 @@ static void test_validator_detects_corruption() {
     ASSERT_SUCCESS(result, "Validator init succeeds");
 
     /// Insert valid UTF-8
-    const char *text = "Hello世界";
+    const char *text = "Hello\xe4\xb8\x96\xe7\x95\x8c";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
 
@@ -613,10 +616,11 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     ASSERT_SUCCESS(result, "Complete sequence 1");
 
     lle_change_sequence_t *seq2 = NULL;
-    result = lle_change_tracker_begin_sequence(tracker, "insert 世界", &seq2);
+    result = lle_change_tracker_begin_sequence(
+        tracker, "insert \xe4\xb8\x96\xe7\x95\x8c", &seq2);
     ASSERT_SUCCESS(result, "Begin sequence 2");
     buffer->current_sequence = seq2;
-    result = lle_buffer_insert_text(buffer, 6, "世界",
+    result = lle_buffer_insert_text(buffer, 6, "\xe4\xb8\x96\xe7\x95\x8c",
                                     6); /// 2 Chinese chars, 6 bytes
     ASSERT_SUCCESS(result, "Insert UTF-8");
     result = lle_change_tracker_complete_sequence(tracker);
@@ -645,7 +649,7 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     result = lle_cursor_manager_move_by_codepoints(cursor_mgr, 7);
     ASSERT_SUCCESS(result, "Move by 7 codepoints");
 
-    /// Should be after "Hello 世" (6 ASCII + 1 Chinese = 9 bytes)
+    /// Should be after "Hello U+4E16" (6 ASCII + 1 Chinese = 9 bytes)
     ASSERT_EQ(buffer->cursor.byte_offset, 9, "Cursor at correct byte offset");
     ASSERT_EQ(buffer->cursor.codepoint_index, 7, "Cursor at codepoint 7");
 
@@ -658,7 +662,7 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     ASSERT_SUCCESS(result, "Undo succeeds");
     ASSERT_EQ(buffer->length, 12, "Length after undo");
 
-    result = lle_change_tracker_undo(tracker, buffer); /// Undo "世界"
+    result = lle_change_tracker_undo(tracker, buffer); /// Undo "U+4E16 U+754C"
     ASSERT_SUCCESS(result, "Undo UTF-8 succeeds");
     ASSERT_EQ(buffer->length, 6, "Length after UTF-8 undo");
     ASSERT_STR_EQ(buffer->data, "Hello ", "Content after UTF-8 undo");

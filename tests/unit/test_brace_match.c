@@ -228,10 +228,10 @@ TEST(brace_explicit_length_no_nul_dependency) {
 TEST(brace_utf8_content_does_not_false_match) {
     /// Multi-byte sequences must advance atomically so a continuation
     /// byte that aliases an ASCII brace byte does not trigger.
-    /// "café" is c-a-f-é where é is U+00E9 = 0xC3 0xA9.
-    ASSERT_EQ(scan("{café}"), (size_t)6, "ok");
+    /// "cafe-acute" is c-a-f-e-acute where e-acute is U+00E9 = 0xC3 0xA9.
+    ASSERT_EQ(scan("{caf\xc3\xa9}"), (size_t)6, "ok");
     /// CJK content (3-byte each):
-    ASSERT_EQ(scan("{中文}"), (size_t)7, "ok");
+    ASSERT_EQ(scan("{\xe4\xb8\xad\xe6\x96\x87}"), (size_t)7, "ok");
 }
 
 /* ----------------------------------------------------------------------------

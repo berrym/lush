@@ -390,7 +390,7 @@ static void lvalue_write(eval_ctx_t *ctx, const lvalue_t *lv, ssize_t value) {
         /// surface. Applied HERE, at the user surface -- not in the low-level
         /// symtable_set_array_element, which shell-internal writers also use.
         /// If the name is not yet an array, strict value typing (lush mode)
-        /// refuses the implicit re-kind (the U+00A73.9 mirror); a relaxed mode
+        /// refuses the implicit re-kind (the S3.9 mirror); a relaxed mode
         /// preserve-promotes, seeding the former scalar as the base element. An
         /// unbound name is a fresh array with no kind change.
         if (!symtable_get_array(lv->name)) {

@@ -129,7 +129,7 @@ TEST(display_cache_store_succeeds) {
 }
 
 /* ============================================================================
- * lle_display_cache: lookup — including ROUND-TRIP DATA verification
+ * lle_display_cache: lookup -- including ROUND-TRIP DATA verification
  *
  * The original tests only asserted data != NULL and size > 0 for hits.
  * That proves the lookup returned something but does not prove it
@@ -175,7 +175,7 @@ TEST(display_cache_lookup_miss_returns_cache_miss) {
 
 TEST(display_cache_store_then_lookup_returns_exact_data) {
     /// Store a known byte pattern, look it up, verify byte-for-byte equality.
-    /// This is the test the original suite was missing — proving the cache
+    /// This is the test the original suite was missing -- proving the cache
     /// actually caches the data, not just that it returns "something".
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
@@ -200,7 +200,7 @@ TEST(display_cache_store_then_lookup_returns_exact_data) {
 }
 
 TEST(display_cache_store_then_lookup_with_binary_data) {
-    /// Store a binary blob containing embedded NUL bytes — proves the
+    /// Store a binary blob containing embedded NUL bytes -- proves the
     /// cache treats data as opaque bytes, not C strings.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
@@ -368,7 +368,7 @@ TEST(display_cache_invalidate_all_then_restore_works) {
 }
 
 TEST(display_cache_invalidate_all_on_empty_is_safe) {
-    /// No assertions on state — just that the call does not crash.
+    /// No assertions on state -- just that the call does not crash.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(lle_display_cache_invalidate_all(cache), LLE_SUCCESS,

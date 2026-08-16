@@ -562,7 +562,7 @@ TEST(parse_until_loop) {
 }
 
 /* ============================================================================
- * REGRESSION TESTS — Issue #45
+ * REGRESSION TESTS -- Issue #45
  * `while` and `until` must accept logical-expression conditions
  * (&& and ||) as bash and zsh do. Until the fix lands, every test
  * below fails with `expected 'DO', got 'LOGICAL_AND'/'LOGICAL_OR'`.
@@ -727,7 +727,7 @@ TEST(parse_function_posix) {
 }
 
 /* ============================================================================
- * REGRESSION TESTS — Issue #46
+ * REGRESSION TESTS -- Issue #46
  * Function bodies must accept any compound command, not only brace groups.
  * Bash and zsh both accept subshell, if, while, for, case, arithmetic,
  * and extended-test bodies. Until the fix lands, every test below fails
@@ -832,7 +832,7 @@ TEST(parse_function_body_keyword_form_subshell) {
 }
 
 /* ============================================================================
- * REGRESSION TESTS — Issue #43
+ * REGRESSION TESTS -- Issue #43
  * Function definitions must accept trailing redirections after the body,
  * matching bash and zsh. Until the fix lands, every test below fails with
  * `expected command name, got '>'/'<'/'2>'/etc.` because the parser leaves
@@ -1315,8 +1315,8 @@ int main(void) {
     RUN_TEST(parse_while_loop);
     RUN_TEST(parse_until_loop);
 
-    printf(
-        "\nRegression tests — Issue #45 (while/until logical conditions):\n");
+    printf("\nRegression tests \xe2\x80\x94 Issue #45 (while/until logical "
+           "conditions):\n");
     RUN_TEST(parse_while_logical_and_simple);
     RUN_TEST(parse_while_logical_or_simple);
     RUN_TEST(parse_until_logical_and_simple);
@@ -1331,7 +1331,8 @@ int main(void) {
     RUN_TEST(parse_function_keyword);
     RUN_TEST(parse_function_posix);
 
-    printf("\nRegression tests — Issue #46 (function compound bodies):\n");
+    printf("\nRegression tests \xe2\x80\x94 Issue #46 (function compound "
+           "bodies):\n");
     RUN_TEST(parse_function_body_subshell);
     RUN_TEST(parse_function_body_if);
     RUN_TEST(parse_function_body_while);
@@ -1340,8 +1341,8 @@ int main(void) {
     RUN_TEST(parse_function_body_arith);
     RUN_TEST(parse_function_body_keyword_form_subshell);
 
-    printf(
-        "\nRegression tests — Issue #43 (function trailing redirections):\n");
+    printf("\nRegression tests \xe2\x80\x94 Issue #43 (function trailing "
+           "redirections):\n");
     RUN_TEST(parse_function_trailing_redir_out);
     RUN_TEST(parse_function_trailing_redir_keyword_form);
     RUN_TEST(parse_function_trailing_redir_keyword_parens_form);

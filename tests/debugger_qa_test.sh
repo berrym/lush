@@ -57,7 +57,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 print_section() {
@@ -72,10 +72,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}Details:${NC} $details"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -576,7 +576,7 @@ generate_debugger_report() {
     # Determine overall result
     local exit_code
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL DEBUGGER TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL DEBUGGER TESTS PASSED! ${NC}"
         echo -e "${GREEN}The integrated debugger is production-ready!${NC}"
         echo -e "${GREEN}This unique feature sets Lush apart from other shells.${NC}"
         exit_code=0
@@ -599,16 +599,16 @@ generate_debugger_report() {
     fi
 
     echo -e "\n${CYAN}Validated Debugger Features:${NC}"
-    echo "✓ Basic debugger initialization and help system"
-    echo "✓ Interactive debug commands (continue, step, next, finish)"
-    echo "✓ Variable inspection and modification (print, set, vars)"
-    echo "✓ Step-by-step execution control"
-    echo "✓ Loop debugging capabilities"
-    echo "✓ Function debugging with step into/out"
-    echo "✓ Stack trace functionality"
-    echo "✓ Error handling and graceful failure"
-    echo "✓ Performance and stability under load"
-    echo "✓ Integration with shell options and features"
+    echo "OK Basic debugger initialization and help system"
+    echo "OK Interactive debug commands (continue, step, next, finish)"
+    echo "OK Variable inspection and modification (print, set, vars)"
+    echo "OK Step-by-step execution control"
+    echo "OK Loop debugging capabilities"
+    echo "OK Function debugging with step into/out"
+    echo "OK Stack trace functionality"
+    echo "OK Error handling and graceful failure"
+    echo "OK Performance and stability under load"
+    echo "OK Integration with shell options and features"
 
     echo -e "\n${BLUE}Unique Value Proposition:${NC}"
     echo "The integrated debugger is Lush's truly unique feature that"
@@ -617,13 +617,13 @@ generate_debugger_report() {
 
     echo -e "\n${CYAN}Recommendations:${NC}"
     if [[ $exit_code -eq 0 ]]; then
-        echo "✅ The integrated debugger is ready for release"
-        echo "✅ Continue with documentation and cross-platform testing"
-        echo "✅ Highlight this unique feature in marketing materials"
+        echo "[OK] The integrated debugger is ready for release"
+        echo "[OK] Continue with documentation and cross-platform testing"
+        echo "[OK] Highlight this unique feature in marketing materials"
     else
-        echo "⚠ Address failing test cases before release"
-        echo "⚠ Focus on stability and error handling improvements"
-        echo "⚠ Consider additional interactive testing scenarios"
+        echo "WARN Address failing test cases before release"
+        echo "WARN Focus on stability and error handling improvements"
+        echo "WARN Consider additional interactive testing scenarios"
     fi
 
     echo -e "\nDebugger QA completed at: $(date)"

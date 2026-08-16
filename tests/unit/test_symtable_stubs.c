@@ -19,7 +19,7 @@ bool shell_mode_allows(shell_feature_t feature) {
     return true; /// Allow all features in tests
 }
 
-/* Shell mode getter stub — symtable.c uses this for issue-#69
+/* Shell mode getter stub -- symtable.c uses this for issue-#69
  * insertion-order vs hashtable-order dispatch on assoc array
  * iteration. Tests run in lush mode (default) by convention so
  * insertion-order ordering applies. */
