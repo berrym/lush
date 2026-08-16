@@ -1033,12 +1033,27 @@ bool screen_buffer_render_line_with_prefix(const screen_buffer_t *buffer,
         pos += prefix_len;
     }
 
-    /// Add line content (full UTF-8 sequences)
-    for (int i = 0; i < line->length && pos < output_size - 1; i++) {
+    /// Add line content, one whole character at a time.
+    ///
+    /// The budget used to be checked per BYTE, so a cell whose sequence did
+    /// not fit was copied partially and the caller received a lead byte with
+    /// no continuations -- invalid UTF-8, written straight to the terminal by
+    /// every consumer of this function, the debugger's output among them
+    /// (issue #706).
+    ///
+    /// A cell is now copied only if its WHOLE sequence fits, and the loop
+    /// stops otherwise. Stopping before a character is never worse than
+    /// stopping inside one: the line is short either way, but it stays
+    /// decodable.
+    for (int i = 0; i < line->length; i++) {
         const screen_cell_t *cell = &line->cells[i];
+        size_t need = (size_t)cell->byte_len;
 
-        /// Copy full UTF-8 sequence
-        for (int b = 0; b < cell->byte_len && pos < output_size - 1; b++) {
+        /// `+ 1` reserves the NUL that is written below.
+        if (pos + need + 1 > output_size) {
+            break;
+        }
+        for (size_t b = 0; b < need; b++) {
             output[pos++] = cell->utf8_bytes[b];
         }
     }
@@ -1064,8 +1079,16 @@ bool screen_buffer_render_multiline_with_prefixes(const screen_buffer_t *buffer,
     for (int i = 0; i < num_lines; i++) {
         int line_num = start_line + i;
 
-        /// Render line with prefix
-        char line_buffer[SCREEN_BUFFER_MAX_COLS * 2];
+        /// Render line with prefix.
+        ///
+        /// Sized for the worst case a row can hold: SCREEN_BUFFER_MAX_COLS
+        /// cells, each up to a 4-byte UTF-8 sequence, plus the NUL. At two
+        /// bytes per cell this held half of what a row of CJK or box-drawing
+        /// characters needs, so such rows were silently cut short by the
+        /// budget in the renderer above (issue #706). A line prefix is
+        /// unbounded and is still handled by that function's own "buffer too
+        /// small" refusal rather than assumed to fit.
+        char line_buffer[SCREEN_BUFFER_MAX_COLS * 4 + 1];
         if (!screen_buffer_render_line_with_prefix(
                 buffer, line_num, line_buffer, sizeof(line_buffer))) {
             return false;

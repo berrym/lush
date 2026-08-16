@@ -956,6 +956,118 @@ static int test_render_line_with_prefix_no_prefix(void) {
     return 1;
 }
 
+static bool is_valid_utf8(const char *s) {
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        int need;
+        if (*p < 0x80) {
+            need = 0;
+        } else if ((*p & 0xE0) == 0xC0) {
+            need = 1;
+        } else if ((*p & 0xF0) == 0xE0) {
+            need = 2;
+        } else if ((*p & 0xF8) == 0xF0) {
+            need = 3;
+        } else {
+            return false; /// continuation byte or invalid lead
+        }
+        p++;
+        for (int i = 0; i < need; i++) {
+            if ((*p & 0xC0) != 0x80) {
+                return false; /// truncated sequence
+            }
+            p++;
+        }
+    }
+    return true;
+}
+
+static int test_render_line_never_truncates_utf8(void) {
+    /// The copy budget was checked per BYTE, so a line whose last character
+    /// did not fit was cut between its lead byte and its continuations and
+    /// the caller received invalid UTF-8 (issue #706). Every consumer of this
+    /// function writes the result to a terminal, including all debugger
+    /// output.
+    ///
+    /// A byte-oriented size makes the failure deterministic: the budget runs
+    /// out partway through a three-byte character.
+    screen_buffer_t buffer;
+    screen_buffer_init(&buffer, 80);
+
+    /// Box-drawing U+2500 is three bytes each.
+    screen_buffer_render(&buffer, "", "\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80",
+                         0);
+
+    for (size_t cap = 2; cap <= 12; cap++) {
+        char output[16];
+        memset(output, 0x7f, sizeof(output));
+        bool result =
+            screen_buffer_render_line_with_prefix(&buffer, 0, output, cap);
+        if (result) {
+            ASSERT(is_valid_utf8(output));
+            ASSERT(strlen(output) < cap);
+        }
+    }
+
+    screen_buffer_cleanup(&buffer);
+    return 1;
+}
+
+static int test_render_line_stops_before_a_partial_character(void) {
+    /// Stopping BEFORE a character is never worse than stopping inside one:
+    /// with room for two of three characters, exactly two are emitted.
+    screen_buffer_t buffer;
+    screen_buffer_init(&buffer, 80);
+    screen_buffer_render(&buffer, "", "\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80",
+                         0);
+
+    char output[16];
+    /// 7 bytes of room holds two 3-byte characters plus the NUL; the third
+    /// character needs three more and must be dropped whole.
+    bool result = screen_buffer_render_line_with_prefix(&buffer, 0, output, 8);
+    ASSERT_EQ(result, true);
+    ASSERT(is_valid_utf8(output));
+    ASSERT_EQ(strlen(output), (size_t)6);
+    ASSERT_STR_EQ(output, "\xe2\x94\x80\xe2\x94\x80");
+
+    screen_buffer_cleanup(&buffer);
+    return 1;
+}
+
+static int test_render_multiline_fits_a_full_wide_row(void) {
+    /// The multiline caller sized its scratch line at MAX_COLS * 2, but a row
+    /// holds MAX_COLS cells and a cell holds up to 4 bytes. A row of
+    /// three-byte characters therefore overran the budget and was truncated
+    /// by it -- which is what made the per-byte cut above reachable in
+    /// ordinary use rather than only at extremes (issue #706).
+    screen_buffer_t buffer;
+    screen_buffer_init(&buffer, SCREEN_BUFFER_MAX_COLS);
+
+    /// Fill a row with three-byte box-drawing characters. Each is one column
+    /// wide, so this fills the row without wrapping.
+    static char wide[SCREEN_BUFFER_MAX_COLS * 3 + 1];
+    size_t n = 0;
+    for (int i = 0; i < SCREEN_BUFFER_MAX_COLS - 1; i++) {
+        wide[n++] = (char)0xe2;
+        wide[n++] = (char)0x94;
+        wide[n++] = (char)0x80;
+    }
+    wide[n] = '\0';
+
+    screen_buffer_render(&buffer, "", wide, 0);
+
+    static char output[SCREEN_BUFFER_MAX_COLS * 4 + 64];
+    bool result = screen_buffer_render_multiline_with_prefixes(
+        &buffer, 0, 1, output, sizeof(output));
+    ASSERT_EQ(result, true);
+    ASSERT(is_valid_utf8(output));
+    /// Every character survives: the scratch buffer must hold the whole row.
+    ASSERT_EQ(strlen(output), n);
+
+    screen_buffer_cleanup(&buffer);
+    return 1;
+}
+
 /* ============================================================
  * RENDER MULTILINE WITH PREFIXES TESTS
  * ============================================================ */
@@ -1258,6 +1370,9 @@ int main(void) {
     RUN_TEST(render_line_with_prefix_null_output);
     RUN_TEST(render_line_with_prefix_negative_line);
     RUN_TEST(render_line_with_prefix_no_prefix);
+    RUN_TEST(render_line_never_truncates_utf8);
+    RUN_TEST(render_line_stops_before_a_partial_character);
+    RUN_TEST(render_multiline_fits_a_full_wide_row);
 
     printf("\n=== Render Multiline with Prefixes Tests ===\n");
     RUN_TEST(render_multiline_null_buffer);
