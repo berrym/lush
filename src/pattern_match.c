@@ -200,12 +200,25 @@ static size_t grapheme_step(const char *s) {
  *
  * `p` points at the opening `[`. On match, returns 1, writes the
  * position just past the closing `]` into `*end`, and writes the
- * byte length of the matched input codepoint into `*s_consumed`. On
- * no-match, returns 0; `*end` is still advanced so the caller can
+ * byte length of the matched input GRAPHEME CLUSTER into `*s_consumed`.
+ * On no-match, returns 0; `*end` is still advanced so the caller can
  * skip the class. Pattern codepoints in the bracket -- both literal
  * characters and the `-` range endpoints -- are decoded as UTF-8
  * codepoints so ranges like `[α-ω]` and literals like `[äöü]` work
  * correctly.
+ *
+ * A bracket class asks the same question `?` does -- "match one
+ * character" -- so it answers it the same way: membership is tested on
+ * the cluster's BASE codepoint, and the whole cluster is consumed on a
+ * match. `[a-z]` therefore matches `é` in both NFC (U+00E9) and NFD
+ * (`e` + U+0301), which is how a reader sees it.
+ *
+ * Consuming only the base left the combining marks behind, so against
+ * decomposed text `${v%[[:alpha:]]}` on `cafe`+U+0301 stripped nothing
+ * at all: the only candidate suffix is the whole cluster, and a matcher
+ * that reported one byte consumed could never account for it (issue
+ * #702). #682 fixed the same defect for `?` and `*`; this is that
+ * question asked at a different code path.
  */
 static int match_char_class(const char *s, const char *p, const char **end,
                             size_t *s_consumed) {
@@ -235,11 +248,19 @@ static int match_char_class(const char *s, const char *p, const char **end,
         return 0;
     }
 
-    /// Decode the input codepoint once for the whole bracket.
+    /// Decode the cluster's base codepoint once for the whole bracket:
+    /// every membership test below is asked about the base. `s` is always
+    /// at a codepoint start here (the matcher advances by whole clusters),
+    /// which is the precondition grapheme_step needs -- lle_is_grapheme_
+    /// boundary reports invalid UTF-8 as a boundary, so it must never be
+    /// asked about a continuation byte.
     size_t cp_bytes = 1;
     uint32_t input_cp = decode_one(s, &cp_bytes);
     if (s_consumed) {
-        *s_consumed = cp_bytes;
+        /// Report the whole cluster: matching one character consumes one
+        /// character, marks included.
+        size_t cluster = grapheme_step(s);
+        *s_consumed = cluster > cp_bytes ? cluster : cp_bytes;
     }
 
     p++; /// past `[`
