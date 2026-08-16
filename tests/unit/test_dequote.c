@@ -125,6 +125,128 @@ TEST(dequote_bracket_word_single_dollar_literal) {
 
 TEST(dequote_empty_span) { assert_dequote("", "", ""); }
 
+/// The map's two structural invariants, asserted for every span in a corpus
+/// rather than spot-checked:
+///
+///   1. text[j] == raw[map[j]] -- every output byte IS the raw byte it names.
+///      Dequoting only ever COPIES or DROPS bytes; it never synthesizes one,
+///      so this holds for the deferred `\X` inside "..." (both bytes copied)
+///      and for the unquoted `\X` (the backslash is dropped and the map names
+///      the surviving char), which are the two shapes most likely to be got
+///      wrong.
+///   2. the map is STRICTLY INCREASING -- each raw byte is consumed at most
+///      once, so no two output bytes may claim the same source offset, and a
+///      consumer can binary-search it.
+///
+/// Both invariants fail loudly if a future append site forgets to pass its
+/// offset, which is the realistic way this decays.
+static void assert_map_invariants(const char *raw) {
+    char *text = NULL, *prov = NULL;
+    size_t *map = NULL;
+    size_t len = strlen(raw);
+    bool ok = lush_dequote_span_mapped(raw, len, &text, &prov, NULL, &map);
+    ASSERT_TRUE(ok, "dequote_mapped succeeds");
+    ASSERT_TRUE(map != NULL, "a map is produced when requested");
+
+    size_t n = strlen(text);
+    for (size_t j = 0; j < n; j++) {
+        ASSERT_TRUE(map[j] < len, "offset is inside the raw span");
+        ASSERT_TRUE(raw[map[j]] == text[j],
+                    "output byte is the raw byte it names");
+        if (j > 0) {
+            ASSERT_TRUE(map[j] > map[j - 1], "offsets strictly increase");
+        }
+    }
+    free(text);
+    free(prov);
+    free(map);
+}
+
+TEST(dequote_map_invariants_over_corpus) {
+    static const char *corpus[] = {
+        "plain",
+        "'a b'",
+        "\"a b\"",
+        "a\\ b",
+        "\"a\\\"b\"",
+        "m[\"a b\"]",
+        "m['$x']",
+        "pre'mid'post",
+        "\"$(echo hi)\"",
+        "\"`echo hi`\"",
+        "\"a`echo x`b\"",
+        "a\\\\b",
+        "\"\"",
+        "''",
+        "$x",
+        "\"${m[\"a b\"]}\"",
+        "one'two'\"three\"four",
+        "\\a\\b\\c",
+        "\"a\nb\"",
+    };
+    for (size_t i = 0; i < sizeof(corpus) / sizeof(corpus[0]); i++) {
+        assert_map_invariants(corpus[i]);
+    }
+}
+
+TEST(dequote_map_names_the_kept_byte_of_an_unquoted_escape) {
+    /// `a\ b` -> `a b`. The backslash at offset 1 is DROPPED, so the space in
+    /// the output must name offset 2, the byte that survived -- not offset 1,
+    /// which is what a naive "advance by one per output byte" would record.
+    char *text = NULL, *prov = NULL;
+    size_t *map = NULL;
+    ASSERT_TRUE(lush_dequote_span_mapped("a\\ b", 4, &text, &prov, NULL, &map),
+                "dequote succeeds");
+    ASSERT_STR_EQ(text, "a b", "text");
+    ASSERT_TRUE(map[0] == 0, "a comes from offset 0");
+    ASSERT_TRUE(map[1] == 2, "the escaped space comes from offset 2");
+    ASSERT_TRUE(map[2] == 3, "b comes from offset 3");
+    free(text);
+    free(prov);
+    free(map);
+}
+
+TEST(dequote_map_skips_quote_delimiters) {
+    /// `m["a b"]` -> `m[a b]`. The delimiters at 2 and 6 are gone, so the
+    /// output offsets jump over them: this is the non-linearity that makes
+    /// the map necessary rather than derivable by arithmetic.
+    char *text = NULL, *prov = NULL;
+    size_t *map = NULL;
+    ASSERT_TRUE(
+        lush_dequote_span_mapped("m[\"a b\"]", 8, &text, &prov, NULL, &map),
+        "dequote succeeds");
+    ASSERT_STR_EQ(text, "m[a b]", "text");
+    size_t want[] = {0, 1, 3, 4, 5, 7};
+    for (size_t j = 0; j < 6; j++) {
+        ASSERT_TRUE(map[j] == want[j], "offset jumps the delimiters");
+    }
+    free(text);
+    free(prov);
+    free(map);
+}
+
+TEST(dequote_map_is_optional_and_the_wrapper_is_unchanged) {
+    /// The 5-argument entry point is now a wrapper. It must produce exactly
+    /// what it always did, and asking for no map must not allocate one.
+    char *t1 = NULL, *p1 = NULL, *t2 = NULL, *p2 = NULL;
+    dequote_flags_t f1, f2;
+    const char *raw = "pre'mid'\"post\"";
+    size_t len = strlen(raw);
+
+    ASSERT_TRUE(lush_dequote_span(raw, len, &t1, &p1, &f1), "wrapper succeeds");
+    ASSERT_TRUE(lush_dequote_span_mapped(raw, len, &t2, &p2, &f2, NULL),
+                "mapped form with a NULL map succeeds");
+    ASSERT_STR_EQ(t1, t2, "wrapper text matches");
+    ASSERT_STR_EQ(p1, p2, "wrapper prov matches");
+    ASSERT_TRUE(f1.any_quoted == f2.any_quoted, "flags agree");
+    ASSERT_TRUE(f1.any_single == f2.any_single, "flags agree");
+    ASSERT_TRUE(f1.expandable == f2.expandable, "flags agree");
+    free(t1);
+    free(p1);
+    free(t2);
+    free(p2);
+}
+
 TEST(dequote_flags_single_vs_double) {
     char *text = NULL, *prov = NULL;
     dequote_flags_t f;
@@ -154,6 +276,10 @@ int main(void) {
     RUN_TEST(dequote_bracket_word_double);
     RUN_TEST(dequote_bracket_word_single_dollar_literal);
     RUN_TEST(dequote_empty_span);
+    RUN_TEST(dequote_map_invariants_over_corpus);
+    RUN_TEST(dequote_map_names_the_kept_byte_of_an_unquoted_escape);
+    RUN_TEST(dequote_map_skips_quote_delimiters);
+    RUN_TEST(dequote_map_is_optional_and_the_wrapper_is_unchanged);
     RUN_TEST(dequote_flags_single_vs_double);
     return TEST_RESULT();
 }
