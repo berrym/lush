@@ -170,6 +170,30 @@ int main(int argc, char **argv) {
     check_agree(lush, "684 an escaped slash in the replacement agrees", "aXb",
                 "//X/\\/", "a\\/b");
 
+    /// A `[*]` form joins on the first character of IFS. With an operator
+    /// applied the join used a hardcoded space, so `${arr[*]#a}` and the
+    /// operator-free `${arr[*]}` beside it disagreed under a custom IFS
+    /// (issue #752). The unset-vs-empty distinction is load-bearing: unset
+    /// IFS means a space, an EMPTY IFS means no separator at all.
+    check(lush, "752 a custom IFS joins the operator result",
+          "IFS=,; arr=(ab xy); printf '<%s>' \"${arr[*]#a}\"", "<b,xy>");
+    check(lush, "752 case conversion joins the same way",
+          "IFS=,; arr=(ab xy); printf '<%s>' \"${arr[*]^^}\"", "<AB,XY>");
+    check(lush, "752 substitution joins the same way",
+          "IFS=,; arr=(ab xy); printf '<%s>' \"${arr[*]//b/Z}\"", "<aZ,xy>");
+    check(lush, "752 positionals join the same way",
+          "IFS=,; set -- ab xy; printf '<%s>' \"${*#a}\"", "<b,xy>");
+    check(lush, "752 an EMPTY IFS concatenates with no separator",
+          "IFS=; arr=(ab xy); printf '<%s>' \"${arr[*]#a}\"", "<bxy>");
+    check(lush, "752 an UNSET IFS joins on a space",
+          "unset IFS; arr=(ab xy); printf '<%s>' \"${arr[*]#a}\"", "<b xy>");
+    check(lush, "752 the operator-free form is unchanged",
+          "IFS=,; arr=(ab xy); printf '<%s>' \"${arr[*]}\"", "<ab,xy>");
+    check(lush, "752 a single element needs no separator",
+          "IFS=,; arr=(ab); printf '<%s>' \"${arr[*]#a}\"", "<b>");
+    check(lush, "752 an empty array yields an empty field",
+          "IFS=,; arr=(); printf '<%s>' \"${arr[*]#a}\"", "<>");
+
     if (failures) {
         fprintf(stderr, "%s: %d failure(s)\n", TEST, failures);
         return 1;
