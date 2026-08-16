@@ -18,6 +18,7 @@
  */
 
 #include "lle/char_width.h"
+#include "lle/utf8_support.h"
 #include "test_framework.h"
 
 /* ============================================================================
@@ -556,6 +557,40 @@ TEST(is_wide_character_false_for_width_0_or_1) {
  * ============================================================================
  */
 
+/// lle_utf8_string_width is the STRING-level wrapper over the per-codepoint
+/// table exercised above. The per-codepoint answers were already pinned here;
+/// the walk that decodes UTF-8 and sums them was not, and callers measure
+/// prompts with it -- the prompt composer now does, having previously guessed
+/// that every 3-byte sequence was two columns.
+TEST(string_width_sums_the_table) {
+    ASSERT_EQ(lle_utf8_string_width("hello", 5), 5, "ascii");
+    ASSERT_EQ(lle_utf8_string_width("", 0), 0, "empty");
+
+    /// 2-byte, one column.
+    ASSERT_EQ(lle_utf8_string_width("\xc3\xa9", 2), 1, "e-acute is one column");
+
+    /// 3-byte and WIDE: the case the old guess got right.
+    ASSERT_EQ(lle_utf8_string_width("\xe3\x81\x82", 3), 2, "hiragana is two");
+    ASSERT_EQ(lle_utf8_string_width("\xe4\xb8\xad\xe6\x96\x87", 6), 4,
+              "two ideographs are four");
+
+    /// 3-byte and NARROW: the case the old guess got wrong. An em dash, a
+    /// check mark and a rupee sign are all three bytes and one column.
+    ASSERT_EQ(lle_utf8_string_width("\xe2\x80\x94", 3), 1, "em dash is one");
+    ASSERT_EQ(lle_utf8_string_width("\xe2\x9c\x93", 3), 1, "check mark is one");
+    ASSERT_EQ(lle_utf8_string_width("\xe2\x82\xb9", 3), 1, "rupee is one");
+
+    /// A combining mark adds nothing to the base it follows.
+    ASSERT_EQ(lle_utf8_string_width("e\xcc\x81", 3), 1,
+              "base plus combining mark is one");
+
+    /// Mixed runs.
+    ASSERT_EQ(lle_utf8_string_width("a\xe3\x81\x82"
+                                    "b",
+                                    5),
+              4, "ascii around a wide character");
+}
+
 int main(void) {
     printf("=== LLE Char Width Tests ===\n\n");
 
@@ -568,6 +603,7 @@ int main(void) {
 
     printf("\n--- ASCII printable ---\n");
     RUN_TEST(ascii_printable_width_one);
+    RUN_TEST(string_width_sums_the_table);
 
     printf("\n--- Combining marks ---\n");
     RUN_TEST(combining_diacritical_marks_zero_width);
