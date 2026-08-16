@@ -604,15 +604,20 @@ TEST(visible_width_ignores_escape_sequences) {
         size_t want;
         const char *what;
     } cases[] = {
-        {                      "hello", 5,                            "no escapes"},
-        {                           "", 0,                                 "empty"},
-        {         "\033[31mred\033[0m", 3,                            "SGR colour"},
-        {      "\033[?25labc\033[?25h", 3, "cursor hide/show: terminators l and h"},
-        {                  "\033[Kabc", 3,                         "erase line: K"},
-        {                 "\033[3~abc", 3,   "final byte ~, which is not a letter"},
-        {"\033[31m\xe3\x81\x82\033[0m", 2,         "wide character inside escapes"},
-        {               "\xe2\x80\x94", 1,        "em dash is one column, not two"},
-        {                  "e\xcc\x81", 1,       "base plus combining mark is one"},
+        {                             "hello", 5,                            "no escapes"},
+        {                                  "", 0,                                 "empty"},
+        {                "\033[31mred\033[0m", 3,                            "SGR colour"},
+        {             "\033[?25labc\033[?25h", 3, "cursor hide/show: terminators l and h"},
+        {                         "\033[Kabc", 3,                         "erase line: K"},
+        {                        "\033[3~abc", 3,   "final byte ~, which is not a letter"},
+        {       "\033[31m\xe3\x81\x82\033[0m", 2,         "wide character inside escapes"},
+        {                      "\xe2\x80\x94", 1,        "em dash is one column, not two"},
+        {                         "e\xcc\x81", 1,       "base plus combining mark is one"},
+        /// Readline's non-printing markers occupy no columns. The display
+        /// subsystem's equivalent already skipped them; both layers now
+        /// agree on the same input, which the prompt bridge relies on.
+        {"\001\033[31m\002red\001\033[0m\002", 3,             "readline-bracketed colour"},
+        {                       "\001\002abc", 3,                          "bare markers"},
     };
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
