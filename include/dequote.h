@@ -76,4 +76,35 @@ typedef struct {
 bool lush_dequote_span(const char *raw, size_t len, char **out_text,
                        char **out_prov, dequote_flags_t *out_flags);
 
+/**
+ * @brief lush_dequote_span, plus a raw-offset position map.
+ *
+ * Identical in every respect to lush_dequote_span -- which is now a wrapper
+ * that passes NULL here -- except that it can also report where each output
+ * byte came from.
+ *
+ * Dequoting DELETES bytes: quote delimiters, the unquoted `\X` backslash, and
+ * `\<newline>`. Output offsets therefore do not map linearly back to the raw
+ * span and cannot be recovered by arithmetic on the result. A consumer holding
+ * a slice of the dequoted text needs this map to name the raw bytes it came
+ * from, which is what a source span on a Word CST part must be absolute
+ * against (issue #701).
+ *
+ * The map records POSITION only. It is not a second provenance channel and
+ * says nothing about quote context; @p out_prov remains the single answer to
+ * that question.
+ *
+ * @param out_map Optional; receives a malloc'd array of @p raw offsets, one
+ *                per output byte, aligned 1:1 with @p out_text: entry j is the
+ *                offset in @p raw of the byte that produced out_text[j]. Only
+ *                the first strlen(*out_text) entries are meaningful -- there is
+ *                no terminator, because 0 is a legitimate offset. May be NULL,
+ *                in which case the map is neither built nor allocated, and the
+ *                call costs exactly what lush_dequote_span costs.
+ * @return true on success (outputs owned by caller); false on OOM.
+ */
+bool lush_dequote_span_mapped(const char *raw, size_t len, char **out_text,
+                              char **out_prov, dequote_flags_t *out_flags,
+                              size_t **out_map);
+
 #endif /* DEQUOTE_H */
