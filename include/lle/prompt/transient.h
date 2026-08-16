@@ -14,7 +14,7 @@
  *
  * Example:
  *   Before: [user@host] ~/path (git-branch *) $ echo hello
- *   After:  ❯ echo hello
+ *   After:  U+276F echo hello
  *
  * Implementation:
  * The transient replacement is triggered by the LLE_HOOK_LINE_ACCEPTED

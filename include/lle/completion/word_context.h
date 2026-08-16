@@ -5,7 +5,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
  * Given a buffer and a cursor byte offset, produce a structured description
- * of what the user is currently completing — where the shell-word starts, what
+ * of what the user is currently completing -- where the shell-word starts, what
  * quote/escape state the cursor is in, where the filename portion begins
  * (after any path operators or expansion prefixes), what kind of expansion
  * (if any) the cursor is inside, and what context the word sits in
@@ -80,18 +80,18 @@ typedef enum {
  * typed an opener like '$', '${', '$(', '$((', '`', '{', or a glob
  * metacharacter, and the expansion has not yet closed). When the cursor is
  * past a complete expansion or no expansion is active, this is
- * LLE_EXPANSION_NONE — the word_context's other fields describe the active
+ * LLE_EXPANSION_NONE -- the word_context's other fields describe the active
  * filename completion in that case.
  */
 typedef enum {
     LLE_EXPANSION_NONE,          /**< Cursor is not inside an expansion  */
-    LLE_EXPANSION_VARIABLE_NAME, /**< $HO|     — bare $name being typed  */
-    LLE_EXPANSION_BRACED_VARIABLE_NAME, /**< ${HO|}   — braced ${name} being
+    LLE_EXPANSION_VARIABLE_NAME, /**< $HO|     -- bare $name being typed  */
+    LLE_EXPANSION_BRACED_VARIABLE_NAME, /**< ${HO|}   -- braced ${name} being
                                            typed */
-    LLE_EXPANSION_COMMAND_SUBST, /**< $(ls|)   — inside $(...)           */
-    LLE_EXPANSION_ARITHMETIC,    /**< $((1+|)) — inside $((...))         */
-    LLE_EXPANSION_BRACE_LIST,    /**< {a,b|}   — inside an open brace    */
-    LLE_EXPANSION_GLOB,          /**< *.t|     — cursor in mid-glob      */
+    LLE_EXPANSION_COMMAND_SUBST, /**< $(ls|)   -- inside $(...)           */
+    LLE_EXPANSION_ARITHMETIC,    /**< $((1+|)) -- inside $((...))         */
+    LLE_EXPANSION_BRACE_LIST,    /**< {a,b|}   -- inside an open brace    */
+    LLE_EXPANSION_GLOB,          /**< *.t|     -- cursor in mid-glob      */
 } lle_expansion_kind_t;
 
 /* ============================================================================
@@ -123,8 +123,8 @@ typedef enum {
  * function definition the cursor is still at COMMAND_POSITION (for the
  * first word of an inner statement) or ARGUMENT (for arguments to that
  * statement); completion dispatch is identical to top-level. If a
- * future need arises to distinguish "we are inside a function" — for
- * example to surface only function-local variables — that can be
+ * future need arises to distinguish "we are inside a function" -- for
+ * example to surface only function-local variables -- that can be
  * added as a separate flag without overloading context_type. */
 
 /* ============================================================================

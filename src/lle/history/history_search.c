@@ -180,8 +180,8 @@ static int compare_results_by_score(const void *a, const void *b) {
  * prefix match against `prefix`, or 0 if no match. Iterates both
  * strings by UTF-8 codepoint and case-folds each via
  * lle_unicode_tolower_codepoint, so prefixes like `caf` correctly
- * match input `Café` and prefixes like `naïv` correctly match
- * `Naïve`. ASCII-only inputs degrade to single-byte iteration with
+ * match input `Cafe-acute` and prefixes like `nai-umlautv` correctly match
+ * `Nai-umlautve`. ASCII-only inputs degrade to single-byte iteration with
  * the same semantics strncasecmp had previously.
  *
  * Returns 0 for empty `prefix` -- callers that treat empty-prefix as
@@ -225,7 +225,7 @@ static size_t cf_prefix_match_bytes(const char *str, const char *prefix) {
  *
  * Replaces the previous strncasecmp-based implementation which only
  * folded ASCII A-Z and produced no matches against history entries
- * containing case-varying non-ASCII letters (filenames with é, Ä,
+ * containing case-varying non-ASCII letters (filenames with e-acute, U+00C4,
  * etc.).
  *
  * @param haystack String to search in (may be NULL)
@@ -986,7 +986,7 @@ void lle_history_search_results_print(
            : results->search_type == LLE_SEARCH_TYPE_SUBSTRING ? "substring"
                                                                : "fuzzy");
     printf("  Count: %zu / %zu\n", results->count, results->capacity);
-    printf("  Time: %" PRIu64 " μs\n", results->search_time_us);
+    printf("  Time: %" PRIu64 " \xce\xbcs\n", results->search_time_us);
     printf("  Results:\n");
 
     for (size_t i = 0; i < results->count; i++) {

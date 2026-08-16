@@ -188,7 +188,7 @@ static int evaluate_single_test(char **argv, int start, int end) {
         if (strcmp(argv[start + 1], "=") == 0) {
             /// test STRING1 = STRING2. Compare under NFC equivalence
             /// via the LLE Unicode primitive so canonically-equivalent
-            /// inputs (precomposed é vs decomposed e + combining acute)
+            /// inputs (precomposed e-acute vs decomposed e + combining acute)
             /// satisfy the user's "are these the same string?" intent.
             /// Bash and zsh keep byte-level comparison; this is a
             /// deliberate lush-superset divergence justified by the

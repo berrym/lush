@@ -263,7 +263,7 @@ typedef struct executor {
     /* Variable-allocated fd registry. Every `exec {var}<file`/`{var}>file`
      * / `{var}>&N` redirection that allocates a new fd (via
      * find_available_fd) appends its number here. `{var}>&-` removes its
-     * entry on explicit close. executor_free() closes whatever remains —
+     * entry on explicit close. executor_free() closes whatever remains --
      * a script that allocates fds without ever closing them does not leak
      * through shell-exit. Subshells fork()-inherit the array (process-
      * local from then on), so child cleanup never affects parent fds.
@@ -275,8 +275,8 @@ typedef struct executor {
 
     /* Source-text retention for the structured-error system. The
      * executor stashes the input text (and its file-relative starting
-     * line) for the current parse/execute batch so any error site —
-     * builtin, expansion, redirection, runtime — can attach the
+     * line) for the current parse/execute batch so any error site --
+     * builtin, expansion, redirection, runtime -- can attach the
      * original source line via shell_error_set_source_line() and
      * produce the full rust-style `--> file:line:col / N | ... / ^~~~`
      * snippet. Both fields are owned by the caller (executor_execute_
@@ -615,8 +615,8 @@ void executor_error_report_with_help(executor_t *executor,
  * @brief Reject a mixed-script identifier when the hardening flag is set
  *
  * Author-time guard for the UAX #39 homograph vector: an identifier
- * drawing letters from more than one script (Latin `p` + Cyrillic `а`
- * in `pаsswd`). When FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off (the
+ * drawing letters from more than one script (Latin `p` + Cyrillic `U+0430`
+ * in `pU+0430sswd`). When FEATURE_REJECT_MIXED_SCRIPT_IDENTS is off (the
  * default in every mode) this is a no-op returning false. When on, a
  * mixed-script @p name reports a structured error at @p loc and returns
  * true so the caller aborts the definition. Call only at author

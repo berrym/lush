@@ -711,15 +711,15 @@ void lle_symbol_set_init_unicode(lle_symbol_set_t *symbols) {
     snprintf(symbols->staged, sizeof(symbols->staged), "%s", "+");
     snprintf(symbols->unstaged, sizeof(symbols->unstaged), "%s", "!");
     snprintf(symbols->untracked, sizeof(symbols->untracked), "%s", "?");
-    snprintf(symbols->ahead, sizeof(symbols->ahead), "%s", "↑");
-    snprintf(symbols->behind, sizeof(symbols->behind), "%s", "↓");
-    snprintf(symbols->stash, sizeof(symbols->stash), "%s", "≡");
+    snprintf(symbols->ahead, sizeof(symbols->ahead), "%s", "\xe2\x86\x91");
+    snprintf(symbols->behind, sizeof(symbols->behind), "%s", "\xe2\x86\x93");
+    snprintf(symbols->stash, sizeof(symbols->stash), "%s", "\xe2\x89\xa1");
     snprintf(symbols->conflict, sizeof(symbols->conflict), "%s", "!");
     snprintf(symbols->home, sizeof(symbols->home), "%s", "~");
-    snprintf(symbols->error, sizeof(symbols->error), "%s", "✗");
-    snprintf(symbols->success, sizeof(symbols->success), "%s", "✓");
-    snprintf(symbols->jobs, sizeof(symbols->jobs), "%s", "⚙");
-    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "↕");
+    snprintf(symbols->error, sizeof(symbols->error), "%s", "\xe2\x9c\x97");
+    snprintf(symbols->success, sizeof(symbols->success), "%s", "\xe2\x9c\x93");
+    snprintf(symbols->jobs, sizeof(symbols->jobs), "%s", "\xe2\x9a\x99");
+    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "\xe2\x86\x95");
     snprintf(symbols->ssh, sizeof(symbols->ssh), "%s", "SSH");
     snprintf(symbols->duration, sizeof(symbols->duration), "%s", "took ");
     snprintf(symbols->virtualenv, sizeof(symbols->virtualenv), "%s", "py:");
@@ -801,9 +801,11 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols) {
     memset(symbols, 0, sizeof(*symbols));
 
     /// Prompt symbols
-    snprintf(symbols->prompt, sizeof(symbols->prompt), "%s", "❯");
-    snprintf(symbols->prompt_root, sizeof(symbols->prompt_root), "%s", "❯");
-    snprintf(symbols->continuation, sizeof(symbols->continuation), "%s", "…");
+    snprintf(symbols->prompt, sizeof(symbols->prompt), "%s", "\xe2\x9d\xaf");
+    snprintf(symbols->prompt_root, sizeof(symbols->prompt_root), "%s",
+             "\xe2\x9d\xaf");
+    snprintf(symbols->continuation, sizeof(symbols->continuation), "%s",
+             "\xe2\x80\xa6");
 
     /// Powerline separators (U+E0B0, U+E0B2)
     snprintf(symbols->separator_left, sizeof(symbols->separator_left),
@@ -845,7 +847,7 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols) {
     snprintf(symbols->time, sizeof(symbols->time), "\xef\x80\x97"); /// U+F017
 
     /// Environment/context symbols
-    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "↕");
+    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "\xe2\x86\x95");
     snprintf(symbols->ssh, sizeof(symbols->ssh), "%s", "SSH");
     snprintf(symbols->duration, sizeof(symbols->duration), "%s", "took ");
     snprintf(symbols->virtualenv, sizeof(symbols->virtualenv), "%s", "py:");
@@ -1016,7 +1018,7 @@ lle_theme_t *lle_theme_create_powerline(void) {
     snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt),
              "\xe2\x9d\xaf");
 
-    /// Powerline rendering mode — composer routes to lle_powerline_render()
+    /// Powerline rendering mode -- composer routes to lle_powerline_render()
     theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
 
     /// Segment order for powerline rendering. The exit-status segment is
@@ -1154,8 +1156,9 @@ lle_theme_t *lle_theme_create_two_line(void) {
 
     /// Two-line layout
     snprintf(theme->layout.ps1_format, sizeof(theme->layout.ps1_format),
-             "┌─[${user}@${host}]─[${directory}]${?git:─[${git}]}\n"
-             "└─${symbol} ");
+             "\xe2\x94\x8c\xe2\x94\x80[${user}@${host}]\xe2\x94\x80[${"
+             "directory}]${?git:\xe2\x94\x80[${git}]}\n"
+             "\xe2\x94\x94\xe2\x94\x80${symbol} ");
     snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format),
              "   > ");
     snprintf(theme->layout.transient_format,
@@ -1334,10 +1337,11 @@ lle_theme_t *lle_theme_create_dark(void) {
 
     /// Two-line layout with box drawing
     snprintf(theme->layout.ps1_format, sizeof(theme->layout.ps1_format),
-             "┌─[${user}@${host}]─[${directory}]${?git:─[${git}]}\n"
-             "└─${symbol} ");
+             "\xe2\x94\x8c\xe2\x94\x80[${user}@${host}]\xe2\x94\x80[${"
+             "directory}]${?git:\xe2\x94\x80[${git}]}\n"
+             "\xe2\x94\x94\xe2\x94\x80${symbol} ");
     snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format),
-             "└─> ");
+             "\xe2\x94\x94\xe2\x94\x80> ");
     snprintf(theme->layout.rps1_format, sizeof(theme->layout.rps1_format),
              "${time}");
     snprintf(theme->layout.transient_format,
@@ -1436,18 +1440,22 @@ lle_theme_t *lle_theme_create_colorful(void) {
     theme->colors.path_root = lle_color_256(196);  /// Red
     theme->colors.path_normal = lle_color_256(75); /// Sky blue
 
-    /// Colorful symbols: ● user@host directory (git) ➜
-    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt), "➜");
-    snprintf(theme->symbols.directory, sizeof(theme->symbols.directory), "●");
+    /// Colorful symbols: U+25CF user@host directory (git) U+279C
+    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt),
+             "\xe2\x9e\x9c");
+    snprintf(theme->symbols.directory, sizeof(theme->symbols.directory),
+             "\xe2\x97\x8f");
 
     /// Creative layout with symbols
     snprintf(theme->layout.ps1_format, sizeof(theme->layout.ps1_format),
-             "● ${user}@${host} ${directory}${?git: (${git})} ➜ ");
-    snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format), "▶ ");
+             "\xe2\x97\x8f ${user}@${host} ${directory}${?git: (${git})} "
+             "\xe2\x9e\x9c ");
+    snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format),
+             "\xe2\x96\xb6 ");
     snprintf(theme->layout.rps1_format, sizeof(theme->layout.rps1_format),
-             "⏰ ${time}");
+             "\xe2\x8f\xb0 ${time}");
     snprintf(theme->layout.transient_format,
-             sizeof(theme->layout.transient_format), "➜ ");
+             sizeof(theme->layout.transient_format), "\xe2\x9e\x9c ");
     theme->layout.enable_right_prompt = true;
     theme->layout.enable_transient = true;
 

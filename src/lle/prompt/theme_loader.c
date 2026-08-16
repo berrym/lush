@@ -587,7 +587,7 @@ bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
         if (stat(s_hot_reload_path, &st) == 0) {
             s_hot_reload_mtime = st.st_mtime;
         }
-        return false; /// First check after switch — just cache, don't reload
+        return false; /// First check after switch -- just cache, don't reload
     }
 
     /// stat() the file and compare mtime
@@ -600,7 +600,7 @@ bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
         return false; /// No change
     }
 
-    /// File modified — reload
+    /// File modified -- reload
     s_hot_reload_mtime = st.st_mtime;
 
     lle_result_t result = lle_theme_reload_by_name(registry, active->name);

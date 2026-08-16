@@ -60,7 +60,7 @@
 #include <unistd.h>
 
 /* ============================================================================
- * Walker — internal state held during one analyze() call
+ * Walker -- internal state held during one analyze() call
  * ============================================================================
  */
 
@@ -103,7 +103,7 @@ typedef struct walker {
 
     /* Quote / escape state. ESCAPE_PENDING is encoded as the bool
      * `escape_pending` flag plus the underlying quote_state (which may be
-     * NONE or DOUBLE — escape inside SINGLE is impossible). The cursor's
+     * NONE or DOUBLE -- escape inside SINGLE is impossible). The cursor's
      * quote_state in the public output reflects this combined state. */
     bool in_single;
     bool in_double;
@@ -274,7 +274,7 @@ static void advance_keyword_state(walker_t *w, size_t word_start,
             w->kw_state = KW_AFTER_CASE;
             return;
         }
-        /// Any other word at command position resets the state machine —
+        /// Any other word at command position resets the state machine --
         /// the keyword sequence is broken by a non-`for`/`case` command.
         w->kw_state = KW_NONE;
         return;
@@ -398,18 +398,18 @@ static bool current_line_matches_heredoc_delim(const walker_t *w) {
 }
 
 /* ============================================================================
- * Walker step — one codepoint forward
+ * Walker step -- one codepoint forward
  * ============================================================================
  *
  * The walker advances pos by the full UTF-8 sequence length of the codepoint
  * at the current pos. State transitions:
  *
- *   ESCAPE_PENDING → cleared (the escaped char is consumed as literal).
- *   SINGLE quote   → only ' returns to NONE; everything else is literal.
- *   DOUBLE quote   → " returns to NONE; \ sets ESCAPE_PENDING; everything
+ *   ESCAPE_PENDING -> cleared (the escaped char is consumed as literal).
+ *   SINGLE quote   -> only ' returns to NONE; everything else is literal.
+ *   DOUBLE quote   -> " returns to NONE; \ sets ESCAPE_PENDING; everything
  *                    else is literal.
- *   BACKTICK quote → ` returns to NONE; \ sets ESCAPE_PENDING.
- *   NONE quote     → ' enters SINGLE, " enters DOUBLE, ` enters BACKTICK,
+ *   BACKTICK quote -> ` returns to NONE; \ sets ESCAPE_PENDING.
+ *   NONE quote     -> ' enters SINGLE, " enters DOUBLE, ` enters BACKTICK,
  *                    \ sets ESCAPE_PENDING; whitespace ends the current
  *                    word; (, ;, &, |, newline are statement separators
  *                    (when paren/brace/bracket depth is 0).
@@ -479,7 +479,7 @@ static void walker_advance_one(walker_t *w) {
         }
         /// `, $ inside double quotes can begin nested command-sub /
         /// variable expansion. The analyzer does not dive into them
-        /// structurally in this revision — they are treated as
+        /// structurally in this revision -- they are treated as
         /// literal-bearing text inside the double-quoted span. Nested
         /// $VAR / $(...) inside "..." will be handled when expansion
         /// resolution is added.
@@ -541,7 +541,7 @@ static void walker_advance_one(walker_t *w) {
     if (cp == '(') {
         if (w->paren_depth == 0 && w->brace_depth == 0 &&
             w->bracket_depth == 0) {
-            /// Subshell start at top level — also treat as statement
+            /// Subshell start at top level -- also treat as statement
             /// boundary.
             w->last_statement_start = w->pos + (size_t)n;
             w->at_command_position = true;
@@ -737,7 +737,7 @@ static void walker_advance_one(walker_t *w) {
                 w->pos += 1;
             }
             w->expecting_heredoc_delim = true;
-            /// Don't set next_word_is_redirect_target — the next word IS
+            /// Don't set next_word_is_redirect_target -- the next word IS
             /// the heredoc delimiter, not a file path.
             w->pos += (size_t)n;
             return;
@@ -1015,13 +1015,13 @@ static size_t compute_filename_portion_start(const char *buf, size_t word_start,
  * expansion_kind. Otherwise return LLE_EXPANSION_NONE.
  *
  * Detection looks at the bytes between word_start and cursor:
- *   $name|        (no { or () after $)              → VARIABLE_NAME
- *   ${name|       (an unmatched ${ )                → BRACED_VARIABLE_NAME
- *   $(...|        (an unmatched $( without (( )     → COMMAND_SUBST
- *   $((...| ))    (an unmatched $((  )              → ARITHMETIC
+ *   $name|        (no { or () after $)              -> VARIABLE_NAME
+ *   ${name|       (an unmatched ${ )                -> BRACED_VARIABLE_NAME
+ *   $(...|        (an unmatched $( without (( )     -> COMMAND_SUBST
+ *   $((...| ))    (an unmatched $((  )              -> ARITHMETIC
  *   {a,b|         (an unmatched {  with at least one comma)
- *                                                    → BRACE_LIST
- *   *foo|, ?foo|, [...] glob char in word           → GLOB
+ *                                                    -> BRACE_LIST
+ *   *foo|, ?foo|, [...] glob char in word           -> GLOB
  *
  * Detection is intentionally simple (and only inspects within the current
  * shell-word). A full grammar-driven detector lives in src/tokenizer.c;
@@ -1094,7 +1094,7 @@ detect_expansion_kind(const char *buf, size_t word_start, size_t cursor) {
                 in_braced_var_name = true;
                 brace_d++;
             } else if (cp == '(') {
-                /// peek for second ( → arithmetic
+                /// peek for second ( -> arithmetic
                 size_t peek_i = i + (size_t)n;
                 uint32_t peek_cp;
                 int peek_n = (peek_i < cursor)
@@ -1650,14 +1650,14 @@ lle_result_t lle_word_context_analyze(const char *buffer,
         return r;
 
     /// Context type. Order of precedence (most specific first):
-    ///   HEREDOC_BODY  — completion is refused; trumps everything else
-    ///   VARIABLE_NAME — cursor inside an in-progress $name / ${name
-    ///   FOR_IN_LIST   — cursor in `for X in <list>` past `in`, before ;
-    ///   CASE_PATTERN  — cursor in `case X in <patterns>` past `in`
-    ///   REDIRECT_TARGET — next word after >, <, >>, etc.
-    ///   COMMAND_POSITION — first word of a fresh statement
-    ///   ARGUMENT      — argument to the current command
-    ///   UNKNOWN       — none of the above
+    ///   HEREDOC_BODY  -- completion is refused; trumps everything else
+    ///   VARIABLE_NAME -- cursor inside an in-progress $name / ${name
+    ///   FOR_IN_LIST   -- cursor in `for X in <list>` past `in`, before ;
+    ///   CASE_PATTERN  -- cursor in `case X in <patterns>` past `in`
+    ///   REDIRECT_TARGET -- next word after >, <, >>, etc.
+    ///   COMMAND_POSITION -- first word of a fresh statement
+    ///   ARGUMENT      -- argument to the current command
+    ///   UNKNOWN       -- none of the above
     if (w.in_heredoc_body) {
         ctx->context_type = LLE_CONTEXT_HEREDOC_BODY;
     } else if (ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME ||

@@ -45,7 +45,7 @@ int bin_let(int argc, char **argv) {
                     free(src_line);
                 }
             }
-            /// Walk executor's context stack — already includes
+            /// Walk executor's context stack -- already includes
             /// "in builtin 'let'" pushed by the dispatcher.
             if (current_executor) {
                 for (size_t i = 0; i < current_executor->context_depth; i++) {
@@ -96,7 +96,7 @@ int bin_let(int argc, char **argv) {
                         free(src_line);
                     }
                 }
-                /// Walk executor's context stack — already includes
+                /// Walk executor's context stack -- already includes
                 /// "in builtin 'let'" pushed by the dispatcher.
                 if (current_executor) {
                     for (size_t i = 0; i < current_executor->context_depth;

@@ -1149,7 +1149,9 @@ prompt_layer_error_t prompt_layer_run_tests(prompt_layer_t *layer) {
     DEBUG_PRINT("Test 2 passed: complex prompt");
 
     /// Test 3: Multiline prompt
-    result = prompt_layer_set_content(layer, "┌─[user@host]─[~/path]\n└─$ ");
+    result = prompt_layer_set_content(
+        layer, "\xe2\x94\x8c\xe2\x94\x80[user@host]\xe2\x94\x80[~/"
+               "path]\n\xe2\x94\x94\xe2\x94\x80$ ");
     if (result != PROMPT_LAYER_SUCCESS) {
         DEBUG_PRINT("Test 3 failed: %s", prompt_layer_error_string(result));
         return result;

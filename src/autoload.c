@@ -126,7 +126,7 @@ void autoload_clear(void) {
  * Covers macOS (Homebrew + system zsh), Debian/Ubuntu, Fedora/Arch.
  * Each entry is a `glob(3)` pattern resolved at lookup time so we pick
  * up whichever zsh version is actually installed without baking the
- * version number into source. The glob is permissive — non-existent
+ * version number into source. The glob is permissive -- non-existent
  * paths are silently skipped.
  */
 static const char *DEFAULT_FPATH_GLOBS[] = {
@@ -296,7 +296,7 @@ bool autoload_try_resolve(struct executor *executor, const char *name) {
     /// Letting those parse errors land on the script's stderr would
     /// surface lush's own gaps as if the script itself had failed. By
     /// suppressing them here we keep autoload's contract narrow:
-    /// succeed silently or fail silently — diagnostics about lush's
+    /// succeed silently or fail silently -- diagnostics about lush's
     /// gaps belong in a debug channel, not the script's stderr.
     fflush(stderr);
     int saved_stderr = dup(STDERR_FILENO);

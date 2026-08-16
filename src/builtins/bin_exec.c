@@ -83,7 +83,7 @@ int bin_exec(int argc, char **argv) {
     /// Under fuzzing sandbox, exec must not call execvp() (which would
     /// replace the fuzzer process) or exit() on execvp failure (which
     /// would terminate it). Short-circuit any exec-with-args invocation
-    /// to a no-op returning 127 — the same status the fall-through
+    /// to a no-op returning 127 -- the same status the fall-through
     /// exit() would convey to a parent.
     (void)argv;
     return 127;

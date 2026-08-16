@@ -504,7 +504,7 @@ lle_result_t lle_key_event_to_string(const lle_key_event_t *key_event,
  * @return LLE_SUCCESS or error code
  *
  * @note Statistics reset on manager creation
- * @note Useful for verifying <50μs performance requirement
+ * @note Useful for verifying <50mus performance requirement
  */
 lle_result_t lle_keybinding_manager_get_stats(lle_keybinding_manager_t *manager,
                                               uint64_t *avg_lookup_time_us,

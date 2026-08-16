@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/// Forward declaration for portability — never `#include <strings.h>`
+/// Forward declaration for portability -- never `#include <strings.h>`
 /// in this project; the forward-declare pattern avoids shadowing
 /// include/strings.h (see ht_fnv1a.c and the project-wide rule).
 int strcasecmp(const char *s1, const char *s2);
@@ -338,7 +338,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 true, /// zsh exits a non-interactive shell on a readonly
                       /// assignment error, like dash; match it in zsh mode
             [FEATURE_ZSH_PARAM_MODIFIERS] = true, /// native zsh modifiers
-            [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
+            [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off -> escapes interp'd
                             by default in zsh's echo builtin */
             [FEATURE_COMPLETION_DSL] =
                 true, /// compdef/compadd are zsh-native; oh-my-zsh / prezto
@@ -469,7 +469,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_XPG_ECHO] =
                 true, /* Curated zsh-style: echo interprets escapes by
                             default. More predictable and modern than bash's
-                            literal-by-default — `echo "\n"` produces a newline
+                            literal-by-default -- `echo "\n"` produces a newline
                             consistently. Use `unsetopt xpg_echo` or
                             `setopt bsd_echo` for bash-style literal. */
             [FEATURE_COMPLETION_DSL] =

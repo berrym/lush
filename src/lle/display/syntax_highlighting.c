@@ -62,7 +62,7 @@ static const lle_syntax_colors_t default_colors = {
     .variable_special = 0x00FF87FF, /// Bright orchid
 
     /* Paths -- ship the three base knobs; leave the six shape-specific
-     * slots at 0 (unset → fall through to the kind-only knob).
+     * slots at 0 (unset -> fall through to the kind-only knob).
      *
      * Files ship unset on the kind-only knob too: valid regular files
      * are intentionally unhighlighted by default, matching the rule
@@ -75,7 +75,7 @@ static const lle_syntax_colors_t default_colors = {
     .path_dir_absolute = 0,
     .path_dir_relative = 0,
     .path_dir_home = 0,
-    .path_file = 0,             /// unset → file paths render as ARGUMENT
+    .path_file = 0,             /// unset -> file paths render as ARGUMENT
     .path_dir = 0x0087D787,     /// Pale green (256: 114)
     .path_invalid = 0x00FF0000, /// Bright red (256: 196)
 
@@ -293,8 +293,8 @@ static bool is_word_char(char c) {
     unsigned char uc = (unsigned char)c;
 
     /// UTF-8 continuation bytes (10xxxxxx) and lead bytes (11xxxxxx) are part
-    /// of words. This ensures multi-byte UTF-8 characters like 'é' (0xC3 0xA9)
-    /// are not split.
+    /// of words. This ensures multi-byte UTF-8 characters like 'e-acute' (0xC3
+    /// 0xA9) are not split.
     if (uc >= 0x80) {
         return true; /// Any non-ASCII byte is part of a word
     }
@@ -409,7 +409,7 @@ static bool is_assignment(const char *word, size_t len) {
     /// Name extent must be a valid identifier under the active mode
     /// (FEATURE_UNICODE_IDENTIFIERS widens the letter set in lush mode).
     /// Walk the [0, name_len) span with the shared predicate so the
-    /// highlighter colors `café=1` as an assignment the same way the
+    /// highlighter colors `cafe-acute=1` as an assignment the same way the
     /// executor accepts it.
     size_t walked = lush_ident_match_start(word, name_len);
     if (walked == 0) {
@@ -451,7 +451,7 @@ static size_t skip_whitespace(const char *input, size_t pos, size_t len) {
  *
  * `path_exists` survives because the command-side path branches in
  * lle_syntax_check_command (./..., /..., ~/...) still want a yes/no
- * existence answer for command-as-path classification. The shape ×
+ * existence answer for command-as-path classification. The shape x
  * kind taxonomy applies to argument-position paths only; commands
  * keep the simpler valid/invalid model.
  *
@@ -703,7 +703,7 @@ static bool is_implicit_path_word(const char *word, size_t len) {
 }
 
 /**
- * @brief Resolve a raw shell-source path word into a shape × kind token.
+ * @brief Resolve a raw shell-source path word into a shape x kind token.
  *
  * Walks the full classification pipeline:
  *   1. Copy `word_len` bytes of the raw word into a stable buffer.
@@ -715,8 +715,8 @@ static bool is_implicit_path_word(const char *word, size_t len) {
  *   4. Expand a leading `~` against $HOME, but remember the original
  *      shape: a path written `~/foo` stays in the HOME shape bucket
  *      regardless of where $HOME points.
- *   5. stat() the resolved path. ENOENT and friends → PATH_INVALID.
- *      S_ISDIR → DIR shape variant; anything else → FILE shape variant.
+ *   5. stat() the resolved path. ENOENT and friends -> PATH_INVALID.
+ *      S_ISDIR -> DIR shape variant; anything else -> FILE shape variant.
  *   6. Cache the result and return.
  *
  * No-cache path: highlighter->path_cache may be NULL during init or in
@@ -1771,9 +1771,9 @@ static void highlight_range(lle_syntax_highlighter_t *highlighter,
                 } else if ((has_slash || is_implicit_path_word(
                                              input + token_start, word_len)) &&
                            highlighter->validate_paths) {
-                    /// Path-shaped argument: shape × kind classification
-                    /// via classify_path_token (dequote → tilde-expand →
-                    /// stat → cache, single helper, see definition for
+                    /// Path-shaped argument: shape x kind classification
+                    /// via classify_path_token (dequote -> tilde-expand ->
+                    /// stat -> cache, single helper, see definition for
                     /// the full pipeline). The trigger admits both
                     /// slash-bearing forms (the classic heuristic) and
                     /// the bare `.` / `..` / `~` indicators per
@@ -1863,7 +1863,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         case LLE_TOKEN_VARIABLE_SPECIAL:
             tok->color = c->variable_special;
             break;
-        /// Path tokens use the shape × kind fallback chain documented
+        /// Path tokens use the shape x kind fallback chain documented
         /// on the lle_syntax_colors struct: shape-specific knob, then
         /// kind-only knob, then 0 (token demoted to ARGUMENT, default
         /// text). The chain is computed inline -- explicit per-case

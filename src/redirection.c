@@ -1063,7 +1063,7 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
 
             /// Check if this line matches the delimiter.
             /// Compare under NFC equivalence so a heredoc terminated
-            /// with a non-ASCII delimiter (e.g. EOFé) matches whether
+            /// with a non-ASCII delimiter (e.g. EOFe-acute) matches whether
             /// the on-script delimiter and the on-stdin terminator
             /// line are encoded as NFC, NFD, or one of each. The
             /// underlying primitive's ASCII fast path means the

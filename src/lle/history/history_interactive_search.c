@@ -680,10 +680,11 @@ void lle_history_interactive_search_print_stats(void) {
                                                            : "failed");
     printf("  Query: \"%s\" (len=%zu)\n", session->query, session->query_len);
     printf("  Total Searches: %" PRIu64 "\n", session->searches_performed);
-    printf("  Total Time: %" PRIu64 " μs\n", session->total_search_time_us);
+    printf("  Total Time: %" PRIu64 " \xce\xbcs\n",
+           session->total_search_time_us);
 
     if (session->searches_performed > 0) {
-        printf("  Avg Time: %" PRIu64 " μs\n",
+        printf("  Avg Time: %" PRIu64 " \xce\xbcs\n",
                session->total_search_time_us / session->searches_performed);
     }
 

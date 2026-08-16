@@ -25,7 +25,7 @@
  * Bypasses stdio because the read builtin must work after the
  * redirection layer dup2()s a new fd into STDIN_FILENO. Stdio's stdin
  * FILE* may carry a stale feof flag set during the shell's own script
- * reading from the original stdin — getline()/fgets() would then
+ * reading from the original stdin -- getline()/fgets() would then
  * return -1 immediately without ever consulting the new fd. Matches
  * what bash and zsh do for the read builtin (issue #55).
  *
@@ -380,7 +380,7 @@ int bin_read(int argc, char **argv) {
             printf("\n");
         }
     } else {
-        /// Normal line reading via raw read() syscall — see
+        /// Normal line reading via raw read() syscall -- see
         /// read_line_from_fd above for why stdio is unsafe here.
         line = read_line_from_fd(fd);
 

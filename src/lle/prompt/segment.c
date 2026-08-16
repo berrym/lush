@@ -1626,14 +1626,17 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
         (theme && theme->symbols.unstaged[0]) ? theme->symbols.unstaged : "*";
     const char *sym_untracked =
         (theme && theme->symbols.untracked[0]) ? theme->symbols.untracked : "?";
-    const char *sym_ahead =
-        (theme && theme->symbols.ahead[0]) ? theme->symbols.ahead : "↑";
-    const char *sym_behind =
-        (theme && theme->symbols.behind[0]) ? theme->symbols.behind : "↓";
+    const char *sym_ahead = (theme && theme->symbols.ahead[0])
+                                ? theme->symbols.ahead
+                                : "\xe2\x86\x91";
+    const char *sym_behind = (theme && theme->symbols.behind[0])
+                                 ? theme->symbols.behind
+                                 : "\xe2\x86\x93";
     const char *sym_branch =
         (theme && theme->symbols.branch[0]) ? theme->symbols.branch : "";
-    const char *sym_stash =
-        (theme && theme->symbols.stash[0]) ? theme->symbols.stash : "≡";
+    const char *sym_stash = (theme && theme->symbols.stash[0])
+                                ? theme->symbols.stash
+                                : "\xe2\x89\xa1";
     const char *sym_conflict =
         (theme && theme->symbols.conflict[0]) ? theme->symbols.conflict : "!";
 
@@ -2236,7 +2239,7 @@ lle_prompt_segment_t *lle_segment_create_aws(void) {
  * @brief Read current-context from kubeconfig file
  *
  * Simple line scan for "current-context:" in the kubeconfig YAML.
- * No full YAML parser — just finds the line and extracts the value.
+ * No full YAML parser -- just finds the line and extracts the value.
  *
  * @param buf    Output buffer for context name
  * @param bufsz  Size of output buffer

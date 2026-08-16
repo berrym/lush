@@ -115,7 +115,7 @@ size_t lush_ident_match_continue(const char *p, size_t remaining);
  * position 0 and lush_ident_match_continue thereafter. Returns true
  * if and only if the entire string is a valid identifier under the
  * currently-active feature-flag setting (so a call from POSIX mode
- * with `FEATURE_UNICODE_IDENTIFIERS` off rejects "café" while a call
+ * with `FEATURE_UNICODE_IDENTIFIERS` off rejects "cafe-acute" while a call
  * from lush mode accepts it).
  *
  * Empty input or NULL returns false.
@@ -128,7 +128,7 @@ bool lush_is_valid_identifier(const char *name);
 /**
  * @brief Canonicalize @p name to NFC for storage and lookup
  *
- * Lush stores identifier names in NFC form so that NFC-encoded `café`
+ * Lush stores identifier names in NFC form so that NFC-encoded `cafe-acute`
  * and NFD-encoded `cafe + combining-acute` collapse to one binding
  * (project-wide NFC-everywhere policy). This helper returns a malloc'd
  * NFC normalization of @p name; the caller frees.
@@ -153,13 +153,13 @@ char *lush_ident_canonicalize_alloc(const char *name);
  * @brief Detect whether an identifier mixes Unicode scripts
  *
  * A single identifier that draws letters from more than one script --
- * Latin `p` next to Cyrillic `а` in `pаsswd` -- is the classic
+ * Latin `p` next to Cyrillic `U+0430` in `pU+0430sswd` -- is the classic
  * homograph vector: visually indistinguishable from a single-script
  * name to a human reading the source. This walks @p name's codepoints
  * (after NFC canonicalization) and reports whether two distinct scripts
  * appear. Script-neutral codepoints (ASCII digits, `_`) and combining
- * marks do not count as a script, so `café`, `Σ`, `имя`, and `x1_y`
- * are all single-script.
+ * marks do not count as a script, so `cafe-acute`, `Sigma`, `U+0438 U+043C
+ * U+044F`, and `x1_y` are all single-script.
  *
  * Detection only; it never rejects. Callers decide the posture: the
  * predictive analyzer surfaces it as an advisory, and a feature-matrix

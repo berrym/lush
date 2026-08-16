@@ -546,7 +546,7 @@ void *symtable_capture_scope_for_lexical(symtable_manager_t *manager) {
  * Identical to symtable_push_scope(SCOPE_LEXICAL, name) except that
  * the new frame's `parent` is the supplied captured pointer, not the
  * dynamic current_scope. This is what gives typed-function (`fn`)
- * bodies lexical (closure) semantics per SEMANTICS §5.3: free names
+ * bodies lexical (closure) semantics per SEMANTICS U+00A75.3: free names
  * inside the body resolve through the declaration-site scope chain,
  * not the call-site chain.
  *
@@ -979,7 +979,7 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
         scope = scope->parent;
     }
 
-    /// Variable does not exist in any scope — create it globally per POSIX.
+    /// Variable does not exist in any scope -- create it globally per POSIX.
     int result = symtable_set_global_var(manager, name, value);
     free(canon);
     return result;
@@ -1461,7 +1461,7 @@ char *symtable_apply_case_attr_alloc(const char *value, symvar_flags_t flags) {
         return NULL;
     }
     /// Case folding can grow byte length on some codepoints (German
-    /// ß -> SS being the canonical example). 4x input length plus a
+    /// U+00DF -> SS being the canonical example). 4x input length plus a
     /// small floor covers the worst case for the project's case
     /// table; values longer than the resulting buffer would have to
     /// be implausibly fold-heavy, so a single allocation suffices.

@@ -6,7 +6,7 @@
  *   Pass 1: lle_template_evaluate() resolves ${...} segments
  *   Pass 2: Single scan expands \X (bash) and %X (zsh) escapes
  *
- * All dependencies are POSIX — no GNU extensions.
+ * All dependencies are POSIX -- no GNU extensions.
  */
 
 #include "lle/prompt/prompt_expansion.h"
@@ -61,7 +61,7 @@ static void buf_append_str(expand_buf_t *b, const char *s) {
             seq_len = 1; /// Invalid lead byte: copy as single byte
         /// Check if the full sequence fits (plus NUL terminator)
         if (b->pos + (size_t)seq_len >= b->size)
-            break; /// Would split a UTF-8 sequence — stop here
+            break; /// Would split a UTF-8 sequence -- stop here
         for (int i = 0; i < seq_len && *s; i++)
             b->buf[b->pos++] = *s++;
     }
@@ -129,12 +129,12 @@ static void get_cwd_basename(char *buf, size_t size) {
     char tilde[PATH_MAX];
     get_cwd_tilde(tilde, sizeof(tilde));
 
-    /// Home dir itself → ~
+    /// Home dir itself -> ~
     if (strcmp(tilde, "~") == 0) {
         snprintf(buf, size, "~");
         return;
     }
-    /// Root → /
+    /// Root -> /
     if (strcmp(tilde, "/") == 0) {
         snprintf(buf, size, "/");
         return;
@@ -669,7 +669,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
             if (seq_len < 1)
                 seq_len = 1; /// Invalid lead byte: copy single byte
             if (b.pos + (size_t)seq_len >= b.size) {
-                break; /// Would split UTF-8 sequence — stop
+                break; /// Would split UTF-8 sequence -- stop
             }
             for (int i = 0; i < seq_len && *p; i++)
                 buf_append_char(&b, *p++);
@@ -691,7 +691,7 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
 
     output[0] = '\0';
 
-    /// Validate UTF-8 input — reject malformed sequences that would produce
+    /// Validate UTF-8 input -- reject malformed sequences that would produce
     /// corrupted terminal output.  Fall back to the format string as-is if
     /// it happens to be mostly ASCII (lle_utf8_is_valid is strict).
     if (!lle_utf8_is_valid(format, strlen(format))) {

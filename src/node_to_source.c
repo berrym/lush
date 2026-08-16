@@ -3,7 +3,7 @@
  * @brief AST to source code regeneration for round-trip testing
  *
  * Provides functionality to convert an AST back to shell source code.
- * This enables round-trip testing: parse → AST → source → parse → AST2
+ * This enables round-trip testing: parse -> AST -> source -> parse -> AST2
  * where AST and AST2 should be structurally equivalent.
  *
  * @author Michael Berry <trismegustis@gmail.com>

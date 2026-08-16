@@ -99,8 +99,8 @@ typedef enum lle_history_dedup_scope {
 #define LLE_HISTORY_MAX_PATH_LENGTH 4096     /// Max path length
 
 /// Performance targets
-#define LLE_HISTORY_ADD_TARGET_US 100     /// 100μs target for add
-#define LLE_HISTORY_RETRIEVE_TARGET_US 50 /// 50μs target for retrieve
+#define LLE_HISTORY_ADD_TARGET_US 100     /// 100mus target for add
+#define LLE_HISTORY_RETRIEVE_TARGET_US 50 /// 50mus target for retrieve
 #define LLE_HISTORY_SEARCH_TARGET_MS 10   /// 10ms target for search
 
 /// File format
@@ -1064,7 +1064,7 @@ void lle_history_search_results_print(
 /**
  * Search history for exact command match
  *
- * Performance target: <500μs for 10K entries
+ * Performance target: <500mus for 10K entries
  *
  * @param history_core History core engine
  * @param query Search query
@@ -1078,7 +1078,7 @@ lle_history_search_exact(lle_history_core_t *history_core, const char *query,
 /**
  * Search history for commands starting with prefix
  *
- * Performance target: <500μs for 10K entries
+ * Performance target: <500mus for 10K entries
  *
  * @param history_core History core engine
  * @param prefix Prefix to search for
@@ -1635,7 +1635,8 @@ lle_result_t lle_history_dedup_configure(lle_history_dedup_engine_t *dedup,
  *
  * When enabled, commands are normalized to NFC (Canonical Composition) form
  * before comparison, ensuring equivalent Unicode sequences compare as equal.
- * This handles cases like precomposed vs decomposed characters (é vs e+́).
+ * This handles cases like precomposed vs decomposed characters (e-acute vs
+ * e+U+0301).
  *
  * @param dedup Deduplication engine
  * @param unicode_normalize true to enable NFC normalization (default: true)

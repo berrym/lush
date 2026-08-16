@@ -450,7 +450,7 @@ char *get_unified_input_at(FILE *in, size_t *lines_consumed) {
         /// <stdin> source. The cumulative file-line counter in the main
         /// loop stays at 1 for interactive mode regardless of this
         /// value, so even multi-line constructs entered interactively
-        /// always display as line-1 relative — matching bash.
+        /// always display as line-1 relative -- matching bash.
         if (lines_consumed) {
             *lines_consumed = 1;
         }

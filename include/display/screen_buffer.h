@@ -210,7 +210,7 @@ void screen_buffer_render_with_continuation(
  * terminal_width (the 1-column gap prevents prompt and rprompt from touching).
  *
  * When command text grows long enough to overlap, rprompt_fits becomes false
- * and the rprompt is hidden — matching zsh behavior.
+ * and the rprompt is hidden -- matching zsh behavior.
  *
  * Must be called AFTER screen_buffer_render() so that command_start_col
  * is valid.
@@ -479,7 +479,7 @@ int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer);
 /// index is in use. A SIGWINCH-style terminal width change is handled
 /// by recomputing visual_height per entry via screen_line_index_rewidth.
 ///
-/// This module is pure cursor math — no terminal I/O, no allocation
+/// This module is pure cursor math -- no terminal I/O, no allocation
 /// of the source content, no concurrency. The pager layer (which lives
 /// elsewhere) composes a screen_buffer view from a slice of the index;
 /// streaming / append-aware variants are layered on top in later steps.
@@ -500,7 +500,7 @@ typedef struct {
  * current allocation. `terminal_width` is the width used to compute
  * each entry's `visual_height` (used for resize invalidation, see
  * screen_line_index_rewidth). `total_visual_rows` is the sum of all
- * `visual_height` values across entries — useful for pager scroll
+ * `visual_height` values across entries -- useful for pager scroll
  * math (how many rows the paginated view will take when fully
  * unrolled).
  */
@@ -545,7 +545,7 @@ int screen_line_index_build(screen_line_index_t *out, const char *content,
  *
  * Used on SIGWINCH-style resize: byte_offset and byte_length are
  * width-invariant and stay the same; only visual_height per entry
- * and total_visual_rows change. Idempotent — re-calling with the same
+ * and total_visual_rows change. Idempotent -- re-calling with the same
  * width is a no-op other than CPU cost.
  *
  * Requires the original content to still be live (the function does

@@ -79,7 +79,7 @@ static bool needs_escape_in_backtick(unsigned char b) {
 }
 
 /* ============================================================================
- * Render helpers — append bytes to a growing buffer
+ * Render helpers -- append bytes to a growing buffer
  * ============================================================================
  */
 

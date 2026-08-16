@@ -571,7 +571,7 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
     va_list args;
     va_start(args, fmt);
-    /// Convert variadic args into a fixed string then forward — the
+    /// Convert variadic args into a fixed string then forward -- the
     /// _at variant takes its own variadic. shell_error already handles
     /// vsnprintf internally; here we just need to hand off the formatted
     /// message. Simplest: format here, pass as a literal "%s" + buffer.
@@ -1134,12 +1134,12 @@ static node_t *parse_pipeline(parser_t *parser) {
  *        emitting a parallel per-character quote-provenance map.
  *
  * The tokenizer's word-context scanner keeps `\X` pairs in the token text
- * verbatim — escape interpretation is deferred. For tokens that did NOT
+ * verbatim -- escape interpretation is deferred. For tokens that did NOT
  * come from a quoted run, POSIX quote-removal says any `\X` (other than
  * `\<newline>`, which the tokenizer already eats as line continuation)
  * collapses to a literal X. Quote-removal happens after parameter
  * expansion in POSIX, but for backslashes that originated outside any
- * quote in the shell source we can collapse them here at parse time —
+ * quote in the shell source we can collapse them here at parse time --
  * those backslashes never ride along inside variable values, so doing
  * it now does not corrupt later expansion. Tokens from `"..."` are NOT
  * touched: their backslashes (kept as `\$`, `\\`, etc. by the
@@ -1498,12 +1498,12 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         ///
         /// Tokens that already had escape semantics applied (or that are
         /// sub-expressions evaluated later) pass through untouched:
-        ///   TOK_STRING               — single-quoted, no escapes ever
-        ///   TOK_EXPANDABLE_STRING    — double-quoted, DQ rules later
-        ///   TOK_ARITH_EXP            — `$((...))`, evaluated as arith
-        ///   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
-        ///   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
-        ///   TOK_VARIABLE             — `$VAR`, no escapes by construction
+        ///   TOK_STRING               -- single-quoted, no escapes ever
+        ///   TOK_EXPANDABLE_STRING    -- double-quoted, DQ rules later
+        ///   TOK_ARITH_EXP            -- `$((...))`, evaluated as arith
+        ///   TOK_COMMAND_SUB          -- `$(...)`, evaluated as cmd
+        ///   TOK_BACKQUOTE            -- `` `...` ``, evaluated as cmd
+        ///   TOK_VARIABLE             -- `$VAR`, no escapes by construction
         /// calloc (not malloc) so a mid-loop failure leaves the not-yet-filled
         /// tail NULL -- the cleanup loops free(dequoted[i]) over the full
         /// range.
@@ -3084,7 +3084,7 @@ static node_t *parse_redirection(parser_t *parser) {
     }
 
     /// Capture the operator's full source_location_t before any
-    /// tokenizer_advance — that call frees the current token, so
+    /// tokenizer_advance -- that call frees the current token, so
     /// dereferencing redir_token later would be use-after-free.
     /// source_location_t is the project's unified position primitive
     /// (shell_error.h:33-39); using it here keeps the heredoc body
@@ -3411,8 +3411,8 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
     *body_end = body_start;
 
     /// Strip outer quotes from the delimiter if present so body lines
-    /// compare against the user-visible terminator text (`'END'` →
-    /// `END`, `"EOF"` → `EOF`). Used only for the line-by-line
+    /// compare against the user-visible terminator text (`'END'` ->
+    /// `END`, `"EOF"` -> `EOF`). Used only for the line-by-line
     /// terminator match below; the delimiter SPEC in the input is not
     /// re-parsed (see content_start computation).
     const char *match_delimiter = delimiter;
@@ -3535,7 +3535,7 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
         line_start = line_end + 1;
     }
 
-    /// EOF reached without finding the delimiter — issue #44.
+    /// EOF reached without finding the delimiter -- issue #44.
     /// Treat this as a parse error rather than silently accepting the
     /// partial body. Bash warns at parse time; lush -n needs an error
     /// because exit code is the only signal available to tooling.
@@ -4073,7 +4073,7 @@ static node_t *parse_until_statement(parser_t *parser) {
         return NULL;
     }
 
-    /// Parse the condition as a bare and-or — same rationale as
+    /// Parse the condition as a bare and-or -- same rationale as
     /// parse_while_statement: &&/|| in conditions are unambiguous because
     /// `do` is the terminator; parse_and_or also leaves a trailing `&` for the
     /// terminator rather than backgrounding the condition.
@@ -6057,7 +6057,7 @@ parse_function_body:
                                          extra_name_count);
     }
 
-    /// Brace-group body — consume '{' and parse until '}'
+    /// Brace-group body -- consume '{' and parse until '}'
     if (!expect_token_with_help(parser, TOK_LBRACE,
                                 "function body must be enclosed in braces { } "
                                 "or be a compound command")) {

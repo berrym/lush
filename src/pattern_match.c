@@ -7,7 +7,7 @@
  * the extended-pattern operators can recurse into arbitrary subpatterns
  * without round-tripping through a portable-but-feature-limited libc
  * implementation. Alternative-pattern matching is done by composing a
- * temporary pattern (alt-text + outer rest) per branch and recursing —
+ * temporary pattern (alt-text + outer rest) per branch and recursing --
  * O(branches * depth) memory and acceptable for the lengths real shell
  * patterns reach in practice.
  *
@@ -204,13 +204,13 @@ static size_t grapheme_step(const char *s) {
  * On no-match, returns 0; `*end` is still advanced so the caller can
  * skip the class. Pattern codepoints in the bracket -- both literal
  * characters and the `-` range endpoints -- are decoded as UTF-8
- * codepoints so ranges like `[α-ω]` and literals like `[äöü]` work
- * correctly.
+ * codepoints so ranges like `[alpha-omega]` and literals like `[a-umlaut
+ * o-umlaut u-umlaut]` work correctly.
  *
  * A bracket class asks the same question `?` does -- "match one
  * character" -- so it answers it the same way: membership is tested on
  * the cluster's BASE codepoint, and the whole cluster is consumed on a
- * match. `[a-z]` therefore matches `é` in both NFC (U+00E9) and NFD
+ * match. `[a-z]` therefore matches `e-acute` in both NFC (U+00E9) and NFD
  * (`e` + U+0301), which is how a reader sees it.
  *
  * Consuming only the base left the combining marks behind, so against

@@ -498,7 +498,7 @@ int symtable_unset_positional_var(symtable_manager_t *manager,
  * runtime semantics of `name=value`, `name+=value`, `for var in ...`,
  * and similar implicit-assignment forms. symtable_set_global_var
  * unconditionally creates or updates a global, ignoring any local of
- * the same name — which leaves the local unchanged and produces silent
+ * the same name -- which leaves the local unchanged and produces silent
  * semantic shifts (issue #47).
  *
  * @param manager Manager instance

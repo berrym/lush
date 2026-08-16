@@ -665,9 +665,9 @@ static void calculate_cursor_screen_position(const char *text,
         /// 3. Treat entire grapheme cluster as that width
         ///
         /// This handles:
-        /// - Base emoji + modifier → base determines width
-        /// - Base char + combining mark → base determines width
-        /// - ZWJ sequences → first emoji determines width
+        /// - Base emoji + modifier -> base determines width
+        /// - Base char + combining mark -> base determines width
+        /// - ZWJ sequences -> first emoji determines width
         uint32_t base_codepoint = 0;
         int decode_result = lle_utf8_decode_codepoint(
             grapheme_start, grapheme_bytes, &base_codepoint);

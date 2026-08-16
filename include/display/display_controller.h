@@ -1124,7 +1124,7 @@ void dc_get_prompt_metrics(int *prompt_lines, int *total_lines,
  * This approach respects the LLE architecture by going through the screen
  * buffer rather than writing directly to the terminal.
  *
- * @param transient_prompt  The simplified prompt string (e.g., "❯ ")
+ * @param transient_prompt  The simplified prompt string (e.g., "U+276F ")
  * @param command_text      The command text to preserve
  * @return true on success, false on failure
  */

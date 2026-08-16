@@ -7,72 +7,72 @@
 
 ---
 
-## 🏗️ ARCHITECTURE OVERVIEW
+## ARCHITECTURE OVERVIEW
 
 The Lush Display System implements a **layered architecture** that provides universal compatibility with any prompt structure while enabling real-time syntax highlighting and unlimited extensibility.
 
 ### **Layer Stack**
 ```
-┌─────────────────────────────────────────────────────────┐
-│                 Layer 5: Display Controller             │
-│  (High-level management, optimization, coordination)    │
-├─────────────────────────────────────────────────────────┤
-│                 Layer 4: Composition Engine             │
-│   (Intelligent layer combination without interference)  │
-├─────────────────────────────────────────────────────────┤
-│     Layer 3A: Prompt Layer    │    Layer 3B: Command Layer    │
-│   (Any prompt structure)      │  (Syntax highlighting)       │
-├─────────────────────────────────────────────────────────┤
-│                 Layer 2: Terminal Control               │
-│    (ANSI sequences, cursor management, capabilities)    │
-├─────────────────────────────────────────────────────────┤
-│                 Layer 1: Base Terminal                  │
-│        (Foundation terminal abstraction)               │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------+
+|                 Layer 5: Display Controller             |
+|  (High-level management, optimization, coordination)    |
++---------------------------------------------------------+
+|                 Layer 4: Composition Engine             |
+|   (Intelligent layer combination without interference)  |
++---------------------------------------------------------+
+|     Layer 3A: Prompt Layer    |    Layer 3B: Command Layer    |
+|   (Any prompt structure)      |  (Syntax highlighting)       |
++---------------------------------------------------------+
+|                 Layer 2: Terminal Control               |
+|    (ANSI sequences, cursor management, capabilities)    |
++---------------------------------------------------------+
+|                 Layer 1: Base Terminal                  |
+|        (Foundation terminal abstraction)               |
++---------------------------------------------------------+
 ```
 
 ---
 
-## 📁 FILE ORGANIZATION
+## FILE ORGANIZATION
 
 ### **Core Implementation Files**
 ```
 src/display/
-├── README.md                   # This file - architecture overview
-├── base_terminal.c             # Layer 1: Foundation terminal abstraction
-├── terminal_control.c          # Layer 2: ANSI and capability management
-├── layer_events.c              # Event system for layer communication
-├── prompt_layer.c              # Layer 3A: Independent prompt rendering
-├── command_layer.c             # Layer 3B: Independent syntax highlighting
-├── composition_engine.c        # Layer 4: Intelligent layer combination
-└── display_controller.c        # Layer 5: High-level display management
++-- README.md                   # This file - architecture overview
++-- base_terminal.c             # Layer 1: Foundation terminal abstraction
++-- terminal_control.c          # Layer 2: ANSI and capability management
++-- layer_events.c              # Event system for layer communication
++-- prompt_layer.c              # Layer 3A: Independent prompt rendering
++-- command_layer.c             # Layer 3B: Independent syntax highlighting
++-- composition_engine.c        # Layer 4: Intelligent layer combination
++-- display_controller.c        # Layer 5: High-level display management
 ```
 
 ### **Header Files**
 ```
 include/display/
-├── base_terminal.h             # Base terminal API
-├── terminal_control.h          # Terminal control API
-├── layer_events.h              # Event system API
-├── prompt_layer.h              # Prompt layer API
-├── command_layer.h             # Command layer API
-├── composition_engine.h        # Composition engine API
-└── display_controller.h        # Display controller API
++-- base_terminal.h             # Base terminal API
++-- terminal_control.h          # Terminal control API
++-- layer_events.h              # Event system API
++-- prompt_layer.h              # Prompt layer API
++-- command_layer.h             # Command layer API
++-- composition_engine.h        # Composition engine API
++-- display_controller.h        # Display controller API
 ```
 
 ### **Test Files**
 ```
 tests/display/
-├── test_base_terminal.c        # Base terminal layer tests
-├── test_terminal_control.c     # Terminal control tests
-├── test_layer_events.c         # Event system tests
-├── test_composition.c          # Composition engine tests
-└── test_integration.c          # Full integration tests
++-- test_base_terminal.c        # Base terminal layer tests
++-- test_terminal_control.c     # Terminal control tests
++-- test_layer_events.c         # Event system tests
++-- test_composition.c          # Composition engine tests
++-- test_integration.c          # Full integration tests
 ```
 
 ---
 
-## 🎯 LAYER RESPONSIBILITIES
+## LAYER RESPONSIBILITIES
 
 ### **Layer 1: Base Terminal** (`base_terminal.c`)
 **Purpose**: Foundation terminal abstraction and raw I/O operations
@@ -142,7 +142,7 @@ tests/display/
 
 ---
 
-## 🔄 LAYER COMMUNICATION
+## LAYER COMMUNICATION
 
 ### **Event-Driven Architecture**
 Layers communicate through events, not direct function calls:
@@ -172,7 +172,7 @@ layer_event_subscribe(LAYER_EVENT_CONTENT_CHANGED, on_content_changed_callback);
 
 ---
 
-## 🎨 UNIVERSAL COMPATIBILITY
+## UNIVERSAL COMPATIBILITY
 
 ### **Works with ANY Prompt Structure**
 ```bash
@@ -180,8 +180,8 @@ layer_event_subscribe(LAYER_EVENT_CONTENT_CHANGED, on_content_changed_callback);
 $ command_here
 
 # Complex themed prompts  
-┌─[user@host]─[~/path] (git-branch)
-└─$ command_here
++-[user@host]-[~/path] (git-branch)
++-$ command_here
 
 # Custom ASCII art prompts
     /\   /\
@@ -191,15 +191,15 @@ $ command_here
 # Dynamic prompts with variables
 [$(date +%H:%M:%S)] user@$(hostname)$ command_here
 
-# Completely novel prompts
-🚀 [DEPLOY:PROD] [CPU:85%] ➜ command_here
+# Completely novel prompts (emoji, box-drawing, any glyph)
+<rocket> [DEPLOY:PROD] [CPU:85%] -> command_here
 ```
 
 **Key Insight**: We don't try to parse or understand prompt structure. We simply render the command layer after the prompt layer, letting each do what it does best.
 
 ---
 
-## 🚀 DEVELOPMENT WORKFLOW
+## DEVELOPMENT WORKFLOW
 
 ### **Phase 1: Foundation (Weeks 1-3)**
 1. **Week 1**: Implement `base_terminal.c` - Foundation layer
@@ -221,7 +221,7 @@ $ command_here
 
 ---
 
-## 🧪 TESTING STRATEGY
+## TESTING STRATEGY
 
 ### **Unit Testing**
 Each layer has comprehensive unit tests:
@@ -254,27 +254,27 @@ struct test_case {
 
 ---
 
-## 🎯 SUCCESS CRITERIA
+## SUCCESS CRITERIA
 
 ### **Universal Compatibility**
-- ✅ Works with ANY prompt structure (no pattern limitations)
-- ✅ No display corruption or infinite loops
-- ✅ Preserves all existing functionality
+- Works with ANY prompt structure (no pattern limitations)
+- No display corruption or infinite loops
+- Preserves all existing functionality
 
 ### **Performance**
-- ✅ <10% overhead compared to current implementation
-- ✅ Intelligent caching reduces redundant operations
-- ✅ Sub-millisecond response times maintained
+- <10% overhead compared to current implementation
+- Intelligent caching reduces redundant operations
+- Sub-millisecond response times maintained
 
 ### **Quality**
-- ✅ >90% test coverage for all new code
-- ✅ Zero memory leaks (valgrind clean)
-- ✅ Cross-platform compatibility (Linux, macOS, BSD)
-- ✅ Professional code quality and documentation
+- >90% test coverage for all new code
+- Zero memory leaks (valgrind clean)
+- Cross-platform compatibility (Linux, macOS, BSD)
+- Professional code quality and documentation
 
 ---
 
-## 🔧 API DESIGN PATTERNS
+## API DESIGN PATTERNS
 
 ### **Consistent Layer API**
 ```c
@@ -314,7 +314,7 @@ if (layer_needs_update(layer)) {
 
 ---
 
-## 🎉 EXPECTED BENEFITS
+## EXPECTED BENEFITS
 
 ### **For Users**
 - **Universal compatibility**: Any prompt works with syntax highlighting
@@ -336,7 +336,7 @@ if (layer_needs_update(layer)) {
 
 ---
 
-## 📚 REFERENCES
+## REFERENCES
 
 ### **Implementation Documents**
 - `docs/LAYERED_ARCHITECTURE_IMPLEMENTATION_PLAN.md` - Detailed implementation plan
@@ -349,7 +349,7 @@ if (layer_needs_update(layer)) {
 
 ---
 
-**🎯 This display system represents the future of terminal technology - universal compatibility with unlimited extensibility!**
+**This display system represents the future of terminal technology - universal compatibility with unlimited extensibility!**
 
 *Last Updated: February 2025*  
 *Status: Implementation Phase 1 Ready*  

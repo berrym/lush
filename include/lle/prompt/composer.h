@@ -54,7 +54,7 @@ extern "C" {
  */
 
 /**
- * @brief PS1/PS2 ownership — who last set the variable
+ * @brief PS1/PS2 ownership -- who last set the variable
  *
  * Used to implement "respect user PS1": when the user explicitly sets
  * PS1 (via assignment or shell script), the theme system stops
@@ -280,7 +280,7 @@ lle_composer_get_theme(const lle_prompt_composer_t *composer);
  * is assigned by user code. Sets ps1_owner to PS1_OWNER_USER so the
  * theme system won't overwrite it on subsequent prompt renders.
  *
- * @param composer  Prompt composer (may be NULL — safe to call before init)
+ * @param composer  Prompt composer (may be NULL -- safe to call before init)
  */
 void lle_prompt_notify_ps1_changed(lle_prompt_composer_t *composer);
 

@@ -39,8 +39,8 @@
  *
  * Called by the executor's builtin dispatch path on entry (with the new
  * call site's loc) and again on exit (with the previous loc returned
- * here on entry) so re-entrant builtin dispatch — e.g. `eval` invoking
- * another builtin — preserves the outer caller's loc when the inner
+ * here on entry) so re-entrant builtin dispatch -- e.g. `eval` invoking
+ * another builtin -- preserves the outer caller's loc when the inner
  * call returns. The stashed location is read by the builtin error
  * helpers so structured-error output gets a real `--> file:line:col`
  * line and source-snippet caret span.

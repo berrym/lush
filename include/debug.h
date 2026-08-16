@@ -710,7 +710,7 @@ void debug_view_emit_line(debug_context_t *ctx, const char *format, ...);
 /**
  * @brief Open a framed block with an optional title
  *
- * Writes the top border: `+- [title] ---...` (ASCII) or `┌─ [title] ─...`
+ * Writes the top border: `+- [title] ---...` (ASCII) or `U+250C- [title] -...`
  * (UTF-8). Pair with debug_view_end_frame.
  *
  * @param ctx Debug context

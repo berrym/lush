@@ -268,7 +268,7 @@ const char *lle_shell_get_rendered_rprompt(void);
  *
  * Called from the executor's variable assignment path. Marks PS1 as
  * user-owned so the theme system won't overwrite it. Also syncs
- * PROMPT ↔ PS1 bidirectionally.
+ * PROMPT U+2194 PS1 bidirectionally.
  *
  * @param var_name  Variable that was set ("PS1", "PS2", or "PROMPT")
  * @param value     The value that was assigned

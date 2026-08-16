@@ -165,7 +165,7 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
         return NULL;
     }
 
-    /// Try to parse the script — content is the entire script body, so
+    /// Try to parse the script -- content is the entire script body, so
     /// its first character is line 1 of the source file.
     parser_t *parser = parser_new_with_source(content, file, 1);
     if (!parser) {
@@ -356,9 +356,9 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
                     "Quote variables to prevent word splitting");
 
                 /// Mixed-script reference: a name drawing letters from
-                /// more than one script (Latin p + Cyrillic а in pаsswd)
-                /// is visually indistinguishable from a single-script
-                /// name. Always-on advisory -- independent of
+                /// more than one script (Latin p + Cyrillic U+0430 in
+                /// pU+0430sswd) is visually indistinguishable from a
+                /// single-script name. Always-on advisory -- independent of
                 /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS, which is the
                 /// runtime hard-stop; this is the audit-time visibility.
                 char namebuf[256];
@@ -427,7 +427,7 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
 
     /// Initialize compat system if not already done. compat_init() already
     /// preserves any pre-set target across the reset, so no caller-side
-    /// save/restore is needed — and attempting one (passing the buffer
+    /// save/restore is needed -- and attempting one (passing the buffer
     /// pointer returned by compat_get_target() back into compat_set_target())
     /// produces a strncpy src/dst overlap.
     if (compat_get_entry_count() == 0) {

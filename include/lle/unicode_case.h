@@ -37,7 +37,7 @@
  * - Greek alphabet
  *
  * Note: Some characters have special case mappings (e.g., German sharp s
- * 'ß' -> 'SS') which expand to multiple characters. This function returns
+ * 'U+00DF' -> 'SS') which expand to multiple characters. This function returns
  * only single-character mappings; use lle_utf8_toupper() for full string
  * conversion that handles expansion.
  *

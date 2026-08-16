@@ -833,7 +833,7 @@ static bool is_word_codepoint(uint32_t codepoint) {
 
     /// Non-ASCII UTF-8: All non-ASCII codepoints are valid word characters
     /// This includes:
-    /// - Latin Extended (accented characters like é, ñ, ü)
+    /// - Latin Extended (accented characters like e-acute, n-tilde, u-umlaut)
     /// - CJK (Chinese, Japanese, Korean)
     /// - Emoji
     /// - All other Unicode scripts
@@ -1689,11 +1689,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                        next == '-' || (next >= '0' && next <= '9')) {
                 /// Simple variable $var, $?, $$, $!, $-, a positional $0..$9,
                 /// etc. $var goes through the lush identifier predicate so a
-                /// non-ASCII identifier ($café, $Σ, $имя) is accepted
-                /// under FEATURE_UNICODE_IDENTIFIERS. Special-form
-                /// single-char variants ($?, $@, etc.) and single-digit
-                /// positionals ($0..$9; ${10} is used for two-plus digits) keep
-                /// their fast-path branch.
+                /// non-ASCII identifier ($cafe-acute, $Sigma, $U+0438 U+043C
+                /// U+044F) is accepted under FEATURE_UNICODE_IDENTIFIERS.
+                /// Special-form single-char variants ($?, $@, etc.) and
+                /// single-digit positionals ($0..$9; ${10} is used for two-plus
+                /// digits) keep their fast-path branch.
 
                 /// For special single-character variables and single-digit
                 /// positionals, only advance by one
