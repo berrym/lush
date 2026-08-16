@@ -536,55 +536,11 @@ lle_composer_create_render_ctx(lle_prompt_composer_t *composer) {
  * @return Visual width in columns
  */
 static size_t calculate_visual_width(const char *str) {
-    if (!str) {
-        return 0;
-    }
-
-    /// Per-character width comes from lle_utf8_string_width, which asks the
-    /// canonical width table. This function used to carry its own guess:
-    /// every 3-byte sequence counted as 2 columns, which is right for CJK and
-    /// WRONG for the many 3-byte characters that occupy one -- an em dash, a
-    /// check mark, most currency signs -- so a prompt containing any of them
-    /// measured too wide and the cursor sat too far right.
-    ///
-    /// The ANSI skip also ended a sequence only on `m`. Any other terminator
-    /// -- `\033[K` to erase a line, `\033[H`, a cursor movement -- left it
-    /// stuck in escape mode, and the whole remainder of the prompt measured as
-    /// zero width. Ending at the CSI final byte fixes that.
-    ///
-    /// The primitive used here lives in LLE, which is the layer this file may
-    /// reach: the display subsystem depends on LLE, not the other way round,
-    /// so this deliberately does not reuse display's copy of the computation.
-    size_t width = 0;
-    const char *p = str;
-
-    while (*p) {
-        if (*p == '\033') {
-            p++;
-            /// A CSI / OSC introducer runs to its final byte (0x40-0x7E);
-            /// any other two-character escape ends immediately.
-            if (*p == '[' || *p == ']') {
-                p++;
-                while (*p && !((unsigned char)*p >= 0x40 &&
-                               (unsigned char)*p <= 0x7E)) {
-                    p++;
-                }
-            }
-            if (*p) {
-                p++;
-            }
-            continue;
-        }
-
-        /// Measure the run up to the next escape in one call.
-        const char *run = p;
-        while (*p && *p != '\033') {
-            p++;
-        }
-        width += lle_utf8_string_width(run, (size_t)(p - run));
-    }
-
-    return width;
+    /// Prompt width, escape sequences excluded. The walk that used to live
+    /// here ended a sequence only on `m`, so `\033[K` or a cursor movement
+    /// left the rest of the prompt measuring as zero width, and it guessed
+    /// every 3-byte sequence was two columns.
+    return str ? lle_utf8_visible_width(str, strlen(str)) : 0;
 }
 
 /**

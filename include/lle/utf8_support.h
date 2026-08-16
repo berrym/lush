@@ -107,4 +107,24 @@ int lle_utf8_codepoint_to_grapheme_index(const char *text, size_t cp_index,
  */
 size_t lle_utf8_string_width(const char *text, size_t length);
 
+/**
+ * @brief Display width of text that may contain ANSI escape sequences
+ *
+ * Like lle_utf8_string_width, but escape sequences contribute nothing. A
+ * sequence ends at its FINAL BYTE -- ECMA-48 defines that as the range
+ * 0x40-0x7E, not "the first letter", so `\033[3~` terminates at the `~`.
+ *
+ * Three places in LLE measured this and each carried its own escape walk with
+ * its own terminator set: the prompt composer ended a sequence only on `m`,
+ * so `\033[K` left it measuring the rest of the prompt as zero width. The
+ * display subsystem has the equivalent computation on its side of the seam;
+ * display depends on LLE and not the reverse, so the two layers keep one each
+ * rather than one reaching across into the other.
+ *
+ * @param text UTF-8 text, may contain escape sequences
+ * @param length Length in bytes
+ * @return Total display width in columns
+ */
+size_t lle_utf8_visible_width(const char *text, size_t length);
+
 #endif /// LLE_UTF8_SUPPORT_H

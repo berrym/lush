@@ -62,63 +62,12 @@ static const char *get_type_category_name(lle_completion_type_t type) {
  * @return Visual width in terminal columns
  */
 static size_t visual_width(const char *str) {
-    if (!str)
-        return 0;
-
-    size_t len = strlen(str);
-    if (len == 0)
-        return 0;
-
-    /// Fast path: no ANSI escape sequences
-    const char *esc = memchr(str, 0x1B, len);
-    if (!esc) {
-        /// No escape sequences - use lle_utf8_string_width directly
-        return lle_utf8_string_width(str, len);
-    }
-
-    /// Slow path: string contains ANSI escape sequences
-    /// Process segments between escape sequences
-    size_t width = 0;
-    size_t i = 0;
-
-    while (i < len) {
-        unsigned char c = (unsigned char)str[i];
-
-        /// Check for ANSI escape sequence (ESC = 0x1B)
-        if (c == 0x1B && i + 1 < len) {
-            unsigned char next = (unsigned char)str[i + 1];
-            if (next == '[') {
-                /// CSI sequence: ESC [ ... final_byte
-                /// Skip until we find the final byte (0x40-0x7E)
-                i += 2; /// Skip ESC [
-                while (i < len) {
-                    unsigned char seq_char = (unsigned char)str[i];
-                    i++;
-                    if (seq_char >= 0x40 && seq_char <= 0x7E) {
-                        break; /// Found final byte, sequence complete
-                    }
-                }
-                continue; /// Don't add to width, continue to next character
-            }
-            /// Other escape sequences (ESC + single char)
-            i += 2;
-            continue;
-        }
-
-        /// Find length of text segment until next escape or end
-        size_t segment_start = i;
-        while (i < len && (unsigned char)str[i] != 0x1B) {
-            i++;
-        }
-
-        /// Calculate width of this segment using proper UTF-8 width
-        if (i > segment_start) {
-            width +=
-                lle_utf8_string_width(str + segment_start, i - segment_start);
-        }
-    }
-
-    return width;
+    /// This file had the CORRECT implementation -- the ECMA-48 final-byte
+    /// rule and the canonical width table -- while three other places in the
+    /// tree each guessed differently. It was promoted to
+    /// lle_utf8_visible_width so the others could stop guessing; what remains
+    /// here is the call.
+    return str ? lle_utf8_visible_width(str, strlen(str)) : 0;
 }
 
 /**

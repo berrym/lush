@@ -543,28 +543,9 @@ size_t lle_completion_menu_get_category_count(
  * @return Visual width in columns
  */
 static size_t calc_visual_width(const char *text) {
-    if (!text)
-        return 0;
-
-    size_t width = 0;
-    bool in_escape = false;
-
-    for (const char *p = text; *p; p++) {
-        if (*p == '\033' || *p == '\x1b') {
-            in_escape = true;
-            continue;
-        }
-        if (in_escape) {
-            if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-                *p == 'm') {
-                in_escape = false;
-            }
-            continue;
-        }
-        width++;
-    }
-
-    return width;
+    /// This counted one column per BYTE, so a CJK menu entry measured three
+    /// columns instead of two and the menu laid out too wide.
+    return text ? lle_utf8_visible_width(text, strlen(text)) : 0;
 }
 
 /**
