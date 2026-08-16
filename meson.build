@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_dangling_dollar.c')
+  test_dangling_dollar = executable('test_dangling_dollar',
+    ['tests/integration/test_dangling_dollar.c'])
+  test('a lone $ is a literal, not the shell pid',
+       test_dangling_dollar,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_case_pattern_substitution.c')
   test_case_pattern_substitution = executable('test_case_pattern_substitution',
     ['tests/integration/test_case_pattern_substitution.c'])
