@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_loop_redirection_status.c')
+  test_loop_redirection_status = executable('test_loop_redirection_status',
+    ['tests/integration/test_loop_redirection_status.c'])
+  test('a redirection on a loop does not change the loop status',
+       test_loop_redirection_status,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_sparse_array_expansion.c')
   test_sparse_array_expansion = executable('test_sparse_array_expansion',
     ['tests/integration/test_sparse_array_expansion.c'])

@@ -3110,6 +3110,23 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
     node_t *current = first_command;
 
     while (current) {
+        /// A redirection node in a sibling chain is not a statement. It is a
+        /// trailing redirection belonging to the enclosing compound
+        /// (`done >file`), which parse_trailing_redirections attaches as a
+        /// sibling of the body and which the loop has already applied through
+        /// setup_redirections. Executing one as a statement fell through
+        /// execute_node's default arm and yielded 0, overwriting the body's
+        /// status, so every redirected loop reported success no matter what
+        /// its body did. execute_if already skips these nodes; the shared
+        /// body walker did not. Skip rather than stop, so a redirection
+        /// appearing before a body statement can never swallow the body, and
+        /// leave last_result untouched: a side-channel contributes no exit
+        /// status.
+        if (is_redirection_node(current)) {
+            current = current->next_sibling;
+            continue;
+        }
+
         last_result = execute_node(executor, current);
 
         /// Check for loop control (break/continue) - stop executing chain
