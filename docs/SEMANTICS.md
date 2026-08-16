@@ -525,6 +525,36 @@ arithmetic-command exit status (non-fatal, consistent with other
 arithmetic errors such as division by zero); in both the write is refused
 and the scalar is unchanged.
 
+### 3.10 Substitution replacements are literal
+
+In `${var/pattern/replacement}` the two halves follow different rules, and the
+difference is deliberate.
+
+The **pattern** is a pattern: `\X` means "a literal X", so `${v//\b/-}`
+replaces the character `b` and `${v//\*/-}` replaces a literal asterisk. This
+is the same escape rule `${v#\a}` and `case` patterns use.
+
+The **replacement** is literal text. A backslash in it is a backslash:
+
+```sh
+v=aXb
+echo "${v//X/\a}"      # a\ab  -- the backslash survives
+```
+
+lush follows zsh here; bash unescapes the replacement. The reason to prefer
+the literal rule is that it has no escape rules to remember, so a value
+containing backslashes round-trips without the doubling an unescaping rule
+forces.
+
+No capability is lost by it. The delimiter is the **first unescaped `/`**, so
+every later `/` in the replacement is already literal and needs no escape:
+
+```sh
+v=aXb
+echo "${v//X//}"          # a/b        -- a literal slash
+echo "${v//X//usr/lib}"   # a/usr/libb -- slashes throughout
+```
+
 ---
 
 ## 4. The three boundary rules

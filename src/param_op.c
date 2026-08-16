@@ -678,14 +678,25 @@ char *lush_pattern_substitute(const char *str, const char *pattern,
     size_t pattern_len = strlen(pattern);
     size_t replacement_len = strlen(replacement);
 
-    /// Detect glob metacharacters that route through lush_pattern_match.
+    /// Does this pattern need the pattern matcher, or can a plain substring
+    /// search answer it?
+    ///
     /// The original check missed `[` (character class) and treated `[bd]`
-    /// patterns as exact-substring matches, which never matched because
-    /// the literal string never contained `[bd]`. lush_pattern_match
-    /// supports character classes natively.
+    /// patterns as exact-substring matches, which never matched because the
+    /// literal string never contained `[bd]`. A BACKSLASH was missing for the
+    /// same reason: `\X` is pattern syntax meaning "a literal X", so
+    /// `${v//\b/-}` searched for the two bytes `\b` and never matched, while
+    /// bash and zsh both substitute -- and lush's own `${v#\a}` and
+    /// `case abc in a\bc)` already get it right. Routing it to
+    /// lush_pattern_match uses the escape handling that matcher already
+    /// implements rather than dequoting here, which would be a second copy of
+    /// a rule that has one canonical home (issue #750).
+    ///
+    /// An escaped METAcharacter (`\*`, `\[`) already routed here, because the
+    /// metacharacter itself satisfied one of the checks above.
     bool is_glob =
         (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '[') ||
-         lush_pattern_opens_extglob_group(pattern));
+         strchr(pattern, '\\') || lush_pattern_opens_extglob_group(pattern));
 
     /// Anchored-start: match pattern once at position 0, then copy the
     /// remainder. Anchored-end: match pattern once at the suffix, copy
@@ -927,6 +938,34 @@ bool lush_param_op_is_pure(int op_type) {
 /// matcher, which handles them per the glob spec. Issue #96.
 /// Returns the owned pattern; *replacement points into @p spec (or "" when the
 /// spec carries no separator, i.e. delete the match).
+/// CURATED: the REPLACEMENT half is literal text.
+///
+/// A backslash in the replacement is a backslash. `${v//X/\a}` yields a
+/// literal `\a`, and `${v//X/\/}` yields `\/`. This is zsh's literal
+/// replacement model, and it is a deliberate choice rather than an omission:
+/// bash unescapes the replacement, zsh does not, and lush follows zsh here as
+/// it does across the parameter-operator family (PHILOSOPHY section 5 -- when
+/// bash and zsh differ, lush curates one and records why).
+///
+/// The reason to prefer it: a literal replacement has NO escape rules to
+/// remember, so a value containing backslashes round-trips without the
+/// doubling that bash's unescaping forces. "Everything is literal except one
+/// thing" is the rule people get wrong.
+///
+/// No capability is lost, which is what makes the choice cheap. The delimiter
+/// is the FIRST unescaped `/`, so every later `/` is already literal:
+///
+///     ${v//X//}            -> a literal `/`, one expression, no escape
+///     ${v//X//usr/lib}     -> a replacement containing slashes
+///     s=/; ${v//X/$s}      -> via a variable
+///
+/// Filed as a defect (issue #750) on the assumption that `${path//X/\/}` was
+/// the only way to reach a literal `/`; measurement showed `${v//X//}` already
+/// does, in lush and in all three references. Closed as curated, not fixed.
+///
+/// The PATTERN half is different and is NOT literal: there `\X` is pattern
+/// syntax meaning "a literal X", which bash, zsh and lush's own `${v#\a}` all
+/// agree on. See the is_glob comment in lush_pattern_substitute.
 char *lush_param_op_split_substitution_spec(const char *spec,
                                             const char **replacement) {
     *replacement = "";
