@@ -6369,17 +6369,30 @@ braced_bare_array_ready:;
             size_t total = symtable_array_length(array);
             char **avals = NULL;
             size_t aval_count = 0;
-            if (array->is_associative) {
-                avals = symtable_array_get_values(array, &aval_count);
-                /// get_values returns NULL for BOTH a real allocation failure
-                /// and an EMPTY map (count 0); only a populated map's NULL is a
-                /// failure. An empty map contributes zero elements
-                /// (aval_count == 0 -> the loop is skipped), not a type error.
-                if (!avals && symtable_array_length(array) > 0) {
-                    return false;
-                }
-                total = aval_count;
+            /// Read the values the array actually HOLDS, for indexed arrays as
+            /// well as maps. The storage is packed-sparse -- `elements[]` with
+            /// a parallel `indices[]` -- so a subscript is not a position, and
+            /// walking positions with symtable_array_get_index asked for
+            /// subscripts that may not exist. On `a=(x); a[9]=y` that produced
+            /// `<x><>`: a phantom empty for the hole at subscript 1, and `y`
+            /// never reached because the loop stopped at count-1 (issue #644).
+            ///
+            /// lush's other four surfaces already read it this way and agree
+            /// with each other -- ${a[*]} joins `x y`, ${#a[@]} is 2,
+            /// ${!a[@]} lists 0 and 9, and declare -p prints both subscripts.
+            /// The vector form was the only reader inventing elements and
+            /// dropping real ones. The comment this replaces described the
+            /// same defect for maps, where it was fixed; an indexed array
+            /// cannot show it until it is sparse, which is why it survived.
+            avals = symtable_array_get_values(array, &aval_count);
+            /// get_values returns NULL for BOTH a real allocation failure and
+            /// an EMPTY array (count 0); only a populated array's NULL is a
+            /// failure. An empty array contributes zero elements
+            /// (aval_count == 0 -> the loop is skipped), not a type error.
+            if (!avals && symtable_array_length(array) > 0) {
+                return false;
             }
+            total = aval_count;
             int start = 0, end_idx = (int)total - 1;
             if (has_slice) {
                 start = slice_offset;

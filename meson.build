@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_sparse_array_expansion.c')
+  test_sparse_array_expansion = executable('test_sparse_array_expansion',
+    ['tests/integration/test_sparse_array_expansion.c'])
+  test('a sparse array expands to the elements it holds',
+       test_sparse_array_expansion,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_arith_error_propagation.c')
   test_arith_error_propagation = executable('test_arith_error_propagation',
     ['tests/integration/test_arith_error_propagation.c'])
