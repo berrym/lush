@@ -45,6 +45,39 @@ bool lush_dollar_paren_is_arithmetic(const char *content, size_t remaining) {
             }
             continue;
         }
+        if (sc == '$' && s + 1 < remaining && content[s + 1] == '(') {
+            /// A nested command substitution. Its `;` separators, braces and
+            /// newlines belong to that substitution, not to the construct
+            /// being classified, so skip the whole balanced span the way the
+            /// `${...}` case above does. Without this, `$(( $(a; b) + 1 ))`
+            /// saw the inner `;`, concluded "command substitution", and ran
+            /// the substitution's OUTPUT as a command (issue #723).
+            s += 2; /// past "$("
+            int pdepth = 1;
+            while (s < remaining && pdepth > 0) {
+                if (content[s] == '(') {
+                    pdepth++;
+                } else if (content[s] == ')') {
+                    pdepth--;
+                }
+                s++;
+            }
+            continue;
+        }
+        if (sc == '`') {
+            /// Same reasoning for the backtick spelling of the same
+            /// construct. A backslash escapes the next byte; an unescaped
+            /// backtick closes.
+            s++;
+            while (s < remaining && content[s] != '`') {
+                if (content[s] == '\\' && s + 1 < remaining) {
+                    s++;
+                }
+                s++;
+            }
+            s++; /// past the closing backtick
+            continue;
+        }
         if (sc == '(') {
             depth++;
         } else if (sc == ')') {
