@@ -1088,24 +1088,37 @@ static size_t visual_width_core(const char *text, size_t byte_len,
     size_t col = start_col;
     size_t i = 0;
     size_t text_len = byte_len;
-    bool in_escape = false;
 
     while (i < text_len) {
         unsigned char ch = (unsigned char)text[i];
 
-        /// Handle ANSI escape sequences (they take 0 columns)
+        /// Handle ANSI escape sequences (they take 0 columns).
+        ///
+        /// A sequence ends at its FINAL BYTE, which ECMA-48 defines as
+        /// 0x40-0x7E -- not "the first letter". The letter test looked
+        /// equivalent because most finals are letters, but `\033[3~` ends in
+        /// `~` (0x7E), so the walk stayed in escape mode and measured the
+        /// entire rest of the text as zero width.
+        ///
+        /// Every hand-rolled copy of this walk in the tree chose its own
+        /// terminator set and every set missed something -- composition_engine
+        /// enumerated twelve letters and so never ended `\033[?25l`, the
+        /// cursor-hide sequence. This is the rule the specification states,
+        /// and the one the completion menu renderer already used.
         if (ch == '\033' || ch == '\x1b') {
-            in_escape = true;
             i++;
-            continue;
-        }
-
-        if (in_escape) {
-            i++;
-            /// Check for escape sequence terminator
-            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-                ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
-                in_escape = false;
+            if (i < text_len && (text[i] == '[' || text[i] == ']')) {
+                i++;
+                while (i < text_len) {
+                    unsigned char fin = (unsigned char)text[i];
+                    i++;
+                    if (fin >= 0x40 && fin <= 0x7E) {
+                        break;
+                    }
+                }
+            } else if (i < text_len) {
+                /// A two-character escape (`ESC M`, `ESC 7`) ends at once.
+                i++;
             }
             continue;
         }

@@ -1480,53 +1480,6 @@ composition_engine_calculate_hash(const composition_engine_t *engine,
 /// ============================================================================
 
 /**
- * @brief Calculate visual width of a text string, stripping ANSI escape
- * sequences
- *
- * Strips ANSI escape sequences and GNU Readline markers (\001 and \002).
- * This is needed to calculate the prompt width correctly.
- *
- * @param text Text content to calculate visual width for
- * @return Visual width in columns (excluding escape sequences)
- */
-static size_t calculate_visual_width(const char *text) {
-    if (!text)
-        return 0;
-
-    size_t visual_len = 0;
-    bool in_escape = false;
-
-    for (const char *p = text; *p; p++) {
-        /// Skip GNU Readline prompt markers (irrelevant for LLE)
-        if (*p == '\001' || *p == '\002') {
-            continue;
-        }
-
-        if (*p == '\033' || *p == '\x1b') {
-            in_escape = true;
-            continue;
-        }
-
-        if (in_escape) {
-            /// Skip until we find the end of the escape sequence
-            if (*p == 'm' || *p == 'K' || *p == 'J' || *p == 'H' || *p == 'A' ||
-                *p == 'B' || *p == 'C' || *p == 'D' || *p == 'G' || *p == 'f' ||
-                *p == 's' || *p == 'u') {
-                in_escape = false;
-            }
-            continue;
-        }
-
-        /// Count visible characters
-        /// TODO: Proper UTF-8 width calculation (for now assume 1 column per
-        /// char)
-        visual_len++;
-    }
-
-    return visual_len;
-}
-
-/**
  * Compose layers with cursor position tracking using incremental tracking.
  *
  * This implements the proven approach from Replxx/Fish/ZLE: walk through
@@ -1570,7 +1523,17 @@ composition_engine_error_t composition_engine_compose_with_cursor(
     }
 
     /// Calculate prompt visual width (strip ANSI codes)
-    size_t prompt_width = calculate_visual_width(prompt_content);
+    /// Width from the display subsystem's single computation -- the same
+    /// function this file already calls when it measures a prompt line for
+    /// cursor placement. It used to call a local copy here that enumerated
+    /// ANSI terminators (m K J H A B C D G f s u) and so never ended a
+    /// sequence finishing in `h` or `l` -- which is what `\033[?25l` and
+    /// `\033[?25h`, the cursor hide/show pair, finish with. Everything after
+    /// one of those measured as ZERO width. The copy also carried a standing
+    /// `TODO: Proper UTF-8 width calculation` and counted one column per
+    /// character, so wide characters measured half their width.
+    size_t prompt_width =
+        screen_buffer_calculate_visual_width(prompt_content, 0);
 
     /// Get command text for cursor tracking
     const char *cmd = engine->command_layer->command_text;
