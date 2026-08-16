@@ -591,6 +591,36 @@ TEST(string_width_sums_the_table) {
               4, "ascii around a wide character");
 }
 
+/// lle_utf8_visible_width is the ANSI-aware wrapper three LLE call sites now
+/// share -- the prompt composer and both completion-menu measurements. Each
+/// previously carried its own escape walk, and each terminator set missed
+/// something different.
+TEST(visible_width_ignores_escape_sequences) {
+    /// Lengths come from strlen, never hand-counted: an earlier version of
+    /// this test passed a length two bytes past the end of a literal and read
+    /// whatever followed it, which looked exactly like a width bug.
+    struct {
+        const char *text;
+        size_t want;
+        const char *what;
+    } cases[] = {
+        {                      "hello", 5,                            "no escapes"},
+        {                           "", 0,                                 "empty"},
+        {         "\033[31mred\033[0m", 3,                            "SGR colour"},
+        {      "\033[?25labc\033[?25h", 3, "cursor hide/show: terminators l and h"},
+        {                  "\033[Kabc", 3,                         "erase line: K"},
+        {                 "\033[3~abc", 3,   "final byte ~, which is not a letter"},
+        {"\033[31m\xe3\x81\x82\033[0m", 2,         "wide character inside escapes"},
+        {               "\xe2\x80\x94", 1,        "em dash is one column, not two"},
+        {                  "e\xcc\x81", 1,       "base plus combining mark is one"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        ASSERT_EQ(lle_utf8_visible_width(cases[i].text, strlen(cases[i].text)),
+                  cases[i].want, cases[i].what);
+    }
+}
+
 int main(void) {
     printf("=== LLE Char Width Tests ===\n\n");
 
@@ -604,6 +634,7 @@ int main(void) {
     printf("\n--- ASCII printable ---\n");
     RUN_TEST(ascii_printable_width_one);
     RUN_TEST(string_width_sums_the_table);
+    RUN_TEST(visible_width_ignores_escape_sequences);
 
     printf("\n--- Combining marks ---\n");
     RUN_TEST(combining_diacritical_marks_zero_width);

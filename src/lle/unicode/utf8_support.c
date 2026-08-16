@@ -401,3 +401,47 @@ size_t lle_utf8_string_width(const char *text, size_t length) {
 
     return total_width;
 }
+
+size_t lle_utf8_visible_width(const char *text, size_t length) {
+    if (!text || length == 0) {
+        return 0;
+    }
+
+    /// Fast path: no escape byte at all.
+    if (!memchr(text, 0x1B, length)) {
+        return lle_utf8_string_width(text, length);
+    }
+
+    size_t width = 0;
+    size_t i = 0;
+
+    while (i < length) {
+        if ((unsigned char)text[i] == 0x1B) {
+            i++;
+            if (i < length && (text[i] == '[' || text[i] == ']')) {
+                i++;
+                /// Run to the final byte (ECMA-48: 0x40-0x7E).
+                while (i < length) {
+                    unsigned char fin = (unsigned char)text[i];
+                    i++;
+                    if (fin >= 0x40 && fin <= 0x7E) {
+                        break;
+                    }
+                }
+            } else if (i < length) {
+                /// A two-character escape ends at once.
+                i++;
+            }
+            continue;
+        }
+
+        /// Measure the run up to the next escape in one call.
+        size_t run_start = i;
+        while (i < length && (unsigned char)text[i] != 0x1B) {
+            i++;
+        }
+        width += lle_utf8_string_width(text + run_start, i - run_start);
+    }
+
+    return width;
+}
