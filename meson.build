@@ -3235,6 +3235,16 @@ if fs.exists('tests/integration/test_array_assign_location.c')
        timeout: 120)
 endif
 
+if fs.exists('tests/integration/test_arith_cmdsub_separator.c')
+  test_arith_cmdsub_separator = executable('test_arith_cmdsub_separator',
+    ['tests/integration/test_arith_cmdsub_separator.c'])
+  test('a separator inside a nested substitution stays there',
+       test_arith_cmdsub_separator,
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 120)
+endif
+
 if fs.exists('tests/integration/test_unset_local_shadowing.c')
   test_unset_local_shadowing = executable('test_unset_local_shadowing',
     ['tests/integration/test_unset_local_shadowing.c'])
