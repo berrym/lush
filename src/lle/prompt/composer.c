@@ -15,6 +15,7 @@
 #include "lle/display_integration.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lle/prompt/powerline.h"
+#include "lle/utf8_support.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -539,46 +540,48 @@ static size_t calculate_visual_width(const char *str) {
         return 0;
     }
 
+    /// Per-character width comes from lle_utf8_string_width, which asks the
+    /// canonical width table. This function used to carry its own guess:
+    /// every 3-byte sequence counted as 2 columns, which is right for CJK and
+    /// WRONG for the many 3-byte characters that occupy one -- an em dash, a
+    /// check mark, most currency signs -- so a prompt containing any of them
+    /// measured too wide and the cursor sat too far right.
+    ///
+    /// The ANSI skip also ended a sequence only on `m`. Any other terminator
+    /// -- `\033[K` to erase a line, `\033[H`, a cursor movement -- left it
+    /// stuck in escape mode, and the whole remainder of the prompt measured as
+    /// zero width. Ending at the CSI final byte fixes that.
+    ///
+    /// The primitive used here lives in LLE, which is the layer this file may
+    /// reach: the display subsystem depends on LLE, not the other way round,
+    /// so this deliberately does not reuse display's copy of the computation.
     size_t width = 0;
     const char *p = str;
-    bool in_escape = false;
 
     while (*p) {
         if (*p == '\033') {
-            in_escape = true;
             p++;
-            continue;
-        }
-        if (in_escape) {
-            if (*p == 'm') {
-                in_escape = false;
+            /// A CSI / OSC introducer runs to its final byte (0x40-0x7E);
+            /// any other two-character escape ends immediately.
+            if (*p == '[' || *p == ']') {
+                p++;
+                while (*p && !((unsigned char)*p >= 0x40 &&
+                               (unsigned char)*p <= 0x7E)) {
+                    p++;
+                }
             }
-            p++;
+            if (*p) {
+                p++;
+            }
             continue;
         }
 
-        /// Count UTF-8 character width
-        unsigned char c = (unsigned char)*p;
-        if ((c & 0x80) == 0) {
-            /// ASCII
-            width++;
-            p++;
-        } else if ((c & 0xE0) == 0xC0) {
-            /// 2-byte UTF-8
-            width++;
-            p += 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            /// 3-byte UTF-8 (CJK characters are typically double-width)
-            width += 2;
-            p += 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            /// 4-byte UTF-8
-            width += 2;
-            p += 4;
-        } else {
-            /// Invalid or continuation byte, skip
+        /// Measure the run up to the next escape in one call.
+        const char *run = p;
+        while (*p && *p != '\033') {
             p++;
         }
+        width += lle_utf8_string_width(run, (size_t)(p - run));
     }
 
     return width;

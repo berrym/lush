@@ -28,6 +28,12 @@
 #include <string.h>
 #include <unistd.h>
 
+/// THE display width computation; defined below, next to the line index it
+/// grew up in. Declared here because the wrappers that route to it appear
+/// earlier in the file.
+static size_t visual_width_core(const char *text, size_t byte_len,
+                                size_t start_col);
+
 /// ============================================================================
 /// INITIALIZATION AND CLEANUP
 /// ============================================================================
@@ -175,63 +181,13 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
 }
 
 size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
-    if (!text)
-        return 0;
-
-    size_t visual_width = 0;
-    size_t i = 0;
-    bool in_escape = false;
-
-    while (i < byte_length && text[i]) {
-        unsigned char ch = (unsigned char)text[i];
-
-        /// Handle ANSI escape sequences (they take 0 columns)
-        if (ch == '\033' || ch == '\x1b') {
-            in_escape = true;
-            i++;
-            continue;
-        }
-
-        if (in_escape) {
-            i++;
-            /// Check for escape sequence terminator
-            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-                ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
-                in_escape = false;
-            }
-            continue;
-        }
-
-        /// Skip readline markers \001 and \002
-        if (ch == '\001' || ch == '\002') {
-            i++;
-            continue;
-        }
-
-        /// Handle UTF-8 multi-byte sequences
-        if ((ch & 0x80) == 0) {
-            /// ASCII: 1 byte, 1 column
-            visual_width++;
-            i++;
-        } else if ((ch & 0xE0) == 0xC0) {
-            /// 2-byte UTF-8
-            visual_width++;
-            i += 2;
-        } else if ((ch & 0xF0) == 0xE0) {
-            /// 3-byte UTF-8
-            visual_width++;
-            i += 3;
-        } else if ((ch & 0xF8) == 0xF0) {
-            /// 4-byte UTF-8
-            visual_width++;
-            i += 4;
-        } else {
-            /// Invalid UTF-8, skip
-            i++;
-        }
-    }
-
-    return visual_width;
+    /// Delegates to visual_width_core. This used to carry its own walk that
+    /// counted EVERY multi-byte character as a single column, so a CJK
+    /// character measured 1 instead of 2 and a combining mark 1 instead of 0.
+    /// Its one caller positions the right prompt, which therefore drifted by
+    /// a column per wide character; a `start_col` of 0 is correct there,
+    /// since an RPROMPT width is measured on its own.
+    return visual_width_core(text, byte_length, 0);
 }
 
 /// ============================================================================
@@ -1113,15 +1069,25 @@ bool screen_buffer_render_multiline_with_prefixes(const screen_buffer_t *buffer,
     return true;
 }
 
-size_t screen_buffer_calculate_visual_width(const char *text,
-                                            size_t start_col) {
+/// THE display width computation. Walks TR#29 grapheme clusters, asks the
+/// width table for each cluster's base codepoint, skips ANSI escapes and the
+/// readline `\001`/`\002` markers, and expands tabs against `start_col`.
+///
+/// Three functions used to answer this same question three different ways.
+/// This one was already right; screen_buffer_visual_width counted EVERY
+/// multi-byte character as one column (a CJK character came back as 1 instead
+/// of 2, a combining mark as 1 instead of 0), and line_index_visual_width
+/// walked codepoints rather than clusters. Both are now wrappers, so the
+/// answer cannot depend on which function a caller happened to reach for.
+static size_t visual_width_core(const char *text, size_t byte_len,
+                                size_t start_col) {
     if (!text)
         return 0;
 
     size_t visual_width = 0;
     size_t col = start_col;
     size_t i = 0;
-    size_t text_len = strlen(text);
+    size_t text_len = byte_len;
     bool in_escape = false;
 
     while (i < text_len) {
@@ -1226,6 +1192,14 @@ size_t screen_buffer_calculate_visual_width(const char *text,
     return visual_width;
 }
 
+size_t screen_buffer_calculate_visual_width(const char *text,
+                                            size_t start_col) {
+    if (!text) {
+        return 0;
+    }
+    return visual_width_core(text, strlen(text), start_col);
+}
+
 /// ============================================================================
 /// LINE INDEX
 /// ============================================================================
@@ -1235,54 +1209,12 @@ size_t screen_buffer_calculate_visual_width(const char *text,
 /// and compute per-line visual_height for a given terminal width.
 
 static size_t line_index_visual_width(const char *text, size_t byte_length) {
-    /// Compute visual columns occupied by a logical line. Matches the
-    /// width semantics of screen_buffer_render: ANSI escape sequences
-    /// take 0 columns, UTF-8 codepoints are decoded and weighed via
-    /// lle_codepoint_width (CJK / emoji count as 2 columns each).
-    /// Readline markers \001 and \002 take 0 columns (consistent with
-    /// screen_buffer_visual_width).
-    if (!text || byte_length == 0) {
-        return 0;
-    }
-    size_t i = 0;
-    size_t visual = 0;
-    bool in_escape = false;
-    while (i < byte_length) {
-        unsigned char ch = (unsigned char)text[i];
-        if (ch == '\033' || ch == '\x1b') {
-            in_escape = true;
-            i++;
-            continue;
-        }
-        if (in_escape) {
-            i++;
-            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-                ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
-                in_escape = false;
-            }
-            continue;
-        }
-        if (ch == '\001' || ch == '\002') {
-            i++;
-            continue;
-        }
-        uint32_t cp = 0;
-        int consumed =
-            lle_utf8_decode_codepoint(text + i, byte_length - i, &cp);
-        if (consumed <= 0) {
-            /// Malformed UTF-8: count one column, advance one byte
-            visual += 1;
-            i += 1;
-            continue;
-        }
-        int w = lle_codepoint_width(cp);
-        if (w < 0) {
-            w = 0; /// Control characters take no visible columns
-        }
-        visual += (size_t)w;
-        i += (size_t)consumed;
-    }
-    return visual;
+    /// Delegates to visual_width_core. This walked CODEPOINTS rather than
+    /// TR#29 grapheme clusters, so it weighed a combining mark on its own
+    /// instead of as part of the character it belongs to. The wrapper stays
+    /// because the line index measures a bounded slice of a larger blob
+    /// rather than a NUL-terminated string.
+    return visual_width_core(text, byte_length, 0);
 }
 
 static size_t line_index_visual_height(size_t visual_width,
