@@ -8372,12 +8372,42 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
     }
 
-    /// Check for backtick command substitution
-    if (text[0] == '`') {
+    /// Check for backtick command substitution.
+    ///
+    /// A backtick anywhere in the word counts, not just at its start. The `$`
+    /// forms above already route a MID-WORD construct to the general expander
+    /// (`first_dollar != text`), but the backtick branch tested only
+    /// `text[0]`, so a word with a leading literal never reached any
+    /// substitution handler and was emitted as its own source text:
+    ///
+    ///     echo x`printf 4`y   ->  x`printf 4`y     (bash, zsh, dash: x4y)
+    ///
+    /// A trailing literal worked, because the backtick was still first
+    /// (issue #740). An ESCAPED backtick is not a substitution and must not
+    /// trigger this, so the scan skips `\X` the way every other backtick
+    /// scanner in the codebase now does.
+    const char *unescaped_backtick = NULL;
+    for (const char *p = text; *p; p++) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            continue;
+        }
+        if (*p == '`') {
+            unescaped_backtick = p;
+            break;
+        }
+    }
+    if (unescaped_backtick) {
         /// `cmd`<text> (e.g. x=`cmd`:b) is a concatenation, not a bare
         /// substitution; route it through the general expander so the
-        /// trailing literal survives.
-        if (!cmdsub_spans_whole_word(text)) {
+        /// trailing literal survives. The same applies when the backtick is
+        /// not first: cmdsub_spans_whole_word assumes the construct starts at
+        /// text[0], so a LEADING literal has to be routed on the position
+        /// test alone -- exactly as the `$` branches above do with
+        /// `first_dollar != text`. Without that test the word was handed to
+        /// expand_command_substitution whole and executed verbatim
+        /// (`echo x\`printf 4\`y` reported `x: command not found`).
+        if (unescaped_backtick != text || !cmdsub_spans_whole_word(text)) {
             return expand_quoted_string(executor, text, false);
         }
         return expand_command_substitution(executor, text);
