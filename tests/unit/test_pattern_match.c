@@ -228,6 +228,68 @@ TEST(star_anchors_on_grapheme_boundaries) {
            "character the tail can start at");
 }
 
+TEST(bracket_class_matches_decomposed_grapheme_cluster) {
+    /// THE DISCRIMINATING CASE, one construct over from `?` (#682). A bracket
+    /// class asks the same question -- "match one character" -- at a different
+    /// code path, so it must give the same answer. Membership is tested on the
+    /// cluster's BASE codepoint and the whole cluster is consumed.
+    ///
+    /// Under codepoint-only semantics the class consumed just the `e` and left
+    /// U+0301 unmatched, so the class could never account for a decomposed
+    /// character at all (issue #702).
+    ///
+    /// A PRECOMPOSED literal cannot detect this -- there one codepoint IS one
+    /// cluster, and both the old and new code pass. The decomposed form below
+    /// is what separates them; keep it that way.
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "caf[a-z]"),
+           "[a-z] matches a decomposed e+U+0301 as ONE character");
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "caf[[:alpha:]]"),
+           "[[:alpha:]] matches a decomposed cluster as one character");
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "c[a-z]f[a-z]"),
+           "two classes match c-a-f-e-combining as four characters");
+    ASSERT(!lush_pattern_match("cafe\xcc\x81", "caf[a-z][a-z]"),
+           "the cluster is ONE character, so two classes overshoot");
+
+    /// The base decides membership, so a class that excludes the base does not
+    /// match however the character is spelled.
+    ASSERT(!lush_pattern_match("cafe\xcc\x81", "caf[0-9]"),
+           "a class that excludes the base does not match the cluster");
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "caf[!0-9]"),
+           "negation is decided on the base and still consumes the cluster");
+
+    /// Same rule at a larger scale.
+    ASSERT(lush_pattern_match("\xf0\x9f\x91\xa9\xe2\x80\x8d"
+                              "\xf0\x9f\x92\xbb",
+                              "[[:print:]]"),
+           "a class matches a ZWJ emoji sequence as one character");
+
+    /// The two spellings do NOT agree here, and that is the documented
+    /// consequence of segmenting without normalizing. `[a-z]` is a CODEPOINT
+    /// range: the decomposed base is `e` (U+0065, in range), while the
+    /// precomposed character is U+00E9 (out of range). Segmentation (TR#29)
+    /// decides where a character ends; normalization (NFC) decides whether two
+    /// spellings are the same character. lush applies the first to pattern
+    /// matching and not the second, so this asymmetry is expected -- see the
+    /// normalization question raised alongside issue #702.
+    ASSERT(!lush_pattern_match("caf\xc3\xa9", "caf[a-z]"),
+           "the precomposed spelling is U+00E9, outside the ASCII range");
+    ASSERT(lush_pattern_match("caf\xc3\xa9", "caf[\xc3\x80-\xc3\xbf]"),
+           "the precomposed spelling matches a range that contains it");
+    ASSERT(lush_pattern_match("caf\xc3\xa9", "caf[[:alpha:]]"),
+           "a category class matches BOTH spellings, since it asks about the "
+           "base rather than a codepoint range");
+}
+
+TEST(bracket_class_anchors_on_grapheme_boundaries) {
+    /// A bare combining mark is not a character a class can match, because a
+    /// class only ever starts at a cluster boundary.
+    ASSERT(!lush_pattern_match("cafe\xcc\x81", "cafe[[:alpha:]]"),
+           "the mark is part of the preceding character, not a character the "
+           "class can match on its own");
+    ASSERT(lush_pattern_match("cafe\xcc\x81", "*[a-z]"),
+           "* anchors before the whole cluster and the class consumes it");
+}
+
 TEST(literal_multibyte_matches) {
     ASSERT(lush_pattern_match("café", "café"),
            "literal multi-byte pattern matches identical input");
@@ -371,6 +433,8 @@ int main(void) {
     RUN_TEST(question_matches_unicode_codepoint);
     RUN_TEST(question_matches_decomposed_grapheme_cluster);
     RUN_TEST(star_anchors_on_grapheme_boundaries);
+    RUN_TEST(bracket_class_matches_decomposed_grapheme_cluster);
+    RUN_TEST(bracket_class_anchors_on_grapheme_boundaries);
     RUN_TEST(literal_multibyte_matches);
     RUN_TEST(star_matches_with_unicode_tail);
     RUN_TEST(bracket_range_unicode_lowercase);
