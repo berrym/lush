@@ -15978,10 +15978,28 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             }
 
-            /// Apply the per-element scalar op to each element and join
-            /// results with a single space. Each branch produces a
-            /// freshly allocated transformed string per element; the
-            /// join loop then concatenates with growth.
+            /// Apply the per-element scalar op to each element and join the
+            /// results on the first character of IFS. Each branch produces a
+            /// freshly allocated transformed string per element; the join loop
+            /// then concatenates with growth.
+            ///
+            /// The separator used to be a hardcoded space, so `${arr[*]#a}`
+            /// joined on " " while the operator-free `${arr[*]}` beside it
+            /// joined on IFS[0] -- under `IFS=,` one gave `b xy` and the other
+            /// `ab,xy` (issue #752). ifs_join_separator is the same helper the
+            /// five other join sites use, and it carries the load-bearing
+            /// unset-vs-empty distinction: unset IFS means a space, an EMPTY
+            /// IFS means no separator at all, which is why the append below is
+            /// guarded on the separator's length rather than assuming one byte.
+            ///
+            /// The FIELD COUNT is a separate question: `${arr[@]}` with an
+            /// operator should contribute N fields rather than being joined at
+            /// all (issue #749). This join is what a `[*]` form legitimately
+            /// wants; it does not decide, and must not be read as deciding,
+            /// what `[@]` does.
+            char elem_join_sep[2];
+            ifs_join_separator(executor, elem_join_sep);
+            size_t elem_join_len = strlen(elem_join_sep);
             size_t out_cap = 64;
             size_t out_pos = 0;
             char *joined = malloc(out_cap);
@@ -16129,7 +16147,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         converted = strdup("");
                     }
                     size_t clen = strlen(converted);
-                    size_t need = out_pos + (out_pos > 0 ? 1 : 0) + clen + 1;
+                    size_t need =
+                        out_pos + (out_pos > 0 ? elem_join_len : 0) + clen + 1;
                     while (need > out_cap) {
                         out_cap *= 2;
                         char *nb = realloc(joined, out_cap);
@@ -16144,8 +16163,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                         free(converted);
                         break;
                     }
-                    if (out_pos > 0) {
-                        joined[out_pos++] = ' ';
+                    if (out_pos > 0 && elem_join_len > 0) {
+                        memcpy(joined + out_pos, elem_join_sep, elem_join_len);
+                        out_pos += elem_join_len;
                     }
                     memcpy(joined + out_pos, converted, clen);
                     out_pos += clen;
