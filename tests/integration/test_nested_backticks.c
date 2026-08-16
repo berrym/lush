@@ -204,6 +204,27 @@ int main(int argc, char **argv) {
     check(lush, "740 a single-quoted backtick stays literal", "echo 'x`y'",
           "x`y");
 
+    /// Inside double quotes, `\"` joins the escape set and yields a plain
+    /// `"`, which then acts as a quote delimiter when the body is parsed --
+    /// so the body passes ONE argument. Leaving the backslashes there passed
+    /// TWO and printf rendered only the first, truncating the word (#743).
+    check(lush, "743 an escaped quote inside a quoted backtick",
+          "echo \"pre`printf \\\"a b\\\"`post\"", "prea bpost");
+    check(lush, "743 the same with no surrounding literals",
+          "echo \"`printf \\\"a b\\\"`\"", "a b");
+    check(lush, "743 a single-word argument is unaffected either way",
+          "echo \"`printf \\\"ab\\\"`\"", "ab");
+
+    /// The rule is CONTEXT-DEPENDENT. Unquoted, `\"` keeps its backslash --
+    /// lush and every peer already agreed on that, and it must not change.
+    check(lush, "743 unquoted, the backslash is kept",
+          "echo `printf \\\"ab\\\"`", "\"ab\"");
+
+    /// `$( )` is NOT affected by the enclosing quotes: its body is a fresh
+    /// command, so `\"` keeps its backslash there even inside double quotes.
+    check(lush, "743 the $( ) form does not take the rule",
+          "echo \"pre$(printf \\\"a b\\\")post\"", "pre\"apost");
+
     /// An unterminated backtick must still be DIAGNOSED rather than silently
     /// consuming the rest of the input -- the scanner now skips an escaped
     /// byte, so it must not be able to skip past the end. Asserted by shape,
