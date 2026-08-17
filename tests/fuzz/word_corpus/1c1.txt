@@ -148,3 +148,18 @@ ${Y:?a}${Y?b}
 "${Y^d}"
 "${U^^é}"
 "${U^^*}"
+
+# An operand beginning with `[` (#761). It used to defer at parse because the
+# operand was re-tokenized and a leading `[` lexes as the `[` builtin; the bytes
+# are now taken directly, so a bracket class is just a pattern. Also the
+# whitespace and `~` operands, which needed special cases only to undo the
+# tokenizer -- legacy's operand pass is `$`-only, so it never tilde-expands.
+"${Y#[cd]}"
+"${Y%[cd]}"
+"${Y^^[cd]}"
+"${Y,,[CD]}"
+"${Y/[cd]/Z}"
+"${Y//[cd]/Z}"
+"${X#a b}"
+"${X# a}"
+"${Y#~}"

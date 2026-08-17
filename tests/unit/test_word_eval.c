@@ -330,6 +330,43 @@ TEST(eval_pe_case_conversion_operators) {
     assert_fields("${s,}", vars, lf); /// , lower first
 }
 
+TEST(eval_pe_operand_leading_bracket_covered) {
+    /// A pattern beginning with `[` used to defer at PARSE, because the operand
+    /// was re-tokenized as a word and a leading `[` lexes as the `[` builtin
+    /// (issue #761). Every literal-operand family was affected. The operand is
+    /// now taken as source bytes, so a bracket class is just a pattern.
+    ///
+    /// assert_fields requires BOTH parse_word and word_eval to report the word
+    /// covered, so these pin the coverage; restoring the tokenizing path fails
+    /// them. The value half alone would not -- legacy produces the same bytes.
+    const char *vars[] = {"s", "abcdef", NULL};
+    const char *strip[] = {"bcdef", NULL};
+    assert_fields("${s#[ab]}", vars, strip); /// pattern-strip
+    const char *suffix[] = {"abcde", NULL};
+    assert_fields("${s%[ef]}", vars, suffix);
+    const char *cased[] = {"AbCdef", NULL};
+    assert_fields("${s^^[ac]}", vars, cased); /// case conversion
+    const char *subst[] = {"Zbcdef", NULL};
+    assert_fields("${s/[ab]/Z}", vars, subst); /// substitution
+    const char *all[] = {"-b-d-f", NULL};
+    assert_fields("${s//[ace]/-}", vars, all);
+}
+
+TEST(eval_pe_operand_whitespace_and_tilde_covered) {
+    /// Taking the operand as source bytes also retires two special cases that
+    /// existed only to undo the tokenizer: an operand whose whitespace is part
+    /// of the pattern (`${s#a b}`, `${s#a }`) and a leading `~`, which legacy
+    /// never tilde-expands in an operand because its operand pass is `$`-only.
+    /// None of these match here, so the value is the subject unchanged -- the
+    /// assertion of record is that the word is COVERED.
+    const char *vars[] = {"s", "abcdef", NULL};
+    const char *same[] = {"abcdef", NULL};
+    assert_fields("${s#a b}", vars, same);
+    assert_fields("${s#a }", vars, same);
+    assert_fields("${s# a}", vars, same);
+    assert_fields("${s#~}", vars, same);
+}
+
 TEST(eval_pe_case_conversion_restricting_pattern) {
     /// The optional pattern restricts WHICH characters convert (#683). These
     /// assertions pin COVERAGE, not just the value: assert_fields requires both
@@ -608,6 +645,8 @@ int main(void) {
     RUN_TEST(eval_pe_pattern_strip_operators);
     RUN_TEST(eval_pe_case_conversion_operators);
     RUN_TEST(eval_pe_case_conversion_restricting_pattern);
+    RUN_TEST(eval_pe_operand_leading_bracket_covered);
+    RUN_TEST(eval_pe_operand_whitespace_and_tilde_covered);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
     RUN_TEST(eval_pe_required_operators);
