@@ -1503,6 +1503,33 @@ TEST(rt_pe_case_conversion_restricting_pattern_covered) {
     ASSERT_EXIT_STATUS(r, 0);
 }
 
+TEST(rt_cmdsub_fuses_after_a_closing_quote) {
+    /// A `$(...)` or `$((...))` abutting a closing quote is part of the same
+    /// word. The tokenizer used to append the `$` as an ordinary byte and then
+    /// stop at `(`, which is not a word character, so `"q"$(cmd)` ended the
+    /// word as `q$` and left `(cmd)` to be parsed as a SUBSHELL: the command
+    /// ran, in command position, and its output never joined the word. The
+    /// arithmetic form lost its value outright (issue #763).
+    ///
+    /// The construct is copied verbatim through the same structure-aware
+    /// matcher the double-quoted branch uses, so a nested substitution, a
+    /// quoted `)` and a case-pattern `)` are all covered by one definition.
+    ///
+    /// `${...}` and `$name` are asserted too: they never had the defect
+    /// because their bytes are word characters, and they must keep working.
+    run_result_t r = run_shell("( v=V\n"
+                               "  echo \"q\"$(echo Z)\n"
+                               "  echo 'q'$(echo Z)\n"
+                               "  echo \"q\"$((1+1))\n"
+                               "  echo x\"q\"y$(echo Z)\n"
+                               "  echo \"q\"$(echo \"$(echo N)\")\n"
+                               "  echo \"q\"$(echo ')')\n"
+                               "  echo \"q\"$v\n"
+                               "  echo \"q\"${v:+Y} )\n");
+    ASSERT_STDOUT_EQ(r, "qZ\nqZ\nq2\nxqyZ\nqN\nq)\nqV\nqY\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9408,6 +9435,7 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_cmdsub_fuses_after_a_closing_quote);
     RUN_TEST(rt_pe_case_conversion_restricting_pattern_covered);
     RUN_TEST(rt_unicode_named_param_defers_in_every_position);
     RUN_TEST(rt_unicode_named_param_unbound_under_nounset);

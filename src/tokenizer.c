@@ -1338,6 +1338,61 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         prov_cap = 0;
                         goto parse_next_segment;
                     }
+                    /// `$(`/`$((` abutting the closing quote. Without this the
+                    /// loop appends the `$` as an ordinary byte and then stops
+                    /// at `(`, which is not a word character -- so `"q"$(cmd)`
+                    /// ended the word as `q$` and left `(cmd)` to be parsed as
+                    /// a SUBSHELL. The command ran, in command position, and
+                    /// its output never joined the word (issue #763).
+                    ///
+                    /// `${...}` and `$name` never had the problem because
+                    /// their bytes are word characters and ride into the token
+                    /// text, which the expander resolves later. This copies the
+                    /// construct verbatim for the same treatment, using the
+                    /// structure-aware matcher the double-quoted branch above
+                    /// already uses -- so a nested `$(...)`, a quoted `)` and a
+                    /// case-pattern `)` (#494) are all handled by one
+                    /// definition rather than a second scanner.
+                    if (wc == '$' &&
+                        tokenizer->position + 1 < tokenizer->input_length &&
+                        tokenizer->input[tokenizer->position + 1] == '(') {
+                        size_t sub_start = tokenizer->position;
+                        size_t close_off = 0;
+                        bool matched = lush_find_matching_brace(
+                            &tokenizer->input[sub_start + 1],
+                            tokenizer->input_length - (sub_start + 1),
+                            &close_off);
+                        size_t sub_end = matched ? sub_start + 1 + close_off + 1
+                                                 : tokenizer->input_length;
+                        size_t sub_len = sub_end - sub_start;
+                        while (result_len + sub_len + 1 >= result_capacity) {
+                            result_capacity *= 2;
+                            char *grown = realloc(result, result_capacity);
+                            if (!grown) {
+                                free(result), free(prov);
+                                return token_new(
+                                    TOK_ERROR, &tokenizer->input[start_pos], 1,
+                                    start_line, start_column, start_pos);
+                            }
+                            result = grown;
+                        }
+                        memcpy(&result[result_len],
+                               &tokenizer->input[sub_start], sub_len);
+                        result_len += sub_len;
+                        prov_append(&prov, &prov_len, &prov_cap,
+                                    QUOTE_PROV_UNQUOTED, sub_len);
+                        while (tokenizer->position < sub_end) {
+                            if (tokenizer->input[tokenizer->position] == '\n') {
+                                tokenizer->line++;
+                                tokenizer->column = 1;
+                            } else {
+                                tokenizer->column++;
+                            }
+                            tokenizer->position++;
+                        }
+                        has_expandable = true;
+                        continue;
+                    }
                     if (!is_word_char(wc) && wc != '\\' && wc != '$') {
                         break;
                     }
