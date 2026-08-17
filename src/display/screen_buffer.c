@@ -302,247 +302,10 @@ static void write_char_to_buffer(screen_buffer_t *buffer,
     (*col)++;
 }
 
-void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
-                          const char *command_text, size_t cursor_byte_offset) {
-    if (!buffer)
-        return;
-
-    /// Clear buffer
-    screen_buffer_clear(buffer);
-
-    int row = 0;
-    int col = 0;
-    bool cursor_set = false;
-
-    /// Render prompt - calculate visual width (excluding ANSI codes)
-    if (prompt_text) {
-        size_t i = 0;
-        size_t text_len = strlen(prompt_text);
-        bool in_readline_marker = false;
-
-        while (i < text_len) {
-            unsigned char ch = (unsigned char)prompt_text[i];
-
-            /// Handle readline markers \001 and \002
-            if (ch == '\001') {
-                in_readline_marker = true;
-                i++;
-                continue;
-            }
-            if (ch == '\002') {
-                in_readline_marker = false;
-                i++;
-                continue;
-            }
-            if (in_readline_marker) {
-                i++;
-                continue;
-            }
-
-            /// Handle ANSI escape sequences (skip without advancing position)
-            if (ch == '\033' || ch == '\x1b') {
-                i = skip_escape_sequence(prompt_text, text_len, i);
-                continue;
-            }
-
-            /// Handle newlines in multi-line prompts
-            if (ch == '\n') {
-                row++;
-                col = 0;
-                if (row >= buffer->num_rows) {
-                    buffer->num_rows = row + 1;
-                }
-                i++;
-                continue;
-            }
-
-            /// Handle carriage returns (move to start of line without newline)
-            if (ch == '\r') {
-                col = 0;
-                i++;
-                continue;
-            }
-
-            /// Handle tabs
-            if (ch == '\t') {
-                int tw = config.tab_width > 0 ? config.tab_width : 4;
-                size_t tab_width = tw - (col % tw);
-                col += tab_width;
-                if (col >= buffer->terminal_width) {
-                    row++;
-                    col = 0;
-                    if (row >= buffer->num_rows) {
-                        buffer->num_rows = row + 1;
-                    }
-                }
-                i++;
-                continue;
-            }
-
-            /// Decode UTF-8 codepoint for proper width calculation
-            uint32_t codepoint;
-            int bytes = lle_utf8_decode_codepoint(prompt_text + i, text_len - i,
-                                                  &codepoint);
-
-            if (bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_codepoint_width(codepoint);
-                if (visual_width > 0) {
-                    /// Store full UTF-8 sequence
-                    write_char_to_buffer(buffer, prompt_text + i, bytes,
-                                         visual_width, true, &row, &col);
-
-                    /// For wide characters (width=2), we store the character in
-                    /// one cell but it occupies 2 columns visually, so advance
-                    /// col by 1 more
-                    if (visual_width == 2) {
-                        col++;
-                        /// Handle wrapping for wide characters at boundary
-                        if (col >= buffer->terminal_width) {
-                            row++;
-                            col = 0;
-                            if (row >= buffer->num_rows) {
-                                buffer->num_rows = row + 1;
-                            }
-                        }
-                    }
-                }
-                i += bytes;
-            } else {
-                i++;
-            }
-        }
-    }
-
-    /// Save position where command starts (this is where cursor save happens)
-    buffer->command_start_row = row;
-    buffer->command_start_col = col;
-
-    /// Render command text using same approach as display_bridge.c
-    if (command_text) {
-        size_t i = 0;
-        size_t text_len = strlen(command_text);
-        size_t bytes_processed =
-            0; /// Actual bytes in raw text (excludes ANSI codes)
-
-        while (i < text_len) {
-            /// Check cursor position BEFORE processing next character
-            if (!cursor_set && bytes_processed == cursor_byte_offset) {
-                buffer->cursor_row = row;
-                buffer->cursor_col = col;
-                cursor_set = true;
-            }
-
-            unsigned char ch = (unsigned char)command_text[i];
-
-            /// Handle ANSI escape sequences (skip without advancing
-            /// bytes_processed or position)
-            if (ch == '\033' || ch == '\x1b') {
-                i = skip_escape_sequence(command_text, text_len, i);
-                /// Don't increment bytes_processed - ANSI codes don't count
-                continue;
-            }
-
-            /// Handle newlines
-            if (ch == '\n') {
-                row++;
-                if (row >= buffer->num_rows) {
-                    buffer->num_rows = row + 1;
-                }
-
-                /// CONTINUATION PROMPT SUPPORT:
-                /// After a newline, check if the next row has a continuation
-                /// prompt prefix. If it does, start column position after the
-                /// prefix (not at column 0). This ensures cursor tracking
-                /// accounts for continuation prompts like "loop> "
-                size_t prefix_width =
-                    screen_buffer_get_line_prefix_visual_width(buffer, row);
-                col = (int)prefix_width;
-
-                i++;
-                bytes_processed++;
-                continue;
-            }
-
-            /// Handle tabs
-            if (ch == '\t') {
-                int tw = config.tab_width > 0 ? config.tab_width : 4;
-                size_t tab_width = tw - (col % tw);
-                col += tab_width;
-                if (col >= buffer->terminal_width) {
-                    row++;
-                    col = 0;
-                    if (row >= buffer->num_rows) {
-                        buffer->num_rows = row + 1;
-                    }
-                }
-                i++;
-                bytes_processed++;
-                continue;
-            }
-
-            /// Decode UTF-8 codepoint for proper width calculation
-            uint32_t codepoint;
-            int char_bytes = lle_utf8_decode_codepoint(
-                command_text + i, text_len - i, &codepoint);
-
-            if (char_bytes > 0 && codepoint >= 32) {
-                int visual_width = lle_codepoint_width(codepoint);
-
-                if (visual_width > 0) {
-                    /// Store full UTF-8 sequence
-                    write_char_to_buffer(buffer, command_text + i, char_bytes,
-                                         visual_width, false, &row, &col);
-
-                    /// For wide characters (width=2), we store the character in
-                    /// one cell but it occupies 2 columns visually, so advance
-                    /// col by 1 more
-                    if (visual_width == 2) {
-                        col++;
-                        /// Handle wrapping for wide characters at boundary
-                        if (col >= buffer->terminal_width) {
-                            row++;
-                            col = 0;
-                            if (row >= buffer->num_rows) {
-                                buffer->num_rows = row + 1;
-                            }
-                        }
-                    }
-                }
-
-                i += char_bytes;
-                bytes_processed += char_bytes;
-            } else {
-                i++;
-                bytes_processed++;
-            }
-        }
-
-        /// If cursor is at end of text
-        if (!cursor_set && bytes_processed == cursor_byte_offset) {
-            buffer->cursor_row = row;
-            buffer->cursor_col = col;
-            cursor_set = true;
-        }
-
-        /// Track where command text ends (for menu/ghost text positioning)
-        buffer->command_end_row = row;
-        buffer->command_end_col = col;
-    }
-
-    /// Ensure at least one row
-    if (buffer->num_rows == 0) {
-        buffer->num_rows = 1;
-    }
-
-    /// Initialize total display rows (will be updated by caller if menu/ghost
-    /// text added)
-    buffer->total_display_rows = buffer->num_rows;
-}
-
-void screen_buffer_render_with_continuation(
-    screen_buffer_t *buffer, const char *prompt_text, const char *command_text,
-    size_t cursor_byte_offset, screen_buffer_continuation_cb continuation_cb,
-    void *user_data) {
+static void render_core(screen_buffer_t *buffer, const char *prompt_text,
+                        const char *command_text, size_t cursor_byte_offset,
+                        screen_buffer_continuation_cb continuation_cb,
+                        void *user_data, bool clear_prefixes) {
     if (!buffer)
         return;
 
@@ -550,8 +313,14 @@ void screen_buffer_render_with_continuation(
     screen_buffer_clear(buffer);
 
     /// Also clear any old prefixes from previous render
-    for (int r = 0; r < SCREEN_BUFFER_MAX_ROWS; r++) {
-        screen_buffer_clear_line_prefix(buffer, r);
+    /// Only the continuation entry point clears stale prefixes. The plain
+    /// entry point never did, and prefixes are documented as persisting
+    /// across a clear, so this stays a parameter rather than becoming
+    /// unconditional -- that would silently drop prefixes a caller set.
+    if (clear_prefixes) {
+        for (int r = 0; r < SCREEN_BUFFER_MAX_ROWS; r++) {
+            screen_buffer_clear_line_prefix(buffer, r);
+        }
     }
 
     int row = 0;
@@ -803,6 +572,27 @@ void screen_buffer_render_with_continuation(
     /// Initialize total display rows (will be updated by caller if menu/ghost
     /// text added)
     buffer->total_display_rows = buffer->num_rows;
+}
+
+/// Render prompt + command into the virtual screen. Both public entry points
+/// are one core: they differed only in whether a continuation callback runs at
+/// each newline and whether stale line prefixes are cleared first, and the
+/// plain one's body had become a strict subset of the other's (issue #755,
+/// item 6). Keeping two copies meant every cursor, wrap and width fix had to
+/// be made twice, and the escape-sequence walk shows what happens when it is
+/// not -- four copies, three different terminator sets, all wrong.
+void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
+                          const char *command_text, size_t cursor_byte_offset) {
+    render_core(buffer, prompt_text, command_text, cursor_byte_offset, NULL,
+                NULL, false);
+}
+
+void screen_buffer_render_with_continuation(
+    screen_buffer_t *buffer, const char *prompt_text, const char *command_text,
+    size_t cursor_byte_offset, screen_buffer_continuation_cb continuation_cb,
+    void *user_data) {
+    render_core(buffer, prompt_text, command_text, cursor_byte_offset,
+                continuation_cb, user_data, true);
 }
 
 /// ============================================================================
