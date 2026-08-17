@@ -135,3 +135,16 @@ ${Y:?a}${Y?b}
 "[`echo H`]"
 "pre`echo H`post"
 "$X`echo H`"
+
+# Case conversion with a RESTRICTING pattern (#683). The pattern selects which
+# characters convert; it is recovered literally and matched by the same
+# lush_case_pattern on both routes. Y="cd" and U="café" exercise an ASCII and a
+# non-ASCII pattern; a class is written non-leading because an operand starting
+# with `[` re-tokenizes as the `[` builtin and defers at parse.
+"${Y^^c}"
+"${Y^^x[cd]}"
+"${Y,,C}"
+"${Y^c}"
+"${Y^d}"
+"${U^^é}"
+"${U^^*}"

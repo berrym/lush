@@ -1462,6 +1462,47 @@ TEST(rt_unicode_named_param_unbound_under_nounset) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
+TEST(rt_pe_case_conversion_restricting_pattern_covered) {
+    /// The case operators take an OPTIONAL glob pattern restricting which
+    /// characters convert. Only the no-pattern form was covered; the pattern
+    /// form deferred because the bench modelled literal patterns only and would
+    /// have reported a false divergence. #681 removed that reason by routing
+    /// the bench through the shared lush_param_op_apply, so the pattern reaches
+    /// the same lush_case_pattern on both routes and the form is parity by
+    /// construction (issue #683).
+    ///
+    /// ^^ / ,, convert every matching character; ^ / , convert only the FIRST
+    /// character, and only when it matches -- so ${v^b} on "abcABC" is
+    /// unchanged because the first character is `a`, not `b`.
+    /// \xc3\xa9 is U+00E9 and \xc3\x89 is U+00C9, exercising a
+    /// non-ASCII pattern against a non-ASCII value.
+    ///
+    /// This test pins the VALUES through the live matcher and executor. It
+    /// does NOT pin coverage -- a deferred word yields the same values via
+    /// legacy -- so eval_pe_case_conversion_restricting_pattern in
+    /// test_word_eval.c carries that half, where assert_fields requires
+    /// word_eval to report the word covered.
+    ///
+    /// A pattern BEGINNING with `[` still defers one stage earlier (the operand
+    /// re-tokenizes and a leading `[` lexes as the `[` builtin); that is
+    /// operator-independent and predates this slice, so `${v^^[ac]}` is
+    /// asserted here only for its VALUE, which legacy supplies.
+    /// Subshell-isolated.
+    run_result_t r =
+        run_shell("( v=abcABC\n"
+                  "  echo \"[${v^^a}][${v,,A}][${v^b}][${v^a}]\"\n"
+                  "  echo \"[${v^^*}][${v,,?}]\"\n"
+                  "  echo \"[${v^^x[ac]}][${v^^[ac]}]\"\n"
+                  "  c=caf\xc3\xa9; echo \"[${c^^\xc3\xa9}][${c^^}]\"\n"
+                  "  u=CAF\xc3\x89; echo \"[${u,,\xc3\x89}]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[AbcABC][abcaBC][abcABC][AbcABC]\n"
+                        "[ABCABC][abcabc]\n"
+                        "[abcABC][AbCABC]\n"
+                        "[caf\xc3\x89][CAF\xc3\x89]\n"
+                        "[CAF\xc3\xa9]\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9367,6 +9408,7 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_pe_case_conversion_restricting_pattern_covered);
     RUN_TEST(rt_unicode_named_param_defers_in_every_position);
     RUN_TEST(rt_unicode_named_param_unbound_under_nounset);
     RUN_TEST(rt_bg_pid_and_option_flags_covered);
