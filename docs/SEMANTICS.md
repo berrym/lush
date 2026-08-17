@@ -555,6 +555,68 @@ echo "${v//X//}"          # a/b        -- a literal slash
 echo "${v//X//usr/lib}"   # a/usr/libb -- slashes throughout
 ```
 
+### 3.11 Lists are sparse, in every mode
+
+An index that was never assigned holds no value. Assigning past the end leaves
+a gap rather than filling it:
+
+```sh
+a=(x); a[9]=y
+echo "${#a[@]}"        # 2  -- two elements, not ten
+echo "${!a[@]}"        # 0 9
+```
+
+This follows from 3.1 and 3.4 rather than from any reference shell. A list is a
+sequence of the values it holds; materializing eight empty strings would invent
+eight values the script never asked for, and would erase the difference between
+"assigned empty" and "never assigned". Sparse is also the more expressive of
+the two: a dense array is recoverable from a sparse one by filling explicitly,
+and the reverse is not.
+
+**No mode changes this.** Storage is an engine property, and section 1's
+dividing rule applies: a preset configures the engine, it never redefines what
+a value IS. zsh has no sparse arrays and fills the gap; `mode zsh` still does
+not, because a preset that could fork the element count would fork the value
+model, which is the thing section 1 rules out. A mode may move the *indexing
+base*, because a base is a spelling; it does not move the storage model.
+
+Recorded as a deliberate divergence, not a gap in `mode zsh`.
+
+### 3.12 Pattern matching segments by cluster and tests by codepoint
+
+Two Unicode axes meet in a pattern, and lush keeps them apart.
+
+**Segmentation** is by grapheme cluster: a `?` or a bracket class consumes one
+user-perceived character, combining marks included. **Membership** is by
+codepoint, tested against the cluster's base:
+
+```sh
+v=$(printf 'cafe\xcc\x81')   # NFD: base e + U+0301
+echo "${v%[a-z]}"              # caf  -- base e is in a-z; the cluster goes whole
+
+v=$(printf 'caf\xc3\xa9')    # NFC: U+00E9
+echo "${v%[a-z]}"              # cafe-acute -- U+00E9 is not in a-z
+```
+
+The matcher does **not** normalize. That is not an oversight: lush's
+normalization policy is a single canonical form, NFC, established at ingest,
+with no NFC/NFD branching downstream. Decomposing inside the matcher would add
+exactly that branch, and would make pattern matching normalize where `=` and
+`==` do not, so the two surfaces would stop agreeing. It would also break a
+range like `[U+00C0-U+00FF]` against NFD text whose base is ASCII.
+
+To ask "is this a letter" without asking "which codepoint is it", use a
+category class -- `[[:alpha:]]` is spelling-independent by construction:
+
+```sh
+v=$(printf 'caf\xc3\xa9')
+echo "${v%[[:alpha:]]}"        # caf
+```
+
+Segmenting by cluster is already better than the codepoint matchers in bash and
+zsh, which consume only the base and can leave a combining mark orphaned.
+Normalizing for membership as well is deliberately declined.
+
 ---
 
 ## 4. The three boundary rules
