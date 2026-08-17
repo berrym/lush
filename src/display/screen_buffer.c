@@ -34,6 +34,37 @@
 static size_t visual_width_core(const char *text, size_t byte_len,
                                 size_t start_col);
 
+/// Advance past the ANSI escape sequence starting at text[i] (text[i] is the
+/// ESC). Returns the index of the first byte AFTER the sequence.
+///
+/// A sequence ends at its FINAL BYTE, which ECMA-48 defines as the range
+/// 0x40-0x7E -- not "the first letter". The letter test looks equivalent
+/// because most finals are letters, but `\033[3~` ends in `~` (0x7E) and
+/// `\033[@` in `@` (0x40). Under the letter rule the walk stays in escape mode
+/// and swallows everything after it.
+///
+/// This is the ONE definition. Every hand-rolled copy in the tree picked its
+/// own terminator set and every set missed something; the width helper was
+/// corrected first, and the render paths kept their own copies until #755's
+/// sweep reached them.
+static size_t skip_escape_sequence(const char *text, size_t len, size_t i) {
+    i++; /// past ESC
+    if (i < len && (text[i] == '[' || text[i] == ']')) {
+        i++;
+        while (i < len) {
+            unsigned char fin = (unsigned char)text[i];
+            i++;
+            if (fin >= 0x40 && fin <= 0x7E) {
+                break;
+            }
+        }
+    } else if (i < len) {
+        /// A two-character escape (`ESC M`, `ESC 7`) ends at once.
+        i++;
+    }
+    return i;
+}
+
 /// ============================================================================
 /// INITIALIZATION AND CLEANUP
 /// ============================================================================
@@ -310,18 +341,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
 
             /// Handle ANSI escape sequences (skip without advancing position)
             if (ch == '\033' || ch == '\x1b') {
-                i++;
-                if (i < text_len && prompt_text[i] == '[') {
-                    i++;
-                    while (i < text_len) {
-                        char c = prompt_text[i++];
-                        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                            c == 'm' || c == 'H' || c == 'J' || c == 'K' ||
-                            c == 'G') {
-                            break;
-                        }
-                    }
-                }
+                i = skip_escape_sequence(prompt_text, text_len, i);
                 continue;
             }
 
@@ -417,18 +437,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
             /// Handle ANSI escape sequences (skip without advancing
             /// bytes_processed or position)
             if (ch == '\033' || ch == '\x1b') {
-                i++;
-                if (i < text_len && command_text[i] == '[') {
-                    i++;
-                    while (i < text_len) {
-                        char c = command_text[i++];
-                        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                            c == 'm' || c == 'H' || c == 'J' || c == 'K' ||
-                            c == 'G' || c == 'f' || c == 's' || c == 'u') {
-                            break;
-                        }
-                    }
-                }
+                i = skip_escape_sequence(command_text, text_len, i);
                 /// Don't increment bytes_processed - ANSI codes don't count
                 continue;
             }
@@ -574,18 +583,7 @@ void screen_buffer_render_with_continuation(
             }
 
             if (ch == '\033' || ch == '\x1b') {
-                i++;
-                if (i < text_len && prompt_text[i] == '[') {
-                    i++;
-                    while (i < text_len) {
-                        char c = prompt_text[i++];
-                        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                            c == 'm' || c == 'H' || c == 'J' || c == 'K' ||
-                            c == 'G') {
-                            break;
-                        }
-                    }
-                }
+                i = skip_escape_sequence(prompt_text, text_len, i);
                 continue;
             }
 
@@ -665,7 +663,6 @@ void screen_buffer_render_with_continuation(
         /// Buffer for plain text of current line (ANSI stripped)
         char plain_line[4096];
         size_t plain_pos = 0;
-        bool in_ansi = false;
 
         while (i < text_len) {
             if (!cursor_set && bytes_processed == cursor_byte_offset) {
@@ -678,20 +675,7 @@ void screen_buffer_render_with_continuation(
 
             /// Handle ANSI escape sequences
             if (ch == '\033' || ch == '\x1b') {
-                in_ansi = true;
-                i++;
-                if (i < text_len && command_text[i] == '[') {
-                    i++;
-                    while (i < text_len) {
-                        char c = command_text[i++];
-                        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                            c == 'm' || c == 'H' || c == 'J' || c == 'K' ||
-                            c == 'G' || c == 'f' || c == 's' || c == 'u') {
-                            in_ansi = false;
-                            break;
-                        }
-                    }
-                }
+                i = skip_escape_sequence(command_text, text_len, i);
                 continue;
             }
 
@@ -734,8 +718,13 @@ void screen_buffer_render_with_continuation(
                 continue;
             }
 
-            /// Accumulate plain text (skip if still in ANSI sequence)
-            if (!in_ansi && plain_pos < sizeof(plain_line) - 1) {
+            /// Accumulate the line's plain text for the continuation
+            /// callback. An escape sequence never reaches here: it is consumed
+            /// whole above and the loop continues, which is why the old
+            /// `in_ansi` flag was dead state -- it was set and cleared within
+            /// one iteration and could only survive as true for an
+            /// UNTERMINATED escape at end of text, where the loop ends anyway.
+            if (plain_pos < sizeof(plain_line) - 1) {
                 /// For non-ANSI characters, add to plain buffer
                 int seq_len = lle_utf8_sequence_length(ch);
                 if (seq_len > 0 && i + seq_len <= text_len) {
