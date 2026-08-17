@@ -316,6 +316,37 @@ static int test_visual_width_utf8_2byte(void) {
     return 1;
 }
 
+static int test_render_escape_sequences_end_at_the_final_byte(void) {
+    /// The same ECMA-48 rule as test_escape_sequences_end_at_the_final_byte,
+    /// asserted against screen_buffer_render rather than the width helper.
+    /// The helper was corrected; render carried its own inline copies of the
+    /// walk, and they still enumerated "any ASCII letter" as the terminator.
+    /// A sequence whose final byte is not a letter therefore never terminated,
+    /// and the rest of the prompt was swallowed as part of the escape --
+    /// so the command started at column 0 instead of after the prompt.
+    struct {
+        const char *prompt;
+        int want_col;
+        const char *what;
+    } cases[] = {
+        {         "$ ", 2,                                "no escape at all"},
+        { "\033[31m$ ", 2,                               "SGR, terminator m"},
+        {"\033[?25l$ ", 2,                       "cursor hide, terminator l"},
+        {  "\033[3~$ ", 2, "terminator ~, a final byte that is not a letter"},
+        {  "\033[@x$ ", 3,     "terminator @, the low end of the 0x40 range"},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        screen_buffer_t buffer;
+        screen_buffer_init(&buffer, 80);
+        screen_buffer_render(&buffer, cases[i].prompt, "cmd", 3);
+        ASSERT_TRUE(buffer.command_start_col == cases[i].want_col,
+                    cases[i].what);
+        screen_buffer_cleanup(&buffer);
+    }
+    return 1;
+}
+
 static int test_escape_sequences_end_at_the_final_byte(void) {
     /// An ANSI sequence ends at its FINAL BYTE, which ECMA-48 defines as the
     /// range 0x40-0x7E -- not "the first letter". Copies of this walk around
@@ -1367,6 +1398,7 @@ int main(void) {
     RUN_TEST(visual_width_utf8_2byte);
     RUN_TEST(width_agrees_on_wide_characters);
     RUN_TEST(escape_sequences_end_at_the_final_byte);
+    RUN_TEST(render_escape_sequences_end_at_the_final_byte);
 
     printf("\n=== Calculate Visual Width Tests ===\n");
     RUN_TEST(calculate_visual_width_null);
