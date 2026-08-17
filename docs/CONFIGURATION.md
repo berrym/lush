@@ -148,6 +148,29 @@ config set completion.fuzzy true  # and tune completion to taste
 This is the polyglot promise made concrete: lush understands bash and
 zsh spellings and curates their defaults, but the user is never locked in.
 
+### What a mode does NOT change
+
+A mode configures the engine; it never redefines it. What a value IS -- its
+kind, its element count, its key set -- is uniform across all four modes by
+construction, and only *boundary policy* is allowed to move per mode (which is
+how `strict_value_typing` legitimately differs). `SEMANTICS.md` section 1 states
+the rule and section 6 lists the divergences it permits.
+
+Two consequences are worth naming, because both look like mode-fidelity gaps
+until the rule is applied:
+
+- **Lists stay sparse in every mode.** zsh has no sparse arrays and fills a gap
+  on assignment past the end; `mode zsh` still does not, because the element
+  count is part of what the value is (`SEMANTICS.md` section 3.11).
+- **Pattern matching does not normalize in any mode.** Segmentation is by
+  grapheme cluster and membership is by codepoint, so the two spellings of an
+  accented character can answer a range test differently
+  (`SEMANTICS.md` section 3.12).
+
+Both are deliberate and documented rather than pending work. A mode that could
+change either would be a separate shell sharing a parser, which is the outcome
+the surface separation exists to prevent.
+
 ---
 
 ## `set` -- POSIX shell options
