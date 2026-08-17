@@ -512,6 +512,23 @@ static word_part_t *parse_simple_expansion(const char *s, size_t n,
         return NULL;
     }
 
+    /// A high-bit byte here may START a Unicode identifier. is_name_start is
+    /// ASCII-only, so it cannot recognize one, and lush curates
+    /// FEATURE_UNICODE_IDENTIFIERS on in lush mode -- `$` + a non-ASCII name
+    /// IS a parameter reference there. Falling through would report "literal
+    /// `$`", which is a CLAIM rather than an observation: the double-quoted
+    /// interior scanner believes it, keeps the word fully covered, and emits
+    /// the reference as its own source bytes. Defer instead, exactly as the
+    /// ASCII-run guard above does when a name continues into a high-bit byte;
+    /// the legacy expander then resolves the name. The guard is deliberately
+    /// mode-INDEPENDENT (this parser takes no shell_mode input): where the
+    /// feature is off the bytes really are a literal `$`, and deferring only
+    /// costs coverage, never correctness.
+    if ((unsigned char)c >= 0x80) {
+        *handled = false;
+        return NULL;
+    }
+
     return NULL; /// `$` followed by something else -> literal `$`
 }
 
