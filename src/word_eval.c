@@ -129,12 +129,22 @@ static bool is_covered_alternation_op(int32_t op) {
 }
 
 /// The case-conversion operators: `${var^p}` (8), `${var^^p}` (4), `${var,p}`
-/// (9), `${var,,p}` (5). The (optional) pattern restricts which characters
-/// convert; this slice covers only the NO-pattern form (convert all / first),
-/// so a case op carrying a pattern defers. (The original reason was that the
-/// bench could not model the pattern-restricted match; since #681 the bench
-/// runs the real lush_case_pattern, so covering it is now just a widening
-/// slice of its own -- see #683.)
+/// (9), `${var,,p}` (5). The optional pattern restricts WHICH characters
+/// convert, and both the empty-pattern (convert all / first) and the
+/// pattern-restricted forms are covered: the operand is recovered literally by
+/// op_has_literal_operand and handed to apply_op, which runs the same
+/// lush_case_pattern on both routes.
+///
+/// The pattern-restricted form deferred until #683, because the bench modelled
+/// only literal patterns and would have reported a false divergence. #681
+/// removed that reason by routing the bench through the shared
+/// lush_param_op_apply.
+///
+/// A pattern that BEGINS with `[` still defers, one stage earlier: the operand
+/// is re-tokenized as its own word and a leading `[` lexes as the `[` builtin,
+/// so parse_word never returns a covered operand. That is operator-independent
+/// -- `${v#[ab]}` and `${v/[ab]/B}` defer identically -- and predates this
+/// slice. A non-leading class (`${v^^x[ac]}`) is covered.
 static bool is_case_op(int32_t op) {
     return op == 4 || op == 5 || op == 8 || op == 9;
 }
@@ -370,14 +380,10 @@ static bool eval_part(const word_part_t *p, eval_acc_t *a,
                     *ok = false;
                     return true;
                 }
-                /// A case op with a restricting pattern (${var^^pat}) defers:
-                /// only the convert-all/first (empty-pattern) form is covered.
-                if (is_case_op(p->u.param.op) && deflt[0] != '\0') {
-                    free(value);
-                    free(deflt);
-                    *ok = false;
-                    return true;
-                }
+                /// A case op's restricting pattern needs no special handling:
+                /// apply_op runs the same lush_case_pattern on both routes, so
+                /// `${var^^[ac]}` is parity by construction exactly as the
+                /// pattern-strip and substitution operands already are (#683).
             } else if (p->u.param.operand &&
                        lush_param_op_consumes_operand(p->u.param.op, value)) {
                 /// Evaluated ONLY on the branch that consumes it (#692). A

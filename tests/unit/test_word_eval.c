@@ -317,9 +317,8 @@ TEST(eval_pe_pattern_strip_operators) {
 }
 
 TEST(eval_pe_case_conversion_operators) {
-    /// No-pattern case conversion via the map + the apply_op stub. (Pattern-
-    /// restricted forms defer and are exercised live where the real matcher
-    /// runs.)
+    /// Case conversion through the shared lush_param_op_apply, so these assert
+    /// the real operator semantics rather than a bench model.
     const char *vars[] = {"s", "heLLo", NULL};
     const char *up[] = {"HELLO", NULL};
     assert_fields("${s^^}", vars, up); /// ^^ upper all
@@ -329,6 +328,28 @@ TEST(eval_pe_case_conversion_operators) {
     assert_fields("${s^}", vars, uf); /// ^ upper first
     const char *lf[] = {"heLLo", NULL};
     assert_fields("${s,}", vars, lf); /// , lower first
+}
+
+TEST(eval_pe_case_conversion_restricting_pattern) {
+    /// The optional pattern restricts WHICH characters convert (#683). These
+    /// assertions pin COVERAGE, not just the value: assert_fields requires both
+    /// parse_word and word_eval to report the word covered, so restoring the
+    /// old "a pattern defers" guard fails them. The live test cannot do that --
+    /// a deferred word still produces the right value via legacy.
+    const char *vars[] = {"s", "heLLo", NULL};
+    const char *ue[] = {"hELLo", NULL};
+    assert_fields("${s^^e}", vars, ue); /// ^^ with a literal pattern
+    const char *ll[] = {"hello", NULL};
+    assert_fields("${s,,L}", vars, ll); /// ,, with a literal pattern
+    const char *uh[] = {"HeLLo", NULL};
+    assert_fields("${s^h}", vars, uh); /// ^ first char matches
+    const char *unchanged[] = {"heLLo", NULL};
+    assert_fields("${s,H}", vars, unchanged); /// , first char does NOT match
+    const char *all[] = {"HELLO", NULL};
+    assert_fields("${s^^*}", vars, all); /// a glob pattern matching everything
+    assert_fields("${s^^x[eo]}", vars,
+                  unchanged); /// a class, not leading (a LEADING `[` still
+                              /// defers at parse -- see is_case_op)
 }
 
 TEST(eval_pe_substring_operators) {
@@ -586,6 +607,7 @@ int main(void) {
     RUN_TEST(eval_pe_alternation_operators);
     RUN_TEST(eval_pe_pattern_strip_operators);
     RUN_TEST(eval_pe_case_conversion_operators);
+    RUN_TEST(eval_pe_case_conversion_restricting_pattern);
     RUN_TEST(eval_pe_substring_operators);
     RUN_TEST(eval_pe_substitution_operators);
     RUN_TEST(eval_pe_required_operators);
