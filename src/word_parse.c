@@ -287,10 +287,44 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
     /// legacy (an audit MISMATCH). Deferring the whole class keeps the two
     /// scanners from ever having to agree. The plain forms this slice is for
     /// -- `${v:?}`, `${v:?required}`, `${v:?must be set}` -- are unaffected.
-    if (op_has_raw_operand(op)) {
+    if (op_has_literal_operand(op)) {
+        /// Every operand in this family is recovered as a LITERAL STRING by
+        /// word_eval (pattern_operand_string), so the bytes between the
+        /// operator and the `}` ARE the operand. Building one WP_LITERAL leaf
+        /// from them is both the faithful structure and the same thing legacy
+        /// produces: expand_variables_in_string copies every non-`$` byte
+        /// verbatim, with no quote removal, backslash processing or tilde
+        /// expansion.
+        ///
+        /// Re-tokenizing the operand as a WORD instead (which this did for
+        /// every family except the raw ones) asks parse_word to parse
+        /// something that is not a word, and it answers accordingly: a
+        /// pattern beginning with `[` lexes as the `[` builtin and defers, so
+        /// `${v^^[ac]}`, `${v#[ab]}` and `${v/[ab]/B}` all fell back to legacy
+        /// (issue #761). It also forced two special cases that exist only to
+        /// undo the tokenizer -- an edge-whitespace defer and a
+        /// trailing-token check -- because the tokenizer strips the very
+        /// whitespace the pattern is made of. Taking the bytes directly
+        /// retires all three.
+        ///
+        /// `$` still defers for the pattern families: legacy expands the
+        /// operand before matching, which this slice does not model. It does
+        /// NOT defer for the raw (message) operators, where #692 made the
+        /// expansion lazy and the two routes already agree.
+        bool defer_dollar = !op_has_raw_operand(op);
         for (size_t i = 0; i < operand_len; i++) {
-            if (operand_str[i] == '\'' || operand_str[i] == '"' ||
-                operand_str[i] == '`' || operand_str[i] == '\\') {
+            char oc = operand_str[i];
+            /// A quote or backslash defers because the two routes DELIMIT the
+            /// `${...}` differently -- lush_find_matching_brace treats a
+            /// quoted span and `\X` as atomic, while legacy's double-quoted
+            /// expander counts braces naively -- so a `}` inside one ends the
+            /// expansion on one route only (#694). A backtick defers because
+            /// legacy's operand pass substitutes it (#709); covering it raw
+            /// would emit the source bytes. parse_word used to refuse these
+            /// two for the pattern families as a side effect of tokenizing;
+            /// now they are refused on purpose.
+            if (oc == '\'' || oc == '"' || oc == '`' || oc == '\\' ||
+                (defer_dollar && oc == '$')) {
                 *handled = false;
                 return NULL;
             }
@@ -336,20 +370,22 @@ static word_part_t *make_operator_param(const char *name, size_t namelen,
         }
         return rp;
     }
-    bool pattern_op = op_has_literal_operand(op);
+    /// Only the ALTERNATION operators reach here: their operand is a default
+    /// VALUE that word_eval evaluates as a word, so it really is tokenized.
+    /// The literal-operand families returned above with their bytes intact.
     for (size_t i = 0; i < operand_len; i++) {
         if (operand_str[i] == '\'' || operand_str[i] == '"' ||
-            operand_str[i] == '\\' || (pattern_op && operand_str[i] == '$')) {
+            operand_str[i] == '\\') {
             *handled = false;
             return NULL;
         }
     }
     /// The tokenizer skips leading/trailing whitespace, so an operand with an
-    /// edge space/tab (`${v#a }` -> pattern "a ", `${u:- x}` -> default " x")
-    /// would tokenize to just the inner word, silently dropping whitespace that
-    /// is part of the pattern/default. The consumed_all check below catches
-    /// INTERIOR whitespace (a trailing token) but not edge whitespace -- defer
-    /// explicitly. (Deferring is always safe; legacy keeps the whitespace.)
+    /// edge space/tab (`${u:- x}` -> default " x") would tokenize to just the
+    /// inner word, silently dropping whitespace that is part of the default.
+    /// The consumed_all check below catches INTERIOR whitespace (a trailing
+    /// token) but not edge whitespace -- defer explicitly. (Deferring is always
+    /// safe; legacy keeps the whitespace.)
     if (operand_len > 0 &&
         (isspace((unsigned char)operand_str[0]) ||
          isspace((unsigned char)operand_str[operand_len - 1]))) {
