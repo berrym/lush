@@ -1423,6 +1423,45 @@ TEST(rt_pe_alternation_operators_covered) {
                         "[x][][a b]\n");
 }
 
+TEST(rt_unicode_named_param_defers_in_every_position) {
+    /// A `$` followed by a non-ASCII identifier byte IS a parameter reference
+    /// in lush mode -- FEATURE_UNICODE_IDENTIFIERS is a curated lush default.
+    /// The CST name scanner is ASCII-only and cannot structure the reference,
+    /// so it must DEFER to the legacy expander in every position.
+    ///
+    /// It did so only when unquoted. Inside double quotes the `$` fell through
+    /// to "literal `$`" while the word stayed fully covered, so the reference
+    /// reached argv as its own source bytes (issue #690) and `set -u` never
+    /// fired on an unbound Unicode name. \xc3\xbc is U+00FC, LATIN SMALL
+    /// LETTER U WITH DIAERESIS.
+    ///
+    /// The last line is the control: a `$` that really is literal must stay
+    /// covered, so the deferral is not simply "defer every `$`".
+    /// Subshell-isolated.
+    run_result_t r = run_shell("( \xc3\xbc"
+                               "x=hi\n"
+                               "  echo \"[$\xc3\xbc"
+                               "x]\"\n"
+                               "  echo pre$\xc3\xbc"
+                               "x\n"
+                               "  echo \"[${\xc3\xbc"
+                               "x}]\"\n"
+                               "  echo \"[$ ][5$]\" )\n");
+    ASSERT_STDOUT_EQ(r, "[hi]\nprehi\n[hi]\n[$ ][5$]\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_unicode_named_param_unbound_under_nounset) {
+    /// `set -u` must fire on an unbound Unicode-named parameter inside double
+    /// quotes. While the word was wrongly covered the CST answered with the
+    /// source bytes and returned 0, so nounset was inert exactly where the
+    /// name could not be scanned. Subshell-isolated.
+    run_result_t r = run_shell("( set -u; echo \"[$\xc3\xbc"
+                               "nbound]\" ) 2>/dev/null\n");
+    ASSERT_STDOUT_EQ(r, "");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9328,6 +9367,8 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_unicode_named_param_defers_in_every_position);
+    RUN_TEST(rt_unicode_named_param_unbound_under_nounset);
     RUN_TEST(rt_bg_pid_and_option_flags_covered);
     RUN_TEST(rt_pe_alternation_operators_covered);
     RUN_TEST(rt_pe_operand_with_quotes_defers);
