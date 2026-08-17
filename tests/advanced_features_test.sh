@@ -53,7 +53,7 @@ print_section() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 test_result() {
@@ -64,10 +64,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}$details${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -458,7 +458,7 @@ main() {
     echo -e "${RED}Failed:${NC} $FAILED_TESTS"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL ADVANCED FEATURES TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL ADVANCED FEATURES TESTS PASSED! ${NC}"
         echo -e "${GREEN}Lush demonstrates excellent enterprise-grade functionality!${NC}"
         exit_code=0
     else
@@ -481,16 +481,16 @@ main() {
     fi
 
     echo -e "\n${CYAN}Validated Enterprise Features:${NC}"
-    echo "✓ Advanced POSIX Option Combinations (strict modes, pipefail)"
-    echo "✓ Security Features (privileged mode, POSIX compliance mode)"
-    echo "✓ Advanced Redirection (noclobber, clobber override >|)"
-    echo "✓ Enhanced Printf (dynamic field width, POSIX compliance)"
-    echo "✓ Job Control (monitor mode, background notifications)"
-    echo "✓ Path Navigation (physical vs logical path resolution)"
-    echo "✓ Editing Modes (emacs/vi switching with mutual exclusivity)"
-    echo "✓ History Management (history control, expansion, comments)"
-    echo "✓ Function Features (definition logging control)"
-    echo "✓ Expansion Control (brace expansion toggle)"
+    echo "OK Advanced POSIX Option Combinations (strict modes, pipefail)"
+    echo "OK Security Features (privileged mode, POSIX compliance mode)"
+    echo "OK Advanced Redirection (noclobber, clobber override >|)"
+    echo "OK Enhanced Printf (dynamic field width, POSIX compliance)"
+    echo "OK Job Control (monitor mode, background notifications)"
+    echo "OK Path Navigation (physical vs logical path resolution)"
+    echo "OK Editing Modes (emacs/vi switching with mutual exclusivity)"
+    echo "OK History Management (history control, expansion, comments)"
+    echo "OK Function Features (definition logging control)"
+    echo "OK Expansion Control (brace expansion toggle)"
 
     echo -e "\n${BLUE}This validation confirms the enterprise-grade advanced features${NC}"
     echo -e "${BLUE}implementation as documented in the handoff document.${NC}"

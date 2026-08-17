@@ -309,8 +309,8 @@ static int test_visual_width_readline_markers(void) {
 }
 
 static int test_visual_width_utf8_2byte(void) {
-    /// é is 2 bytes UTF-8, 1 column width
-    const char *text = "café"; /// c a f é
+    /// e-acute is 2 bytes UTF-8, 1 column width
+    const char *text = "caf\xc3\xa9"; /// c a f e-acute
     size_t width = screen_buffer_visual_width(text, strlen(text));
     ASSERT_EQ(width, 4);
     return 1;

@@ -1,22 +1,22 @@
 # Completion Rewrite Plan
 
-**Status (2026-05-23):** **IMPLEMENTED** — see [`COMPLETION_ARCHITECTURE.md`](COMPLETION_ARCHITECTURE.md) for the authoritative as-built reference. This document is preserved as the design record that fed that implementation.
+**Status (2026-05-23):** **IMPLEMENTED** -- see [`COMPLETION_ARCHITECTURE.md`](COMPLETION_ARCHITECTURE.md) for the authoritative as-built reference. This document is preserved as the design record that fed that implementation.
 **Original status:** Design ready for implementation. Drafted from Q&A session 2026-05-02.
-**Provenance:** Replaces the scratched `completion-rewrite` branch (nuked 2026-05-01); supersedes the deleted `COMPLETION_ARCHITECTURE.md` v1/v2 from that branch. The previous attempt's failure modes are captured in the project memory `project-completion-rewrite-failure-postmortem.md` and informed this design — but the design's correctness rests on lush's own architectural standards, not on the postmortem's prescriptions.
+**Provenance:** Replaces the scratched `completion-rewrite` branch (nuked 2026-05-01); supersedes the deleted `COMPLETION_ARCHITECTURE.md` v1/v2 from that branch. The previous attempt's failure modes are captured in the project memory `project-completion-rewrite-failure-postmortem.md` and informed this design -- but the design's correctness rests on lush's own architectural standards, not on the postmortem's prescriptions.
 
 ## 1. The Bugs This Closes
 
 Two release-blocking defects in the current completion subsystem:
 
-**B1 — TAB does not handle filenames containing spaces.** A user who types `cat "my fi<TAB>` or `cat my\ fi<TAB>` does not get the partial `my fi` matched against filenames; the engine's word-boundary detection at `src/lle/completion/context_analyzer.c:23` and `src/lle/completion/completion_generator.c:43` is quote-blind and treats every space as a hard word terminator regardless of quote/escape state. After candidate selection, `replace_word_at_cursor` at `src/lle/keybinding/keybinding_actions.c:326` splices raw bytes; no escape rendering is performed so even if word boundaries were right, inserting a literal space would re-break the parse on the next line.
+**B1 -- TAB does not handle filenames containing spaces.** A user who types `cat "my fi<TAB>` or `cat my\ fi<TAB>` does not get the partial `my fi` matched against filenames; the engine's word-boundary detection at `src/lle/completion/context_analyzer.c:23` and `src/lle/completion/completion_generator.c:43` is quote-blind and treats every space as a hard word terminator regardless of quote/escape state. After candidate selection, `replace_word_at_cursor` at `src/lle/keybinding/keybinding_actions.c:326` splices raw bytes; no escape rendering is performed so even if word boundaries were right, inserting a literal space would re-break the parse on the next line.
 
-**B2 — TAB does not continue into directories.** When a candidate is a directory, the file source at `src/lle/completion/completion_sources.c:540` correctly sets `suffix = "/"` on the item, but all three insertion sites — `keybinding_actions.c:2545` (single-match), `:2688` (ENTER pick), `:411` (TAB cycling preview) — splice only `item->text`, ignoring `item->suffix`. The directory completes without a trailing slash, so the user's next TAB walks back from cursor past the directory name and the file source is queried with the wrong working directory.
+**B2 -- TAB does not continue into directories.** When a candidate is a directory, the file source at `src/lle/completion/completion_sources.c:540` correctly sets `suffix = "/"` on the item, but all three insertion sites -- `keybinding_actions.c:2545` (single-match), `:2688` (ENTER pick), `:411` (TAB cycling preview) -- splice only `item->text`, ignoring `item->suffix`. The directory completes without a trailing slash, so the user's next TAB walks back from cursor past the directory name and the file source is queried with the wrong working directory.
 
 Both bugs are surface symptoms of the same architectural gap: the engine has no model of "this byte is inside a quoted region" and no opinion about shell-escaping its output. The two parallel context analyzers (`lle_context_analyzer_t` in `context_analyzer.c` and `lle_completion_context_info_t` in `completion_generator.c`) compute different word boundaries from the same buffer, so any one-place fix to boundary handling silently fails to take effect everywhere.
 
 ## 2. Why a Fresh Rebuild
 
-Per `feedback-architectural-correctness-over-expediency.md`, the right move when an existing module has the wrong shape is to rebuild it, not to bolt corrections onto a quote-blind walker that wasn't designed for the problem. The current analyzers ship a two-pass design — one walk for word boundary, a separate walk for `is_inside_quotes`, a third for `is_in_assignment` — which is itself a fingerprint of a module written without quote-state in mind. Bolting a fourth pass on top reliably leaves residual inconsistencies between passes.
+Per `feedback-architectural-correctness-over-expediency.md`, the right move when an existing module has the wrong shape is to rebuild it, not to bolt corrections onto a quote-blind walker that wasn't designed for the problem. The current analyzers ship a two-pass design -- one walk for word boundary, a separate walk for `is_inside_quotes`, a third for `is_in_assignment` -- which is itself a fingerprint of a module written without quote-state in mind. Bolting a fourth pass on top reliably leaves residual inconsistencies between passes.
 
 Per `feedback-engineer-fixes-properly.md`, the splice/escape behavior is one operation. The current code replicates pieces of it across three insertion sites and embeds path-prefix preservation logic inside the file source itself. The right shape is one engine-side splicer that every source feeds into.
 
@@ -24,7 +24,7 @@ Per `feedback-engineer-fixes-properly.md`, the splice/escape behavior is one ope
 
 These are the non-negotiable principles all subsequent decisions hang from. They were established in the 2026-05-02 Q&A and are recorded in the project memory.
 
-1. **Engine smart, sources dumb.** Sources emit candidates as literals only — no path prefix, no quote machinery, no escaping. The engine owns word-boundary detection, quote-state, expansion evaluation, escape rendering, splice math, and the close-quote/space/`/` finalization on accept.
+1. **Engine smart, sources dumb.** Sources emit candidates as literals only -- no path prefix, no quote machinery, no escaping. The engine owns word-boundary detection, quote-state, expansion evaluation, escape rendering, splice math, and the close-quote/space/`/` finalization on accept.
 2. **Preserve the user's typed prefix byte-for-byte**, with one structured exception: TAB at the end of a fully-typed expansion (variable, tilde, parameter, arithmetic, brace, glob) with no further word content resolves the expansion to its value(s) and appends a space. TAB after `<expansion>/<filename-prefix>` preserves the user's typed expansion bytes and completes the filename.
 3. **One context analyzer.** The two parallel analyzers are deleted; one new primitive feeds both initial generation and TAB-cycling re-analysis.
 4. **NFC unicode throughout** (per `project-unicode-normalization-policy.md`). Comparisons use `src/lle/unicode/unicode_compare.c`. Byte-`strncmp` is allowed only when both sides are 100 % ASCII-guaranteed.
@@ -50,7 +50,7 @@ Every significant decision from the Q&A, indexed for traceability.
 | D8 | Single-value expansions (`~`, `~user`, `$VAR`, `${VAR}`, `${VAR:-default}` and friends, `$((...))`) follow uniform rules: TAB-alone at expansion end resolves to value; TAB after `<expansion>/<prefix>` preserves the typed expansion and completes the filename inside the resolved directory. | Consistent semantics across all single-value expansions. |
 | D9 | `$(...)` and backticks default to bash/zsh-style evaluation during completion (matches the bash/zsh consensus behavior); configurable to safe-mode (no evaluation) via `display lle completion eval_command_subst off` for users who specifically want footgun protection from accidental TAB on pasted command substitutions. | Bash and zsh agree on evaluation; per `project-defaults-bash-zsh-consensus.md` lush defaults to the consensus. Safe-mode remains available as the lush opinion via one config flip. |
 | D10 | Brace expansion `{a,b}/Doc<TAB>` uses smart-when-possible synthesis: engine evaluates the brace, runs file completion in each branch, splices candidate after typed `{a,b}/` if the **intersection** of per-branch matches is non-empty (preserves brace shorthand); falls back to bash/zsh-style inline expansion (`a/Doc b/Doc `) when intersection is empty. Configurable to pure bash mode, pure intersect mode, or union mode. | Outperforms bash/zsh when smart is possible, matches them when it isn't. |
-| D11 | Brace `{a,b}<TAB>` (no path content after) resolves to space-joined values (`a b `), matching bash/zsh and consistent with the resolve-on-TAB-alone rule for other expansions. | The brace-shorthand-loss is the same trade-off `$HOME<TAB> → /home/user` accepts. |
+| D11 | Brace `{a,b}<TAB>` (no path content after) resolves to space-joined values (`a b `), matching bash/zsh and consistent with the resolve-on-TAB-alone rule for other expansions. | The brace-shorthand-loss is the same trade-off `$HOME<TAB> -> /home/user` accepts. |
 | D12 | Globs (`*`, `?`, `[...]`) inline-expand on TAB by default, matching bash/zsh. Configurable to preserve-glob-form. | Globs don't execute commands, so the safety-first argument doesn't apply with the same force; users typed the glob to refer to a set, and making the set explicit is what they wanted to see. |
 | D13 | Custom / plugin sources use the same literal-only contract. No special opt-out. | Single contract; they get splice + escape behavior for free. |
 | D14 | Multiple expansions in one word route through `src/expand.c` for full evaluation. The result drives the per-expansion-type rule (e.g., a brace inside a path becomes the brace handling case). | Engine doesn't re-derive expansion semantics; reuses the canonical machinery. |
@@ -72,7 +72,7 @@ All registered in the central config registry per `project-central-config-archit
 
 **Location:** `include/lle/completion/word_context.h`, `src/lle/completion/word_context.c`.
 
-**Responsibility:** Given `(buffer, cursor_byte_offset)`, produce a structured description of the completion context — what's being completed, what shape it has, what was typed, what's still being typed.
+**Responsibility:** Given `(buffer, cursor_byte_offset)`, produce a structured description of the completion context -- what's being completed, what shape it has, what was typed, what's still being typed.
 
 **Output struct (conceptual fields):**
 
@@ -95,8 +95,8 @@ All registered in the central config registry per `project-central-config-archit
 **Anchor selection:** the analyzer doesn't always need to walk from byte 0. It walks from the most recent unambiguous statement boundary (after `;`, `&`, `|`, `&&`, `||`, newline outside any open quote/expression, or start of buffer). For interactive single-line buffers this is byte 0; for multiline buffers it's the start of the current statement.
 
 **Public functions:**
-- `lle_word_context_analyze(buffer, cursor_byte_offset, pool, &out_context) → lle_result_t`
-- `lle_word_context_free(context) → void`
+- `lle_word_context_analyze(buffer, cursor_byte_offset, pool, &out_context) -> lle_result_t`
+- `lle_word_context_free(context) -> void`
 
 ## 7. The New Source Contract
 
@@ -143,31 +143,31 @@ The `suffix` field on `lle_completion_item_t` is removed. Behavior is driven by 
 **Algorithm (accept phase):**
 
 1. Compute `delete_range = [filename_portion_start .. cursor)`.
-2. Render the candidate's `text` field for the current `quote_state` (call `splicer_render_for_context(text, quote_state) → rendered_bytes`):
-   - `quote_state == NONE`: backslash-escape every byte that is shell-special in unquoted context — space, tab, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `$`, `` ` ``, `\`, `"`, `'`, `*`, `?`, `[`, `{`, `~` (only at position 0 of the rendered output), `#` (only at position 0), `!`, newline.
+2. Render the candidate's `text` field for the current `quote_state` (call `splicer_render_for_context(text, quote_state) -> rendered_bytes`):
+   - `quote_state == NONE`: backslash-escape every byte that is shell-special in unquoted context -- space, tab, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `$`, `` ` ``, `\`, `"`, `'`, `*`, `?`, `[`, `{`, `~` (only at position 0 of the rendered output), `#` (only at position 0), `!`, newline.
    - `quote_state == DOUBLE`: backslash-escape only `$`, `` ` ``, `\`, `"`. Spaces and other metacharacters become literal.
-   - `quote_state == SINGLE`: no escaping is possible inside single quotes (POSIX); if the candidate contains a single-quote byte, the splicer must close the single quote, emit `\'`, and re-open the single quote (`...'` → `...'\''...`). The user's typed open quote remains the open quote.
+   - `quote_state == SINGLE`: no escaping is possible inside single quotes (POSIX); if the candidate contains a single-quote byte, the splicer must close the single quote, emit `\'`, and re-open the single quote (`...'` -> `...'\''...`). The user's typed open quote remains the open quote.
    - `quote_state == BACKTICK`: same rules as `DOUBLE` for backslash escaping (`$`, `` ` ``, `\`).
-   - `quote_state == ESCAPE_PENDING`: the user's typed `\` ate one byte; emit nothing for the first rendered byte (it gets eaten by the pending escape) — practically this state should be rare; if cursor lands here the analyzer treats the next user keystroke as the escapee.
+   - `quote_state == ESCAPE_PENDING`: the user's typed `\` ate one byte; emit nothing for the first rendered byte (it gets eaten by the pending escape) -- practically this state should be rare; if cursor lands here the analyzer treats the next user keystroke as the escapee.
 3. Compute the suffix for accept-phase based on candidate type and `quote_state`:
    - `type == DIRECTORY`: append `/`. Do not close any open quote. Do not append a trailing space.
-   - `type == FILE | COMMAND | BUILTIN | ALIAS | VARIABLE | HISTORY | CUSTOM`: if `quote_state ∈ {SINGLE, DOUBLE, BACKTICK}`, append the matching close character. Append a trailing space.
+   - `type == FILE | COMMAND | BUILTIN | ALIAS | VARIABLE | HISTORY | CUSTOM`: if `quote_state  in  {SINGLE, DOUBLE, BACKTICK}`, append the matching close character. Append a trailing space.
 4. Atomic buffer mutation via `lle_buffer_replace_text(buffer, filename_portion_start, cursor - filename_portion_start, rendered_bytes + suffix, length)`.
 5. Move cursor to `filename_portion_start + length(rendered_bytes + suffix)`.
 
-**Algorithm (preview phase, multi-match cycling):** as accept-phase but step 3 emits no suffix — the close-char and trailing space are added only on accept. ESC-during-preview restores `buffer[delete_range]` to the original `dequoted_filename_prefix` rendering (which equals the user's original typed bytes for that range — already preserved on the session-state object).
+**Algorithm (preview phase, multi-match cycling):** as accept-phase but step 3 emits no suffix -- the close-char and trailing space are added only on accept. ESC-during-preview restores `buffer[delete_range]` to the original `dequoted_filename_prefix` rendering (which equals the user's original typed bytes for that range -- already preserved on the session-state object).
 
 **Public functions:**
-- `lle_splicer_splice_accept(buffer, cursor_mgr, context, item) → lle_result_t`
-- `lle_splicer_splice_preview(buffer, cursor_mgr, context, item, preview_state) → lle_result_t`
-- `lle_splicer_render_for_context(text, quote_state, pool, &rendered) → lle_result_t`
-- `lle_splicer_close_char(quote_state) → char` (returns `'\0'` for NONE/ESCAPE_PENDING)
+- `lle_splicer_splice_accept(buffer, cursor_mgr, context, item) -> lle_result_t`
+- `lle_splicer_splice_preview(buffer, cursor_mgr, context, item, preview_state) -> lle_result_t`
+- `lle_splicer_render_for_context(text, quote_state, pool, &rendered) -> lle_result_t`
+- `lle_splicer_close_char(quote_state) -> char` (returns `'\0'` for NONE/ESCAPE_PENDING)
 
 ## 9. Expansion Pipeline
 
 When the analyzer determines the typed shell-word contains expansion operators, the engine routes through `src/expand.c` to evaluate them, with these mode flags:
 - `EXPAND_NOCMD` defaults to OFF for completion (matching `completion.eval_command_subst = true`, which is the default). When the user opts into safe-mode by setting that key to `false`, the flag is set so command substitutions are not evaluated during completion.
-- `EXPAND_NOGLOB` for the brace-handling smart path — the engine wants the brace expansion separately from glob expansion when computing per-branch directory targets.
+- `EXPAND_NOGLOB` for the brace-handling smart path -- the engine wants the brace expansion separately from glob expansion when computing per-branch directory targets.
 
 **Single-value expansions** (`~`, `~user`, `$VAR`, `${VAR}`, `${VAR:-...}`, `$((...))`):
 - For TAB-alone at expansion end: ask `src/expand.c` to fully resolve, replace the user's typed expansion bytes with the resolved value, append space.
@@ -185,9 +185,9 @@ When the analyzer determines the typed shell-word contains expansion operators, 
 **Command substitution / backticks**:
 - Default (matches bash/zsh): evaluate via `src/expand.c` (which spawns the subshell). TAB-alone at end of `$(...)` resolves the subshell output and appends a space. TAB after `$(...)/<prefix>` evaluates the subshell, uses the result as the resolved directory, completes the filename inside it. The user's typed `$(...)` bytes are preserved per the standing rule (only the post-`/` filename portion is replaced).
 - Alt (`completion.eval_command_subst = false`, safe-mode): treat as opaque. TAB-alone at end of `$(...)` appends a space without evaluation. TAB after `$(...)/<prefix>` refuses (no buffer change) since the engine cannot know the resolved directory without running the subshell.
-- TAB inside the subshell (cursor between the parens, completing the command name within `$(ls<TAB>...)`) is a future feature regardless of mode — see Section 16.
+- TAB inside the subshell (cursor between the parens, completing the command name within `$(ls<TAB>...)`) is a future feature regardless of mode -- see Section 16.
 
-**Cursor inside an in-progress expansion** (e.g., `echo $HO<TAB>` — cursor mid-variable-name):
+**Cursor inside an in-progress expansion** (e.g., `echo $HO<TAB>` -- cursor mid-variable-name):
 - Analyzer's `expansion_kind = VARIABLE_NAME` (or `BRACED_VARIABLE_NAME`, etc.).
 - Engine dispatches to the variable-name source (not the file source). Splicer treats this as non-path completion (no `/` splitting); replaces user's typed `HO` with `HOME`. The leading `$` is preserved (it's outside `expansion_prefix_end`).
 
@@ -195,100 +195,100 @@ When the analyzer determines the typed shell-word contains expansion operators, 
 
 Concrete traces of every defining scenario.
 
-### 10.1 `cat my<TAB>` — single match, no quote
+### 10.1 `cat my<TAB>` -- single match, no quote
 
 - Buffer: `cat my`, cursor at byte 6.
 - Analyzer: `word_start=4`, `quote_state=NONE`, `expansion_prefix_end=4`, `filename_portion_start=4`, `dequoted_filename_prefix="my"`, `context_type=ARGUMENT`, `command_name="cat"`.
 - Engine dispatches to file source with `query.prefix="my"`, `query.expanded_directory=getcwd()`.
 - Source returns `[{text: "my file.txt", type: FILE}]`.
-- Single match → splicer accept-phase. `delete_range=[4,6)`, render `"my file.txt"` for `NONE` → `"my\ file.txt"`, suffix = `" "` (file, no quote). Result: `cat my\ file.txt `.
+- Single match -> splicer accept-phase. `delete_range=[4,6)`, render `"my file.txt"` for `NONE` -> `"my\ file.txt"`, suffix = `" "` (file, no quote). Result: `cat my\ file.txt `.
 - Cursor at byte 17.
 
-### 10.2 `cat "my fi<TAB>` — single match, double-quote open
+### 10.2 `cat "my fi<TAB>` -- single match, double-quote open
 
 - Buffer: `cat "my fi`, cursor at byte 10.
 - Analyzer: `word_start=4` (the open `"`), `quote_state=DOUBLE`, `filename_portion_start=5` (one past the open `"`), `dequoted_filename_prefix="my fi"`, `context_type=ARGUMENT`, `command_name="cat"`.
 - Engine: file source, `query.prefix="my fi"`.
 - Source returns `[{text: "my file.txt", type: FILE}]`.
-- Splicer: `delete_range=[5,10)`, render `"my file.txt"` for `DOUBLE` → `"my file.txt"` (no escape needed inside double quotes for spaces), suffix = `"\" "` (close-double-quote + space). Result: `cat "my file.txt" `.
+- Splicer: `delete_range=[5,10)`, render `"my file.txt"` for `DOUBLE` -> `"my file.txt"` (no escape needed inside double quotes for spaces), suffix = `"\" "` (close-double-quote + space). Result: `cat "my file.txt" `.
 
-### 10.3 `cat 'my fi<TAB>` — single match, single-quote open
+### 10.3 `cat 'my fi<TAB>` -- single match, single-quote open
 
 - Same as 10.2 but `quote_state=SINGLE`, suffix = `"' "` (close-single-quote + space). Result: `cat 'my file.txt' `.
 
-### 10.4 `cat my\ fi<TAB>` — single match, backslash-escape style
+### 10.4 `cat my\ fi<TAB>` -- single match, backslash-escape style
 
 - Buffer: `cat my\ fi`, cursor at byte 10.
 - Analyzer: `word_start=4`, `quote_state=NONE`, the analyzer walks the `\ ` sequence and treats them as part of the same shell-word; `filename_portion_start=4`, `dequoted_filename_prefix="my fi"` (the `\ ` dequoted to a literal space), `context_type=ARGUMENT`.
 - Engine: file source, `query.prefix="my fi"`.
 - Source returns `[{text: "my file.txt", type: FILE}]`.
-- Splicer: `delete_range=[4,10)`, render for `NONE` → `"my\ file.txt"`, suffix = `" "`. Result: `cat my\ file.txt `.
+- Splicer: `delete_range=[4,10)`, render for `NONE` -> `"my\ file.txt"`, suffix = `" "`. Result: `cat my\ file.txt `.
 
-Note: the user's chosen escape style (backslash) is reflected in the splicer output because the rendering rule for `NONE` happens to produce backslash-escape — the engine doesn't track "user prefers backslash" as a separate flag; the `quote_state=NONE` rule produces the same byte shape the user already typed.
+Note: the user's chosen escape style (backslash) is reflected in the splicer output because the rendering rule for `NONE` happens to produce backslash-escape -- the engine doesn't track "user prefers backslash" as a separate flag; the `quote_state=NONE` rule produces the same byte shape the user already typed.
 
-### 10.5 `cd "my <TAB>` — single match, directory, double-quote open
+### 10.5 `cd "my <TAB>` -- single match, directory, double-quote open
 
 - Buffer: `cd "my `, cursor at byte 7.
 - Analyzer: `word_start=3`, `quote_state=DOUBLE`, `filename_portion_start=4`, `dequoted_filename_prefix="my "`, `context_type=ARGUMENT`, `command_name="cd"`.
 - Engine: file source (filtered to directories because `command_name == "cd"`), `query.prefix="my "`.
 - Source returns `[{text: "My Documents", type: DIRECTORY}]`.
-- Splicer: `delete_range=[4,7)`, render `"My Documents"` for `DOUBLE` → `"My Documents"`, suffix = `"/"` (dir → no close, just slash). Result: `cd "My Documents/`. Cursor inside the still-open quote, ready for next TAB.
+- Splicer: `delete_range=[4,7)`, render `"My Documents"` for `DOUBLE` -> `"My Documents"`, suffix = `"/"` (dir -> no close, just slash). Result: `cd "My Documents/`. Cursor inside the still-open quote, ready for next TAB.
 
-### 10.6 `cat ~/Doc<TAB>` — single match, tilde + path
+### 10.6 `cat ~/Doc<TAB>` -- single match, tilde + path
 
 - Buffer: `cat ~/Doc`, cursor at byte 9.
 - Analyzer: `word_start=4`, `quote_state=NONE`, `expansion_prefix_end=6` (after `~/`), `filename_portion_start=6`, `dequoted_filename_prefix="Doc"`, expansion-prefix bytes (`~/`) preserved.
 - Engine resolves `~/` via `src/expand.c` to `/home/user/`, sets `query.expanded_directory="/home/user/"`, `query.prefix="Doc"`.
 - Source returns `[{text: "Documents", type: DIRECTORY}]`.
-- Splicer: `delete_range=[6,9)`, render `"Documents"` for `NONE` → `"Documents"`, suffix = `"/"`. Result: `cat ~/Documents/`. The user's `~/` is untouched.
+- Splicer: `delete_range=[6,9)`, render `"Documents"` for `NONE` -> `"Documents"`, suffix = `"/"`. Result: `cat ~/Documents/`. The user's `~/` is untouched.
 
-### 10.7 `cat $HOME/Doc<TAB>` — single match, variable + path
+### 10.7 `cat $HOME/Doc<TAB>` -- single match, variable + path
 
 - Same as 10.6 with `expansion_prefix_end=11` (after `$HOME/`). Engine resolves `$HOME` via `src/expand.c`. Result: `cat $HOME/Documents/`. The user's `$HOME/` is preserved.
 
-### 10.8 `echo $HO<TAB>` — variable name completion
+### 10.8 `echo $HO<TAB>` -- variable name completion
 
 - Buffer: `echo $HO`, cursor at byte 8.
 - Analyzer: `word_start=5` (the `$`), `expansion_kind=VARIABLE_NAME`, `filename_portion_start=6` (one past the `$`), `dequoted_filename_prefix="HO"`.
 - Engine dispatches to the variable-name source. Source returns `[{text: "HOME", type: VARIABLE}, {text: "HOSTNAME", type: VARIABLE}]`.
-- Multi-match → menu. Preview phase splices `HOME` after the `$`. ENTER: variables get `" "` suffix (no path semantics, treat as accepted word). Result: `echo $HOME `.
+- Multi-match -> menu. Preview phase splices `HOME` after the `$`. ENTER: variables get `" "` suffix (no path semantics, treat as accepted word). Result: `echo $HOME `.
 
-### 10.9 `echo $HOME<TAB>` — TAB at end of variable name (resolved by engine env-lookup)
+### 10.9 `echo $HOME<TAB>` -- TAB at end of variable name (resolved by engine env-lookup)
 
 - Buffer: `echo $HOME`, cursor at byte 10.
-- Analyzer: `word_start=5`, `quote_state=NONE`, `expansion_prefix_end=10`, `filename_portion_start=10` (no further word content), `expansion_kind=VARIABLE_NAME`, `context_type=VARIABLE_NAME`. The analyzer is purely structural — it cannot tell whether `$HOME` is a "complete" env variable or a partial the user might extend; it always reports VARIABLE_NAME for `$NAME` at end of word.
-- Engine: this is the TAB-on-variable-name case. Engine queries the variables source with prefix `"HOME"`. Source returns exactly one match equal to the typed prefix (`HOME`). Engine treats this as the resolve-on-complete case: resolves `$HOME` via `src/expand.c` to `/home/user`, replaces user's typed `$HOME` (bytes 5–10) with `/home/user `, suffix = `" "`. Result: `echo /home/user `. If the source had returned multiple matches or none equal-prefix, the engine would offer a completion menu instead.
+- Analyzer: `word_start=5`, `quote_state=NONE`, `expansion_prefix_end=10`, `filename_portion_start=10` (no further word content), `expansion_kind=VARIABLE_NAME`, `context_type=VARIABLE_NAME`. The analyzer is purely structural -- it cannot tell whether `$HOME` is a "complete" env variable or a partial the user might extend; it always reports VARIABLE_NAME for `$NAME` at end of word.
+- Engine: this is the TAB-on-variable-name case. Engine queries the variables source with prefix `"HOME"`. Source returns exactly one match equal to the typed prefix (`HOME`). Engine treats this as the resolve-on-complete case: resolves `$HOME` via `src/expand.c` to `/home/user`, replaces user's typed `$HOME` (bytes 5-10) with `/home/user `, suffix = `" "`. Result: `echo /home/user `. If the source had returned multiple matches or none equal-prefix, the engine would offer a completion menu instead.
 
-### 10.10 `cat {a,b}/Doc<TAB>` — brace expansion with intersection completion
+### 10.10 `cat {a,b}/Doc<TAB>` -- brace expansion with intersection completion
 
 - Buffer: `cat {a,b}/Doc`, cursor at byte 13.
 - Analyzer: `word_start=4`, `quote_state=NONE`, `expansion_kind=BRACE_LIST`, the brace evaluates to branches `{a, b}`, `expansion_prefix_end=10` (after `{a,b}/`), `filename_portion_start=10`, `dequoted_filename_prefix="Doc"`, `multivalue_expansion_set=[(a/, "Doc"), (b/, "Doc")]`.
-- Engine queries the file source once per branch. Results: `a/` returns `[{text: "Documents", type: DIRECTORY}]`; `b/` returns `[{text: "Documents", type: DIRECTORY}]`. **Intersection** non-empty → smart completion path.
+- Engine queries the file source once per branch. Results: `a/` returns `[{text: "Documents", type: DIRECTORY}]`; `b/` returns `[{text: "Documents", type: DIRECTORY}]`. **Intersection** non-empty -> smart completion path.
 - Splicer: `delete_range=[10,13)`, render `"Documents"`, suffix = `"/"`. Result: `cat {a,b}/Documents/`. Brace shorthand preserved.
 
 If only `a/Documents/` existed and `b/Documents/` did not, the intersection would be empty. Engine falls back to bash/zsh-style inline expansion: replace user's typed `{a,b}/Doc` with `a/Doc b/Doc `.
 
-### 10.11 `cat *.tx<TAB>` — glob inline expansion (default)
+### 10.11 `cat *.tx<TAB>` -- glob inline expansion (default)
 
 - Buffer: `cat *.tx`, cursor at byte 8.
 - Analyzer: `expansion_kind=GLOB`, glob matches in `getcwd()` are e.g. `foo.txt, bar.txt, baz.txt`.
 - Engine inline-expands: replace user's typed `*.tx` with `foo.txt bar.txt baz.txt `, append space. Result: `cat foo.txt bar.txt baz.txt `.
 
-When `completion.glob_mode = preserve_form`, engine instead just appends a space → `cat *.tx ` (treats as opaque).
+When `completion.glob_mode = preserve_form`, engine instead just appends a space -> `cat *.tx ` (treats as opaque).
 
-### 10.12 `git checkout feat<TAB>` — custom source, candidate may contain `/`
+### 10.12 `git checkout feat<TAB>` -- custom source, candidate may contain `/`
 
 - Buffer: `git checkout feat`, cursor at byte 17.
 - Analyzer: `word_start=13`, `quote_state=NONE`, `filename_portion_start=13` (no `/` in user's word), `dequoted_filename_prefix="feat"`, `context_type=ARGUMENT`, `command_name="git"`.
 - Engine dispatches to a custom git source. Source returns `[{text: "feature/foo", type: CUSTOM}, {text: "feature/bar", type: CUSTOM}]`.
-- Multi-match → menu. Preview splices `feature/foo` for `NONE` (slashes are not shell-special so no escape; only spaces, etc., would). On accept: suffix = `" "`. Result: `git checkout feature/foo `.
+- Multi-match -> menu. Preview splices `feature/foo` for `NONE` (slashes are not shell-special so no escape; only spaces, etc., would). On accept: suffix = `" "`. Result: `git checkout feature/foo `.
 
-### 10.13 `set -o err<TAB>` — builtin arg, no path
+### 10.13 `set -o err<TAB>` -- builtin arg, no path
 
 - Buffer: `set -o err`, cursor at byte 10.
 - Analyzer: `context_type=ARGUMENT`, `command_name="set"`, `arg_index=1`, `dequoted_filename_prefix="err"`.
 - Engine dispatches to the builtin-args source for `set`. Source returns `[{text: "errexit", type: BUILTIN}]`.
-- Single match → accept-phase. Result: `set -o errexit `.
+- Single match -> accept-phase. Result: `set -o errexit `.
 
 ## 11. What Gets Deleted
 
@@ -305,9 +305,9 @@ When `completion.glob_mode = preserve_form`, engine instead just appends a space
 ## 12. What Gets Created or Modified
 
 **Created:**
-- `include/lle/completion/word_context.h`, `src/lle/completion/word_context.c` — new analyzer.
-- `include/lle/completion/splicer.h`, `src/lle/completion/splicer.c` — new splicer + escape rendering.
-- `include/lle/completion/completion_query.h` — new `lle_completion_query_t` type and constructors. (Could live inside `word_context.h`; separation is for testability.)
+- `include/lle/completion/word_context.h`, `src/lle/completion/word_context.c` -- new analyzer.
+- `include/lle/completion/splicer.h`, `src/lle/completion/splicer.c` -- new splicer + escape rendering.
+- `include/lle/completion/completion_query.h` -- new `lle_completion_query_t` type and constructors. (Could live inside `word_context.h`; separation is for testability.)
 
 **Modified:**
 - All sources in `src/lle/completion/completion_sources.c` rewritten to:
@@ -316,12 +316,12 @@ When `completion.glob_mode = preserve_form`, engine instead just appends a space
   - Use `query.unicode_compare` for prefix matching.
   - For file/directory sources: use `query.expanded_directory` directly (no internal expansion).
 - `src/lle/completion/completion_system.c::lle_completion_system_generate` rewritten to call the new analyzer + new query construction + dispatch sources via the new contract.
-- `src/lle/completion/source_manager.c` — adapt source registration to the new signature.
+- `src/lle/completion/source_manager.c` -- adapt source registration to the new signature.
 - `src/lle/keybinding/keybinding_actions.c::lle_complete` and `lle_accept_line` rewritten to use the analyzer + splicer.
-- `src/lle/completion/builtin_completions.c` — adapt builtin-arg sources to the new contract.
-- `src/lle/completion/custom_source.c` — adapt the plugin source registration.
-- `src/lle/completion/completion_menu_*.c` — adapt menu rendering to render each candidate in the active `quote_state` (calls the splicer's render function).
-- `src/config.c` — register the four new config keys (D-9, D-10, D-12, D-15).
+- `src/lle/completion/builtin_completions.c` -- adapt builtin-arg sources to the new contract.
+- `src/lle/completion/custom_source.c` -- adapt the plugin source registration.
+- `src/lle/completion/completion_menu_*.c` -- adapt menu rendering to render each candidate in the active `quote_state` (calls the splicer's render function).
+- `src/config.c` -- register the four new config keys (D-9, D-10, D-12, D-15).
 
 **Untouched (continue to work as today):**
 - `src/lle/completion/ssh_hosts.c` (data layer; gets adapted to new source signature, internals unchanged).
@@ -343,7 +343,7 @@ Ordered atomic commits. Each one compiles and passes the existing test suite. Ea
 | 7 | `LLE: delete suffix field, drive accept behavior from item type` | Remove `lle_completion_item_t::suffix` and every site that sets it. |
 | 8 | `LLE: register completion config keys` | The four new keys + `display lle completion ...` builtin sugar. Defaults match the doc. |
 | 9 | `LLE: implement brace and glob expansion paths` | Tests cover D-10, D-11, D-12 walkthroughs. |
-| 10 | `LLE: implement $(...) evaluation default and safe-mode config opt-in` | Tests cover D-9 walkthrough — bash/zsh-style evaluation is default; `completion.eval_command_subst = false` switches to safe-mode (opaque, no evaluation). |
+| 10 | `LLE: implement $(...) evaluation default and safe-mode config opt-in` | Tests cover D-9 walkthrough -- bash/zsh-style evaluation is default; `completion.eval_command_subst = false` switches to safe-mode (opaque, no evaluation). |
 | 11 | `LLE: delete lle_completion_expand_*, replace_word_at_cursor` | Final cleanup. After this, no completion-related code exists outside the new modules. |
 | 12 | `LLE: cross-platform NFC normalization in source prefix matching` | Verifies that NFD names from macOS readdir get normalized to NFC at ingest before comparison. Tests on a macOS-style fixture. |
 
@@ -355,7 +355,7 @@ Tests are added under `tests/lle/unit/`, `tests/lle/functional/`, and `tests/lle
 
 **Unit tests (analyzer):**
 - For each of the 13 walkthrough scenarios in Section 10, a test that constructs the buffer + cursor and asserts on every analyzer field.
-- Multiline buffer cases: `if test -f /tmp/foo\nthen\n  cat /tmp/<TAB>\nfi` — analyzer correctly identifies the cursor's enclosing context.
+- Multiline buffer cases: `if test -f /tmp/foo\nthen\n  cat /tmp/<TAB>\nfi` -- analyzer correctly identifies the cursor's enclosing context.
 - Quote-state edge cases: cursor right at an open quote (`cat "<TAB>`), cursor right after a close quote, cursor inside an escape-pending state (`cat \<TAB>`), cursor inside `$(echo "nested")<TAB>`, cursor inside heredoc body.
 - NFC normalization: a candidate filename in NFD bytes is matched against an NFC-typed prefix.
 
@@ -366,26 +366,26 @@ Tests are added under `tests/lle/unit/`, `tests/lle/functional/`, and `tests/lle
 
 **Functional tests:**
 - End-to-end: each walkthrough scenario simulated through `lle_complete` on a test buffer; final buffer state asserted.
-- Multi-match cycling: TAB cycles, ESC restores, ENTER finalizes — each transition asserted.
+- Multi-match cycling: TAB cycles, ESC restores, ENTER finalizes -- each transition asserted.
 - Configuration toggles: every config key from Section 5 toggled; the corresponding behavior change asserted.
 
-**Compliance test (`spec_12_completion_compliance.c`):** updated to assert the architectural invariants — sources never see the user's typed shell-source prefix, splicer is the only function mutating the buffer in completion code paths, etc.
+**Compliance test (`spec_12_completion_compliance.c`):** updated to assert the architectural invariants -- sources never see the user's typed shell-source prefix, splicer is the only function mutating the buffer in completion code paths, etc.
 
 **Cross-shell compatibility tests** (per `project-polyglot-identity.md`): a small corpus of completion scenarios exercised in lush, bash (subset), and zsh (subset); assertions on the user-visible buffer state on accept.
 
 ## 15. Open Implementation Questions
 
-These don't gate the design — they're items to settle in code review.
+These don't gate the design -- they're items to settle in code review.
 
 1. The exact API by which the splicer accesses the buffer's change-tracking. Probably the existing `lle_buffer_replace_text` is enough since it already creates a single atomic change-tracker entry; verify before committing.
 2. Whether `lle_completion_query_t` carries the analyzer's full `lle_word_context_t` by reference, or copies the relevant fields. Reference is cheaper but couples query lifetime to context lifetime.
-3. The precise enumeration of `expansion_kind` for backslash-escape-pending state — there's no expansion underway, but the cursor is in a state where the next byte will be escaped. Treating this as `expansion_kind=NONE` with `quote_state=ESCAPE_PENDING` may be cleaner than introducing an `ESCAPE_PENDING` expansion kind.
+3. The precise enumeration of `expansion_kind` for backslash-escape-pending state -- there's no expansion underway, but the cursor is in a state where the next byte will be escaped. Treating this as `expansion_kind=NONE` with `quote_state=ESCAPE_PENDING` may be cleaner than introducing an `ESCAPE_PENDING` expansion kind.
 4. How the menu renderer is told which `quote_state` to render against. Probably part of the menu state that's already kept across cycles; verify in the existing menu code before committing.
 5. Whether the unicode comparison primitive needs a dedicated "filename prefix match" function in `src/lle/unicode/unicode_compare.c` or whether existing functions suffice. Investigate before adding new ones (per `feedback-lush-already-has-it.md`).
 
 ## 16. Out of the Way (Not in This Rewrite)
 
-Things that are real future features but explicitly not part of this work — listed so they don't leak in by accident.
+Things that are real future features but explicitly not part of this work -- listed so they don't leak in by accident.
 
 - A `hash -d`-equivalent named-directory feature (zsh-style). When added later, `~name<TAB>` could menu the named directories. The completion engine's analyzer is designed to accommodate it (`expansion_kind` would gain `NAMED_DIR`), but the feature itself is not built here.
 - Fuzzy matching across candidates. The current architecture supports adding it later as a result-filtering layer; not built here.

@@ -24,13 +24,13 @@ For a candidate `path/to/upstream.sh`:
 
 ```
 ingest.sh
-  ├── scan-violations.sh          (1) detect non-hermetic constructs
-  ├── hermeticize.sh              (2) apply standard transforms
-  ├── header-template.sh          (3) generate provenance header
-  ├── place under corpus/<bucket>/<set>/
-  ├── append to corpus/<bucket>/<set>/SOURCES.md
-  ├── append waivers to corpus/WAIVERS.md
-  └── run reference shell twice, refuse on non-determinism
+  +-- scan-violations.sh          (1) detect non-hermetic constructs
+  +-- hermeticize.sh              (2) apply standard transforms
+  +-- header-template.sh          (3) generate provenance header
+  +-- place under corpus/<bucket>/<set>/
+  +-- append to corpus/<bucket>/<set>/SOURCES.md
+  +-- append waivers to corpus/WAIVERS.md
+  +-- run reference shell twice, refuse on non-determinism
 ```
 
 The order matters: scan rejects hard violations before any transform

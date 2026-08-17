@@ -54,7 +54,7 @@
  * translation units (src/builtins/builtins.c, src/config.c,
  * src/display_integration.c, src/signals.c, the LLE shell-integration
  * sources) reference these symbols. Provide minimal in-target
- * replacements so the linker is satisfied — the fuzz session never
+ * replacements so the linker is satisfied -- the fuzz session never
  * exits cleanly anyway, so cleanup is not required.
  *
  * In src/lush.c global_executor is `static` (file-scope) and accessed
@@ -119,7 +119,7 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     /// the shell itself never spawns. The cap exists in case a stray
     /// fork() site is added later. The sanitizer runtime (ASan/UBSan)
     /// still needs to fork to spawn its external symbolizer when
-    /// formatting stack traces — a too-low cap silently breaks crash
+    /// formatting stack traces -- a too-low cap silently breaks crash
     /// reporting (symbolizer fork fails, stacks come back as raw
     /// addresses, libFuzzer exits with a non-standard code and no
     /// usable diagnostic). 256 leaves comfortable headroom for the
@@ -168,7 +168,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memcpy(input, data, size);
     input[size] = '\0';
 
-    /// Reject inputs containing literal NUL bytes — the executor's
+    /// Reject inputs containing literal NUL bytes -- the executor's
     /// command-line API can't see past them. The PARSER fuzzer already
     /// exercises NUL-byte handling at the parse layer; the executor
     /// fuzzer's job is the post-parse code.

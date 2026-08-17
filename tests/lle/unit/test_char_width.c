@@ -172,10 +172,10 @@ TEST(cjk_extension_c_through_g_wide) {
 
 TEST(hangul_syllables_wide) {
     /// U+AC00..U+D7A3
-    ASSERT_EQ(lle_codepoint_width(0xAC00), 2, "first syllable (가)");
-    ASSERT_EQ(lle_codepoint_width(0xC548), 2, "안");
-    ASSERT_EQ(lle_codepoint_width(0xB155), 2, "녕");
-    ASSERT_EQ(lle_codepoint_width(0xD7A3), 2, "last syllable (힣)");
+    ASSERT_EQ(lle_codepoint_width(0xAC00), 2, "first syllable (\xea\xb0\x80)");
+    ASSERT_EQ(lle_codepoint_width(0xC548), 2, "\xec\x95\x88");
+    ASSERT_EQ(lle_codepoint_width(0xB155), 2, "\xeb\x85\x95");
+    ASSERT_EQ(lle_codepoint_width(0xD7A3), 2, "last syllable (\xed\x9e\xa3)");
 }
 
 /* ============================================================================
@@ -187,14 +187,14 @@ TEST(hiragana_wide) {
     /// Per TR11, the Hiragana 'W' range is U+3041..U+3096 plus
     /// U+3099..U+309F. U+3040 itself is reserved/Neutral.
     ASSERT_EQ(lle_codepoint_width(0x3041), 2, "HIRAGANA LETTER SMALL A");
-    ASSERT_EQ(lle_codepoint_width(0x3042), 2, "あ");
+    ASSERT_EQ(lle_codepoint_width(0x3042), 2, "\xe3\x81\x82");
     ASSERT_EQ(lle_codepoint_width(0x309F), 2, "last hiragana block");
 }
 
 TEST(katakana_wide) {
     /// U+30A0..U+30FF
     ASSERT_EQ(lle_codepoint_width(0x30A0), 2, "first katakana block");
-    ASSERT_EQ(lle_codepoint_width(0x30AB), 2, "カ");
+    ASSERT_EQ(lle_codepoint_width(0x30AB), 2, "\xe3\x82\xab");
     ASSERT_EQ(lle_codepoint_width(0x30FF), 2, "last katakana block");
 }
 
@@ -229,7 +229,7 @@ TEST(fullwidth_forms_secondary_range_wide) {
  */
 
 TEST(emoji_main_block_wide) {
-    /// U+1F300..U+1F9FF — the dominant emoji blocks
+    /// U+1F300..U+1F9FF -- the dominant emoji blocks
     ASSERT_EQ(lle_codepoint_width(0x1F300), 2, "first emoji block");
     ASSERT_EQ(lle_codepoint_width(0x1F600), 2, "smiley");
     ASSERT_EQ(lle_codepoint_width(0x1F9FF), 2, "last in emoji block");
@@ -302,7 +302,7 @@ TEST(emoji_skin_tone_modifiers_wide) {
  */
 
 TEST(regional_indicators_wide) {
-    /// U+1F1E6..U+1F1FF — flag letters
+    /// U+1F1E6..U+1F1FF -- flag letters
     ASSERT_EQ(lle_codepoint_width(0x1F1E6), 2, "REGIONAL INDICATOR A");
     ASSERT_EQ(lle_codepoint_width(0x1F1FA), 2, "REGIONAL INDICATOR U");
     ASSERT_EQ(lle_codepoint_width(0x1F1FF), 2, "REGIONAL INDICATOR Z");
@@ -531,7 +531,7 @@ TEST(boundary_just_after_block_elements) {
 }
 
 /* ============================================================================
- * lle_is_wide_character() — should agree with width == 2
+ * lle_is_wide_character() -- should agree with width == 2
  * ============================================================================
  */
 
@@ -604,15 +604,20 @@ TEST(visible_width_ignores_escape_sequences) {
         size_t want;
         const char *what;
     } cases[] = {
-        {                      "hello", 5,                            "no escapes"},
-        {                           "", 0,                                 "empty"},
-        {         "\033[31mred\033[0m", 3,                            "SGR colour"},
-        {      "\033[?25labc\033[?25h", 3, "cursor hide/show: terminators l and h"},
-        {                  "\033[Kabc", 3,                         "erase line: K"},
-        {                 "\033[3~abc", 3,   "final byte ~, which is not a letter"},
-        {"\033[31m\xe3\x81\x82\033[0m", 2,         "wide character inside escapes"},
-        {               "\xe2\x80\x94", 1,        "em dash is one column, not two"},
-        {                  "e\xcc\x81", 1,       "base plus combining mark is one"},
+        {                             "hello", 5,                            "no escapes"},
+        {                                  "", 0,                                 "empty"},
+        {                "\033[31mred\033[0m", 3,                            "SGR colour"},
+        {             "\033[?25labc\033[?25h", 3, "cursor hide/show: terminators l and h"},
+        {                         "\033[Kabc", 3,                         "erase line: K"},
+        {                        "\033[3~abc", 3,   "final byte ~, which is not a letter"},
+        {       "\033[31m\xe3\x81\x82\033[0m", 2,         "wide character inside escapes"},
+        {                      "\xe2\x80\x94", 1,        "em dash is one column, not two"},
+        {                         "e\xcc\x81", 1,       "base plus combining mark is one"},
+        /// Readline's non-printing markers occupy no columns. The display
+        /// subsystem's equivalent already skipped them; both layers now
+        /// agree on the same input, which the prompt bridge relies on.
+        {"\001\033[31m\002red\001\033[0m\002", 3,             "readline-bracketed colour"},
+        {                       "\001\002abc", 3,                          "bare markers"},
     };
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {

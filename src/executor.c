@@ -3359,9 +3359,9 @@ cleanup:
 /* Runaway-loop safety: detect a loop body that fails with non-zero exit
  * status N consecutive times across at least T seconds. The "consecutive
  * non-zero" signal cleanly separates stuck-on-failure loops from any
- * legitimate idiom — counter loops, daemons (`while true; do work; done`),
+ * legitimate idiom -- counter loops, daemons (`while true; do work; done`),
  * read-line loops, retry-with-backoff that intermixes failures with
- * successes — none of which produce a long stretch of consecutive
+ * successes -- none of which produce a long stretch of consecutive
  * non-zero body exits. The wall-clock floor prevents tripping on
  * legitimate fast-fail-many-times-then-succeed retry patterns where the
  * full streak fits inside hundreds of milliseconds.
@@ -3601,7 +3601,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
         executor_error_add(
             executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
             "while loop body failed with status %d for %d consecutive "
-            "iterations over %d+ seconds — likely stuck "
+            "iterations over %d+ seconds \xe2\x80\x94 likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
             monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
@@ -3734,7 +3734,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
         executor_error_add(
             executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
             "until loop body failed with status %d for %d consecutive "
-            "iterations over %d+ seconds — likely stuck "
+            "iterations over %d+ seconds \xe2\x80\x94 likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
             monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
@@ -4392,7 +4392,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
         executor_error_add(
             executor, SHELL_ERR_LOOP_LIMIT, for_node->loc,
             "for loop body failed with status %d for %d consecutive "
-            "iterations over %d+ seconds — likely stuck "
+            "iterations over %d+ seconds \xe2\x80\x94 likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
             monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
@@ -4633,7 +4633,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         executor_error_add(
             executor, SHELL_ERR_LOOP_LIMIT, for_arith_node->loc,
             "C-style for loop body failed with status %d for %d "
-            "consecutive iterations over %d+ seconds — likely stuck "
+            "consecutive iterations over %d+ seconds \xe2\x80\x94 likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
             monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
@@ -5119,7 +5119,7 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
             /// Use the shared type-aware expansion helper so anon-function
             /// args follow the same per-node-type semantics as regular
-            /// command arguments — single-quoted stays literal, double-
+            /// command arguments -- single-quoted stays literal, double-
             /// quoted expands variables, arith / command substitution /
             /// process substitution all dispatch correctly.
             argv[i++] = expand_arg_node(executor, arg);
@@ -6618,7 +6618,7 @@ char *expand_arg_node(executor_t *executor, node_t *node) {
 /**
  * @brief Expand an array reference with no subscript ($arr or ${arr}).
  *
- * Mode-aware semantics — matches what each shell's $arr / ${arr} form
+ * Mode-aware semantics -- matches what each shell's $arr / ${arr} form
  * actually produces:
  *   - bash:  first element only (equivalent to ${arr[0]})
  *   - zsh:   all elements joined by space (default IFS behavior)
@@ -8350,7 +8350,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             /// $var format - check if there's more text after variable name
             const char *p = text + 1; /// Skip $
             /// Find end of variable name. Uses the lush identifier
-            /// predicate so a non-ASCII name ($café, $Σ) extends to
+            /// predicate so a non-ASCII name ($cafe-acute, $Sigma) extends to
             /// its full Unicode extent when FEATURE_UNICODE_IDENTIFIERS
             /// is on; ASCII names hit the fast path.
             if (*p == '?' || *p == '$' || *p == '#' || *p == '*' || *p == '@' ||
@@ -10236,7 +10236,7 @@ static bool needs_brace_expansion(const char *str) {
  * @return Array of expanded strings (caller must free), or NULL on error
  */
 /* Returns the configured brace expansion result-count cap.
- * 0 means unbounded (matches bash/zsh — caller skips the limit check). */
+ * 0 means unbounded (matches bash/zsh -- caller skips the limit check). */
 static int brace_expansion_cap(void) {
     int cap = config.brace_expansion_max;
     return cap > 0 ? cap : 0;
@@ -10612,7 +10612,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
 
     /// Check if this is a SIMPLE range pattern (e.g. `1..10`, `a..z`,
     /// `1..10..2`). A range pattern has `..` and no top-level commas
-    /// and no nested braces — otherwise it's a comma-list whose items
+    /// and no nested braces -- otherwise it's a comma-list whose items
     /// happen to contain ranges (e.g. `{{1..3},{a..c}}`) and must be
     /// split on the outer commas first.
     bool is_range = false;
@@ -10766,7 +10766,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
 
         for (int i = 0; i < item_count; i++) {
             if (limit_hit) {
-                /// Already over cap — drain remaining originals
+                /// Already over cap -- drain remaining originals
                 /// cleanly to avoid leaks.
                 free(result[i]);
                 continue;
@@ -10822,7 +10822,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
                     } else {
-                        /// realloc failed — original was unmodified, but
+                        /// realloc failed -- original was unmodified, but
                         /// result[i] is now orphaned; free it to avoid
                         /// a leak under malloc pressure.
                         free(result[i]);
@@ -10849,7 +10849,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         free(result); /// Free original array
 
         if (limit_hit) {
-            /// Cap exceeded — release the partial accumulation cleanly
+            /// Cap exceeded -- release the partial accumulation cleanly
             /// and return the limit sentinel for the top-level caller.
             for (int j = 0; j < final_count; j++) {
                 free(final_results[j]);
@@ -11101,7 +11101,7 @@ static int execute_builtin_command(executor_t *executor, char **argv,
             /// stack for the duration of this builtin invocation.
             /// executor_error_report() (the canonical wrapper) walks
             /// the context stack at display time, so any error a
-            /// builtin emits — directly or via the wrapper — picks up
+            /// builtin emits -- directly or via the wrapper -- picks up
             /// this context frame automatically. Per-builtin sites no
             /// longer need to push it themselves.
             executor_push_context(executor, loc, "in builtin '%s'", argv[0]);
@@ -12996,7 +12996,7 @@ char *expand_variables_in_string(executor_t *executor, const char *str) {
                     /// Zsh bare-subscript form: $var[N] / $var[N,M].
                     /// Consume the bracket span so var_expr becomes
                     /// "$var[N]" rather than "$var" + literal "[N]".
-                    /// Gated on FEATURE_ZSH_BARE_SUBSCRIPT — bash mode
+                    /// Gated on FEATURE_ZSH_BARE_SUBSCRIPT -- bash mode
                     /// keeps the literal-[N]-after-$var semantic.
                     if (var_end > var_start && var_end < len &&
                         str[var_end] == '[' &&
@@ -13596,7 +13596,7 @@ static char *parse_parameter_expansion(executor_t *executor,
 
             /// Check for 'k' / 'v' flags (return keys / values for arrays).
             /// The combination 'kv' (or 'vk') asks for interleaved key/value
-            /// pairs and must be detected before the keys-only branch — see
+            /// pairs and must be detected before the keys-only branch -- see
             /// the (want_keys && want_values) handler below.
             bool want_keys = (strchr(flags, 'k') != NULL);
             bool want_values = (strchr(flags, 'v') != NULL);
@@ -13661,7 +13661,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         if (shell_mode_get() == SHELL_MODE_ZSH &&
                             !array->is_associative) {
                             /// zsh-mode special case: ${(kv)indexed_array}
-                            /// emits values only — zsh treats indexed arrays
+                            /// emits values only -- zsh treats indexed arrays
                             /// as having no meaningful "keys" so (kv) collapses
                             /// to (v). lush mode keeps the interleaved
                             /// indices+values form (curated pick: internally
@@ -13764,7 +13764,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             !array->is_associative) {
                             /// zsh-mode special case: ${(k)indexed_array} emits
                             /// values only (zsh treats indexed-array indices as
-                            /// not meaningfully "keys" — `(k)` collapses to
+                            /// not meaningfully "keys" -- `(k)` collapses to
                             /// `(v)`). lush mode keeps the existing 0-based
                             /// indices behavior (curated pick: more useful for
                             /// iteration / debugging than redundantly emitting
@@ -15292,7 +15292,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             /// through unchanged so the symtable helper's
                             /// built-in "from-end" handling fires.
                             /// lush/bash-mode (0-based): pass through
-                            /// directly. (Issue #68 — array half.)
+                            /// directly. (Issue #68 -- array half.)
                             if (!shell_mode_allows(
                                     FEATURE_ARRAY_ZERO_INDEXED)) {
                                 if (idx == 0) {
@@ -16686,7 +16686,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
         /// expand_variables_in_string already consumed the bracket span
         /// into var_text when FEATURE_ZSH_BARE_SUBSCRIPT is enabled, so
         /// if we see '[' after the name we route through
-        /// parse_parameter_expansion("var[N]") — same backend as the
+        /// parse_parameter_expansion("var[N]") -- same backend as the
         /// brace form ${var[N]}. Gating here is a defensive double-check;
         /// the primary gate is at the caller.
         if (name_len > 0 && var_name[name_len] == '[' &&
@@ -18023,9 +18023,10 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
         /// literal -- `printf "%s\n"`, `"user@host"`, and `"100% off"` all
         /// survive.  The tokenizer recognizes a bare sigil only at word start
         /// (never mid-word), so expanding `@`/`%` anywhere inside quotes here
-        /// would itself violate the SEMANTICS §3.6 invariant that quoting does
-        /// not change presentation: `echo user@host` and `echo "user@host"`
-        /// must agree.  Inside quotes, list interpolation uses the `$` form,
+        /// would itself violate the SEMANTICS S3.6 invariant that quoting
+        /// does not change presentation: `echo user@host` and `echo
+        /// "user@host"` must agree.  Inside quotes, list interpolation uses the
+        /// `$` form,
         /// `"${arr[@]}"`, handled below.
         if (str[i] == '$' && i + 1 < len) {
             /// NOTE: ANSI-C quoting $'...' is NOT expanded inside double quotes
@@ -18258,7 +18259,7 @@ static char *expand_quoted_string_prov(executor_t *executor, const char *str,
                     /// the bracket span so we pass "$var[N]" to
                     /// expand_variable, which routes it through
                     /// parse_parameter_expansion. Gated on
-                    /// FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
+                    /// FEATURE_ZSH_BARE_SUBSCRIPT -- bash mode keeps the
                     /// literal-[N]-after-$var semantic. Mirrors the
                     /// unquoted path in expand_variables_in_string.
                     if (var_name_len > 0 && var_start + var_name_len < len &&
@@ -18470,7 +18471,7 @@ static void initialize_job_control(executor_t *executor) {
     /// fuzzer's process group every iteration when stdin is a TTY,
     /// causing eventual SIGABRT after many iterations as accumulated
     /// signal state corrupts the process. The fuzz binary never needs
-    /// to take terminal control — it does not run external commands
+    /// to take terminal control -- it does not run external commands
     /// (LUSH_FUZZ_SANDBOX makes lush_fork() return -1) and has no
     /// interactive prompt. (Issue #75.)
     executor->shell_pgid = getpgrp();
@@ -20793,9 +20794,10 @@ static int execute_extended_test(executor_t *executor, node_t *test_node) {
  * @return 0 on success, 1 on error
  */
 /// Report a scalar->array kind-transition error (issue #621) -- the mirror of
-/// the §3.9 list->scalar E1134. Emitted only under strict value typing (lush
-/// mode), when an array element write or append would implicitly re-kind an
-/// existing scalar into a list. Requests a POSIX exit like the §3.9 gate.
+/// the S3.9 list->scalar E1134. Emitted only under strict value typing
+/// (lush mode), when an array element write or append would implicitly re-kind
+/// an existing scalar into a list. Requests a POSIX exit like the S3.9
+/// gate.
 static void report_scalar_kind_error(executor_t *executor,
                                      source_location_t loc, const char *name) {
     shell_error_t *err = shell_error_create(

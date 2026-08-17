@@ -28,7 +28,7 @@ echo ""
 report_violation() {
     local check_name="$1"
     local details="$2"
-    echo -e "${RED}✗ VIOLATION${NC}: $check_name"
+    echo -e "${RED}FAIL VIOLATION${NC}: $check_name"
     echo "  Details: $details"
     echo ""
     ((VIOLATIONS++))
@@ -38,7 +38,7 @@ report_violation() {
 report_warning() {
     local check_name="$1"
     local details="$2"
-    echo -e "${YELLOW}⚠ WARNING${NC}: $check_name"
+    echo -e "${YELLOW}WARNING WARNING${NC}: $check_name"
     echo "  Details: $details"
     echo ""
     ((WARNINGS++))
@@ -47,7 +47,7 @@ report_warning() {
 # Function to report pass
 report_pass() {
     local check_name="$1"
-    echo -e "${GREEN}✓ PASS${NC}: $check_name"
+    echo -e "${GREEN}OK PASS${NC}: $check_name"
     ((CHECKS++))
 }
 

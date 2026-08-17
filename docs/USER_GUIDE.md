@@ -227,7 +227,7 @@ LLE highlights your input in real-time:
   `/...`, relative `./...`, home `~/...`) and *kind* (regular file vs.
   directory vs. missing). Defaults: directories underlined green,
   missing paths red, regular files unhighlighted (let the line itself
-  speak). Themes can color every shape × kind slot independently or
+  speak). Themes can color every shape x kind slot independently or
   override the kind-only `path_file` / `path_dir` fallbacks. See the
   `[syntax]` section in `examples/theme.toml`.
 - **Errors**: Syntax errors indicated before execution
@@ -846,9 +846,9 @@ Lush v1.5.0 uses a unified TOML-based configuration system with XDG Base Directo
 
 ```
 ~/.config/lush/
-├── lushrc.toml          # Main configuration (TOML format)
-├── lushrc               # Optional shell script (sourced after lushrc.toml)
-└── themes/              # Theme files
++-- lushrc.toml          # Main configuration (TOML format)
++-- lushrc               # Optional shell script (sourced after lushrc.toml)
++-- themes/              # Theme files
 ```
 
 The shell respects `$XDG_CONFIG_HOME` if set, otherwise uses `~/.config`.

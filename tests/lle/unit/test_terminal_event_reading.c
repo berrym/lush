@@ -161,7 +161,7 @@ TEST(read_ascii_character) {
 }
 
 TEST(read_utf8_2byte) {
-    /// UTF-8 for 'é' (U+00E9) = C3 A9
+    /// UTF-8 for 'e-acute' (U+00E9) = C3 A9
     unsigned char data[] = {0xC3, 0xA9};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
     ASSERT(pipe_fd >= 0);
@@ -179,7 +179,7 @@ TEST(read_utf8_2byte) {
 
     ASSERT(result == LLE_SUCCESS);
     ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
-    ASSERT(event.data.character.codepoint == 0x00E9); /// é
+    ASSERT(event.data.character.codepoint == 0x00E9); /// e-acute
     ASSERT(event.data.character.byte_count == 2);
     ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xC3);
     ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0xA9);
@@ -191,7 +191,7 @@ TEST(read_utf8_2byte) {
 }
 
 TEST(read_utf8_3byte) {
-    /// UTF-8 for '€' (U+20AC) = E2 82 AC
+    /// UTF-8 for 'U+20AC' (U+20AC) = E2 82 AC
     unsigned char data[] = {0xE2, 0x82, 0xAC};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
     ASSERT(pipe_fd >= 0);
@@ -209,7 +209,7 @@ TEST(read_utf8_3byte) {
 
     ASSERT(result == LLE_SUCCESS);
     ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
-    ASSERT(event.data.character.codepoint == 0x20AC); /// €
+    ASSERT(event.data.character.codepoint == 0x20AC); /// U+20AC
     ASSERT(event.data.character.byte_count == 3);
     ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xE2);
     ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0x82);
@@ -222,7 +222,7 @@ TEST(read_utf8_3byte) {
 }
 
 TEST(read_utf8_4byte) {
-    /// UTF-8 for '𝄞' (U+1D11E) = F0 9D 84 9E
+    /// UTF-8 for 'U+1D11E' (U+1D11E) = F0 9D 84 9E
     unsigned char data[] = {0xF0, 0x9D, 0x84, 0x9E};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
     ASSERT(pipe_fd >= 0);
@@ -240,7 +240,7 @@ TEST(read_utf8_4byte) {
 
     ASSERT(result == LLE_SUCCESS);
     ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
-    ASSERT(event.data.character.codepoint == 0x1D11E); /// 𝄞
+    ASSERT(event.data.character.codepoint == 0x1D11E); /// U+1D11E
     ASSERT(event.data.character.byte_count == 4);
     ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xF0);
     ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0x9D);

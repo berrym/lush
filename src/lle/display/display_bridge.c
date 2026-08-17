@@ -298,26 +298,18 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
             prompt_layer_get_rendered_content(prompt_layer, prompt_buffer,
                                               sizeof(prompt_buffer));
 
-            /// Calculate visual width (excluding ANSI codes and readline
-            /// markers)
-            bool in_escape = false;
-            for (const char *p = prompt_buffer; *p; p++) {
-                if (*p == '\001' || *p == '\002')
-                    continue; /// Skip readline markers
-                if (*p == '\033') {
-                    in_escape = true;
-                    continue;
-                }
-                if (in_escape) {
-                    if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-                        *p == 'm') {
-                        in_escape = false;
-                    }
-                    continue;
-                }
-                if (*p >= 32)
-                    prompt_width++;
-            }
+            /// Visual width, escapes and readline markers excluded.
+            ///
+            /// This walk counted `*p >= 32` per BYTE, which is wrong twice
+            /// over. A UTF-8 continuation byte is 0x80-0xBF, so with SIGNED
+            /// char (this toolchain) it compares negative and a wide
+            /// character contributed ZERO columns; where char is unsigned it
+            /// contributed three. The same prompt measured differently per
+            /// platform, and prompt_width is what the cursor position is
+            /// computed from. Its escape scan also ended at the first letter,
+            /// so a sequence ending in `~` never terminated.
+            prompt_width =
+                lle_utf8_visible_width(prompt_buffer, strlen(prompt_buffer));
         }
 
         /// IMPORTANT: Per Replxx approach, LLE calculates cursor position
@@ -673,9 +665,9 @@ static void calculate_cursor_screen_position(const char *text,
         /// 3. Treat entire grapheme cluster as that width
         ///
         /// This handles:
-        /// - Base emoji + modifier → base determines width
-        /// - Base char + combining mark → base determines width
-        /// - ZWJ sequences → first emoji determines width
+        /// - Base emoji + modifier -> base determines width
+        /// - Base char + combining mark -> base determines width
+        /// - ZWJ sequences -> first emoji determines width
         uint32_t base_codepoint = 0;
         int decode_result = lle_utf8_decode_codepoint(
             grapheme_start, grapheme_bytes, &base_codepoint);

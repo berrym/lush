@@ -24,7 +24,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/// Callback state tracking — shared by completion-callback tests
+/// Callback state tracking -- shared by completion-callback tests
 static pthread_mutex_t callback_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t callback_cond = PTHREAD_COND_INITIALIZER;
 static int callback_count = 0;

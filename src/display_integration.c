@@ -1832,7 +1832,7 @@ void display_integration_print_layer_cache_report(void) {
                dc_total, layer_cache_stats.display_controller_hits,
                layer_cache_stats.display_controller_misses);
         printf("  Hit Rate: %.1f%% %s\n", dc_hit_rate,
-               dc_hit_rate >= 75.0 ? "✓" : "✗");
+               dc_hit_rate >= 75.0 ? "\xe2\x9c\x93" : "\xe2\x9c\x97");
     } else {
         printf("Display Controller Cache: No operations recorded\n");
     }
@@ -1849,7 +1849,7 @@ void display_integration_print_layer_cache_report(void) {
                ce_total, layer_cache_stats.composition_engine_hits,
                layer_cache_stats.composition_engine_misses);
         printf("  Hit Rate: %.1f%% %s\n", ce_hit_rate,
-               ce_hit_rate >= 75.0 ? "✓" : "✗");
+               ce_hit_rate >= 75.0 ? "\xe2\x9c\x93" : "\xe2\x9c\x97");
     } else {
         printf("Composition Engine Cache: No operations recorded\n");
     }
@@ -1866,8 +1866,9 @@ void display_integration_print_layer_cache_report(void) {
                cl_total, layer_cache_stats.command_layer_hits,
                layer_cache_stats.command_layer_misses);
         printf("  Hit Rate: %.1f%% %s\n", cl_hit_rate,
-               cl_hit_rate >= 80.0 ? "✓"
-                                   : "✗"); /// Command layer has 80% target
+               cl_hit_rate >= 80.0
+                   ? "\xe2\x9c\x93"
+                   : "\xe2\x9c\x97"); /// Command layer has 80% target
     } else {
         printf("Command Layer Cache: No operations recorded\n");
     }
@@ -1884,8 +1885,9 @@ void display_integration_print_layer_cache_report(void) {
                as_total, layer_cache_stats.autosuggestions_hits,
                layer_cache_stats.autosuggestions_misses);
         printf("  Hit Rate: %.1f%% %s\n", as_hit_rate,
-               as_hit_rate >= 70.0 ? "✓"
-                                   : "✗"); /// Autosuggestions has 70% target
+               as_hit_rate >= 70.0
+                   ? "\xe2\x9c\x93"
+                   : "\xe2\x9c\x97"); /// Autosuggestions has 70% target
     } else {
         printf("Autosuggestions Cache: No operations recorded\n");
     }
@@ -1902,7 +1904,7 @@ void display_integration_print_layer_cache_report(void) {
                pl_total, layer_cache_stats.prompt_layer_hits,
                layer_cache_stats.prompt_layer_misses);
         printf("  Hit Rate: %.1f%% %s\n", pl_hit_rate,
-               pl_hit_rate >= 75.0 ? "✓" : "✗");
+               pl_hit_rate >= 75.0 ? "\xe2\x9c\x93" : "\xe2\x9c\x97");
     } else {
         printf("Prompt Layer Cache: No operations recorded\n");
     }
@@ -1938,7 +1940,8 @@ bool display_integration_perf_monitor_report(bool detailed) {
     printf("  Hit Rate: %.1f%% (Target: >%.1f%%) %s\n",
            enhanced_perf_metrics.cache_hit_rate_current,
            enhanced_perf_metrics.cache_hit_rate_target,
-           enhanced_perf_metrics.cache_target_achieved ? "✓" : "✗");
+           enhanced_perf_metrics.cache_target_achieved ? "\xe2\x9c\x93"
+                                                       : "\xe2\x9c\x97");
 
     /// Display Timing Analysis
     printf("Display Timing:\n");
@@ -1947,7 +1950,9 @@ bool display_integration_perf_monitor_report(bool detailed) {
     printf("  Average: %.2fms (Target: <%.1fms) %s\n",
            enhanced_perf_metrics.display_time_avg_ms,
            enhanced_perf_metrics.display_time_target_ms,
-           enhanced_perf_metrics.display_timing_target_achieved ? "✓" : "✗");
+           enhanced_perf_metrics.display_timing_target_achieved
+               ? "\xe2\x9c\x93"
+               : "\xe2\x9c\x97");
 
     if (detailed && enhanced_perf_metrics.display_operations_measured > 0) {
         printf("  Range: %.2fms - %.2fms\n",
@@ -1992,11 +1997,11 @@ bool display_integration_perf_monitor_report(bool detailed) {
         /// Memory pool efficiency assessment
         printf("  Pool efficiency: ");
         if (pool_stats.pool_hit_rate > 80.0) {
-            printf("EXCELLENT ✓\n");
+            printf("EXCELLENT \xe2\x9c\x93\n");
         } else if (pool_stats.pool_hit_rate > 60.0) {
-            printf("GOOD ⚠\n");
+            printf("GOOD \xe2\x9a\xa0\n");
         } else {
-            printf("NEEDS OPTIMIZATION ✗\n");
+            printf("NEEDS OPTIMIZATION \xe2\x9c\x97\n");
         }
     }
 
@@ -2004,12 +2009,12 @@ bool display_integration_perf_monitor_report(bool detailed) {
     printf("Performance Status: ");
     if (enhanced_perf_metrics.cache_target_achieved &&
         enhanced_perf_metrics.display_timing_target_achieved) {
-        printf("TARGETS MET ✓\n");
+        printf("TARGETS MET \xe2\x9c\x93\n");
     } else if (enhanced_perf_metrics.cache_target_achieved ||
                enhanced_perf_metrics.display_timing_target_achieved) {
-        printf("PARTIAL ⚠\n");
+        printf("PARTIAL \xe2\x9a\xa0\n");
     } else {
-        printf("NEEDS OPTIMIZATION ✗\n");
+        printf("NEEDS OPTIMIZATION \xe2\x9c\x97\n");
     }
 
     printf("=====================================\n\n");

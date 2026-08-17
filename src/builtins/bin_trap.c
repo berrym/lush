@@ -70,8 +70,9 @@ int bin_trap(int argc, char **argv) {
                     }
                 }
             }
-            shell_error_set_suggestion(err, "trap [-l] [action] [signal ...] — "
-                                            "use -l to list supported signals");
+            shell_error_set_suggestion(
+                err, "trap [-l] [action] [signal ...] \xe2\x80\x94 "
+                     "use -l to list supported signals");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
@@ -109,8 +110,9 @@ int bin_trap(int argc, char **argv) {
                     }
                 }
             }
-            shell_error_set_suggestion(err, "trap [-l] [action] [signal ...] — "
-                                            "use -l to list supported signals");
+            shell_error_set_suggestion(
+                err, "trap [-l] [action] [signal ...] \xe2\x80\x94 "
+                     "use -l to list supported signals");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {

@@ -7,7 +7,7 @@ under the cursor to three shell variables the user composes
 surfaces around.**
 
 **Status**: shipped.
-**Spec lineage**: `docs/SEMANTICS.md` §8 (formerly deferred line
+**Spec lineage**: `docs/SEMANTICS.md` S8 (formerly deferred line
 "LLE real-time variable inspection -- inspection hooks on the
 command line").
 
@@ -28,7 +28,7 @@ live symbol table, and publishes three shell variables:
 The widget is the primitive. Surfaces are composed from the
 variables: a prompt segment that displays `$LUSH_INSPECT_VALUE`, a
 post-widget hook that writes it to a log, a status line, a transient
-tooltip. The widget is unbound by default — pick a key.
+tooltip. The widget is unbound by default -- pick a key.
 
 ```bash
 # In ~/.config/lush/lushrc or interactively:
@@ -184,7 +184,7 @@ inspectors, builtin diagnostic widgets, runtime metric viewers).
 
 ## See also
 
-- `docs/SEMANTICS.md` §3 -- the kind-tagged value model the inspector
+- `docs/SEMANTICS.md` S3 -- the kind-tagged value model the inspector
   reports.
 - `docs/features/sigil-conventions.md` -- the `$` / `@` / `%`
   presentation rules; the inspector currently reads `$`-form

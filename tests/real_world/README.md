@@ -21,23 +21,23 @@ See [HARNESS.md](HARNESS.md) for how the corpus pipeline works.
 
 ```
 tests/real_world/
-├── curated/                 # Hand-written, one-script-per-idiom
-│   ├── posix/               # POSIX-portable patterns (oracle: dash)
-│   ├── bash/                # Bash-leaning idioms     (oracle: bash)
-│   ├── zsh/                 # Zsh-leaning idioms      (oracle: zsh)
-│   └── lush/                # Polyglot intermix       (no oracle)
-├── corpus/                  # Upstream-sourced, harness-ingested
-│   ├── posix/               # e.g. corpus/posix/autoconf/*.sh
-│   ├── bash/                # e.g. corpus/bash/bash-completion/*.sh
-│   ├── zsh/                 # e.g. corpus/zsh/oh-my-zsh/*.sh
-│   ├── lush/
-│   ├── WAIVERS.md           # Top-level ledger of every hermeticity waiver
-│   └── <bucket>/<set>/      # Per-upstream-set subdirectory
-│       ├── SOURCES.md       # Upstream URL + commit per script
-│       └── *.sh             # Adapted scripts with provenance headers
-├── _harness/                # Curation tooling (ingest.sh, etc.)
-├── README.md
-└── HARNESS.md
++-- curated/                 # Hand-written, one-script-per-idiom
+|   +-- posix/               # POSIX-portable patterns (oracle: dash)
+|   +-- bash/                # Bash-leaning idioms     (oracle: bash)
+|   +-- zsh/                 # Zsh-leaning idioms      (oracle: zsh)
+|   +-- lush/                # Polyglot intermix       (no oracle)
++-- corpus/                  # Upstream-sourced, harness-ingested
+|   +-- posix/               # e.g. corpus/posix/autoconf/*.sh
+|   +-- bash/                # e.g. corpus/bash/bash-completion/*.sh
+|   +-- zsh/                 # e.g. corpus/zsh/oh-my-zsh/*.sh
+|   +-- lush/
+|   +-- WAIVERS.md           # Top-level ledger of every hermeticity waiver
+|   +-- <bucket>/<set>/      # Per-upstream-set subdirectory
+|       +-- SOURCES.md       # Upstream URL + commit per script
+|       +-- *.sh             # Adapted scripts with provenance headers
++-- _harness/                # Curation tooling (ingest.sh, etc.)
++-- README.md
++-- HARNESS.md
 ```
 
 Naming conventions:

@@ -65,7 +65,7 @@ print_section() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ CATEGORY: $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### CATEGORY: $1 ###${NC}"
 }
 
 run_test() {
@@ -84,12 +84,12 @@ run_test() {
 
     # Compare results
     if [ "$actual_output" = "$expected_output" ]; then
-        echo -e "  ${GREEN}✓${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${GREEN}OK${NC} Test $TOTAL_TESTS: $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         CAT_PASSED=$((CAT_PASSED + 1))
         return 0
     else
-        echo -e "  ${RED}✗${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${RED}FAIL${NC} Test $TOTAL_TESTS: $test_name"
         echo -e "    ${YELLOW}Expected:${NC} '$expected_output'"
         echo -e "    ${YELLOW}Actual:${NC}   '$actual_output'"
         echo -e "    ${YELLOW}Exit Code:${NC} $exit_code"
@@ -114,12 +114,12 @@ run_test_with_exit_code() {
 
     # Compare results
     if [ "$actual_output" = "$expected_output" ] && [ "$actual_exit_code" = "$expected_exit_code" ]; then
-        echo -e "  ${GREEN}✓${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${GREEN}OK${NC} Test $TOTAL_TESTS: $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         CAT_PASSED=$((CAT_PASSED + 1))
         return 0
     else
-        echo -e "  ${RED}✗${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${RED}FAIL${NC} Test $TOTAL_TESTS: $test_name"
         echo -e "    ${YELLOW}Expected Output:${NC} '$expected_output'"
         echo -e "    ${YELLOW}Actual Output:${NC}   '$actual_output'"
         echo -e "    ${YELLOW}Expected Exit:${NC}   $expected_exit_code"
@@ -159,12 +159,12 @@ run_test_error() {
     fi
 
     if [ "$has_error" = "true" ] && [ "$pattern_matches" = "true" ]; then
-        echo -e "  ${GREEN}✓${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${GREEN}OK${NC} Test $TOTAL_TESTS: $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         CAT_PASSED=$((CAT_PASSED + 1))
         return 0
     else
-        echo -e "  ${RED}✗${NC} Test $TOTAL_TESTS: $test_name"
+        echo -e "  ${RED}FAIL${NC} Test $TOTAL_TESTS: $test_name"
         echo -e "    ${YELLOW}Expected:${NC} Error condition (non-zero exit or error message)"
         echo -e "    ${YELLOW}Actual:${NC}   exit=$exit_code, output='$actual_output'"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -186,7 +186,7 @@ run_test_optional() {
     if ! echo "$feature_check" | $SHELL_UNDER_TEST >/dev/null 2>&1; then
         TOTAL_TESTS=$((TOTAL_TESTS + 1))
         SKIPPED_TESTS=$((SKIPPED_TESTS + 1))
-        echo -e "  ${YELLOW}⊘${NC} Test $TOTAL_TESTS: $test_name (skipped - feature not supported)"
+        echo -e "  ${YELLOW}SKIP${NC} Test $TOTAL_TESTS: $test_name (skipped - feature not supported)"
         # Don't count skipped tests against the shell
         return 0
     fi
@@ -1015,21 +1015,21 @@ calculate_final_score() {
         overall_score=$((weighted_sum / total_weight))
     fi
 
-    echo -e "\n${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "\n${PURPLE}===============================================================${NC}"
     echo -e "${PURPLE}OVERALL SHELL COMPLIANCE SCORE: ${overall_score}%${NC}"
-    echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}===============================================================${NC}"
 
     # Compliance level assessment
     if [ $overall_score -ge 95 ]; then
-        echo -e "${GREEN}🏆 EXCELLENT: Production-ready shell with full compliance${NC}"
+        echo -e "${GREEN}EXCELLENT: Production-ready shell with full compliance${NC}"
     elif [ $overall_score -ge 85 ]; then
-        echo -e "${GREEN}✅ VERY GOOD: High-quality shell suitable for most use cases${NC}"
+        echo -e "${GREEN}[OK] VERY GOOD: High-quality shell suitable for most use cases${NC}"
     elif [ $overall_score -ge 75 ]; then
-        echo -e "${YELLOW}⚠️  GOOD: Functional shell with some limitations${NC}"
+        echo -e "${YELLOW}WARN GOOD: Functional shell with some limitations${NC}"
     elif [ $overall_score -ge 60 ]; then
-        echo -e "${YELLOW}⚠️  FAIR: Basic shell functionality present${NC}"
+        echo -e "${YELLOW}WARN FAIR: Basic shell functionality present${NC}"
     else
-        echo -e "${RED}❌ NEEDS WORK: Significant functionality gaps${NC}"
+        echo -e "${RED}FAIL NEEDS WORK: Significant functionality gaps${NC}"
     fi
 
     echo -e "\n${CYAN}Test Summary:${NC}"
@@ -1059,14 +1059,14 @@ calculate_final_score() {
     # Recommendations
     echo -e "\n${CYAN}Development Recommendations:${NC}"
     if [ $overall_score -lt 95 ]; then
-        echo -e "  • Focus on categories scoring below 90%"
-        echo -e "  • Prioritize parameter expansion and arithmetic features"
-        echo -e "  • Enhance error handling and edge case support"
+        echo -e "  * Focus on categories scoring below 90%"
+        echo -e "  * Prioritize parameter expansion and arithmetic features"
+        echo -e "  * Enhance error handling and edge case support"
     fi
     if [ $overall_score -ge 90 ]; then
-        echo -e "  • Shell is approaching production readiness"
-        echo -e "  • Consider advanced feature implementation"
-        echo -e "  • Focus on performance optimization"
+        echo -e "  * Shell is approaching production readiness"
+        echo -e "  * Consider advanced feature implementation"
+        echo -e "  * Focus on performance optimization"
     fi
 
     return $overall_score

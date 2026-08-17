@@ -1,8 +1,8 @@
 #!/usr/bin/env lush
-# Lush kind-aware semantics (docs/SEMANTICS.md §3 -- the value model).
+# Lush kind-aware semantics (docs/SEMANTICS.md S3 -- the value model).
 # The engine distinguishes scalar / list / map at the value level;
 # `[@]` / `[*]` are presentation operators ON list values, not type
-# switches. The whole-word constraint (§3.9) makes presentation
+# switches. The whole-word constraint (S3.9) makes presentation
 # depend only on the subscript and never on quote context.
 #
 # This fixture exercises the kinds in positive shape -- showing that
@@ -50,7 +50,7 @@ for k in "${!config[@]}"; do
 done
 
 # --- Round-trip: append, then re-read ---
-# Use [*] (join via IFS) in scalar string context per SEMANTICS §3.9
+# Use [*] (join via IFS) in scalar string context per SEMANTICS S3.9
 # whole-word constraint; [@] is for vector-accepting positions.
 nums+=(6 7)
 echo "after-append:  ${nums[*]}"

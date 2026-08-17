@@ -30,11 +30,11 @@ The LLE prompt theme system currently bypasses traditional shell prompt variable
 ### 1.1 Current Architecture (Problem)
 
 ```
-Theme System ──► Composer ──► Segment Rendering ──► ANSI Output
-                                    │
-                                    └──► PS1/PS2 (overwritten as side effect)
-                                              │
-                                              └──► User sets PS1 ──► IGNORED next render
+Theme System --> Composer --> Segment Rendering --> ANSI Output
+                                    |
+                                    +--> PS1/PS2 (overwritten as side effect)
+                                              |
+                                              +--> User sets PS1 --> IGNORED next render
 ```
 
 The prompt composer owns the rendering pipeline. PS1/PS2 are write-only outputs. User-set values are silently overwritten on every prompt render cycle.
@@ -42,35 +42,35 @@ The prompt composer owns the rendering pipeline. PS1/PS2 are write-only outputs.
 ### 1.2 Target Architecture (v1.5.0)
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    PS1 / PS2 / PROMPT                     │
-│              (canonical format strings)                    │
-│                                                            │
-│  Sources that SET these variables:                         │
-│  ┌─────────────┐  ┌───────────┐  ┌───────────────────┐   │
-│  │ Theme TOML  │  │ User      │  │ Shell script       │   │
-│  │ [layout]    │  │ override  │  │ (lushrc, .bashrc)  │   │
-│  │ ps1 = "..." │  │ PS1='...' │  │ export PS1='...'   │   │
-│  └──────┬──────┘  └─────┬─────┘  └────────┬──────────┘   │
-│         │               │                  │               │
-│         └───────────────┴──────────────────┘               │
-│                         │                                  │
-│                    PS1 value                                │
-│                         │                                  │
-│              ┌──────────▼──────────┐                       │
-│              │   Prompt Renderer   │                       │
-│              │  (unified engine)   │                       │
-│              │                     │                       │
-│              │  Recognizes:        │                       │
-│              │  • \u \h \w \W \$   │  ← bash escapes      │
-│              │  • %n %m %~ %#      │  ← zsh escapes       │
-│              │  • ${segment}       │  ← LLE segments      │
-│              │  • ${?cond:t:f}     │  ← LLE conditionals  │
-│              │  • %F{color}...%f   │  ← zsh color         │
-│              └──────────┬──────────┘                       │
-│                         │                                  │
-│                    ANSI Output                             │
-└──────────────────────────────────────────────────────────┘
++----------------------------------------------------------+
+|                    PS1 / PS2 / PROMPT                     |
+|              (canonical format strings)                    |
+|                                                            |
+|  Sources that SET these variables:                         |
+|  +-------------+  +-----------+  +-------------------+   |
+|  | Theme TOML  |  | User      |  | Shell script       |   |
+|  | [layout]    |  | override  |  | (lushrc, .bashrc)  |   |
+|  | ps1 = "..." |  | PS1='...' |  | export PS1='...'   |   |
+|  +------+------+  +-----+-----+  +--------+----------+   |
+|         |               |                  |               |
+|         +---------------+------------------+               |
+|                         |                                  |
+|                    PS1 value                                |
+|                         |                                  |
+|              +----------v----------+                       |
+|              |   Prompt Renderer   |                       |
+|              |  (unified engine)   |                       |
+|              |                     |                       |
+|              |  Recognizes:        |                       |
+|              |  * \u \h \w \W \$   |  <- bash escapes      |
+|              |  * %n %m %~ %#      |  <- zsh escapes       |
+|              |  * ${segment}       |  <- LLE segments      |
+|              |  * ${?cond:t:f}     |  <- LLE conditionals  |
+|              |  * %F{color}...%f   |  <- zsh color         |
+|              +----------+----------+                       |
+|                         |                                  |
+|                    ANSI Output                             |
++----------------------------------------------------------+
 ```
 
 ### 1.3 Priority Order for PS1 Value
@@ -166,19 +166,19 @@ The prompt renderer must recognize all three syntax families. When a format stri
 ### 2.2 Syntax Disambiguation
 
 The three syntaxes are unambiguous:
-- `\` followed by a recognized escape letter → bash escape
-- `%` followed by a recognized escape letter/pattern → zsh escape
-- `${` → LLE segment/conditional syntax
+- `\` followed by a recognized escape letter -> bash escape
+- `%` followed by a recognized escape letter/pattern -> zsh escape
+- `${` -> LLE segment/conditional syntax
 - Literal `\`, `%`, `$` can be escaped: `\\`, `%%`, `\$`
 
 **Edge case**: `${var}` in PS1 could be a shell variable expansion OR an LLE segment reference. Resolution: LLE segment names are a known fixed set (`user`, `host`, `directory`, `git`, `time`, `status`, `jobs`, `symbol`). If the name matches a known segment, treat it as a segment reference. Otherwise, treat it as a shell variable expansion (expand from environment/symbol table). This matches how zsh handles PROMPT expansion.
 
 ### 2.3 Expansion Order
 
-1. **LLE segments** (`${segment}`, `${?cond:...}`) — expanded first, producing text that may contain ANSI codes
-2. **Shell variable expansion** (`${VAR}` for non-segment names) — standard parameter expansion
-3. **Prompt escapes** (`\u`, `%n`, etc.) — expanded to their values
-4. **Non-printing markers** (`\[...\]`, `%{...%}`) — processed for width calculation
+1. **LLE segments** (`${segment}`, `${?cond:...}`) -- expanded first, producing text that may contain ANSI codes
+2. **Shell variable expansion** (`${VAR}` for non-segment names) -- standard parameter expansion
+3. **Prompt escapes** (`\u`, `%n`, etc.) -- expanded to their values
+4. **Non-printing markers** (`\[...\]`, `%{...%}`) -- processed for width calculation
 
 This order ensures that segments can produce color codes that are then properly wrapped in non-printing markers.
 
@@ -381,7 +381,7 @@ User themes loaded from TOML files MUST be treated identically to built-in theme
 - Refactor from: `src/executor.c` `transform_prompt()` (bash escapes), `src/lle/prompt/template_engine.c` (LLE segments)
 
 **Deliverables**:
-- `lle_prompt_expand(const char *format, char *output, size_t output_size, lle_prompt_context_t *ctx)` — unified expansion function
+- `lle_prompt_expand(const char *format, char *output, size_t output_size, lle_prompt_context_t *ctx)` -- unified expansion function
 - Handles all escapes from Section 2.1
 - Uses segment rendering callbacks from existing template engine
 - Terminal-capability-aware color output (via cached detection)
@@ -391,9 +391,9 @@ User themes loaded from TOML files MUST be treated identically to built-in theme
 **Goal**: Invert the prompt rendering flow so PS1 is read, expanded, and rendered rather than being overwritten.
 
 **Files**:
-- Modify: `src/lle/prompt/composer.c` — read PS1 instead of generating from scratch
-- Modify: `src/lle/lle_shell_integration.c` — set PS1 from theme on activation, respect user overrides
-- Modify: `src/display/prompt_layer.c` — use expanded PS1 for display
+- Modify: `src/lle/prompt/composer.c` -- read PS1 instead of generating from scratch
+- Modify: `src/lle/lle_shell_integration.c` -- set PS1 from theme on activation, respect user overrides
+- Modify: `src/display/prompt_layer.c` -- use expanded PS1 for display
 
 **Deliverables**:
 - Theme activation sets PS1/PS2 (one-time, not every render)
@@ -406,8 +406,8 @@ User themes loaded from TOML files MUST be treated identically to built-in theme
 **Goal**: Ensure TOML theme files can fully configure every aspect of the prompt experience.
 
 **Files**:
-- Modify: `src/lle/prompt/theme_parser.c` — complete parsing for all sections
-- Modify: `src/lle/prompt/theme_loader.c` — complete loading for all fields
+- Modify: `src/lle/prompt/theme_parser.c` -- complete parsing for all sections
+- Modify: `src/lle/prompt/theme_loader.c` -- complete loading for all fields
 - Add: Per-segment configuration in `[segments.<name>]` sections
 - Verify: `examples/theme.toml` works end-to-end
 
@@ -423,8 +423,8 @@ User themes loaded from TOML files MUST be treated identically to built-in theme
 **Goal**: User-defined themes are fully equivalent to built-in themes. The system is ready for v1.5.0.
 
 **Files**:
-- Modify: `src/lle/prompt/theme.c` — ensure user themes have full feature parity
-- Modify: `src/builtins/builtins.c` — `theme` builtin for list/switch/reload
+- Modify: `src/lle/prompt/theme.c` -- ensure user themes have full feature parity
+- Modify: `src/builtins/builtins.c` -- `theme` builtin for list/switch/reload
 - Add: Theme validation and helpful error messages
 
 **Deliverables**:
@@ -496,7 +496,7 @@ For users upgrading to v1.5.0:
 - Theme activation sets PS1 correctly
 - User PS1 override is respected across multiple prompt renders
 - Theme switch after user override asks or restores correctly
-- TOML theme load → PS1 value matches `[layout] ps1`
+- TOML theme load -> PS1 value matches `[layout] ps1`
 - `PROMPT` alias bidirectionality
 
 ### 8.3 Compliance Tests
@@ -526,25 +526,25 @@ All prompt expansion, rendering, and comparison code MUST be UTF-8 and grapheme-
 
 ### 10.1 Core Principle
 
-Prompt content — usernames, hostnames, directory paths, git branch names, segment output — may contain arbitrary UTF-8 text including multi-byte characters (accented Latin, CJK, emoji, combining marks, ZWJ sequences). The prompt system must handle these correctly at every stage:
+Prompt content -- usernames, hostnames, directory paths, git branch names, segment output -- may contain arbitrary UTF-8 text including multi-byte characters (accented Latin, CJK, emoji, combining marks, ZWJ sequences). The prompt system must handle these correctly at every stage:
 
 - **Visual width**: Use `lle_utf8_string_width()` (not `strlen()`) for terminal column calculations. CJK characters occupy 2 columns; combining marks occupy 0 columns; emoji may occupy 2 columns.
 - **Grapheme counting**: Use `lle_utf8_count_graphemes()` when counting user-perceived characters (e.g., for truncation display like "show last N characters of path").
 - **Buffer truncation**: Never split a multi-byte UTF-8 sequence at buffer boundaries. When output must be truncated, back up to the last complete UTF-8 sequence (use `lle_utf8_sequence_length()` to validate).
-- **String comparison**: Use `lle_unicode_strings_equal()` with appropriate options when comparing user content where normalization matters (e.g., filename matching, branch name comparison). NFC normalization ensures that `"café"` matches `"café"` regardless of encoding form.
-- **Input validation**: Validate UTF-8 encoding with `lle_utf8_is_valid()` at system boundaries (reading PS1 from symtable, receiving segment output). Invalid UTF-8 must be handled gracefully — fall back to a safe default rather than producing corrupted terminal output.
+- **String comparison**: Use `lle_unicode_strings_equal()` with appropriate options when comparing user content where normalization matters (e.g., filename matching, branch name comparison). NFC normalization ensures that the decomposed spelling (`"cafe"` + U+0301 COMBINING ACUTE ACCENT) matches the precomposed one (`"caf"` + U+00E9), which are distinct byte sequences that display identically.
+- **Input validation**: Validate UTF-8 encoding with `lle_utf8_is_valid()` at system boundaries (reading PS1 from symtable, receiving segment output). Invalid UTF-8 must be handled gracefully -- fall back to a safe default rather than producing corrupted terminal output.
 - **Character width detection**: Use `lle_utf8_codepoint_width()` or `lle_is_wide_character()` for per-character width calculations when building display layouts.
 
 ### 10.2 When Byte-Level Operations Are Acceptable
 
 ASCII-only syntax parsing does not require Unicode-aware functions. The following are explicitly permitted as byte-level operations:
 
-- **Escape sequence syntax**: Parsing `\X` (bash), `%X` (zsh), `${...}` (LLE) — these syntaxes are defined as ASCII and cannot contain multi-byte characters in their syntax tokens.
+- **Escape sequence syntax**: Parsing `\X` (bash), `%X` (zsh), `${...}` (LLE) -- these syntaxes are defined as ASCII and cannot contain multi-byte characters in their syntax tokens.
 - **ANSI escape sequences**: CSI sequences (`ESC [ ... final_byte`) are 7-bit ASCII. Byte-level scanning for these is correct.
-- **Shell identifier comparison**: Comparing variable names (`PS1`, `PS2`, `PROMPT`) with `strcmp()` — POSIX shell identifiers are ASCII `[a-zA-Z_][a-zA-Z0-9_]*`.
-- **Color specification parsing**: Named colors (`red`, `blue`), numeric codes (`255`), hex codes (`#RRGGBB`) — these are ASCII by definition.
-- **Path separator scanning**: `strchr(path, '/')`, `strrchr(path, '/')` — the ASCII byte `0x2F` cannot appear as a continuation byte in valid UTF-8 multi-byte sequences, making byte-level search safe.
-- **Single-byte ASCII character emission**: Writing `\n`, `\r`, `\\`, `$`, `#`, `%`, `ESC`, `BEL` — these are 7-bit ASCII values.
+- **Shell identifier comparison**: Comparing variable names (`PS1`, `PS2`, `PROMPT`) with `strcmp()` -- POSIX shell identifiers are ASCII `[a-zA-Z_][a-zA-Z0-9_]*`.
+- **Color specification parsing**: Named colors (`red`, `blue`), numeric codes (`255`), hex codes (`#RRGGBB`) -- these are ASCII by definition.
+- **Path separator scanning**: `strchr(path, '/')`, `strrchr(path, '/')` -- the ASCII byte `0x2F` cannot appear as a continuation byte in valid UTF-8 multi-byte sequences, making byte-level search safe.
+- **Single-byte ASCII character emission**: Writing `\n`, `\r`, `\\`, `$`, `#`, `%`, `ESC`, `BEL` -- these are 7-bit ASCII values.
 
 The distinction is: **syntax is ASCII; content is UTF-8**. All content that originates from or passes through user-visible paths (environment values, filesystem names, command output) must use UTF-8-safe operations.
 
@@ -567,7 +567,7 @@ All phases of this specification MUST use the following LLE modules where applic
 **Phase 1 (Expansion Engine)**:
 - Buffer append operations must not split UTF-8 multi-byte sequences on truncation
 - UTF-8 input validation at `lle_prompt_expand()` entry point
-- Content substitutions (username, hostname, cwd) pass through as opaque UTF-8 bytes — correct by design since these functions return kernel/libc strings
+- Content substitutions (username, hostname, cwd) pass through as opaque UTF-8 bytes -- correct by design since these functions return kernel/libc strings
 
 **Phase 2 (PS1 as Format String)**:
 - UTF-8 validation of PS1/PS2 read from symtable before expansion

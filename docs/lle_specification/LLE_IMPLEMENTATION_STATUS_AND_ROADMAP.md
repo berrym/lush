@@ -108,43 +108,43 @@ These features exist only in specifications and are **explicitly deferred**:
 
 | Spec | Title | Implementation | Notes |
 |------|-------|----------------|-------|
-| 02 | Terminal Abstraction | ✅ 95% | Screen buffer added post-spec; working |
-| 03 | Buffer Management | ✅ 95% | Complete with UTF-8, undo/redo |
-| 04 | Event System | ✅ 90% | Shell event hub complete |
-| 05 | libhashtable Integration | ✅ 100% | Fully integrated |
-| 06 | Input Parsing | ✅ 90% | Escape sequences, UTF-8 working |
-| 07 | Extensibility Framework | ⚠️ 15% | Widget system only; no plugins |
-| 08 | Display Integration | ✅ 85% | Render pipeline working |
-| 09 | History System | ✅ 95% | Most comprehensive subsystem |
-| 10 | Autosuggestions | ⚠️ 70% | History-based working |
-| 11 | Syntax Highlighting | ✅ 85% | Full shell construct coverage, TOML theme colors |
-| 12 | Completion System | ✅ 95% | Menu, categories, sources, custom source API |
+| 02 | Terminal Abstraction | OK 95% | Screen buffer added post-spec; working |
+| 03 | Buffer Management | OK 95% | Complete with UTF-8, undo/redo |
+| 04 | Event System | OK 90% | Shell event hub complete |
+| 05 | libhashtable Integration | OK 100% | Fully integrated |
+| 06 | Input Parsing | OK 90% | Escape sequences, UTF-8 working |
+| 07 | Extensibility Framework | WARNING15% | Widget system only; no plugins |
+| 08 | Display Integration | OK 85% | Render pipeline working |
+| 09 | History System | OK 95% | Most comprehensive subsystem |
+| 10 | Autosuggestions | WARNING70% | History-based working |
+| 11 | Syntax Highlighting | OK 85% | Full shell construct coverage, TOML theme colors |
+| 12 | Completion System | OK 95% | Menu, categories, sources, custom source API |
 
 ### 2.2 Feature Specifications (13-22)
 
 | Spec | Title | Implementation | Notes |
 |------|-------|----------------|-------|
-| 13 | User Customization | ⚠️ 25% | Keybindings done; scripting **DEFERRED** |
-| 14 | Performance Optimization | ⚠️ 40% | Core monitoring exists |
-| 15 | Memory Management | ✅ 90% | Pool system working |
-| 16 | Error Handling | ✅ 85% | Error system implemented |
-| 17 | Testing Framework | ✅ 70% | Tests exist, coverage ongoing |
-| 18 | Plugin API | ❌ 5% | **DEFERRED** - Spec only |
-| 19 | Security Analysis | ⚠️ 30% | Secure memory exists; sandboxing **DEFERRED** |
+| 13 | User Customization | WARNING25% | Keybindings done; scripting **DEFERRED** |
+| 14 | Performance Optimization | WARNING40% | Core monitoring exists |
+| 15 | Memory Management | OK 90% | Pool system working |
+| 16 | Error Handling | OK 85% | Error system implemented |
+| 17 | Testing Framework | OK 70% | Tests exist, coverage ongoing |
+| 18 | Plugin API | FAIL 5% | **DEFERRED** - Spec only |
+| 19 | Security Analysis | WARNING30% | Secure memory exists; sandboxing **DEFERRED** |
 | 20 | Deployment Procedures | N/A | Documentation |
 | 21 | Maintenance Procedures | N/A | Documentation |
-| 22 | User Interface | ⚠️ 50% | Partial command implementation |
+| 22 | User Interface | WARNING50% | Partial command implementation |
 
 ### 2.3 Critical Gap Specifications (22-27 in critical_gaps/)
 
 | Spec | Title | Implementation | Notes |
 |------|-------|----------------|-------|
-| 22 | History-Buffer Integration | ✅ 100% | Complete |
-| 23 | Interactive Completion Menu | ✅ 100% | Complete |
-| 24 | Advanced Prompt Widget Hooks | ⚠️ 15% | Basic hooks work; full ZSH-equivalent features not implemented |
-| 25 | Default Keybindings | ✅ 100% | Complete |
-| 26 | Adaptive Terminal Integration | ✅ 100% | Complete |
-| 27 | Fuzzy Matching Library | ✅ 100% | Complete - `src/libfuzzy/fuzzy_match.c`, integrated into autocorrect, completion, history search |
+| 22 | History-Buffer Integration | OK 100% | Complete |
+| 23 | Interactive Completion Menu | OK 100% | Complete |
+| 24 | Advanced Prompt Widget Hooks | WARNING15% | Basic hooks work; full ZSH-equivalent features not implemented |
+| 25 | Default Keybindings | OK 100% | Complete |
+| 26 | Adaptive Terminal Integration | OK 100% | Complete |
+| 27 | Fuzzy Matching Library | OK 100% | Complete - `src/libfuzzy/fuzzy_match.c`, integrated into autocorrect, completion, history search |
 
 ### 2.4 New Specifications (25-26 in main folder)
 
@@ -152,8 +152,8 @@ These specifications were created to address architectural needs discovered duri
 
 | Spec | Title | Implementation | Notes |
 |------|-------|----------------|-------|
-| **25 (new)** | Prompt/Theme System | ✅ ~95% | Template engine, segments, 10 themes, transient prompts, composer, exit_code/jobs wiring |
-| **26 (new)** | Initialization System | ✅ ~95% | Shell integration, persistent editor, shell event hub, lifecycle management |
+| **25 (new)** | Prompt/Theme System | OK ~95% | Template engine, segments, 10 themes, transient prompts, composer, exit_code/jobs wiring |
+| **26 (new)** | Initialization System | OK ~95% | Shell integration, persistent editor, shell event hub, lifecycle management |
 
 **Note**: The main folder specs 25-26 are different from critical_gaps/ specs 25-26. The main folder versions represent the actual LLE prompt/theme and initialization systems that are implemented and working.
 
@@ -163,12 +163,12 @@ These systems are **implemented and working** (not gaps or future work):
 
 | System | Location | Status |
 |--------|----------|--------|
-| **Persistent Global Editor** | `g_lle_integration->editor` | ✅ Working - survives across readline sessions |
-| **Shell Event Hub** | `lle_shell_event_hub.c` | ✅ Working - fires DIRECTORY_CHANGED, PRE/POST_COMMAND |
-| **Async Worker Thread Pool** | `core/async_worker.c` | ✅ Working - for non-blocking git status, etc. |
-| **TOML-Subset Parser** | `prompt/theme_parser.c` | ✅ Working - custom, dependency-free |
-| **Screen Buffer for Prompts** | Used by LLE prompt composer | ✅ Working - proper cursor positioning |
-| **Prompt Cache Invalidation** | Called from `bin_cd()`, etc. | ✅ Working - event-driven refresh |
+| **Persistent Global Editor** | `g_lle_integration->editor` | OK Working - survives across readline sessions |
+| **Shell Event Hub** | `lle_shell_event_hub.c` | OK Working - fires DIRECTORY_CHANGED, PRE/POST_COMMAND |
+| **Async Worker Thread Pool** | `core/async_worker.c` | OK Working - for non-blocking git status, etc. |
+| **TOML-Subset Parser** | `prompt/theme_parser.c` | OK Working - custom, dependency-free |
+| **Screen Buffer for Prompts** | Used by LLE prompt composer | OK Working - proper cursor positioning |
+| **Prompt Cache Invalidation** | Called from `bin_cd()`, etc. | OK Working - event-driven refresh |
 
 **Legacy systems** (`src/prompt.c`, `src/themes.c`) exist only for GNU Readline compatibility and are deprecated.
 
@@ -178,9 +178,9 @@ Components added during implementation that weren't in the original specs:
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| **Screen Buffer** | ✅ 100% | Virtual terminal screen for proper UTF-8/cursor handling |
-| **Watchdog** | ✅ 100% | SIGALRM-based deadlock detection (Session 80) |
-| **Defensive State Machine** | ✅ 100% | Guaranteed Ctrl+C/Ctrl+G exit paths from any state |
+| **Screen Buffer** | OK 100% | Virtual terminal screen for proper UTF-8/cursor handling |
+| **Watchdog** | OK 100% | SIGALRM-based deadlock detection (Session 80) |
+| **Defensive State Machine** | OK 100% | Guaranteed Ctrl+C/Ctrl+G exit paths from any state |
 
 ### 2.7 Theme System Feature Status (Session 88 Audit, Updated Session 90)
 
@@ -190,13 +190,13 @@ Many theme features are **parsed from TOML but not used** in rendering. This sec
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `ps1`, `ps2` | ✅ Working | Main and continuation prompts |
-| `newline_before` | ✅ Working | Blank lines before prompt |
-| `newline_after` | ✅ Working | Blank lines after prompt (Session 89) |
-| `rps1` (right prompt) | ⚠️ Parsed only | Rendered by composer but not displayed by display layer |
-| `transient` | ⚠️ Partial | Works in widgets only, not main prompt |
-| `enable_multiline` | ⚠️ Parsed only | Multiline is template-driven, flag ignored |
-| `compact_mode` | ⚠️ Parsed only | Never checked in rendering |
+| `ps1`, `ps2` | OK Working | Main and continuation prompts |
+| `newline_before` | OK Working | Blank lines before prompt |
+| `newline_after` | OK Working | Blank lines after prompt (Session 89) |
+| `rps1` (right prompt) | WARNINGParsed only | Rendered by composer but not displayed by display layer |
+| `transient` | WARNINGPartial | Works in widgets only, not main prompt |
+| `enable_multiline` | WARNINGParsed only | Multiline is template-driven, flag ignored |
+| `compact_mode` | WARNINGParsed only | Never checked in rendering |
 
 #### Semantic Colors
 
@@ -222,8 +222,8 @@ Many theme features are **parsed from TOML but not used** in rendering. This sec
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `enabled_segments` array | ⚠️ Parsed only | Segment filtering not implemented |
-| Syntax highlighting colors | ✅ Working | All 30+ syntax colors work (Session 88) |
+| `enabled_segments` array | WARNINGParsed only | Segment filtering not implemented |
+| Syntax highlighting colors | OK Working | All 30+ syntax colors work (Session 88) |
 
 **Reference**: See `examples/theme.toml` for detailed inline status annotations.
 
@@ -239,23 +239,23 @@ These are achievable next steps, ordered by priority and dependency.
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|
-| ~~Fix display stress test memory leak~~ | ~~Medium~~ | ✅ Fixed | Session 83: `pool_was_ever_initialized` flag in lush_memory_pool.c |
+| ~~Fix display stress test memory leak~~ | ~~Medium~~ | OK Fixed | Session 83: `pool_was_ever_initialized` flag in lush_memory_pool.c |
 | Address any remaining freeze scenarios | High | Ongoing | Session 80 added watchdog and state machine |
 | Complete Vi mode if desired | Low | Partial | Keybindings exist, needs testing |
-| ~~Clean up dead code (broken diff updates)~~ | ~~Low~~ | ✅ Done | Session 92: Removed ~575 lines of broken differential display code |
+| ~~Clean up dead code (broken diff updates)~~ | ~~Low~~ | OK Done | Session 92: Removed ~575 lines of broken differential display code |
 
 ### Phase 2: Configuration Foundation
 
 **Goal**: User customization without scripting dependencies
 
 **Already Implemented:**
-- ✅ LLE preferences in core config (`src/config.c`) - arrow modes, history, dedup, multiline, search, etc.
-- ✅ User theme files from XDG paths (`$XDG_CONFIG_HOME/lush/themes/` or `~/.config/lush/themes/`)
-- ✅ System theme files (`/etc/lush/themes/`)
-- ✅ Theme hot reload (`display lle theme reload`)
-- ✅ Theme export (`display lle theme export`)
-- ✅ User keybinding configuration (`~/.config/lush/keybindings.toml`)
-- ✅ Keybinding hot reload (`display lle keybindings reload`)
+- OK LLE preferences in core config (`src/config.c`) - arrow modes, history, dedup, multiline, search, etc.
+- OK User theme files from XDG paths (`$XDG_CONFIG_HOME/lush/themes/` or `~/.config/lush/themes/`)
+- OK System theme files (`/etc/lush/themes/`)
+- OK Theme hot reload (`display lle theme reload`)
+- OK Theme export (`display lle theme export`)
+- OK User keybinding configuration (`~/.config/lush/keybindings.toml`)
+- OK Keybinding hot reload (`display lle keybindings reload`)
 
 **Remaining Work:**
 
@@ -268,10 +268,10 @@ These are achievable next steps, ordered by priority and dependency.
 **Goal**: User customization through native means
 
 **Already Implemented:**
-- ✅ Custom completion source API (`include/lle/completion/custom_source.h`)
-- ✅ Config-based completion sources (`~/.config/lush/completions.toml`)
-- ✅ Shell command execution with caching for completions
-- ✅ Display commands: `display lle completion sources [list|reload|help]`
+- OK Custom completion source API (`include/lle/completion/custom_source.h`)
+- OK Config-based completion sources (`~/.config/lush/completions.toml`)
+- OK Shell command execution with caching for completions
+- OK Display commands: `display lle completion sources [list|reload|help]`
 
 **Remaining Work:**
 
@@ -287,7 +287,7 @@ These are achievable next steps, ordered by priority and dependency.
 
 | Task | Priority | Description |
 |------|----------|-------------|
-| ~~Fix or remove differential updates~~ | ~~Medium~~ | ✅ Removed Session 92; full redraw is reliable and sufficient |
+| ~~Fix or remove differential updates~~ | ~~Medium~~ | OK Removed Session 92; full redraw is reliable and sufficient |
 | Advanced syntax highlighting rules | Medium | More shell construct coverage |
 | Improved autosuggestion algorithm | Low | Context-aware, not just history prefix |
 | Fish-style path abbreviation | Low | ~/D/p/lush instead of ~/Documents/projects/lush |
@@ -414,10 +414,10 @@ LLE uses a **persistent global integration** (`g_lle_integration` in `lle_shell_
 
 ```
 g_lle_integration (persistent)
-├── editor         - Persistent LLE editor instance
-├── event_hub      - Shell event hub for lifecycle events
-├── composer       - Prompt composer (Spec 25)
-└── init_state     - Initialization tracking
++-- editor         - Persistent LLE editor instance
++-- event_hub      - Shell event hub for lifecycle events
++-- composer       - Prompt composer (Spec 25)
++-- init_state     - Initialization tracking
 ```
 
 **Two complementary event systems:**
@@ -435,11 +435,11 @@ g_lle_integration (persistent)
 **Example flow for `cd` command:**
 ```
 bin_cd() 
-  → prompt_cache_invalidate()
-  → prompt_async_refresh_git() 
-  → lle_fire_directory_changed()
-    → lle_shell_event_hub_fire(DIRECTORY_CHANGED)
-      → registered handlers notified
+  -> prompt_cache_invalidate()
+  -> prompt_async_refresh_git() 
+  -> lle_fire_directory_changed()
+    -> lle_shell_event_hub_fire(DIRECTORY_CHANGED)
+      -> registered handlers notified
 ```
 
 ### Display Rendering Approach
@@ -490,7 +490,7 @@ The original specifications remain as inspiration for what LLE could become, whi
 - v2.5 (2025-12-31): Session 91 - GNU readline fully removed; LLE is now the sole line editor
 - v2.4 (2025-12-31): Session 90 - Git segment now uses async worker for non-blocking status fetching; src/prompt.c reorganized with clear LLE/legacy sections; Legacy code marked for future removal
 - v2.3 (2025-12-31): Session 89 - Wired theme symbols (prompt, git, jobs, status) and colors (git_ahead/behind/untracked); Implemented newline_after; Segment render API now includes theme parameter
-- v2.2 (2025-12-31): Session 88 - Syntax highlighting 60%→85% (shell constructs, TOML colors); Theme feature audit with working/parsed-only status
+- v2.2 (2025-12-31): Session 88 - Syntax highlighting 60%->85% (shell constructs, TOML colors); Theme feature audit with working/parsed-only status
 - v2.1 (2025-12-31): Session 87 - exit_code/jobs template variable wiring complete
 - v2.0 (2025-12-30): Complete rewrite with accurate status assessment
 - v1.0 (2025-12-26): Original document (now outdated)

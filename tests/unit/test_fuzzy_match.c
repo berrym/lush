@@ -550,7 +550,7 @@ TEST(completion_pattern_longer_than_text_zero) {
 TEST(completion_unicode_nfc_normalization) {
     /// Default options normalize to NFC, so a precomposed and a
     /// decomposed form of the same string match identically.
-    const char *precomposed = "caf\xc3\xa9"; // café (U+00E9)
+    const char *precomposed = "caf\xc3\xa9"; // cafe-acute (U+00E9)
     const char *decomposed = "cafe\xcc\x81"; // cafe + COMBINING ACUTE
     int s_pre = fuzzy_completion_score("caf", precomposed, NULL);
     int s_dec = fuzzy_completion_score("caf", decomposed, NULL);

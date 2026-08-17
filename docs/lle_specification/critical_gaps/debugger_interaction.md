@@ -25,7 +25,7 @@ politeness protocol between two owners is still two owners. It is to
 make the debugger a *consumer* of LLE, like every other interactive
 surface. The debugger obtains its input from LLE.
 
-This gap is the concrete instance that motivated PHILOSOPHY.md §7
+This gap is the concrete instance that motivated PHILOSOPHY.md S7
 (the debugger keeps pace with the language): the debugger predates a
 core subsystem and never integrated with it.
 
@@ -43,7 +43,7 @@ Consequences, all positive:
   no bespoke code;
 - completion of in-scope variable names and debug commands at the
   prompt becomes possible -- the foundation for the type-aware
-  inspection UX (debugger Tiers 1-2, SEMANTICS.md §3.9).
+  inspection UX (debugger Tiers 1-2, SEMANTICS.md S3.9).
 
 ## 3. What supports feasibility (verified)
 
@@ -57,13 +57,13 @@ Consequences, all positive:
   `exit_raw_mode`. Because each interface restores the state it
   found, nested create/enter/exit/destroy plausibly composes (last
   in, first out) without clobbering an outer session -- though this
-  must be confirmed under true nesting (§5).
+  must be confirmed under true nesting (S5).
 - The completion source is pluggable via the LLE source manager
   (`lle_source_manager_register`) -- a debug-command / variable-name
   source can be registered for the debug prompt.
 - LLE's multiline-continuation machinery shows the prompt layer
   already handles dynamic, context-aware re-prompting -- though the
-  debug prompt needs nothing that elaborate (§4).
+  debug prompt needs nothing that elaborate (S4).
 
 ## 4. The gap to close -- and what it is *not*
 
@@ -135,6 +135,6 @@ build on it.
 
 ## See also
 
-- [../../PHILOSOPHY.md](../../PHILOSOPHY.md) -- §7, debugger coherence.
+- [../../PHILOSOPHY.md](../../PHILOSOPHY.md) -- S7, debugger coherence.
 - `include/lle/lle_readline.h` -- the `lle_readline` contract.
 - `src/debug/debug_breakpoints.c` -- the current `fgets` break-prompt.

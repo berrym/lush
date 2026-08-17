@@ -100,7 +100,7 @@ static void s_move(screen_t *s, int new_x, int new_y) {
 
 ### 1.4 Integration with Display System
 
-**Reader → Screen Integration**:
+**Reader -> Screen Integration**:
 ```c
 // From reader.cpp
 void layout_and_repaint(const wchar_t *reason) {
@@ -134,7 +134,7 @@ color_support_t output_get_color_support();
 **Diff-Based Updates**:
 1. Build desired screen representation in memory
 2. Compare with actual screen state
-3. Generate minimal escape sequences to transform actual → desired
+3. Generate minimal escape sequences to transform actual -> desired
 4. Track cursor position throughout update
 5. Update internal "actual" state to match "desired"
 
@@ -570,7 +570,7 @@ void Terminal::enable_raw_mode() {
 ### 4.6 Key Takeaways
 
 1. **Terminal class abstraction** - clean platform-independent interface
-2. **Three-stage rendering** - render → virtual render → terminal update
+2. **Three-stage rendering** - render -> virtual render -> terminal update
 3. **Direct writes through abstraction** - Terminal class wraps platform calls
 4. **Rate limiting** - prevents excessive refresh during rapid input
 5. **UTF-32 internal representation** - simplifies character handling
@@ -592,38 +592,38 @@ void Terminal::enable_raw_mode() {
 
 | Project | Integration Pattern | State Authority | Refresh Trigger |
 |---------|-------------------|-----------------|-----------------|
-| **Fish** | Reader → Screen | Internal buffer | `layout_and_repaint()` |
-| **Zsh ZLE** | ZLE → zrefresh | Video buffers | After widget execution |
-| **Rustyline** | Editor → Renderer | Layout struct | `refresh_line()` |
-| **Replxx** | ReplxxImpl → Terminal | Display buffer | Manual refresh |
+| **Fish** | Reader -> Screen | Internal buffer | `layout_and_repaint()` |
+| **Zsh ZLE** | ZLE -> zrefresh | Video buffers | After widget execution |
+| **Rustyline** | Editor -> Renderer | Layout struct | `refresh_line()` |
+| **Replxx** | ReplxxImpl -> Terminal | Display buffer | Manual refresh |
 
 ### 5.3 Separation of Concerns
 
 **All implementations follow similar separation:**
 
 ```
-┌─────────────────────────────────────┐
-│   Line Editing Logic Layer          │
-│   (Buffer management, commands)     │
-└───────────────┬─────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│   Display Generation Layer          │
-│   (Layout calculation, diff)        │
-└───────────────┬─────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│   Terminal Abstraction Layer        │
-│   (Escape sequences, capabilities)  │
-└───────────────┬─────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│   Platform I/O Layer                │
-│   (write(), tcsetattr(), etc.)      │
-└─────────────────────────────────────┘
++-------------------------------------+
+|   Line Editing Logic Layer          |
+|   (Buffer management, commands)     |
++---------------+---------------------+
+                |
+                v
++-------------------------------------+
+|   Display Generation Layer          |
+|   (Layout calculation, diff)        |
++---------------+---------------------+
+                |
+                v
++-------------------------------------+
+|   Terminal Abstraction Layer        |
+|   (Escape sequences, capabilities)  |
++---------------+---------------------+
+                |
+                v
++-------------------------------------+
+|   Platform I/O Layer                |
+|   (write(), tcsetattr(), etc.)      |
++-------------------------------------+
 ```
 
 ### 5.4 State Authority Model
@@ -693,7 +693,7 @@ struct screen_state {
 
 1. **Integrated Display System (Fish, Zsh)**:
    ```
-   Editor → Display Manager → Screen Layer → Terminal
+   Editor -> Display Manager -> Screen Layer -> Terminal
    ```
    - Centralized display management
    - Multiple display consumers (prompt, pager, editor)
@@ -701,7 +701,7 @@ struct screen_state {
 
 2. **Direct Rendering (Rustyline, Replxx)**:
    ```
-   Editor → Renderer → Terminal
+   Editor -> Renderer -> Terminal
    ```
    - Direct control over display
    - Simpler architecture
@@ -714,8 +714,8 @@ struct screen_state {
 ```c
 // NEVER do this (query terminal state)
 int get_cursor_position() {
-    write(fd, "\x1b[6n", 4);  // ❌ BAD
-    read_response();           // ❌ BAD
+    write(fd, "\x1b[6n", 4);  // FAIL BAD
+    read_response();           // FAIL BAD
 }
 
 // ALWAYS do this (track internal state)
@@ -731,7 +731,7 @@ struct cursor_state {
         // Send movement commands
         output_movement(dy, dx);
         
-        // Update internal state ✅ GOOD
+        // Update internal state OK GOOD
         row = new_row;
         col = new_col;
     }
@@ -773,11 +773,11 @@ void initialize_terminal() {
 
 Your LLE design already follows the best practices found in these implementations:
 
-✅ **Internal State Authority** - Buffer is authoritative, never query terminal  
-✅ **Display Layer Integration** - Renders through Lush display system  
-✅ **One-Time Capability Detection** - At initialization only  
-✅ **Terminal Abstraction** - All terminal I/O through Lush display layer  
-✅ **Atomic Display Updates** - Complete content generation for rendering
+OK **Internal State Authority** - Buffer is authoritative, never query terminal  
+OK **Display Layer Integration** - Renders through Lush display system  
+OK **One-Time Capability Detection** - At initialization only  
+OK **Terminal Abstraction** - All terminal I/O through Lush display layer  
+OK **Atomic Display Updates** - Complete content generation for rendering
 
 ### 7.2 Recommended Patterns from Research
 
@@ -819,11 +819,11 @@ lle_layout_t calculate_layout(lle_buffer_t *buffer);
 **4. Clear Separation (All projects)**:
 ```
 LLE Buffer Management (editing logic)
-          ↓
+          v
 LLE Display Generator (layout, content)
-          ↓
+          v
 Lush Display System (terminal abstraction)
-          ↓
+          v
 Terminal I/O (escape sequences, raw mode)
 ```
 
@@ -831,17 +831,17 @@ Terminal I/O (escape sequences, raw mode)
 
 Based on problems found in these implementations:
 
-❌ **Don't Query Terminal State**:
+FAIL **Don't Query Terminal State**:
 - Fish issue #11721: Display corruption from cursor queries
 - ZLE: Avoided queries from the beginning (1992)
 - Rustyline: Layout pre-calculation avoids queries
 
-❌ **Don't Assume Terminal Capabilities**:
+FAIL **Don't Assume Terminal Capabilities**:
 - Fish: Extensive terminal compatibility detection
 - ZLE: Falls back to single-line mode when capabilities lacking
 - Rustyline: Detects color support levels
 
-❌ **Don't Mix Rendering Concerns**:
+FAIL **Don't Mix Rendering Concerns**:
 - Keep buffer management separate from display
 - Keep display generation separate from terminal I/O
 - Keep terminal abstraction separate from platform I/O

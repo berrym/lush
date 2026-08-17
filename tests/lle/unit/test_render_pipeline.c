@@ -359,7 +359,9 @@ TEST(pipeline_handles_unicode) {
 
     /// 8 multibyte code points (4 CJK at 3 bytes, a space, an emoji at 4
     /// bytes) plus the 9-byte ASCII prefix "Unicode: ".
-    const char *unicode = "Unicode: 你好世界 🎉";
+    const char *unicode =
+        "Unicode: \xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c "
+        "\xf0\x9f\x8e\x89";
     lle_buffer_t *buffer = create_mock_buffer(unicode);
     lle_render_context_t context = {0};
     context.buffer = buffer;

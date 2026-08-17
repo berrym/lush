@@ -146,13 +146,13 @@ if (result != LLE_SUCCESS) {
 All steps are **shell-level** (persist for shell lifetime) unless noted:
 
 ```
-Step 1: Memory pool → validate        [Shell-level, already done in init()]
-Step 2: Terminal detection → validate [Shell-level, already done in init()]
-Step 3: Shell event hub → validate    [Shell-level, NEW - for cd/command events]
-Step 4: Editor core → validate        [Shell-level, global_lle_editor]
-Step 5: History system → validate     [Shell-level, part of editor]
-Step 6: Prompt system → validate      [Shell-level, Spec 25 composer]
-Step 7: Shell event hooks → validate  [Shell-level, wire builtins to hub]
+Step 1: Memory pool -> validate        [Shell-level, already done in init()]
+Step 2: Terminal detection -> validate [Shell-level, already done in init()]
+Step 3: Shell event hub -> validate    [Shell-level, NEW - for cd/command events]
+Step 4: Editor core -> validate        [Shell-level, global_lle_editor]
+Step 5: History system -> validate     [Shell-level, part of editor]
+Step 6: Prompt system -> validate      [Shell-level, Spec 25 composer]
+Step 7: Shell event hooks -> validate  [Shell-level, wire builtins to hub]
 
 Per-readline components (created/destroyed each lle_readline() call):
 - lle_buffer_t (fresh buffer)
@@ -200,42 +200,42 @@ void lle_init_rollback(lle_init_state_t *state) {
 ### 3.1 Component Hierarchy
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         SHELL LEVEL                                  │
-│   Initialized once in init() - persists for shell lifetime          │
-├─────────────────────────────────────────────────────────────────────┤
-│  lle_shell_integration_t                                            │
-│  ├── lle_init_state_t          (initialization tracking)           │
-│  ├── lle_shell_event_hub_t     (shell→LLE event routing)           │
-│  ├── lle_editor_t*             (global editor - persistent)         │
-│  │   ├── history_system        (persistent across readline)         │
-│  │   ├── kill_ring             (persistent across readline)         │
-│  │   ├── widget_registry       (persistent across readline)         │
-│  │   └── keybinding_manager    (persistent across readline) [NOTE]  │
-│  ├── lle_prompt_composer_t*    (Spec 25 - persistent)               │
-│  │   ├── segment_registry      (persistent)                         │
-│  │   ├── theme_registry        (persistent)                         │
-│  │   └── prompt_context        (updated by shell events)            │
-│  └── lle_terminal_caps_t*      (detected once - persistent)         │
-├─────────────────────────────────────────────────────────────────────┤
-│                        READLINE LEVEL                                │
-│   Created/destroyed per lle_readline() call                         │
-├─────────────────────────────────────────────────────────────────────┤
-│  readline_context_t            (per-readline session)               │
-│  ├── lle_buffer_t*             (fresh buffer per readline)          │
-│  ├── lle_terminal_abstraction* (raw mode per readline)              │
-│  ├── lle_event_system_t*       (keystroke events per readline)      │
-│  ├── continuation_state_t      (multiline parser state)             │
-│  └── current_suggestion        (autosuggestion buffer)              │
-├─────────────────────────────────────────────────────────────────────┤
-│                        DISPLAY LEVEL                                 │
-│   Managed by display_integration (separate lifecycle)               │
-├─────────────────────────────────────────────────────────────────────┤
-│  lle_display_integration_t     (Spec 08)                            │
-│  ├── render_controller                                               │
-│  ├── display_bridge                                                  │
-│  └── dirty_tracker                                                   │
-└─────────────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------------+
+|                         SHELL LEVEL                                  |
+|   Initialized once in init() - persists for shell lifetime          |
++---------------------------------------------------------------------+
+|  lle_shell_integration_t                                            |
+|  +-- lle_init_state_t          (initialization tracking)           |
+|  +-- lle_shell_event_hub_t     (shell->LLE event routing)           |
+|  +-- lle_editor_t*             (global editor - persistent)         |
+|  |   +-- history_system        (persistent across readline)         |
+|  |   +-- kill_ring             (persistent across readline)         |
+|  |   +-- widget_registry       (persistent across readline)         |
+|  |   +-- keybinding_manager    (persistent across readline) [NOTE]  |
+|  +-- lle_prompt_composer_t*    (Spec 25 - persistent)               |
+|  |   +-- segment_registry      (persistent)                         |
+|  |   +-- theme_registry        (persistent)                         |
+|  |   +-- prompt_context        (updated by shell events)            |
+|  +-- lle_terminal_caps_t*      (detected once - persistent)         |
++---------------------------------------------------------------------+
+|                        READLINE LEVEL                                |
+|   Created/destroyed per lle_readline() call                         |
++---------------------------------------------------------------------+
+|  readline_context_t            (per-readline session)               |
+|  +-- lle_buffer_t*             (fresh buffer per readline)          |
+|  +-- lle_terminal_abstraction* (raw mode per readline)              |
+|  +-- lle_event_system_t*       (keystroke events per readline)      |
+|  +-- continuation_state_t      (multiline parser state)             |
+|  +-- current_suggestion        (autosuggestion buffer)              |
++---------------------------------------------------------------------+
+|                        DISPLAY LEVEL                                 |
+|   Managed by display_integration (separate lifecycle)               |
++---------------------------------------------------------------------+
+|  lle_display_integration_t     (Spec 08)                            |
+|  +-- render_controller                                               |
+|  +-- display_bridge                                                  |
+|  +-- dirty_tracker                                                   |
++---------------------------------------------------------------------+
 ```
 
 > **[NOTE] keybinding_manager persistence**: Currently in `lle_readline.c`, the 
@@ -250,42 +250,42 @@ void lle_init_rollback(lle_init_state_t *state) {
 
 ```
 main() 
-  ↓
+  v
 init(argc, argv, &in)
-  ├── [existing init steps 1-35]
-  ├── Step 36: lle_shell_integration_init()  ← NEW
-  │   ├── Check config.use_lle
-  │   ├── If false: skip (GNU readline mode, LLE available via display cmd)
-  │   ├── If true: initialize LLE components
-  │   │   ├── lle_init_shell_event_hub()  ← NEW: shell event routing
-  │   │   ├── lle_init_editor()           ← Includes keybinding_manager
-  │   │   ├── lle_init_history()
-  │   │   ├── lle_init_prompt_system()    ← Enables Spec 25
-  │   │   └── lle_install_shell_hooks()   ← Wire builtins to event hub
-  │   └── On failure: (see below)
-  ├── [continue existing init]
-  └── return
-  ↓
+  +-- [existing init steps 1-35]
+  +-- Step 36: lle_shell_integration_init()  <- NEW
+  |   +-- Check config.use_lle
+  |   +-- If false: skip (GNU readline mode, LLE available via display cmd)
+  |   +-- If true: initialize LLE components
+  |   |   +-- lle_init_shell_event_hub()  <- NEW: shell event routing
+  |   |   +-- lle_init_editor()           <- Includes keybinding_manager
+  |   |   +-- lle_init_history()
+  |   |   +-- lle_init_prompt_system()    <- Enables Spec 25
+  |   |   +-- lle_install_shell_hooks()   <- Wire builtins to event hub
+  |   +-- On failure: (see below)
+  +-- [continue existing init]
+  +-- return
+  v
 Main Loop
-  ├── get_unified_input() → lle_readline() or readline()
-  ├── lle_fire_pre_command()  ← NEW: before execution
-  ├── parse_and_execute()
-  │   └── [cd builtin] → lle_fire_directory_changed()
-  ├── lle_fire_post_command()  ← NEW: after execution (exit code, duration)
-  └── display_integration_post_command_update()
-  ↓
+  +-- get_unified_input() -> lle_readline() or readline()
+  +-- lle_fire_pre_command()  <- NEW: before execution
+  +-- parse_and_execute()
+  |   +-- [cd builtin] -> lle_fire_directory_changed()
+  +-- lle_fire_post_command()  <- NEW: after execution (exit code, duration)
+  +-- display_integration_post_command_update()
+  v
 Shell Exit
-  └── lle_shell_integration_shutdown()  ← NEW (via atexit)
+  +-- lle_shell_integration_shutdown()  <- NEW (via atexit)
 ```
 
 **On initialization failure:**
 
 ```
 #ifdef HAVE_READLINE
-  └── Set config.use_lle = false (fall back to GNU readline)
+  +-- Set config.use_lle = false (fall back to GNU readline)
       User can retry later via: display lle enable
 #else
-  └── lle_hard_reset() then retry
+  +-- lle_hard_reset() then retry
       If still failing: lle_init_minimal() (degraded mode)
 #endif
 ```
@@ -635,7 +635,7 @@ Routes shell events to LLE components.
 ```c
 /**
  * Shell event hub
- * Central routing for shell→LLE events
+ * Central routing for shell->LLE events
  */
 typedef struct lle_shell_event_hub {
     // Event handlers
@@ -680,15 +680,15 @@ typedef struct lle_shell_event_hub {
 > **Architecture:**
 > ```
 > Shell Event Hub (this spec)
->   └── LLE_SHELL_EVENT_PRE_COMMAND
->         ├── Internal: Update prompt context
->         └── Future: Iterate user preexec functions
->   └── LLE_SHELL_EVENT_POST_COMMAND
->         ├── Internal: Record exit code, duration
->         └── Future: Iterate user precmd functions
->   └── LLE_SHELL_EVENT_DIRECTORY_CHANGED
->         ├── Internal: Update cwd, invalidate git cache
->         └── Future: Iterate user chpwd functions
+>   +-- LLE_SHELL_EVENT_PRE_COMMAND
+>         +-- Internal: Update prompt context
+>         +-- Future: Iterate user preexec functions
+>   +-- LLE_SHELL_EVENT_POST_COMMAND
+>         +-- Internal: Record exit code, duration
+>         +-- Future: Iterate user precmd functions
+>   +-- LLE_SHELL_EVENT_DIRECTORY_CHANGED
+>         +-- Internal: Update cwd, invalidate git cache
+>         +-- Future: Iterate user chpwd functions
 > ```
 >
 > This spec establishes the internal event infrastructure. User hook registration,
@@ -1474,9 +1474,9 @@ void lle_log(lle_log_level_t level, const char *format, ...);
 // tests/lle/test_initialization.c
 
 void test_init_full_success(void);           // All components initialize
-void test_init_editor_failure_fallback(void); // Editor fails → readline
-void test_init_history_failure_continue(void); // History fails → continue
-void test_init_prompt_failure_continue(void);  // Prompt fails → fallback
+void test_init_editor_failure_fallback(void); // Editor fails -> readline
+void test_init_history_failure_continue(void); // History fails -> continue
+void test_init_prompt_failure_continue(void);  // Prompt fails -> fallback
 void test_init_rollback_on_failure(void);     // Clean rollback
 void test_shutdown_saves_history(void);       // History saved on exit
 ```

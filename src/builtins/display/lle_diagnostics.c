@@ -62,10 +62,13 @@ int display_lle_diagnostics(int argc, char **argv) {
             if (lle_keybinding_manager_get_stats(editor->keybinding_manager,
                                                  &avg_us,
                                                  &max_us) == LLE_SUCCESS) {
-                printf("  Avg lookup time: %lu µs\n", (unsigned long)avg_us);
-                printf("  Max lookup time: %lu µs\n", (unsigned long)max_us);
-                printf("  Performance: %s\n",
-                       max_us < 50 ? "OK (<50µs)" : "SLOW (>50µs)");
+                printf("  Avg lookup time: %lu \xc2\xb5s\n",
+                       (unsigned long)avg_us);
+                printf("  Max lookup time: %lu \xc2\xb5s\n",
+                       (unsigned long)max_us);
+                printf("  Performance: %s\n", max_us < 50
+                                                  ? "OK (<50\xc2\xb5s)"
+                                                  : "SLOW (>50\xc2\xb5s)");
             }
         }
     }

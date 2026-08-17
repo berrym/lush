@@ -146,7 +146,7 @@ uint64_t lle_measure_current_performance_impact(void) {
     uint32_t concurrent = atomic_load_explicit(
         &g_error_atomic_counters.concurrent_errors, memory_order_relaxed);
 
-    /// Each concurrent error adds ~10μs estimated impact
+    /// Each concurrent error adds ~10mus estimated impact
     return concurrent * 10000ULL;
 }
 

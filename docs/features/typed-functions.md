@@ -6,7 +6,7 @@ expression. Coexists with classical POSIX functions; both forms run
 side by side in the same script.**
 
 **Status**: shipped.
-**Spec lineage**: `docs/SEMANTICS.md` §5 (scoping discipline), §8
+**Spec lineage**: `docs/SEMANTICS.md` S5 (scoping discipline), S8
 (formerly deferred line "The typed-function form").
 **Implementer reference**: `docs/development/TYPED_FUNCTIONS_DESIGN.md`.
 
@@ -327,9 +327,9 @@ side by side.
 
 ## See also
 
-- `docs/SEMANTICS.md` §3 -- the kind-tagged value model typed
+- `docs/SEMANTICS.md` S3 -- the kind-tagged value model typed
   functions sit on top of.
-- `docs/SEMANTICS.md` §5 -- the scoping discipline; lexical vs
+- `docs/SEMANTICS.md` S5 -- the scoping discipline; lexical vs
   dynamic.
 - `docs/features/sigil-conventions.md` -- the `@`/`%` sigils used
   for passing list/map arguments to typed-function calls.

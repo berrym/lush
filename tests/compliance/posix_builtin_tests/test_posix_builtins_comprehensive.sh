@@ -57,11 +57,11 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ "$actual" == "$expected" && "$exit_code" == "0" ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: $test_name" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         echo "    Expected: '$expected'"
         echo "    Actual: '$actual'"
         echo "    Exit Code: $exit_code"
@@ -79,12 +79,12 @@ test_builtin_exists() {
 
     result=$($SHELL_PATH -c "type $builtin_name" 2>/dev/null)
     if [[ $? -eq 0 && "$result" == "$builtin_name is a shell builtin" ]]; then
-        echo -e "  ${GREEN}✓${NC} $builtin_name builtin exists"
+        echo -e "  ${GREEN}OK${NC} $builtin_name builtin exists"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: $builtin_name builtin exists" >> "$LOGFILE"
         return 0
     else
-        echo -e "  ${RED}✗${NC} $builtin_name builtin missing"
+        echo -e "  ${RED}FAIL${NC} $builtin_name builtin missing"
         echo "    Output: $result"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: $builtin_name builtin missing - Output: $result" >> "$LOGFILE"
@@ -122,11 +122,11 @@ run_test_exit_code() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ "$exit_code" == "$expected_exit" ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: $test_name" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         echo "    Expected exit code: $expected_exit"
         echo "    Actual exit code: $exit_code"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -135,7 +135,7 @@ run_test_exit_code() {
 }
 
 print_section() {
-    echo -e "\n${BLUE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${BLUE}### $1 ###${NC}"
 }
 
 print_subsection() {
@@ -379,11 +379,11 @@ test_times_builtin() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$times_output" =~ [0-9]+m[0-9]+\.[0-9]+s ]]; then
-        echo -e "  ${GREEN}✓${NC} times shows process times"
+        echo -e "  ${GREEN}OK${NC} times shows process times"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: times shows process times" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} times format incorrect"
+        echo -e "  ${RED}FAIL${NC} times format incorrect"
         echo "    Output: $times_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: times format incorrect - Output: $times_output" >> "$LOGFILE"
@@ -495,11 +495,11 @@ test_command_line_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$trace_output" =~ "+ echo traced" ]]; then
-        echo -e "  ${GREEN}✓${NC} -x traces command execution"
+        echo -e "  ${GREEN}OK${NC} -x traces command execution"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: -x traces command execution" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} -x trace not working"
+        echo -e "  ${RED}FAIL${NC} -x trace not working"
         echo "    Output: $trace_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: -x trace not working - Output: $trace_output" >> "$LOGFILE"
@@ -514,11 +514,11 @@ test_command_line_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$verbose_output" =~ "echo verbose" ]]; then
-        echo -e "  ${GREEN}✓${NC} -v verbose mode shows input"
+        echo -e "  ${GREEN}OK${NC} -v verbose mode shows input"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: -v verbose mode shows input" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} -v verbose mode not working"
+        echo -e "  ${RED}FAIL${NC} -v verbose mode not working"
         echo "    Output: $verbose_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: -v verbose mode not working - Output: $verbose_output" >> "$LOGFILE"
@@ -578,11 +578,11 @@ test_missing_builtins() {
     fi
 
     if [ ${#missing_builtins[@]} -eq 0 ]; then
-        echo -e "  ${GREEN}✓${NC} All POSIX required builtins are implemented"
+        echo -e "  ${GREEN}OK${NC} All POSIX required builtins are implemented"
     else
         echo -e "  ${YELLOW}!${NC} Missing POSIX required builtins:"
         for builtin in "${missing_builtins[@]}"; do
-            echo -e "    ${RED}✗${NC} $builtin"
+            echo -e "    ${RED}FAIL${NC} $builtin"
         done
         echo ""
         echo "POSIX Shell Standards require these builtins to be implemented:"
@@ -656,10 +656,10 @@ main() {
     echo -e "${RED}Failed: $FAILED_TESTS${NC}"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}✓ ALL POSIX BUILTIN TESTS PASSED${NC}"
+        echo -e "\n${GREEN}OK ALL POSIX BUILTIN TESTS PASSED${NC}"
         echo "Lush demonstrates excellent POSIX builtin compliance!"
     else
-        echo -e "\n${YELLOW}⚠ SOME POSIX BUILTIN TESTS FAILED${NC}"
+        echo -e "\n${YELLOW}WARN SOME POSIX BUILTIN TESTS FAILED${NC}"
         echo "Check $LOGFILE for detailed failure information."
         echo ""
         echo "Summary of areas needing attention:"

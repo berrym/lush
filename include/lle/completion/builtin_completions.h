@@ -7,7 +7,7 @@
  * Provides context-aware tab completions for all shell builtins including:
  * - Options (e.g., echo -n, -e, -E)
  * - Subcommands (e.g., display lle theme list)
- * - Dynamic arguments (e.g., cd → directories, unalias → aliases)
+ * - Dynamic arguments (e.g., cd -> directories, unalias -> aliases)
  *
  * This module is part of the LLE completion system (Spec 12).
  */

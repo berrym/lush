@@ -17,7 +17,7 @@
  *     comparison result.
  *   - Exits non-zero if any divergence was not in the allow-list.
  *
- * Lush is a polyglot superset of POSIX, bash, and zsh — none of those
+ * Lush is a polyglot superset of POSIX, bash, and zsh -- none of those
  * three is "the" reference shell. Mode-tagged inputs are checked
  * against the oracle that matches their declared mode. Inputs in the
  * lush/ subdir have no oracle; they are run through lush only and
@@ -661,7 +661,7 @@ static int process_input(const char *path, const char *lush_path) {
     run_result_t lush_r =
         run_with_input(lush_path, lush_argv, lush_input, DIFF_TIMEOUT_SEC);
 
-    /// Resolve oracle binary via env override → PATH → candidate list.
+    /// Resolve oracle binary via env override -> PATH -> candidate list.
     /// Missing oracle is not fatal: the JSONL record marks it as
     /// absent and the input is skipped from comparison.
     const char *oracle_bin = (mode != MODE_LUSH) ? resolve_oracle(mode) : NULL;
@@ -677,12 +677,12 @@ static int process_input(const char *path, const char *lush_path) {
     /// Decide outcome
     bool divergent = false;
     if (mode == MODE_LUSH) {
-        /// No oracle — flag only crashes/timeouts
+        /// No oracle -- flag only crashes/timeouts
         if (lush_r.timed_out || lush_r.exit_status >= 128) {
             divergent = true;
         }
     } else if (!oracle_present) {
-        /// Oracle missing — skip silently in JSONL marker
+        /// Oracle missing -- skip silently in JSONL marker
     } else if (!results_agree(&lush_r, &oracle_r)) {
         divergent = true;
     }

@@ -8,10 +8,10 @@ the same bar as `VISION.md`.
 
 **Scope**: this document specifies the value model and the scoping
 discipline -- the core of how lush evaluates. It is deliberately not
-yet exhaustive (§8 records what is still open); it grows toward a
+yet exhaustive (S8 records what is still open); it grows toward a
 complete semantic specification.
 
-This document is the concrete form of `PHILOSOPHY.md` §2 ("Spelling is
+This document is the concrete form of `PHILOSOPHY.md` S2 ("Spelling is
 polyglot; behavior is canonical lush"). PHILOSOPHY states the principle
 abstractly -- one unified engine behind many dialect spellings. This
 document specifies that engine: the kinds of values it holds, the rules
@@ -28,7 +28,7 @@ scope-related implementation choice should be measurable against it.
 Lush has exactly two layers, and they are never the same layer.
 
 **The preset layer** is the four configuration surfaces of
-`PHILOSOPHY.md` §3 -- `mode`, `set`, `setopt`/`shopt`, `config`. It
+`PHILOSOPHY.md` S3 -- `mode`, `set`, `setopt`/`shopt`, `config`. It
 governs *which syntax is accepted* and *which behaviors default on*.
 It is curation over a substrate.
 
@@ -49,19 +49,19 @@ This is not a stylistic preference; it is what makes lush one shell.
 A preset that could fork the type system or the name-resolution rule
 would not produce a polyglot shell -- it would produce N shells
 sharing a parser. "Polyglot" means many syntactic front doors onto
-*one* engine (PHILOSOPHY §2: "not because it runs three engines under
+*one* engine (PHILOSOPHY S2: "not because it runs three engines under
 the hood"). The **value model** -- the kinds (scalar/list/map), the
 `[@]`-vs-`[*]` presentation, name resolution, scoping -- is uniform
 across every mode, by construction. Whether a kind mismatch at a
 boundary is **diagnosed** (a type error) or **reconciled to the oracle**
-(a silent flatten) is a preset (§3.9): a list flattened by `mode bash`
+(a silent flatten) is a preset (S3.9): a list flattened by `mode bash`
 was still a list at the point of reference -- the flag changed only the
 crossing policy, not the value's nature.
 
 When a behavior feels like it could belong to either layer, apply the
 test: *does it change what a value is, or only how a value is spelled
 or defaulted?* The former is engine; the latter is preset. Word
-splitting (§3.8) is a preset because it gates an expansion behavior. The
+splitting (S3.8) is a preset because it gates an expansion behavior. The
 list/scalar *distinction* (a list is a list) is engine; the *boundary
 policy* for a list meeting a scalar slot -- strict type error vs oracle
 flatten -- is a preset (`FEATURE_STRICT_VALUE_TYPING`), strict by default
@@ -87,8 +87,8 @@ means.
 Pure-local reasoning is the property the rest of this document is
 built to preserve. Where a design choice would make meaning depend on
 surrounding context, the choice is wrong. This is why presentation is
-bound to the subscript and not to quoting (§3.5), and why scoping is
-bound to the declaration form and not to the mode (§5).
+bound to the subscript and not to quoting (S3.5), and why scoping is
+bound to the declaration form and not to the mode (S5).
 
 ---
 
@@ -121,7 +121,7 @@ model (Nushell, Elvish). The reasoning:
   byte streams. A fully-nested value crossing a pipe into `grep`,
   `awk`, or `sed` must be flattened to text, and the shell would have
   to *guess* how. A guess is implicit coercion -- the precise thing
-  §3.4 forbids. A bounded model makes every text-boundary crossing
+  S3.4 forbids. A bounded model makes every text-boundary crossing
   total and obvious: a flat list maps to an argument vector or to
   lines; a flat map maps to key/value lines or to environment
   variables. Nothing is guessed.
@@ -156,7 +156,7 @@ operations rather than through type-system complexity.
 In lush mode, a list is never converted to a scalar string implicitly
 -- not by a double quote, not by an assignment, not by reaching a
 string-shaped slot. Joining a list into a string is always an operation
-the script *asks for* (the `[*]` subscript of §3.5, an explicit `join`,
+the script *asks for* (the `[*]` subscript of S3.5, an explicit `join`,
 a `(j:)` flag).
 
 Implicit list-to-string coercion is one of the largest sources of
@@ -166,10 +166,10 @@ hides type errors (passing a list where a scalar was meant should be a
 clear, immediate diagnostic, not a quiet flatten).
 
 This is lush mode's central safety property -- its flagship type
-guarantee. Everything in §3.5 and §3.6 exists to uphold it. The
+guarantee. Everything in S3.5 and S3.6 exists to uphold it. The
 compatibility modes (`bash`, `zsh`, `posix`) *relax* it back to the
 oracle's silent flatten so that legacy scripts run unchanged; this is a
-**boundary policy** selected by the preset (§3.9,
+**boundary policy** selected by the preset (S3.9,
 `FEATURE_STRICT_VALUE_TYPING`), not a change to what a value is -- a
 list is a list in every mode, and the diagnostic-vs-flatten choice is
 the only thing the mode moves.
@@ -225,11 +225,11 @@ The consequence is zero quoting footguns of the legacy kind: omitting
 a quote can never silently turn a list into a merged scalar, and the
 structural intent of a reference is baked into the reference itself
 (`[@]` vs `[*]`), not into the syntax that happens to wrap it. This is
-§2 (pure-local reasoning) applied to expansion.
+S2 (pure-local reasoning) applied to expansion.
 
 This rule governs *list structure* on the `$` / `[@]` / `[*]` forms.
 It does **not** apply to the bare `@name` / `%name` kind sigils, which
-are a separate surface (§3 value kinds). Those sigils are
+are a separate surface (S3 value kinds). Those sigils are
 bare-word-only and quote-suppressed, like `~` tilde expansion: `echo
 @arr` expands but `echo "@arr"` is the literal `@arr`, just as `~`
 expands but `"~"` does not. This keeps double-quoted strings safe for
@@ -244,12 +244,12 @@ zsh's `(@)` parameter flag forces array context. In lush the `[@]`
 subscript already *is* the vector marker, unconditionally and locally.
 `(@)` is therefore not load-bearing and not part of the engine. If it
 is accepted at all, it is accepted only as a polyglot **spelling**
-courtesy (PHILOSOPHY §2) routing to the same presentation as `[@]`. It
+courtesy (PHILOSOPHY S2) routing to the same presentation as `[@]`. It
 carries no semantics that `[@]` does not already carry.
 
 ### 3.8 Word splitting is retained as a preset
 
-§3.4 forbids implicit list-to-**string** coercion. It does *not*
+S3.4 forbids implicit list-to-**string** coercion. It does *not*
 forbid string-to-**list** word splitting (`for f in $files`). These
 are different operations, and only one is a silent engine coercion:
 
@@ -278,11 +278,11 @@ two diverge by mode: bash, zsh, and dash all split command output, but
 zsh alone does **not** split a bare `$var`. lush's default profile turns
 `FEATURE_CMDSUB_WORD_SPLIT` off as well, so `set -- $(echo a b c)` passes
 **one** argument, exactly like `set -- $x` -- one consistent mental model
-(no implicit `IFS`-driven splitting of command output, §4.1). The compat
+(no implicit `IFS`-driven splitting of command output, S4.1). The compat
 modes restore each reference's behavior: `mode bash` / `mode posix` split
 both a bare `$var` and a command sub, `mode zsh` splits only the command
 sub. Explicit splitting stays available via an array literal
-`arr=( $(cmd) )` or a native splitter (§4.1).
+`arr=( $(cmd) )` or a native splitter (S4.1).
 
 **Null-word removal is a separate operation and is always on.** Word
 splitting turns a *non-empty* value into several words; null-word
@@ -291,7 +291,7 @@ produces the empty string contributes **zero** words: `$x` with `x=""`
 is a null command (exit 0, no "command not found"), and `cmd $x` passes
 no argument. A **quoted** empty (`"$x"`, `''`) stays **one** empty word.
 Unlike word splitting this is bash/zsh/dash consensus (POSIX
-§2.6.5 field splitting removes a wholly-empty unquoted field), so it is
+S2.6.5 field splitting removes a wholly-empty unquoted field), so it is
 the lush default in every profile, independent of
 `FEATURE_WORD_SPLIT_DEFAULT`. The removal keys on the empty string
 alone, never on whitespace -- so a whitespace-only value under the
@@ -302,7 +302,7 @@ and `select` word lists, and array literals.
 
 ### 3.9 List and map values meeting a position
 
-§3.4 forbids implicit list→string coercion; §3.5 binds presentation to
+S3.4 forbids implicit list->string coercion; S3.5 binds presentation to
 the subscript. This section completes the model: what a list or map
 value does when it reaches a position, and what is forbidden outright.
 
@@ -312,11 +312,11 @@ scalar-requiring slot or violates the whole-word constraint -- is lush
 mode's default and its flagship safety feature. It is gated by
 `FEATURE_STRICT_VALUE_TYPING`: **on** in lush mode, **off** in the
 `bash`, `zsh`, and `posix` compatibility modes, where the same crossing
-is *reconciled to the oracle* instead of diagnosed. This is the §1
+is *reconciled to the oracle* instead of diagnosed. This is the S1
 engine-vs-preset split in action: the value model is uniform (a list is
 a list in every mode; `[@]`/`[*]` presentation is unchanged); only the
 **boundary policy** -- diagnose vs silently flatten -- moves with the
-mode, exactly as word splitting (§3.8) does. Under the relaxed policy
+mode, exactly as word splitting (S3.8) does. Under the relaxed policy
 the flatten follows the oracle precisely: a `${arr[@]}` in a scalar slot
 joins on a literal space (bash/posix, IFS-independent) or on IFS[0]
 (zsh); a bare `${arr}` yields element 0 (bash/posix) or the whole array
@@ -354,7 +354,7 @@ whole-join), then apply the operator to that scalar* -- which is exact
 bash element-0 parity for every operator, and exact zsh parity for every
 operator in a scalar (quoted) slot. Two zsh behaviors are deliberately
 **not** cloned, and are curated to the flatten-then-apply reading (see the
-divergence registry, §6):
+divergence registry, S6):
 
 - zsh reads bare `${arr:o:l}` as *element* slicing (`${arr:1:2}` = two
   elements); lush keeps it a scalar substring of the joined value. The
@@ -377,11 +377,11 @@ the *entire* whitespace-delimited word it appears in. It may not be
 glued to literal text or to another expansion within a single word.
 
 - Permitted: `${arr[@]}`, `"${arr[@]}"` -- the expansion is the whole
-  word's content (the quotes are a whitespace anchor, §3.6, and do not
+  word's content (the quotes are a whitespace anchor, S3.6, and do not
   change this).
 - Forbidden: `x${arr}`, `"prefix_${arr[@]}"` -- a list glued to text.
   Gluing a list to a string has no coherent meaning; allowing it would
-  force an implicit flatten, which §3.4 forbids.
+  force an implicit flatten, which S3.4 forbids.
 
 String concatenation is therefore *not* a slot category -- it is a
 within-word phenomenon governed entirely by this constraint. To build
@@ -453,7 +453,7 @@ parts=("${(s/:/)str}")       # split-yielded list, splices flat
 uniq=("${(u)other[@]}")      # uniq-yielded list, splices flat
 ```
 
-Quotes are a whitespace anchor (§3.6); they preserve the grouping of
+Quotes are a whitespace anchor (S3.6); they preserve the grouping of
 each individual element, but they do not coerce a list into a scalar.
 The principle is data topology (list vs. scalar) versus evaluation
 context (preserve word boundaries inside each element): these are
@@ -496,11 +496,11 @@ positions and is a diagnosed type error in scalar-requiring ones.
 There is no implicit join, ever.
 
 **The write-side mirror: a list operation on a scalar-kind variable.**
-§3.9 above governs a list or map *value* reaching a scalar *slot*. The
+S3.9 above governs a list or map *value* reaching a scalar *slot*. The
 mirror is a list *operation* -- an element write `s[i]=v`, an append
 `s+=(...)`, or the arithmetic writer `(( s[i]=v ))` -- applied to a
 variable that currently holds a *scalar* value. This is a kind transition
-(scalar → list), gated by the same `FEATURE_STRICT_VALUE_TYPING` flag. In
+(scalar -> list), gated by the same `FEATURE_STRICT_VALUE_TYPING` flag. In
 lush mode it is the type error (`E1134`): a scalar is not a list, and the
 implicit re-kind is refused with the guidance to `declare -a name` (or
 `unset name`) first, exactly as the value-side crossing is refused. In the
@@ -577,7 +577,7 @@ separator: `"a\nb\n"` splits to two elements, not three. Other shapes
 (custom delimiter, NUL-delimited, CSV, JSON) are explicit helpers or
 flags. In the lush profile there is no implicit `IFS`-driven splitting of
 command output -- gated by `FEATURE_CMDSUB_WORD_SPLIT` (off in lush, on
-in the bash/zsh/posix compat modes; see §3.8), so `set -- $(echo a b c)`
+in the bash/zsh/posix compat modes; see S3.8), so `set -- $(echo a b c)`
 yields one argument, the same as `set -- $x`.
 
 ### 4.2 Maps preserve insertion order
@@ -589,7 +589,7 @@ deterministic, never hash-bucket order. This is implemented by building
 (`known_divergences.txt` entry 052); this model ratifies it.
 
 Insertion order is the modern consensus (Python 3.7+, Ruby, JS) and
-the only choice compatible with §2 -- a map that enumerated
+the only choice compatible with S2 -- a map that enumerated
 nondeterministically would render differently in the debugger on every
 step. Sorted *views* are available on top via `${(ko)map}` /
 `${(kO)map}`: a deterministic default, plus explicit tools to reorder.
@@ -619,7 +619,7 @@ filter transformation -- never as a side effect of expansion.
 
 ### 5.1 Scoping is a property of the declaration form, not the mode
 
-How a name resolves to a value is engine-layer (§1) -- it cannot be
+How a name resolves to a value is engine-layer (S1) -- it cannot be
 forked by a preset. But lush supports two function-declaration forms,
 and **each form carries its own scoping discipline**, uniformly in
 every mode.
@@ -634,7 +634,7 @@ form keep it.
 
 ### 5.3 Lush typed-function form: lexical scoping
 
-A function declared in lush's typed-function form (see §7 -- this form
+A function declared in lush's typed-function form (see S7 -- this form
 is not yet built) is **lexically (block) scoped**, in every mode
 including POSIX mode. Name resolution is determined by the program's
 block structure, not by the dynamic call chain. There is no
@@ -646,13 +646,13 @@ resolve a name's binding from the program text alone.
 The engine supports both disciplines as first-class. A function's
 declaration form states which one applies; a reader determines a
 function's scoping from its own header line, with no reference to mode
-or caller -- §2 again. A single script may contain a dynamically
+or caller -- S2 again. A single script may contain a dynamically
 scoped POSIX-form helper and a lexically scoped typed function side by
 side, each coherent, because each is self-describing.
 
 Lexical scoping is therefore not a mode and not a bolt-on -- it is a
 property the typed-function form *carries*. A consistency dividend
-from §3.8: dynamic scoping's one genuinely-used feature in legacy
+from S3.8: dynamic scoping's one genuinely-used feature in legacy
 shells -- a caller setting `local IFS` to steer a callee's splitting --
 is already largely moot, because implicit `IFS` splitting is no longer
 the default path.
@@ -672,20 +672,20 @@ different statements about two different axes; do not conflate them.
 
 The four preset surfaces (`mode`, `set`, `setopt`/`shopt`, `config`)
 govern dialect spelling and curated defaults. They never govern the
-value kinds (§3.1), the transformation/presentation split (§3.5), or
-the scoping discipline (§5). Those are engine. What they *may* govern is
+value kinds (S3.1), the transformation/presentation split (S3.5), or
+the scoping discipline (S5). Those are engine. What they *may* govern is
 a **boundary policy** -- what happens when a value crosses into a slot
 of another kind -- which is a behavior, not a kind.
 
 Two legitimate presets of this form exist:
 
 - `FEATURE_WORD_SPLIT_DEFAULT` gates an expansion *behavior*, not a
-  value *kind* (§3.8).
+  value *kind* (S3.8).
 - `FEATURE_STRICT_VALUE_TYPING` gates the boundary policy for a
-  list/map reaching a scalar slot (§3.4, §3.9): a diagnosed type error
+  list/map reaching a scalar slot (S3.4, S3.9): a diagnosed type error
   (lush mode) versus an oracle flatten (compat modes). The value is a
   list in both cases; only the crossing policy differs. This was an
-  explicit owner decision (2026-07) recorded here so the §3.4/§3.9
+  explicit owner decision (2026-07) recorded here so the S3.4/S3.9
   strictness is understood as lush mode's flagship default, not an
   engine invariant.
 
@@ -716,20 +716,20 @@ sizes are rough engineering estimates.)
 | Area | Current state | Target | Gap |
 |------|---------------|--------|-----|
 | Value kinds | scalar/list/map all live in per-scope `vars_ht` as kind-tagged `symvar` entries; the previous global `array_storage` side-table is removed; `symtable_lookup` returns a kind-tagged view (`lush_value_view_t`) | scalar/list/map are first-class throughout the expansion engine | **match** |
-| Flatness / nesting | none (a list element is always `char *`) | none (bounded, §3.2) | **match** |
-| Map insertion order | implemented -- insertion-ordered `array_value_t.assoc_map` (Issue #69) | insertion order (§4.2) | **match** |
-| Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (§3.5) | **match** |
-| Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (§3.5) | **match** |
-| Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (§3.6) -- so the un-threaded state is *correct*, not a gap | **match** |
-| Implicit list-to-string | `${arr[@]}` in a scalar slot raises `SHELL_ERR_TYPE_MISMATCH` and aborts the script (`executor.c` general parameter-expansion fallthrough). Bare `${arr}` enforced the same way: vector slot yields N elements, scalar slot raises type mismatch, glued-to-text raises type mismatch. `export` and `readonly` raise on list values rather than silently joining. | no implicit coercion (§3.4, §3.9) | **match** |
-| `(@)` flag | accepted as a no-op spelling alias for `[@]` presentation in `try_expand_vector_arg` (`${(@)arr}` yields the same as `${arr[@]}`) | redundant; at most a spelling alias (§3.7) | **match** |
+| Flatness / nesting | none (a list element is always `char *`) | none (bounded, S3.2) | **match** |
+| Map insertion order | implemented -- insertion-ordered `array_value_t.assoc_map` (Issue #69) | insertion order (S4.2) | **match** |
+| Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (S3.5) | **match** |
+| Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (S3.5) | **match** |
+| Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (S3.6) -- so the un-threaded state is *correct*, not a gap | **match** |
+| Implicit list-to-string | `${arr[@]}` in a scalar slot raises `SHELL_ERR_TYPE_MISMATCH` and aborts the script (`executor.c` general parameter-expansion fallthrough). Bare `${arr}` enforced the same way: vector slot yields N elements, scalar slot raises type mismatch, glued-to-text raises type mismatch. `export` and `readonly` raise on list values rather than silently joining. | no implicit coercion (S3.4, S3.9) | **match** |
+| `(@)` flag | accepted as a no-op spelling alias for `[@]` presentation in `try_expand_vector_arg` (`${(@)arr}` yields the same as `${arr[@]}`) | redundant; at most a spelling alias (S3.7) | **match** |
 | Array-literal discrimination | parser-internal `\x1F` sentinel prefix on unquoted `name=(...)` argv elements lets `local`/`declare`/`typeset` route to array-literal handling while `local data="(scoped)"` (which strips quotes to the same shape) correctly stays a scalar | a parsed `local arr=(a b c)` must build a real array, distinct from `local data="(...)"` | **match** |
-| Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (§3.8) | **match** |
-| Typed-function form | declaration grammar implemented -- `fn name(p: kind, ...) [-> kind] { body }` parses to NODE_FN_DECL; call expression, typed `return`, and `let name = call(args)` capture in flight. The legacy `return_value` builtin and its `__LUSH_RETURN__` marker scanner were removed; the typed form is the only path to a structured return value | a typed form carrying lexical scope (§5.3) | parser surface landed; runtime + lexical resolution + debugger surface remain |
-| Scoping | dynamic scope-chain for all functions (`symtable` walks `scope->parent`; issue #47 assignment semantics) | dynamic for POSIX form, lexical for the typed form (§5) | large -- lexical resolution and the typed form both unbuilt |
+| Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (S3.8) | **match** |
+| Typed-function form | declaration grammar implemented -- `fn name(p: kind, ...) [-> kind] { body }` parses to NODE_FN_DECL; call expression, typed `return`, and `let name = call(args)` capture in flight. The legacy `return_value` builtin and its `__LUSH_RETURN__` marker scanner were removed; the typed form is the only path to a structured return value | a typed form carrying lexical scope (S5.3) | parser surface landed; runtime + lexical resolution + debugger surface remain |
+| Scoping | dynamic scope-chain for all functions (`symtable` walks `scope->parent`; issue #47 assignment semantics) | dynamic for POSIX form, lexical for the typed form (S5) | large -- lexical resolution and the typed form both unbuilt |
 
 The two "large" gaps -- the typed-function form and lexical scoping --
-are coupled and are recorded in §8 as the next pieces of work. The
+are coupled and are recorded in S8 as the next pieces of work. The
 six value-model rows that previously sat at medium / small / "one
 targeted fix" have all landed: `tests/real_world/` runs at 100% (20
 passes + 2 principled `known_divergences.txt` entries), and the
@@ -759,8 +759,8 @@ document; they are to be decided against it, as their own work.
 ## See also
 
 - [VISION.md](VISION.md) -- what lush is.
-- [PHILOSOPHY.md](PHILOSOPHY.md) -- the founding principles; §2 and
-  §3 are the abstract form of §1 here.
+- [PHILOSOPHY.md](PHILOSOPHY.md) -- the founding principles; S2 and
+  S3 are the abstract form of S1 here.
 - [CONFIGURATION.md](CONFIGURATION.md) -- the four preset surfaces.
 - `tests/fuzz/differential/known_divergences.txt` -- the deliberate-
   divergence registry this document is the rationale for.

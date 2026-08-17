@@ -42,7 +42,7 @@ typedef struct {
  * Used when the theme does not provide a per-segment bg_color.
  */
 static lle_color_t default_segment_bg(const char *name) {
-    /// True color backgrounds — palette indices get remapped by terminal
+    /// True color backgrounds -- palette indices get remapped by terminal
     /// colorschemes and produce unpredictable results.
     if (strcmp(name, "user") == 0)
         return lle_color_rgb(68, 68, 68); /// #444444 dark gray

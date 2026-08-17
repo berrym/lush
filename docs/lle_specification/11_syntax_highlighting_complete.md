@@ -658,10 +658,10 @@ lle_result_t lle_syntax_on_historical_prompt_modify(
 
 #### 4.1.3 Widget Integration Performance Requirements
 
-- **Prompt Mode Switching**: <15μs for switching between normal and bottom-prompt modes
-- **Bottom-Prompt Highlighting**: <100μs for full bottom-prompt syntax analysis
-- **Historical Command Highlighting**: <50μs for historical command syntax highlighting
-- **Widget Callback Execution**: <25μs for all widget callback processing
+- **Prompt Mode Switching**: <15us for switching between normal and bottom-prompt modes
+- **Bottom-Prompt Highlighting**: <100us for full bottom-prompt syntax analysis
+- **Historical Command Highlighting**: <50us for historical command syntax highlighting
+- **Widget Callback Execution**: <25us for all widget callback processing
 
 ---
 
@@ -835,10 +835,10 @@ lle_result_t lle_syntax_highlight_with_terminal_optimization(
 
 #### 5.1.3 Terminal Integration Performance Requirements
 
-- **Color Capability Detection**: <50μs for terminal capability detection
-- **Color Mapping**: <25μs for mapping colors to terminal capabilities
-- **Adaptive Color Application**: <30μs for applying terminal-optimized colors
-- **Terminal-Specific Optimization**: <100μs total for complete terminal adaptation
+- **Color Capability Detection**: <50us for terminal capability detection
+- **Color Mapping**: <25us for mapping colors to terminal capabilities
+- **Adaptive Color Application**: <30us for applying terminal-optimized colors
+- **Terminal-Specific Optimization**: <100us total for complete terminal adaptation
 
 ---
 
@@ -2477,7 +2477,7 @@ lle_result_t lle_test_syntax_highlighting_accuracy(lle_syntax_test_suite_t *test
    - Create `lle_widget_highlight_engine_t` system
    - Set up widget callback registration
    - **Dependencies**: 24_advanced_prompt_widget_hooks_complete.md
-   - **Success Criteria**: Widget callbacks functional with <15μs mode switching
+   - **Success Criteria**: Widget callbacks functional with <15us mode switching
 
 2. **Bottom-Prompt Highlighting**
    - Implement bottom-prompt syntax parser
@@ -2491,7 +2491,7 @@ lle_result_t lle_test_syntax_highlighting_accuracy(lle_syntax_test_suite_t *test
    - Create color capability detection system
    - Set up adaptive color management
    - **Dependencies**: 26_adaptive_terminal_integration_complete.md
-   - **Success Criteria**: Terminal detection <50μs
+   - **Success Criteria**: Terminal detection <50us
 
 2. **Color Adaptation System**
    - Implement terminal-specific color mapping
@@ -2508,7 +2508,7 @@ lle_result_t lle_test_syntax_highlighting_accuracy(lle_syntax_test_suite_t *test
    - Implement cross-system context sharing
    - Create context consistency validation
    - **Integration**: Share highlighting context with widget and terminal systems
-   - **Performance**: Context updates <30μs
+   - **Performance**: Context updates <30us
 
 2. **Enhanced Color Management**
    - Implement integration-aware color selection
@@ -2518,10 +2518,10 @@ lle_result_t lle_test_syntax_highlighting_accuracy(lle_syntax_test_suite_t *test
 
 **Week 4: Performance Integration**
 1. **Integration Performance Optimization**
-   - Optimize widget callback overhead <25μs
+   - Optimize widget callback overhead <25us
    - Implement integration-specific caching
    - Create performance monitoring for integrations
-   - **Performance**: Total integration overhead <100μs
+   - **Performance**: Total integration overhead <100us
 
 2. **Integration Testing Framework**
    - Build cross-system integration tests

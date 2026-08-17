@@ -2,7 +2,7 @@
  * @file test_ast_roundtrip.c
  * @brief AST round-trip tests for parser validation
  *
- * Tests that verify: parse(input) → AST → source → parse(source) → AST2
+ * Tests that verify: parse(input) -> AST -> source -> parse(source) -> AST2
  * where AST and AST2 should be structurally equivalent.
  *
  * @author Michael Berry <trismegustis@gmail.com>

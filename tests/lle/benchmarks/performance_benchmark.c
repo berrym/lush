@@ -156,7 +156,9 @@ int main(void) {
         return 1;
     }
     const char *utf8_text =
-        "Hello 🌍 World! This is a test with émojis and spëcial çharacters.";
+        "Hello \xf0\x9f\x8c\x8d World! This is a test with \xc3\xa9mojis and "
+        "sp\xc3\xab"
+        "cial \xc3\xa7haracters.";
     size_t text_len = strlen(utf8_text);
     lle_buffer_insert_text(buffer, 0, utf8_text, text_len);
 
@@ -273,7 +275,8 @@ int main(void) {
         lle_buffer_destroy(buffer);
         return 1;
     }
-    const char *validation_text = "Test validation performance with UTF-8: 🌍";
+    const char *validation_text =
+        "Test validation performance with UTF-8: \xf0\x9f\x8c\x8d";
     lle_buffer_insert_text(buffer, 0, validation_text, strlen(validation_text));
 
     RUN_BENCHMARK(

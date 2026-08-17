@@ -104,43 +104,43 @@ Syntax is an interface layer. Multiple syntaxes map to the same underlying opera
 ### Builtin Bridging
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Input                           │
-│  shopt -s extglob  │  setopt extended_glob              │
-└─────────┬──────────┴─────────────┬──────────────────────┘
-          │                        │
-          ▼                        ▼
-┌─────────────────────────────────────────────────────────┐
-│              Builtin Dispatcher                         │
-│  Recognizes: shopt, setopt, declare, typeset, etc.     │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Feature Matrix                             │
-│  shell_feature_enable(FEATURE_EXTENDED_GLOB)           │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------+
+|                    User Input                           |
+|  shopt -s extglob  |  setopt extended_glob              |
++---------+----------+-------------+----------------------+
+          |                        |
+          v                        v
++---------------------------------------------------------+
+|              Builtin Dispatcher                         |
+|  Recognizes: shopt, setopt, declare, typeset, etc.     |
++---------------------+-----------------------------------+
+                      |
+                      v
++---------------------------------------------------------+
+|              Feature Matrix                             |
+|  shell_feature_enable(FEATURE_EXTENDED_GLOB)           |
++---------------------------------------------------------+
 ```
 
 ### Parameter Expansion Bridging
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Input                           │
-│     ${var^^}       │      ${(U)var}                     │
-└─────────┬──────────┴─────────────┬──────────────────────┘
-          │                        │
-          ▼                        ▼
-┌─────────────────────────────────────────────────────────┐
-│              Parser                                     │
-│  Recognizes both syntaxes, creates same AST node       │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Executor                                   │
-│  expand_case_modification(var, CASE_UPPER)             │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------+
+|                    User Input                           |
+|     ${var^^}       |      ${(U)var}                     |
++---------+----------+-------------+----------------------+
+          |                        |
+          v                        v
++---------------------------------------------------------+
+|              Parser                                     |
+|  Recognizes both syntaxes, creates same AST node       |
++---------------------+-----------------------------------+
+                      |
+                      v
++---------------------------------------------------------+
+|              Executor                                   |
+|  expand_case_modification(var, CASE_UPPER)             |
++---------------------------------------------------------+
 ```
 
 ---
@@ -176,15 +176,15 @@ setopt null_glob               # Override: enable nullglob (bash has it off)
 |---------|-------------|------------|---------------|--------|
 | Enable option | `shopt -s X` | `setopt X` | `setopt X` | **TODO: shopt** |
 | Disable option | `shopt -u X` | `unsetopt X` | `unsetopt X` | **TODO: shopt** |
-| Nameref | `declare -n` | `typeset -n` | `declare -n` | ✓ Implemented |
+| Nameref | `declare -n` | `typeset -n` | `declare -n` | OK Implemented |
 | Uppercase | `${var^^}` | `${(U)var}` | `${var^^}` | **TODO: zsh flags** |
 | Lowercase | `${var,,}` | `${(L)var}` | `${var,,}` | **TODO: zsh flags** |
-| First upper | `${var^}` | N/A | `${var^}` | ✓ Implemented |
-| First lower | `${var,}` | N/A | `${var,}` | ✓ Implemented |
-| Mapfile | `mapfile` | N/A | `mapfile` | ✓ Implemented |
-| Readarray | `readarray` | N/A | `readarray` | ✓ Implemented |
-| Glob qualifiers | N/A | `*(.)` `*(/)` | `*(.)` `*(/)` | ✓ Implemented |
-| Extended glob | `?()/*()/+()` | `#/##/^` | Both | ✓ Bash style |
+| First upper | `${var^}` | N/A | `${var^}` | OK Implemented |
+| First lower | `${var,}` | N/A | `${var,}` | OK Implemented |
+| Mapfile | `mapfile` | N/A | `mapfile` | OK Implemented |
+| Readarray | `readarray` | N/A | `readarray` | OK Implemented |
+| Glob qualifiers | N/A | `*(.)` `*(/)` | `*(.)` `*(/)` | OK Implemented |
+| Extended glob | `?()/*()/+()` | `#/##/^` | Both | OK Bash style |
 | Herestring | `<<<` | `<<<` | `<<<` | **BUG: Not working** |
 
 ### To Be Implemented (Zsh Parameter Flags)
@@ -243,12 +243,12 @@ All compatibility work is meaningless if core features are broken.
 
 ### Phase 3: Syntax Bridging - Parameter Expansion
 1. Implement zsh parameter flag parser
-2. `${(U)var}` → uppercase (shares code with `${var^^}`)
-3. `${(L)var}` → lowercase (shares code with `${var,,}`)
-4. `${(f)var}` → split on newlines
-5. `${(j:X:)arr}` → join with separator
-6. `${(s:X:)var}` → split on separator
-7. `${(o)arr}` / `${(O)arr}` → sort
+2. `${(U)var}` -> uppercase (shares code with `${var^^}`)
+3. `${(L)var}` -> lowercase (shares code with `${var,,}`)
+4. `${(f)var}` -> split on newlines
+5. `${(j:X:)arr}` -> join with separator
+6. `${(s:X:)var}` -> split on separator
+7. `${(o)arr}` / `${(O)arr}` -> sort
 
 ### Phase 4: Profile System Polish
 1. Verify all profile defaults match target shells

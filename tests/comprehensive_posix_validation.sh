@@ -40,7 +40,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 print_section() {
@@ -153,10 +153,10 @@ run_test() {
     fi
 
     if $test_passed; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         echo -e "    ${YELLOW}Expected ($test_type):${NC} '$expected_pattern'"
         echo -e "    ${YELLOW}Actual output:${NC} '$actual_output'"
         echo -e "    ${YELLOW}Exit code:${NC} $actual_exit (expected: $expected_exit)"
@@ -351,12 +351,12 @@ echo -e "${RED}Failed:${NC} $FAILED_TESTS"
 echo -e "${YELLOW}Duration:${NC} ${DURATION}s"
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
-    echo -e "\n${GREEN}🎉 ALL TESTS PASSED! 🎉${NC}"
+    echo -e "\n${GREEN}ALL TESTS PASSED! ${NC}"
     echo -e "${GREEN}Lush demonstrates excellent POSIX compliance across all 24 implemented options!${NC}"
     EXIT_CODE=0
 else
     PASS_RATE=$((PASSED_TESTS * 100 / TOTAL_TESTS))
-    echo -e "\n${YELLOW}⚠ Some tests failed (${PASS_RATE}% pass rate)${NC}"
+    echo -e "\n${YELLOW}WARN Some tests failed (${PASS_RATE}% pass rate)${NC}"
 
     if [[ $PASS_RATE -ge 95 ]]; then
         echo -e "${GREEN}EXCELLENT${NC} - Very high compliance rate"
@@ -374,12 +374,12 @@ else
 fi
 
 echo -e "\n${CYAN}Tested POSIX Options Coverage:${NC}"
-echo "✓ Basic Options: -a, -b, -C, -e, -f, -h, -m, -n, -t, -u, -v, -x"
-echo "✓ Named Options: ignoreeof, nolog, emacs, vi, posix, pipefail"
-echo "✓ Named Options: histexpand, history, interactive-comments, braceexpand"
-echo "✓ Named Options: physical, privileged"
-echo "✓ Integration: Option combinations, inheritance, error handling"
-echo "✓ Compliance: POSIX standard behavior verification"
+echo "OK Basic Options: -a, -b, -C, -e, -f, -h, -m, -n, -t, -u, -v, -x"
+echo "OK Named Options: ignoreeof, nolog, emacs, vi, posix, pipefail"
+echo "OK Named Options: histexpand, history, interactive-comments, braceexpand"
+echo "OK Named Options: physical, privileged"
+echo "OK Integration: Option combinations, inheritance, error handling"
+echo "OK Compliance: POSIX standard behavior verification"
 
 echo -e "\nTest completed at: $(date)"
 echo -e "${BLUE}This validation confirms the comprehensive POSIX options implementation claimed in the handoff document.${NC}"

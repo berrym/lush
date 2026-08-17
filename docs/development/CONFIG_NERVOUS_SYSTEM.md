@@ -18,26 +18,26 @@ variables and `fish_config`, and that single move is the most-loved thing about
 fish. The cost is a brutal learning curve: customizing a shell means learning a
 pile of unrelated, poorly-documented, inconsistent tools.
 
-Lush takes the opposite stance. There is **one** configuration store — a central
-nervous system — and a small set of discoverable, easy-to-use front-ends over
+Lush takes the opposite stance. There is **one** configuration store -- a central
+nervous system -- and a small set of discoverable, easy-to-use front-ends over
 it. This is an **alternative, not a replacement**: power users keep editing the
 TOML file by hand; beginners get a guided, discoverable path; both see the same
 truth. The goal is to make a *powerful* shell *learnable to customize*, which is
 a genuine differentiator. Lush distinguishes itself by **innovating**, not by
 copying the older shells' fragmentation.
 
-This vision is convergent with the best configuration systems in existence —
+This vision is convergent with the best configuration systems in existence --
 GNOME's GSettings/dconf, Nix's module system, Emacs' Customize, git's layered
 config, VS Code's settings. We arrived at the same shape from first principles;
 where this document is specific, it is because those systems proved the pattern
-and we are stealing it deliberately (§8).
+and we are stealing it deliberately (S8).
 
 ## 2. The Model
 
 CREG (the config registry) is, in one sentence:
 
-> a **schema-first, reactive, layered** configuration store — the single source
-> of truth — where runtime, file (TOML), env, and mode-presets are *layers* over
+> a **schema-first, reactive, layered** configuration store -- the single source
+> of truth -- where runtime, file (TOML), env, and mode-presets are *layers* over
 > it with explicit precedence and provenance; subsystems *bind* to keys instead
 > of hand-syncing; and every surface (the `config` CLI, the `display` front-end,
 > a schema-generated wizard, the TOML file) is a generated or curated *view* of
@@ -45,19 +45,19 @@ CREG (the config registry) is, in one sentence:
 
 Four pillars:
 
-1. **Schema-first** — every option is declared once with type, default,
+1. **Schema-first** -- every option is declared once with type, default,
    range/enum, docs, and a discoverability tier. That one declaration drives
    validation, `config show`, completion, help, and (planned) the wizard.
    *(PLANNED: the full type vtable; today options carry type + default + help.)*
-2. **Reactive via bindings** — a binding ties a key to the real runtime lvalue;
+2. **Reactive via bindings** -- a binding ties a key to the real runtime lvalue;
    the registry is its single writer and write-throughs every change. This
    replaces hand-written sync hooks and the entire "phantom sync" bug class.
    **(PROVEN.)**
-3. **Layered** — each option holds an independent value per layer; the effective
+3. **Layered** -- each option holds an independent value per layer; the effective
    value is the highest-precedence present layer. Writes route to a layer by
    source. This gives precedence, provenance, and the mode-clobber fix for free.
    **(PROVEN.)**
-4. **Single source of truth** — the registry *is* the truth. The legacy
+4. **Single source of truth** -- the registry *is* the truth. The legacy
    `config_options[]` table and the parallel C struct are retired section by
    section as each migrates. *(IN PROGRESS: `history.*` migrated; the global
    `config` struct survives as a passive binding target, not a peer source.)*
@@ -68,13 +68,13 @@ Every configuration change is held against these:
 
 - **One source of truth.** A value lives in the registry. Runtime fields are
   bound *caches*, never peer sources. Two write paths to the same value is a bug.
-- **Declare once.** Type, default, docs, tier, binding — one declaration, many
+- **Declare once.** Type, default, docs, tier, binding -- one declaration, many
   consumers. No fact about an option is stated twice.
 - **No hand-written sync.** Bindings replace `sync_to_runtime`/`sync_from_runtime`.
-  If you find yourself writing a function that copies registry→struct, stop.
+  If you find yourself writing a function that copies registry->struct, stop.
 - **Precedence is explicit, provenance is free.** Layers, not ad-hoc overrides.
   Every value can answer "where did I come from."
-- **Settings are data; behavior is code (§7).** CREG stores settings and named
+- **Settings are data; behavior is code (S7).** CREG stores settings and named
   tables; it never stores imperative behavior.
 - **Discoverability is a content discipline.** Every key ships with a real
   description and a sensible tier, or it does not ship. A flat key dump is a
@@ -88,7 +88,7 @@ Every configuration change is held against these:
 
 ## 4. The mechanism (proven)
 
-### 4.1 Bindings — the keystone
+### 4.1 Bindings -- the keystone
 
 ```c
 config_registry_bind_boolean("history.enabled", &config.history_enabled);
@@ -101,9 +101,9 @@ A binding is a typed pointer to the runtime cell plus an optional `on_change`
 side-effect hook. `config_registry_set` (the single writer) does, in order:
 resolve the option, validate, write the addressed **layer slot**, recompute the
 effective value, **write-through** the bound cell (mapping an enum-string to its
-int once, here — deleting strcmp ladders), run `on_change` if present, then
-notify subscribers. Every set path — interactive `config set`, TOML load, mode
-preset — funnels through this, so bound cells stay current with **zero**
+int once, here -- deleting strcmp ladders), run `on_change` if present, then
+notify subscribers. Every set path -- interactive `config set`, TOML load, mode
+preset -- funnels through this, so bound cells stay current with **zero**
 hand-written sync.
 
 Two properties matter:
@@ -120,7 +120,7 @@ Proven on `history.*`: the section's two sync hooks and its enum strcmp ladders
 were deleted; `config set`, per-mode defaults, and `lushrc.toml` all reach
 `config.history_*` through the binding; full suite green.
 
-### 4.2 Layers — precedence and provenance
+### 4.2 Layers -- precedence and provenance
 
 ```
 DEFAULT < MODE < SYSTEM < USER(toml) < SESSION(config set)
@@ -128,18 +128,18 @@ DEFAULT < MODE < SYSTEM < USER(toml) < SESSION(config set)
 
 Each option holds one value per layer (`creg_layer_view_t slots[]`). The
 effective value is the highest present layer (a pure resolve). Writes route by
-source: registration → DEFAULT, mode preset → MODE, `lushrc.toml` → USER,
-interactive `config set` → SESSION.
+source: registration -> DEFAULT, mode preset -> MODE, `lushrc.toml` -> USER,
+interactive `config set` -> SESSION.
 
 This **structurally** fixes the mode-default clobber. `apply_mode_defaults`
 clears the MODE layer wholesale and re-seeds it, so an interactive `config set`
 (SESSION) sits above MODE and survives a mode switch, while a stale preset from
-the previous mode falls away. No special-case code — the precedence does it.
+the previous mode falls away. No special-case code -- the precedence does it.
 
 `config reset KEY` clears the SESSION layer and re-resolves (the value falls
 through to file / mode / default), rather than stamping the static default.
 
-### 4.3 Provenance — `config explain`
+### 4.3 Provenance -- `config explain`
 
 Because layers are explicit, `config_registry_inspect` reports the effective
 value, the winning layer, and every present layer's value + origin for free:
@@ -153,42 +153,42 @@ history.finder.match = prefix  (from session)
        default  = fuzzy          [default]
 ```
 
-This is the "lush knows why" guarantee applied to configuration itself — the
+This is the "lush knows why" guarantee applied to configuration itself -- the
 shadowed stack that answers *what is this, and where did it come from*. git's
 `--show-origin` and VS Code's `inspect()` do this; no shell does.
 
 ## 5. Surfaces (all views over the one store)
 
-- **`config` builtin** — speaks CREG keys natively (`get`/`set`/`explain`/
+- **`config` builtin** -- speaks CREG keys natively (`get`/`set`/`explain`/
   `show`/`save`). The universal surface; can reach anything. *(PROVEN: get/set/
   explain route through the registry; `show` registry-awareness is PLANNED.)*
-- **`display` builtin** — a specialized, ergonomic front-end to the layered
+- **`display` builtin** -- a specialized, ergonomic front-end to the layered
   display/LLE engine and its subsystems (autosuggestions, completion, syntax,
   history, themes, transient, pager, performance/health monitoring). Convenient
   and discoverable; every setting it changes syncs through CREG. It is
-  *deliberately* a curated view — redundant with the raw `config` builtin the
+  *deliberately* a curated view -- redundant with the raw `config` builtin the
   way a settings GUI is redundant with a config file, and just as worth having.
   *(IN PROGRESS: several subcommands synced; full coverage is the display-builtin
   workstream.)*
-- **`setopt` / `set`** — the POSIX/bash/zsh-compatible surface, mapped onto CREG
+- **`setopt` / `set`** -- the POSIX/bash/zsh-compatible surface, mapped onto CREG
   keys. *(PLANNED: route through the registry as thin projections of the engine
   store.)*
-- **`lushrc.toml`** — the persisted serialization of the store, for power users
+- **`lushrc.toml`** -- the persisted serialization of the store, for power users
   who edit by hand. First-class, not an afterthought. `config save` materializes
   the runtime store into it; `config diff` (PLANNED) shows runtime vs saved.
-- **env vars** — an override layer for `$LUSH_*` knobs. *(PLANNED.)*
-- **Wizard** — a schema-generated, live-preview guided setup that walks the
-  beginner tier and writes commented TOML. *(PLANNED; §7.)*
+- **env vars** -- an override layer for `$LUSH_*` knobs. *(PLANNED.)*
+- **Wizard** -- a schema-generated, live-preview guided setup that walks the
+  beginner tier and writes commented TOML. *(PLANNED; S7.)*
 
-## 6. Config vs Code — the boundary
+## 6. Config vs Code -- the boundary
 
 The most important line in the design. It resolves what does and does not belong
 in CREG:
 
-- **Settings and named-relation tables are data → CREG.** Scalars (booleans,
+- **Settings and named-relation tables are data -> CREG.** Scalars (booleans,
   ints, enums, strings), and keyed tables (keybindings, aliases, prompt segments,
   theme data). These are declarative and belong in the store.
-- **Imperative behavior is code → the rc script.** Shell functions, hooks
+- **Imperative behavior is code -> the rc script.** Shell functions, hooks
   implemented as code, custom widgets implemented as logic. These are *executed*,
   not stored as data. CREG stores their **enablement and parameters** (is this
   hook on? with what threshold?), never the behavior itself.
@@ -202,21 +202,21 @@ lives in the script and is re-executed.
 
 ## 7. The features that make it a category better
 
-- **Provenance** (`config explain`) — *(PROVEN.)* "What, and from where."
-- **Scopes** — session (try) vs persisted (keep); `config save` materializes,
+- **Provenance** (`config explain`) -- *(PROVEN.)* "What, and from where."
+- **Scopes** -- session (try) vs persisted (keep); `config save` materializes,
   `config diff` shows the delta. *(PARTIAL: SESSION/USER layers PROVEN; `config
   save` exists; `config diff` PLANNED.)*
-- **Schema-driven validation** — one canonical parser/validator per type via the
+- **Schema-driven validation** -- one canonical parser/validator per type via the
   type vtable; bad values rejected with a precise, typed error. *(PLANNED: the
   vtable; today validation is per-key.)*
-- **Versioning + migration** — the schema carries a version; older TOML migrates
+- **Versioning + migration** -- the schema carries a version; older TOML migrates
   forward automatically, so options can be renamed/refactored without breaking
   users. This is what makes the system *evolvable* under heavy development.
   *(PLANNED.)*
-- **Discoverability** — tiers (beginner/common/advanced/expert) + mandatory
+- **Discoverability** -- tiers (beginner/common/advanced/expert) + mandatory
   descriptions, fed to `config show`, completion, help, and the wizard from one
   schema. *(PLANNED: tiers; descriptions exist as `help` today.)*
-- **The wizard** — generated *from the schema* (so it is never the hand-coded,
+- **The wizard** -- generated *from the schema* (so it is never the hand-coded,
   shallow thing zsh ships), walking the beginner tier with plain-language
   explanations and a **live preview** (change it, watch the prompt/editor change
   now), writing commented TOML at the end. Built last, as a view, once the schema
@@ -224,21 +224,21 @@ lives in the script and is re-executed.
 
 ## 8. Research backbone (what each system contributed)
 
-- **GNOME GSettings/dconf** — the closest proven analog: a schema-backed reactive
+- **GNOME GSettings/dconf** -- the closest proven analog: a schema-backed reactive
   store with *bindings* and a layered database, multiple surfaces over one
   schema. The binding model and the "compile = validate" idea come from here
   (we keep the validation as a CI/startup check and avoid the external
   `glib-compile-schemas` toolchain).
-- **Nix/NixOS module system** — `mkOption {type; default; example; description}`:
+- **Nix/NixOS module system** -- `mkOption {type; default; example; description}`:
   the gold standard for *schema-generates-typed-docs* and option precedence.
-- **Emacs `defcustom`** — `:type`/`:set`/`:group`: the apply-on-change callback
-  (our `on_change`) and "the declaration generates the UI" — 40 years of proof,
+- **Emacs `defcustom`** -- `:type`/`:set`/`:group`: the apply-on-change callback
+  (our `on_change`) and "the declaration generates the UI" -- 40 years of proof,
   with the cautionary tale of a clunky Customize UI to avoid.
-- **git config** — multi-level layering and `--show-origin`: our layers and
+- **git config** -- multi-level layering and `--show-origin`: our layers and
   provenance.
-- **VS Code settings** — scopes, file-and-GUI as equal views, schema-driven UI:
+- **VS Code settings** -- scopes, file-and-GUI as equal views, schema-driven UI:
   our surfaces and scopes.
-- **Kubernetes / systemd** — reconciliation (desired-state → reality) and
+- **Kubernetes / systemd** -- reconciliation (desired-state -> reality) and
   drop-in layering: the reactive mental model and the layer cascade.
 
 ## 9. Migration strategy (strangler)
@@ -246,7 +246,7 @@ lives in the script and is re-executed.
 One section at a time, behind the unchanged `config_registry_get/set` API, build
 green at every step:
 
-1. Add the new mechanism (bindings, layers) to the registry core — done.
+1. Add the new mechanism (bindings, layers) to the registry core -- done.
 2. Migrate a section: bind its keys, delete its sync hooks, remove its rows from
    the legacy `config_options[]` table, drop now-dead enum machinery, update any
    tests that encoded the old semantics.
@@ -275,14 +275,14 @@ becomes the sole store.
 ## 11. Open questions (deliberate, not yet decided)
 
 - **Composite/dynamic values.** Keybindings, aliases, widgets/hooks/segments are
-  name→value tables, and the value model today is scalar. A map/dynamic-key type
+  name->value tables, and the value model today is scalar. A map/dynamic-key type
   (a CREG `GVariant`-like) is needed for true `config save`/`show` coverage of
-  those surfaces — vs keeping them in dedicated files with declarative
-  re-execution. The config-vs-code boundary (§6) frames this: their *config* is
+  those surfaces -- vs keeping them in dedicated files with declarative
+  re-execution. The config-vs-code boundary (S6) frames this: their *config* is
   data, their *behavior* is code.
-- **Theme persistence key** — `display.lle.theme` (parallel to
+- **Theme persistence key** -- `display.lle.theme` (parallel to
   `display.lle.pager.*`); the dead legacy `prompt.*`/`prompt.theme*` family was
   removed rather than reused.
-- **Reset granularity** — a `config reset [key|section|all]` surface, and whether
+- **Reset granularity** -- a `config reset [key|section|all]` surface, and whether
   a distinct `display lle defaults` exists alongside the editor-recovery
   `display lle reset`.

@@ -34,7 +34,7 @@
  * buffer fills (typically 64 KB). The capturing process is also the
  * writer here, so a blocking write would deadlock. Temp files have no
  * such limit; data is read back after the captured call returns. The
- * captured-output buffers are bounded at 4 KB each — tests producing
+ * captured-output buffers are bounded at 4 KB each -- tests producing
  * more should split, page, or escalate to a subprocess capture.
  */
 
@@ -177,7 +177,7 @@ static inline run_result_t run_shell(const char *src) {
 /* ============================================================================
  * Subprocess execution
  *
- * Use these when the test needs a fresh process state — exit, signals,
+ * Use these when the test needs a fresh process state -- exit, signals,
  * trap firing, or anything else the in-process executor short-circuits.
  * ============================================================================
  */
@@ -247,7 +247,7 @@ static inline run_result_t run_shell_subprocess(const char *src) {
     }
 
     /// Use the project's fork wrapper so any pending stdio buffer
-    /// content is flushed before the child inherits it — otherwise
+    /// content is flushed before the child inherits it -- otherwise
     /// captured output may include duplicated bytes from the parent's
     /// pre-fork stdio state.
     pid_t pid = lush_fork();
@@ -354,7 +354,7 @@ static inline node_t *node_child(const node_t *n, size_t index) {
 /**
  * @brief First WORD-typed child string of a NODE_COMMAND, or NULL
  *
- * Looks for the first child whose val_type is VAL_STR — typically the
+ * Looks for the first child whose val_type is VAL_STR -- typically the
  * command name itself for a NODE_COMMAND. Returns NULL if no such child
  * exists or the node has no children.
  */

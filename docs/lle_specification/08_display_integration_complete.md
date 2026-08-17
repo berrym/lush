@@ -5,7 +5,7 @@
 **Date**: 2025-10-11  
 **Status**: Research-Validated and Audit-Complete Specification  
 **Classification**: Critical Core Component  
-**Audit Status**: ✅ FULLY COMPLIANT - Research-validated Terminal State Abstraction Layer architecture
+**Audit Status**: OK FULLY COMPLIANT - Research-validated Terminal State Abstraction Layer architecture
 
 ---
 
@@ -2231,24 +2231,24 @@ lle_result_t lle_display_color_table(lle_color_scheme_t *scheme, bool verbose) {
     }
     
     printf("Current Color Scheme: %s\n", scheme->name ? scheme->name : "Default");
-    printf("┌─────────────────────┬──────────┬──────────────────────┐\n");
-    printf("│ Color Category      │ Value    │ Description          │\n");
-    printf("├─────────────────────┼──────────┼──────────────────────┤\n");
-    printf("│ Primary             │ %s      │ Main interface color │\n", scheme->primary_color);
-    printf("│ Secondary           │ %s      │ Secondary UI color   │\n", scheme->secondary_color);
-    printf("│ Background          │ %s      │ Background color     │\n", scheme->background_color);
-    printf("│ Text                │ %s      │ Primary text color   │\n", scheme->text_color);
-    printf("│ Highlight           │ %s      │ Selection highlight  │\n", scheme->highlight_color);
+    printf("+---------------------+----------+----------------------+\n");
+    printf("| Color Category      | Value    | Description          |\n");
+    printf("+---------------------+----------+----------------------+\n");
+    printf("| Primary             | %s      | Main interface color |\n", scheme->primary_color);
+    printf("| Secondary           | %s      | Secondary UI color   |\n", scheme->secondary_color);
+    printf("| Background          | %s      | Background color     |\n", scheme->background_color);
+    printf("| Text                | %s      | Primary text color   |\n", scheme->text_color);
+    printf("| Highlight           | %s      | Selection highlight  |\n", scheme->highlight_color);
     
     if (verbose) {
-        printf("├─────────────────────┼──────────┼──────────────────────┤\n");
-        printf("│ Error               │ %s      │ Error text color     │\n", scheme->error_color);
-        printf("│ Warning             │ %s      │ Warning text color   │\n", scheme->warning_color);
-        printf("│ Success             │ %s      │ Success text color   │\n", scheme->success_color);
-        printf("│ Info                │ %s      │ Information color    │\n", scheme->info_color);
+        printf("+---------------------+----------+----------------------+\n");
+        printf("| Error               | %s      | Error text color     |\n", scheme->error_color);
+        printf("| Warning             | %s      | Warning text color   |\n", scheme->warning_color);
+        printf("| Success             | %s      | Success text color   |\n", scheme->success_color);
+        printf("| Info                | %s      | Information color    |\n", scheme->info_color);
     }
     
-    printf("└─────────────────────┴──────────┴──────────────────────┘\n");
+    printf("+---------------------+----------+----------------------+\n");
     return LLE_SUCCESS;
 }
 
@@ -2673,12 +2673,12 @@ lle_performance_requirement_t display_performance_requirements[] = {
     {
         .metric_name = "buffer_render_time",
         .max_value_ns = 250000,  // 250 microseconds maximum
-        .description = "Buffer rendering must complete within 250μs"
+        .description = "Buffer rendering must complete within 250us"
     },
     {
         .metric_name = "cursor_update_time",
         .max_value_ns = 50000,   // 50 microseconds maximum
-        .description = "Cursor updates must complete within 50μs"
+        .description = "Cursor updates must complete within 50us"
     },
     {
         .metric_name = "cache_hit_ratio",
@@ -2781,7 +2781,7 @@ lle_implementation_phase_t display_integration_phases[] = {
 
 ---
 
-## 🎮 **COMMAND INTERFACE INTEGRATION**
+## **COMMAND INTERFACE INTEGRATION**
 
 ### **Display Command Extensions**
 
@@ -2946,7 +2946,7 @@ int lle_handle_display_status_command(int argc, char **argv) {
         if (lle_get_display_performance_stats(&stats) == LLE_SUCCESS) {
             printf("\nPerformance Statistics:\n");
             printf("  Render Operations: %zu\n", stats.render_operations);
-            printf("  Average Render Time: %zu μs\n", stats.avg_render_time_us);
+            printf("  Average Render Time: %zu us\n", stats.avg_render_time_us);
             printf("  Cache Hit Rate: %.2f%%\n", stats.cache_hit_rate * 100.0);
             printf("  Memory Usage: %zu KB\n", stats.memory_usage_kb);
         }

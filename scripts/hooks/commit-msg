@@ -9,23 +9,30 @@ COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
 CHECKS_FAILED=0
 
 # ============================================================================
-# UNIVERSAL EMOJI CHECK - APPLIES TO ALL COMMITS
+# UNIVERSAL ASCII CHECK - APPLIES TO ALL COMMITS
 # ============================================================================
 
-# ZERO TOLERANCE ENFORCEMENT: Block emoji in commit messages (ALL COMMITS)
-echo "Checking commit message for emoji..."
-if echo "$COMMIT_MSG" | grep -qE "✅|❌|⚠️|✓|✗|🔥|💯|⭐|📝|📋|🚀|🎯|💡|⚡|🔧|🛠️|📦|🎨|♻️|🔒|🚨|💻|📁|🛠|⚙️|🔨"; then
-    echo "❌ ZERO TOLERANCE VIOLATION: Emoji detected in commit message"
+# A commit message must contain ASCII bytes only. This supersedes the older
+# check, which enumerated about two dozen specific emoji and therefore let
+# every other non-ASCII byte through: a pasted em dash, a smart quote, an
+# arrow. Enumerating the forbidden set is unbounded; requiring the permitted
+# set is one rule.
+echo "Checking commit message for non-ASCII bytes..."
+BAD_LINES=$(perl -ne 'next if /^#/; printf("%d: %s", $., $_) if /[^\x00-\x7F]/' "$COMMIT_MSG_FILE" 2>/dev/null || true)
+if [ -n "$BAD_LINES" ]; then
+    echo "ZERO TOLERANCE VIOLATION: non-ASCII byte in commit message"
     echo ""
-    echo "FORBIDDEN: Professional git commits MUST NOT contain emoji"
-    echo "This violates professional development standards and git log clarity"
+    echo "Commit messages are ASCII only -- no emoji, em dashes, smart quotes,"
+    echo "arrows or accented characters. Offending lines:"
     echo ""
-    echo "Found emoji in commit message. Please remove all emoji characters."
-    echo "Use plain text only: 'FIXED', 'COMPLETE', 'WARNING' instead of emoji"
+    printf '%s\n' "$BAD_LINES" | sed 's/^/    /'
+    echo ""
+    echo "Use plain text: -- for an em dash, -> for an arrow, OK/FAIL/WARNING"
+    echo "instead of symbols."
     echo ""
     CHECKS_FAILED=1
 else
-    echo "✓ No emoji detected in commit message"
+    echo "OK: commit message is ASCII"
 fi
 
 # ============================================================================
@@ -39,7 +46,7 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
     echo "Checking LLE commit message prefix..."
 
     if ! echo "$COMMIT_MSG" | grep -q "^LLE"; then
-        echo "❌ POLICY VIOLATION: LLE commits must start with 'LLE' prefix"
+        echo "FAIL POLICY VIOLATION: LLE commits must start with 'LLE' prefix"
         echo ""
         echo "REQUIRED: LLE-related commits must begin with 'LLE' for git history clarity"
         echo "Example: 'LLE Spec 03 Phase 1: Buffer Management Foundation'"
@@ -49,12 +56,12 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
         echo ""
         CHECKS_FAILED=1
     else
-        echo "✓ LLE commit message prefix present"
+        echo "OK LLE commit message prefix present"
     fi
 
     # ZERO TOLERANCE ENFORCEMENT: Block false compliance claims (INFO ONLY)
     if echo "$COMMIT_MSG" | grep -qE "100% compliant|100% complete|zero stubs|zero TODOs|fully compliant|complete compliance"; then
-        echo "📋 POLICY REMINDER: Compliance claim detected in commit message"
+        echo "POLICY REMINDER: Compliance claim detected in commit message"
         echo ""
         echo "Claims like '100% compliant', 'zero stubs', 'fully compliant' require verification."
         echo "Ensure your code actually meets these claims before committing."
@@ -67,7 +74,7 @@ fi
 if [ $CHECKS_FAILED -eq 1 ]; then
     echo ""
     echo "========================================="
-    echo "❌ COMMIT MESSAGE CHECKS FAILED"
+    echo "FAIL COMMIT MESSAGE CHECKS FAILED"
     echo "========================================="
     echo "Fix the violations above before committing."
     echo ""

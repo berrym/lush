@@ -1561,7 +1561,7 @@ bool test_multiline_for_loop_reconstruction(void) {
 - **Reconstruction Speed**: <0.5ms for simple commands, <2ms for complex multiline constructs  
 - **Memory Efficiency**: <1MB baseline usage with efficient scaling
 - **Cache Performance**: >75% hit rate for reconstruction cache
-- **Event Processing**: <100μs for history-buffer integration events
+- **Event Processing**: <100us for history-buffer integration events
 - **Session Management**: <1ms session creation and cleanup
 
 **Quality Requirements:**

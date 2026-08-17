@@ -20,7 +20,7 @@
 
 #include "test_framework.h"
 
-/* Local 1-arg ASSERT family (cond only — no message) wrapping the
+/* Local 1-arg ASSERT family (cond only -- no message) wrapping the
  * framework's failure mechanism, replacing the historical exit(1)
  * pattern with longjmp-based isolation per RUN_TEST. */
 #undef ASSERT
@@ -335,7 +335,7 @@ TEST(powerline_strips_segment_ansi) {
 
     /// The directory segment normally embeds ESC[38;5;33m for path_normal
     /// color. In powerline mode this must NOT appear inside the content
-    /// area — only the powerline renderer's own 48;5;33 (bg) should use
+    /// area -- only the powerline renderer's own 48;5;33 (bg) should use
     /// color 33. Check that 38;5;33m appears only in separator contexts
     /// (where fg is set to directory's bg), not before path text.
     const char *path_text = strstr(output, "~/project");

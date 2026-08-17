@@ -30,6 +30,6 @@ if ! ./scripts/lle_architectural_compliance_check.sh; then
 fi
 
 echo ""
-echo "✓ Architectural compliance verified"
+echo "OK Architectural compliance verified"
 echo ""
 exit 0

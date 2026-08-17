@@ -345,7 +345,7 @@ precmd() {
 ## Extending the Shell (without a Plugin Loader)
 
 Lush does **not yet** ship a dedicated plugin loader / manager.
-That work is tracked under "User extensibility / plugins — Not yet
+That work is tracked under "User extensibility / plugins -- Not yet
 implemented" in the README. What lush does ship today is enough to
 build the same patterns by composing existing mechanisms:
 
@@ -433,7 +433,7 @@ git_status_unload() {
 
 The eventual plugin manager will add: enable/disable lifecycle,
 dependency resolution, a permission model, and a repository surface.
-Conventions in this document are designed to migrate forward — an
+Conventions in this document are designed to migrate forward -- an
 extension organized as `~/.config/lush/extensions/<name>/init.lush`
 will be a one-line move to whatever the manager ends up requiring.
 

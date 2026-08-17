@@ -38,9 +38,9 @@ trap cleanup EXIT
 show_section() {
     local title="$1"
     echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}===============================================================================${NC}"
     echo -e "${YELLOW}$title${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}===============================================================================${NC}"
     echo ""
 }
 
@@ -51,14 +51,14 @@ show_result() {
     local details="$3"
 
     if [ "$status" = "PASS" ]; then
-        echo -e "${GREEN}✓ PASS${NC}: $test_name"
+        echo -e "${GREEN}OK PASS${NC}: $test_name"
         [ -n "$details" ] && echo -e "  ${BLUE}$details${NC}"
     elif [ "$status" = "FAIL" ]; then
-        echo -e "${RED}✗ FAIL${NC}: $test_name"
+        echo -e "${RED}FAIL FAIL${NC}: $test_name"
         [ -n "$details" ] && echo -e "  ${RED}$details${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     elif [ "$status" = "WARN" ]; then
-        echo -e "${YELLOW}⚠ WARN${NC}: $test_name"
+        echo -e "${YELLOW}WARN WARN${NC}: $test_name"
         [ -n "$details" ] && echo -e "  ${YELLOW}$details${NC}"
         WARNING_TESTS=$((WARNING_TESTS + 1))
     fi
@@ -73,9 +73,9 @@ WARNING_TESTS=0
 
 # Clear screen and show header
 clear
-echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║${NC}                     ${YELLOW}LUSH v1.0.0 RELEASE VERIFICATION${NC}                     ${CYAN}║${NC}"
-echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}+===============================================================================+${NC}"
+echo -e "${CYAN}|${NC}                     ${YELLOW}LUSH v1.0.0 RELEASE VERIFICATION${NC}                     ${CYAN}|${NC}"
+echo -e "${CYAN}+===============================================================================+${NC}"
 echo ""
 echo -e "${BLUE}Verifying LUSH v1.0.0 production release readiness...${NC}"
 echo -e "${BLUE}Expected Version: $EXPECTED_VERSION${NC}"
@@ -507,54 +507,54 @@ echo ""
 
 # Final determination - more lenient for v1.0.0 release
 if [ $FAILED_TESTS -eq 0 ] && [ $PRODUCTION_CRITERIA -ge 7 ]; then
-    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║${NC}                          ${GREEN}✅ RELEASE APPROVED ✅${NC}                          ${GREEN}║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${GREEN}+===============================================================================+${NC}"
+    echo -e "${GREEN}|${NC}                          ${GREEN}[OK] RELEASE APPROVED [OK]${NC}                          ${GREEN}|${NC}"
+    echo -e "${GREEN}+===============================================================================+${NC}"
     echo ""
-    echo -e "${GREEN}🎉 LUSH v1.0.0 IS READY FOR PRODUCTION RELEASE!${NC}"
+    echo -e "${GREEN}LUSH v1.0.0 IS READY FOR PRODUCTION RELEASE!${NC}"
     echo ""
-    echo -e "${GREEN}✅ VERIFICATION SUMMARY:${NC}"
-    echo -e "  • POSIX Compliance: 100% verified"
-    echo -e "  • Feature Completeness: All major features working"
-    echo -e "  • Performance: Within acceptable limits"
-    echo -e "  • Documentation: Complete and up-to-date"
-    echo -e "  • Security: Basic security checks passed"
-    echo -e "  • Compatibility: POSIX script compatibility verified"
+    echo -e "${GREEN}[OK] VERIFICATION SUMMARY:${NC}"
+    echo -e "  * POSIX Compliance: 100% verified"
+    echo -e "  * Feature Completeness: All major features working"
+    echo -e "  * Performance: Within acceptable limits"
+    echo -e "  * Documentation: Complete and up-to-date"
+    echo -e "  * Security: Basic security checks passed"
+    echo -e "  * Compatibility: POSIX script compatibility verified"
     echo ""
     echo -e "${CYAN}Ready for:${NC}"
-    echo -e "  🏢 Enterprise deployment"
-    echo -e "  👥 End user adoption"
-    echo -e "  🔧 System administration"
-    echo -e "  💻 Development environments"
+    echo -e "  Enterprise deployment"
+    echo -e "  End user adoption"
+    echo -e "  System administration"
+    echo -e "  Development environments"
     echo ""
     exit 0
 
 elif [ $FAILED_TESTS -le 1 ] && [ $WARNING_TESTS -le 8 ]; then
-    echo -e "${YELLOW}╔═══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║${NC}                        ${YELLOW}⚠️  CONDITIONAL APPROVAL ⚠️${NC}                        ${YELLOW}║${NC}"
-    echo -e "${YELLOW}╚═══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${YELLOW}+===============================================================================+${NC}"
+    echo -e "${YELLOW}|${NC}                        ${YELLOW}WARN CONDITIONAL APPROVAL WARN${NC}                        ${YELLOW}|${NC}"
+    echo -e "${YELLOW}+===============================================================================+${NC}"
     echo ""
-    echo -e "${YELLOW}🔍 LUSH v1.0.0 can be released with minor caveats${NC}"
+    echo -e "${YELLOW}LUSH v1.0.0 can be released with minor caveats${NC}"
     echo ""
-    echo -e "${YELLOW}⚠️  REVIEW REQUIRED:${NC}"
-    echo -e "  • $WARNING_TESTS warnings need review"
-    echo -e "  • Performance may need optimization"
-    echo -e "  • Some features may need refinement"
+    echo -e "${YELLOW}WARN REVIEW REQUIRED:${NC}"
+    echo -e "  * $WARNING_TESTS warnings need review"
+    echo -e "  * Performance may need optimization"
+    echo -e "  * Some features may need refinement"
     echo ""
     echo -e "${BLUE}Recommendation: Address warnings and re-verify${NC}"
     exit 1
 
 else
-    echo -e "${RED}╔═══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║${NC}                          ${RED}❌ RELEASE BLOCKED ❌${NC}                          ${RED}║${NC}"
-    echo -e "${RED}╚═══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${RED}+===============================================================================+${NC}"
+    echo -e "${RED}|${NC}                          ${RED}FAIL RELEASE BLOCKED FAIL${NC}                          ${RED}|${NC}"
+    echo -e "${RED}+===============================================================================+${NC}"
     echo ""
-    echo -e "${RED}🚫 LUSH v1.0.0 IS NOT READY FOR RELEASE${NC}"
+    echo -e "${RED}LUSH v1.0.0 IS NOT READY FOR RELEASE${NC}"
     echo ""
-    echo -e "${RED}❌ CRITICAL ISSUES:${NC}"
-    echo -e "  • $FAILED_TESTS tests failed"
-    echo -e "  • $WARNING_TESTS warnings present"
-    echo -e "  • Production criteria: $PRODUCTION_CRITERIA/$PRODUCTION_TOTAL met"
+    echo -e "${RED}FAIL CRITICAL ISSUES:${NC}"
+    echo -e "  * $FAILED_TESTS tests failed"
+    echo -e "  * $WARNING_TESTS warnings present"
+    echo -e "  * Production criteria: $PRODUCTION_CRITERIA/$PRODUCTION_TOTAL met"
     echo ""
     echo -e "${RED}Required actions:${NC}"
     echo -e "  1. Fix all failing tests"

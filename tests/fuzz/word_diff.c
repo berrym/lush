@@ -150,8 +150,9 @@ int main(int argc, char **argv) {
     setenv("X", "a b c", 1);
     setenv("Y", "cd", 1);
     setenv("E", "", 1);
-    setenv("U", "café", 1); /// multi-byte, for the grapheme-aware operators
-    unsetenv("IFS");        /// default IFS
+    setenv("U", "caf\xc3\xa9",
+           1);       /// multi-byte, for the grapheme-aware operators
+    unsetenv("IFS"); /// default IFS
     /// Pin the reference lush to the LEGACY expander so a covered line is
     /// compared CST-vs-legacy rather than CST-vs-CST (see the lu_argv comment).
     /// wordtool ignores this variable -- it IS the CST -- so one setenv here

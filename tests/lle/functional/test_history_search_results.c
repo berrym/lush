@@ -46,19 +46,19 @@ static int tests_failed = 0;
 #define TEST_PASS()                                                            \
     do {                                                                       \
         tests_passed++;                                                        \
-        printf("  ✓ PASS\n");                                                  \
+        printf("  \xe2\x9c\x93 PASS\n");                                       \
     } while (0)
 
 #define TEST_FAIL(msg)                                                         \
     do {                                                                       \
         tests_failed++;                                                        \
-        printf("  ✗ FAIL: %s\n", msg);                                         \
+        printf("  \xe2\x9c\x97 FAIL: %s\n", msg);                              \
     } while (0)
 
 #define ASSERT_EQ(actual, expected, msg)                                       \
     do {                                                                       \
         if ((actual) != (expected)) {                                          \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             printf("    Expected: %ld, Got: %ld\n", (long)(expected),          \
                    (long)(actual));                                            \
             TEST_FAIL(msg);                                                    \
@@ -69,7 +69,7 @@ static int tests_failed = 0;
 #define ASSERT_TRUE(cond, msg)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             TEST_FAIL(msg);                                                    \
             return;                                                            \
         }                                                                      \
@@ -78,7 +78,7 @@ static int tests_failed = 0;
 #define ASSERT_NOT_NULL(ptr, msg)                                              \
     do {                                                                       \
         if ((ptr) == NULL) {                                                   \
-            printf("  ✗ ASSERTION FAILED: %s (got NULL)\n", msg);              \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s (got NULL)\n", msg);   \
             TEST_FAIL(msg);                                                    \
             return;                                                            \
         }                                                                      \
@@ -87,7 +87,8 @@ static int tests_failed = 0;
 #define ASSERT_NULL(ptr, msg)                                                  \
     do {                                                                       \
         if ((ptr) != NULL) {                                                   \
-            printf("  ✗ ASSERTION FAILED: %s (expected NULL)\n", msg);         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s (expected NULL)\n",    \
+                   msg);                                                       \
             TEST_FAIL(msg);                                                    \
             return;                                                            \
         }                                                                      \
@@ -183,13 +184,14 @@ void test_exact_match_nfc_nfd_equivalence(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    /// Entry stored in NFC form: "café" = caf + e-acute (U+00E9, bytes C3 A9)
+    /// Entry stored in NFC form: "cafe-acute" = caf + e-acute (U+00E9, bytes C3
+    /// A9)
     lle_history_add_entry(core, "caf\xC3\xA9", 0, NULL);
     /// Unrelated entry for noise.
     lle_history_add_entry(core, "echo hello", 0, NULL);
 
-    /// Query in NFD form: "café" = caf + e + combining acute (U+0301, CC 81)
-    /// Must match the NFC-stored entry under NFC equivalence.
+    /// Query in NFD form: "cafe-acute" = caf + e + combining acute (U+0301, CC
+    /// 81) Must match the NFC-stored entry under NFC equivalence.
     lle_history_search_results_t *results =
         lle_history_search_exact(core, "cafe\xCC\x81", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
@@ -407,29 +409,33 @@ void test_substring_search_case_insensitive_unicode(void) {
 
     /// Mixed-case entries with non-ASCII letters that the previous
     /// strncasecmp-based search could not fold (only A-Z -> a-z).
-    lle_history_add_entry(core, "echo Café", 0, NULL);
-    lle_history_add_entry(core, "echo NAÏVE", 0, NULL);
-    lle_history_add_entry(core, "echo Ångström", 0, NULL);
-    lle_history_add_entry(core, "echo straße", 0, NULL);
+    lle_history_add_entry(core, "echo Caf\xc3\xa9", 0, NULL);
+    lle_history_add_entry(core, "echo NA\xc3\x8fVE", 0, NULL);
+    lle_history_add_entry(core, "echo \xc3\x85ngstr\xc3\xb6m", 0, NULL);
+    lle_history_add_entry(core,
+                          "echo stra\xc3\x9f"
+                          "e",
+                          0, NULL);
 
     /// Lowercase needle must match the uppercase Unicode entries.
     lle_history_search_results_t *results =
-        lle_history_search_substring(core, "café", 10);
+        lle_history_search_substring(core, "caf\xc3\xa9", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
     ASSERT_EQ(lle_history_search_results_get_count(results), 1,
-              "Should find 'echo Café' via 'café'");
+              "Should find 'echo Caf\xc3\xa9' via 'caf\xc3\xa9'");
     lle_history_search_results_destroy(results);
 
-    results = lle_history_search_substring(core, "naïve", 10);
+    results = lle_history_search_substring(core, "na\xc3\xafve", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
     ASSERT_EQ(lle_history_search_results_get_count(results), 1,
-              "Should find 'echo NAÏVE' via 'naïve'");
+              "Should find 'echo NA\xc3\x8fVE' via 'na\xc3\xafve'");
     lle_history_search_results_destroy(results);
 
-    results = lle_history_search_substring(core, "ångström", 10);
+    results = lle_history_search_substring(core, "\xc3\xa5ngstr\xc3\xb6m", 10);
     ASSERT_NOT_NULL(results, "Search should return results");
     ASSERT_EQ(lle_history_search_results_get_count(results), 1,
-              "Should find 'echo Ångström' via 'ångström'");
+              "Should find 'echo \xc3\x85ngstr\xc3\xb6m' via "
+              "'\xc3\xa5ngstr\xc3\xb6m'");
     lle_history_search_results_destroy(results);
 
     lle_history_core_destroy(core);
@@ -443,17 +449,33 @@ void test_prefix_search_case_insensitive_unicode(void) {
     lle_history_core_t *core = NULL;
     lle_history_core_create(&core, NULL, NULL);
 
-    lle_history_add_entry(core, "Über alle Berge", 0, NULL);
-    lle_history_add_entry(core, "ÜBER LASTIG", 0, NULL);
-    lle_history_add_entry(core, "über die Brücke", 0, NULL);
+    lle_history_add_entry(core,
+                          "\xc3\x9c"
+                          "ber alle Berge",
+                          0, NULL);
+    lle_history_add_entry(core,
+                          "\xc3\x9c"
+                          "BER LASTIG",
+                          0, NULL);
+    lle_history_add_entry(core,
+                          "\xc3\xbc"
+                          "ber die Br\xc3\xbc"
+                          "cke",
+                          0, NULL);
     lle_history_add_entry(core, "git status", 0, NULL);
 
-    /// Lowercase 'ü' prefix must match all three Unicode entries.
-    lle_history_search_results_t *results =
-        lle_history_search_prefix(core, "über", 10);
+    /// Lowercase 'u-umlaut' prefix must match all three Unicode entries.
+    lle_history_search_results_t *results = lle_history_search_prefix(core,
+                                                                      "\xc3\xbc"
+                                                                      "ber",
+                                                                      10);
     ASSERT_NOT_NULL(results, "Search should return results");
     ASSERT_EQ(lle_history_search_results_get_count(results), 3,
-              "Should find all 3 'Über' / 'ÜBER' / 'über' prefix variants");
+              "Should find all 3 '\xc3\x9c"
+              "ber' / '\xc3\x9c"
+              "BER' / '\xc3\xbc"
+              "ber' "
+              "prefix variants");
 
     lle_history_search_results_destroy(results);
     lle_history_core_destroy(core);
@@ -731,7 +753,7 @@ void test_search_performance_large_history(void) {
     ASSERT_NOT_NULL(results, "Search should succeed");
 
     uint64_t time_us = lle_history_search_results_get_time_us(results);
-    printf("  Search time: %" PRIu64 " μs\n", time_us);
+    printf("  Search time: %" PRIu64 " \xce\xbcs\n", time_us);
 
     /// Should complete in reasonable time (< 50ms for 1000 entries)
     ASSERT_TRUE(time_us < 50000, "Search should complete in < 50ms");
@@ -798,8 +820,8 @@ int main(void) {
     printf("  TEST RESULTS\n");
     printf("=======================================================\n");
     printf("Total Tests:  %d\n", tests_run);
-    printf("Passed:       %d ✓\n", tests_passed);
-    printf("Failed:       %d ✗\n", tests_failed);
+    printf("Passed:       %d \xe2\x9c\x93\n", tests_passed);
+    printf("Failed:       %d \xe2\x9c\x97\n", tests_failed);
     printf("Success Rate: %.1f%%\n",
            tests_run > 0 ? (100.0 * tests_passed / tests_run) : 0.0);
     printf("=======================================================\n");

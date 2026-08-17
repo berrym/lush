@@ -192,7 +192,7 @@ int bin_printf(int argc, char **argv) {
 
                 /// Reconstruct the user's original conversion spec
                 /// (e.g. "%05d", "%+8.2f") so libc printf handles all
-                /// flags — `0`, `+`, ` `, `#`, `-` — uniformly across
+                /// flags -- `0`, `+`, ` `, `#`, `-` -- uniformly across
                 /// every numeric specifier. Without this, lush would
                 /// silently drop every flag except `-`.
                 char fwd_fmt[64];

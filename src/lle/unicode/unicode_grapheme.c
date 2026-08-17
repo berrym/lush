@@ -610,19 +610,19 @@ static bool lle_check_grapheme_break(uint32_t prev_cp, uint32_t curr_cp,
         return true; /// Break
     }
 
-    /// GB6: Do not break Hangul syllable sequences (L × (L | V | LV | LVT))
+    /// GB6: Do not break Hangul syllable sequences (L x (L | V | LV | LVT))
     if (prev_gcb == GCB_L && (curr_gcb == GCB_L || curr_gcb == GCB_V ||
                               curr_gcb == GCB_LV || curr_gcb == GCB_LVT)) {
         return false; /// No break
     }
 
-    /// GB7: Do not break Hangul syllable sequences ((LV | V) × (V | T))
+    /// GB7: Do not break Hangul syllable sequences ((LV | V) x (V | T))
     if ((prev_gcb == GCB_LV || prev_gcb == GCB_V) &&
         (curr_gcb == GCB_V || curr_gcb == GCB_T)) {
         return false; /// No break
     }
 
-    /// GB8: Do not break Hangul syllable sequences ((LVT | T) × T)
+    /// GB8: Do not break Hangul syllable sequences ((LVT | T) x T)
     if ((prev_gcb == GCB_LVT || prev_gcb == GCB_T) && curr_gcb == GCB_T) {
         return false; /// No break
     }
@@ -643,7 +643,7 @@ static bool lle_check_grapheme_break(uint32_t prev_cp, uint32_t curr_cp,
     }
 
     /// GB11: Do not break within emoji modifier sequences or emoji ZWJ
-    /// sequences (ZWJ × Extended_Pictographic)
+    /// sequences (ZWJ x Extended_Pictographic)
     if (prev_gcb == GCB_ZWJ && curr_gcb == GCB_EXTENDED_PICTOGRAPHIC) {
         return false; /// No break
     }

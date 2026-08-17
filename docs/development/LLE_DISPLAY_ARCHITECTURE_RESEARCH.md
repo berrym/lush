@@ -28,23 +28,23 @@ as anachronisms.
 
 ```
 LLE Buffer (source of truth)
-    ↓
+    v
 GNU Readline Integration OR LLE Direct
-    ↓
+    v
 command_layer.c (receives raw command text + cursor position)
-    ↓
+    v
 command_layer applies syntax highlighting
-    ↓
+    v
 display_controller.c queries command_layer for highlighted text
-    ↓
+    v
 display_controller.c calls screen_buffer_render(prompt, highlighted_command, cursor_offset)
-    ↓
+    v
 screen_buffer creates virtual screen representation
-    ↓
+    v
 screen_buffer_diff() compares old vs new virtual screens
-    ↓
+    v
 screen_buffer_apply_diff() writes minimal ANSI sequences to terminal
-    ↓
+    v
 Terminal Display
 ```
 
@@ -335,28 +335,28 @@ From `src/lle/terminal_lush_client.c:122-132`:
 
 ```
 [LLE Buffer - Source of Truth]
-       ↓
+       v
   command_layer_update_command(text, cursor)
-       ↓
+       v
   command_layer applies syntax highlighting
-       ↓
+       v
   display_controller queries:
     - prompt_layer_get_rendered_content()
     - command_layer_get_highlighted_text()
     - cmd_layer->cursor_position
-       ↓
+       v
   display_controller detects multiline
   and sets continuation prompt prefixes
-       ↓
+       v
   screen_buffer_render(prompt, command, cursor_offset)
     [Creates virtual screen, accounts for prefixes]
-       ↓
+       v
   screen_buffer_diff(old, new)
     [Compares virtual screens cell-by-cell]
-       ↓
+       v
   screen_buffer_apply_diff(diff, STDOUT)
     [Writes minimal ANSI sequences]
-       ↓
+       v
   [Terminal Display]
 ```
 

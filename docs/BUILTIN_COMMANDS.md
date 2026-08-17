@@ -2,9 +2,9 @@
 
 **All 65 registered builtin entries (60 distinct commands) in Lush v1.5.0**
 
-Five entries are aliases that share an implementation: `.` ↔ `source`,
-`[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
-`printenv` ↔ `env`. The canonical registry lives in
+Five entries are aliases that share an implementation: `.` <-> `source`,
+`[` <-> `test`, `typeset` <-> `declare`, `readarray` <-> `mapfile`,
+`printenv` <-> `env`. The canonical registry lives in
 `src/builtins/builtins.c` (the static `builtins[]` array).
 
 ---
@@ -1003,9 +1003,9 @@ trap        true        type        typeset     ulimit
 umask       unalias     unset       unsetopt    wait
 ```
 
-Five entries are aliases (same underlying impl): `.` ↔ `source`,
-`[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
-`printenv` ↔ `env`. Distinct command count is 60.
+Five entries are aliases (same underlying impl): `.` <-> `source`,
+`[` <-> `test`, `typeset` <-> `declare`, `readarray` <-> `mapfile`,
+`printenv` <-> `env`. Distinct command count is 60.
 
 ### By Purpose
 

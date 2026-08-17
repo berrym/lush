@@ -64,16 +64,16 @@ typedef enum lle_syntax_token_type {
 
     /* Paths -- two-axis classification.
      *
-     * Shape (per spec § 6.2): absolute (`/...`), relative (`./`, `../`,
+     * Shape (per spec S6.2): absolute (`/...`), relative (`./`, `../`,
      * bare with a slash), home (`~/...`).
      * Kind: regular file vs. directory, determined by stat() at
      * highlight time when validate_paths is on.
      *
-     * The cross-product yields six (shape × kind) tokens; PATH_INVALID
+     * The cross-product yields six (shape x kind) tokens; PATH_INVALID
      * is the seventh, reserved for paths that fail stat. Defaults
      * leave file-side coloring to fall through to ARGUMENT (no
      * highlight) and emphasize directories; themes can override every
-     * shape × kind slot independently or use the kind-only fallbacks. */
+     * shape x kind slot independently or use the kind-only fallbacks. */
     LLE_TOKEN_PATH_FILE_ABSOLUTE,
     LLE_TOKEN_PATH_FILE_RELATIVE,
     LLE_TOKEN_PATH_FILE_HOME,
@@ -157,7 +157,7 @@ typedef struct lle_syntax_colors {
     uint32_t variable;         ///< Variables (typically magenta/purple)
     uint32_t variable_special; ///< Special variables
 
-    /* Paths -- shape × kind grid with kind-only fallbacks.
+    /* Paths -- shape x kind grid with kind-only fallbacks.
      *
      * Resolution at color-application time:
      *   PATH_FILE_<SHAPE>  -> path_file_<shape> if non-zero

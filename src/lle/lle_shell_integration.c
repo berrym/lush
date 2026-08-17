@@ -964,7 +964,7 @@ static int detect_prompt_color_depth(void) {
  * Spec 28: Reads PS1 as a format string (containing bash \u,
  * zsh %n, and/or LLE ${segment} escapes), expands it via the unified
  * prompt expansion engine, and stores the rendered result for display.
- * PS1 in the symtable retains the format string — it is NOT overwritten
+ * PS1 in the symtable retains the format string -- it is NOT overwritten
  * with rendered output.
  *
  * The rendered prompt is stored in a static buffer and returned by
@@ -1075,7 +1075,7 @@ void lle_shell_update_prompt(void) {
         }
     }
 
-    /// Validate UTF-8 encoding — malformed PS1 would produce corrupted
+    /// Validate UTF-8 encoding -- malformed PS1 would produce corrupted
     /// terminal output.  Replace with safe fallback.
     if (!lle_utf8_is_valid(ps1_fmt, strlen(ps1_fmt))) {
         free(ps1_fmt);
@@ -1104,7 +1104,7 @@ void lle_shell_update_prompt(void) {
         offset = 1;
     }
 
-    /// Expand PS1 format → rendered output
+    /// Expand PS1 format -> rendered output
     lle_result_t result =
         lle_prompt_expand(ps1_fmt, s_rendered_ps1 + offset,
                           sizeof(s_rendered_ps1) - offset, &expand_ctx);
@@ -1149,7 +1149,7 @@ void lle_shell_update_prompt(void) {
  * @brief Notify that PS1, PS2, or PROMPT was set by user code
  *
  * Marks the variable as user-owned so the theme system respects it.
- * Syncs PROMPT ↔ PS1 bidirectionally.
+ * Syncs PROMPT U+2194 PS1 bidirectionally.
  */
 void lle_shell_notify_prompt_var_set(const char *var_name, const char *value) {
     if (!var_name)

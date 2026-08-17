@@ -10,7 +10,7 @@
  * target). This is a well-known source of duplicated / misdirected
  * output.
  *
- * Every fork site in lush — in the shell core, in the LLE, anywhere —
+ * Every fork site in lush -- in the shell core, in the LLE, anywhere --
  * should call lush_fork() instead of fork() directly. Implemented as
  * static inline so this header has no link-time dependency on any other
  * translation unit, allowing it to be included from any subsystem

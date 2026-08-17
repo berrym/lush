@@ -35,30 +35,30 @@ has proven itself through extended real-world use by the developer.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `lle_readline()` orchestration | ✅ Complete | Full event pipeline functional |
-| Emacs keybindings | ✅ Complete | Full GNU Readline compatibility |
-| Completion system | ✅ Complete | Multi-column menu, fuzzy matching |
-| Completion menu navigation | ✅ Complete | Arrow keys, vim-style (hjkl) |
-| History system | ✅ Complete | Navigation, add-time & nav-time dedup |
-| Autosuggestions | ✅ Complete | Fish-style, partial accept (Ctrl+Right) |
-| Syntax highlighting | ✅ Complete | Themeable, 6 built-in themes |
-| Widget system | ✅ Complete | 24 builtin widgets, lifecycle hooks |
-| Display pipeline | ✅ Complete | Layered architecture, event-driven |
-| UTF-8/Unicode support | ✅ Complete | Grapheme clusters, wide chars |
-| Multiline editing | ✅ Complete | Dynamic continuation prompts |
-| Ctrl+G abort | ✅ Complete | Tiered dismissal, ZSH-style recovery |
+| `lle_readline()` orchestration | OK Complete | Full event pipeline functional |
+| Emacs keybindings | OK Complete | Full GNU Readline compatibility |
+| Completion system | OK Complete | Multi-column menu, fuzzy matching |
+| Completion menu navigation | OK Complete | Arrow keys, vim-style (hjkl) |
+| History system | OK Complete | Navigation, add-time & nav-time dedup |
+| Autosuggestions | OK Complete | Fish-style, partial accept (Ctrl+Right) |
+| Syntax highlighting | OK Complete | Themeable, 6 built-in themes |
+| Widget system | OK Complete | 24 builtin widgets, lifecycle hooks |
+| Display pipeline | OK Complete | Layered architecture, event-driven |
+| UTF-8/Unicode support | OK Complete | Grapheme clusters, wide chars |
+| Multiline editing | OK Complete | Dynamic continuation prompts |
+| Ctrl+G abort | OK Complete | Tiered dismissal, ZSH-style recovery |
 
 ### What's Missing (Priority Order)
 
 | Priority | Feature | Status | Effort | Blocker? |
 |----------|---------|--------|--------|----------|
-| **P1** | Ctrl+C signal handling | ✅ Complete | Done | NO - implemented |
-| **P2** | macOS compatibility | ❌ Untested | 1 week | YES - cross-platform required |
-| **P3** | Ctrl+R history search | ❌ Missing | 3-5 days | YES - fundamental feature |
-| **P4** | Undo/Redo | ❌ Missing | 3-5 days | YES - editing safety |
-| **P5** | `display lle` subcommands | ❌ Missing | 2-3 days | No - polish |
-| **P6** | Builtin completion context | ❌ Missing | 3-5 days | No - polish |
-| **P7** | Make readline optional | ❌ Not started | 2-3 days | No - technical debt |
+| **P1** | Ctrl+C signal handling | OK Complete | Done | NO - implemented |
+| **P2** | macOS compatibility | FAIL Untested | 1 week | YES - cross-platform required |
+| **P3** | Ctrl+R history search | FAIL Missing | 3-5 days | YES - fundamental feature |
+| **P4** | Undo/Redo | FAIL Missing | 3-5 days | YES - editing safety |
+| **P5** | `display lle` subcommands | FAIL Missing | 2-3 days | No - polish |
+| **P6** | Builtin completion context | FAIL Missing | 3-5 days | No - polish |
+| **P7** | Make readline optional | FAIL Not started | 2-3 days | No - technical debt |
 
 ### Deferred (Not Priority)
 
@@ -70,7 +70,7 @@ has proven itself through extended real-world use by the developer.
 
 ---
 
-## Priority 1: Ctrl+C Signal Handling ✅ COMPLETE
+## Priority 1: Ctrl+C Signal Handling OK COMPLETE
 
 **Implemented**: 2025-11-30 (Session 38)
 
@@ -98,12 +98,12 @@ The fix required coordination between lush's signal handler and LLE's input loop
 
 ### Behavior
 
-- Ctrl+C on empty buffer: shows `^C` and new prompt ✅
-- Ctrl+C mid-input: clears line, shows `^C` and new prompt ✅
-- Ctrl+C with completion menu: dismisses menu, clears line ✅
-- Ctrl+C with autosuggestion: clears suggestion, aborts line ✅
-- No terminal corruption after Ctrl+C ✅
-- No zombie processes or resource leaks ✅
+- Ctrl+C on empty buffer: shows `^C` and new prompt OK
+- Ctrl+C mid-input: clears line, shows `^C` and new prompt OK
+- Ctrl+C with completion menu: dismisses menu, clears line OK
+- Ctrl+C with autosuggestion: clears suggestion, aborts line OK
+- No terminal corruption after Ctrl+C OK
+- No zombie processes or resource leaks OK
 
 ---
 

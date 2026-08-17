@@ -6,7 +6,7 @@
 
 **Status**: IMPLEMENTED (2025-12-03)
 
-> **RESTORED 2026-06-24** — removed in the `856e8f79a` doc sweep, but the live
+> **RESTORED 2026-06-24** -- removed in the `856e8f79a` doc sweep, but the live
 > code cites it by name (`display_controller.c:566`, `:888`). Its central design
 > is implemented and current, so it is restored.
 >
@@ -19,12 +19,12 @@
 >
 > **Status of the three fields this plan added to `screen_buffer_t`
 > (verified 2026-06-24):**
-> - `menu_lines` — populated by `add_text_rows`, but **overwritten per call**, so
+> - `menu_lines` -- populated by `add_text_rows`, but **overwritten per call**, so
 >   it holds only the last overlay's count; the cursor math does not depend on it
 >   (it uses cumulative `num_rows`).
-> - `total_display_rows` — set to `num_rows` (not a separate sum).
-> - **`ghost_text_lines` — still DEAD/RESERVED**: only ever set to 0, never read.
->   Autosuggestion ghost rows are NOT yet routed through this unified geometry —
+> - `total_display_rows` -- set to `num_rows` (not a separate sum).
+> - **`ghost_text_lines` -- still DEAD/RESERVED**: only ever set to 0, never read.
+>   Autosuggestion ghost rows are NOT yet routed through this unified geometry --
 >   they are computed by an ad-hoc `ghost_text_extra_rows` side-calc in
 >   `dc_handle_redraw_needed`. Finishing the ghost half (a `screen_buffer_add_
 >   ghost_text` that populates `ghost_text_lines`, noting the ghost begins INLINE
@@ -197,48 +197,48 @@ if (menu_text && *menu_text) {
 
 ```
 Current Flow (BROKEN):
-┌─────────────────────────────────────────┐
-│ 1. screen_buffer_render()              │
-│    - Renders prompt + command          │
-│    - Sets num_rows = 5 (example)       │
-│    - Sets cursor_row, cursor_col       │
-└─────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────┐
-│ 2. Direct write() to terminal          │
-│    - Bypasses everything               │
-│    - Menu appears but not tracked      │
-└─────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────┐
-│ 3. screen_buffer_diff()                │
-│    - Compares rows 0-4 only            │
-│    - Doesn't know menu exists          │
-│    - Can't generate clear commands     │
-└─────────────────────────────────────────┘
++-----------------------------------------+
+| 1. screen_buffer_render()              |
+|    - Renders prompt + command          |
+|    - Sets num_rows = 5 (example)       |
+|    - Sets cursor_row, cursor_col       |
++-----------------------------------------+
+         v
++-----------------------------------------+
+| 2. Direct write() to terminal          |
+|    - Bypasses everything               |
+|    - Menu appears but not tracked      |
++-----------------------------------------+
+         v
++-----------------------------------------+
+| 3. screen_buffer_diff()                |
+|    - Compares rows 0-4 only            |
+|    - Doesn't know menu exists          |
+|    - Can't generate clear commands     |
++-----------------------------------------+
 
 Proper Flow (FIXED):
-┌─────────────────────────────────────────┐
-│ 1. screen_buffer_render()              │
-│    - Renders prompt + command          │
-│    - Sets num_rows = 5                 │
-│    - Sets cursor_row, cursor_col       │
-└─────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────┐
-│ 2. Add menu rows to screen_buffer      │
-│    - Parse menu text into rows         │
-│    - Add each row starting at row 5    │
-│    - Update num_rows = 5 + menu_rows   │
-│    - Menu is now part of virtual screen│
-└─────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────┐
-│ 3. screen_buffer_diff()                │
-│    - Compares ALL rows (0 to num_rows) │
-│    - Knows menu exists                 │
-│    - Generates proper clear/update     │
-└─────────────────────────────────────────┘
++-----------------------------------------+
+| 1. screen_buffer_render()              |
+|    - Renders prompt + command          |
+|    - Sets num_rows = 5                 |
+|    - Sets cursor_row, cursor_col       |
++-----------------------------------------+
+         v
++-----------------------------------------+
+| 2. Add menu rows to screen_buffer      |
+|    - Parse menu text into rows         |
+|    - Add each row starting at row 5    |
+|    - Update num_rows = 5 + menu_rows   |
+|    - Menu is now part of virtual screen|
++-----------------------------------------+
+         v
++-----------------------------------------+
+| 3. screen_buffer_diff()                |
+|    - Compares ALL rows (0 to num_rows) |
+|    - Knows menu exists                 |
+|    - Generates proper clear/update     |
++-----------------------------------------+
 ```
 
 ---
@@ -630,16 +630,16 @@ Verify: num_rows accounts for wrapping, menu positioned correctly
 
 ## Success Criteria
 
-1. ✅ Menu renders without corruption
-2. ✅ TAB cycling updates menu cleanly
-3. ✅ Backspace clears menu
-4. ✅ ESC clears menu
-5. ✅ Ctrl+G clears menu
-6. ✅ Character insertion clears menu
-7. ✅ Enter accepts completion (separate fix)
-8. ✅ Cursor position stays correct
-9. ✅ Works with multi-line input
-10. ✅ Works with line wrapping
+1. OK Menu renders without corruption
+2. OK TAB cycling updates menu cleanly
+3. OK Backspace clears menu
+4. OK ESC clears menu
+5. OK Ctrl+G clears menu
+6. OK Character insertion clears menu
+7. OK Enter accepts completion (separate fix)
+8. OK Cursor position stays correct
+9. OK Works with multi-line input
+10. OK Works with line wrapping
 
 ---
 

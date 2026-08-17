@@ -325,7 +325,7 @@ lle_cursor_manager_move_to_byte_offset(lle_cursor_manager_t *manager,
     if (byte_offset == 0) {
         manager->position.grapheme_index = 0;
     } else if (buffer->utf8_index && buffer->utf8_index_valid) {
-        /// O(1) lookup via byte→codepoint→grapheme
+        /// O(1) lookup via byte->codepoint->grapheme
         size_t codepoint_idx;
         if (lle_utf8_index_byte_to_codepoint(buffer->utf8_index, byte_offset,
                                              &codepoint_idx) == LLE_SUCCESS &&

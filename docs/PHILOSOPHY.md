@@ -199,7 +199,7 @@ this project worth building.
 
 ## 7. The debugger keeps pace with the language
 
-Lush's integrated debugger is part of its identity (§1): "the IDE for
+Lush's integrated debugger is part of its identity (S1): "the IDE for
 shell developers" is only true while the debugger understands
 everything the shell can do. A debugger that has fallen behind the
 language it debugs is worse than no debugger -- it misleads with
@@ -240,10 +240,10 @@ left-gutter UI rendered through the screen buffer; variable
 inspection queries the symtable directly via
 `symtable_enumerate_current_scope_vars` and renders the actual
 Scalar/List/Map kind; `type` / `t` exposes the kind explicitly;
-`debug analyze` statically warns on the §3.9 list-in-scalar
+`debug analyze` statically warns on the S3.9 list-in-scalar
 pattern before the script runs. The two open obligations this rule
-will impose work for next: a typed-function form (§8) and
-lexical-scope resolution (§5.3); when those land they each carry a
+will impose work for next: a typed-function form (S8) and
+lexical-scope resolution (S5.3); when those land they each carry a
 debugger obligation by this rule.
 
 ---

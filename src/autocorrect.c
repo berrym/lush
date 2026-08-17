@@ -631,8 +631,8 @@ int autocorrect_suggest_functions(executor_t *executor, const char *command,
  * expensive Unicode-aware fuzzy matching. Delegates to libfuzzy's
  * Damerau-Levenshtein, which iterates codepoints (not bytes) and
  * case-folds via the project's Unicode case table -- so names like
- * "Café" / "café" or "naïve" / "Naïve" are correctly identified
- * as near-matches in the PATH scan.
+ * "Cafe-acute" / "cafe-acute" or "nai-umlautve" / "Nai-umlautve" are correctly
+ * identified as near-matches in the PATH scan.
  *
  * The codepoint-length cap of FAST_EDIT_DISTANCE_CP_CAP keeps the
  * pre-filter bounded for absurd dirents (the libfuzzy matrix is

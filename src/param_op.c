@@ -36,7 +36,7 @@ static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
  * indexed.
  *
  * Iterates by *codepoint* using lle_utf8_decode_codepoint (the canonical
- * pattern used elsewhere in the shell — see src/tokenizer.c:2075). At
+ * pattern used elsewhere in the shell -- see src/tokenizer.c:2075). At
  * each codepoint boundary, lle_is_grapheme_boundary determines whether
  * the codepoint also starts a new *grapheme cluster*. A multi-codepoint
  * grapheme (emoji+ZWJ+emoji, base+combining-mark, etc.) increments the
@@ -66,7 +66,7 @@ char *lush_slice_graphemes(const char *str, size_t str_len, int start_grapheme,
     size_t i = 0;
     while (i < str_len) {
         /// Check grapheme boundary at this codepoint start (not at every
-        /// byte — continuation bytes would falsely register as boundaries
+        /// byte -- continuation bytes would falsely register as boundaries
         /// because lle_is_grapheme_boundary treats invalid UTF-8 as a
         /// boundary, and continuation bytes alone are invalid as a
         /// standalone codepoint).
@@ -369,8 +369,8 @@ char *lush_case_first_lower(const char *str) {
  * mapping goes through lle_unicode_toupper_codepoint /
  * lle_unicode_tolower_codepoint so non-ASCII letters convert correctly.
  * lush_pattern_match is codepoint-aware, so ASCII patterns like
- * `[aeiou]`, Unicode literals/ranges like `[äöü]`, and Unicode
- * general-category char-classes like `[[:alpha:]]` all work.
+ * `[aeiou]`, Unicode literals/ranges like `[a-umlaut o-umlaut u-umlaut]`, and
+ * Unicode general-category char-classes like `[[:alpha:]]` all work.
  *
  * @param str Input string
  * @param pattern Glob pattern (may be NULL/empty -- treated as "any char")
@@ -406,7 +406,7 @@ char *lush_case_pattern(const char *str, const char *pattern, bool to_upper,
             lle_utf8_decode_codepoint(str + in_pos, len - in_pos, &cp);
         if (consumed <= 0) {
             /// Malformed UTF-8: copy the byte through unchanged and advance
-            /// one. Defensive — most input is well-formed.
+            /// one. Defensive -- most input is well-formed.
             if (out_pos < out_cap - 1) {
                 result[out_pos++] = str[in_pos];
             }

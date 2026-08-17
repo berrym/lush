@@ -53,7 +53,7 @@ print_header() {
 }
 
 print_category() {
-    echo -e "\n${BLUE}▓▓▓ CATEGORY: $1 ▓▓▓${NC}\n"
+    echo -e "\n${BLUE}### CATEGORY: $1 ###${NC}\n"
 }
 
 print_section() {
@@ -66,14 +66,14 @@ print_test_result() {
     local details="$3"
 
     if [ "$result" = "PASS" ]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
     elif [ "$result" = "FAIL" ]; then
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         if [ -n "$details" ]; then
             echo -e "    ${RED}$details${NC}"
         fi
     elif [ "$result" = "SKIP" ]; then
-        echo -e "  ${YELLOW}⚠${NC} $test_name (SKIPPED)"
+        echo -e "  ${YELLOW}WARN${NC} $test_name (SKIPPED)"
     fi
 }
 
@@ -996,23 +996,23 @@ calculate_final_score() {
     local overall_score=$((total_score / category_count))
 
     echo
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}===============================================================${NC}"
     if [ "$overall_score" -ge 95 ]; then
-        echo -e "${GREEN}🏆 OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
-        echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
-        echo -e "${GREEN}✨ EXCELLENT: Production-ready shell with exceptional compliance${NC}"
+        echo -e "${GREEN}OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
+        echo -e "${GREEN}===============================================================${NC}"
+        echo -e "${GREEN}* EXCELLENT: Production-ready shell with exceptional compliance${NC}"
     elif [ "$overall_score" -ge 90 ]; then
-        echo -e "${YELLOW}🎯 OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
-        echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-        echo -e "${YELLOW}⭐ VERY GOOD: High-quality shell suitable for most use cases${NC}"
+        echo -e "${YELLOW}OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
+        echo -e "${YELLOW}===============================================================${NC}"
+        echo -e "${YELLOW}* VERY GOOD: High-quality shell suitable for most use cases${NC}"
     elif [ "$overall_score" -ge 80 ]; then
-        echo -e "${YELLOW}📈 OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
-        echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-        echo -e "${YELLOW}👍 GOOD: Functional shell with room for improvement${NC}"
+        echo -e "${YELLOW}OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
+        echo -e "${YELLOW}===============================================================${NC}"
+        echo -e "${YELLOW}GOOD: Functional shell with room for improvement${NC}"
     else
-        echo -e "${RED}📊 OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
-        echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
-        echo -e "${RED}🔧 NEEDS WORK: Significant functionality gaps${NC}"
+        echo -e "${RED}OVERALL SHELL COMPLIANCE SCORE: $overall_score%${NC}"
+        echo -e "${RED}===============================================================${NC}"
+        echo -e "${RED}NEEDS WORK: Significant functionality gaps${NC}"
     fi
 
     echo
@@ -1035,19 +1035,19 @@ calculate_final_score() {
     echo
     if [ "$overall_score" -ge 95 ]; then
         echo -e "${GREEN}Development Recommendations:${NC}"
-        echo -e "  • ${GREEN}Shell is production-ready and highly compliant${NC}"
-        echo -e "  • ${GREEN}Consider advanced feature enhancements${NC}"
-        echo -e "  • ${GREEN}Focus on performance optimization and user experience${NC}"
+        echo -e "  * ${GREEN}Shell is production-ready and highly compliant${NC}"
+        echo -e "  * ${GREEN}Consider advanced feature enhancements${NC}"
+        echo -e "  * ${GREEN}Focus on performance optimization and user experience${NC}"
     elif [ "$overall_score" -ge 90 ]; then
         echo -e "${YELLOW}Development Recommendations:${NC}"
-        echo -e "  • ${YELLOW}Shell is approaching production readiness${NC}"
-        echo -e "  • ${YELLOW}Address remaining failing test categories${NC}"
-        echo -e "  • ${YELLOW}Focus on edge case handling${NC}"
+        echo -e "  * ${YELLOW}Shell is approaching production readiness${NC}"
+        echo -e "  * ${YELLOW}Address remaining failing test categories${NC}"
+        echo -e "  * ${YELLOW}Focus on edge case handling${NC}"
     else
         echo -e "${RED}Development Recommendations:${NC}"
-        echo -e "  • ${RED}Focus on categories scoring below 80%${NC}"
-        echo -e "  • ${RED}Prioritize core functionality implementation${NC}"
-        echo -e "  • ${RED}Enhance error handling and edge case support${NC}"
+        echo -e "  * ${RED}Focus on categories scoring below 80%${NC}"
+        echo -e "  * ${RED}Prioritize core functionality implementation${NC}"
+        echo -e "  * ${RED}Enhance error handling and edge case support${NC}"
     fi
 
     print_header "COMPREHENSIVE COMPLIANCE TESTING COMPLETE"

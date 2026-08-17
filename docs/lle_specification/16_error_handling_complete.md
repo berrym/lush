@@ -637,7 +637,7 @@ static float lle_score_recovery_strategy(const lle_recovery_strategy_t *strategy
     score += strategy->success_probability * 40.0f;
     
     // Penalty for high cost
-    if (strategy->estimated_cost_ns > 100000) { // > 100μs
+    if (strategy->estimated_cost_ns > 100000) { // > 100us
         score -= 10.0f;
     }
     
@@ -1350,7 +1350,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
             .target_component = "EventSystem",
             .should_recover_automatically = true,
             .expected_degradation = DEGRADATION_LEVEL_MINIMAL,
-            .max_recovery_time_ns = 500000, // 500μs
+            .max_recovery_time_ns = 500000, // 500us
             .setup_test = lle_setup_event_overflow_test,
             .execute_test = lle_execute_event_overflow_test,
             .validate_result = lle_validate_event_recovery,
@@ -1371,10 +1371,10 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
         
         if (test_result == LLE_SUCCESS) {
             passed_tests++;
-            printf("✓ PASS: %s\n", test->test_name);
+            printf("OK PASS: %s\n", test->test_name);
         } else {
             failed_tests++;
-            printf("✗ FAIL: %s (error: %d)\n", test->test_name, test_result);
+            printf("FAIL FAIL: %s (error: %d)\n", test->test_name, test_result);
         }
     }
     
@@ -1396,7 +1396,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
 - **Memory Pool Integration**: All error contexts allocated from dedicated error memory pools
 - **Zero-Allocation Paths**: Critical path error handling uses pre-allocated contexts
 - **Thread Safety**: All error handling operations must be thread-safe
-- **Performance Target**: Error context creation <10μs, error handling <50μs
+- **Performance Target**: Error context creation <10us, error handling <50us
 
 **Recovery System Implementation:**
 - **Strategy Selection**: Automated strategy selection based on error context and system state
@@ -1483,28 +1483,28 @@ static const lle_component_integration_spec_t g_error_integration_specs[] = {
 ### 13.1 Error Handling Performance Targets
 
 **Critical Path Performance:**
-- **Error Context Creation**: <10μs for critical path errors
-- **Error Handling Execution**: <50μs total handling time
+- **Error Context Creation**: <10us for critical path errors
+- **Error Handling Execution**: <50us total handling time
 - **Memory Allocation**: Zero allocation for critical path error handling
 - **Recovery Execution**: <1ms for automatic recovery strategies
 
 **Non-Critical Path Performance:**
-- **Comprehensive Error Context**: <100μs for full context creation
-- **Forensic Logging**: <500μs for complete forensic log entry
-- **Recovery Planning**: <200μs for recovery strategy selection
+- **Comprehensive Error Context**: <100us for full context creation
+- **Forensic Logging**: <500us for complete forensic log entry
+- **Recovery Planning**: <200us for recovery strategy selection
 - **Error Reporting**: <1ms for comprehensive error reporting
 
 **Memory Performance:**
 - **Error Context Size**: <512 bytes average per error context
 - **Memory Pool Efficiency**: >95% pool utilization for error contexts
 - **Memory Overhead**: <1% total memory overhead for error handling infrastructure
-- **Cleanup Efficiency**: <10μs average cleanup time per error context
+- **Cleanup Efficiency**: <10us average cleanup time per error context
 
 ### 13.2 Scalability Requirements
 
 **Concurrent Error Handling:**
 - **Thread Safety**: Support unlimited concurrent error handling operations
-- **Lock Contention**: <1μs average lock contention time
+- **Lock Contention**: <1us average lock contention time
 - **Queue Performance**: Support >10,000 errors per second in error reporting queue
 
 **Resource Scaling:**

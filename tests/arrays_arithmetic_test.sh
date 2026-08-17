@@ -54,7 +54,7 @@ print_section() {
 }
 
 print_category() {
-    echo -e "\n${PURPLE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${PURPLE}### $1 ###${NC}"
 }
 
 test_result() {
@@ -65,10 +65,10 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ $result -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         [[ -n "$details" ]] && echo -e "    ${YELLOW}$details${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
@@ -454,7 +454,7 @@ main() {
     echo -e "${RED}Failed:${NC} $FAILED_TESTS"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}🎉 ALL TESTS PASSED! 🎉${NC}"
+        echo -e "\n${GREEN}ALL TESTS PASSED! ${NC}"
         echo -e "${GREEN}Arrays and Arithmetic Command implementation is complete!${NC}"
         exit_code=0
     else
@@ -477,19 +477,19 @@ main() {
     fi
 
     echo -e "\n${CYAN}Features Tested:${NC}"
-    echo "✓ Indexed array creation with arr=(...) syntax"
-    echo "✓ Array element access \${arr[n]}"
-    echo "✓ Array expansion \${arr[@]} and \${arr[*]}"
-    echo "✓ Array length \${#arr[@]}"
-    echo "✓ Element string length \${#arr[n]}"
-    echo "✓ Array element assignment arr[n]=value"
-    echo "✓ Sparse array support"
-    echo "✓ Arithmetic command (( expr ))"
-    echo "✓ declare -a for indexed arrays"
-    echo "✓ declare -i for integer variables"
-    echo "✓ declare -p for printing declarations"
-    echo "✓ typeset alias for declare"
-    echo "✓ Shell mode integration"
+    echo "OK Indexed array creation with arr=(...) syntax"
+    echo "OK Array element access \${arr[n]}"
+    echo "OK Array expansion \${arr[@]} and \${arr[*]}"
+    echo "OK Array length \${#arr[@]}"
+    echo "OK Element string length \${#arr[n]}"
+    echo "OK Array element assignment arr[n]=value"
+    echo "OK Sparse array support"
+    echo "OK Arithmetic command (( expr ))"
+    echo "OK declare -a for indexed arrays"
+    echo "OK declare -i for integer variables"
+    echo "OK declare -p for printing declarations"
+    echo "OK typeset alias for declare"
+    echo "OK Shell mode integration"
 
     echo -e "\nTest completed at: $(date)"
 

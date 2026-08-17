@@ -13,7 +13,7 @@ The LLE Notification System provides transient, unobtrusive hints displayed belo
 The notification system follows the **completion menu pattern** for display integration:
 
 ```
-User Action → Notification State → Display Controller → screen_buffer → Terminal
+User Action -> Notification State -> Display Controller -> screen_buffer -> Terminal
 ```
 
 **Critical Principle**: All display output must go through `screen_buffer`. The screen_buffer is the mechanism that makes LLE display work correctly. Notifications are added via `screen_buffer_add_text_rows()`, identical to how completion menus are handled.

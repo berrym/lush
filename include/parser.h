@@ -283,7 +283,7 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
  * Identical to parser_error_add_with_help() but the location is
  * provided by the caller rather than inferred from the parser's
  * current token. Use when the construct that caused the error is
- * not at the parser's current position — for example,
+ * not at the parser's current position -- for example,
  * unterminated-heredoc errors should point at the `<<` operator
  * (long since past) rather than at end-of-input.
  *

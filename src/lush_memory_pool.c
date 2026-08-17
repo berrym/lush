@@ -926,10 +926,10 @@ void lush_pool_analyze_fallback_patterns(void) {
     }
 
     printf("Fallback breakdown:\n");
-    printf("  ≤ 128B (SMALL pool):  %d fallbacks\n", small_misses);
-    printf("  ≤ 512B (MEDIUM pool): %d fallbacks\n", medium_misses);
-    printf("  ≤ 4KB (LARGE pool):   %d fallbacks\n", large_misses);
-    printf("  ≤ 16KB (XLARGE pool): %d fallbacks\n", xlarge_misses);
+    printf("  \xe2\x89\xa4 128B (SMALL pool):  %d fallbacks\n", small_misses);
+    printf("  \xe2\x89\xa4 512B (MEDIUM pool): %d fallbacks\n", medium_misses);
+    printf("  \xe2\x89\xa4 4KB (LARGE pool):   %d fallbacks\n", large_misses);
+    printf("  \xe2\x89\xa4 16KB (XLARGE pool): %d fallbacks\n", xlarge_misses);
     printf("  > 16KB (oversized):   %d fallbacks\n", oversized);
 
     /// Show pool status

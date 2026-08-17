@@ -216,13 +216,13 @@ TEST(parse_unicode_escape_bmp) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /// \u00E9 = é (Latin Small Letter E with Acute)
+    /// \u00E9 = e-acute (Latin Small Letter E with Acute)
     toml_parser_init(&parser, "text = \"caf\\u00E9\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 1);
-    ASSERT_STR_EQ(ctx.values[0].data.string, "café");
+    ASSERT_STR_EQ(ctx.values[0].data.string, "caf\xc3\xa9");
 
     free_test_ctx(&ctx);
     toml_parser_cleanup(&parser);
@@ -233,14 +233,14 @@ TEST(parse_unicode_escape_emoji) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /// \U0001F600 = 😀 (Grinning Face) - requires 4 UTF-8 bytes
+    /// \U0001F600 = U+1F600 (Grinning Face) - requires 4 UTF-8 bytes
     toml_parser_init(&parser, "emoji = \"\\U0001F600\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 1);
     /// UTF-8: F0 9F 98 80
-    ASSERT_STR_EQ(ctx.values[0].data.string, "😀");
+    ASSERT_STR_EQ(ctx.values[0].data.string, "\xf0\x9f\x98\x80");
 
     free_test_ctx(&ctx);
     toml_parser_cleanup(&parser);
@@ -251,13 +251,13 @@ TEST(parse_unicode_escape_mixed) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /// Hello + \u4E16\u754C (世界 = "world" in Chinese) + !
+    /// Hello + \u4E16\u754C (U+4E16 U+754C = "world" in Chinese) + !
     toml_parser_init(&parser, "msg = \"Hello \\u4E16\\u754C!\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 1);
-    ASSERT_STR_EQ(ctx.values[0].data.string, "Hello 世界!");
+    ASSERT_STR_EQ(ctx.values[0].data.string, "Hello \xe4\xb8\x96\xe7\x95\x8c!");
 
     free_test_ctx(&ctx);
     toml_parser_cleanup(&parser);

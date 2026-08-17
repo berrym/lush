@@ -57,7 +57,7 @@ The Extensibility Framework provides the foundational architecture for unlimited
 1. **Unlimited Extensibility**: ANY future enhancement can be added natively through plugin system
 2. **First-Class Integration**: All core systems (widget hooks, keybindings, history, completion) available to plugins
 3. **Security First**: All plugins execute in controlled sandbox environment with granular permissions
-4. **Performance Excellence**: Plugin overhead must not degrade user experience (<50μs execution time)
+4. **Performance Excellence**: Plugin overhead must not degrade user experience (<50us execution time)
 5. **API Stability**: Plugin API remains stable across LLE versions with comprehensive compatibility guarantees
 6. **User Empowerment**: Users can customize every aspect of editor behavior through plugins
 
@@ -926,10 +926,10 @@ lle_result_t lle_plugin_register_completion_source(lle_plugin_t *plugin,
 - Production deployment with all integrations active
 
 ### Success Metrics (Enhanced):
-- **Integration Performance**: < 50μs overhead per integration point
-- **Widget Hook Execution**: < 25μs per hook callback  
-- **Keybinding Resolution**: < 10μs keybinding lookup with plugins
-- **History Callback Execution**: < 100μs per history editing callback
+- **Integration Performance**: < 50us overhead per integration point
+- **Widget Hook Execution**: < 25us per hook callback  
+- **Keybinding Resolution**: < 10us keybinding lookup with plugins
+- **History Callback Execution**: < 100us per history editing callback
 - **Completion Generation**: < 5ms for plugin completion sources
 
 ---

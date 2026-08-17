@@ -231,10 +231,10 @@ typedef enum {
 
     FEATURE_REJECT_MIXED_SCRIPT_IDENTS, ///< When on, an identifier that mixes
                                         ///< Unicode scripts (e.g. Latin p +
-                                        ///< Cyrillic а in pаsswd, the homograph
-                                        ///< vector) is a hard error at
-                                        ///< definition time. Default false in
-                                        ///< every mode, lush included: the
+                                        ///< Cyrillic U+0430 in pU+0430sswd, the
+                                        ///< homograph vector) is a hard error
+                                        ///< at definition time. Default false
+                                        ///< in every mode, lush included: the
                                         ///< canonical mode stays permissive
                                         ///< (presets are not restrictions) and
                                         ///< surfaces mixed-script as an
@@ -523,7 +523,7 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
  *
  * Some aliases are *inverted*: `setopt <inverted-alias>` is semantically
  * equivalent to `unsetopt <canonical>`. For example, `bsd_echo` (zsh
- * setopt name) is an inverted alias for the canonical `xpg_echo` —
+ * setopt name) is an inverted alias for the canonical `xpg_echo` --
  * `setopt bsd_echo` disables XSI escape interpretation; `setopt xpg_echo`
  * enables it. Pass a non-NULL `invert` to receive that flag; callers that
  * don't care (e.g. test code, config readers that already know the

@@ -569,7 +569,7 @@ prompt_layer_error_t prompt_layer_run_tests(prompt_layer_t *layer);
  * /// Works with any prompt format
  * prompt_layer_set_content(layer, "$ ");                    /// Simple
  * prompt_layer_set_content(layer, "[user@host ~/path]$ ");  /// Complex
- * prompt_layer_set_content(layer, "┌─[user@host]─[~/path]\n└─$ "); ///
+ * prompt_layer_set_content(layer, "U+250C-[user@host]-[~/path]\n+-$ "); ///
  * Multi-line
  *
  * /// Get positioning information

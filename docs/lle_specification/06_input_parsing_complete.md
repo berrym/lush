@@ -60,7 +60,7 @@ The Input Parsing System provides comprehensive, high-performance parsing of ter
 ### 1.4 Integration Updates
 
 **NEW in Version 2.0.0**: Complete integration with critical core systems:
-- **Keybinding System Integration**: Real-time keybinding lookup during input parsing with <10μs resolution time
+- **Keybinding System Integration**: Real-time keybinding lookup during input parsing with <10us resolution time
 - **Widget Hook System Integration**: Automatic trigger of appropriate widget hooks based on input context
 - **Adaptive Terminal Integration**: Dynamic use of terminal-specific capabilities for optimal parsing
 
@@ -216,7 +216,7 @@ lle_result_t lle_input_process_with_keybinding_lookup(lle_input_parser_system_t 
         return lle_input_process_standard(parser, event);
     }
     
-    // Step 2: Perform keybinding lookup with <10μs target
+    // Step 2: Perform keybinding lookup with <10us target
     uint64_t lookup_start = lle_get_current_time_microseconds();
     
     result = lle_keybinding_engine_lookup_sequence(parser->keybinding_integration->keybinding_engine,
@@ -535,7 +535,7 @@ lle_result_t lle_key_detector_detect_with_integration(lle_key_detector_t *detect
 ## Implementation Roadmap (Updated)
 
 ### Phase 1: Core Integration Implementation (Weeks 1-2)
-- **Keybinding Integration**: Real-time keybinding lookup during input parsing (<10μs target)
+- **Keybinding Integration**: Real-time keybinding lookup during input parsing (<10us target)
 - **Widget Hook Triggers**: Automatic hook execution based on input context
 - **Adaptive Terminal Integration**: Dynamic terminal capability utilization
 - **Integration Coordination**: Cross-system coordination and conflict resolution
@@ -547,14 +547,14 @@ lle_result_t lle_key_detector_detect_with_integration(lle_key_detector_t *detect
 
 ### Phase 3: Validation and Testing (Weeks 5-6)
 - **Integration Testing**: Comprehensive testing of all integration points
-- **Performance Validation**: Verify <10μs keybinding lookup and <25μs hook execution targets
+- **Performance Validation**: Verify <10us keybinding lookup and <25us hook execution targets
 - **Cross-System Testing**: Validate integration with all 4 critical core systems
 
 ### Success Metrics (Enhanced):
-- **Keybinding Lookup Performance**: < 10μs per lookup with integration active
-- **Widget Hook Execution**: < 25μs per hook trigger on input events
+- **Keybinding Lookup Performance**: < 10us per lookup with integration active
+- **Widget Hook Execution**: < 25us per hook trigger on input events
 - **Adaptive Parsing Performance**: < 5% overhead with terminal-specific optimizations
-- **Overall Integration Impact**: < 50μs total overhead for fully integrated input processing
+- **Overall Integration Impact**: < 50us total overhead for fully integrated input processing
 
 ---
 
@@ -562,7 +562,7 @@ lle_result_t lle_key_detector_detect_with_integration(lle_key_detector_t *detect
 
 The Enhanced Input Parsing System now provides **complete integration** with all critical core systems:
 
-1. **Keybinding Integration** - Real-time keybinding lookup during input parsing with <10μs performance target
+1. **Keybinding Integration** - Real-time keybinding lookup during input parsing with <10us performance target
 2. **Widget Hook Triggers** - Automatic execution of appropriate widget hooks based on input context  
 3. **Adaptive Terminal Integration** - Dynamic use of terminal-specific capabilities for optimal parsing performance
 

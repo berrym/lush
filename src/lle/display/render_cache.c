@@ -56,7 +56,7 @@
  * followed by the raw data bytes. The header has no internal NUL so it can
  * still be parsed with sscanf when the buffer is treated as a C string up
  * to the '|' separator. The data section may contain arbitrary bytes
- * (including NULs) — total length is tracked separately.
+ * (including NULs) -- total length is tracked separately.
  *
  * @param entry Cache entry to serialize
  * @param out_size Receives the total serialized length on success
@@ -88,7 +88,7 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
         return NULL;
     }
 
-    /// Append data verbatim — may contain embedded NULs
+    /// Append data verbatim -- may contain embedded NULs
     memcpy(serialized + header_len, entry->data, entry->data_size);
 
     *out_size = (size_t)header_len + entry->data_size;
@@ -378,7 +378,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
 
     /// Step 4: Create binary-safe libhashtable for cache storage. The cache
     /// stores serialized entries that contain arbitrary data bytes (issue
-    /// #49 — embedded NULs were silently truncated under the previous
+    /// #49 -- embedded NULs were silently truncated under the previous
     /// string-only hashtable wrapper). render_cache provides its own
     /// rwlock and metrics so the bare libhashtable type is sufficient
     /// here; an lle_strblob wrapper can be added later if a second

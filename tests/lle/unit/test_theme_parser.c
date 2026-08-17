@@ -89,7 +89,7 @@ static lle_result_t collect_callback(const char *section, const char *key,
         item->bool_value = value->data.boolean;
         break;
     default:
-        /// Arrays and tables — recorded as type only; tests can re-parse
+        /// Arrays and tables -- recorded as type only; tests can re-parse
         /// via the value pointer if they need finer detail.
         break;
     }

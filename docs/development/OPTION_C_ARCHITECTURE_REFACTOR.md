@@ -5,12 +5,12 @@
 **Status**: COMPLETE
 **Related**: LLE Spec 12 Phase 5.4 - Completion System
 
-> **RESTORED 2026-06-24** — this doc was removed in the `856e8f79a` "Remove 200+
+> **RESTORED 2026-06-24** -- this doc was removed in the `856e8f79a` "Remove 200+
 > outdated docs" sweep but the live code still cites it: `display_controller.c`
 > labels the menu integration "Spec 12 - Proper Architecture" at lines 45, 490,
 > 1809, 2663. It documents a design that is STILL IN FORCE, so it is restored.
 >
-> **What is still accurate:** the core decision — completion-menu composition
+> **What is still accurate:** the core decision -- completion-menu composition
 > lives in the **display controller** (`dc_handle_redraw_needed`), not baked into
 > command-layer text; the "double re-append hack" is gone. Menu text is rendered
 > at display time (`lle_completion_menu_render`) and its rows are added to the
@@ -25,7 +25,7 @@
 >   SIGWINCH mask. The differential/diff render path (`screen_buffer_diff` /
 >   `apply_diff`) referenced in some sibling docs was **removed** (`bddfac9ad`) as
 >   architecturally broken; ignore diff framing.
-> - `screen_buffer` is a **virtual layout engine for cursor math only** — it does
+> - `screen_buffer` is a **virtual layout engine for cursor math only** -- it does
 >   not write to the terminal.
 
 ---
@@ -100,7 +100,7 @@ This caused:
 - Optimize to single highlighting pass
 - **Rejected**: Still wrong layer for menu management
 
-**Option C** (Proper Architecture): ✅ **CHOSEN**
+**Option C** (Proper Architecture): OK **CHOSEN**
 - Move menu management to display_controller
 - Compose menu at render time, not bake into command text
 - Eliminate redundant call
@@ -338,19 +338,19 @@ lle_completion_menu_state_t *display_controller_get_completion_menu(...);
 
 ```
 User presses key
-    ↓
+    v
 display_bridge.c
-    ↓
+    v
 command_layer_set_command()
-    ├─ perform_syntax_highlighting() → WIPES menu
-    └─ append_menu_to_highlighted_text() → RE-APPEND menu (hack #1)
-    ↓
+    +- perform_syntax_highlighting() -> WIPES menu
+    +- append_menu_to_highlighted_text() -> RE-APPEND menu (hack #1)
+    v
 command_layer_update()
-    ├─ perform_syntax_highlighting() → WIPES menu AGAIN
-    └─ append_menu_to_highlighted_text() → RE-APPEND menu AGAIN (hack #2)
-    ↓
+    +- perform_syntax_highlighting() -> WIPES menu AGAIN
+    +- append_menu_to_highlighted_text() -> RE-APPEND menu AGAIN (hack #2)
+    v
 display_controller renders
-    ↓
+    v
 Menu baked into command text
 ```
 
@@ -358,20 +358,20 @@ Menu baked into command text
 
 ```
 User presses key
-    ↓
+    v
 display_bridge.c
-    ↓
+    v
 command_layer_set_command()
-    ├─ perform_syntax_highlighting() → Clean command text only
-    └─ publish_command_event(LAYER_EVENT_REDRAW_NEEDED)
-    ↓
+    +- perform_syntax_highlighting() -> Clean command text only
+    +- publish_command_event(LAYER_EVENT_REDRAW_NEEDED)
+    v
 display_controller event handler
-    ↓
+    v
 dc_handle_redraw_needed()
-    ├─ Get command text from command_layer
-    ├─ Compose menu at render time (if active_completion_menu set)
-    └─ Write: command + "\n" + menu
-    ↓
+    +- Get command text from command_layer
+    +- Compose menu at render time (if active_completion_menu set)
+    +- Write: command + "\n" + menu
+    v
 Menu composed separately, not baked into command
 ```
 
@@ -401,9 +401,9 @@ Menu composed separately, not baked into command
 ## Testing
 
 ### Compilation Status
-✅ **Main binary compiled successfully**: `builddir/lusush` (3.3MB)
-✅ **No typedef conflicts**: Proper header inclusion resolved issues
-✅ **Shell runs**: Basic command execution working
+OK **Main binary compiled successfully**: `builddir/lusush` (3.3MB)
+OK **No typedef conflicts**: Proper header inclusion resolved issues
+OK **Shell runs**: Basic command execution working
 
 ### Manual Testing Required
 Since completion menu requires interactive terminal, testing requires:
@@ -485,7 +485,7 @@ This refactor enables cleaner implementation of remaining Phase 5.4 features:
 ## Lessons Learned
 
 1. **Architecture matters** - "Hacks" are red flags for deeper issues
-2. **User instinct correct** - "I don't feel comfortable with hack solution" → led to proper fix
+2. **User instinct correct** - "I don't feel comfortable with hack solution" -> led to proper fix
 3. **Separation of concerns** - Putting state in right layer makes everything easier
 4. **Type safety** - Direct header inclusion better than forward declarations when circular deps not an issue
 5. **Performance + clarity** - Proper architecture often faster AND cleaner

@@ -66,7 +66,8 @@ void debug_string(const char *label, const char *text) {
     }
 
     printf("Expected: 1 grapheme cluster\n");
-    printf("Result: %s\n", grapheme_count == 1 ? "PASS ✓" : "FAIL ✗");
+    printf("Result: %s\n",
+           grapheme_count == 1 ? "PASS \xe2\x9c\x93" : "FAIL \xe2\x9c\x97");
 }
 
 int main() {
@@ -75,16 +76,18 @@ int main() {
 
     /// Test 4: Family emoji (ZWJ sequence)
     debug_string("Test 4: Family emoji ZWJ sequence",
-                 "👨‍👩‍👧‍👦");
+                 "\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0"
+                 "\x9f\x91\xa7\xe2\x80\x8d\xf0\x9f\x91\xa6");
 
     /// Test 5: Flag emoji (Regional Indicators)
-    debug_string("Test 5: Flag emoji", "🇺🇸");
+    debug_string("Test 5: Flag emoji", "\xf0\x9f\x87\xba\xf0\x9f\x87\xb8");
 
     /// Test 7: Skin tone modifier
-    debug_string("Test 7: Skin tone modifier", "👋🏽");
+    debug_string("Test 7: Skin tone modifier",
+                 "\xf0\x9f\x91\x8b\xf0\x9f\x8f\xbd");
 
     /// Working test for comparison
-    debug_string("Working: Simple emoji", "🎉");
+    debug_string("Working: Simple emoji", "\xf0\x9f\x8e\x89");
 
     return 0;
 }

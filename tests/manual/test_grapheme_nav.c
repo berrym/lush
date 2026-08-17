@@ -34,9 +34,11 @@ int main(void) {
         const char *text;
         size_t expected_graphemes;
     } tests[] = {
-        {"Family emoji", "👨‍👩‍👧‍👦", 1},
-        {  "Flag emoji",                        "🇺🇸", 1},
-        {   "Skin tone",                      "👋🏽", 1},
+        {"Family emoji",
+         "\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x91"
+         "\xa7\xe2\x80\x8d\xf0\x9f\x91\xa6", 1                },
+        {  "Flag emoji", "\xf0\x9f\x87\xba\xf0\x9f\x87\xb8", 1},
+        {   "Skin tone", "\xf0\x9f\x91\x8b\xf0\x9f\x8f\xbd", 1},
     };
 
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

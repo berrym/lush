@@ -55,19 +55,19 @@ static int tests_failed = 0;
 #define TEST_PASS()                                                            \
     do {                                                                       \
         tests_passed++;                                                        \
-        printf("  ✓ PASS\n");                                                  \
+        printf("  \xe2\x9c\x93 PASS\n");                                       \
     } while (0)
 
 #define TEST_FAIL(msg)                                                         \
     do {                                                                       \
         tests_failed++;                                                        \
-        printf("  ✗ FAIL: %s\n", msg);                                         \
+        printf("  \xe2\x9c\x97 FAIL: %s\n", msg);                              \
     } while (0)
 
 #define ASSERT_EQ(actual, expected, msg)                                       \
     do {                                                                       \
         if ((actual) != (expected)) {                                          \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             printf("    Expected: %ld, Got: %ld\n", (long)(expected),          \
                    (long)(actual));                                            \
             TEST_FAIL(msg);                                                    \
@@ -78,7 +78,7 @@ static int tests_failed = 0;
 #define ASSERT_TRUE(cond, msg)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s\n", msg);              \
             TEST_FAIL(msg);                                                    \
             return;                                                            \
         }                                                                      \
@@ -87,7 +87,7 @@ static int tests_failed = 0;
 #define ASSERT_NOT_NULL(ptr, msg)                                              \
     do {                                                                       \
         if ((ptr) == NULL) {                                                   \
-            printf("  ✗ ASSERTION FAILED: %s (got NULL)\n", msg);              \
+            printf("  \xe2\x9c\x97 ASSERTION FAILED: %s (got NULL)\n", msg);   \
             TEST_FAIL(msg);                                                    \
             return;                                                            \
         }                                                                      \
@@ -819,8 +819,8 @@ int main(void) {
     printf("  TEST RESULTS\n");
     printf("=======================================================\n");
     printf("Total Tests:  %d\n", tests_run);
-    printf("Passed:       %d ✓\n", tests_passed);
-    printf("Failed:       %d ✗\n", tests_failed);
+    printf("Passed:       %d \xe2\x9c\x93\n", tests_passed);
+    printf("Failed:       %d \xe2\x9c\x97\n", tests_failed);
     printf("Success Rate: %.1f%%\n",
            tests_run > 0 ? (100.0 * tests_passed / tests_run) : 0.0);
     printf("=======================================================\n");

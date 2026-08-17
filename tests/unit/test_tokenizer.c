@@ -754,7 +754,7 @@ TEST(tokenize_line_position_tracking) {
 }
 
 /* ============================================================================
- * REGRESSION — issue #50
+ * REGRESSION -- issue #50
  * Brace-expansion suffix scanner used to advance scan_pos by the claimed
  * UTF-8 sequence length without bounds-checking against input_length, so
  * a partial sequence at end-of-input caused token_new's memcpy to read

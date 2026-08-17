@@ -1472,48 +1472,49 @@ TEST(rt_pe_case_conversion_operators_covered) {
     /// legacy and still matches. Validated under --setup lush:audit.
     /// Subshell-isolated.
     run_result_t r =
-        run_shell("( s=heLLo; b=banana; c=café; unset -v u\n"
+        run_shell("( s=heLLo; b=banana; c=caf\xc3\xa9; unset -v u\n"
                   "  echo \"[${s^^}][${s,,}][${s^}][${s,}]\"\n"
                   "  echo \"[${b^^a}][${u^^}][${s^^}x][pre${s,,}]\"\n"
                   "  echo \"[${c^^}][${c,,}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[HELLO][hello][HeLLo][heLLo]\n"
                         "[bAnAnA][][HELLOx][prehello]\n"
-                        "[CAFÉ][café]\n");
+                        "[CAF\xc3\x89][caf\xc3\xa9]\n");
 }
 
 TEST(rt_pe_substring_operators_covered) {
     /// Substring ${var:off} / ${var:off:len} expands on the CST backbone via
     /// the shared apply_param_operator (lush_substring_extract,
     /// grapheme-aware). Covers the simple non-negative numeric spec, incl.
-    /// UTF-8 live (café -> caf / é by grapheme, not byte); offset/length past
-    /// the end clamp; an unset var is empty. A negative length (${s:2:-1}) is
-    /// NOT covered and defers to legacy, still matching. Validated under
+    /// UTF-8 live (cafe-acute -> caf / e-acute by grapheme, not byte);
+    /// offset/length past the end clamp; an unset var is empty. A negative
+    /// length (${s:2:-1}) is NOT covered and defers to legacy, still matching.
+    /// Validated under
     /// --setup lush:audit. Subshell-isolated.
     run_result_t r =
-        run_shell("( s=abcdef; c=café; unset -v u\n"
+        run_shell("( s=abcdef; c=caf\xc3\xa9; unset -v u\n"
                   "  echo \"[${s:2}][${s:2:2}][${s:0:3}][${s:4:99}][${s:9}]\"\n"
                   "  echo \"[${c:0:3}][${c:3}][${u:0:2}][${s:2:-1}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[cdef][cd][abc][ef][]\n"
-                        "[caf][é][][cde]\n");
+                        "[caf][\xc3\xa9][][cde]\n");
 }
 
 TEST(rt_pe_substitution_operators_covered) {
     /// Substitution ${var/pat/repl} (first) and ${var//pat/repl} (all) expand
     /// on the CST backbone via the shared apply_param_operator (pattern_
-    /// substitute). Covered: literal + glob patterns (o*b) + UTF-8 (é), incl.
-    /// empty replacement (remove), no-match (unchanged) and a `%` anchor whose
-    /// pattern does not start an identifier (${n/%1/X}). Deferring to legacy
-    /// (still matching): the \/ escaped-slash idiom, a /# anchor (a leading `#`
-    /// opens a comment) and a /%name kind-sigil anchor.
-    /// Validated under --setup lush:audit. Subshell-isolated.
+    /// substitute). Covered: literal + glob patterns (o*b) + UTF-8 (e-acute),
+    /// incl. empty replacement (remove), no-match (unchanged) and a `%` anchor
+    /// whose pattern does not start an identifier (${n/%1/X}). Deferring to
+    /// legacy (still matching): the \/ escaped-slash idiom, a /# anchor (a
+    /// leading `#` opens a comment) and a /%name kind-sigil anchor. Validated
+    /// under --setup lush:audit. Subshell-isolated.
     run_result_t r = run_shell(
-        "( s=abcabc; f=foobar; g=foofoo; p=path/to/x; c=café; n=ab1\n"
+        "( s=abcabc; f=foobar; g=foofoo; p=path/to/x; c=caf\xc3\xa9; n=ab1\n"
         "  echo \"[${s/a/X}][${s//a/X}][${s//a/}][${s/zzz/Q}]\"\n"
         "  echo \"[${f/o*b/Z}][${g/#foo/X}][${g/%foo/X}][${n/%1/X}]\"\n"
-        "  echo \"[${p//\\//.}][${c/é/e}][${c//o/0}]\" )\n");
+        "  echo \"[${p//\\//.}][${c/\xc3\xa9/e}][${c//o/0}]\" )\n");
     ASSERT_STDOUT_EQ(r, "[Xbcabc][XbcXbc][bcbc][abcabc]\n"
                         "[fZar][Xfoo][fooX][abX]\n"
-                        "[path.to.x][cafe][café]\n");
+                        "[path.to.x][cafe][caf\xc3\xa9]\n");
 }
 
 TEST(rt_nounset_errors_on_covered_words) {
@@ -2939,12 +2940,12 @@ TEST(function_return) {
 }
 
 /* ============================================================================
- * REGRESSION TESTS — Issue #47
+ * REGRESSION TESTS -- Issue #47
  * Variables declared with local/declare/typeset must honor subsequent
  * assignments using POSIX scope-chain semantics: an unprefixed `name=value`
  * in a function should update the existing local, not silently create or
  * update a global. The same applies to += append, for-loop variables, and
- * other implicit-assignment forms — they all share the same root cause
+ * other implicit-assignment forms -- they all share the same root cause
  * (unconditional global write at the executor level).
  *
  * Each test below stores the post-assignment value in a global RESULT
@@ -4310,13 +4311,14 @@ TEST(rt_sub642_large_index_dollar_write) {
 /* ==========================================================================
  * #621: scalar -> array kind transition. A list operation (s[i]=v, s+=(...),
  * (( s[i]=v ))) on a variable currently holding a SCALAR is a kind change --
- * the mirror of the §3.9 list->scalar E1134, gated by FEATURE_STRICT_VALUE_
- * TYPING. Strict (lush mode) REFUSES the implicit re-kind; a relaxed mode
- * (bash/zsh) PRESERVE-PROMOTEs, keeping the former scalar as the base element.
- * An unbound name is a fresh array (no kind change); whole-assign replaces.
- * POSIX has arrays disabled at the parser, so it never reaches these paths.
- * Distinct names (process-global symbol table); index 1 keeps the array tests
- * decoupled from lush's 0-index default where possible.
+ * the mirror of the S3.9 list->scalar E1134, gated by
+ * FEATURE_STRICT_VALUE_ TYPING. Strict (lush mode) REFUSES the implicit
+ * re-kind; a relaxed mode (bash/zsh) PRESERVE-PROMOTEs, keeping the former
+ * scalar as the base element. An unbound name is a fresh array (no kind
+ * change); whole-assign replaces. POSIX has arrays disabled at the parser, so
+ * it never reaches these paths. Distinct names (process-global symbol table);
+ * index 1 keeps the array tests decoupled from lush's 0-index default where
+ * possible.
  * ========================================================================== */
 
 // --- lush mode (strict): refuse the implicit re-kind ---
@@ -5190,7 +5192,7 @@ TEST(local_plus_equals_append) {
 }
 
 TEST(local_while_loop_counter) {
-    /// The original symptomatic case from issue #47 — a while-loop counter
+    /// The original symptomatic case from issue #47 -- a while-loop counter
     /// with `local` infinite-looped before the fix. The test framework
     /// exits on first failure, so earlier simpler tests stop the run before
     /// this one ever executes in the broken state. After the fix, this
@@ -5212,7 +5214,7 @@ TEST(local_while_loop_counter) {
 }
 
 /* ============================================================================
- * REGRESSION TESTS — Issue #48
+ * REGRESSION TESTS -- Issue #48
  * Trailing redirections attached to a function definition must be applied
  * when the function is called. The parser side landed in #43 and these
  * inputs now produce a correct AST; the executor needs to honor it.
@@ -5340,7 +5342,7 @@ TEST(function_redir_does_not_break_normal_call) {
     executor_execute_command_line(
         exec, "f() { echo from-f; } > /tmp/lush_test_48", 1);
     executor_execute_command_line(exec, "f", 1);
-    /// This echo must NOT also be captured by f's redirect — its output
+    /// This echo must NOT also be captured by f's redirect -- its output
     /// should be discarded as normal (we don't capture stdout here).
     executor_execute_command_line(exec, "echo from-second-call", 1);
     executor_execute_command_line(
@@ -6236,24 +6238,29 @@ TEST(param_string_length_counts_codepoints_not_bytes) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /// 4 codepoints, 5 bytes.
-    run_result_t r = run_shell_with_executor(exec, "V=café; LEN=${#V}");
+    run_result_t r = run_shell_with_executor(exec, "V=caf\xc3\xa9; LEN=${#V}");
     ASSERT_EXIT_STATUS(r, 0);
     char *len = symtable_get_var(exec->symtable, "LEN");
-    ASSERT_STR_EQ(len, "4", "Length of 'café' should be 4 (codepoints)");
+    ASSERT_STR_EQ(len, "4", "Length of 'caf\xc3\xa9' should be 4 (codepoints)");
     free(len);
 
     /// CJK: 2 codepoints, 6 bytes.
-    r = run_shell_with_executor(exec, "V=中文; LEN=${#V}");
+    r = run_shell_with_executor(exec, "V=\xe4\xb8\xad\xe6\x96\x87; LEN=${#V}");
     ASSERT_EXIT_STATUS(r, 0);
     len = symtable_get_var(exec->symtable, "LEN");
-    ASSERT_STR_EQ(len, "2", "Length of '中文' should be 2 (codepoints)");
+    ASSERT_STR_EQ(
+        len, "2",
+        "Length of '\xe4\xb8\xad\xe6\x96\x87' should be 2 (codepoints)");
     free(len);
 
-    /// Emoji: ab🌍c = 4 codepoints (a, b, 🌍, c), 7 bytes.
-    r = run_shell_with_executor(exec, "V=ab🌍c; LEN=${#V}");
+    /// Emoji: abU+1F30Dc = 4 codepoints (a, b, U+1F30D, c), 7 bytes.
+    r = run_shell_with_executor(exec, "V=ab\xf0\x9f\x8c\x8d"
+                                      "c; LEN=${#V}");
     ASSERT_EXIT_STATUS(r, 0);
     len = symtable_get_var(exec->symtable, "LEN");
-    ASSERT_STR_EQ(len, "4", "Length of 'ab🌍c' should be 4 (codepoints)");
+    ASSERT_STR_EQ(len, "4",
+                  "Length of 'ab\xf0\x9f\x8c\x8d"
+                  "c' should be 4 (codepoints)");
     free(len);
 
     /// Empty string still returns 0.
@@ -6869,14 +6876,14 @@ TEST(rt_assoc_key_nfc_nfd_collapse) {
 
 TEST(rt_assoc_key_distinct_when_actually_different) {
     /// NFC normalization does not paper over real key differences.
-    /// "café" and "CAFÉ" hash to separate entries (case folding is
+    /// "cafe-acute" and "CAFE-acute" hash to separate entries (case folding is
     /// a separate axis from NFC normalization).
     run_result_t r = run_shell("declare -A m\n"
-                               "m[café]=lower\n"
-                               "m[CAFÉ]=upper\n"
+                               "m[caf\xc3\xa9]=lower\n"
+                               "m[CAF\xc3\x89]=upper\n"
                                "echo len=${#m[@]}\n"
-                               "echo lower=${m[café]}\n"
-                               "echo upper=${m[CAFÉ]}\n");
+                               "echo lower=${m[caf\xc3\xa9]}\n"
+                               "echo upper=${m[CAF\xc3\x89]}\n");
     ASSERT_STDOUT_EQ(r, "len=2\nlower=lower\nupper=upper\n");
 }
 
@@ -6896,7 +6903,7 @@ TEST(rt_assoc_key_ascii_paths_unchanged) {
 
 TEST(rt_unicode_ident_declare_and_expand_latin) {
     /// FEATURE_UNICODE_IDENTIFIERS is default-on in lush mode. A
-    /// non-ASCII identifier (precomposed café) round-trips through
+    /// non-ASCII identifier (precomposed cafe-acute) round-trips through
     /// declare's name validation, symtable storage, tokenizer
     /// $var parsing, and the expand_variable name-extraction loop.
     run_result_t r =
@@ -6910,7 +6917,7 @@ TEST(rt_unicode_ident_declare_and_expand_greek) {
 }
 
 TEST(rt_unicode_ident_declare_and_expand_cyrillic) {
-    /// Cyrillic "имя" (name) -- 3 codepoints, 6 UTF-8 bytes.
+    /// Cyrillic "U+0438 U+043C U+044F" (name) -- 3 codepoints, 6 UTF-8 bytes.
     run_result_t r = run_shell("declare \xd0\xb8\xd0\xbc\xd1\x8f=name\n"
                                "echo $\xd0\xb8\xd0\xbc\xd1\x8f\n");
     ASSERT_STDOUT_EQ(r, "name\n");
@@ -6969,24 +6976,24 @@ TEST(rt_unicode_ident_invalid_start_still_rejected) {
 
 TEST(rt_unicode_ident_arithmetic_bare) {
     /// Non-ASCII identifier as a bare arithmetic operand:
-    /// $((café+1)) reads café from the symbol table.
-    run_result_t r = run_shell("declare café=41\n"
-                               "echo $((café+1))\n");
+    /// $((cafe-acute+1)) reads cafe-acute from the symbol table.
+    run_result_t r = run_shell("declare caf\xc3\xa9=41\n"
+                               "echo $((caf\xc3\xa9+1))\n");
     ASSERT_STDOUT_EQ(r, "42\n");
 }
 
 TEST(rt_unicode_ident_arithmetic_dollar) {
     /// Non-ASCII identifier with $ sigil inside arithmetic.
-    run_result_t r = run_shell("declare Σ=10\n"
-                               "echo $(($Σ*3))\n");
+    run_result_t r = run_shell("declare \xce\xa3=10\n"
+                               "echo $(($\xce\xa3*3))\n");
     ASSERT_STDOUT_EQ(r, "30\n");
 }
 
 TEST(rt_unicode_ident_arithmetic_compound) {
     /// (( ... )) compound, increment with non-ASCII name.
-    run_result_t r = run_shell("declare имя=7\n"
-                               "(( имя += 5 ))\n"
-                               "echo $имя\n");
+    run_result_t r = run_shell("declare \xd0\xb8\xd0\xbc\xd1\x8f=7\n"
+                               "(( \xd0\xb8\xd0\xbc\xd1\x8f += 5 ))\n"
+                               "echo $\xd0\xb8\xd0\xbc\xd1\x8f\n");
     ASSERT_STDOUT_EQ(r, "12\n");
 }
 
@@ -7003,9 +7010,10 @@ TEST(rt_unicode_ident_function_name_lush) {
     /// Parser was already permissive here (POSIX-only validation),
     /// but the lush_is_valid_identifier delegation must not regress
     /// the lush case.
-    run_result_t r = run_shell("función() { echo from-función; }\n"
-                               "función\n");
-    ASSERT_STDOUT_EQ(r, "from-función\n");
+    run_result_t r =
+        run_shell("funci\xc3\xb3n() { echo from-funci\xc3\xb3n; }\n"
+                  "funci\xc3\xb3n\n");
+    ASSERT_STDOUT_EQ(r, "from-funci\xc3\xb3n\n");
 }
 
 TEST(rt_unicode_ident_function_name_posix_rejected) {
@@ -7013,7 +7021,7 @@ TEST(rt_unicode_ident_function_name_posix_rejected) {
     /// name containing non-ASCII bytes must be rejected. Two separate
     /// run_shell calls so the parser sees posix_mode = true.
     (void)run_shell("set -o posix\n");
-    run_result_t r = run_shell("función() { :; }\n");
+    run_result_t r = run_shell("funci\xc3\xb3n() { :; }\n");
     ASSERT_STDERR_CONTAINS(r, "invalid function name in POSIX mode");
     (void)run_shell("mode lush\n");
 }
@@ -7024,8 +7032,8 @@ TEST(rt_unicode_ident_function_name_posix_opt_in) {
     /// test: parser sees posix_mode + feature override at parse time.
     (void)run_shell("set -o posix\n"
                     "shopt -s unicode_identifiers\n");
-    run_result_t r = run_shell("función() { echo posix-ok; }\n"
-                               "función\n");
+    run_result_t r = run_shell("funci\xc3\xb3n() { echo posix-ok; }\n"
+                               "funci\xc3\xb3n\n");
     ASSERT_STDOUT_EQ(r, "posix-ok\n");
     (void)run_shell("mode lush\n");
 }
@@ -7036,15 +7044,15 @@ TEST(rt_unicode_ident_alias_name_lush) {
     /// harness shares with set_alias; the real shell calls it during startup
     /// via src/init.c but the harness has no equivalent entry point.
     init_aliases();
-    run_result_t r = run_shell("alias café=\"echo from-café\"\n"
-                               "café\n");
-    ASSERT_STDOUT_EQ(r, "from-café\n");
+    run_result_t r = run_shell("alias caf\xc3\xa9=\"echo from-caf\xc3\xa9\"\n"
+                               "caf\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "from-caf\xc3\xa9\n");
 }
 
 TEST(rt_unicode_ident_alias_name_bash_rejected) {
-    /// In bash mode, the byte-level check rejects café.
+    /// In bash mode, the byte-level check rejects cafe-acute.
     (void)run_shell("mode bash\n");
-    run_result_t r = run_shell("alias café=\"echo nope\"\n");
+    run_result_t r = run_shell("alias caf\xc3\xa9=\"echo nope\"\n");
     ASSERT_STDERR_CONTAINS(r, "invalid alias name");
     (void)run_shell("mode lush\n");
 }
@@ -7071,15 +7079,16 @@ TEST(rt_unicode_ident_array_subscript) {
     /// the executor wave the name-prefix validator in
     /// parse_parameter_expansion rejected the non-ASCII bytes and
     /// silently fell through to the scalar branch, returning empty.
-    run_result_t r = run_shell("café=(alpha beta gamma)\n"
-                               "echo \"${café[0]}=${café[1]}=${café[2]}\"\n");
+    run_result_t r = run_shell(
+        "caf\xc3\xa9=(alpha beta gamma)\n"
+        "echo \"${caf\xc3\xa9[0]}=${caf\xc3\xa9[1]}=${caf\xc3\xa9[2]}\"\n");
     ASSERT_STDOUT_EQ(r, "alpha=beta=gamma\n");
 }
 
 TEST(rt_unicode_ident_array_length) {
     /// ${#arr[@]} on a unicode-named array.
-    run_result_t r = run_shell("café=(one two three four)\n"
-                               "echo \"${#café[@]}\"\n");
+    run_result_t r = run_shell("caf\xc3\xa9=(one two three four)\n"
+                               "echo \"${#caf\xc3\xa9[@]}\"\n");
     ASSERT_STDOUT_EQ(r, "4\n");
 }
 
@@ -7089,34 +7098,36 @@ TEST(rt_unicode_ident_array_vector_in_for) {
     /// declined the unicode name and the scalar-slot enforcement
     /// raised SHELL_ERR_TYPE_MISMATCH ("list value in scalar position").
     run_result_t r =
-        run_shell("café=(a b c)\n"
-                  "for x in \"${café[@]}\"; do echo \"[$x]\"; done\n");
+        run_shell("caf\xc3\xa9=(a b c)\n"
+                  "for x in \"${caf\xc3\xa9[@]}\"; do echo \"[$x]\"; done\n");
     ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
 }
 
 TEST(rt_unicode_ident_array_joined) {
     /// ${arr[*]} space-joined form.
-    run_result_t r = run_shell("café=(one two three)\n"
-                               "echo \"[${café[*]}]\"\n");
+    run_result_t r = run_shell("caf\xc3\xa9=(one two three)\n"
+                               "echo \"[${caf\xc3\xa9[*]}]\"\n");
     ASSERT_STDOUT_EQ(r, "[one two three]\n");
 }
 
 TEST(rt_unicode_ident_assoc_array_subscript) {
     /// Associative array with a unicode name; key lookup honors the
     /// predicate-driven name prefix detection too.
-    run_result_t r = run_shell("declare -A имя\n"
-                               "имя[k1]=v1\n"
-                               "имя[k2]=v2\n"
-                               "echo \"${имя[k1]}=${имя[k2]}\"\n");
+    run_result_t r = run_shell("declare -A \xd0\xb8\xd0\xbc\xd1\x8f\n"
+                               "\xd0\xb8\xd0\xbc\xd1\x8f[k1]=v1\n"
+                               "\xd0\xb8\xd0\xbc\xd1\x8f[k2]=v2\n"
+                               "echo "
+                               "\"${\xd0\xb8\xd0\xbc\xd1\x8f[k1]}=${"
+                               "\xd0\xb8\xd0\xbc\xd1\x8f[k2]}\"\n");
     ASSERT_STDOUT_EQ(r, "v1=v2\n");
 }
 
 TEST(rt_unicode_ident_kind_sigil) {
-    /// Bare `@café` kind sigil on a unicode-named array (lush default has
+    /// Bare `@cafe-acute` kind sigil on a unicode-named array (lush default has
     /// FEATURE_KIND_SIGILS on). Sigils are bare-word-only; double quotes
     /// would suppress them (see rt_sigil_literal_in_double_quotes).
-    run_result_t r = run_shell("café=(a b c)\n"
-                               "echo @café\n");
+    run_result_t r = run_shell("caf\xc3\xa9=(a b c)\n"
+                               "echo @caf\xc3\xa9\n");
     ASSERT_STDOUT_EQ(r, "a b c\n");
 }
 
@@ -7124,25 +7135,26 @@ TEST(rt_unicode_ident_bare_array_expands_zsh_lush) {
     /// Bare $arr explodes to N words in zsh/lush mode -- now also
     /// works for unicode names via the migrated try_expand_vector_arg
     /// detection.
-    run_result_t r = run_shell("café=(a b c)\n"
-                               "for x in $café; do echo \"[$x]\"; done\n");
+    run_result_t r =
+        run_shell("caf\xc3\xa9=(a b c)\n"
+                  "for x in $caf\xc3\xa9; do echo \"[$x]\"; done\n");
     ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
 }
 
 TEST(rt_unicode_ident_indirect_expansion_target) {
     /// ${!ptr} resolves the value of $ptr as a variable name. Both
     /// the pointer and the target may now be unicode-named.
-    run_result_t r = run_shell("declare ptr=café\n"
-                               "declare café=hello\n"
+    run_result_t r = run_shell("declare ptr=caf\xc3\xa9\n"
+                               "declare caf\xc3\xa9=hello\n"
                                "echo \"${!ptr}\"\n");
     ASSERT_STDOUT_EQ(r, "hello\n");
 }
 
 TEST(rt_unicode_ident_indirect_expansion_pointer) {
     /// Pointer itself uses a unicode identifier name.
-    run_result_t r = run_shell("declare имя=café\n"
-                               "declare café=world\n"
-                               "echo \"${!имя}\"\n");
+    run_result_t r = run_shell("declare \xd0\xb8\xd0\xbc\xd1\x8f=caf\xc3\xa9\n"
+                               "declare caf\xc3\xa9=world\n"
+                               "echo \"${!\xd0\xb8\xd0\xbc\xd1\x8f}\"\n");
     ASSERT_STDOUT_EQ(r, "world\n");
 }
 
@@ -7150,8 +7162,8 @@ TEST(rt_unicode_ident_zsh_bare_subscript) {
     /// $arr[0] (zsh bare subscript, no braces). The tokenizer's
     /// quoted-string $NAME scanner used to byte-test the name;
     /// now it walks lush_ident_match_continue.
-    run_result_t r = run_shell("café=(a b c)\n"
-                               "echo $café[0]\n");
+    run_result_t r = run_shell("caf\xc3\xa9=(a b c)\n"
+                               "echo $caf\xc3\xa9[0]\n");
     ASSERT_STDOUT_EQ(r, "a\n");
 }
 
@@ -7159,18 +7171,18 @@ TEST(rt_unicode_ident_fd_allocation_var) {
     /// exec {varname}>FILE allocates a free fd into $varname.
     /// The tokenizer's {NAME} fd-allocation scanner must accept
     /// unicode names too.
-    run_result_t r = run_shell("exec {café}>/tmp/lush_ut_fd.out\n"
-                               "[ $café -ge 10 ] && echo high-fd\n");
+    run_result_t r = run_shell("exec {caf\xc3\xa9}>/tmp/lush_ut_fd.out\n"
+                               "[ $caf\xc3\xa9 -ge 10 ] && echo high-fd\n");
     ASSERT_STDOUT_EQ(r, "high-fd\n");
     unlink("/tmp/lush_ut_fd.out");
 }
 
 TEST(rt_unicode_ident_nfd_passes_validation) {
     /// NFD-encoded "cafe + combining-acute" (U+0301) validates as a
-    /// single canonicalized identifier "café" after the validator's
+    /// single canonicalized identifier "cafe-acute" after the validator's
     /// NFC normalization. Before this wave, declare rejected NFD with
     /// "not a valid identifier". Lookup uses the precomposed NFC name
-    /// "caf<é>" (4 codepoints) -- the canonical storage form.
+    /// "caf<e-acute>" (4 codepoints) -- the canonical storage form.
     run_result_t r = run_shell("declare cafe\xCC\x81=NFD_FORM\n"
                                "echo \"$caf\xC3\xA9\"\n");
     ASSERT_STDOUT_EQ(r, "NFD_FORM\n");
@@ -7200,7 +7212,7 @@ TEST(rt_unicode_ident_leading_mark_not_identifier) {
 }
 
 TEST(rt_unicode_ident_nfc_nfd_storage_collision) {
-    /// NFC-encoded `café` and NFD-encoded `cafe + U+0301` MUST
+    /// NFC-encoded `cafe-acute` and NFD-encoded `cafe + U+0301` MUST
     /// collide as one binding in the symtable. Set via NFC, overwrite
     /// via NFD, read via NFC: the NFC read sees the NFD-side write.
     run_result_t r = run_shell("declare caf\xC3\xA9=NFC_FIRST\n"
@@ -7243,13 +7255,13 @@ TEST(rt_unicode_ident_nfc_array_assoc_collision) {
 }
 
 TEST(rt_unicode_ident_highlight_spans_full_name) {
-    /// Syntax highlighter must color the whole `$café` as one VARIABLE
-    /// token. The byte-test it replaced stopped at the multibyte `é`,
+    /// Syntax highlighter must color the whole `$cafe-acute` as one VARIABLE
+    /// token. The byte-test it replaced stopped at the multibyte `e-acute`,
     /// truncating the highlighted span to `$caf`. This binary links the
     /// strong, feature-flag-aware lush_ident_match_* (src/identifier.c),
     /// so it overrides the ASCII weak fallback in liblle and proves the
-    /// real product highlights unicode identifiers. `$café` is 6 bytes:
-    /// `$` + `caf` + `é` (0xC3 0xA9). FEATURE_UNICODE_IDENTIFIERS is the
+    /// real product highlights unicode identifiers. `$cafe-acute` is 6 bytes:
+    /// `$` + `caf` + `e-acute` (0xC3 0xA9). FEATURE_UNICODE_IDENTIFIERS is the
     /// lush-mode default the harness runs under.
     (void)run_shell("mode lush\n");
     lle_syntax_highlighter_t *h = NULL;
@@ -7269,15 +7281,16 @@ TEST(rt_unicode_ident_highlight_spans_full_name) {
         }
     }
     lle_syntax_highlighter_destroy(h);
-    ASSERT(found, "a VARIABLE token was produced for $café");
-    /// `$café` begins at offset 5 ("echo " is 5 bytes) and is 6 bytes.
+    ASSERT(found, "a VARIABLE token was produced for $caf\xc3\xa9");
+    /// `$cafe-acute` begins at offset 5 ("echo " is 5 bytes) and is 6 bytes.
     ASSERT_EQ(var_start, (size_t)5, "variable token starts at $");
-    ASSERT_EQ(var_end - var_start, (size_t)6, "variable token spans $café");
+    ASSERT_EQ(var_end - var_start, (size_t)6,
+              "variable token spans $caf\xc3\xa9");
 }
 
 TEST(rt_unicode_ident_mixed_script_detected) {
-    /// `pаsswd` -- Latin p, then Cyrillic а (U+0430), then Latin sswd --
-    /// is the classic homograph: visually `passwd`. lush_ident_mixes_scripts
+    /// `pU+0430sswd` -- Latin p, then Cyrillic U+0430 (U+0430), then Latin sswd
+    /// -- is the classic homograph: visually `passwd`. lush_ident_mixes_scripts
     /// reports the crossing and names both scripts.
     const char *a = NULL, *b = NULL;
     bool mixed = lush_ident_mixes_scripts("p\xD0\xB0sswd", &a, &b);
@@ -7291,16 +7304,18 @@ TEST(rt_unicode_ident_mixed_script_detected) {
 TEST(rt_unicode_ident_single_script_not_flagged) {
     /// Single-script names -- including ones with digits, underscores,
     /// and combining marks -- are not mixed-script.
-    ASSERT(!lush_ident_mixes_scripts("café", NULL, NULL), "all-Latin café");
-    ASSERT(!lush_ident_mixes_scripts("\xCE\xA3", NULL, NULL), "all-Greek Σ");
+    ASSERT(!lush_ident_mixes_scripts("caf\xc3\xa9", NULL, NULL),
+           "all-Latin caf\xc3\xa9");
+    ASSERT(!lush_ident_mixes_scripts("\xCE\xA3", NULL, NULL),
+           "all-Greek \xce\xa3");
     ASSERT(!lush_ident_mixes_scripts("\xD0\xB8\xD0\xBC\xD1\x8F", NULL, NULL),
-           "all-Cyrillic имя");
+           "all-Cyrillic \xd0\xb8\xd0\xbc\xd1\x8f");
     ASSERT(!lush_ident_mixes_scripts("x1_y2", NULL, NULL),
            "ASCII with digits/underscore");
-    /// NFD café (cafe + combining acute): the mark is inherited, not a
+    /// NFD cafe-acute (cafe + combining acute): the mark is inherited, not a
     /// second script.
     ASSERT(!lush_ident_mixes_scripts("cafe\xCC\x81", NULL, NULL),
-           "NFD café -- combining mark is inherited, not mixed");
+           "NFD caf\xc3\xa9 -- combining mark is inherited, not mixed");
 }
 
 TEST(rt_unicode_ident_mixed_script_allowed_by_default) {
@@ -8787,8 +8802,8 @@ TEST(rt_extended_test_single_equals_alias) {
 
 TEST(rt_test_equality_under_nfc_equivalence) {
     /// `[ a = b ]` (and the `[`-builtin form) now compares under NFC
-    /// equivalence: precomposed "café" (e-acute U+00E9, bytes
-    /// C3 A9) equals decomposed "café" (e + combining acute,
+    /// equivalence: precomposed "cafe-acute" (e-acute U+00E9, bytes
+    /// C3 A9) equals decomposed "cafe-acute" (e + combining acute,
     /// bytes 65 CC 81) even though byte-level strcmp would diverge.
     /// Lush-superset divergence from bash/zsh; justified by the
     /// project's NFC-everywhere policy.
@@ -8802,10 +8817,10 @@ TEST(rt_test_equality_under_nfc_equivalence) {
 
 TEST(rt_test_inequality_under_nfc_when_actually_different) {
     /// NFC equivalence does not paper over actually-different
-    /// strings.  Lowercase café vs uppercase CAFÉ remain unequal
+    /// strings.  Lowercase cafe-acute vs uppercase CAFE-acute remain unequal
     /// (case folding is a separate axis from NFC).
-    run_result_t r =
-        run_shell("[ \"café\" = \"CAFÉ\" ] && echo eq || echo ne\n");
+    run_result_t r = run_shell(
+        "[ \"caf\xc3\xa9\" = \"CAF\xc3\x89\" ] && echo eq || echo ne\n");
     ASSERT_STDOUT_EQ(r, "ne\n");
 }
 
@@ -9185,8 +9200,9 @@ TEST(rt_declare_l_subsequent_assignment_folded) {
 TEST(rt_declare_l_unicode_fold) {
     /// Case fold goes through lle_utf8_tolower so non-ASCII codepoints
     /// fold per the project's Unicode case table.
-    run_result_t r = run_shell("declare -l DL_UNI=CAFÉ\necho \"$DL_UNI\"\n");
-    ASSERT_STDOUT_EQ(r, "café\n");
+    run_result_t r =
+        run_shell("declare -l DL_UNI=CAF\xc3\x89\necho \"$DL_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "caf\xc3\xa9\n");
 }
 
 TEST(rt_declare_l_promotes_existing) {
@@ -9216,8 +9232,9 @@ TEST(rt_declare_u_subsequent_assignment_folded) {
 
 TEST(rt_declare_u_unicode_fold) {
     /// Unicode fold via lle_utf8_toupper.
-    run_result_t r = run_shell("declare -u DU_UNI=café\necho \"$DU_UNI\"\n");
-    ASSERT_STDOUT_EQ(r, "CAFÉ\n");
+    run_result_t r =
+        run_shell("declare -u DU_UNI=caf\xc3\xa9\necho \"$DU_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "CAF\xc3\x89\n");
 }
 
 TEST(rt_declare_no_value_preserves_existing) {
@@ -9420,8 +9437,8 @@ int main(void) {
     RUN_TEST(function_with_args);
     RUN_TEST(function_return);
 
-    printf(
-        "\nRegression tests — Issue #47 (local/declare/typeset assignment):\n");
+    printf("\nRegression tests \xe2\x80\x94 Issue #47 (local/declare/typeset "
+           "assignment):\n");
     RUN_TEST(local_plain_string_reassignment);
     RUN_TEST(local_integer_reassignment);
     RUN_TEST(local_arith_substitution);
@@ -9583,7 +9600,8 @@ int main(void) {
     RUN_TEST(local_quoted_paren_value_stays_scalar);
     RUN_TEST(local_array_dies_with_function_scope);
 
-    printf("\nRegression tests — Issue #48 (function trailing redirections at "
+    printf("\nRegression tests \xe2\x80\x94 Issue #48 (function trailing "
+           "redirections at "
            "call):\n");
     RUN_TEST(function_redir_out_applied_at_call);
     RUN_TEST(function_redir_stderr_applied_at_call);

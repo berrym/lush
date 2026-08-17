@@ -64,11 +64,11 @@ test_result() {
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     if [[ "$actual" == "$expected" && "$actual_exit" == "$expected_exit" ]]; then
-        echo -e "  ${GREEN}✓${NC} $test_name"
+        echo -e "  ${GREEN}OK${NC} $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: $test_name" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} $test_name"
+        echo -e "  ${RED}FAIL${NC} $test_name"
         echo "    Expected output: '$expected'"
         echo "    Actual output: '$actual'"
         echo "    Expected exit: $expected_exit"
@@ -117,7 +117,7 @@ test_set_option() {
 }
 
 print_section() {
-    echo -e "\n${BLUE}▓▓▓ $1 ▓▓▓${NC}"
+    echo -e "\n${BLUE}### $1 ###${NC}"
 }
 
 print_subsection() {
@@ -201,11 +201,11 @@ test_shell_behavior_options() {
     local syntax_check_exit=$?
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ $syntax_check_exit -ne 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} -n detects syntax errors"
+        echo -e "  ${GREEN}OK${NC} -n detects syntax errors"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: -n detects syntax errors" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} -n should detect syntax errors"
+        echo -e "  ${RED}FAIL${NC} -n should detect syntax errors"
         echo "    Output: $syntax_check_output"
         echo "    Exit code: $syntax_check_exit"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -221,11 +221,11 @@ test_shell_behavior_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$trace_output" =~ "+ echo traced_command" || "$trace_output" =~ "traced_command" ]]; then
-        echo -e "  ${GREEN}✓${NC} -x traces command execution"
+        echo -e "  ${GREEN}OK${NC} -x traces command execution"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: -x traces command execution" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} -x trace not working properly"
+        echo -e "  ${RED}FAIL${NC} -x trace not working properly"
         echo "    Output: $trace_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: -x trace not working - Output: $trace_output" >> "$LOGFILE"
@@ -241,11 +241,11 @@ test_shell_behavior_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$verbose_output" =~ "echo verbose_test" || "$verbose_output" =~ "verbose_test" ]]; then
-        echo -e "  ${GREEN}✓${NC} -v verbose mode shows input"
+        echo -e "  ${GREEN}OK${NC} -v verbose mode shows input"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: -v verbose mode shows input" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} -v verbose mode not working"
+        echo -e "  ${RED}FAIL${NC} -v verbose mode not working"
         echo "    Output: $verbose_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: -v verbose mode not working - Output: $verbose_output" >> "$LOGFILE"
@@ -277,11 +277,11 @@ test_expansion_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$glob_output" =~ "file1.txt" || "$glob_output" =~ "*.txt" ]]; then
-        echo -e "  ${GREEN}✓${NC} +f enables globbing"
+        echo -e "  ${GREEN}OK${NC} +f enables globbing"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: +f enables globbing" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} +f globbing not working"
+        echo -e "  ${RED}FAIL${NC} +f globbing not working"
         echo "    Output: $glob_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: +f globbing not working - Output: $glob_output" >> "$LOGFILE"
@@ -332,11 +332,11 @@ test_set_builtin_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ $set_exit -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} set without args shows variables"
+        echo -e "  ${GREEN}OK${NC} set without args shows variables"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: set without args shows variables" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} set without args failed"
+        echo -e "  ${RED}FAIL${NC} set without args failed"
         echo "    Exit code: $set_exit"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: set without args failed - Exit: $set_exit" >> "$LOGFILE"
@@ -349,11 +349,11 @@ test_set_builtin_options() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ $set_o_exit -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} set -o shows option states"
+        echo -e "  ${GREEN}OK${NC} set -o shows option states"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: set -o shows option states" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} set -o failed"
+        echo -e "  ${RED}FAIL${NC} set -o failed"
         echo "    Output: $set_o_output"
         echo "    Exit code: $set_o_exit"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -389,11 +389,11 @@ test_posix_compatibility() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ "$persist_output" =~ "recovered" && "$persist_output" =~ "success" ]]; then
-        echo -e "  ${GREEN}✓${NC} option state persists correctly"
+        echo -e "  ${GREEN}OK${NC} option state persists correctly"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: option state persists correctly" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} option state persistence issue"
+        echo -e "  ${RED}FAIL${NC} option state persistence issue"
         echo "    Output: $persist_output"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo "FAIL: option state persistence issue - Output: $persist_output" >> "$LOGFILE"
@@ -408,11 +408,11 @@ test_posix_compatibility() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ $invalid_exit -ne 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} invalid options are rejected"
+        echo -e "  ${GREEN}OK${NC} invalid options are rejected"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: invalid options are rejected" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} invalid option should fail"
+        echo -e "  ${RED}FAIL${NC} invalid option should fail"
         echo "    Output: $invalid_output"
         echo "    Exit code: $invalid_exit"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -431,11 +431,11 @@ test_posix_compatibility() {
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [[ $inherit_exit -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} option inheritance works"
+        echo -e "  ${GREEN}OK${NC} option inheritance works"
         PASSED_TESTS=$((PASSED_TESTS + 1))
         echo "PASS: option inheritance works" >> "$LOGFILE"
     else
-        echo -e "  ${RED}✗${NC} option inheritance failed"
+        echo -e "  ${RED}FAIL${NC} option inheritance failed"
         echo "    Output: $inherit_output"
         echo "    Exit code: $inherit_exit"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -482,10 +482,10 @@ main() {
     echo -e "${RED}Failed: $FAILED_TESTS${NC}"
 
     if [[ $FAILED_TESTS -eq 0 ]]; then
-        echo -e "\n${GREEN}✓ ALL POSIX COMMAND LINE OPTION TESTS PASSED${NC}"
+        echo -e "\n${GREEN}OK ALL POSIX COMMAND LINE OPTION TESTS PASSED${NC}"
         echo "Lush demonstrates excellent POSIX command line option compliance!"
     else
-        echo -e "\n${YELLOW}⚠ SOME POSIX COMMAND LINE OPTION TESTS FAILED${NC}"
+        echo -e "\n${YELLOW}WARN SOME POSIX COMMAND LINE OPTION TESTS FAILED${NC}"
         echo "Check $LOGFILE for detailed failure information."
         echo ""
         echo "Summary of failed tests:"

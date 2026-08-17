@@ -1156,14 +1156,14 @@ lle_result_t lle_run_compatibility_tests(lle_editor_t *editor) {
             char *buffer_content = lle_buffer_get_content(editor->buffer);
             if (strcmp(buffer_content, test->expected_result) == 0) {
                 passed_tests++;
-                printf("✅ %s: PASSED\n", test->test_name);
+                printf("OK %s: PASSED\n", test->test_name);
             } else {
-                printf("❌ %s: FAILED - Expected: '%s', Got: '%s'\n", 
+                printf("FAIL %s: FAILED - Expected: '%s', Got: '%s'\n", 
                        test->test_name, test->expected_result, buffer_content);
             }
             lle_memory_pool_free(editor->memory_pool, buffer_content);
         } else {
-            printf("❌ %s: FAILED - Execution error: %d\n", test->test_name, result);
+            printf("FAIL %s: FAILED - Execution error: %d\n", test->test_name, result);
         }
     }
     
@@ -1265,8 +1265,8 @@ bool test_keybinding_performance(void) {
     // Must be under 50 microseconds per lookup
     bool performance_ok = (avg_time < 50);
     
-    printf("Keybinding lookup performance: %lu µs (target: <50µs) %s\n",
-           avg_time, performance_ok ? "✅" : "❌");
+    printf("Keybinding lookup performance: %lu us (target: <50us) %s\n",
+           avg_time, performance_ok ? "OK" : "FAIL");
     
     cleanup_test_editor(editor);
     return performance_ok;
@@ -1292,7 +1292,7 @@ This specification provides **100% GNU Readline compatibility** with enhanced ca
 2. **Critical Operations** - Ctrl-G abort, history navigation, completion
 3. **Vi Mode Support** - Full vi-style editing mode preset
 4. **Multiline Enhancement** - All bindings work better with complex commands
-5. **Performance Excellence** - Sub-50µs keybinding lookup guaranteed
+5. **Performance Excellence** - Sub-50us keybinding lookup guaranteed
 6. **Unlimited Customization** - All defaults can be overridden by users
 
 **Implementation Status**: Complete specification ready for development  

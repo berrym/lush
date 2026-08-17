@@ -15,10 +15,10 @@ test_builtin() {
     local exit_code=$?
 
     if [[ $exit_code -eq 0 ]]; then
-        echo "✓ $name: $result"
+        echo "OK $name: $result"
         return 0
     else
-        echo "✗ $name: NOT FOUND (exit code: $exit_code)"
+        echo "FAIL $name: NOT FOUND (exit code: $exit_code)"
         return 1
     fi
 }
@@ -62,48 +62,48 @@ echo "Testing basic functionality:"
 # Echo test
 result=$($SHELL_PATH -c "echo hello world" 2>/dev/null)
 if [[ "$result" == "hello world" ]]; then
-    echo "✓ echo: works correctly"
+    echo "OK echo: works correctly"
 else
-    echo "✗ echo: failed (got: '$result')"
+    echo "FAIL echo: failed (got: '$result')"
 fi
 
 # PWD test
 result=$($SHELL_PATH -c "pwd" 2>/dev/null)
 if [[ -n "$result" && -d "$result" ]]; then
-    echo "✓ pwd: works correctly"
+    echo "OK pwd: works correctly"
 else
-    echo "✗ pwd: failed (got: '$result')"
+    echo "FAIL pwd: failed (got: '$result')"
 fi
 
 # CD test
 result=$($SHELL_PATH -c "cd /tmp && pwd" 2>/dev/null)
 if [[ "$result" == "/tmp" ]]; then
-    echo "✓ cd: works correctly"
+    echo "OK cd: works correctly"
 else
-    echo "✗ cd: failed (got: '$result')"
+    echo "FAIL cd: failed (got: '$result')"
 fi
 
 # True/False test
 $SHELL_PATH -c "true" 2>/dev/null
 if [[ $? -eq 0 ]]; then
-    echo "✓ true: returns 0"
+    echo "OK true: returns 0"
 else
-    echo "✗ true: failed"
+    echo "FAIL true: failed"
 fi
 
 $SHELL_PATH -c "false" 2>/dev/null
 if [[ $? -eq 1 ]]; then
-    echo "✓ false: returns 1"
+    echo "OK false: returns 1"
 else
-    echo "✗ false: failed"
+    echo "FAIL false: failed"
 fi
 
 # Export test
 result=$($SHELL_PATH -c "export TEST_VAR=value; echo \$TEST_VAR" 2>/dev/null)
 if [[ "$result" == "value" ]]; then
-    echo "✓ export: works correctly"
+    echo "OK export: works correctly"
 else
-    echo "✗ export: failed (got: '$result')"
+    echo "FAIL export: failed (got: '$result')"
 fi
 
 echo
@@ -114,19 +114,19 @@ missing_builtins=()
 
 for builtin in readonly hash; do
     if ! $SHELL_PATH -c "type $builtin" >/dev/null 2>&1; then
-        echo "✗ MISSING: $builtin"
+        echo "FAIL MISSING: $builtin"
         missing_builtins+=("$builtin")
         ((missing_count++))
     else
-        echo "✓ FOUND: $builtin"
+        echo "OK FOUND: $builtin"
     fi
 done
 
 echo
 if [[ $missing_count -eq 0 ]]; then
-    echo "✓ All critical POSIX builtins are implemented!"
+    echo "OK All critical POSIX builtins are implemented!"
 else
-    echo "⚠ $missing_count POSIX builtin(s) are missing:"
+    echo "WARN $missing_count POSIX builtin(s) are missing:"
     for builtin in "${missing_builtins[@]}"; do
         echo "  - $builtin"
     done

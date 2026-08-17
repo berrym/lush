@@ -36,7 +36,7 @@ if build_dir_name != 'build'
           'Then build with: meson compile -C build')
 endif
 
-message('Build directory: ' + build_dir_name + ' ✓')
+message('Build directory: ' + build_dir_name + ' OK')
 
 # ============================================================================
 # WORD CST DIFFERENTIAL AUDIT SETUP
@@ -403,9 +403,9 @@ if lle_sources.length() > 0
 
   # Display integration tests
   # Tests the complete integration flow through the display system:
-  # - Display Bridge → Event Coordinator → Render Controller
-  # - Render Controller → Pipeline → Cache → Output
-  # - Terminal Adapter → Theme Integration
+  # - Display Bridge -> Event Coordinator -> Render Controller
+  # - Render Controller -> Pipeline -> Cache -> Output
+  # - Terminal Adapter -> Theme Integration
   # - Full rendering workflows with multi-component scenarios
   # NOTE: display_integration_test disabled - dirty_tracker removed
   # test_display_integration = executable('test_display_integration',
@@ -1674,7 +1674,7 @@ if fs.exists('tests/unit/test_parser_negative.c')
        timeout: 60)
 endif
 
-# AST Round-Trip Tests - Verify parse → source → parse produces equivalent AST
+# AST Round-Trip Tests - Verify parse -> source -> parse produces equivalent AST
 if fs.exists('tests/unit/test_ast_roundtrip.c')
   test_ast_roundtrip = executable('test_ast_roundtrip',
                            'tests/unit/test_ast_roundtrip.c',
@@ -2494,7 +2494,7 @@ if fuzzing_enabled
     # this needs the FULL core src minus lush.c (which has main()),
     # because the executor pulls in builtins, expansion, redirection,
     # debug, autocorrect, and the rest of the shell. fuzz_stubs.c is
-    # NOT included here — for the executor target we want the real
+    # NOT included here -- for the executor target we want the real
     # implementations of every function the parser fuzzers stubbed.
     # LUSH_FUZZ_SANDBOX in c_args makes lush_fork() always return -1
     # (see include/lush_fork.h), preventing any actual external

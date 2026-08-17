@@ -95,66 +95,66 @@ bool is_grapheme_cluster_boundary(uint32_t cp1, uint32_t cp2, bool prev_was_zwj,
     grapheme_break_property_t prop1 = get_grapheme_break_property(cp1);
     grapheme_break_property_t prop2 = get_grapheme_break_property(cp2);
 
-    /// GB3: CR × LF
+    /// GB3: CR x LF
     if (prop1 == GB_CR && prop2 == GB_LF) {
         return false; /// No break
     }
 
-    /// GB4: (Control | CR | LF) ÷
+    /// GB4: (Control | CR | LF) U+00F7
     if (prop1 == GB_CONTROL || prop1 == GB_CR || prop1 == GB_LF) {
         return true; /// Break
     }
 
-    /// GB5: ÷ (Control | CR | LF)
+    /// GB5: U+00F7 (Control | CR | LF)
     if (prop2 == GB_CONTROL || prop2 == GB_CR || prop2 == GB_LF) {
         return true; /// Break
     }
 
-    /// GB6: L × (L | V | LV | LVT)
+    /// GB6: L x (L | V | LV | LVT)
     if (prop1 == GB_L &&
         (prop2 == GB_L || prop2 == GB_V || prop2 == GB_LV || prop2 == GB_LVT)) {
         return false; /// No break
     }
 
-    /// GB7: (LV | V) × (V | T)
+    /// GB7: (LV | V) x (V | T)
     if ((prop1 == GB_LV || prop1 == GB_V) && (prop2 == GB_V || prop2 == GB_T)) {
         return false; /// No break
     }
 
-    /// GB8: (LVT | T) × T
+    /// GB8: (LVT | T) x T
     if ((prop1 == GB_LVT || prop1 == GB_T) && prop2 == GB_T) {
         return false; /// No break
     }
 
-    /// GB9: × (Extend | ZWJ)
+    /// GB9: x (Extend | ZWJ)
     if (prop2 == GB_EXTEND || prop2 == GB_ZWJ) {
         return false; /// No break
     }
 
-    /// GB9a: × SpacingMark
+    /// GB9a: x SpacingMark
     if (prop2 == GB_SPACING_MARK) {
         return false; /// No break
     }
 
-    /// GB9b: Prepend ×
+    /// GB9b: Prepend x
     if (prop1 == GB_PREPEND) {
         return false; /// No break
     }
 
-    /// GB11: \p{Extended_Pictographic} Extend* ZWJ × \p{Extended_Pictographic}
+    /// GB11: \p{Extended_Pictographic} Extend* ZWJ x \p{Extended_Pictographic}
     if (prev_was_zwj && prop1 == GB_EXTENDED_PICTOGRAPHIC &&
         prop2 == GB_EXTENDED_PICTOGRAPHIC) {
         return false; /// No break (emoji sequence)
     }
 
-    /// GB12/GB13: Regional Indicator × Regional Indicator (pairs)
+    /// GB12/GB13: Regional Indicator x Regional Indicator (pairs)
     if (prop1 == GB_REGIONAL_INDICATOR && prop2 == GB_REGIONAL_INDICATOR) {
         /// Regional indicators pair up (for flags)
         /// Odd position = no break, even position = break
         return (ri_sequence_count % 2) == 0;
     }
 
-    /// GB999: Any ÷ Any
+    /// GB999: Any U+00F7 Any
     return true; /// Default: break
 }
 

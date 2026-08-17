@@ -459,8 +459,8 @@ void ssh_hosts_refresh(void) {
 
     char path[1024];
 
-    /// Source list matches docs/COMPLETION_SYSTEM.md §SSH host
-    /// completion. Order matters: ssh_host_cache_find dedupes by
+    /// Source list matches docs/COMPLETION_SYSTEM.md section "SSH host
+    /// completion". Order matters: ssh_host_cache_find dedupes by
     /// hostname and earlier entries win, so higher-priority sources are
     /// read first.
     ///

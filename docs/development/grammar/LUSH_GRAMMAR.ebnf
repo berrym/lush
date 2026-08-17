@@ -6,7 +6,7 @@
    current branch. It is descriptive, not generative: the parser is hand-
    written recursive descent, and this document was written by mapping every
    parser function to a production. See PARSER_NOTES.md for everything pure
-   EBNF cannot express — lexer modes, context-sensitivity, the heredoc dance,
+   EBNF cannot express -- lexer modes, context-sensitivity, the heredoc dance,
    parser asymmetries, and open questions.
 
    Notation:
@@ -17,7 +17,7 @@
      ( ... )  grouping
      "..."    literal token text (when unambiguous)
      UPPER    token name from token_type_t (e.g., TOK_WORD, TOK_LBRACE)
-     §N       cross-reference to a numbered section
+     SN       cross-reference to a numbered section
 
    Feature gates are noted inline as (* feat: FEATURE_X *). When the relevant
    feature is disabled, the production is rejected at parse time.
@@ -27,7 +27,7 @@
 
 
 (* ----------------------------------------------------------------------------
-   §1  Program entry, command lists, pipelines, logical expressions
+   S1  Program entry, command lists, pipelines, logical expressions
    ---------------------------------------------------------------------------- *)
 
 program            = { wsp | comment | newline } [ command_list ] .
@@ -50,23 +50,23 @@ negate             = "!" .
 pipe_op            = "|" | "|&" .
                      (* TOK_PIPE | TOK_PIPE_STDERR; |& requires FEATURE_PROCESS_SUBSTITUTION *)
 
-simple_or_compound = simple_command          (* §2 *)
-                   | brace_group             (* §3 *)
-                   | subshell                (* §3 *)
-                   | if_statement            (* §3 *)
-                   | while_statement         (* §3 *)
-                   | until_statement         (* §3 *)
-                   | for_statement           (* §4 *)
-                   | select_statement        (* §4 *)
-                   | time_command            (* §4 *)
-                   | coproc                  (* §4 *)
-                   | anonymous_function      (* §4 *)
-                   | case_statement          (* §5 *)
-                   | function_definition     (* §6 *)
-                   | arithmetic_command      (* §7 *)
-                   | extended_test           (* §7 *) .
+simple_or_compound = simple_command          (* S2 *)
+                   | brace_group             (* S3 *)
+                   | subshell                (* S3 *)
+                   | if_statement            (* S3 *)
+                   | while_statement         (* S3 *)
+                   | until_statement         (* S3 *)
+                   | for_statement           (* S4 *)
+                   | select_statement        (* S4 *)
+                   | time_command            (* S4 *)
+                   | coproc                  (* S4 *)
+                   | anonymous_function      (* S4 *)
+                   | case_statement          (* S5 *)
+                   | function_definition     (* S6 *)
+                   | arithmetic_command      (* S7 *)
+                   | extended_test           (* S7 *) .
 
-(* Body framings used by §3-§5 *)
+(* Body framings used by S3-S5 *)
 
 command_body       = { separator } [ logical_expression { separator logical_expression } { separator } ] .
                      (* parser.c:553; parameterized by terminator; stops without consuming it *)
@@ -76,7 +76,7 @@ if_body            = { separator } [ logical_expression { separator logical_expr
 
 
 (* ----------------------------------------------------------------------------
-   §2  Simple commands — assignments, command name, arguments, redirections
+   S2  Simple commands -- assignments, command name, arguments, redirections
    ---------------------------------------------------------------------------- *)
 
 simple_command     = { assignment } [ command_name { argument_or_redirection } ]
@@ -86,8 +86,8 @@ simple_command     = { assignment } [ command_name { argument_or_redirection } ]
 assignment         = NAME "=" assignment_value
                    | NAME "+=" assignment_value                       (* feat: FEATURE_INDEXED_ARRAYS *)
                    | NAME "[" subscript "]" ( "=" | "+=" ) value      (* feat: FEATURE_INDEXED_ARRAYS *)
-                   | NAME "=" array_literal                           (* feat: FEATURE_INDEXED_ARRAYS; §7 *)
-                   | NAME "+=" array_literal                          (* feat: FEATURE_INDEXED_ARRAYS; §7 *) .
+                   | NAME "=" array_literal                           (* feat: FEATURE_INDEXED_ARRAYS; S7 *)
+                   | NAME "+=" array_literal                          (* feat: FEATURE_INDEXED_ARRAYS; S7 *) .
 
 assignment_value   = (* empty *)
                    | concatenated_word .
@@ -99,11 +99,11 @@ command_name       = word_like_token | KEYWORD | TOK_LBRACKET .
                      (* TOK_LBRACKET allowed as the [ builtin *)
 
 argument_or_redirection
-                   = redirection                                       (* §8 *)
+                   = redirection                                       (* S8 *)
                    | argument .
 
 argument           = concatenated_word
-                   | process_substitution                              (* §7 *)
+                   | process_substitution                              (* S7 *)
                    | array_literal_arg .                               (* feat: FEATURE_INDEXED_ARRAYS *)
 
 concatenated_word  = single_word { adjacent single_word } .
@@ -121,11 +121,11 @@ word_like_token    = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING
                      (* token_is_word_like(); tokenizer.c:385 *)
 
 array_literal_arg  = NAME ( "=" | "+=" ) array_literal .
-                     (* declare -A map=([k]=v) — adjacent NAME=( pattern in argument context *)
+                     (* declare -A map=([k]=v) -- adjacent NAME=( pattern in argument context *)
 
 
 (* ----------------------------------------------------------------------------
-   §3  Brace groups, subshells, if/while/until
+   S3  Brace groups, subshells, if/while/until
    ---------------------------------------------------------------------------- *)
 
 brace_group        = "{" command_body "}" trailing_redirections .
@@ -137,7 +137,7 @@ subshell           = "(" command_body ")" trailing_redirections .
 if_statement       = "if" logical_expression separator "then" if_body
                      { elif_clause } [ else_clause ]
                      "fi" trailing_redirections .
-                     (* parser.c:2237; elif chains are FLAT — all conds and bodies
+                     (* parser.c:2237; elif chains are FLAT -- all conds and bodies
                         are direct children of one NODE_IF, not nested *)
 
 elif_clause        = "elif" logical_expression separator "then" if_body .
@@ -154,11 +154,11 @@ until_statement    = "until" condition separator "do" command_body "done"
 
 condition          = simple_command | pipeline .
                      (* lush-specific: NOT a full logical_expression. `while a && b` does
-                        NOT parse as expected — `a` is the condition, `&& b; do ...` follows *)
+                        NOT parse as expected -- `a` is the condition, `&& b; do ...` follows *)
 
 
 (* ----------------------------------------------------------------------------
-   §4  for, select, time, coproc, anonymous functions
+   S4  for, select, time, coproc, anonymous functions
    ---------------------------------------------------------------------------- *)
 
 for_statement      = "for" ( for_arith | for_posix ) .
@@ -178,7 +178,7 @@ arith_expr         = { TOKEN } .
                         `>=`, etc. that the tokenizer splits *)
 
 word_list          = word { word } .
-                     (* tokens reassembled across `=` adjacency; see §2 concatenated_word *)
+                     (* tokens reassembled across `=` adjacency; see S2 concatenated_word *)
 
 select_statement   = "select" NAME [ "in" word_list ]
                      separator "do" command_body "done"
@@ -197,7 +197,7 @@ anonymous_function = "(" ")" "{" command_body "}" .
 
 
 (* ----------------------------------------------------------------------------
-   §5  Case statements
+   S5  Case statements
    ---------------------------------------------------------------------------- *)
 
 case_statement     = "case" word "in" { case_item } "esac" trailing_redirections .
@@ -219,7 +219,7 @@ pattern            = { TOK_WORD | TOK_VARIABLE | TOK_STRING | TOK_EXPANDABLE_STR
 
 
 (* ----------------------------------------------------------------------------
-   §6  Function definitions
+   S6  Function definitions
    ---------------------------------------------------------------------------- *)
 
 function_definition
@@ -229,7 +229,7 @@ function_definition
 
 posix_function_form
                    = NAME "(" [ parameters ] ")" brace_group_body .
-                     (* detected by 2-token lookahead in §2: word_like_token + TOK_LPAREN *)
+                     (* detected by 2-token lookahead in S2: word_like_token + TOK_LPAREN *)
 
 keyword_function_form
                    = "function" NAME [ "(" [ parameters ] ")" ] brace_group_body .
@@ -253,7 +253,7 @@ NAME               = TOK_WORD .
 
 
 (* ----------------------------------------------------------------------------
-   §7  Extended features
+   S7  Extended features
    ---------------------------------------------------------------------------- *)
 
 arithmetic_command = "((" arith_token_seq "))" .
@@ -275,7 +275,7 @@ array_element      = "[" subscript "]" "=" array_value     (* indexed *)
 
 array_value        = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING
                    | TOK_VARIABLE | TOK_ARITH_EXP | TOK_COMMAND_SUB .
-                     (* nested `(` is NOT recognized — `arr=(a (b c) d)` does
+                     (* nested `(` is NOT recognized -- `arr=(a (b c) d)` does
                         NOT produce a nested array *)
 
 extended_test      = "[[" test_token_seq "]]" .
@@ -294,19 +294,19 @@ process_substitution
                    | TOK_PROC_SUB_OUT command_list ")" .  (* >(...) *)
                      (* parser.c:4603; feat: FEATURE_PROCESS_SUBSTITUTION;
                         recognized at the LEXER, not reconstructed from tokens;
-                        inner body is a full command_list (§1); valid as a
+                        inner body is a full command_list (S1); valid as a
                         word in simple commands AND as a redirection target *)
 
 
 (* ----------------------------------------------------------------------------
-   §8  Redirections and heredocs
+   S8  Redirections and heredocs
    ---------------------------------------------------------------------------- *)
 
 trailing_redirections
                    = { redirection } .
                      (* attached to brace_group, subshell, if, while, until, for,
-                        for_arith, case, select, time per parser.c §3-§5;
-                        function_definition support is uncertain — see notes *)
+                        for_arith, case, select, time per parser.c S3-S5;
+                        function_definition support is uncertain -- see notes *)
 
 redirection        = file_redirection
                    | fd_redirection
@@ -356,7 +356,7 @@ redirection_target = concatenated_word
 
 
 (* ----------------------------------------------------------------------------
-   §9  Tokenizer-level constructs (informative)
+   S9  Tokenizer-level constructs (informative)
    ---------------------------------------------------------------------------- *)
 
 (* The tokenizer recognizes brace expansion `{a,b,c}` / `{1..10}` (feat:

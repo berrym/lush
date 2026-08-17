@@ -6,6 +6,57 @@ echo "Running pre-commit checks..."
 CHECKS_FAILED=0
 
 # ============================================================================
+# ASCII-ONLY SOURCE ENFORCEMENT
+# ============================================================================
+
+echo "Checking staged files for non-ASCII bytes..."
+ASCII_RULES="$(git rev-parse --show-toplevel)/scripts/ascii-only.rules"
+if [ -f "$ASCII_RULES" ]; then
+    ASCII_OFFENDERS=""
+    for f in $(git diff --cached --name-only --diff-filter=d); do
+        # exempt wins over enforce; both are simple path prefixes
+        skip=0
+        while read -r kind path; do
+            case "$kind" in
+                exempt:) case "$f" in $path*) skip=1 ;; esac ;;
+            esac
+        done < <(grep -E '^(enforce|exempt):' "$ASCII_RULES")
+        [ "$skip" = "1" ] && continue
+
+        enforced=0
+        while read -r kind path; do
+            case "$kind" in
+                enforce:) case "$f" in $path*) enforced=1 ;; esac ;;
+            esac
+        done < <(grep -E '^(enforce|exempt):' "$ASCII_RULES")
+        [ "$enforced" = "0" ] && continue
+
+        hits=$(git show ":$f" 2>/dev/null | perl -ne 'printf("%d: %s", $., $_) if /[^\x00-\x7F]/' | head -3)
+        if [ -n "$hits" ]; then
+            ASCII_OFFENDERS="$ASCII_OFFENDERS\n  $f\n$(printf '%s' "$hits" | sed 's/^/    /')"
+        fi
+    done
+
+    if [ -n "$ASCII_OFFENDERS" ]; then
+        echo "POLICY VIOLATION: non-ASCII bytes in enforced source paths"
+        echo ""
+        printf '%b\n' "$ASCII_OFFENDERS"
+        echo ""
+        echo "Source, docs and scripts are ASCII only. Use -- for an em dash,"
+        echo "-> for an arrow, and \\xNN escapes when a C literal genuinely"
+        echo "needs specific bytes."
+        echo ""
+        echo "If the file is test DATA whose bytes are the payload (a fuzz"
+        echo "corpus, a Unicode parity fixture), add it to scripts/ascii-only.rules"
+        echo "as an exempt: entry, with the reason."
+        echo ""
+        CHECKS_FAILED=1
+    else
+        echo "OK: staged files are ASCII"
+    fi
+fi
+
+# ============================================================================
 # COMMENT-STYLE + CLANG-FORMAT GATE
 # ============================================================================
 # Enforces lush's mixed C11/Doxygen comment style and clang-format
@@ -33,7 +84,7 @@ STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d | grep -E '^tests/.
 for t in $STAGED_TESTS; do
     [ -f "$t" ] || continue
     if grep -q 'RUN_TEST(' "$t" && ! grep -q 'TEST_RESULT(' "$t"; then
-        echo "❌ TEST INTEGRITY VIOLATION: $t uses RUN_TEST() but never returns TEST_RESULT()"
+        echo "FAIL TEST INTEGRITY VIOLATION: $t uses RUN_TEST() but never returns TEST_RESULT()"
         echo "   main() must end with 'return TEST_RESULT();' so a failing test reaches"
         echo "   the process exit code; a bare 'return 0' makes the suite always-green."
         echo ""
@@ -51,7 +102,7 @@ echo "Checking documentation policy compliance..."
 # Check for prohibited files in root
 PROHIBITED_IN_ROOT=$(git diff --cached --name-only | grep -E "^[^/]*\.(o|log)$|^core\." || true)
 if [ -n "$PROHIBITED_IN_ROOT" ]; then
-    echo "❌ POLICY VIOLATION: Prohibited files in root directory"
+    echo "FAIL POLICY VIOLATION: Prohibited files in root directory"
     echo "   Build artifacts and logs must not be in root"
     echo "   Files:"
     echo "$PROHIBITED_IN_ROOT"
@@ -62,7 +113,7 @@ fi
 # Check for markdown files in root (excluding allowed files, excluding deletions)
 ROOT_MD=$(git diff --cached --name-only --diff-filter=d | grep "^[^/]*\.md$" | grep -v "^README\.md$" || true)
 if [ -n "$ROOT_MD" ]; then
-    echo "❌ POLICY VIOLATION: Markdown files must be in docs/ subdirectories"
+    echo "FAIL POLICY VIOLATION: Markdown files must be in docs/ subdirectories"
     echo "   Only README.md allowed in root"
     echo "   Files:"
     echo "$ROOT_MD"
@@ -75,7 +126,7 @@ NEW_DOCS=$(git diff --cached --name-only --diff-filter=A | grep "\.md$" || true)
 if [ -n "$NEW_DOCS" ]; then
     for doc in $NEW_DOCS; do
         if ! echo "$doc" | grep -qE "^docs/(user|project|development|lle_specification|lle_implementation|archived)/|^docs/DOCUMENTATION_POLICY\.md$|^docs/VISION\.md$|^README\.md$|^CLAUDE\.md$"; then
-            echo "⚠ WARNING: New markdown file outside documented structure: $doc"
+            echo "WARNING WARNING: New markdown file outside documented structure: $doc"
             echo "   Consider placing in docs/project/ or appropriate subdirectory"
             echo "   See docs/DOCUMENTATION_POLICY.md for structure"
             echo ""
@@ -86,13 +137,13 @@ fi
 # Rule 3: Deletion Warning
 DELETED_FILES=$(git diff --cached --name-only --diff-filter=D | grep -E "\.(md|c|h)$" || true)
 if [ -n "$DELETED_FILES" ]; then
-    echo "⚠ Note: File deletions detected"
+    echo "WARNING Note: File deletions detected"
     echo "   Deleted files:"
     echo "$DELETED_FILES" | head -5
     echo ""
 fi
 
-echo "✓ Documentation policy checks complete"
+echo "OK Documentation policy checks complete"
 echo ""
 
 # ============================================================================
@@ -137,7 +188,7 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
         done
 
         if [ -n "$STUB_MARKER_FOUND" ]; then
-            echo "❌ COMPLIANCE VIOLATION: STUB/FIXME markers found in LLE code"
+            echo "FAIL COMPLIANCE VIOLATION: STUB/FIXME markers found in LLE code"
             echo ""
             echo "FORBIDDEN: LLE code must be complete. No stubs allowed."
             echo "Note: TODO comments are allowed for documenting future enhancements."
@@ -146,7 +197,7 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
         fi
 
         if [ -n "$STUB_FOUND" ]; then
-            echo "❌ COMPLIANCE VIOLATION: Actual stub implementations found in LLE code"
+            echo "FAIL COMPLIANCE VIOLATION: Actual stub implementations found in LLE code"
             echo ""
             echo "FORBIDDEN: Functions cannot just return error codes without implementation."
             echo ""
@@ -154,7 +205,7 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
         fi
 
         if [ -n "$SIMPLIFIED_FOUND" ]; then
-            echo "❌ ZERO TOLERANCE VIOLATION: 'Simplified' language found in LLE code"
+            echo "FAIL ZERO TOLERANCE VIOLATION: 'Simplified' language found in LLE code"
             echo ""
             echo "FORBIDDEN: Code or comments indicating simplified implementations"
             echo ""
@@ -162,7 +213,7 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
         fi
 
         if [ -n "$DEFERRED_FOUND" ]; then
-            echo "❌ ZERO TOLERANCE VIOLATION: 'Deferred' language found in LLE code"
+            echo "FAIL ZERO TOLERANCE VIOLATION: 'Deferred' language found in LLE code"
             echo ""
             echo "FORBIDDEN: Code or comments indicating deferred work"
             echo ""
@@ -174,9 +225,9 @@ if [ -n "$LLE_FILES_CHANGED" ]; then
     if [ -f "meson.build" ] && [ -d "build" ]; then
         echo "Verifying LLE compilation..."
         if meson compile -C build 2>/dev/null 1>/dev/null; then
-            echo "✓ LLE files compile successfully"
+            echo "OK LLE files compile successfully"
         else
-            echo "⚠ Warning: LLE compilation check failed"
+            echo "WARNING Warning: LLE compilation check failed"
         fi
     fi
 fi
@@ -185,14 +236,14 @@ fi
 if [ $CHECKS_FAILED -eq 1 ]; then
     echo ""
     echo "========================================="
-    echo "❌ PRE-COMMIT CHECKS FAILED"
+    echo "FAIL PRE-COMMIT CHECKS FAILED"
     echo "========================================="
     echo "Fix the violations above before committing."
     echo ""
     exit 1
 else
     echo ""
-    echo "Pre-commit checks complete ✓"
+    echo "Pre-commit checks complete OK"
     echo ""
     exit 0
 fi

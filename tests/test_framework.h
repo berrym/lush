@@ -27,7 +27,7 @@
  *   Binary assertions use (actual, expected, message). The historical
  *   inconsistency where some macros took (expected, actual) and others
  *   took (actual, expected) is the kind of foundational confusion this
- *   framework removes — pick a convention and stick to it.
+ *   framework removes -- pick a convention and stick to it.
  *
  * Why header-only:
  *   Avoids a separate library that every test binary would have to
@@ -46,7 +46,7 @@
 #include <string.h>
 
 /* ============================================================================
- * Internal state — file-scope so each test binary has its own copy.
+ * Internal state -- file-scope so each test binary has its own copy.
  * ============================================================================
  */
 
@@ -219,7 +219,7 @@ static const char *test_framework_current_name = "(none)";
         const char *_a = (actual);                                             \
         const char *_e = (expected);                                           \
         if (_a == NULL && _e == NULL) {                                        \
-            /* both NULL — equal */                                            \
+            /* both NULL -- equal */                                           \
         } else if (_a == NULL || _e == NULL || strcmp(_a, _e) != 0) {          \
             TEST_FAIL_FMT("%s: expected \"%s\", got \"%s\"", (msg),            \
                           _e ? _e : "(NULL)", _a ? _a : "(NULL)");             \

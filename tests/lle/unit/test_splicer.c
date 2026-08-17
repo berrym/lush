@@ -34,7 +34,7 @@
 #define POOL ((lle_memory_pool_t *)1)
 
 /* ============================================================================
- * Render rules — NONE quote state
+ * Render rules -- NONE quote state
  * ============================================================================
  */
 
@@ -84,10 +84,10 @@ TEST(render_none_escapes_all_shell_metacharacters) {
 TEST(render_none_escapes_tilde_only_at_position_zero) {
     char *out = NULL;
     size_t len = 0;
-    /// ~/foo at position 0 — the leading ~ is escaped, the inner / is
+    /// ~/foo at position 0 -- the leading ~ is escaped, the inner / is
     /// escaped (it's a path separator in shell context for an unquoted
     /// word, but actually slashes aren't special in unquoted word
-    /// tokenization; see needs_escape_in_none — / is NOT in the list).
+    /// tokenization; see needs_escape_in_none -- / is NOT in the list).
     /// Wait: my rule does NOT escape '/'. Let me reread the function.
     /// Re-checking: no, / isn't in needs_escape_in_none. Adjust the
     /// expectation.
@@ -121,7 +121,7 @@ TEST(render_none_escapes_hash_only_at_position_zero) {
 TEST(render_none_passes_non_ascii_bytes_through) {
     /// Multi-byte UTF-8 bytes (high bit set) are not shell-special
     /// regardless of quote_state and must pass through untouched.
-    /// "café" with é = U+00E9 = 0xC3 0xA9
+    /// "cafe-acute" with e-acute = U+00E9 = 0xC3 0xA9
     const char *input = "caf\xC3\xA9";
     char *out = NULL;
     size_t len = 0;
@@ -132,7 +132,7 @@ TEST(render_none_passes_non_ascii_bytes_through) {
 }
 
 /* ============================================================================
- * Render rules — DOUBLE quote state
+ * Render rules -- DOUBLE quote state
  * ============================================================================
  */
 
@@ -143,7 +143,7 @@ TEST(render_double_passes_space_through_unescaped) {
         lle_splicer_render_for_context("my file.txt", strlen("my file.txt"),
                                        LLE_QUOTE_DOUBLE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
-    /// Inside double quotes, space is literal — no backslash.
+    /// Inside double quotes, space is literal -- no backslash.
     ASSERT(strcmp(out, "my file.txt") == 0);
 }
 
@@ -161,7 +161,7 @@ TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote) {
 }
 
 /* ============================================================================
- * Render rules — SINGLE quote state
+ * Render rules -- SINGLE quote state
  * ============================================================================
  */
 
@@ -178,8 +178,8 @@ TEST(render_single_passes_metacharacters_through) {
 }
 
 TEST(render_single_handles_embedded_single_quote) {
-    /// A ' in the candidate is rendered '\'' — close, escape, reopen.
-    /// Candidate: it's   →  it'\''s
+    /// A ' in the candidate is rendered '\'' -- close, escape, reopen.
+    /// Candidate: it's   ->  it'\''s
     char *out = NULL;
     size_t len = 0;
     lle_result_t r = lle_splicer_render_for_context(
@@ -189,7 +189,7 @@ TEST(render_single_handles_embedded_single_quote) {
 }
 
 /* ============================================================================
- * Render rules — BACKTICK quote state
+ * Render rules -- BACKTICK quote state
  * ============================================================================
  */
 
@@ -212,12 +212,12 @@ TEST(render_backtick_escapes_dollar_backtick_backslash) {
  * direct test would be filler. */
 
 /* ============================================================================
- * lle_splicer_compute — full splice with suffix logic
+ * lle_splicer_compute -- full splice with suffix logic
  * ============================================================================
  *
  * compute() needs an lle_word_context_t and an lle_completion_item_t.
  * For these tests we construct them by hand instead of going through
- * the analyzer or item factories — the splicer has no dependency on
+ * the analyzer or item factories -- the splicer has no dependency on
  * how those structs were produced; it reads only the fields it cares
  * about (quote_state, filename_portion_start, word_end on the
  * context; text and type on the item).
@@ -269,7 +269,7 @@ TEST(compute_accept_file_no_quote_appends_space) {
 
 TEST(compute_accept_file_double_quote_appends_close_and_space) {
     lle_word_context_t ctx;
-    /// simulating "cat \"my fi" — word_start at the open ", filename
+    /// simulating "cat \"my fi" -- word_start at the open ", filename
     /// portion starts one byte later.
     make_context(&ctx, LLE_QUOTE_DOUBLE, 5, 10);
     lle_completion_item_t item;
@@ -330,7 +330,7 @@ TEST(compute_delete_range_replaces_filename_portion_only) {
     /// the filename portion ("Doc") not the path prefix ("~/").
     lle_word_context_t ctx;
     /// word_start=4 (~), filename_portion_start=6 (after /),
-    /// word_end=9 (after Doc) — typed bytes are "cat ~/Doc".
+    /// word_end=9 (after Doc) -- typed bytes are "cat ~/Doc".
     make_context(&ctx, LLE_QUOTE_NONE, 6, 9);
     lle_completion_item_t item;
     make_item(&item, "Documents", LLE_COMPLETION_TYPE_DIRECTORY);
@@ -340,7 +340,7 @@ TEST(compute_delete_range_replaces_filename_portion_only) {
     ASSERT(r == LLE_SUCCESS);
     ASSERT(splice.delete_start == 6);
     ASSERT(splice.delete_length == 3); /// "Doc"
-    /// Insert is "Documents/" — the path prefix "~/" is NOT in the
+    /// Insert is "Documents/" -- the path prefix "~/" is NOT in the
     /// insert_text because the engine preserves it untouched.
     ASSERT(strcmp(splice.insert_text, "Documents/") == 0);
     ASSERT(splice.cursor_after == 6 + strlen("Documents/"));

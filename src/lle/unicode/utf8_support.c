@@ -407,8 +407,9 @@ size_t lle_utf8_visible_width(const char *text, size_t length) {
         return 0;
     }
 
-    /// Fast path: no escape byte at all.
-    if (!memchr(text, 0x1B, length)) {
+    /// Fast path: nothing to skip.
+    if (!memchr(text, 0x1B, length) && !memchr(text, 0x01, length) &&
+        !memchr(text, 0x02, length)) {
         return lle_utf8_string_width(text, length);
     }
 
@@ -435,9 +436,20 @@ size_t lle_utf8_visible_width(const char *text, size_t length) {
             continue;
         }
 
-        /// Measure the run up to the next escape in one call.
+        /// Readline's \001 / \002 "non-printing" markers bracket escape
+        /// runs in a prompt and occupy no columns. The display subsystem's
+        /// equivalent already skipped them; skipping them here too keeps the
+        /// two layers' answers identical for the same input.
+        if ((unsigned char)text[i] == 0x01 || (unsigned char)text[i] == 0x02) {
+            i++;
+            continue;
+        }
+
+        /// Measure the run up to the next escape or marker in one call.
         size_t run_start = i;
-        while (i < length && (unsigned char)text[i] != 0x1B) {
+        while (i < length && (unsigned char)text[i] != 0x1B &&
+               (unsigned char)text[i] != 0x01 &&
+               (unsigned char)text[i] != 0x02) {
             i++;
         }
         width += lle_utf8_string_width(text + run_start, i - run_start);

@@ -78,7 +78,7 @@ TEST(ansi_octal) {
 }
 
 TEST(ansi_unicode_bmp) {
-    /// é is U+00E9 (e-acute) = UTF-8 0xC3 0xA9.
+    /// e-acute is U+00E9 (e-acute) = UTF-8 0xC3 0xA9.
     char *r = esc_expand("\\u00e9", LUSH_ESC_ANSI_C);
     ASSERT_TRUE((unsigned char)r[0] == 0xC3 && (unsigned char)r[1] == 0xA9 &&
                     r[2] == '\0',

@@ -15,10 +15,10 @@
  *
  * Architecture:
  *
- *     config.toml ──────► TOML Parser ──────► Config Registry
- *                                                    │
- *                              ┌─────────────────────┼─────────────────────┐
- *                              ▼                     ▼                     ▼
+ *     config.toml ------U+25BA TOML Parser ------U+25BA Config Registry
+ *                                                    |
+ *                              U+250C---------------------U+253C---------------------U+2510
+ *                              U+25BC                     U+25BC U+25BC
  *                         shell_opts            shell_mode             display
  *                        (subscribers)         (subscribers) (subscribers)
  *

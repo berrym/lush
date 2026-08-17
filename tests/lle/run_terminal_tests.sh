@@ -32,7 +32,7 @@ gcc -o test_terminal_capability \
     -Wall -Wextra \
     -g
 
-echo "✓ Compilation successful"
+echo "OK Compilation successful"
 echo ""
 
 # Run the test
@@ -55,9 +55,9 @@ TEST_RESULT=$?
 
 echo ""
 if [ $TEST_RESULT -eq 0 ]; then
-    echo "✓ ALL TESTS PASSED"
+    echo "OK ALL TESTS PASSED"
 else
-    echo "✗ SOME TESTS FAILED"
+    echo "FAIL SOME TESTS FAILED"
 fi
 
 # Cleanup

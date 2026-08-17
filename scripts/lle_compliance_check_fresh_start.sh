@@ -32,7 +32,7 @@ echo ""
 report_violation() {
     local check_name="$1"
     local details="$2"
-    echo -e "${RED}✗ VIOLATION${NC}: $check_name"
+    echo -e "${RED}FAIL VIOLATION${NC}: $check_name"
     echo "  Details: $details"
     echo ""
     ((VIOLATIONS++))
@@ -42,7 +42,7 @@ report_violation() {
 report_warning() {
     local check_name="$1"
     local details="$2"
-    echo -e "${YELLOW}⚠ WARNING${NC}: $check_name"
+    echo -e "${YELLOW}WARNING WARNING${NC}: $check_name"
     echo "  Details: $details"
     echo ""
     ((WARNINGS++))
@@ -51,7 +51,7 @@ report_warning() {
 # Function to report pass
 report_pass() {
     local check_name="$1"
-    echo -e "${GREEN}✓ PASS${NC}: $check_name"
+    echo -e "${GREEN}OK PASS${NC}: $check_name"
     ((CHECKS++))
 }
 
@@ -188,7 +188,7 @@ echo "Warnings: $WARNINGS"
 echo ""
 
 if [ $VIOLATIONS -eq 0 ]; then
-    echo -e "${GREEN}✓ COMPLIANCE CHECK PASSED${NC}"
+    echo -e "${GREEN}OK COMPLIANCE CHECK PASSED${NC}"
     echo ""
     echo "All architectural requirements met for current implementation stage."
     if [ $WARNINGS -gt 0 ]; then
@@ -196,7 +196,7 @@ if [ $VIOLATIONS -eq 0 ]; then
     fi
     exit 0
 else
-    echo -e "${RED}✗ COMPLIANCE CHECK FAILED${NC}"
+    echo -e "${RED}FAIL COMPLIANCE CHECK FAILED${NC}"
     echo ""
     echo "Found $VIOLATIONS architectural violation(s)."
     echo "These MUST be fixed before committing code."

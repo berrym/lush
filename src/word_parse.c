@@ -483,9 +483,9 @@ static word_part_t *parse_simple_expansion(const char *s, size_t n,
             j++;
         }
         /// The name scan is ASCII-only, but lush supports Unicode identifiers
-        /// (`$café` in NFC/NFD). A high-bit byte right after the ASCII run may
-        /// continue the identifier, which this slice does not decode -- defer
-        /// rather than truncate the name and resolve the wrong variable.
+        /// (`$cafe-acute` in NFC/NFD). A high-bit byte right after the ASCII
+        /// run may continue the identifier, which this slice does not decode --
+        /// defer rather than truncate the name and resolve the wrong variable.
         if (j < n && (unsigned char)s[j] >= 0x80) {
             *handled = false;
             return NULL;

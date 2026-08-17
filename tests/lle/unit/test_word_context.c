@@ -86,7 +86,7 @@ TEST(empty_buffer) {
 }
 
 TEST(plain_word_at_command_position) {
-    /// "ec|" — cursor right after typing 'ec' as the first word
+    /// "ec|" -- cursor right after typing 'ec' as the first word
     ANALYZE("ec", 2, ctx);
     ASSERT(ctx->word_start == 0);
     ASSERT(ctx->word_end == 2);
@@ -97,7 +97,7 @@ TEST(plain_word_at_command_position) {
 }
 
 TEST(plain_word_as_argument) {
-    /// "cat my|" — cursor after typing 'my' as first arg to cat
+    /// "cat my|" -- cursor after typing 'my' as first arg to cat
     ANALYZE("cat my", 6, ctx);
     ASSERT(ctx->word_start == 4);
     ASSERT(ctx->word_end == 6);
@@ -110,7 +110,7 @@ TEST(plain_word_as_argument) {
 }
 
 TEST(double_quote_open_word) {
-    /// cat "my fi|   — quote_state must be DOUBLE; word_start is the open "
+    /// cat "my fi|   -- quote_state must be DOUBLE; word_start is the open "
     const char *buf = "cat \"my fi";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -122,7 +122,7 @@ TEST(double_quote_open_word) {
 }
 
 TEST(single_quote_open_word) {
-    /// cat 'my fi|   — quote_state must be SINGLE
+    /// cat 'my fi|   -- quote_state must be SINGLE
     const char *buf = "cat 'my fi";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -132,21 +132,21 @@ TEST(single_quote_open_word) {
 }
 
 TEST(backtick_open_word) {
-    /// cat `da|   — quote_state must be BACKTICK
+    /// cat `da|   -- quote_state must be BACKTICK
     const char *buf = "cat `da";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->quote_state == LLE_QUOTE_BACKTICK);
 }
 
 TEST(escape_pending_at_cursor) {
-    /// cat \   — cursor right after a backslash, escape_pending
+    /// cat \   -- cursor right after a backslash, escape_pending
     const char *buf = "cat \\";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->quote_state == LLE_QUOTE_ESCAPE_PENDING);
 }
 
 TEST(backslash_escaped_space_in_word) {
-    /// cat my\ fi|  — '\ ' is part of the same word; dequoted = "my fi"
+    /// cat my\ fi|  -- '\ ' is part of the same word; dequoted = "my fi"
     const char *buf = "cat my\\ fi";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -156,7 +156,7 @@ TEST(backslash_escaped_space_in_word) {
 }
 
 TEST(closed_quote_then_more_text) {
-    /// cat "abc"de|  — quote closed; the word continues unquoted
+    /// cat "abc"de|  -- quote closed; the word continues unquoted
     const char *buf = "cat \"abc\"de";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->quote_state == LLE_QUOTE_NONE);
@@ -166,7 +166,7 @@ TEST(closed_quote_then_more_text) {
 }
 
 TEST(double_quote_with_internal_backslash_escape) {
-    /// cat "abc\$|  — \$ inside double quotes escapes the $; dequoted = abc$
+    /// cat "abc\$|  -- \$ inside double quotes escapes the $; dequoted = abc$
     const char *buf = "cat \"abc\\$";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->quote_state == LLE_QUOTE_DOUBLE);
@@ -179,7 +179,7 @@ TEST(double_quote_with_internal_backslash_escape) {
  */
 
 TEST(filename_portion_after_slash_unquoted) {
-    /// cat path/to/Doc|  — filename_portion_start at byte after last '/'
+    /// cat path/to/Doc|  -- filename_portion_start at byte after last '/'
     const char *buf = "cat path/to/Doc";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -188,7 +188,7 @@ TEST(filename_portion_after_slash_unquoted) {
 }
 
 TEST(filename_portion_inside_double_quote) {
-    /// cat "path/to/Do|c — filename_portion_start at byte after last '/'
+    /// cat "path/to/Do|c -- filename_portion_start at byte after last '/'
     const char *buf = "cat \"path/to/Do";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -202,7 +202,7 @@ TEST(filename_portion_inside_double_quote) {
 }
 
 TEST(no_slash_in_word_filename_portion_at_word_start) {
-    /// cat my|  — no '/' in word, filename_portion_start = word_start
+    /// cat my|  -- no '/' in word, filename_portion_start = word_start
     const char *buf = "cat my";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -210,7 +210,7 @@ TEST(no_slash_in_word_filename_portion_at_word_start) {
 }
 
 TEST(no_slash_in_quoted_word_filename_portion_skips_open_quote) {
-    /// cat "my  — filename_portion_start = byte after open "
+    /// cat "my  -- filename_portion_start = byte after open "
     const char *buf = "cat \"my";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == 4);
@@ -228,35 +228,35 @@ TEST(command_position_at_buffer_start) {
 }
 
 TEST(command_position_after_pipe) {
-    /// ls -l | gr|  — cursor after pipe + space, command position again
+    /// ls -l | gr|  -- cursor after pipe + space, command position again
     const char *buf = "ls -l | gr";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
 }
 
 TEST(command_position_after_semicolon) {
-    /// cmd; ne|  — semicolon resets to command position
+    /// cmd; ne|  -- semicolon resets to command position
     const char *buf = "cmd; ne";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
 }
 
 TEST(redirect_target_after_gt) {
-    /// cat foo > /tmp/o|  — after '>', next word is a redirect target
+    /// cat foo > /tmp/o|  -- after '>', next word is a redirect target
     const char *buf = "cat foo > /tmp/o";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_REDIRECT_TARGET);
 }
 
 TEST(redirect_target_after_lt) {
-    /// cat < my|  — after '<', next word is a redirect target
+    /// cat < my|  -- after '<', next word is a redirect target
     const char *buf = "cat < my";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_REDIRECT_TARGET);
 }
 
 TEST(argument_after_command) {
-    /// cat foo|  — after the command name, this is argument position
+    /// cat foo|  -- after the command name, this is argument position
     const char *buf = "cat foo";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_ARGUMENT);
@@ -264,7 +264,7 @@ TEST(argument_after_command) {
 }
 
 TEST(arg_index_increments_with_args) {
-    /// cat foo bar baz|  — third arg => arg_index == 2
+    /// cat foo bar baz|  -- third arg => arg_index == 2
     const char *buf = "cat foo bar baz";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->arg_index == 2);
@@ -283,7 +283,7 @@ TEST(command_name_extraction) {
  */
 
 TEST(expansion_kind_variable_name) {
-    /// echo $HO|  — cursor mid-variable-name
+    /// echo $HO|  -- cursor mid-variable-name
     const char *buf = "echo $HO";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME);
@@ -291,7 +291,7 @@ TEST(expansion_kind_variable_name) {
 }
 
 TEST(expansion_kind_braced_variable_name) {
-    /// echo ${HO|  — cursor mid-braced-variable-name
+    /// echo ${HO|  -- cursor mid-braced-variable-name
     const char *buf = "echo ${HO";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_BRACED_VARIABLE_NAME);
@@ -299,11 +299,11 @@ TEST(expansion_kind_braced_variable_name) {
 }
 
 TEST(expansion_kind_unicode_variable_name) {
-    /// echo $café|  -- cursor at end of a variable name whose final
-    /// codepoint is the multibyte é (U+00E9, bytes 0xC3 0xA9). The
-    /// analyzer must take all of café as the in-progress variable name
+    /// echo $cafe-acute|  -- cursor at end of a variable name whose final
+    /// codepoint is the multibyte e-acute (U+00E9, bytes 0xC3 0xA9). The
+    /// analyzer must take all of cafe-acute as the in-progress variable name
     /// and report VARIABLE_NAME at the cursor. The byte-test this
-    /// replaced stopped the name at the é, leaving the cursor past a
+    /// replaced stopped the name at the e-acute, leaving the cursor past a
     /// truncated $caf and out of variable-name context. This binary
     /// links the strong feature-flag-aware lush_ident_match_* with a
     /// shell_mode_allows stub returning the feature on, so the unicode
@@ -333,35 +333,35 @@ TEST(expansion_kind_pct_sigil_variable_name) {
 }
 
 TEST(expansion_kind_command_subst_open) {
-    /// echo $(ls|  — cursor inside open $(
+    /// echo $(ls|  -- cursor inside open $(
     const char *buf = "echo $(ls";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_COMMAND_SUBST);
 }
 
 TEST(expansion_kind_arithmetic_open) {
-    /// echo $((1+|  — cursor inside open $((
+    /// echo $((1+|  -- cursor inside open $((
     const char *buf = "echo $((1+";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_ARITHMETIC);
 }
 
 TEST(expansion_kind_brace_list_with_comma) {
-    /// cat {a,b|  — cursor inside open brace expansion with a comma
+    /// cat {a,b|  -- cursor inside open brace expansion with a comma
     const char *buf = "cat {a,b";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_BRACE_LIST);
 }
 
 TEST(expansion_kind_glob_in_word) {
-    /// cat *.tx|  — glob char present, no other in-progress expansion
+    /// cat *.tx|  -- glob char present, no other in-progress expansion
     const char *buf = "cat *.tx";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_GLOB);
 }
 
 TEST(expansion_kind_none_after_complete_var) {
-    /// cat $HOME/Doc|  — variable is complete, cursor in filename portion;
+    /// cat $HOME/Doc|  -- variable is complete, cursor in filename portion;
     /// expansion_kind is NONE (no in-progress expansion at cursor)
     const char *buf = "cat $HOME/Doc";
     ANALYZE(buf, strlen(buf), ctx);
@@ -369,11 +369,11 @@ TEST(expansion_kind_none_after_complete_var) {
 }
 
 TEST(expansion_kind_variable_name_at_end_of_word) {
-    /// cat $HOME|  — cursor right after a $NAME with no path content. The
+    /// cat $HOME|  -- cursor right after a $NAME with no path content. The
     /// analyzer is purely structural: it cannot know whether $HOME is a
     /// "complete" environment variable or a partial that the user intends
     /// to extend. It always reports VARIABLE_NAME; the engine consults the
-    /// variables source to disambiguate (exact-single-match → resolve;
+    /// variables source to disambiguate (exact-single-match -> resolve;
     /// otherwise offer completions). See COMPLETION_REWRITE_PLAN.md
     /// walkthrough 10.9 for the engine-side routing.
     const char *buf = "cat $HOME";
@@ -392,11 +392,11 @@ TEST(nfc_normalization_handles_decomposed_input) {
     /// NFC should recompose to U+00E9. UTF-8 bytes:
     ///   c a f e (4 ASCII) + 0xCC 0x81 (U+0301)
     /// Total raw input: "cafe\xCC\x81"
-    /// Expected NFC: "caf" + 0xC3 0xA9  (which is "café")
+    /// Expected NFC: "caf" + 0xC3 0xA9  (which is "cafe-acute")
     const char *buf = "cat cafe\xCC\x81";
     ANALYZE(buf, strlen(buf), ctx);
     /// The dequoted, NFC-normalized prefix should compose the e + combining
-    /// acute into the single precomposed é codepoint.
+    /// acute into the single precomposed e-acute codepoint.
     ASSERT(strcmp(ctx->dequoted_filename_prefix, "caf\xC3\xA9") == 0);
 }
 
@@ -406,7 +406,7 @@ TEST(nfc_normalization_handles_decomposed_input) {
  */
 
 TEST(multiline_buffer_command_position_after_newline) {
-    /// "echo hi\ncat my|"  — newline outside any quote resets to command
+    /// "echo hi\ncat my|"  -- newline outside any quote resets to command
     /// position for the next pipeline. Cursor on second line in the middle
     /// of an argument.
     const char *buf = "echo hi\ncat my";
@@ -417,7 +417,7 @@ TEST(multiline_buffer_command_position_after_newline) {
 }
 
 TEST(multiline_buffer_newline_inside_double_quote_is_literal) {
-    /// "echo \"abc\ndef|"  — open " spans the newline; the cursor is still
+    /// "echo \"abc\ndef|"  -- open " spans the newline; the cursor is still
     /// inside the same quoted word.
     const char *buf = "echo \"abc\ndef";
     ANALYZE(buf, strlen(buf), ctx);
@@ -451,7 +451,7 @@ TEST(invalid_inputs_return_error) {
 }
 
 TEST(cursor_at_whitespace_yields_empty_word) {
-    /// cat |  — cursor right after a space; current word is empty
+    /// cat |  -- cursor right after a space; current word is empty
     const char *buf = "cat ";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->word_start == ctx->word_end);
@@ -480,7 +480,7 @@ TEST(free_handles_null) {
  */
 
 TEST(cursor_in_second_arg_after_first_quoted_arg) {
-    /// cat "my file" /tmp/o|  — first arg is a complete quoted string;
+    /// cat "my file" /tmp/o|  -- first arg is a complete quoted string;
     /// cursor is in the SECOND arg's filename portion. The walker must
     /// have closed the quote correctly so this doesn't bleed.
     const char *buf = "cat \"my file\" /tmp/o";
@@ -490,13 +490,13 @@ TEST(cursor_in_second_arg_after_first_quoted_arg) {
     ASSERT(ctx->word_start == 14);
     ASSERT(ctx->arg_index == 1);
     /// filename_portion_start = byte after the last unquoted '/' in the
-    /// current word ("/tmp/o" → byte after '/' before 'o' = position 19).
+    /// current word ("/tmp/o" -> byte after '/' before 'o' = position 19).
     ASSERT(ctx->filename_portion_start == 19);
     ASSERT(strcmp(ctx->dequoted_filename_prefix, "o") == 0);
 }
 
 TEST(quoted_arg_after_pipe_is_argument_not_command_position) {
-    /// ls | grep "p|  — cursor is inside a quoted argument to grep, not
+    /// ls | grep "p|  -- cursor is inside a quoted argument to grep, not
     /// at command position. The pipe reset to command_position when grep
     /// was at the start, then grep's command-word terminated normally,
     /// and now we're in argument-position with quote_state=DOUBLE.
@@ -511,7 +511,7 @@ TEST(quoted_arg_after_pipe_is_argument_not_command_position) {
 }
 
 TEST(unquoted_pipe_inside_quoted_string_is_literal) {
-    /// echo "a | b|  — the | is inside a still-open double quote; it
+    /// echo "a | b|  -- the | is inside a still-open double quote; it
     /// must NOT be interpreted as a pipe (which would reset command
     /// position). The cursor should remain in argument position with
     /// the original "echo" still as the command name.
@@ -535,7 +535,7 @@ TEST(unquoted_pipe_inside_quoted_string_is_literal) {
  */
 
 TEST(resolve_path_prefix_with_tilde_uses_HOME) {
-    /// cat ~/Doc|  — tilde expansion is local (getenv("HOME")). The
+    /// cat ~/Doc|  -- tilde expansion is local (getenv("HOME")). The
     /// analyzer does NOT need the executor for this case; setting
     /// HOME to a known value lets us verify the resolved directory
     /// exactly.
@@ -554,7 +554,7 @@ TEST(resolve_path_prefix_with_tilde_uses_HOME) {
 }
 
 TEST(resolve_path_prefix_with_variable_uses_getenv) {
-    /// cat $HOME/Doc|  — variable expansion is local (getenv).
+    /// cat $HOME/Doc|  -- variable expansion is local (getenv).
     /// No executor required.
     mock_completion_reset();
     setenv("HOME", "/test/home", 1);
@@ -567,7 +567,7 @@ TEST(resolve_path_prefix_with_variable_uses_getenv) {
 }
 
 TEST(resolve_path_prefix_absolute_path) {
-    /// cat /tmp/Doc|  — absolute path, no expansion needed; passes
+    /// cat /tmp/Doc|  -- absolute path, no expansion needed; passes
     /// through verbatim. No executor required.
     mock_completion_reset();
     const char *buf = "cat /tmp/Doc";
@@ -578,7 +578,7 @@ TEST(resolve_path_prefix_absolute_path) {
 }
 
 TEST(no_path_prefix_leaves_expanded_directory_null) {
-    /// cat my|  — no '/' in word, no path-prefix to resolve.
+    /// cat my|  -- no '/' in word, no path-prefix to resolve.
     mock_completion_reset();
     const char *buf = "cat my";
     ANALYZE(buf, strlen(buf), ctx);
@@ -587,7 +587,7 @@ TEST(no_path_prefix_leaves_expanded_directory_null) {
 }
 
 TEST(unresolvable_command_substitution_without_executor_leaves_null) {
-    /// cat $(pwd)/Doc|  — command substitution requires the
+    /// cat $(pwd)/Doc|  -- command substitution requires the
     /// executor's expand_if_needed; without an executor the analyzer
     /// cannot resolve the directory and leaves expanded_directory
     /// NULL. The engine then treats the completion as cwd-relative or
@@ -602,7 +602,7 @@ TEST(unresolvable_command_substitution_without_executor_leaves_null) {
 }
 
 TEST(brace_in_path_prefix_populates_branches) {
-    /// cat {a,b}/Doc|  — brace expansion yields per-directory branches.
+    /// cat {a,b}/Doc|  -- brace expansion yields per-directory branches.
     /// Mock expand_brace_pattern returns ["a/", "b/"]; expand_if_needed
     /// is called once per branch and pass-through returns the directory
     /// literal in each case.
@@ -623,20 +623,20 @@ TEST(brace_in_path_prefix_populates_branches) {
     ASSERT(ctx->branches != NULL);
     ASSERT(ctx->branches[0].expanded_directory != NULL);
     ASSERT(ctx->branches[1].expanded_directory != NULL);
-    /// The shared filename prefix is "Doc" — every branch points at the
+    /// The shared filename prefix is "Doc" -- every branch points at the
     /// same dequoted_filename_prefix string the analyzer extracted from
     /// the typed bytes.
     ASSERT(ctx->branches[0].dequoted_filename_prefix ==
            ctx->dequoted_filename_prefix);
     ASSERT(strcmp(ctx->branches[0].dequoted_filename_prefix, "Doc") == 0);
-    /// When branches[] is populated, expanded_directory is left NULL —
+    /// When branches[] is populated, expanded_directory is left NULL --
     /// the engine reads branches when branch_count > 0.
     ASSERT(ctx->expanded_directory == NULL);
     mock_completion_reset();
 }
 
 TEST(brace_with_no_comma_does_not_populate_branches) {
-    /// cat {nocomma}/Doc|  — a brace expression with no comma or range
+    /// cat {nocomma}/Doc|  -- a brace expression with no comma or range
     /// is not a multi-branch pattern; the analyzer falls through to
     /// single-value resolution.
     mock_completion_reset();
@@ -695,14 +695,14 @@ TEST(tilde_path_resolves_without_executor) {
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expanded_directory != NULL);
     ASSERT(ctx->expanded_directory[0] == '/');
-    /// ~/ → $HOME + '/' (the trailing slash from the user's prefix).
+    /// ~/ -> $HOME + '/' (the trailing slash from the user's prefix).
     size_t n = strlen(ctx->expanded_directory);
     ASSERT(n > 0 && ctx->expanded_directory[n - 1] == '/');
     mock_completion_reset();
 }
 
 TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
-    /// cat {a,b}|  — brace at end of word with no '/' after; no path
+    /// cat {a,b}|  -- brace at end of word with no '/' after; no path
     /// prefix to resolve. The TAB-alone-at-end-of-expansion handling
     /// happens at the engine layer, not the analyzer.
     mock_completion_reset();
@@ -712,7 +712,7 @@ TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
     mock_brace_branch_count = 2;
     const char *buf = "cat {a,b}";
     ANALYZE(buf, strlen(buf), ctx);
-    /// No '/' in word → no path-prefix → resolve helper does not run.
+    /// No '/' in word -> no path-prefix -> resolve helper does not run.
     ASSERT(ctx->branch_count == 0);
     ASSERT(ctx->expanded_directory == NULL);
     mock_completion_reset();
@@ -724,7 +724,7 @@ TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
  */
 
 TEST(for_in_list_after_for_x_in) {
-    /// for x in /tmp/|  — cursor is in the for-list, after the `in`
+    /// for x in /tmp/|  -- cursor is in the for-list, after the `in`
     /// keyword. Engine should source files for completion.
     const char *buf = "for x in /tmp/";
     ANALYZE(buf, strlen(buf), ctx);
@@ -732,14 +732,14 @@ TEST(for_in_list_after_for_x_in) {
 }
 
 TEST(for_in_list_remains_until_terminator) {
-    /// for x in a b c|  — still in the list with multiple items typed.
+    /// for x in a b c|  -- still in the list with multiple items typed.
     const char *buf = "for x in a b c";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_FOR_IN_LIST);
 }
 
 TEST(for_in_list_ends_at_semicolon) {
-    /// for x in a b c; do ec|  — the `;` closes the list; the cursor
+    /// for x in a b c; do ec|  -- the `;` closes the list; the cursor
     /// after `do` is in command position again, completing a command.
     const char *buf = "for x in a b c; do ec";
     ANALYZE(buf, strlen(buf), ctx);
@@ -747,7 +747,7 @@ TEST(for_in_list_ends_at_semicolon) {
 }
 
 TEST(for_without_in_keyword_falls_back_to_argument) {
-    /// for x mal|  — the second word after `for` was not `in`; the
+    /// for x mal|  -- the second word after `for` was not `in`; the
     /// keyword sequence is broken, fall back to argument completion.
     const char *buf = "for x mal";
     ANALYZE(buf, strlen(buf), ctx);
@@ -760,14 +760,14 @@ TEST(for_without_in_keyword_falls_back_to_argument) {
 }
 
 TEST(case_pattern_after_case_x_in) {
-    /// case "$x" in pat|  — cursor in the patterns position.
+    /// case "$x" in pat|  -- cursor in the patterns position.
     const char *buf = "case x in pat";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->context_type == LLE_CONTEXT_CASE_PATTERN);
 }
 
 TEST(case_pattern_ends_at_esac_keyword) {
-    /// case x in p) cmd ;; esac; ec|  — past `esac`, then a command
+    /// case x in p) cmd ;; esac; ec|  -- past `esac`, then a command
     /// position after `;`.
     const char *buf = "case x in p) cmd ;; esac; ec";
     ANALYZE(buf, strlen(buf), ctx);
@@ -775,7 +775,7 @@ TEST(case_pattern_ends_at_esac_keyword) {
 }
 
 TEST(heredoc_body_cursor_inside) {
-    /// cat <<EOF\nhello |world\nEOF\n  — cursor in the heredoc body
+    /// cat <<EOF\nhello |world\nEOF\n  -- cursor in the heredoc body
     /// between two newlines. The analyzer reports HEREDOC_BODY so the
     /// engine can refuse to complete.
     const char *buf = "cat <<EOF\nhello world";
@@ -784,7 +784,7 @@ TEST(heredoc_body_cursor_inside) {
 }
 
 TEST(heredoc_body_cursor_after_delimiter_line) {
-    /// cat <<EOF\nbody\nEOF\nec|  — past the heredoc terminator; cursor
+    /// cat <<EOF\nbody\nEOF\nec|  -- past the heredoc terminator; cursor
     /// is at command position again.
     const char *buf = "cat <<EOF\nbody\nEOF\nec";
     ANALYZE(buf, strlen(buf), ctx);
@@ -792,7 +792,7 @@ TEST(heredoc_body_cursor_after_delimiter_line) {
 }
 
 TEST(heredoc_body_dash_form_strips_leading_tabs) {
-    /// cat <<-EOF\n\t\tbody\n\tEOF\nec|  — the `<<-` form allows leading
+    /// cat <<-EOF\n\t\tbody\n\tEOF\nec|  -- the `<<-` form allows leading
     /// tabs on the delimiter line. After the matching tab-prefixed
     /// delimiter, the heredoc ends.
     const char *buf = "cat <<-EOF\n\t\tbody\n\tEOF\nec";
@@ -801,7 +801,7 @@ TEST(heredoc_body_dash_form_strips_leading_tabs) {
 }
 
 TEST(heredoc_introducing_line_is_not_heredoc_body) {
-    /// cat <<EO|F  — cursor on the introducing line, mid-delimiter.
+    /// cat <<EO|F  -- cursor on the introducing line, mid-delimiter.
     /// The body has not started yet; this is still ARGUMENT context
     /// (the heredoc delimiter is a redirect-like target, but the
     /// walker has not entered the body).
@@ -815,7 +815,7 @@ TEST(heredoc_introducing_line_is_not_heredoc_body) {
 }
 
 TEST(here_string_is_not_heredoc) {
-    /// cat <<<value|  — `<<<` is a here-string operator, not a heredoc. The
+    /// cat <<<value|  -- `<<<` is a here-string operator, not a heredoc. The
     /// analyzer treats `<<<` like the other redirect operators, so the word
     /// after it is the redirect target; no heredoc body tracking is active.
     const char *buf = "cat <<<value";
