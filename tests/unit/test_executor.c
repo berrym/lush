@@ -1530,6 +1530,46 @@ TEST(rt_cmdsub_fuses_after_a_closing_quote) {
     ASSERT_EXIT_STATUS(r, 0);
 }
 
+TEST(rt_substitution_search_is_grapheme_aligned) {
+    /// The substitution search used to advance one BYTE per position and let a
+    /// candidate match end anywhere, so it could start or finish inside a
+    /// character. The anchored operators were already cluster-aware and
+    /// correctly refused, which made lush inconsistent with itself (#768).
+    ///
+    /// Two shapes, both from decomposed or multi-byte input -- a precomposed
+    /// literal cannot tell codepoint and grapheme semantics apart.
+    ///
+    /// 1. \xe4\xb8\xad is U+4E2D and \xe6\x96\x87 is U+6587. `?` matched
+    ///    ONE BYTE, so `${c/?/Q}` emitted Q followed by the two orphaned
+    ///    continuation bytes of a broken character, and `${c//?/Q}` produced
+    ///    seven replacements for three characters.
+    /// 2. `e` + \xcc\x81 is a decomposed e-acute. A literal, a class and an
+    ///    extglob group each matched the cluster's BASE and left the combining
+    ///    mark attached to the replacement.
+    ///
+    /// The literal and the class answer DIFFERENTLY now, and both are right.
+    /// `e` is an exact-text match and the text is a two-codepoint cluster, so
+    /// it does not match. `[e]` is a membership test against the cluster's
+    /// BASE, so it matches and consumes the cluster WHOLE -- SEMANTICS 3.12.
+    /// Neither splits the character, which is what this test is about.
+    ///
+    /// Replacing a WHOLE cluster still works -- the fix rejects matches that
+    /// end mid-character, not matches of multi-byte text.
+    run_result_t r = run_shell(
+        "( c=$(printf '\xe4\xb8\xad\xe6\x96\x87y')\n"
+        "  printf '[%s]' \"${c/?/Q}\"; printf '[%s]\\n' \"${c//?/Q}\"\n"
+        "  d=$(printf 'cafe\xcc\x81z')\n"
+        "  printf '[%s]' \"${d/e/X}\"; printf '[%s]' \"${d/[e]/X}\"\n"
+        "  printf '[%s]\\n' \"${d/@(e)/X}\"\n"
+        "  p=$(printf 'caf\xc3\xa9x')\n"
+        "  printf '[%s]' \"${p/$(printf '\xc3\xa9')/X}\"\n"
+        "  printf '[%s]\\n' \"${d/$(printf 'e\xcc\x81')/X}\" )\n");
+    ASSERT_STDOUT_EQ(r, "[Q\xe6\x96\x87y][QQQ]\n"
+                        "[cafe\xcc\x81z][cafXz][cafe\xcc\x81z]\n"
+                        "[cafXx][cafXz]\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9435,6 +9475,7 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_substitution_search_is_grapheme_aligned);
     RUN_TEST(rt_cmdsub_fuses_after_a_closing_quote);
     RUN_TEST(rt_pe_case_conversion_restricting_pattern_covered);
     RUN_TEST(rt_unicode_named_param_defers_in_every_position);
