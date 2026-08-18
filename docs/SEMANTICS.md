@@ -615,7 +615,14 @@ echo "${v%[[:alpha:]]}"        # caf
 
 Segmenting by cluster is already better than the codepoint matchers in bash and
 zsh, which consume only the base and can leave a combining mark orphaned.
-Normalizing for membership as well is deliberately declined.
+Normalizing for membership as well is deliberately declined **in the matcher**.
+Being spelling-independent is a worthwhile goal; the place to reach it is the
+INGEST layer, where text is brought to one canonical form on the way in (as the
+completion path already does), not a decomposition branch inside
+`pattern_match.c`. A matcher that decomposed would be the downstream NFC/NFD
+branch the single-form policy exists to prevent, and it would leave `=` and `==`
+disagreeing with patterns. Improve normalization at the entry points; leave the
+matcher single-pass.
 
 ---
 
