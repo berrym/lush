@@ -190,6 +190,83 @@ static void test_forward_char_utf8_2byte(lush_memory_pool_t *pool) {
     TEST_PASS();
 }
 
+static void test_forward_char_decomposed_cluster(lush_memory_pool_t *pool) {
+    TEST_START("lle_forward_char: DECOMPOSED cluster moves as one character");
+
+    /// Every other case in this file uses input where one codepoint IS one
+    /// grapheme -- precomposed e-acute, CJK, single-codepoint emoji. Under
+    /// that input a codepoint-stepping cursor is indistinguishable from a
+    /// grapheme-stepping one, so those tests cannot detect a regression to
+    /// codepoint movement. This one can.
+    ///
+    /// "caf" + e(0x65) + COMBINING ACUTE(0xCC 0x81): 6 bytes, 5 codepoints,
+    /// 4 grapheme clusters. Byte layout: c(0) a(1) f(2) e+mark(3-5).
+    lle_editor_t *editor = create_editor_with_content("cafe\xcc\x81", pool);
+    TEST_ASSERT(editor != NULL, "Failed to create editor");
+
+    size_t byte_off, gr_idx;
+
+    lle_forward_char(editor);
+    lle_forward_char(editor);
+    lle_forward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 3 && gr_idx == 3,
+                "Should sit at the cluster start");
+
+    /// One more must cross the WHOLE cluster -- base and mark together --
+    /// landing at end of text, not between the base and its accent.
+    lle_forward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 6,
+                "Cursor stopped INSIDE a grapheme cluster (byte 4 means it "
+                "stepped by codepoint, splitting the base from its mark)");
+    TEST_ASSERT(gr_idx == 4, "Grapheme index after the cluster incorrect");
+
+    /// And back over it in one step.
+    lle_backward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 3 && gr_idx == 3,
+                "Backward did not cross the whole cluster");
+
+    lle_editor_destroy(editor);
+    TEST_PASS();
+}
+
+static void test_forward_char_zwj_sequence(lush_memory_pool_t *pool) {
+    TEST_START("lle_forward_char: ZWJ emoji sequence is ONE character");
+
+    /// "a" + U+1F468 ZWJ U+1F4BB + "b": the emoji is 3 codepoints (11 bytes)
+    /// joined into a single grapheme cluster. Byte layout:
+    /// a(0) emoji(1-11) b(12).
+    lle_editor_t *editor = create_editor_with_content(
+        "a\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x92\xbb"
+        "b",
+        pool);
+    TEST_ASSERT(editor != NULL, "Failed to create editor");
+
+    size_t byte_off, gr_idx;
+
+    lle_forward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 1 && gr_idx == 1, "Past the leading 'a'");
+
+    /// One step must cross all three codepoints of the sequence.
+    lle_forward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 12,
+                "Cursor landed inside the ZWJ sequence (byte 5 or 8 means it "
+                "stepped by codepoint, splitting a single character)");
+    TEST_ASSERT(gr_idx == 2, "Grapheme index after the sequence incorrect");
+
+    lle_backward_char(editor);
+    get_cursor_position(editor, &byte_off, NULL, &gr_idx);
+    TEST_ASSERT(byte_off == 1 && gr_idx == 1,
+                "Backward did not cross the whole ZWJ sequence");
+
+    lle_editor_destroy(editor);
+    TEST_PASS();
+}
+
 static void test_forward_char_utf8_3byte(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: 3-byte UTF-8 (CJK)");
 
@@ -497,6 +574,8 @@ int main(void) {
     /// Run all tests
     test_forward_char_ascii(pool);
     test_forward_char_utf8_2byte(pool);
+    test_forward_char_decomposed_cluster(pool);
+    test_forward_char_zwj_sequence(pool);
     test_forward_char_utf8_3byte(pool);
     test_forward_char_utf8_4byte(pool);
     test_forward_char_mixed(pool);
