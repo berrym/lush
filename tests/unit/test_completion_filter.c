@@ -58,6 +58,55 @@ static void config_restore(void) {
  * ============================================================================
  */
 
+TEST(filter_matches_across_normalization_forms) {
+    /// A user types the text they see; the candidate came from the filesystem,
+    /// which may store the other normalization form. All three match modes must
+    /// answer the same question the same way regardless of spelling.
+    ///
+    /// \xc3\xa9 is precomposed e-acute; e + \xcc\x81 is the decomposed pair.
+    /// Both render identically, so a user cannot tell which they typed.
+    config_snapshot();
+    const char *nfc = "caf\xc3\xa9-file";
+    const char *nfd = "cafe\xcc\x81-file";
+
+    config.completion_match_mode = COMPLETION_MATCH_PREFIX;
+    ASSERT_TRUE(completion_filter_admits("cafe\xcc\x81", nfc),
+                "prefix: decomposed query must match a precomposed candidate");
+    ASSERT_TRUE(completion_filter_admits("caf\xc3\xa9", nfd),
+                "prefix: precomposed query must match a decomposed candidate");
+
+    config.completion_match_mode = COMPLETION_MATCH_SUBSTRING;
+    ASSERT_TRUE(
+        completion_filter_admits("cafe\xcc\x81", nfc),
+        "substring: decomposed query must match a precomposed candidate");
+
+    config.completion_match_mode = COMPLETION_MATCH_FUZZY;
+    config.completion_threshold = 0;
+    config.completion_fuzzy_min_chars = 0;
+    ASSERT_TRUE(completion_filter_admits("cafe\xcc\x81", nfc),
+                "fuzzy: decomposed query must match a precomposed candidate");
+    ASSERT_TRUE(completion_filter_admits("caf\xc3\xa9", nfd),
+                "fuzzy: precomposed query must match a decomposed candidate");
+    config_restore();
+}
+
+TEST(filter_prefix_does_not_end_inside_a_character) {
+    /// "cafe" is a prefix of the decomposed candidate's BYTES, but it would end
+    /// between the base and its combining mark -- half a character. The prefix
+    /// test refuses, which is the same rule pattern matching settled on: a
+    /// literal matches exact text, and a cluster's base is not the cluster.
+    ///
+    /// This is the behavior history prefix search does NOT have (issue #775);
+    /// completion is the precedent it should follow.
+    config_snapshot();
+    config.completion_match_mode = COMPLETION_MATCH_PREFIX;
+    ASSERT_TRUE(!completion_filter_admits("cafe", "cafe\xcc\x81-file"),
+                "prefix must not match a candidate mid-cluster");
+    ASSERT_TRUE(completion_filter_admits("caf", "cafe\xcc\x81-file"),
+                "a prefix ending ON a boundary still matches");
+    config_restore();
+}
+
 TEST(filter_empty_prefix_admits_everything) {
     config_snapshot();
     config.completion_match_mode = COMPLETION_MATCH_PREFIX;
@@ -332,6 +381,8 @@ int main(int argc, char **argv) {
     printf("===============================\n");
 
     printf("\nEdge cases:\n");
+    RUN_TEST(filter_matches_across_normalization_forms);
+    RUN_TEST(filter_prefix_does_not_end_inside_a_character);
     RUN_TEST(filter_empty_prefix_admits_everything);
     RUN_TEST(filter_null_or_empty_candidate_rejected);
 
