@@ -3012,6 +3012,19 @@ endif
 # Spawns the lush binary with various env configurations and observes
 # the visible side effect; can't be a unit test because $ENV is
 # consulted during shell init.
+# Unicode conformance gate. Sweeps every text-processing surface with input
+# that DISCRIMINATES -- decomposed clusters, ZWJ sequences, wide CJK -- because
+# a precomposed literal cannot tell codepoint semantics from grapheme
+# semantics, which is how byte-wise paths kept surviving review (#682, #702,
+# #768). A surface that steps by byte or codepoint fails here.
+if fs.exists('tests/integration/test_unicode_conformance.sh')
+  test('unicode conformance',
+       find_program('tests/integration/test_unicode_conformance.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_env_sourcing.sh')
   test('POSIX $ENV sourcing',
        find_program('tests/integration/test_env_sourcing.sh'),
