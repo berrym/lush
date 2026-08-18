@@ -213,6 +213,45 @@ void test_exact_match_nfc_nfd_equivalence(void) {
     TEST_PASS();
 }
 
+void test_prefix_search_matches_exact_on_normalization(void) {
+    TEST_START("Prefix Search - normalization and cluster boundaries");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    /// Entry stored precomposed; query typed decomposed. Same visible text.
+    /// Exact search has always matched this; prefix search did not, and prefix
+    /// search is what interactive recall uses (issue #775).
+    lle_history_add_entry(core, "caf\xC3\xA9 alpha", 0, NULL);
+    lle_history_search_results_t *r =
+        lle_history_search_prefix(core, "cafe\xCC\x81", 10);
+    ASSERT_NOT_NULL(r, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(r), 1,
+              "decomposed query must find the precomposed entry");
+    lle_history_search_results_destroy(r);
+
+    /// A query that would end BETWEEN a base and its combining mark is half a
+    /// character, and does not match -- the rule completion filtering and the
+    /// substitution search both use.
+    lle_history_add_entry(core, "cafe\xCC\x81 beta", 0, NULL);
+    r = lle_history_search_prefix(core, "cafe", 10);
+    ASSERT_NOT_NULL(r, "Search should return a result set");
+    ASSERT_EQ(lle_history_search_results_get_count(r), 0,
+              "a prefix must not match inside a character");
+    lle_history_search_results_destroy(r);
+
+    /// Ending ON a boundary matches both spellings, since they normalize
+    /// to the same text.
+    r = lle_history_search_prefix(core, "caf", 10);
+    ASSERT_NOT_NULL(r, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(r), 2,
+              "a boundary-aligned prefix matches both stored spellings");
+    lle_history_search_results_destroy(r);
+
+    lle_history_core_destroy(core);
+    TEST_PASS();
+}
+
 void test_exact_match_no_results(void) {
     TEST_START("Exact Match Search - No Results");
 
@@ -784,6 +823,7 @@ int main(void) {
     printf("\n--- EXACT MATCH SEARCH ---\n");
     test_exact_match_search();
     test_exact_match_nfc_nfd_equivalence();
+    test_prefix_search_matches_exact_on_normalization();
     test_exact_match_no_results();
     test_exact_match_case_sensitive();
 

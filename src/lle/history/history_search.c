@@ -31,6 +31,7 @@
 #include "lle/performance.h"
 #include "lle/unicode_case.h"
 #include "lle/unicode_compare.h"
+#include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include <ctype.h>
 #include <inttypes.h>
@@ -173,83 +174,77 @@ static int compare_results_by_score(const void *a, const void *b) {
     return 0;
 }
 
-/**
- * @brief Codepoint-level case-fold prefix match
- *
- * Returns the number of bytes of `str` consumed by a case-insensitive
- * prefix match against `prefix`, or 0 if no match. Iterates both
- * strings by UTF-8 codepoint and case-folds each via
- * lle_unicode_tolower_codepoint, so prefixes like `caf` correctly
- * match input `Cafe-acute` and prefixes like `nai-umlautv` correctly match
- * `Nai-umlautve`. ASCII-only inputs degrade to single-byte iteration with
- * the same semantics strncasecmp had previously.
- *
- * Returns 0 for empty `prefix` -- callers that treat empty-prefix as
- * vacuously-true must handle the empty case explicitly.
- *
- * @param str    String to check (must not be NULL)
- * @param prefix Prefix to test (must not be NULL)
- * @return Number of bytes of str matched, or 0 on no-match / empty prefix
- */
-static size_t cf_prefix_match_bytes(const char *str, const char *prefix) {
-    size_t s_pos = 0, p_pos = 0;
-    size_t s_len = strlen(str);
-    size_t p_len = strlen(prefix);
-    while (p_pos < p_len) {
-        uint32_t s_cp, p_cp;
-        int s_bytes =
-            lle_utf8_decode_codepoint(str + s_pos, s_len - s_pos, &s_cp);
-        int p_bytes =
-            lle_utf8_decode_codepoint(prefix + p_pos, p_len - p_pos, &p_cp);
-        if (s_bytes <= 0 || p_bytes <= 0) {
-            return 0;
-        }
-        if (lle_unicode_tolower_codepoint(s_cp) !=
-            lle_unicode_tolower_codepoint(p_cp)) {
-            return 0;
-        }
-        s_pos += (size_t)s_bytes;
-        p_pos += (size_t)p_bytes;
-    }
-    return s_pos;
+/// The comparison options history search matches under: NFC-normalized and
+/// case-insensitive.
+///
+/// Normalization is the half a user can trip over. A history entry and the
+/// query can hold different spellings of the same visible text -- the entry
+/// came from a buffer, the query from the keyboard -- and they render
+/// identically, so nobody can tell which they typed. Without normalizing, an
+/// NFD query found nothing against an NFC entry while the SAME query found it
+/// through lle_history_search_exact, which has always normalized. Two search
+/// modes in one core answering differently is the defect (issue #775).
+static lle_unicode_compare_options_t history_cmp_options(void) {
+    lle_unicode_compare_options_t o = LLE_UNICODE_COMPARE_DEFAULT;
+    o.case_insensitive = true;
+    return o;
 }
 
 /**
  * @brief Unicode-aware case-insensitive substring search
  *
- * Walks `haystack` by codepoint, testing for a case-insensitive
- * prefix match against `needle` at each codepoint boundary. Returns
- * a pointer into haystack to the first match, or NULL if not found.
- * Empty needle returns `haystack` (vacuous match), matching the C
- * library convention for strstr.
+ * Returns a pointer to the first match in @p haystack, or NULL.
  *
- * Replaces the previous strncasecmp-based implementation which only
- * folded ASCII A-Z and produced no matches against history entries
- * containing case-varying non-ASCII letters (filenames with e-acute, U+00C4,
- * etc.).
+ * The scan steps by GRAPHEME CLUSTER, so a reported match never begins inside
+ * a character. The previous walk advanced by codepoint, which could start a
+ * match on a combining mark; the position it returned is stored in the search
+ * result, so a renderer highlighting from it would have split a character.
+ *
+ * Matching itself is delegated to lle_unicode_is_prefix -- the same comparison
+ * completion filtering uses -- rather than re-implemented here. That is what
+ * makes the normalization behavior identical across the two surfaces instead
+ * of two hand-written walks that drift.
  *
  * @param haystack String to search in (may be NULL)
  * @param needle   String to search for (may be NULL)
  * @return Pointer to first match in haystack, or NULL
  */
 static const char *stristr(const char *haystack, const char *needle) {
-    if (!haystack || !needle)
+    if (!haystack || !needle) {
         return NULL;
-    if (*needle == '\0')
-        return haystack;
+    }
+    if (*needle == '\0') {
+        return haystack; /// vacuous match, as strstr does
+    }
+    lle_unicode_compare_options_t opts = history_cmp_options();
     size_t h_len = strlen(haystack);
     size_t h_pos = 0;
     while (h_pos < h_len) {
-        if (cf_prefix_match_bytes(haystack + h_pos, needle) > 0) {
+        if (lle_unicode_is_prefix_z(needle, haystack + h_pos, &opts)) {
             return haystack + h_pos;
         }
-        uint32_t cp;
+        /// Advance one cluster: past this codepoint, then over any codepoints
+        /// that do not begin a new cluster. The boundary predicate is asked
+        /// only at codepoint starts, because it reports invalid UTF-8 as a
+        /// boundary and would otherwise answer "yes" mid-character.
+        uint32_t cp = 0;
         int bytes =
             lle_utf8_decode_codepoint(haystack + h_pos, h_len - h_pos, &cp);
         if (bytes <= 0) {
-            bytes = 1; /// defensive against malformed UTF-8
+            h_pos++; /// malformed UTF-8: byte at a time, as before
+            continue;
         }
         h_pos += (size_t)bytes;
+        while (h_pos < h_len &&
+               !lle_is_grapheme_boundary(haystack + h_pos, haystack,
+                                         haystack + h_len)) {
+            bytes =
+                lle_utf8_decode_codepoint(haystack + h_pos, h_len - h_pos, &cp);
+            if (bytes <= 0) {
+                break;
+            }
+            h_pos += (size_t)bytes;
+        }
     }
     return NULL;
 }
@@ -257,19 +252,25 @@ static const char *stristr(const char *haystack, const char *needle) {
 /**
  * @brief Unicode-aware case-insensitive prefix match
  *
- * Replaces the prior strncasecmp-based implementation. Empty prefix
- * is vacuously true.
+ * Delegates to the comparison completion filtering uses, so the two surfaces
+ * answer the same question the same way: normalized, and refusing a match that
+ * would end inside a character. The previous implementation did neither, so
+ * `cafe` matched a decomposed `cafe`+U+0301 entry -- half a character -- while
+ * the precomposed spelling of the same text did not match at all.
  *
  * @param str    String to check (may be NULL)
  * @param prefix Prefix to match (may be NULL)
- * @return true if str starts with prefix (codepoint-level case-insensitive)
+ * @return true if str starts with prefix
  */
 static bool str_starts_with_i(const char *str, const char *prefix) {
-    if (!str || !prefix)
+    if (!str || !prefix) {
         return false;
-    if (*prefix == '\0')
+    }
+    if (*prefix == '\0') {
         return true;
-    return cf_prefix_match_bytes(str, prefix) > 0;
+    }
+    lle_unicode_compare_options_t opts = history_cmp_options();
+    return lle_unicode_is_prefix_z(prefix, str, &opts);
 }
 
 /* ============================================================================
