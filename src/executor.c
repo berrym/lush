@@ -14653,14 +14653,13 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         /// Nested form ${#${INNER}}: count the length of the inner
         /// expansion's result. expand_variable handles the full ${...}
-        /// form. Issue #98. Bash/zsh return codepoint count, not byte
-        /// count, for multi-byte strings; use the canonical UTF-8
-        /// counter to match the consensus.
+        /// form. Issue #98. Counted in GRAPHEME CLUSTERS, like every other
+        /// length here -- see the scalar site below for why.
         if (var_name[0] == '$' && var_name[1] == '{') {
             char *inner = expand_variable(executor, var_name);
             if (inner) {
                 size_t inner_len =
-                    lle_utf8_count_codepoints(inner, strlen(inner));
+                    lle_utf8_count_graphemes(inner, strlen(inner));
                 free(inner);
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%zu", inner_len);
@@ -14726,7 +14725,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                             symtable_array_get_index(array,
                                                                      idx);
                                         size_t elem_len =
-                                            elem ? lle_utf8_count_codepoints(
+                                            elem ? lle_utf8_count_graphemes(
                                                        elem, strlen(elem))
                                                  : 0;
                                         snprintf(result_buf, sizeof(result_buf),
@@ -14736,7 +14735,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
                                     size_t elem_len =
-                                        elem ? lle_utf8_count_codepoints(
+                                        elem ? lle_utf8_count_graphemes(
                                                    elem, strlen(elem))
                                              : 0;
                                     snprintf(result_buf, sizeof(result_buf),
@@ -14779,14 +14778,28 @@ static char *parse_parameter_expansion(executor_t *executor,
         ///   lush: number of elements (curated zsh idiom)
         ///   posix: arrays don't exist, but if one was carried over
         ///          from a prior mode, match bash's first-element rule.
-        /// Unified lookup branches on kind in a single call. Length is
-        /// counted in codepoints (bash/zsh consensus) via the canonical
-        /// UTF-8 counter, not in bytes.
+        /// Unified lookup branches on kind in a single call.
+        ///
+        /// Length is counted in GRAPHEME CLUSTERS -- what a reader would call
+        /// characters -- not in bytes and not in codepoints. This diverges
+        /// from bash and zsh, which count codepoints, and the reason is
+        /// internal consistency rather than preference: lush already SLICES
+        /// and INDEXES by cluster, in every mode. Counting by codepoint left
+        /// the two units disagreeing, so `${v:$((${#v}-1))}` -- the ordinary
+        /// last-character idiom -- indexed past the end and produced nothing
+        /// for any string containing a combining mark or a ZWJ sequence
+        /// (issue #770). The references are self-consistent at codepoints;
+        /// lush is self-consistent at clusters, which is also the standing
+        /// TR#29 rule.
+        ///
+        /// Not mode-gated, because slicing is not: making the count a preset
+        /// would repair lush mode and leave bash, zsh and posix modes with the
+        /// mismatch they have today.
         lush_value_view_t view = {0};
         symtable_lookup(var_name, &view);
         if (view.kind == LUSH_VALUE_SCALAR) {
             const char *s = view.scalar_value;
-            size_t len = lle_utf8_count_codepoints(s, strlen(s));
+            size_t len = lle_utf8_count_graphemes(s, strlen(s));
             lush_value_view_clear(&view);
             char *result = malloc(24);
             if (result) {
@@ -14806,7 +14819,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
                 const char *first = symtable_array_get_index(array, 0);
                 size_t first_len =
-                    first ? lle_utf8_count_codepoints(first, strlen(first)) : 0;
+                    first ? lle_utf8_count_graphemes(first, strlen(first)) : 0;
                 snprintf(result, 24, "%zu", first_len);
             } else {
                 snprintf(result, 24, "%zu", symtable_array_length(array));

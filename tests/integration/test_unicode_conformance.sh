@@ -85,13 +85,19 @@ check_hex 'slice ${c:0:1} is one CJK'     "${CJK}printf '%s' \"\${c:0:1}\"" 'e4b
 printf '== case conversion preserves the mark ==\n'
 check_hex 'upper ${d^^}'             "${NFD}printf '%s' \"\${d^^}\""      '43414645cc815a'
 
-printf '== KNOWN GAP: length counts codepoints, not clusters (#770) ==\n'
-## Pinned deliberately at the WRONG value so this gate stays green while the
-## curation call on #770 is open. When #770 lands, these become 5 and 3 and the
-## last-character idiom below starts working. Leaving it unpinned would let the
-## gate fail for a known, filed reason and train everyone to ignore it.
-check_hex 'len ${#d} is 6 (want 5)'  "${NFD}printf '%s' \"\${#d}\""       '36'
-check_hex 'len ${#z} is 5 (want 3)'  "${ZWJ}printf '%s' \"\${#z}\""       '35'
+printf '== length counts CLUSTERS, and agrees with slicing (#770) ==\n'
+## The unit of ${#var} and the unit of ${var:o:l} must be the same one, or the
+## ordinary idioms built from both silently break. Before #770 the count was in
+## codepoints while the index was in clusters, so the last-character idiom read
+## past the end and produced nothing.
+check_hex 'len ${#d} counts clusters' "${NFD}printf '%s' \"\${#d}\""      '35'
+check_hex 'len ${#z} counts clusters' "${ZWJ}printf '%s' \"\${#z}\""      '33'
+check_hex 'len ${#c} counts clusters' "${CJK}printf '%s' \"\${#c}\""      '33'
+## The idioms that only work when the two units agree.
+check_hex 'last char ${d:len-1}'   "${NFD}printf '%s' \"\${d:\$((\${#d}-1))}\"" '7a'
+check_hex 'last char ${z:len-1}'   "${ZWJ}printf '%s' \"\${z:\$((\${#z}-1))}\"" '62'
+check_hex 'identity ${d:0:len}'    "${NFD}printf '%s' \"\${d:0:\${#d}}\"" '63616665cc817a'
+check_hex 'identity ${z:0:len}'    "${ZWJ}printf '%s' \"\${z:0:\${#z}}\"" '61f09f91a8e2808df09f92bb62'
 
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1
