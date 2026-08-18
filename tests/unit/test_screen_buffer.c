@@ -316,6 +316,38 @@ static int test_visual_width_utf8_2byte(void) {
     return 1;
 }
 
+static int test_cluster_widths(void) {
+    /// Display width of a STRING containing grapheme clusters. test_char_width
+    /// covers per-CODEPOINT width, which cannot catch a walk that sums the
+    /// codepoints of a cluster: a ZWJ sequence would measure 4 columns (2 + 0 +
+    /// 2) instead of the 2 it occupies, and every column computed after it --
+    /// cursor position, wrap point, rprompt fit -- would drift.
+    ///
+    /// Precomposed input cannot catch it either, since there one codepoint is
+    /// the whole cluster. These cases discriminate.
+    struct {
+        const char *text;
+        const char *what;
+        size_t want;
+    } cases[] = {
+        {                                         "abc","plain ASCII", 3                                                        },
+        {                    "\xe4\xb8\xad\xe6\x96\x87",    "two CJK, 2 columns each", 4},
+        {                                 "caf\xc3\xa9",        "precomposed e-acute", 4},
+        {                                "cafe\xcc\x81", "decomposed: mark is 0 wide", 4},
+        {"\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x92\xbb",
+         "ZWJ family is ONE cell pair", 2                                               },
+        {                                  "a\xcc\x81"
+                                  "b",   "base+mark+b is 2 columns", 2         },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        size_t w =
+            screen_buffer_visual_width(cases[i].text, strlen(cases[i].text));
+        ASSERT_TRUE(w == cases[i].want, cases[i].what);
+    }
+    return 1;
+}
+
 static int test_render_escape_sequences_end_at_the_final_byte(void) {
     /// The same ECMA-48 rule as test_escape_sequences_end_at_the_final_byte,
     /// asserted against screen_buffer_render rather than the width helper.
@@ -1398,6 +1430,7 @@ int main(void) {
     RUN_TEST(visual_width_utf8_2byte);
     RUN_TEST(width_agrees_on_wide_characters);
     RUN_TEST(escape_sequences_end_at_the_final_byte);
+    RUN_TEST(cluster_widths);
     RUN_TEST(render_escape_sequences_end_at_the_final_byte);
 
     printf("\n=== Calculate Visual Width Tests ===\n");
