@@ -642,6 +642,60 @@ bool lush_pattern_opens_extglob_group(const char *pattern) {
  * @param global If true, replace all occurrences; if false, only first
  * @return New string with substitutions (caller must free)
  */
+/// True when byte offset @p off in @p str begins a grapheme cluster (or is the
+/// end of the string). Used to keep the substitution search from starting or
+/// ending a match inside a character.
+///
+/// The predicate is consulted only at CODEPOINT starts, because
+/// lle_is_grapheme_boundary reports invalid UTF-8 as a boundary -- asking it
+/// about a continuation byte answers "yes", which is exactly the mid-character
+/// offset the check exists to reject. This walks codepoints from the start, the
+/// same way lush_slice_graphemes does.
+static bool substitute_is_cluster_boundary(const char *str, size_t str_len,
+                                           size_t off) {
+    if (off == 0 || off >= str_len) {
+        return true;
+    }
+    size_t i = 0;
+    while (i < str_len) {
+        if (i == off) {
+            return lle_is_grapheme_boundary(str + i, str, str + str_len);
+        }
+        if (i > off) {
+            return false; /// off landed inside a codepoint
+        }
+        uint32_t cp = 0;
+        int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
+        if (cp_len <= 0) {
+            return true; /// invalid UTF-8: fall back to byte behavior
+        }
+        i += (size_t)cp_len;
+    }
+    return true;
+}
+
+/// Advance one grapheme cluster from @p off, for the no-match step of the
+/// substitution search. Returns at least off+1 so the loop always progresses.
+static size_t substitute_next_cluster(const char *str, size_t str_len,
+                                      size_t off) {
+    size_t i = off;
+    uint32_t cp = 0;
+    int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
+    if (cp_len <= 0) {
+        return off + 1; /// invalid UTF-8: byte-at-a-time, as before
+    }
+    i += (size_t)cp_len;
+    while (i < str_len &&
+           !lle_is_grapheme_boundary(str + i, str, str + str_len)) {
+        cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
+        if (cp_len <= 0) {
+            break;
+        }
+        i += (size_t)cp_len;
+    }
+    return i > off ? i : off + 1;
+}
+
 char *lush_pattern_substitute(const char *str, const char *pattern,
                               const char *replacement, bool global) {
     if (!str) {
@@ -831,7 +885,9 @@ char *lush_pattern_substitute(const char *str, const char *pattern,
                 if (substr) {
                     strncpy(substr, str + i, try_len);
                     substr[try_len] = '\0';
-                    if (lush_shell_pattern_match(substr, pattern)) {
+                    if (lush_shell_pattern_match(substr, pattern) &&
+                        substitute_is_cluster_boundary(str, str_len,
+                                                       i + try_len)) {
                         matched = true;
                         match_len = try_len;
                         /// Variable-length patterns (`*`, and extglob groups
@@ -847,7 +903,9 @@ char *lush_pattern_substitute(const char *str, const char *pattern,
                                     strncpy(longer_substr, str + i, longer);
                                     longer_substr[longer] = '\0';
                                     if (lush_shell_pattern_match(longer_substr,
-                                                                 pattern)) {
+                                                                 pattern) &&
+                                        substitute_is_cluster_boundary(
+                                            str, str_len, i + longer)) {
                                         match_len = longer;
                                     }
                                     free(longer_substr);
@@ -862,7 +920,8 @@ char *lush_pattern_substitute(const char *str, const char *pattern,
             }
         } else {
             /// Exact substring match
-            if (strncmp(str + i, pattern, pattern_len) == 0) {
+            if (strncmp(str + i, pattern, pattern_len) == 0 &&
+                substitute_is_cluster_boundary(str, str_len, i + pattern_len)) {
                 matched = true;
                 match_len = pattern_len;
             }
@@ -896,7 +955,22 @@ char *lush_pattern_substitute(const char *str, const char *pattern,
                 }
                 result = new_result;
             }
-            result[result_pos++] = str[i++];
+            /// Advance a whole cluster, so the next attempt starts on a
+            /// character boundary rather than inside one. Copying the cluster's
+            /// bytes here is what keeps the untouched text byte-exact.
+            size_t next = substitute_next_cluster(str, str_len, i);
+            if (result_pos + (next - i) + 1 >= result_size) {
+                result_size = result_size * 2 + (next - i);
+                char *grown = realloc(result, result_size);
+                if (!grown) {
+                    free(result);
+                    return strdup(str);
+                }
+                result = grown;
+            }
+            while (i < next) {
+                result[result_pos++] = str[i++];
+            }
         }
     }
 
