@@ -267,6 +267,77 @@ static void test_forward_char_zwj_sequence(lush_memory_pool_t *pool) {
     TEST_PASS();
 }
 
+static void test_delete_removes_whole_clusters(lush_memory_pool_t *pool) {
+    TEST_START("delete/backspace remove a WHOLE grapheme cluster");
+
+    /// A deletion that removes only the last codepoint leaves an orphaned
+    /// combining mark in the buffer -- the character visibly changes into a
+    /// different one rather than disappearing. Precomposed input cannot catch
+    /// that, because there one codepoint IS the whole cluster.
+
+    /// "caf" + e + COMBINING ACUTE = 6 bytes, 4 clusters.
+    lle_editor_t *e = create_editor_with_content("cafe\xcc\x81", pool);
+    TEST_ASSERT(e != NULL, "Failed to create editor");
+    lle_end_of_line(e);
+    lle_backward_delete_char(e);
+    TEST_ASSERT(e->buffer->length == 3,
+                "Backspace left part of the cluster behind (4 would mean the "
+                "combining mark is still there without its base)");
+    lle_editor_destroy(e);
+
+    /// "a" + a three-codepoint ZWJ sequence = 12 bytes, 2 clusters.
+    e = create_editor_with_content(
+        "a\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x92\xbb", pool);
+    TEST_ASSERT(e != NULL, "Failed to create editor");
+    lle_end_of_line(e);
+    lle_backward_delete_char(e);
+    TEST_ASSERT(e->buffer->length == 1,
+                "Backspace removed only part of the ZWJ sequence");
+    lle_editor_destroy(e);
+
+    /// Forward delete at the START of a cluster must take all of it.
+    e = create_editor_with_content("cafe\xcc\x81z", pool);
+    TEST_ASSERT(e != NULL, "Failed to create editor");
+    lle_beginning_of_line(e);
+    lle_forward_char(e);
+    lle_forward_char(e);
+    lle_forward_char(e);
+    lle_delete_char(e);
+    TEST_ASSERT(e->buffer->length == 4,
+                "Forward delete split the cluster, leaving its mark");
+    lle_editor_destroy(e);
+
+    TEST_PASS();
+}
+
+static void test_word_motion_over_clusters(lush_memory_pool_t *pool) {
+    TEST_START("word motion and kill land on cluster boundaries");
+
+    /// A word whose last character is a decomposed cluster: forward-word must
+    /// land past the whole thing, not between the base and its mark.
+    lle_editor_t *e = create_editor_with_content("cafe\xcc\x81 xy", pool);
+    TEST_ASSERT(e != NULL, "Failed to create editor");
+    lle_beginning_of_line(e);
+    lle_forward_word(e);
+    size_t byte_off;
+    get_cursor_position(e, &byte_off, NULL, NULL);
+    TEST_ASSERT(byte_off == 6,
+                "forward-word stopped inside the trailing cluster (5 would "
+                "mean it split the base from its mark)");
+    lle_editor_destroy(e);
+
+    /// backward-kill-word must remove the cluster-bearing word entirely.
+    e = create_editor_with_content("xy cafe\xcc\x81", pool);
+    TEST_ASSERT(e != NULL, "Failed to create editor");
+    lle_end_of_line(e);
+    lle_backward_kill_word(e);
+    TEST_ASSERT(e->buffer->length == 3,
+                "backward-kill-word left part of the cluster in the buffer");
+    lle_editor_destroy(e);
+
+    TEST_PASS();
+}
+
 static void test_forward_char_utf8_3byte(lush_memory_pool_t *pool) {
     TEST_START("lle_forward_char: 3-byte UTF-8 (CJK)");
 
@@ -574,6 +645,8 @@ int main(void) {
     /// Run all tests
     test_forward_char_ascii(pool);
     test_forward_char_utf8_2byte(pool);
+    test_delete_removes_whole_clusters(pool);
+    test_word_motion_over_clusters(pool);
     test_forward_char_decomposed_cluster(pool);
     test_forward_char_zwj_sequence(pool);
     test_forward_char_utf8_3byte(pool);
