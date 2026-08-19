@@ -66,6 +66,27 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
+/// Is this translation unit built under AddressSanitizer?
+///
+/// The `defined(__has_feature) && __has_feature(...)` one-liner does NOT work:
+/// a preprocessor that lacks __has_feature substitutes the unknown identifier
+/// with 0 and then fails on the following `(` -- `defined()` does not
+/// short-circuit the PARSE. GCC rejected exactly that with "missing binary
+/// operator before token" while clang accepted it, so the one-liner built
+/// clean on macOS and broke the Linux jobs. The nested form is the portable
+/// spelling: the inner directive is only ever reached where __has_feature
+/// exists.
+#if defined(__SANITIZE_ADDRESS__)
+#define LUSH_TEST_UNDER_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define LUSH_TEST_UNDER_ASAN 1
+#endif
+#endif
+#ifndef LUSH_TEST_UNDER_ASAN
+#define LUSH_TEST_UNDER_ASAN 0
+#endif
+
 #define ASSERT_TRUE(cond, msg)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
@@ -815,8 +836,7 @@ void test_search_performance_large_history(void) {
     /// exactly the kind of assertion that fails for reasons unrelated to the
     /// code under test. A normal build is still held to the bound, which is
     /// where the number means something.
-#if defined(__SANITIZE_ADDRESS__) ||                                           \
-    (defined(__has_feature) && __has_feature(address_sanitizer))
+#if LUSH_TEST_UNDER_ASAN
     if (time_us >= 50000) {
         printf("  (over 50ms; not asserted under sanitizers)\n");
     }
