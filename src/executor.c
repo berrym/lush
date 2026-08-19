@@ -14698,6 +14698,39 @@ static char *parse_parameter_expansion(executor_t *executor,
                             /// ${#arr[@]} - number of elements
                             snprintf(result_buf, sizeof(result_buf), "%zu",
                                      symtable_array_length(array));
+                        } else if (array->is_associative) {
+                            /// ${#map[key]} - length of the element under a
+                            /// STRING key.
+                            ///
+                            /// This branch did not exist: every subscript was
+                            /// run through the arithmetic evaluator and used as
+                            /// an index. For a map that is the wrong question.
+                            /// `ab` is not arithmetic, so it evaluated to 0 and
+                            /// the length of index 0 -- nothing -- was
+                            /// reported, making ${#m[ab]} answer 0 for every
+                            /// key. A key containing a space fared worse: it
+                            /// reached the evaluator as `a b` and raised a
+                            /// parse error, so a length query aborted the
+                            /// script.
+                            ///
+                            /// The read path already branches on kind; this
+                            /// uses the same canonicalization so a length keys
+                            /// on the exact bytes the write produced.
+                            char *expanded_subscript = subscript_normalize_key(
+                                executor, subscript, strlen(subscript));
+                            const char *key = expanded_subscript
+                                                  ? expanded_subscript
+                                                  : subscript;
+                            const char *elem =
+                                symtable_array_get_assoc(array, key);
+                            size_t elem_len = elem ? lle_utf8_count_graphemes(
+                                                         elem, strlen(elem))
+                                                   : 0;
+                            snprintf(result_buf, sizeof(result_buf), "%zu",
+                                     elem_len);
+                            if (expanded_subscript) {
+                                free(expanded_subscript);
+                            }
                         } else {
                             /// ${#arr[n]} - length of element at index n
                             arithm_clear_error();
