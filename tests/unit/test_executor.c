@@ -1570,6 +1570,59 @@ TEST(rt_substitution_search_is_grapheme_aligned) {
     ASSERT_EXIT_STATUS(r, 0);
 }
 
+TEST(rt_command_word_fuses_with_adjacent_tokens) {
+    /// A command word concatenates with adjacent tokens, the same POSIX 2.10.2
+    /// rule arguments already followed. The command path took ONE token and
+    /// advanced, so `$(echo ec)ho` dropped the `ho` and ran `ec`, and
+    /// `$(echo /bin)/echo` tried to exec the directory (issue #583).
+    ///
+    /// The asymmetry was the tell: `echo $(echo /bin)/x` was already correct in
+    /// argument position, so the fix is to route the command word through the
+    /// same collector rather than write a second concatenation loop.
+    run_result_t r = run_shell("( $(echo ec)ho one\n"
+                               "  ec$(echo ho) two\n"
+                               "  `echo ec`ho three\n"
+                               "  $(echo ec)$(echo ho) four )\n");
+    ASSERT_STDOUT_EQ(r, "one\ntwo\nthree\nfour\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_empty_command_name_keeps_its_quoting) {
+    /// Null-word removal distinguishes an UNQUOTED empty command name (drop the
+    /// word; the command is null and succeeds) from a QUOTED one (keep one
+    /// empty word; report it as not found). Routing the command word through
+    /// the argument collector meant re-deriving that bit from the fused node's
+    /// TYPE, and a single-quoted word is NODE_STRING_LITERAL while a
+    /// double-quoted one is NODE_STRING_EXPANDABLE.
+    ///
+    /// Testing only the latter made `''` look unquoted, so it was dropped and
+    /// the NEXT word became the command: `'' hi` ran `hi`. Both quote kinds are
+    /// pinned here, in both the with-argument and bare forms.
+    run_result_t r = run_shell("( unset x\n"
+                               "  $x\n"
+                               "  echo unquoted-empty=$? )\n");
+    ASSERT_STDOUT_EQ(r, "unquoted-empty=0\n");
+
+    /// A quoted empty name is a real (empty) command name: looked up, reported
+    /// missing, and it must NOT let a following word take its place.
+    ///
+    /// The argument here is `echo oops`, chosen because it DISCRIMINATES. If
+    /// the empty name is wrongly dropped, `echo` becomes the command and the
+    /// line prints "oops" and succeeds. Asserting only the exit status would
+    /// not catch it -- both the correct and the broken behavior exit 127 when
+    /// the argument is a missing command, which is what the first version of
+    /// this test did, and a mutation proved it vacuous.
+    r = run_shell("( '' echo oops ) 2>/dev/null\n");
+    ASSERT_STDOUT_EQ(r, "");
+    ASSERT_EXIT_STATUS(r, 127);
+    r = run_shell("( \"\" echo oops ) 2>/dev/null\n");
+    ASSERT_STDOUT_EQ(r, "");
+    ASSERT_EXIT_STATUS(r, 127);
+    r = run_shell("( unset x; \"$x\" echo oops ) 2>/dev/null\n");
+    ASSERT_STDOUT_EQ(r, "");
+    ASSERT_EXIT_STATUS(r, 127);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9475,6 +9528,8 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_command_word_fuses_with_adjacent_tokens);
+    RUN_TEST(rt_empty_command_name_keeps_its_quoting);
     RUN_TEST(rt_substitution_search_is_grapheme_aligned);
     RUN_TEST(rt_cmdsub_fuses_after_a_closing_quote);
     RUN_TEST(rt_pe_case_conversion_restricting_pattern_covered);

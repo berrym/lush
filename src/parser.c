@@ -2187,17 +2187,56 @@ static node_t *parse_simple_command(parser_t *parser) {
         return NULL;
     }
 
-    /// Set command name
-    command->val.str = strdup(current->text);
+    /// Set command name.
+    ///
+    /// The command word FUSES with adjacent tokens, exactly as an argument
+    /// does. It used to take one token and advance, so `$(echo ec)ho` lost the
+    /// `ho` and ran `ec`, and `$(echo /bin)/echo` tried to exec the directory
+    /// -- POSIX 2.10.2 word concatenation applied in argument position and not
+    /// here (issue #583).
+    ///
+    /// This delegates to collect_word_argument rather than repeating its loop.
+    /// That loop is not a simple strcat: a quoted token's text has already lost
+    /// its delimiters, so the segments carry a per-character quote-provenance
+    /// map that the expander reads to decide, byte by byte, what is literal in
+    /// a fused mixed-quote word. A second implementation here would be a second
+    /// thing to keep in step, and the two would drift.
+    ///
+    /// The helper appends a node to a parent, so it is given a scratch parent
+    /// and the finished word is adopted onto the command node.
+    node_t *fuse_scratch = new_node(NODE_COMMAND);
+    if (!fuse_scratch) {
+        free_node_tree(command);
+        return NULL;
+    }
+    if (!collect_word_argument(parser, fuse_scratch)) {
+        free_node_tree(fuse_scratch);
+        free_node_tree(command);
+        return NULL;
+    }
+    node_t *fused = fuse_scratch->first_child;
+    if (!fused || !fused->val.str) {
+        free_node_tree(fuse_scratch);
+        free_node_tree(command);
+        return NULL;
+    }
+    command->val.str = fused->val.str;
+    fused->val.str = NULL; /// ownership moves to the command node
     command->val_type = VAL_STR;
+    command->quote_prov = fused->quote_prov;
+    fused->quote_prov = NULL;
+    command->glob_qualified = fused->glob_qualified;
     /// Record whether the command-name word carried a quoted segment, so
     /// null-word removal can tell an unquoted empty name `$x` (drop -> null
     /// command, exit 0) from a quoted empty name `"$x"` / `''` (keep one
-    /// empty word -> command not found). Arguments carry this in their own
-    /// node type; the command name's token type is otherwise discarded here.
-    command->name_quoted =
-        (current->type == TOK_STRING || current->type == TOK_EXPANDABLE_STRING);
-    tokenizer_advance(parser->tokenizer);
+    /// empty word -> command not found). The fused word reports it through its
+    /// node type: a single-quoted segment becomes NODE_STRING_LITERAL and a
+    /// double-quoted or fused one NODE_STRING_EXPANDABLE. Testing only the
+    /// latter treated `''` as UNQUOTED, so null-word removal dropped it and the
+    /// next word became the command -- `'' hi` tried to run `hi`.
+    command->name_quoted = (fused->type == NODE_STRING_EXPANDABLE ||
+                            fused->type == NODE_STRING_LITERAL);
+    free_node_tree(fuse_scratch);
 
     if (!parse_command_suffix(parser, command)) {
         free_node_tree(command);
