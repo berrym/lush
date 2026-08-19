@@ -1623,6 +1623,28 @@ TEST(rt_empty_command_name_keeps_its_quoting) {
     ASSERT_EXIT_STATUS(r, 127);
 }
 
+TEST(rt_assoc_element_length_uses_the_key) {
+    /// ${#map[key]} asks for the LENGTH OF AN ELEMENT, and the element is found
+    /// by a string key. The branch had no associative case: every subscript
+    /// went through the arithmetic evaluator and the result was used as an
+    /// index, so `ab` evaluated to 0, index 0 was fetched (nothing), and the
+    /// answer was 0 for every key. A key containing a space did not answer
+    /// wrongly -- it reached the evaluator as `a b`, raised a parse error, and
+    /// ABORTED the script from inside a read-only length query (issue #780).
+    ///
+    /// Indexed arrays were always correct, which is the tell: the read path
+    /// branches on array kind and the length path did not.
+    run_result_t r =
+        run_shell("( declare -A m\n"
+                  "  m[ab]=hello; m[\"a b\"]=99\n"
+                  "  printf '[%s][%s]' \"${#m[ab]}\" \"${#m[a b]}\"\n"
+                  "  a=(x yy zzz)\n"
+                  "  printf '[%s][%s][%s]\\n' \"${#a[1]}\" \"${#a[@]}\" "
+                  "\"${#m[@]}\" )\n");
+    ASSERT_STDOUT_EQ(r, "[5][2][2][3][2]\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
 TEST(rt_pe_operand_with_quotes_defers) {
     /// Legacy expands the PE operand through a $-only pass that does NOT remove
     /// quotes or backslashes (${un:-'x'} keeps the quotes literal -- a lush
@@ -9528,6 +9550,7 @@ int main(void) {
     RUN_TEST(rt_special_params_scalar_covered);
     RUN_TEST(rt_unquoted_param_glob_brace_value_defers);
     RUN_TEST(rt_positional_params_covered);
+    RUN_TEST(rt_assoc_element_length_uses_the_key);
     RUN_TEST(rt_command_word_fuses_with_adjacent_tokens);
     RUN_TEST(rt_empty_command_name_keeps_its_quoting);
     RUN_TEST(rt_substitution_search_is_grapheme_aligned);
