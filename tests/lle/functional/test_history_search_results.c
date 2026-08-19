@@ -66,6 +66,27 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
+/// Is this translation unit built under AddressSanitizer?
+///
+/// The `defined(__has_feature) && __has_feature(...)` one-liner does NOT work:
+/// a preprocessor that lacks __has_feature substitutes the unknown identifier
+/// with 0 and then fails on the following `(` -- `defined()` does not
+/// short-circuit the PARSE. GCC rejected exactly that with "missing binary
+/// operator before token" while clang accepted it, so the one-liner built
+/// clean on macOS and broke the Linux jobs. The nested form is the portable
+/// spelling: the inner directive is only ever reached where __has_feature
+/// exists.
+#if defined(__SANITIZE_ADDRESS__)
+#define LUSH_TEST_UNDER_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define LUSH_TEST_UNDER_ASAN 1
+#endif
+#endif
+#ifndef LUSH_TEST_UNDER_ASAN
+#define LUSH_TEST_UNDER_ASAN 0
+#endif
+
 #define ASSERT_TRUE(cond, msg)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
@@ -791,17 +812,37 @@ void test_search_performance_large_history(void) {
         lle_history_search_substring(core, "target", 10);
     ASSERT_NOT_NULL(results, "Search should succeed");
 
+    /// Read everything out, then RELEASE, then assert.
+    ///
+    /// ASSERT_TRUE returns from the function, so an assertion placed before the
+    /// destroy calls skips them -- and this test holds 1001 entries plus an
+    /// index. Under the leak-enforcing sanitizer job that turned ONE failed
+    /// assertion into 294KB of leaks across 4234 allocations and a SIGABRT, so
+    /// the report named a leak where the real defect was the assertion above
+    /// it. Cleanup must not be conditional on the test passing.
     uint64_t time_us = lle_history_search_results_get_time_us(results);
-    printf("  Search time: %" PRIu64 " \xce\xbcs\n", time_us);
-
-    /// Should complete in reasonable time (< 50ms for 1000 entries)
-    ASSERT_TRUE(time_us < 50000, "Search should complete in < 50ms");
-
     size_t count = lle_history_search_results_get_count(results);
-    ASSERT_TRUE(count >= 1, "Should find target command");
 
     lle_history_search_results_destroy(results);
     lle_history_core_destroy(core);
+
+    printf("  Search time: %" PRIu64 " \xce\xbcs\n", time_us);
+
+    ASSERT_TRUE(count >= 1, "Should find target command");
+
+    /// The wall-clock bound is informational under a sanitizer build. ASan
+    /// slows execution by an order of magnitude and the CI runners are shared,
+    /// so a 50ms threshold there measures the machine rather than the search --
+    /// exactly the kind of assertion that fails for reasons unrelated to the
+    /// code under test. A normal build is still held to the bound, which is
+    /// where the number means something.
+#if LUSH_TEST_UNDER_ASAN
+    if (time_us >= 50000) {
+        printf("  (over 50ms; not asserted under sanitizers)\n");
+    }
+#else
+    ASSERT_TRUE(time_us < 50000, "Search should complete in < 50ms");
+#endif
 
     TEST_PASS();
 }
