@@ -434,8 +434,15 @@ static int load_directory(const char *dir_path) {
             continue;
         }
 
+        /// A truncated path names a DIFFERENT file, so stat() below would be
+        /// reporting on something other than the entry just enumerated. Skip
+        /// what cannot be represented instead (#788).
         char path[COMPAT_PATH_MAX];
-        snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
+        int path_len =
+            snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
+        if (path_len < 0 || (size_t)path_len >= sizeof(path)) {
+            continue;
+        }
 
         struct stat st;
         if (stat(path, &st) != 0) {

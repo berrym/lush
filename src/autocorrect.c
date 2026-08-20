@@ -719,8 +719,18 @@ int autocorrect_suggest_path_commands(const char *command,
                 continue;
             }
 
+            /// A truncated path is not a shorter name for the same file, it
+            /// is a DIFFERENT path -- and under a deep tree it can collide
+            /// with a real, unrelated entry, so is_executable_file() would be
+            /// answering about a file that was never enumerated. Skip an
+            /// entry whose path cannot be represented rather than testing a
+            /// path that does not exist as written (#788).
             char full_path[1024];
-            snprintf(full_path, sizeof(full_path), "%s/%s", dir, entry->d_name);
+            int path_len = snprintf(full_path, sizeof(full_path), "%s/%s", dir,
+                                    entry->d_name);
+            if (path_len < 0 || (size_t)path_len >= sizeof(full_path)) {
+                continue;
+            }
 
             if (is_executable_file(full_path)) {
                 /// Full Unicode-aware scoring for candidates that passed
