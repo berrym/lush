@@ -510,13 +510,20 @@ lle_result_t lle_test_runner_execute_test(lle_test_runner_t *runner,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
+    /// Initialize the out-parameter before any early return the caller can
+    /// read from, so the contract is "on every return where result was
+    /// non-NULL, *result has been written". This zeroing used to sit below
+    /// the test_case checks, so an INVALID_STATE return left the caller's
+    /// stack object indeterminate -- and lle_test_runner_run_suite() reads
+    /// execution_time_us and peak_memory_usage WITHOUT guarding on the
+    /// returned status, folding garbage into the suite totals. Wrong numbers
+    /// reported confidently, rather than a visible failure.
+    memset(result, 0, sizeof(lle_test_execution_result_t));
+
     lle_test_case_t *test_case = context->current_test;
     if (!test_case || !test_case->test_function) {
         return LLE_ERROR_INVALID_STATE;
     }
-
-    /// Initialize result
-    memset(result, 0, sizeof(lle_test_execution_result_t));
 
     /// Record test start time
     struct timespec start_time;
