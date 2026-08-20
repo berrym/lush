@@ -9513,13 +9513,22 @@ static int expand_globstar_recursive(const char *base_dir,
             continue;
         }
 
-        /// Build full path
+        /// Build full path. A truncated path names a DIFFERENT file, so a
+        /// match against it would report a path that is not on disk as
+        /// written; skip the entry instead. This is the same guard the
+        /// remaining-pattern candidate below already applies -- the two are
+        /// built the same way and must fail the same way (#788).
         char full_path[PATH_MAX];
+        int full_len;
         if (base_dir[0]) {
-            snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
-                     entry->d_name);
+            full_len = snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
+                                entry->d_name);
         } else {
-            snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
+            full_len =
+                snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
+        }
+        if (full_len < 0 || (size_t)full_len >= sizeof(full_path)) {
+            continue;
         }
 
         /// Check if this path matches the remaining pattern
