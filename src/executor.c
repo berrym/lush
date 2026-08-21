@@ -20,6 +20,7 @@
 #include "builtins.h"
 #include "config.h"
 #include "debug.h"
+#include "dequote.h"
 #include "escape.h"
 #include "field_split.h"
 #include "ht.h"
@@ -21575,9 +21576,29 @@ static int execute_array_assignment_inner(executor_t *executor,
             free(expanded_subscript);
         }
     } else {
-        /// Indexed array - evaluate subscript as arithmetic expression
+        /// Indexed array - the subscript is an arithmetic expression, but one
+        /// level of quoting comes off first. `a["0"]=x` and `a["$k"]=x` are
+        /// ordinary spellings that reached the arithmetic evaluator with their
+        /// quotes still attached and died there on `unexpected character '"'`,
+        /// so a literal subscript that collides with syntax had no spelling at
+        /// all on this surface. The associative branch above already
+        /// canonicalizes its interior; this one never did (#639).
+        ///
+        /// Only the QUOTING is stripped. Expansion stays with the arithmetic
+        /// evaluator, which does its own -- dequoting leaves `$k` in place for
+        /// it, rather than expanding twice.
+        char *dequoted_subscript = NULL;
+        char *subscript_prov = NULL;
+        const char *arith_source = subscript;
+        if (lush_dequote_span(subscript, strlen(subscript), &dequoted_subscript,
+                              &subscript_prov, NULL)) {
+            arith_source = dequoted_subscript;
+        }
+        free(subscript_prov);
+
         arithm_clear_error();
-        char *idx_result = arithm_expand_with_executor(executor, subscript);
+        char *idx_result = arithm_expand_with_executor(executor, arith_source);
+        free(dequoted_subscript);
 
         if (!idx_result || arithm_error_is_flagged()) {
             if (idx_result)

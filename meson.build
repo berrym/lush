@@ -3030,6 +3030,19 @@ endif
 # (SEMANTICS 3.1). Read, length, write and unset had drifted into four
 # different answers to that one question (#634, #784), so this pins all four
 # together across every mode.
+# Quoting inside an array subscript. A subscript colliding with shell syntax
+# (@, *, a space) needs a spelling, and quoting is it -- but the indexed
+# assignment target handed its quotes to the arithmetic evaluator and died
+# there, so a["0"]=x could not be written at all (#639). SEMANTICS 3.13 will
+# add a further lush-mode meaning on top of this; these pin today's behavior.
+if fs.exists('tests/integration/test_array_subscript_quoting.sh')
+  test('array subscript quoting',
+       find_program('tests/integration/test_array_subscript_quoting.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_scalar_element_surface.sh')
   test('scalar element surface',
        find_program('tests/integration/test_scalar_element_surface.sh'),
