@@ -624,6 +624,73 @@ branch the single-form policy exists to prevent, and it would leave `=` and `==`
 disagreeing with patterns. Improve normalization at the entry points; leave the
 matcher single-pass.
 
+### 3.13 A subscript's quoting says how to read it (lush mode)
+
+**Status: approved, not yet implemented.** The enabling work is the quote-context
+fix (#695 cluster 1); see the note at the end of this section.
+
+In lush mode the quoting of a subscript states what the subscript IS:
+
+```sh
+${a[i]}       # i is an ARITHMETIC EXPRESSION -- evaluate it, use it as an index
+${a["i"]}     # i is a LITERAL KEY -- do not evaluate anything
+${a['i']}     # likewise
+```
+
+#### Why the quoting has to carry this
+
+Today the question "is this subscript an index or a key?" is answered by the
+array's KIND -- was the name declared as a list or a map. That is ambient state
+the reader cannot see at the point of use, so a reference cannot be understood
+from itself. That is precisely what section 2 forbids: a reader looking at
+`${a[i]}` should know what it means from those characters, without scanning
+outward for a declaration.
+
+The cost is not hypothetical. In issue #780 a map subscript was handed to the
+arithmetic evaluator because the code path had no kind branch; the key `ab`
+evaluated to 0, the element at index 0 was read, and the length of a map element
+came back as 0 for every key. A spaced key raised a parse error out of a
+read-only length query. Both are the same root: the meaning of the subscript was
+inferred from state rather than stated at the site.
+
+Quoting is the natural carrier because the reader is already using it to say
+"these bytes are literal". Extending that to subscripts adds no new syntax and
+no new rule to remember -- it makes an existing rule apply where it previously
+did nothing.
+
+#### What this is NOT
+
+It is not a fork of the value model. A list is still indexed by integers and a
+map is still keyed by strings, in every mode; section 1's dividing rule holds.
+What changes is how a REFERENCE states which it wants -- a spelling, in the sense
+of PHILOSOPHY section 2. The engine underneath is unchanged.
+
+It is also not a new dequoting rule. The quotes are removed exactly as they are
+anywhere else; what is added is that their PRESENCE is information.
+
+#### Modes
+
+The distinction is enforced in lush mode. The compatibility modes reproduce
+their own baselines, where quotes inside a subscript are removed and carry no
+meaning, so `${a["i"]}` and `${a[i]}` are the same reference there. A script
+written for another dialect keeps working under its own mode; a script written
+for lush gets a reference that can be read locally.
+
+#### Blocked on quote context
+
+This cannot be implemented until quote context survives the `${` scan. Today it
+does not: in a double-quoted word, an inner `"` terminates the enclosing span, so
+
+```sh
+declare -A m; m["a b"]=9
+set -- "${m["a b"]}"; echo $#      # 2 -- the word SPLIT, and the text is literal
+```
+
+the subscript's quotes never reach the expander to mean anything. That is
+issue #695 cluster 1. This section is recorded now so the quote-context work is
+built knowing what the quoting will be asked to carry, rather than having this
+grafted on afterwards.
+
 ---
 
 ## 4. The three boundary rules

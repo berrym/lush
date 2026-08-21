@@ -171,6 +171,18 @@ Both are deliberate and documented rather than pending work. A mode that could
 change either would be a separate shell sharing a parser, which is the outcome
 the surface separation exists to prevent.
 
+### What a mode legitimately DOES change
+
+Spelling. A mode selects which syntax means what, never what a value is.
+
+The clearest upcoming case is subscript quoting (`SEMANTICS.md` section 3.13,
+approved and pending the quote-context work): in lush mode `${a[i]}` reads the
+subscript as an arithmetic expression and `${a["i"]}` reads it as a literal key,
+while the compatibility modes reproduce their baselines, where the quotes are
+removed and mean nothing. A list is still indexed by integers and a map still
+keyed by strings in every mode -- only the way a reference STATES which it wants
+differs. That is the line: the same engine, addressed in a different dialect.
+
 ---
 
 ## `set` -- POSIX shell options
