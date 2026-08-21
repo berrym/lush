@@ -449,7 +449,18 @@ lle_result_t lle_theme_value_table_get_string(const lle_theme_value_t *value,
         if (strcmp(value->data.table.entries[i].key, key) == 0) {
             const lle_theme_value_t *v = value->data.table.entries[i].value;
             if (v && v->type == LLE_THEME_VALUE_STRING) {
-                snprintf(out, out_len, "%s", v->data.string);
+                /// A value that does not fit is not a usable spec. Truncating
+                /// it silently is worse than rejecting it: the callers hand
+                /// the result to lle_parse_color_spec(), which can ACCEPT a
+                /// truncated prefix as a valid color, so the theme would
+                /// render a color its file never named and say nothing.
+                /// Reported the way the function already reports a malformed
+                /// entry; the callers fall back to the integer form when the
+                /// string lookup fails (#788).
+                int written = snprintf(out, out_len, "%s", v->data.string);
+                if (written < 0 || (size_t)written >= out_len) {
+                    return LLE_ERROR_INVALID_PARAMETER;
+                }
                 return LLE_SUCCESS;
             }
             return LLE_ERROR_INVALID_PARAMETER;

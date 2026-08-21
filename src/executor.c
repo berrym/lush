@@ -9513,13 +9513,22 @@ static int expand_globstar_recursive(const char *base_dir,
             continue;
         }
 
-        /// Build full path
+        /// Build full path. A truncated path names a DIFFERENT file, so a
+        /// match against it would report a path that is not on disk as
+        /// written; skip the entry instead. This is the same guard the
+        /// remaining-pattern candidate below already applies -- the two are
+        /// built the same way and must fail the same way (#788).
         char full_path[PATH_MAX];
+        int full_len;
         if (base_dir[0]) {
-            snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
-                     entry->d_name);
+            full_len = snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
+                                entry->d_name);
         } else {
-            snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
+            full_len =
+                snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
+        }
+        if (full_len < 0 || (size_t)full_len >= sizeof(full_path)) {
+            continue;
         }
 
         /// Check if this path matches the remaining pattern
@@ -13522,6 +13531,117 @@ static int cmp_str_desc(const void *a, const void *b) {
     return strcmp(*(const char *const *)b, *(const char *const *)a);
 }
 
+/// Grapheme-cluster slice of a scalar: `${s[N]}` and `${s[N,M]}`.
+///
+/// On a scalar the subscript does not address an element -- a scalar has no
+/// elements (SEMANTICS S3.1). It names a TR#29 grapheme-cluster slice: a
+/// read-only view of the string, scalar in and scalar out, so it is not a
+/// kind crossing and S3.9 does not govern it. The indexing base is the same
+/// preset the array surfaces use (FEATURE_ARRAY_ZERO_INDEXED: 0-based in
+/// lush/bash/posix, 1-based in zsh mode) and a negative index counts from the
+/// end (issue #68).
+///
+/// Shared by the value path and the `${#s[N]}` length path. The two computed
+/// the answer independently before, and the length path had no scalar case at
+/// all: it answered a flat 0 for every slice, so `${s[1,2]}` expanded to `bc`
+/// while `${#s[1,2]}` reported 0 (issue #784). Deriving the length from the
+/// slice makes the two agree by construction rather than by parallel edits,
+/// and each mode's length then follows its own slice automatically.
+///
+/// @return owned slice string, or NULL only on allocation failure.
+/// Evaluate one bound of a scalar slice subscript as an arithmetic
+/// expression. Returns false when the expression is malformed, leaving *out
+/// untouched; the caller reports. An empty expression is 0, as `$(( ))` is,
+/// so `${s[]}` keeps addressing the first cluster.
+static bool scalar_slice_bound(executor_t *executor, const char *expr,
+                               int *out) {
+    arithm_clear_error();
+    char *evaluated = arithm_expand_with_executor(executor, expr);
+    if (!evaluated || arithm_error_is_flagged()) {
+        free(evaluated);
+        return false;
+    }
+    *out = (int)strtoll(evaluated, NULL, 10);
+    free(evaluated);
+    return true;
+}
+
+static char *scalar_grapheme_slice(executor_t *executor, const char *str_value,
+                                   const char *subscript, bool *out_error) {
+    if (out_error) {
+        *out_error = false;
+    }
+
+    /// The subscript is an arithmetic expression, as it is on every array
+    /// element surface and as SEMANTICS S3.13 commits lush to: `${a[i]}` is
+    /// an expression, `${a["i"]}` a literal key. This path used atoi, which
+    /// parses a leading integer and stops -- so `i` read as 0 and `1+1` as 1,
+    /// silently and with status 0, while lush's own array path evaluated both
+    /// correctly. A malformed expression is now reported rather than quietly
+    /// becoming index 0, the discipline #647 and #710 set for the element
+    /// surfaces.
+    int start_idx = 0, end_idx = -1;
+    const char *comma = strchr(subscript, ',');
+    if (comma) {
+        char *lower = strndup(subscript, (size_t)(comma - subscript));
+        bool ok = lower != NULL &&
+                  scalar_slice_bound(executor, lower, &start_idx) &&
+                  scalar_slice_bound(executor, comma + 1, &end_idx);
+        free(lower);
+        if (!ok) {
+            if (out_error) {
+                *out_error = true;
+            }
+            return NULL;
+        }
+    } else {
+        if (!scalar_slice_bound(executor, subscript, &start_idx)) {
+            if (out_error) {
+                *out_error = true;
+            }
+            return NULL;
+        }
+        end_idx = start_idx; /// single grapheme
+    }
+    size_t value_len = strlen(str_value);
+    bool slice_empty = false;
+
+    /// Negative-index handling: ${str[-N]} counts from the end (issue #68),
+    /// via lle_utf8_count_graphemes.
+    if (start_idx < 0 || end_idx < 0) {
+        int total = (int)lle_utf8_count_graphemes(str_value, value_len);
+        bool one_based = !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
+        if (start_idx < 0) {
+            start_idx = total + start_idx + (one_based ? 1 : 0);
+        }
+        if (end_idx < 0) {
+            end_idx = total + end_idx + (one_based ? 1 : 0);
+        }
+    }
+
+    /// Convert from 1-based (zsh) to 0-based if needed.
+    if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
+        if (start_idx <= 0 || end_idx <= 0) {
+            slice_empty = true;
+        } else {
+            start_idx--;
+            end_idx--;
+        }
+    }
+
+    /// Inverted range yields empty.
+    if (!slice_empty && end_idx < start_idx) {
+        slice_empty = true;
+    }
+
+    if (slice_empty) {
+        return strdup("");
+    }
+    int count = end_idx - start_idx + 1;
+    char *sliced = lush_slice_graphemes(str_value, value_len, start_idx, count);
+    return sliced ? sliced : strdup("");
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -14797,6 +14917,48 @@ static char *parse_parameter_expansion(executor_t *executor,
                         return strdup(result_buf);
                     }
 
+                    /// The name is not an array. On a scalar the subscript
+                    /// names a grapheme slice, not an element, and the length
+                    /// of a reference is the length of what that reference
+                    /// expands to -- so measure the slice the value path
+                    /// would produce instead of answering a flat 0 (#784).
+                    /// `@` / `*` are array-only and keep the 0.
+                    if (strcmp(subscript, "@") != 0 &&
+                        strcmp(subscript, "*") != 0) {
+                        char *str_value =
+                            symtable_get_var(executor->symtable, arr_name);
+                        if (str_value) {
+                            bool slice_failed = false;
+                            char *sliced = scalar_grapheme_slice(
+                                executor, str_value, subscript, &slice_failed);
+                            free(str_value);
+                            if (slice_failed) {
+                                /// A length of 0 is a LEGITIMATE answer, so it
+                                /// must not double as the failure token --
+                                /// the same rule the array length path above
+                                /// follows (#710). Report and yield nothing.
+                                executor_report_arith_failure(
+                                    executor, executor_current_loc(executor),
+                                    "evaluating a scalar slice subscript");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
+                            }
+                            if (sliced) {
+                                char len_buf[32];
+                                snprintf(len_buf, sizeof(len_buf), "%zu",
+                                         lle_utf8_count_graphemes(
+                                             sliced, strlen(sliced)));
+                                free(sliced);
+                                free(subscript);
+                                free(arr_name);
+                                return strdup(len_buf);
+                            }
+                        }
+                    }
+
                     free(subscript);
                 }
             }
@@ -15510,62 +15672,24 @@ static char *parse_parameter_expansion(executor_t *executor,
                         symtable_get_var(executor->symtable, arr_name);
                     if (str_value) {
                         name_is_scalar = true;
-                        int start_idx = 0, end_idx = -1;
-                        char *comma = strchr(subscript, ',');
-                        if (comma) {
-                            *comma = '\0';
-                            start_idx = atoi(subscript);
-                            end_idx = atoi(comma + 1);
-                            *comma = ',';
-                        } else {
-                            start_idx = atoi(subscript);
-                            end_idx = start_idx; /// single grapheme
-                        }
-                        size_t value_len = strlen(str_value);
-                        bool slice_empty = false;
-
-                        /// Negative-index handling: ${str[-N]} counts from
-                        /// the end (issue #68), via lle_utf8_count_graphemes.
-                        if (start_idx < 0 || end_idx < 0) {
-                            int total = (int)lle_utf8_count_graphemes(
-                                str_value, value_len);
-                            bool one_based =
-                                !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
-                            if (start_idx < 0) {
-                                start_idx =
-                                    total + start_idx + (one_based ? 1 : 0);
-                            }
-                            if (end_idx < 0) {
-                                end_idx = total + end_idx + (one_based ? 1 : 0);
-                            }
-                        }
-
-                        /// Convert from 1-based (zsh) to 0-based if needed.
-                        if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
-                            if (start_idx <= 0 || end_idx <= 0) {
-                                slice_empty = true;
-                            } else {
-                                start_idx--;
-                                end_idx--;
-                            }
-                        }
-
-                        /// Inverted range yields empty.
-                        if (!slice_empty && end_idx < start_idx) {
-                            slice_empty = true;
-                        }
-
-                        if (slice_empty) {
-                            elem_result = strdup("");
-                        } else {
-                            int count = end_idx - start_idx + 1;
-                            elem_result = lush_slice_graphemes(
-                                str_value, value_len, start_idx, count);
-                            if (!elem_result) {
-                                elem_result = strdup("");
-                            }
-                        }
+                        bool slice_failed = false;
+                        elem_result = scalar_grapheme_slice(
+                            executor, str_value, subscript, &slice_failed);
                         free(str_value);
+                        if (slice_failed) {
+                            /// An empty slice is a legitimate result, so it
+                            /// cannot signal the failure; report and yield
+                            /// nothing, as the array element path does for a
+                            /// bad subscript (#710).
+                            executor_report_arith_failure(
+                                executor, executor_current_loc(executor),
+                                "evaluating a scalar slice subscript");
+                            executor->expansion_error = true;
+                            executor->expansion_exit_status = 1;
+                            free(subscript);
+                            free(arr_name);
+                            return strdup("");
+                        }
                     }
                 }
 

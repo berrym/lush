@@ -99,5 +99,23 @@ check_hex 'last char ${z:len-1}'   "${ZWJ}printf '%s' \"\${z:\$((\${#z}-1))}\"" 
 check_hex 'identity ${d:0:len}'    "${NFD}printf '%s' \"\${d:0:\${#d}}\"" '63616665cc817a'
 check_hex 'identity ${z:0:len}'    "${ZWJ}printf '%s' \"\${z:0:\${#z}}\"" '61f09f91a8e2808df09f92bb62'
 
+printf '== a scalar subscript slices by CLUSTER, and its length agrees (#784) ==\n'
+## On a scalar, ${s[N]} / ${s[N,M]} is a grapheme-cluster slice, not an
+## element -- a scalar has no elements (SEMANTICS 3.1). The slice was already
+## cluster-correct; the LENGTH operator had no scalar case and answered a flat
+## 0 for every slice, so ${s[1,2]} expanded to two characters while ${#s[1,2]}
+## said 0. Both now derive from one shared slice, so they cannot drift apart
+## again. zsh slices the same references by CODEPOINT and returns a bare base
+## character for the NFD subject, which is what these expectations exclude.
+check_hex 'slice ${d[3]} whole cluster' "${NFD}printf '%s' \"\${d[3]}\""    '65cc81'
+check_hex 'len   ${#d[3]} is 1'         "${NFD}printf '%s' \"\${#d[3]}\""   '31'
+check_hex 'slice ${z[1]} whole ZWJ'     "${ZWJ}printf '%s' \"\${z[1]}\""    'f09f91a8e2808df09f92bb'
+check_hex 'len   ${#z[1]} is 1'         "${ZWJ}printf '%s' \"\${#z[1]}\""   '31'
+check_hex 'range ${c[0,1]} two wide'    "${CJK}printf '%s' \"\${c[0,1]}\""  'e4b8ade69687'
+check_hex 'len   ${#c[0,1]} is 2'       "${CJK}printf '%s' \"\${#c[0,1]}\"" '32'
+## Negative indices count clusters from the end (#68) and the length follows.
+check_hex 'slice ${d[-1]} from end'     "${NFD}printf '%s' \"\${d[-1]}\""   '7a'
+check_hex 'len   ${#d[-1]} is 1'        "${NFD}printf '%s' \"\${#d[-1]}\""  '31'
+
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1

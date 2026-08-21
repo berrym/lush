@@ -35,6 +35,12 @@ int bin_unset(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
 
+        /// Declared at loop scope, not inside the subscript branch, so the
+        /// bare name outlives that branch: bash mode retargets the unset at
+        /// it and falls through to the shared nameref + readonly + unset tail
+        /// below rather than carrying a second copy of those guards (#634).
+        char name_buf[256];
+
         /// Array-element form: `unset arr[N]` or `unset assoc[key]`
         /// removes just the matching element, not the whole array.
         /// Bash semantics; without this lush ignored the subscript
@@ -48,7 +54,6 @@ int bin_unset(int argc, char **argv) {
             if (close && close > bracket + 1) {
                 size_t name_len = (size_t)(bracket - var_name);
                 size_t sub_len = (size_t)(close - bracket - 1);
-                char name_buf[256];
                 char sub_buf[256];
                 if (name_len < sizeof(name_buf) && sub_len < sizeof(sub_buf)) {
                     memcpy(name_buf, var_name, name_len);
@@ -113,6 +118,81 @@ int bin_unset(int argc, char **argv) {
                             symtable_array_unset_index(array, idx);
                         }
                         continue;
+                    }
+
+                    /// The name is not an array. On a scalar the subscript
+                    /// does not address an element -- a scalar has none
+                    /// (SEMANTICS S3.1) -- it names a grapheme-cluster slice,
+                    /// a read-only view of the string. `unset` removes a
+                    /// binding or a list/map element, and a view is neither.
+                    /// Without this the request fell through and unset the
+                    /// literal name "s[0]", which binds nothing, so it
+                    /// vanished with status 0 and the value intact (#634).
+                    /// The write surface already refuses to assign through
+                    /// the view (E1134, the #621 kind-transition error);
+                    /// refusing to remove through it is the same rule on the
+                    /// same surface, so the two spellings of one category
+                    /// error stop disagreeing.
+                    ///
+                    /// Gated the way S3.9 gates every kind-boundary crossing:
+                    /// strict in lush mode, reconciled to the oracle in the
+                    /// compatibility modes. bash reads a scalar as a
+                    /// degenerate array whose element 0 IS the variable, so
+                    /// bash mode retargets the unset at the bare name; zsh
+                    /// and dash both reject a subscript on a scalar, so those
+                    /// modes take the diagnostic.
+                    lush_value_view_t sview = {0};
+                    symtable_lookup(name_buf, &sview);
+                    bool name_is_scalar = (sview.kind == LUSH_VALUE_SCALAR);
+                    lush_value_view_clear(&sview);
+                    if (name_is_scalar) {
+                        if (!shell_mode_allows(FEATURE_STRICT_VALUE_TYPING) &&
+                            shell_mode_get() == SHELL_MODE_BASH) {
+                            /// Fall through to the shared tail with the bare
+                            /// name, so the nameref resolution and the
+                            /// readonly guard both still apply -- bash also
+                            /// refuses `unset s[0]` on a readonly scalar.
+                            var_name = name_buf;
+                        } else {
+                            shell_error_t *err = shell_error_create(
+                                SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                                builtin_get_source_location(),
+                                "type mismatch: cannot unset an element of "
+                                "scalar '%s'",
+                                name_buf);
+                            if (err) {
+                                /// Sized so the worst case cannot truncate:
+                                /// the name is bounded by name_buf (255 chars)
+                                /// and appears three times, plus ~170 bytes of
+                                /// fixed text. GCC proves the bound at -O3 and
+                                /// rejects a buffer that could overflow it
+                                /// (-Werror=format-truncation); clang does not
+                                /// implement that warning, so this only ever
+                                /// showed up on the Linux builds.
+                                char sugg[1024];
+                                snprintf(
+                                    sugg, sizeof(sugg),
+                                    "'%s' holds a scalar; a subscript on it "
+                                    "names a read-only grapheme slice, not an "
+                                    "element. Use `unset %s` to remove the "
+                                    "whole variable, or declare it a list "
+                                    "first (declare -a %s).",
+                                    name_buf, name_buf, name_buf);
+                                shell_error_set_suggestion(err, sugg);
+                                shell_error_display(err, stderr,
+                                                    isatty(STDERR_FILENO));
+                                shell_error_free(err);
+                            } else {
+                                executor_error_report(
+                                    current_executor, SHELL_ERR_TYPE_MISMATCH,
+                                    builtin_get_source_location(),
+                                    "type mismatch: cannot unset an element "
+                                    "of scalar '%s'",
+                                    name_buf);
+                            }
+                            rc = 1;
+                            continue;
+                        }
                     }
                 }
             }

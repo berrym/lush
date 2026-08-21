@@ -3025,6 +3025,19 @@ if fs.exists('tests/integration/test_unicode_conformance.sh')
        timeout: 60)
 endif
 
+# The scalar element surface. A subscript on a scalar names a grapheme-cluster
+# slice -- a read-only view -- not an element, since a scalar has no elements
+# (SEMANTICS 3.1). Read, length, write and unset had drifted into four
+# different answers to that one question (#634, #784), so this pins all four
+# together across every mode.
+if fs.exists('tests/integration/test_scalar_element_surface.sh')
+  test('scalar element surface',
+       find_program('tests/integration/test_scalar_element_surface.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_env_sourcing.sh')
   test('POSIX $ENV sourcing',
        find_program('tests/integration/test_env_sourcing.sh'),
