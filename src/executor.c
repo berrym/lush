@@ -13549,17 +13549,58 @@ static int cmp_str_desc(const void *a, const void *b) {
 /// and each mode's length then follows its own slice automatically.
 ///
 /// @return owned slice string, or NULL only on allocation failure.
-static char *scalar_grapheme_slice(const char *str_value,
-                                   const char *subscript) {
-    /// atoi stops at the separator, so the range form needs no temporary
-    /// termination of the caller's buffer.
+/// Evaluate one bound of a scalar slice subscript as an arithmetic
+/// expression. Returns false when the expression is malformed, leaving *out
+/// untouched; the caller reports. An empty expression is 0, as `$(( ))` is,
+/// so `${s[]}` keeps addressing the first cluster.
+static bool scalar_slice_bound(executor_t *executor, const char *expr,
+                               int *out) {
+    arithm_clear_error();
+    char *evaluated = arithm_expand_with_executor(executor, expr);
+    if (!evaluated || arithm_error_is_flagged()) {
+        free(evaluated);
+        return false;
+    }
+    *out = (int)strtoll(evaluated, NULL, 10);
+    free(evaluated);
+    return true;
+}
+
+static char *scalar_grapheme_slice(executor_t *executor, const char *str_value,
+                                   const char *subscript, bool *out_error) {
+    if (out_error) {
+        *out_error = false;
+    }
+
+    /// The subscript is an arithmetic expression, as it is on every array
+    /// element surface and as SEMANTICS S3.13 commits lush to: `${a[i]}` is
+    /// an expression, `${a["i"]}` a literal key. This path used atoi, which
+    /// parses a leading integer and stops -- so `i` read as 0 and `1+1` as 1,
+    /// silently and with status 0, while lush's own array path evaluated both
+    /// correctly. A malformed expression is now reported rather than quietly
+    /// becoming index 0, the discipline #647 and #710 set for the element
+    /// surfaces.
     int start_idx = 0, end_idx = -1;
     const char *comma = strchr(subscript, ',');
     if (comma) {
-        start_idx = atoi(subscript);
-        end_idx = atoi(comma + 1);
+        char *lower = strndup(subscript, (size_t)(comma - subscript));
+        bool ok = lower != NULL &&
+                  scalar_slice_bound(executor, lower, &start_idx) &&
+                  scalar_slice_bound(executor, comma + 1, &end_idx);
+        free(lower);
+        if (!ok) {
+            if (out_error) {
+                *out_error = true;
+            }
+            return NULL;
+        }
     } else {
-        start_idx = atoi(subscript);
+        if (!scalar_slice_bound(executor, subscript, &start_idx)) {
+            if (out_error) {
+                *out_error = true;
+            }
+            return NULL;
+        }
         end_idx = start_idx; /// single grapheme
     }
     size_t value_len = strlen(str_value);
@@ -14887,9 +14928,24 @@ static char *parse_parameter_expansion(executor_t *executor,
                         char *str_value =
                             symtable_get_var(executor->symtable, arr_name);
                         if (str_value) {
-                            char *sliced =
-                                scalar_grapheme_slice(str_value, subscript);
+                            bool slice_failed = false;
+                            char *sliced = scalar_grapheme_slice(
+                                executor, str_value, subscript, &slice_failed);
                             free(str_value);
+                            if (slice_failed) {
+                                /// A length of 0 is a LEGITIMATE answer, so it
+                                /// must not double as the failure token --
+                                /// the same rule the array length path above
+                                /// follows (#710). Report and yield nothing.
+                                executor_report_arith_failure(
+                                    executor, executor_current_loc(executor),
+                                    "evaluating a scalar slice subscript");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
+                            }
                             if (sliced) {
                                 char len_buf[32];
                                 snprintf(len_buf, sizeof(len_buf), "%zu",
@@ -15616,9 +15672,24 @@ static char *parse_parameter_expansion(executor_t *executor,
                         symtable_get_var(executor->symtable, arr_name);
                     if (str_value) {
                         name_is_scalar = true;
-                        elem_result =
-                            scalar_grapheme_slice(str_value, subscript);
+                        bool slice_failed = false;
+                        elem_result = scalar_grapheme_slice(
+                            executor, str_value, subscript, &slice_failed);
                         free(str_value);
+                        if (slice_failed) {
+                            /// An empty slice is a legitimate result, so it
+                            /// cannot signal the failure; report and yield
+                            /// nothing, as the array element path does for a
+                            /// bad subscript (#710).
+                            executor_report_arith_failure(
+                                executor, executor_current_loc(executor),
+                                "evaluating a scalar slice subscript");
+                            executor->expansion_error = true;
+                            executor->expansion_exit_status = 1;
+                            free(subscript);
+                            free(arr_name);
+                            return strdup("");
+                        }
                     }
                 }
 

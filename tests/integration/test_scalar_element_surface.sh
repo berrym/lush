@@ -151,5 +151,41 @@ check 'plain unset still removes the binding' '' \
 check 'unset nonexistent[0] succeeds' '' \
     'unset "nope[0]"; printf "%s" "$?"' '0'
 
+printf '== the subscript is an arithmetic expression (#785) ==\n'
+## SEMANTICS 3.13: ${a[i]} is an expression, ${a["i"]} a literal key. This
+## path used atoi, which parses a leading integer and stops -- so `i` read as
+## 0 and `1+1` as 1, silently, while lush's own array path evaluated both.
+## The subject is four distinct characters so reading 0 cannot pass as a
+## correct answer.
+check 'variable subscript ${s[i]}'   '' 's=abcd; i=2; printf "%s" "${s[i]}"'   'c'
+check 'expression ${s[1+1]}'         '' 's=abcd; printf "%s" "${s[1+1]}"'      'c'
+check 'nested ${s[$((1+1))]}'        '' 's=abcd; printf "%s" "${s[$((1+1))]}"' 'c'
+check 'both range bounds ${s[i,j]}'  '' \
+    's=abcd; i=1; j=2; printf "%s" "${s[i,j]}"' 'bc'
+check 'expression range ${s[0+1,1+2]}' '' \
+    's=abcd; printf "%s" "${s[0+1,1+2]}"' 'bcd'
+## An unset name is 0 in shell arithmetic, so this addresses the first
+## cluster -- it is not an error, and must not become one.
+check 'unset name in subscript is 0' '' \
+    's=abcd; printf "%s" "${s[nope]}"' 'a'
+## The length operator shares the slice, so it inherits the arithmetic.
+check 'length follows: ${#s[i]}'     '' 's=abcd; i=2; printf "%s" "${#s[i]}"'  '1'
+## Negative arithmetic still counts clusters from the end (#68).
+check 'negative expression ${s[-1+0]}' '' 's=abcd; printf "%s" "${s[-1+0]}"'   'd'
+## zsh mode evaluates the same expression against its own 1-based origin.
+check 'zsh mode ${s[i]} i=2'  '--zsh' 's=abcd; i=2; printf "%s" "${s[i]}"'     'b'
+
+printf '== a malformed subscript is diagnosed, not read as 0 ==\n'
+## It used to yield index 1 for `1+` with status 0. Both bounds of a range
+## must report, and an empty slice cannot double as the failure token -- the
+## discipline #647 and #710 set for the element surfaces.
+check_err 'bad subscript diagnoses'      '' 's=abcd; printf "%s" "${s[1+]}"'   'E1304'
+check_err 'bad subscript names the site' '' 's=abcd; printf "%s" "${s[1+]}"' \
+    'evaluating a scalar slice subscript'
+check_err 'bad SECOND range bound'       '' 's=abcd; printf "%s" "${s[0,1+]}"' 'E1304'
+check_err 'bad subscript in ${#s[N]}'    '' 's=abcd; printf "%s" "${#s[1+]}"'  'E1304'
+check 'bad subscript sets status 1'      '' \
+    's=abcd; printf "%s" "${s[1+]}" 2>/dev/null; printf "%s" "$?"' '1'
+
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1
