@@ -3675,11 +3675,18 @@ int symtable_set_array_element(const char *name, const char *subscript,
         /// (( a[i]=v )) writer) consistent with the plain index surface. Native
         /// zsh 1-indexed negatives stay rejected below, matching the plain
         /// executor path (a separate curation).
+        /// The base and the SIGN are orthogonal: the base says where counting
+        /// starts, a negative says which end to count from. Refusing every
+        /// index <= 0 conflated them, so `(( a[-1] = v ))` failed in zsh mode
+        /// while the same expression worked in every other mode and `${a[-1]}`
+        /// read from the end beside it (#629). Only 0 addresses nothing.
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
-            if (index <= 0) {
-                return -1; /// In 1-indexed mode, index 0 and below are invalid
+            if (index == 0) {
+                return -1; /// In 1-indexed mode, index 0 addresses nothing
             }
-            index--; /// Convert 1-indexed to 0-indexed internally
+            if (index > 0) {
+                index--; /// Convert 1-indexed to 0-indexed internally
+            }
         }
 
         return symtable_array_set_index(array, index, value);
@@ -3718,12 +3725,18 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
         /// to symtable_array_get_index for from-end resolution, matching
         /// ${a[-1]} and the set-side wrapper. Native zsh 1-indexed negatives
         /// stay rejected below.
+        /// Same orthogonality as the set wrapper: only 0 addresses nothing in
+        /// a 1-based mode; a negative counts from the end. Refusing every
+        /// index <= 0 made `$(( a[-1] ))` answer 0 in zsh mode -- a silent
+        /// wrong number, not a diagnostic -- while `${a[-1]}` beside it read
+        /// the last element (#629).
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
-            if (index <= 0) {
-                return NULL; /// In 1-indexed mode, index 0 and below are
-                             /// invalid
+            if (index == 0) {
+                return NULL; /// In 1-indexed mode, index 0 addresses nothing
             }
-            index--; /// Convert 1-indexed to 0-indexed internally
+            if (index > 0) {
+                index--; /// Convert 1-indexed to 0-indexed internally
+            }
         }
 
         result = symtable_array_get_index(array, index);

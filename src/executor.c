@@ -21665,11 +21665,20 @@ static int execute_array_assignment_inner(executor_t *executor,
         long long idx = strtoll(idx_result, NULL, 10);
         free(idx_result);
 
-        /// Adjust for 1-indexed arrays (zsh mode)
-        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        /// internal 0
+        /// Adjust for 1-indexed arrays (zsh mode): user index 1 maps to
+        /// internal 0.
+        ///
+        /// The base and the SIGN are orthogonal. The base says where counting
+        /// starts; a negative says which end to count from, and that is the
+        /// same question in either base. This guard conflated them and
+        /// refused every index <= 0, so `a[-1]=v` was rejected in zsh mode
+        /// while `${a[-1]}` beside it read from the end -- lush disagreeing
+        /// with itself about what -1 means depending on the surface (#629).
+        /// Only 0 addresses nothing; a negative falls through to
+        /// symtable_array_set_index, the from-end primitive that already
+        /// powers the read.
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
-            if (idx <= 0) {
+            if (idx == 0) {
                 if (expanded_value)
                     free(expanded_value);
                 /// Same phantom-array rollback as the non-integer path.
@@ -21680,7 +21689,9 @@ static int execute_array_assignment_inner(executor_t *executor,
                                    "Array index must be positive in zsh mode");
                 return 1;
             }
-            idx--; /// Convert 1-indexed to 0-indexed internally
+            if (idx > 0) {
+                idx--; /// Convert 1-indexed to 0-indexed internally
+            }
         }
 
         int set_rc = 0;

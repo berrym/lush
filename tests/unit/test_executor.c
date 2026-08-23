@@ -4922,16 +4922,42 @@ TEST(rt_arith_neg_surface_consistency) {
     executor_free(exec);
 }
 
-TEST(rt_arith_neg_zsh_mode_still_rejected) {
+TEST(rt_arith_neg_zsh_mode_from_end) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
-    /// Scope boundary / no regression: zsh 1-indexed mode still rejects a
-    /// native negative subscript (the retained zsh guard), matching the plain
-    /// executor path.
+    /// zsh mode resolves a negative subscript from the END, like every other
+    /// mode and every other surface.
+    ///
+    /// This test previously asserted the opposite -- that zsh mode still
+    /// REJECTED a native negative -- because #616 fixed the 0-indexed modes
+    /// and deliberately left the 1-indexed guard alone, recording the
+    /// remainder as a separate curation. That curation is #629, and this is
+    /// its contract now.
+    ///
+    /// The index BASE and the SIGN are orthogonal: the base says where
+    /// counting starts, the sign says which end to count from. The guard
+    /// conflated them by refusing every index <= 0, so this write raised
+    /// "out of range" while `${an7[-1]}` beside it read the last element --
+    /// lush disagreeing with itself about what -1 means, by surface.
     run_result_t r = run_shell_with_executor(
-        exec, "mode zsh\nan7=(10 20 30)\n(( an7[-1]=1 ))\necho POST\n");
+        exec,
+        "mode zsh\nan7=(10 20 30)\n(( an7[-1]=1 ))\necho \"${an7[*]}\"\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "10 20 1\n");
+    executor_free(exec);
+}
+
+TEST(rt_arith_zsh_mode_index_zero_still_rejected) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+    /// The boundary the #629 change must NOT cross. Separating the sign from
+    /// the base widens what is accepted, so index 0 -- which addresses nothing
+    /// in a 1-based mode -- has to stay refused, and refused with a
+    /// diagnostic rather than silently writing somewhere.
+    run_result_t r = run_shell_with_executor(
+        exec, "mode zsh\nan8=(10 20 30)\n(( an8[0]=1 ))\necho \"${an8[*]}\"\n");
     ASSERT_STDERR_CONTAINS(r, "out of range");
-    ASSERT_STDOUT_CONTAINS(r, "POST");
+    ASSERT_STDOUT_CONTAINS(r, "10 20 30");
     executor_free(exec);
 }
 
@@ -9807,7 +9833,8 @@ int main(void) {
     RUN_TEST(rt_arith_neg_compound_and_incr);
     RUN_TEST(rt_arith_neg_oob_read_zero);
     RUN_TEST(rt_arith_neg_surface_consistency);
-    RUN_TEST(rt_arith_neg_zsh_mode_still_rejected);
+    RUN_TEST(rt_arith_neg_zsh_mode_from_end);
+    RUN_TEST(rt_arith_zsh_mode_index_zero_still_rejected);
     RUN_TEST(rt_arith_neg_blast_radius_rematch);
     RUN_TEST(rt_arith_assoc_literal_key);
     RUN_TEST(rt_arith_assoc_compound_assign);

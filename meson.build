@@ -3040,6 +3040,19 @@ endif
 # each a silent wrong answer: a dropped element, a literal "[1]=Z" stored as
 # text, and a zsh-mode origin the sibling element path already honored
 # (#640, #793). Both spellings now share one helper; these pin its rules.
+# A negative subscript counts from the END, on every surface and in every
+# mode. The index base and the sign are orthogonal -- the base says where
+# counting starts, the sign says which end -- and the 1-based guards conflated
+# them, so zsh mode gave three different answers to one question, including a
+# silent 0 from the arithmetic surface (#629).
+if fs.exists('tests/integration/test_negative_subscripts.sh')
+  test('negative subscripts',
+       find_program('tests/integration/test_negative_subscripts.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_array_literal_elements.sh')
   test('array literal elements',
        find_program('tests/integration/test_array_literal_elements.sh'),
