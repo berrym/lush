@@ -21062,6 +21062,110 @@ static void report_invalid_index_error(executor_t *executor,
     }
 }
 
+/// Outcome of offering one list-literal element to the bracketed
+/// `[index]=value` / `[key]=value` form.
+typedef enum {
+    LITERAL_ELEM_NOT_BRACKETED, ///< Not the bracketed form; store positionally.
+    LITERAL_ELEM_APPLIED,       ///< Written at the stated index or key.
+    LITERAL_ELEM_ERROR          ///< Bracketed but invalid; already reported.
+} literal_elem_result_t;
+
+/// Apply one `[index]=value` element of a list literal.
+///
+/// Shared by the replace path (`a=(...)`) and the append path (`a+=(...)`)
+/// because they are two spellings of one syntax and had diverged: the append
+/// path never recognized the form at all and stored the literal five-byte
+/// string `[1]=Z` as an element, so `a+=([1]=Z)` grew the list instead of
+/// writing index 1 (#640).
+///
+/// On success `*positional_index` is left at one PAST the index written, so a
+/// following bare element continues after it. It used to be left AT that
+/// index, so the next bare element overwrote the slot just filled and
+/// `a=(z [1]=y w)` silently lost `y` (#640).
+static literal_elem_result_t
+array_literal_apply_element(executor_t *executor, array_value_t *array,
+                            const char *elem_str, bool is_associative,
+                            int *positional_index, source_location_t loc) {
+    if (!elem_str || elem_str[0] != '[') {
+        return LITERAL_ELEM_NOT_BRACKETED;
+    }
+    const char *bracket_end = strchr(elem_str, ']');
+    if (!bracket_end || bracket_end[1] != '=') {
+        return LITERAL_ELEM_NOT_BRACKETED;
+    }
+
+    size_t idx_len = (size_t)(bracket_end - elem_str - 1);
+    char *idx_str = strndup(elem_str + 1, idx_len);
+    if (!idx_str) {
+        return LITERAL_ELEM_NOT_BRACKETED;
+    }
+
+    /// `a=([@]=x)` is the array-literal spelling of `a[@]=x`: the aggregate
+    /// selector is not a writable element target, so it is refused here too,
+    /// uniformly in every context (#627).
+    if (strcmp(idx_str, "@") == 0 || strcmp(idx_str, "*") == 0) {
+        report_aggregate_subscript_error(executor, loc, idx_str);
+        free(idx_str);
+        return LITERAL_ELEM_ERROR;
+    }
+
+    /// Value after `]=`, expanded the same way the positional elements are
+    /// (handles `$'...'` ANSI-C quoting).
+    const char *value = bracket_end + 2;
+    char *expanded = expand_if_needed(executor, value);
+    const char *final_value = expanded ? expanded : value;
+
+    if (is_associative) {
+        symtable_array_set_assoc(array, idx_str, final_value);
+    } else {
+        arithm_clear_error();
+        char *idx_result = arithm_expand_with_executor(executor, idx_str);
+        long long idx_val = -1;
+        if (idx_result && !arithm_error_is_flagged()) {
+            idx_val = strtoll(idx_result, NULL, 10);
+        }
+        free(idx_result);
+
+        if (idx_val >= 0) {
+            /// One origin per mode, whichever surface states the index. zsh
+            /// mode is 1-based, and the element write path (`a[1]=v`) converts
+            /// to the internal 0-based slot and refuses index 0 outright --
+            /// this literal form stored the arithmetic result directly, so
+            /// lush's zsh mode disagreed with ITSELF about what `[1]` meant,
+            /// and silently accepted a `[0]` its sibling path rejects (#793).
+            if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
+                if (idx_val == 0) {
+                    set_executor_error(
+                        executor, "Array index must be positive in zsh mode");
+                    free(idx_str);
+                    free(expanded);
+                    return LITERAL_ELEM_ERROR;
+                }
+                idx_val--;
+            }
+
+            /// Full-width store so a 64-bit index is not truncated (#618).
+            symtable_array_set_index(array, idx_val, final_value);
+            /// Advance the counter PAST this index. Guarded so an index at
+            /// INT_MAX cannot overflow the counter.
+            if (idx_val < INT_MAX) {
+                *positional_index = (int)idx_val + 1;
+            }
+        } else {
+            /// Unparseable, arithmetic error, or negative: fall back to the
+            /// running positional index, as before.
+            symtable_array_set_index(array, *positional_index, final_value);
+            if (*positional_index < INT_MAX) {
+                (*positional_index)++;
+            }
+        }
+    }
+
+    free(idx_str);
+    free(expanded);
+    return LITERAL_ELEM_APPLIED;
+}
+
 static int execute_array_assignment_inner(executor_t *executor,
                                           node_t *assign_node);
 
@@ -21146,89 +21250,20 @@ static int execute_array_assignment_inner(executor_t *executor,
             if (elem->val.str) {
                 const char *elem_str = elem->val.str;
 
-                /// Check for [index]=value syntax
-                if (elem_str[0] == '[') {
-                    /// Parse [index]=value
-                    const char *bracket_end = strchr(elem_str, ']');
-                    if (bracket_end && bracket_end[1] == '=') {
-                        /// Extract index/key
-                        size_t idx_len = bracket_end - elem_str - 1;
-                        char *idx_str = malloc(idx_len + 1);
-                        if (idx_str) {
-                            strncpy(idx_str, elem_str + 1, idx_len);
-                            idx_str[idx_len] = '\0';
-
-                            /// a=([@]=x) is the array-literal spelling of
-                            /// a[@]=x: the aggregate selector is not a writable
-                            /// element target, so reject it here too (issue
-                            /// #627, uniform in every context). Fail the whole
-                            /// literal -- the fresh array is discarded and the
-                            /// existing binding, stored only after this loop,
-                            /// is left untouched -- matching the element path.
-                            if (strcmp(idx_str, "@") == 0 ||
-                                strcmp(idx_str, "*") == 0) {
-                                report_aggregate_subscript_error(
-                                    executor, assign_node->loc, idx_str);
-                                free(idx_str);
-                                symtable_array_free(array);
-                                return 1;
-                            }
-
-                            /// Get value after ]=
-                            const char *value = bracket_end + 2;
-
-                            /// Expand value using full expansion (handles
-                            /// $'...' ANSI-C quoting)
-                            char *expanded = expand_if_needed(executor, value);
-                            const char *final_value =
-                                expanded ? expanded : value;
-
-                            if (is_associative) {
-                                /// Use string key directly for associative
-                                /// arrays
-                                symtable_array_set_assoc(array, idx_str,
-                                                         final_value);
-                            } else {
-                                /// Evaluate index as arithmetic for indexed
-                                /// arrays
-                                arithm_clear_error();
-                                char *idx_result = arithm_expand_with_executor(
-                                    executor, idx_str);
-                                long long idx_val = -1;
-                                if (idx_result && !arithm_error_is_flagged()) {
-                                    idx_val = strtoll(idx_result, NULL, 10);
-                                }
-                                free(idx_result);
-
-                                if (idx_val >= 0) {
-                                    /// Explicit non-negative index: store at
-                                    /// the full-width index (set_index is
-                                    /// int64, issue #618 -- no (int)
-                                    /// truncation) and advance the positional
-                                    /// counter to follow when it fits the
-                                    /// counter's width.
-                                    symtable_array_set_index(array, idx_val,
-                                                             final_value);
-                                    if (idx_val <= INT_MAX) {
-                                        index = (int)idx_val;
-                                    }
-                                } else {
-                                    /// Unparseable / arithmetic error /
-                                    /// negative falls back to the running
-                                    /// positional index (pre-existing
-                                    /// behavior).
-                                    symtable_array_set_index(array, index,
-                                                             final_value);
-                                }
-                            }
-
-                            free(idx_str);
-                            if (expanded) {
-                                free(expanded);
-                            }
-                        }
-                    }
-                } else {
+                /// The bracketed `[index]=value` form is applied by the
+                /// shared helper, which the append path uses too, so the two
+                /// spellings of one syntax cannot diverge again (#640).
+                literal_elem_result_t bracketed = array_literal_apply_element(
+                    executor, array, elem_str, is_associative, &index,
+                    assign_node->loc);
+                if (bracketed == LITERAL_ELEM_ERROR) {
+                    /// Fail the whole literal -- the fresh array is discarded
+                    /// and the existing binding, stored only after this loop,
+                    /// is left untouched -- matching the element path.
+                    symtable_array_free(array);
+                    return 1;
+                }
+                if (bracketed == LITERAL_ELEM_NOT_BRACKETED) {
                     /// Splice list-kinded expansions into the array
                     /// builder. Array construction `name=( ... )` is a
                     /// collection-accepting context per the lush value-
@@ -21761,22 +21796,60 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         new_array = true;
     }
 
-    /// Process each element in the literal and append
+    /// Process each element in the literal and append.
+    ///
+    /// The bracketed `[index]=value` form is honored here through the same
+    /// helper the replace path uses. This loop used to append every element
+    /// verbatim, so `a+=([1]=Z)` grew the list by one and stored the literal
+    /// five-byte string `[1]=Z` rather than writing index 1 (#640).
+    ///
+    /// The positional counter starts UNSEEDED: a bare element appends, and
+    /// takes its position from the append itself, so `+=` keeps meaning "after
+    /// what is already there". An explicit `[n]=` then sets n and the counter
+    /// resumes at n+1, exactly as it does in a replace literal. That falls out
+    /// of what `+=` means rather than from any one reference -- the peers
+    /// disagree here, one continuing after the existing content and the other
+    /// restarting at the origin, and restarting would make an append overwrite
+    /// what it was appending to.
     node_t *elem = first_child->first_child;
+    int index = -1; /// < 0: no explicit index seen yet, so append
 
     while (elem) {
         if (elem->val.str) {
             const char *elem_str = elem->val.str;
 
-            /// Expand value if needed
-            char *expanded = expand_variable(executor, elem_str);
-            const char *final_value = expanded ? expanded : elem_str;
+            literal_elem_result_t bracketed = array_literal_apply_element(
+                executor, array, elem_str, array->is_associative, &index,
+                append_node->loc);
+            if (bracketed == LITERAL_ELEM_ERROR) {
+                if (new_array) {
+                    symtable_array_free(array);
+                }
+                return 1;
+            }
 
-            /// Append to array using symtable_array_append
-            symtable_array_append(array, final_value);
+            if (bracketed == LITERAL_ELEM_NOT_BRACKETED) {
+                /// Expand value if needed
+                char *expanded = expand_variable(executor, elem_str);
+                const char *final_value = expanded ? expanded : elem_str;
 
-            if (expanded) {
-                free(expanded);
+                if (index < 0) {
+                    /// Append and adopt the position it chose, so the counter
+                    /// continues from the end of the existing content.
+                    int64_t placed = symtable_array_append(array, final_value);
+                    if (placed >= 0 && placed < INT_MAX) {
+                        index = (int)placed + 1;
+                    }
+                } else {
+                    symtable_array_set_index(array, index, final_value);
+                    if (index < INT_MAX) {
+                        index++;
+                    }
+                }
+
+                if (expanded) {
+                    free(expanded);
+                }
             }
         }
         elem = elem->next_sibling;

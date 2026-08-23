@@ -3035,6 +3035,19 @@ endif
 # assignment target handed its quotes to the arithmetic evaluator and died
 # there, so a["0"]=x could not be written at all (#639). SEMANTICS 3.13 will
 # add a further lush-mode meaning on top of this; these pin today's behavior.
+# The [index]=value element form inside a list literal. `a=(...)` and
+# `a+=(...)` are two spellings of one syntax and had drifted apart three ways,
+# each a silent wrong answer: a dropped element, a literal "[1]=Z" stored as
+# text, and a zsh-mode origin the sibling element path already honored
+# (#640, #793). Both spellings now share one helper; these pin its rules.
+if fs.exists('tests/integration/test_array_literal_elements.sh')
+  test('array literal elements',
+       find_program('tests/integration/test_array_literal_elements.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_array_subscript_quoting.sh')
   test('array subscript quoting',
        find_program('tests/integration/test_array_subscript_quoting.sh'),
