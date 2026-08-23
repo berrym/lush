@@ -4,8 +4,8 @@
 ## WHY THIS EXISTS
 ##
 ## `a=( ... )` and `a+=( ... )` are two spellings of one syntax, and they had
-## drifted apart -- each one a silent wrong answer rather than a visible
-## failure:
+## drifted apart in three separate ways -- each one a silent wrong answer
+## rather than a visible failure:
 ##
 ##   a=(z [1]=y w)     dropped y: the positional counter was left AT the
 ##                     explicit index instead of past it, so the next bare
@@ -13,6 +13,9 @@
 ##   a+=([1]=Z)        grew the list by one and stored the literal five-byte
 ##                     string "[1]=Z" as an element, because the append loop
 ##                     never parsed the form at all (#640)
+##   zsh mode [n]=     ignored the 1-based origin that the element write path
+##                     `a[1]=v` right beside it honors, and silently accepted
+##                     an index 0 that its sibling rejects (#793)
 ##
 ## Both spellings now go through one shared helper, so they cannot diverge
 ## again. These checks pin the rules that helper implements:
@@ -20,6 +23,7 @@
 ##   1. An explicit [n]= writes n, and the counter resumes at n+1.
 ##   2. `+=` means AFTER what is already there -- a bare element in an append
 ##      takes the next free slot, never the origin.
+##   3. The origin is the mode's, whichever spelling states the index.
 ##
 ## Rule 2 is lush's own derivation rather than a copy: the peers disagree here,
 ## one continuing after the existing content and the other restarting at the
@@ -75,6 +79,27 @@ check 'a+=(x [5]=y z) values' '' \
 ## A leading explicit index in an append must not be treated as position 0.
 check 'a+=([5]=y z) after existing' '' \
     'a=(p q); a+=([5]=y z); printf "%s" "${!a[*]}"' '0 1 5 6'
+
+printf '== the origin is the mode owners, whichever spelling states it (#793) ==\n'
+## zsh mode is 1-based, and `a[1]=v` has always honored that. The literal form
+## stored the raw arithmetic result, so lush disagreed with itself.
+check 'zsh mode [1] is the first slot' '--zsh' \
+    'a=(z y w); a[1]=Q; printf "%s" "${a[*]}"' 'Q y w'
+check 'zsh mode literal [1] agrees'    '--zsh' \
+    'a=(z [1]=y w); printf "%s" "${a[*]}"' 'y w'
+check 'zsh mode append [1] agrees'     '--zsh' \
+    'a=(p q); a+=([1]=Z); printf "%s" "${a[*]}"' 'Z q'
+## Index 0 addresses nothing in a 1-based mode; the element path already
+## refused it and the literal form silently accepted it.
+check 'zsh mode literal [0] refused'   '--zsh' \
+    'a=(z [0]=y w); printf "%s" "${a[*]}"' ''
+## The 0-based modes are untouched.
+check 'lush mode stays 0-based'  '' \
+    'a=(z [1]=y w); printf "%s" "${a[*]}"' 'z y w'
+check 'bash mode stays 0-based'  '--bash' \
+    'a=(z [1]=y w); printf "%s" "${a[*]}"' 'z y w'
+## posix mode is deliberately absent from this group: it provides no array
+## literal at all, matching dash, so there is no origin for it to state.
 
 printf '== controls: the surrounding behavior is unchanged ==\n'
 check 'plain literal'        '' 'a=(p q r); printf "%s" "${a[*]}"' 'p q r'

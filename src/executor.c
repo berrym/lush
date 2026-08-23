@@ -21127,6 +21127,23 @@ array_literal_apply_element(executor_t *executor, array_value_t *array,
         free(idx_result);
 
         if (idx_val >= 0) {
+            /// One origin per mode, whichever surface states the index. zsh
+            /// mode is 1-based, and the element write path (`a[1]=v`) converts
+            /// to the internal 0-based slot and refuses index 0 outright --
+            /// this literal form stored the arithmetic result directly, so
+            /// lush's zsh mode disagreed with ITSELF about what `[1]` meant,
+            /// and silently accepted a `[0]` its sibling path rejects (#793).
+            if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
+                if (idx_val == 0) {
+                    set_executor_error(
+                        executor, "Array index must be positive in zsh mode");
+                    free(idx_str);
+                    free(expanded);
+                    return LITERAL_ELEM_ERROR;
+                }
+                idx_val--;
+            }
+
             /// Full-width store so a 64-bit index is not truncated (#618).
             symtable_array_set_index(array, idx_val, final_value);
             /// Advance the counter PAST this index. Guarded so an index at
