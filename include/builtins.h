@@ -54,6 +54,23 @@
  * @param loc New source location to stash
  * @return Previous stashed source location
  */
+/**
+ * @brief Write a value to an assignable target that addresses an array element.
+ *
+ * Returns false when @p target is a plain variable name, leaving the caller to
+ * handle it; returns true when it addressed `name[subscript]`, with the
+ * builtin status in @p out_rc. Shared so `printf -v`, `declare` and `read`
+ * cannot drift from the assignment surfaces on subscript arithmetic, the index
+ * base, negative offsets, or associative key canonicalization (#643, #798).
+ */
+/**
+ * @brief Does this target address an array element rather than name a variable?
+ */
+bool builtin_is_element_target(const char *target);
+
+bool builtin_assign_element_target(const char *target, const char *value,
+                                   int *out_rc);
+
 source_location_t builtin_swap_source_location(source_location_t loc);
 
 /**

@@ -392,14 +392,29 @@ int bin_printf(int argc, char **argv) {
             if (buf) {
                 size_t got = fread(buf, 1, (size_t)n, printf_capture);
                 buf[got] = '\0';
-                symtable_set_global(assign_var, buf);
+                /// `-v` takes an assignable target, and an array element
+                /// address is one. This wrote the whole string as a scalar
+                /// NAME, so `printf -v 'a[2]'` bound nothing and reported
+                /// success (#643).
+                int elem_rc = 0;
+                if (!builtin_assign_element_target(assign_var, buf, &elem_rc)) {
+                    symtable_set_global(assign_var, buf);
+                } else if (elem_rc != 0) {
+                    free(buf);
+                    fclose(printf_capture);
+                    return elem_rc;
+                }
                 free(buf);
             }
             fclose(printf_capture);
         } else {
             /// Capture setup failed; clear the target rather than leave a
-            /// stale value.
-            symtable_set_global(assign_var, "");
+            /// stale value. An element target is cleared in place, not
+            /// shadowed by a scalar of the same spelling.
+            int elem_rc = 0;
+            if (!builtin_assign_element_target(assign_var, "", &elem_rc)) {
+                symtable_set_global(assign_var, "");
+            }
         }
     }
 
