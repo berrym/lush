@@ -21084,8 +21084,9 @@ typedef enum {
 /// `a=(z [1]=y w)` silently lost `y` (#640).
 static literal_elem_result_t
 array_literal_apply_element(executor_t *executor, array_value_t *array,
-                            const char *elem_str, bool is_associative,
-                            int *positional_index, source_location_t loc) {
+                            const char *var_name, const char *elem_str,
+                            bool is_associative, int *positional_index,
+                            source_location_t loc) {
     if (!elem_str || elem_str[0] != '[') {
         return LITERAL_ELEM_NOT_BRACKETED;
     }
@@ -21120,21 +21121,46 @@ array_literal_apply_element(executor_t *executor, array_value_t *array,
     } else {
         arithm_clear_error();
         char *idx_result = arithm_expand_with_executor(executor, idx_str);
-        long long idx_val = -1;
-        if (idx_result && !arithm_error_is_flagged()) {
+        /// Success is tracked in its own flag. It used to be signalled by
+        /// leaving idx_val at -1, but -1 is a LEGITIMATE subscript meaning
+        /// "the last element", so a genuine `[-1]` was indistinguishable from
+        /// a failed evaluation and took the failure path (#795).
+        bool idx_ok = (idx_result != NULL) && !arithm_error_is_flagged();
+        long long idx_val = 0;
+        if (idx_ok) {
             idx_val = strtoll(idx_result, NULL, 10);
         }
         free(idx_result);
 
-        if (idx_val >= 0) {
+        if (!idx_ok) {
+            /// Unparseable or an arithmetic error: fall back to the running
+            /// positional index, as before.
+            symtable_array_set_index(array, *positional_index, final_value);
+            if (*positional_index < INT_MAX) {
+                (*positional_index)++;
+            }
+        } else {
             /// One origin per mode, whichever surface states the index. zsh
             /// mode is 1-based, and the element write path (`a[1]=v`) converts
             /// to the internal 0-based slot and refuses index 0 outright --
             /// this literal form stored the arithmetic result directly, so
             /// lush's zsh mode disagreed with ITSELF about what `[1]` meant,
             /// and silently accepted a `[0]` its sibling path rejects (#793).
+            ///
+            /// The conversion applies to POSITIVE indices only: the base says
+            /// where counting starts, the sign says which END to count from,
+            /// and those are independent questions (#629).
+            ///
+            /// zsh mode refuses BOTH 0 and negatives on this surface, and only
+            /// on this surface. That is not the engine rule -- lush mode and
+            /// bash mode resolve a negative here from the end, as every other
+            /// subscript surface does -- it is oracle fidelity. zsh accepts
+            /// `a[-1]=v` on its element surface and refuses `a=([-1]=v)` in a
+            /// literal, so a script written for zsh sees that split, and a
+            /// compatibility mode reproduces its target rather than correcting
+            /// it. Engine cohesion is lush mode's job (#795).
             if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
-                if (idx_val == 0) {
+                if (idx_val <= 0) {
                     set_executor_error(
                         executor, "Array index must be positive in zsh mode");
                     free(idx_str);
@@ -21144,19 +21170,38 @@ array_literal_apply_element(executor_t *executor, array_value_t *array,
                 idx_val--;
             }
 
+            /// A negative counts from the END of the array as it stands at
+            /// this point in the literal -- the same rule every other
+            /// subscript surface follows (#629). It used to fall through to
+            /// the positional counter instead, so `[-1]` wrote wherever the
+            /// counter happened to point (#795).
+            ///
+            /// The RESOLVED index is needed here, not merely the effect of the
+            /// write, because the positional counter has to resume past it --
+            /// hence the shared resolver rather than letting set_index resolve
+            /// internally.
+            int64_t resolved = symtable_array_resolve_index(array, idx_val);
+            if (resolved < 0) {
+                /// Out of range: a negative reaching past the start, or any
+                /// negative in a literal with nothing yet to count back from.
+                /// Diagnosed the way the element write surface diagnoses the
+                /// same condition, rather than silently writing somewhere.
+                executor_error_report_with_help(
+                    executor, SHELL_ERR_INVALID_SUBSCRIPT, loc,
+                    "the subscript is out of range for this array",
+                    "array subscript %lld out of range for '%s'", idx_val,
+                    var_name ? var_name : "array");
+                free(idx_str);
+                free(expanded);
+                return LITERAL_ELEM_ERROR;
+            }
+
             /// Full-width store so a 64-bit index is not truncated (#618).
-            symtable_array_set_index(array, idx_val, final_value);
+            symtable_array_set_index(array, resolved, final_value);
             /// Advance the counter PAST this index. Guarded so an index at
             /// INT_MAX cannot overflow the counter.
-            if (idx_val < INT_MAX) {
-                *positional_index = (int)idx_val + 1;
-            }
-        } else {
-            /// Unparseable, arithmetic error, or negative: fall back to the
-            /// running positional index, as before.
-            symtable_array_set_index(array, *positional_index, final_value);
-            if (*positional_index < INT_MAX) {
-                (*positional_index)++;
+            if (resolved < INT_MAX) {
+                *positional_index = (int)resolved + 1;
             }
         }
     }
@@ -21254,7 +21299,7 @@ static int execute_array_assignment_inner(executor_t *executor,
                 /// shared helper, which the append path uses too, so the two
                 /// spellings of one syntax cannot diverge again (#640).
                 literal_elem_result_t bracketed = array_literal_apply_element(
-                    executor, array, elem_str, is_associative, &index,
+                    executor, array, var_name, elem_str, is_associative, &index,
                     assign_node->loc);
                 if (bracketed == LITERAL_ELEM_ERROR) {
                     /// Fail the whole literal -- the fresh array is discarded
@@ -21830,8 +21875,8 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
             const char *elem_str = elem->val.str;
 
             literal_elem_result_t bracketed = array_literal_apply_element(
-                executor, array, elem_str, array->is_associative, &index,
-                append_node->loc);
+                executor, array, var_name, elem_str, array->is_associative,
+                &index, append_node->loc);
             if (bracketed == LITERAL_ELEM_ERROR) {
                 if (new_array) {
                     symtable_array_free(array);

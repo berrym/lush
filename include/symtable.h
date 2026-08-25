@@ -1287,6 +1287,24 @@ array_value_t *symtable_array_create(bool is_associative);
 void symtable_array_free(array_value_t *array);
 
 /**
+ * @brief Resolve a possibly-negative subscript against an array's extent.
+ *
+ * A negative counts from the END (-1 is the last element). An empty array has
+ * no end to count back from, and a negative reaching past the start is out of
+ * range; both answer -1. A non-negative index is returned unchanged, so a
+ * caller may route through this without branching on the sign.
+ *
+ * Exposed so surfaces that need the RESOLVED index -- rather than just the
+ * effect of the write -- share the one implementation instead of restating the
+ * formula (#795).
+ *
+ * @param array Source array (indexed; an associative array has no extent)
+ * @param index Subscript, possibly negative
+ * @return Resolved 0-based index, or -1 when out of range
+ */
+int64_t symtable_array_resolve_index(const array_value_t *array, int64_t index);
+
+/**
  * @brief Set an element in an indexed array
  *
  * @param array Target array
