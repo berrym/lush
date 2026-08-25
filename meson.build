@@ -3053,6 +3053,19 @@ if fs.exists('tests/integration/test_negative_subscripts.sh')
        timeout: 60)
 endif
 
+# An array element address is an assignable target on every surface that takes
+# one. printf -v wrote nothing and reported success (#643); declare and read
+# refused the address as "not a valid identifier" (#798). All three now share
+# one helper, so they cannot drift from the assignment surfaces on subscript
+# arithmetic, the index base, negative offsets or key canonicalization.
+if fs.exists('tests/integration/test_assignable_targets.sh')
+  test('assignable targets',
+       find_program('tests/integration/test_assignable_targets.sh'),
+       args: [lush_exe.full_path()],
+       suite: 'integration',
+       timeout: 60)
+endif
+
 if fs.exists('tests/integration/test_array_literal_elements.sh')
   test('array literal elements',
        find_program('tests/integration/test_array_literal_elements.sh'),

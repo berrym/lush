@@ -384,7 +384,15 @@ int bin_declare(int argc, char **argv) {
         /// identifier is accepted under lush-mode default (or any
         /// mode with the feature opt-in) and rejected under
         /// POSIX/bash/zsh defaults.
-        if (!lush_is_valid_identifier(name)) {
+        /// An array element address is an assignable target, not a plain
+        /// identifier: `declare a[2]=v` writes the element exactly as
+        /// `a[2]=v` does. The identifier predicate refused the whole spelling,
+        /// so the element form was unreachable through this builtin (#798).
+        /// In lush and zsh modes null_glob usually ate the word before it got
+        /// here, which made the refusal look like a silent no-op.
+        bool element_target = builtin_is_element_target(name);
+
+        if (!element_target && !lush_is_valid_identifier(name)) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                                   builtin_get_source_location(),
                                   "`%s': not a valid identifier", name);
@@ -648,6 +656,24 @@ int bin_declare(int argc, char **argv) {
                 flags |= SYMVAR_UPPERCASE;
             }
             (void)opt_trace; /// accepted-but-no-op; see comment above
+
+            if (final_value && element_target) {
+                /// Attributes describe a whole binding, not one element, so
+                /// an element assignment writes and is done -- the flag and
+                /// export handling below applies to names, not addresses.
+                int elem_rc = 0;
+                bool handled =
+                    builtin_assign_element_target(name, final_value, &elem_rc);
+                free(final_value);
+                free(name);
+                if (!handled) {
+                    return 1;
+                }
+                if (elem_rc != 0) {
+                    return elem_rc;
+                }
+                continue;
+            }
 
             if (final_value) {
                 if (opt_global) {

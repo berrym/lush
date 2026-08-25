@@ -39,12 +39,15 @@
 
 #include "builtins.h"
 
+#include "arithmetic.h"
 #include "config.h"
 #include "dirstack.h"
 #include "executor.h"
 #include "ht.h"
 #include "identifier.h"
 #include "shell_mode.h"
+#include "subscript_key.h"
+#include "symtable.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -298,6 +301,124 @@ int bin_set(int argc, char **argv) {
  * innermost builtin currently executing.
  * ============================================================================
  */
+
+/**
+ * @brief Write a value to an assignable target that addresses an array element.
+ *
+ * An array element address `name[subscript]` is a first-class assignable
+ * target in lush -- `a[2]=v` and `(( a[2]=v ))` both write the element -- but
+ * the builtins that take a target treated the whole string as a scalar NAME.
+ * `printf -v 'a[2]'` and `declare a[2]=v` therefore did nothing at all, with
+ * status 0 and no diagnostic, and `read 'a[2]'` refused the target outright
+ * (#643, #798).
+ *
+ * The subscript is handled exactly as the assignment surfaces handle it, so
+ * the builtins cannot drift from them: an associative key is canonicalized
+ * (one level of quoting removed, then `$`-expanded) so `m[a b]` and `m["a b"]`
+ * name the same key, and an indexed subscript is an arithmetic expression, so
+ * `a[i]` and `a[n+1]` work here as they do in an assignment. The index base
+ * and from-end negatives then come from symtable_set_array_element(), which
+ * every element writer already shares.
+ *
+ * Deciding "is this an element target" in one place matters more than the
+ * dispatch itself: the same question is currently answered inline at eight
+ * other sites (#799), and every array surface that drifted this session --
+ * #629, #640, #793, #795 -- drifted because a rule was restated per site.
+ *
+ * @param target Candidate target, e.g. `a[2]`, `m[key]`, or a plain name.
+ * @param value  Value to write.
+ * @param out_rc Receives the builtin status when the target IS an element.
+ * @return true when @p target addressed an element and the write was attempted
+ *         (check @p out_rc); false when it is not an element address at all,
+ *         leaving the caller to handle it as a plain variable name.
+ */
+/**
+ * @brief Does this target address an array element rather than name a variable?
+ *
+ * Shared so the builtins that validate a target as an identifier agree with
+ * the one that writes it. `declare` and `read` both refused `a[2]` outright
+ * because their identifier predicate saw the whole spelling (#798).
+ */
+bool builtin_is_element_target(const char *target) {
+    if (!target || target[0] == '[') {
+        return false;
+    }
+    size_t len = strlen(target);
+    return len > 0 && target[len - 1] == ']' && strchr(target, '[') != NULL;
+}
+
+bool builtin_assign_element_target(const char *target, const char *value,
+                                   int *out_rc) {
+    if (!target || !value) {
+        return false;
+    }
+
+    /// An element address is `name[...]` with the bracket closing at the very
+    /// end. A name cannot be empty, and anything after the `]` means this is
+    /// not a bare target, so both fall through to the caller's scalar path
+    /// rather than being silently reinterpreted.
+    const char *bracket = strchr(target, '[');
+    if (!bracket || bracket == target) {
+        return false;
+    }
+    size_t len = strlen(target);
+    if (target[len - 1] != ']') {
+        return false;
+    }
+    size_t name_len = (size_t)(bracket - target);
+    size_t sub_len = len - name_len - 2; /// interior, between '[' and ']'
+
+    char *name = strndup(target, name_len);
+    char *subscript = strndup(bracket + 1, sub_len);
+    if (!name || !subscript) {
+        free(name);
+        free(subscript);
+        return false;
+    }
+
+    /// A name that is not an identifier is not an element target; let the
+    /// caller reject the whole string with its own diagnostic.
+    if (!is_valid_identifier(name)) {
+        free(name);
+        free(subscript);
+        return false;
+    }
+
+    int rc = 0;
+    array_value_t *array = symtable_get_array(name);
+
+    if (array && array->is_associative) {
+        char *key = subscript_normalize_key(current_executor, subscript,
+                                            strlen(subscript));
+        rc = symtable_set_array_element(name, key ? key : subscript, value) ? 1
+                                                                            : 0;
+        free(key);
+    } else {
+        /// Indexed: the subscript is an arithmetic expression, as it is on
+        /// every other element surface. A failure is reported rather than
+        /// quietly becoming index 0 (#647, #710).
+        arithm_clear_error();
+        char *evaluated =
+            arithm_expand_with_executor(current_executor, subscript);
+        if (!evaluated || arithm_error_is_flagged()) {
+            free(evaluated);
+            executor_report_arith_failure(current_executor,
+                                          builtin_get_source_location(),
+                                          "evaluating an array subscript");
+            rc = 1;
+        } else {
+            rc = symtable_set_array_element(name, evaluated, value) ? 1 : 0;
+            free(evaluated);
+        }
+    }
+
+    free(name);
+    free(subscript);
+    if (out_rc) {
+        *out_rc = rc;
+    }
+    return true;
+}
 
 static source_location_t s_builtin_call_loc = SOURCE_LOC_UNKNOWN;
 

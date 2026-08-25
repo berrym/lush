@@ -77,6 +77,18 @@ static bool read_is_ifs_white(char c, const char *ifs) {
     return (c == ' ' || c == '\t' || c == '\n') && strchr(ifs, c) != NULL;
 }
 
+/// Assign one field to a `read` target, which may be a plain name or an array
+/// element address. `read` refused `a[2]` as an invalid identifier while
+/// `a[2]=v` beside it wrote the element (#798); routing every write through
+/// one place keeps the five assignment sites in this builtin from disagreeing
+/// with each other as well as with the assignment surfaces.
+static void read_assign_target(const char *target, const char *value) {
+    int elem_rc = 0;
+    if (!builtin_assign_element_target(target, value, &elem_rc)) {
+        symtable_set_global(target, value);
+    }
+}
+
 int bin_read(int argc, char **argv) {
     /// Option flags
     char *prompt = NULL;
@@ -242,7 +254,8 @@ int bin_read(int argc, char **argv) {
     if (n_varnames > 0) {
         varname = argv[opt_index]; /* first name; kept for the
                                     * single-var fast paths below */
-        if (!is_valid_identifier(varname)) {
+        if (!builtin_is_element_target(varname) &&
+            !is_valid_identifier(varname)) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                                   builtin_get_source_location(),
                                   "'%s' not a valid identifier", varname);
@@ -250,7 +263,8 @@ int bin_read(int argc, char **argv) {
         }
     }
     for (int i = 1; i < n_varnames; i++) {
-        if (!is_valid_identifier(argv[opt_index + i])) {
+        if (!builtin_is_element_target(argv[opt_index + i]) &&
+            !is_valid_identifier(argv[opt_index + i])) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                                   builtin_get_source_location(),
                                   "'%s' not a valid identifier",
@@ -313,7 +327,7 @@ int bin_read(int argc, char **argv) {
             if (termios_modified) {
                 tcsetattr(fd, TCSANOW, &orig_termios);
             }
-            symtable_set_global(varname, "");
+            read_assign_target(varname, "");
             return (select_result == 0) ? 142 : 1; /// 142 = timeout exit code
         }
     }
@@ -397,7 +411,7 @@ int bin_read(int argc, char **argv) {
 
     if (!line) {
         /// EOF or input error
-        symtable_set_global(varname, "");
+        read_assign_target(varname, "");
         return result ? result : 1;
     }
 
@@ -549,7 +563,7 @@ int bin_read(int argc, char **argv) {
         }
         memcpy(val, src, vlen);
         val[vlen] = '\0';
-        symtable_set_global(varname, val);
+        read_assign_target(varname, val);
         free(val);
         free(ifs_val);
     } else {
@@ -588,7 +602,7 @@ int bin_read(int argc, char **argv) {
             }
             memcpy(field, field_start, flen);
             field[flen] = '\0';
-            symtable_set_global(argv[opt_index + i], field);
+            read_assign_target(argv[opt_index + i], field);
             free(field);
 
             /// Consume exactly one delimiter: an IFS white-space run, at most
@@ -652,7 +666,7 @@ int bin_read(int argc, char **argv) {
         }
         memcpy(val, src, vlen);
         val[vlen] = '\0';
-        symtable_set_global(argv[opt_index + n_varnames - 1], val);
+        read_assign_target(argv[opt_index + n_varnames - 1], val);
         free(val);
         free(ifs_val);
     }
