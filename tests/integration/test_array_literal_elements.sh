@@ -52,6 +52,23 @@ check() {
     fi
 }
 
+## Assert the diagnostic reaches stderr, not merely that nothing was written:
+## a silent no-op and a diagnosed refusal both leave the array untouched.
+## $1 label, $2 mode flag, $3 script, $4 substring required in stderr
+check_err() {
+    checks=$((checks + 1))
+    # shellcheck disable=SC2086
+    got=$("$LUSH" $2 -c "$3" 2>&1 >/dev/null) || true
+    case "$got" in
+    *"$4"*) printf '  OK   %s\n' "$1" ;;
+    *)
+        printf '  FAIL %s\n     stderr lacked [%s]\n     got      [%s]\n' \
+            "$1" "$4" "$got"
+        failures=$((failures + 1))
+        ;;
+    esac
+}
+
 printf '== the positional counter resumes PAST an explicit index (#640) ==\n'
 ## Values alone are not enough here: the keys are asserted too, because a
 ## dropped element and a shifted one can print the same joined string.
@@ -100,6 +117,60 @@ check 'bash mode stays 0-based'  '--bash' \
     'a=(z [1]=y w); printf "%s" "${a[*]}"' 'z y w'
 ## posix mode is deliberately absent from this group: it provides no array
 ## literal at all, matching dash, so there is no origin for it to state.
+
+printf '== a negative element counts from the END, like every other surface (#795) ==\n'
+## It used to fall through to the positional counter, so [-1] wrote wherever
+## the counter happened to point. The append path made that visible: its
+## counter starts unseeded at -1, which the primitive then resolved from the
+## end -- so the SAME spelling gave two answers depending on whether a bare
+## element came first.
+check 'a+=([-1]=v) writes the last'   '' \
+    'a=(10 20 30); a+=([-1]=v); printf "%s" "${a[*]}"' '10 20 v'
+check 'a+=(x [-1]=v) writes the last' '' \
+    'a=(10 20 30); a+=(x [-1]=v); printf "%s" "${a[*]}"' '10 20 30 v'
+## In a literal the end is wherever the literal has reached so far.
+check 'a=(p q [-1]=v) from the end'   '' \
+    'a=(p q [-1]=v); printf "%s" "${a[*]}"' 'p v'
+check 'a=(p q r [-2]=v)'              '' \
+    'a=(p q r [-2]=v); printf "%s" "${a[*]}"' 'p v r'
+## The counter resumes past the RESOLVED index, not past the negative.
+check 'a=(p q [-1]=v w) resumes'      '' \
+    'a=(p q [-1]=v w); printf "%s|%s" "${a[*]}" "${!a[*]}"' 'p v w|0 1 2'
+## A negative with nothing yet to count back from is out of range, and is
+## diagnosed rather than silently written somewhere. The element write surface
+## already answered this condition the same way.
+check_err 'a=([-1]=v) out of range'   '' 'a=([-1]=v)' 'out of range'
+check_err 'a=([-1]=v) names the array' '' 'a=([-1]=v)' "for 'a'"
+check 'a=([-1]=v) binds nothing'      '' \
+    'a=([-1]=v); printf "[%s]" "${a[*]}"' '[]'
+check_err 'a=(p [-9]=v) past the start' '' 'a=(p [-9]=v)' 'out of range'
+## bash mode shares the engine rule.
+check 'bash mode negative from the end' '--bash' \
+    'a=(p q [-1]=v); printf "%s" "${a[*]}"' 'p v'
+check 'bash mode append from the end'   '--bash' \
+    'a=(10 20 30); a+=(x [-1]=v); printf "%s" "${a[*]}"' '10 20 30 v'
+
+printf '== zsh mode refuses a negative HERE, and only here (oracle fidelity) ==\n'
+## This is deliberately NOT the engine rule. zsh accepts `a[-1]=v` on its
+## element surface and refuses `a=([-1]=v)` in a literal, so a script written
+## for zsh sees that split. A compatibility mode reproduces its target rather
+## than correcting it; engine cohesion is lush mode's job.
+check 'zsh mode refuses a literal negative' '--zsh' \
+    'a=(10 20 30); a=(p q [-1]=v); printf "%s" "${a[*]}"' '10 20 30'
+check_err 'zsh mode diagnoses it'          '--zsh' \
+    'a=(p q [-1]=v)' 'must be positive'
+check 'zsh mode refuses it on append too'  '--zsh' \
+    'a=(10 20 30); a+=([-1]=v); printf "%s" "${a[*]}"' '10 20 30'
+## The other half of the split: the ELEMENT surface still takes a negative in
+## zsh mode, exactly as zsh does (#629). If this ever starts failing, the gate
+## above has leaked out of the literal surface.
+check 'zsh mode element negative still works' '--zsh' \
+    'a=(p q r); a[-1]=v; printf "%s" "${a[*]}"' 'p q v'
+check 'zsh mode arith negative still works'   '--zsh' \
+    'a=(10 20 30); printf "%s" "$(( a[-1] ))"' '30'
+## ...and zsh-mode POSITIVES in a literal stay 1-based (#793).
+check 'zsh mode positive still 1-based' '--zsh' \
+    'a=(z [1]=y w); printf "%s" "${a[*]}"' 'y w'
 
 printf '== controls: the surrounding behavior is unchanged ==\n'
 check 'plain literal'        '' 'a=(p q r); printf "%s" "${a[*]}"' 'p q r'

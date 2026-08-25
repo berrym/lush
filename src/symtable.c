@@ -2872,6 +2872,40 @@ static int array_ensure_capacity(array_value_t *array) {
 }
 
 /**
+ * @brief Resolve a possibly-negative subscript against an array's extent.
+ *
+ * A negative counts from the END: resolved = max_index + 1 + index, written as
+ * max_index + (index + 1) so the `+ 1` cannot overflow when max_index is
+ * INT64_MAX (index is negative there, so index + 1 <= 0). An empty array has
+ * no end to count back from, and a negative reaching past the start is out of
+ * range; both answer -1.
+ *
+ * A non-negative index is returned unchanged, so a caller can route through
+ * this unconditionally rather than branching on the sign first.
+ *
+ * One implementation because the formula had been written out at three call
+ * sites -- set, get and unset -- and the array-literal element form was about
+ * to become a fourth (#795). A rule spelled out per site is a rule that drifts
+ * per site, which is what #629 had just finished repairing on the surfaces
+ * above this one.
+ *
+ * @param array Source array (indexed; an associative array has no extent).
+ * @param index Subscript, possibly negative.
+ * @return Resolved 0-based index, or -1 when out of range.
+ */
+int64_t symtable_array_resolve_index(const array_value_t *array,
+                                     int64_t index) {
+    if (!array || index >= 0) {
+        return index >= 0 ? index : -1;
+    }
+    if (array->count == 0) {
+        return -1; /// No elements to count back from
+    }
+    int64_t resolved = array->max_index + (index + 1);
+    return resolved < 0 ? -1 : resolved; /// Still negative = out of bounds
+}
+
+/**
  * @brief Set an element in an indexed array
  *
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
@@ -2887,17 +2921,9 @@ int symtable_array_set_index(array_value_t *array, int64_t index,
     /// (never truncated to int, issue #618), and a positive index up to
     /// INT64_MAX is a native key, not an over-allocation (the store is sparse).
     /// The only rejection is a from-end negative that resolves below 0.
+    index = symtable_array_resolve_index(array, index);
     if (index < 0) {
-        if (array->count == 0) {
-            return -1; /// No elements to count back from
-        }
-        /// resolved = max_index + 1 + index, computed as max_index + (index +
-        /// 1) so the `+ 1` does not overflow when max_index == INT64_MAX (index
-        /// is negative, so index + 1 <= 0 and cannot overflow either).
-        index = array->max_index + (index + 1);
-        if (index < 0) {
-            return -1; /// Still negative = out of bounds
-        }
+        return -1;
     }
 
     bool found;
@@ -2942,16 +2968,10 @@ const char *symtable_array_get_index(array_value_t *array, int64_t index) {
         return NULL;
     }
 
-    /// Handle negative indices (Bash-style: -1 = last element) in 64-bit,
-    /// matching the set path (issue #618); overflow-safe at INT64_MAX.
+    /// Negative = from the end, resolved by the shared helper (#618, #795).
+    index = symtable_array_resolve_index(array, index);
     if (index < 0) {
-        if (array->count == 0) {
-            return NULL;
-        }
-        index = array->max_index + (index + 1);
-        if (index < 0) {
-            return NULL; /// Still negative = out of bounds
-        }
+        return NULL;
     }
 
     bool found;
@@ -3077,16 +3097,10 @@ int symtable_array_unset_index(array_value_t *array, int64_t index) {
         return -1;
     }
 
-    /// Handle negative indices (Bash-style: -1 = last element) in 64-bit,
-    /// matching the set/get paths (issue #618); overflow-safe at INT64_MAX.
+    /// Negative = from the end, resolved by the shared helper (#618, #795).
+    index = symtable_array_resolve_index(array, index);
     if (index < 0) {
-        if (array->count == 0) {
-            return -1;
-        }
-        index = array->max_index + (index + 1);
-        if (index < 0) {
-            return -1; /// Still negative = out of bounds
-        }
+        return -1;
     }
 
     bool found;
