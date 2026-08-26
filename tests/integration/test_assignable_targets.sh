@@ -44,6 +44,23 @@ check() {
     fi
 }
 
+## Assert the diagnostic reaches stderr, not merely that nothing was written:
+## a silent no-op and a diagnosed refusal both leave the array untouched.
+## $1 label, $2 mode flag, $3 script, $4 substring required in stderr
+check_err() {
+    checks=$((checks + 1))
+    # shellcheck disable=SC2086
+    got=$("$LUSH" $2 -c "$3" 2>&1 >/dev/null) || true
+    case "$got" in
+    *"$4"*) printf '  OK   %s\n' "$1" ;;
+    *)
+        printf '  FAIL %s\n     stderr lacked [%s]\n     got      [%s]\n' \
+            "$1" "$4" "$got"
+        failures=$((failures + 1))
+        ;;
+    esac
+}
+
 printf '== the anchor: surfaces that already accepted an element address ==\n'
 check 'a[2]=v'         '' 'a=(x y z); a[2]=NEW; printf "%s" "${a[*]}"' 'x y NEW'
 check '(( a[2]=v ))'   '' 'a=(x y z); (( a[2] = 7 )); printf "%s" "${a[*]}"' 'x y 7'
@@ -116,6 +133,52 @@ check 'declare 1bad refused' '' \
     'declare "1bad=x" 2>/dev/null; printf "%s" "$?"' '1'
 check 'read 1bad refused'    '' \
     'read 1bad <<< x 2>/dev/null; printf "%s" "$?"' '1'
+
+printf '== a subscript span must TERMINATE the target (#801) ==\n'
+## `unset` found the subscript with strrchr -- the last `]` anywhere in the
+## string -- and never checked it ended the target, so everything after it was
+## ignored and a malformed address silently destroyed a real element with
+## status 0. The span now comes from scan_subscript_bounds() and must end the
+## target, so these fall through to the plain-name path and remove nothing.
+check 'unset a[0]junk removes nothing' '' \
+    'a=(p q r); unset "a[0]junk" 2>/dev/null; printf "%s" "${a[*]}"' 'p q r'
+check 'unset a[0]=x removes nothing'   '' \
+    'a=(p q r); unset "a[0]=x" 2>/dev/null; printf "%s" "${a[*]}"' 'p q r'
+check 'unset "a[0] " removes nothing'  '' \
+    'a=(p q r); unset "a[0] " 2>/dev/null; printf "%s" "${a[*]}"' 'p q r'
+## Not removing it is only half the answer. A malformed address is a
+## structural mistake, and falling through to the plain-name path would report
+## success for a name that cannot exist -- a silent wrong answer in place of a
+## destructive one. lush says what is wrong and fails.
+check_err 'malformed target diagnosed'  '' \
+    'a=(p q r); unset "a[0]junk"' 'invalid array element target'
+check_err 'the diagnostic names the target' '' \
+    'a=(p q r); unset "a[0]junk"' 'a[0]junk'
+check 'malformed target fails'          '' \
+    'a=(p q r); unset "a[0]junk" 2>/dev/null; printf "%s" "$?"' '1'
+check 'zsh mode diagnoses too'    '--zsh' \
+    'a=(p q r); unset "a[0]junk" 2>/dev/null; printf "%s" "$?"' '1'
+## bash mode keeps bash's silent success: a script written against that
+## behavior is who the mode is for, and its own oracle decides there.
+check 'bash mode stays silent'   '--bash' \
+    'a=(p q r); unset "a[0]junk" 2>/dev/null; printf "%s|%s" "$?" "${a[*]}"' '0|p q r'
+## The legitimate forms must be untouched by that tightening -- including the
+## ones the naive scan happened to get right.
+check 'unset a[0] still works'    '' \
+    'a=(p q r); unset "a[0]"; printf "%s" "${a[*]}"' 'q r'
+check 'unset a[-1] from the end'  '' \
+    'a=(p q r); unset "a[-1]"; printf "%s" "${a[*]}"' 'p q'
+check 'unset a[1+1] arithmetic'   '' \
+    'a=(p q r); unset "a[1+1]"; printf "%s" "${a[*]}"' 'p q'
+## A nested subscript closes at the OUTER bracket: a depth-counted scan, not
+## the first `]`.
+check 'unset a[b[0]] nested'      '' \
+    'a=(p q r); b=(2); unset "a[b[0]]"; printf "%s" "${a[*]}"' 'p q'
+## An associative key keeps its spaces, and a plain name still unsets.
+check 'unset m[a b] spaced key'   '' \
+    'declare -A m; m["a b"]=1; m[j]=2; unset "m[a b]"; printf "%s" "${!m[*]}"' 'j'
+check 'unset a plain name'        '' \
+    's=7; unset s; printf "[%s]" "$s"' '[]'
 
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1
