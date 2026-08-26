@@ -7,6 +7,7 @@
  */
 
 #include "arithmetic.h"
+#include "brace_match.h"
 #include "builtins.h"
 #include "shell_mode.h"
 #include "symtable.h"
@@ -48,10 +49,56 @@ int bin_unset(int argc, char **argv) {
         /// "arr[N]" (issue #101). Detect a `[` in the name; if
         /// followed by a matching `]`, route through the array
         /// element-unset API.
+        /// Where the subscript ends is decided by scan_subscript_bounds(), the
+        /// canonical span finder: quote- and escape-aware, depth-counted for
+        /// nested `[...]`, and skipping `$(...)`, `${...}` and `$((...))`.
+        ///
+        /// This used to be a hand-rolled strrchr for the LAST `]` in the
+        /// string, which is not a subscript scan but a guess. Two consequences,
+        /// both live: a key containing `]` was re-cut at the wrong place, and
+        /// -- because nothing checked that the `]` ENDED the target -- anything
+        /// after it was ignored, so a malformed address destroyed a real
+        /// element. `unset "a[0]junk"`, `unset "a[0]=x"` and `unset "a[0] "`
+        /// each deleted element 0 silently. Requiring the span to terminate the
+        /// target is what makes those refusals rather than deletions (#799).
         const char *bracket = strchr(var_name, '[');
+        subscript_span_t span = {0};
+        bool element_target = false;
         if (bracket && bracket > var_name) {
-            const char *close = strrchr(bracket, ']');
-            if (close && close > bracket + 1) {
+            span = scan_subscript_bounds(bracket, strlen(bracket));
+            /// A well-formed address is a matched span with a non-empty
+            /// interior that ENDS the target. `a[0]junk` satisfies none of
+            /// the last part and is not an address at all.
+            element_target = span.is_valid && span.close > 1 &&
+                             bracket[span.close + 1] == '\0';
+
+            if (!element_target) {
+                /// A malformed address is a structural mistake, and letting it
+                /// fall through to the plain-name path hides it as an ordinary
+                /// miss: `unset "a[0]junk"` would report success for a name
+                /// that cannot exist, having named an array the caller clearly
+                /// meant to modify. lush says what is wrong.
+                ///
+                /// bash mode keeps bash's silent success -- a script written
+                /// against that behavior is who the mode is for, and its own
+                /// oracle is the authority there, not lush's preference
+                /// (#795). zsh diagnoses this, dash rejects any bracketed
+                /// name, and lush mode diagnoses on its own terms.
+                if (shell_mode_get() != SHELL_MODE_BASH) {
+                    executor_error_report_with_help(
+                        current_executor, SHELL_ERR_INVALID_SUBSCRIPT,
+                        builtin_get_source_location(),
+                        "an array element address is name[subscript] with "
+                        "nothing after the closing bracket",
+                        "%s: invalid array element target", var_name);
+                    rc = 1;
+                    continue;
+                }
+            }
+        }
+        if (element_target) {
+            const char *close = bracket + span.close;
+            {
                 size_t name_len = (size_t)(bracket - var_name);
                 size_t sub_len = (size_t)(close - bracket - 1);
                 char sub_buf[256];
