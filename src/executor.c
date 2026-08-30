@@ -14800,8 +14800,20 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(arr_name, var_name, name_len);
             arr_name[name_len] = '\0';
 
-            /// Get subscript
-            const char *close = strchr(bracket, ']');
+            /// Where the subscript ends is decided by scan_subscript_bounds(),
+            /// the canonical span finder: quote-aware, escape-aware,
+            /// depth-counting nested `[...]`, and skipping `$(...)`, `${...}`
+            /// and `$((...))`.
+            ///
+            /// This was `strchr(bracket, ']')` -- the FIRST `]` -- so a nested
+            /// subscript was cut short and the fragment reached the arithmetic
+            /// evaluator: `${#a[b[0]]}` truncated to `b[0` and failed with
+            /// "unmatched '['", while `${a[b[0]]}` beside it resolved the same
+            /// reference correctly. lush disagreeing with itself about what a
+            /// reference means, by surface (#799).
+            subscript_span_t span =
+                scan_subscript_bounds(bracket, strlen(bracket));
+            const char *close = span.is_valid ? bracket + span.close : NULL;
             if (close) {
                 size_t sub_len = close - bracket - 1;
                 char *subscript = malloc(sub_len + 1);

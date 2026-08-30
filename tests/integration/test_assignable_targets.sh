@@ -180,5 +180,25 @@ check 'unset m[a b] spaced key'   '' \
 check 'unset a plain name'        '' \
     's=7; unset s; printf "[%s]" "$s"' '[]'
 
+printf '== every surface measures a subscript the same way (#799) ==\n'
+## The length path found its closing bracket with strchr -- the FIRST `]` --
+## so a nested subscript was cut short and the fragment reached the arithmetic
+## evaluator. The read path resolved the same reference correctly, so lush
+## disagreed with itself about what a reference MEANS depending on the surface.
+check 'read resolves a nested subscript'   '' \
+    'a=(xx yyy zzzz); b=(2); printf "%s" "${a[b[0]]}"' 'zzzz'
+check 'length resolves it identically'     '' \
+    'a=(xx yyy zzzz); b=(2); printf "%s" "${#a[b[0]]}"' '4'
+check 'unset resolves it identically'      '' \
+    'a=(xx yyy zzzz); b=(2); unset "a[b[0]]"; printf "%s" "${a[*]}"' 'xx yyy'
+## The ordinary length forms must survive that change.
+check 'length of an element'    '' 'a=(xx yyy); printf "%s" "${#a[1]}"' '3'
+check 'length of the array'     '' 'a=(xx yyy); printf "%s" "${#a[@]}"' '2'
+check 'length from the end'     '' 'a=(xx yyy); printf "%s" "${#a[-1]}"' '3'
+check 'length of a map value'   '' \
+    'declare -A m; m[k]=hello; printf "%s" "${#m[k]}"' '5'
+check 'length of a spaced key'  '' \
+    'declare -A m; m["a b"]=hello; printf "%s" "${#m[a b]}"' '5'
+
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1
