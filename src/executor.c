@@ -13679,17 +13679,80 @@ static char *parse_parameter_expansion(executor_t *executor,
                 return strdup(found ? "1" : "0");
             }
         }
-        /// Plain ${+NAME}: ignore any trailing [subscript] for now and
-        /// probe the symbol table for the base name.
+        /// `${+NAME}` answers whether the reference is set. With a subscript
+        /// the reference is an ELEMENT, so that is what gets probed.
+        ///
+        /// This used to discard the subscript and report the base name's
+        /// boundness, so `${+a[9]}` answered 1 for an element that does not
+        /// exist and could not be told apart from `${+a[0]}` -- a plausible
+        /// answer rather than a wrong-looking one, which is the failure mode
+        /// this project treats as most dangerous. `${+...}` is a zsh
+        /// construct (bash: "bad substitution"; dash: a syntax error), and
+        /// zsh answers 0 for a missing element and for a missing map key, so
+        /// that is the reference for what the form MEANS (#799).
+        ///
+        /// The span comes from the canonical scanner, so a nested subscript
+        /// is measured the way every other surface measures it.
         const char *bracket = strchr(name, '[');
+        subscript_span_t plus_span = {0};
+        if (bracket && bracket > name) {
+            plus_span = scan_subscript_bounds(bracket, strlen(bracket));
+        }
+        bool addresses_element = plus_span.is_valid && plus_span.close > 1 &&
+                                 bracket[plus_span.close + 1] == '\0';
+
         char *probe_name =
             bracket ? strndup(name, (size_t)(bracket - name)) : strdup(name);
         bool bound = false;
         if (probe_name && *probe_name) {
-            lush_value_view_t view;
-            bound = symtable_lookup(probe_name, &view);
-            if (bound) {
-                lush_value_view_clear(&view);
+            if (addresses_element) {
+                /// An element reference is set when the element itself is,
+                /// not when its container is.
+                array_value_t *array = symtable_get_array(probe_name);
+                if (array) {
+                    char *subscript =
+                        strndup(bracket + 1, (size_t)(plus_span.close - 1));
+                    if (subscript) {
+                        if (array->is_associative) {
+                            char *key = subscript_normalize_key(
+                                executor, subscript, strlen(subscript));
+                            bound = symtable_array_get_assoc(
+                                        array, key ? key : subscript) != NULL;
+                            free(key);
+                        } else {
+                            /// The subscript is an arithmetic expression, as
+                            /// on every other element surface; a malformed one
+                            /// addresses nothing rather than probing index 0.
+                            arithm_clear_error();
+                            char *idx = arithm_expand_with_executor(executor,
+                                                                    subscript);
+                            if (idx && !arithm_error_is_flagged()) {
+                                long long i = strtoll(idx, NULL, 10);
+                                /// zsh mode is 1-based here too, and index 0
+                                /// addresses nothing there (#629, #793).
+                                bool ok = true;
+                                if (!shell_mode_allows(
+                                        FEATURE_ARRAY_ZERO_INDEXED)) {
+                                    if (i == 0) {
+                                        ok = false;
+                                    } else if (i > 0) {
+                                        i--;
+                                    }
+                                }
+                                bound = ok && symtable_array_get_index(
+                                                  array, i) != NULL;
+                            }
+                            free(idx);
+                        }
+                        free(subscript);
+                    }
+                }
+            } else {
+                lush_value_view_t view;
+                bound = symtable_lookup(probe_name, &view);
+                if (bound) {
+                    lush_value_view_clear(&view);
+                }
             }
         }
         free(probe_name);

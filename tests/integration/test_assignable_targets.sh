@@ -200,5 +200,29 @@ check 'length of a map value'   '' \
 check 'length of a spaced key'  '' \
     'declare -A m; m["a b"]=hello; printf "%s" "${#m[a b]}"' '5'
 
+printf '== ${+ref} answers about the REFERENCE, not its container (#799) ==\n'
+## This discarded the subscript and reported the base name's boundness, so
+## ${+a[9]} answered 1 for an element that does not exist -- indistinguishable
+## from ${+a[0]}. `${+...}` is a zsh construct (bash calls it a bad
+## substitution, dash a syntax error), and zsh answers 0 for a missing element,
+## so zsh is the reference for what the form means.
+check '${+a[0]} present'      '' 'a=(p q r); printf "%s" "${+a[0]}"' '1'
+check '${+a[2]} present'      '' 'a=(p q r); printf "%s" "${+a[2]}"' '1'
+check '${+a[3]} absent'       '' 'a=(p q r); printf "%s" "${+a[3]}"' '0'
+check '${+a[9]} absent'       '' 'a=(p q r); printf "%s" "${+a[9]}"' '0'
+## The index base is the mode's here as everywhere: zsh mode is 1-based, and
+## index 0 addresses nothing there.
+check 'zsh mode ${+a[1]} present' '--zsh' 'a=(p q r); printf "%s" "${+a[1]}"' '1'
+check 'zsh mode ${+a[3]} present' '--zsh' 'a=(p q r); printf "%s" "${+a[3]}"' '1'
+check 'zsh mode ${+a[0]} absent'  '--zsh' 'a=(p q r); printf "%s" "${+a[0]}"' '0'
+check 'zsh mode ${+a[9]} absent'  '--zsh' 'a=(p q r); printf "%s" "${+a[9]}"' '0'
+## A map key is probed as a key.
+check '${+m[k]} present'   '' 'declare -A m; m[k]=v; printf "%s" "${+m[k]}"' '1'
+check '${+m[nope]} absent' '' 'declare -A m; m[k]=v; printf "%s" "${+m[nope]}"' '0'
+## A reference with no subscript still asks about the NAME.
+check '${+a} bare name'    '' 'a=(p q r); printf "%s" "${+a}"' '1'
+check '${+unset name}'     '' 'printf "%s" "${+nope}"' '0'
+check '${+s} scalar'       '' 's=x; printf "%s" "${+s}"' '1'
+
 printf '\n%d checks, %d failures\n' "$checks" "$failures"
 [ "$failures" -eq 0 ] || exit 1
