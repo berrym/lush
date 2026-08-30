@@ -13550,6 +13550,32 @@ static int cmp_str_desc(const void *a, const void *b) {
 /// and each mode's length then follows its own slice automatically.
 ///
 /// @return owned slice string, or NULL only on allocation failure.
+/// Extract the base NAME from a possibly-subscripted reference.
+///
+/// `arr[@]` -> `arr`, `m[a b]` -> `m`, `plain` -> `plain`. A variable name
+/// cannot contain `[`, so the first one ends the name unambiguously -- this is
+/// the OPENING bracket, not the closing one, and needs no span scan. Where the
+/// subscript ENDS is the ambiguous question, and that belongs to
+/// scan_subscript_bounds().
+///
+/// The same four lines were written out at five sites in three different
+/// spellings -- two `strndup` conditionals and two `malloc`/`strncpy` pairs --
+/// each re-deciding what part of a reference is the name (#799).
+///
+/// Callers keep their own out-of-memory response, which genuinely differs by
+/// site (one yields "", another "0"), so this reports failure rather than
+/// choosing for them.
+///
+/// @param ref Reference text, subscripted or not.
+/// @return Owned base name, or NULL on allocation failure.
+static char *reference_base_name(const char *ref) {
+    if (!ref) {
+        return NULL;
+    }
+    const char *bracket = strchr(ref, '[');
+    return bracket ? strndup(ref, (size_t)(bracket - ref)) : strdup(ref);
+}
+
 /// Evaluate one bound of a scalar slice subscript as an arithmetic
 /// expression. Returns false when the expression is malformed, leaving *out
 /// untouched; the caller reports. An empty expression is 0, as `$(( ))` is,
@@ -13701,8 +13727,7 @@ static char *parse_parameter_expansion(executor_t *executor,
         bool addresses_element = plus_span.is_valid && plus_span.close > 1 &&
                                  bracket[plus_span.close + 1] == '\0';
 
-        char *probe_name =
-            bracket ? strndup(name, (size_t)(bracket - name)) : strdup(name);
+        char *probe_name = reference_base_name(name);
         bool bound = false;
         if (probe_name && *probe_name) {
             if (addresses_element) {
@@ -13793,13 +13818,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 /// symtable_array_get_values() iterate the same source data
                 /// (hashtable for assoc, indices array for indexed) in the
                 /// same order, so keys[i] pairs with values[i].
-                char *arr_name = NULL;
-                const char *bracket = strchr(rest, '[');
-                if (bracket) {
-                    arr_name = strndup(rest, bracket - rest);
-                } else {
-                    arr_name = strdup(rest);
-                }
+                char *arr_name = reference_base_name(rest);
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
@@ -13897,13 +13916,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             } else if (want_keys) {
                 /// Handle (k) flag: return array keys instead of values
                 /// Parse array name from rest (e.g., "arr[@]" -> "arr")
-                char *arr_name = NULL;
-                const char *bracket = strchr(rest, '[');
-                if (bracket) {
-                    arr_name = strndup(rest, bracket - rest);
-                } else {
-                    arr_name = strdup(rest);
-                }
+                char *arr_name = reference_base_name(rest);
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
@@ -14716,13 +14729,10 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// Check for ${!arr[@]} or ${!arr[*]} - array keys
         const char *bracket = strchr(var_name, '[');
         if (bracket) {
-            size_t arr_name_len = bracket - var_name;
-            char *arr_name = malloc(arr_name_len + 1);
+            char *arr_name = reference_base_name(var_name);
             if (!arr_name) {
                 return strdup("");
             }
-            strncpy(arr_name, var_name, arr_name_len);
-            arr_name[arr_name_len] = '\0';
 
             array_value_t *array = symtable_get_array(arr_name);
 
@@ -14855,13 +14865,10 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// Check for array subscript
         const char *bracket = strchr(var_name, '[');
         if (bracket) {
-            size_t name_len = bracket - var_name;
-            char *arr_name = malloc(name_len + 1);
+            char *arr_name = reference_base_name(var_name);
             if (!arr_name) {
                 return strdup("0");
             }
-            strncpy(arr_name, var_name, name_len);
-            arr_name[name_len] = '\0';
 
             /// Where the subscript ends is decided by scan_subscript_bounds(),
             /// the canonical span finder: quote-aware, escape-aware,
